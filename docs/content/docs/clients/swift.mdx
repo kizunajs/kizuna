@@ -82,7 +82,7 @@ try await client.sendNotification(
 
 ## Use it in a screen
 
-A schema wrapped in [`Kizuna.model`](/docs/reference/kizuna-model) generates a named struct, so a view can name it in its signature and every route that returns a user hands back the same type:
+A schema wrapped in [`Kizuna.model`](/docs/reference/kizuna-model) generates a named type, so a view can name it in its signature and every route that returns a user hands back the same `API.User`:
 
 ```swift title="UserRow.swift"
 import SwiftUI

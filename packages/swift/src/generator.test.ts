@@ -749,6 +749,80 @@ describe('Swift generator: owned type nesting', () => {
         expect(output).not.toContain('public enum VideoStatus');
     });
 
+    it('emits a named enum model once and shares it between parents', () => {
+        const BaseUnitSchema = Kizuna.model({
+            title: 'BaseUnit',
+            schema: z.enum(['g', 'ml']),
+        });
+        const contractRoutes = k.routes('api', {
+            getFood: {
+                method: 'GET',
+                path: '/foods/:id',
+                responses: {
+                    200: Kizuna.model({
+                        title: 'Food',
+                        schema: z.object({
+                            id: z.string(),
+                            baseUnit: BaseUnitSchema,
+                        }),
+                    }),
+                },
+            },
+            getFoodEntry: {
+                method: 'GET',
+                path: '/food-entries/:id',
+                responses: {
+                    200: Kizuna.model({
+                        title: 'FoodEntry',
+                        schema: z.object({
+                            id: z.string(),
+                            baseUnit: BaseUnitSchema,
+                        }),
+                    }),
+                },
+            },
+        });
+
+        const contract = k.contract({
+            routes: contractRoutes,
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output.match(/public enum BaseUnit: String, Codable, Sendable/g)).toHaveLength(1);
+        expect(output).not.toContain('FoodBaseUnit');
+        expect(output).not.toContain('FoodEntryBaseUnit');
+        expect(output).toContain('public let baseUnit: BaseUnit');
+    });
+
+    it('keeps a named enum model at top level when its title starts with the parent struct name', () => {
+        const FoodSourceSchema = Kizuna.model({
+            title: 'FoodSource',
+            schema: z.enum(['manual', 'barcode']),
+        });
+        const contractRoutes = k.routes('api', {
+            getFood: {
+                method: 'GET',
+                path: '/foods/:id',
+                responses: {
+                    200: Kizuna.model({
+                        title: 'Food',
+                        schema: z.object({
+                            id: z.string(),
+                            source: FoodSourceSchema,
+                        }),
+                    }),
+                },
+            },
+        });
+
+        const contract = k.contract({
+            routes: contractRoutes,
+        });
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public enum FoodSource: String, Codable, Sendable');
+        expect(output).toContain('public let source: FoodSource');
+        expect(output).not.toContain('public enum Source:');
+    });
+
     it('sanitizes enum values that are not valid Swift identifiers into camelCase case names', () => {
         const contractRoutes = k.routes('api', {
             getFile: {

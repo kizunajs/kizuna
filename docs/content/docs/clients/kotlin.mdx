@@ -106,7 +106,7 @@ val created = client.users.createUser {
 
 ## Use it in a screen
 
-A schema wrapped in [`Kizuna.model`](/docs/reference/kizuna-model) generates a named data class, so a composable can name it in its signature and every route that returns a user hands back the same type:
+A schema wrapped in [`Kizuna.model`](/docs/reference/kizuna-model) generates a named type, so a composable can name it in its signature and every route that returns a user hands back the same `API.User`:
 
 ```kotlin title="UserRow.kt"
 @Composable

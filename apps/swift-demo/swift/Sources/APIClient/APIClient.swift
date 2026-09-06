@@ -269,21 +269,21 @@ public enum API {
         }
     }
 
-    public struct EventRecord: Codable, Sendable, Equatable {
+    public enum EventKind: String, Codable, Sendable {
+        case login = "login"
+        case logout = "logout"
+        case signup = "signup"
+    }
 
-        public enum Kind: String, Codable, Sendable {
-            case login = "login"
-            case logout = "logout"
-            case signup = "signup"
-        }
+    public struct EventRecord: Codable, Sendable, Equatable {
         public let id: String
-        public let kind: Kind
+        public let kind: EventKind
         public let occurredAt: Date
         public let userId: String
 
         public init(
             id: String,
-            kind: Kind,
+            kind: EventKind,
             occurredAt: Date,
             userId: String
         ) {
@@ -1222,12 +1222,6 @@ public final class APIClient: Sendable {
 
     public enum NotificationsListEvents {
 
-        public enum QueryKind: String, Codable, Sendable {
-            case login = "login"
-            case logout = "logout"
-            case signup = "signup"
-        }
-
         public struct Response: Codable, Sendable, Equatable {
             public let events: [API.EventRecord]
             public let echo: ResponseEcho
@@ -1243,7 +1237,7 @@ public final class APIClient: Sendable {
 
         public struct ResponseEcho: Codable, Sendable, Equatable {
             public let since: Date?
-            public let kind: ResponseEchoKind?
+            public let kind: API.EventKind?
             public let ids: [String]?
             public let label: String?
             public let tagIds: [String]?
@@ -1251,7 +1245,7 @@ public final class APIClient: Sendable {
 
             public init(
                 since: Date? = nil,
-                kind: ResponseEchoKind? = nil,
+                kind: API.EventKind? = nil,
                 ids: [String]? = nil,
                 label: String? = nil,
                 tagIds: [String]? = nil,
@@ -1266,22 +1260,16 @@ public final class APIClient: Sendable {
             }
         }
 
-        public enum ResponseEchoKind: String, Codable, Sendable {
-            case login = "login"
-            case logout = "logout"
-            case signup = "signup"
-        }
-
         public struct Query: Sendable {
             public let since: Date?
-            public let kind: QueryKind?
+            public let kind: API.EventKind?
             public let ids: [String]?
             public let label: String?
             public let tagIds: [String]?
 
             public init(
                 since: Date? = nil,
-                kind: QueryKind? = nil,
+                kind: API.EventKind? = nil,
                 ids: [String]? = nil,
                 label: String? = nil,
                 tagIds: [String]? = nil
@@ -1295,7 +1283,7 @@ public final class APIClient: Sendable {
 
             public static func query(
                 since: Date? = nil,
-                kind: QueryKind? = nil,
+                kind: API.EventKind? = nil,
                 ids: [String]? = nil,
                 label: String? = nil,
                 tagIds: [String]? = nil

@@ -1081,6 +1081,76 @@ describe('Kotlin generator: discriminated union', () => {
         expect(output).not.toContain('VideoEncodingStatus');
     });
 
+    it('emits a named enum model once and shares it between parents', () => {
+        const BaseUnitSchema = Kizuna.model({
+            title: 'BaseUnit',
+            schema: z.enum(['g', 'ml']),
+        });
+        const contract = k.contract({
+            routes: {
+                getFood: {
+                    method: 'GET',
+                    path: '/foods/:id',
+                    responses: {
+                        200: Kizuna.model({
+                            title: 'Food',
+                            schema: z.object({
+                                id: z.string(),
+                                baseUnit: BaseUnitSchema,
+                            }),
+                        }),
+                    },
+                },
+                getFoodEntry: {
+                    method: 'GET',
+                    path: '/food-entries/:id',
+                    responses: {
+                        200: Kizuna.model({
+                            title: 'FoodEntry',
+                            schema: z.object({
+                                id: z.string(),
+                                baseUnit: BaseUnitSchema,
+                            }),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output.match(/enum class BaseUnit/g)).toHaveLength(1);
+        expect(output).not.toContain('FoodBaseUnit');
+        expect(output).not.toContain('FoodEntryBaseUnit');
+        expect(output).toContain('val baseUnit: BaseUnit');
+    });
+
+    it('keeps a named enum model at top level when its title starts with the parent class name', () => {
+        const FoodSourceSchema = Kizuna.model({
+            title: 'FoodSource',
+            schema: z.enum(['manual', 'barcode']),
+        });
+        const contract = k.contract({
+            routes: {
+                getFood: {
+                    method: 'GET',
+                    path: '/foods/:id',
+                    responses: {
+                        200: Kizuna.model({
+                            title: 'Food',
+                            schema: z.object({
+                                id: z.string(),
+                                source: FoodSourceSchema,
+                            }),
+                        }),
+                    },
+                },
+            },
+        });
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('enum class FoodSource');
+        expect(output).toContain('val source: FoodSource');
+        expect(output).not.toContain('enum class Source');
+    });
+
     it('emits union members under their model title so direct field references resolve', () => {
         const Video = Kizuna.model({
             title: 'Video',

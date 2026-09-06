@@ -296,50 +296,50 @@ public enum OpenEnumAPI {
         }
     }
 
-    public struct EventRecord: Codable, Sendable, Equatable {
+    public enum EventKind: RawRepresentable, Codable, Sendable, Hashable {
+        case login
+        case logout
+        case signup
+        case unknown(String)
 
-        public enum Kind: RawRepresentable, Codable, Sendable, Hashable {
-            case login
-            case logout
-            case signup
-            case unknown(String)
-
-            public init(rawValue: String) {
-                switch rawValue {
-                case "login": self = .login
-                case "logout": self = .logout
-                case "signup": self = .signup
-                default: self = .unknown(rawValue)
-                }
-            }
-
-            public var rawValue: String {
-                switch self {
-                case .login: return "login"
-                case .logout: return "logout"
-                case .signup: return "signup"
-                case let .unknown(value): return value
-                }
-            }
-
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                self.init(rawValue: try container.decode(String.self))
-            }
-
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                try container.encode(rawValue)
+        public init(rawValue: String) {
+            switch rawValue {
+            case "login": self = .login
+            case "logout": self = .logout
+            case "signup": self = .signup
+            default: self = .unknown(rawValue)
             }
         }
+
+        public var rawValue: String {
+            switch self {
+            case .login: return "login"
+            case .logout: return "logout"
+            case .signup: return "signup"
+            case let .unknown(value): return value
+            }
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            self.init(rawValue: try container.decode(String.self))
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+    }
+
+    public struct EventRecord: Codable, Sendable, Equatable {
         public let id: String
-        public let kind: Kind
+        public let kind: EventKind
         public let occurredAt: Date
         public let userId: String
 
         public init(
             id: String,
-            kind: Kind,
+            kind: EventKind,
             occurredAt: Date,
             userId: String
         ) {
@@ -1309,41 +1309,6 @@ public final class OpenEnumAPIClient: Sendable {
 
     public enum NotificationsListEvents {
 
-        public enum QueryKind: RawRepresentable, Codable, Sendable, Hashable {
-            case login
-            case logout
-            case signup
-            case unknown(String)
-
-            public init(rawValue: String) {
-                switch rawValue {
-                case "login": self = .login
-                case "logout": self = .logout
-                case "signup": self = .signup
-                default: self = .unknown(rawValue)
-                }
-            }
-
-            public var rawValue: String {
-                switch self {
-                case .login: return "login"
-                case .logout: return "logout"
-                case .signup: return "signup"
-                case let .unknown(value): return value
-                }
-            }
-
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                self.init(rawValue: try container.decode(String.self))
-            }
-
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                try container.encode(rawValue)
-            }
-        }
-
         public struct Response: Codable, Sendable, Equatable {
             public let events: [OpenEnumAPI.EventRecord]
             public let echo: ResponseEcho
@@ -1359,7 +1324,7 @@ public final class OpenEnumAPIClient: Sendable {
 
         public struct ResponseEcho: Codable, Sendable, Equatable {
             public let since: Date?
-            public let kind: ResponseEchoKind?
+            public let kind: OpenEnumAPI.EventKind?
             public let ids: [String]?
             public let label: String?
             public let tagIds: [String]?
@@ -1367,7 +1332,7 @@ public final class OpenEnumAPIClient: Sendable {
 
             public init(
                 since: Date? = nil,
-                kind: ResponseEchoKind? = nil,
+                kind: OpenEnumAPI.EventKind? = nil,
                 ids: [String]? = nil,
                 label: String? = nil,
                 tagIds: [String]? = nil,
@@ -1382,51 +1347,16 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public enum ResponseEchoKind: RawRepresentable, Codable, Sendable, Hashable {
-            case login
-            case logout
-            case signup
-            case unknown(String)
-
-            public init(rawValue: String) {
-                switch rawValue {
-                case "login": self = .login
-                case "logout": self = .logout
-                case "signup": self = .signup
-                default: self = .unknown(rawValue)
-                }
-            }
-
-            public var rawValue: String {
-                switch self {
-                case .login: return "login"
-                case .logout: return "logout"
-                case .signup: return "signup"
-                case let .unknown(value): return value
-                }
-            }
-
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                self.init(rawValue: try container.decode(String.self))
-            }
-
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                try container.encode(rawValue)
-            }
-        }
-
         public struct Query: Sendable {
             public let since: Date?
-            public let kind: QueryKind?
+            public let kind: OpenEnumAPI.EventKind?
             public let ids: [String]?
             public let label: String?
             public let tagIds: [String]?
 
             public init(
                 since: Date? = nil,
-                kind: QueryKind? = nil,
+                kind: OpenEnumAPI.EventKind? = nil,
                 ids: [String]? = nil,
                 label: String? = nil,
                 tagIds: [String]? = nil
@@ -1440,7 +1370,7 @@ public final class OpenEnumAPIClient: Sendable {
 
             public static func query(
                 since: Date? = nil,
-                kind: QueryKind? = nil,
+                kind: OpenEnumAPI.EventKind? = nil,
                 ids: [String]? = nil,
                 label: String? = nil,
                 tagIds: [String]? = nil
