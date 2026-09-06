@@ -3,17 +3,17 @@ import XCTest
 
 final class OpenEnumTests: XCTestCase {
     func testDecodesKnownValue() throws {
-        let decoded = try JSONDecoder().decode(OpenEnumAPI.EventRecord.Kind.self, from: Data("\"login\"".utf8))
+        let decoded = try JSONDecoder().decode(OpenEnumAPI.EventKind.self, from: Data("\"login\"".utf8))
         XCTAssertEqual(decoded, .login)
     }
 
     func testFallsBackToUnknownInsteadOfThrowing() throws {
-        let decoded = try JSONDecoder().decode(OpenEnumAPI.EventRecord.Kind.self, from: Data("\"teleport\"".utf8))
+        let decoded = try JSONDecoder().decode(OpenEnumAPI.EventKind.self, from: Data("\"teleport\"".utf8))
         XCTAssertEqual(decoded, .unknown("teleport"))
     }
 
     func testUnknownRawValueRoundTrips() throws {
-        let encoded = try JSONEncoder().encode(OpenEnumAPI.EventRecord.Kind.unknown("teleport"))
+        let encoded = try JSONEncoder().encode(OpenEnumAPI.EventKind.unknown("teleport"))
         XCTAssertEqual(String(decoding: encoded, as: UTF8.self), "\"teleport\"")
     }
 

@@ -106,20 +106,19 @@ object API {
     ) : NotificationEvent
 
     @Serializable
+    enum class EventKind(override val wireValue: String) : KizunaQueryValue {
+        @SerialName("login") LOGIN("login"),
+        @SerialName("logout") LOGOUT("logout"),
+        @SerialName("signup") SIGNUP("signup")
+    }
+
+    @Serializable
     data class EventRecord(
         val id: String,
-        val kind: Kind,
+        val kind: EventKind,
         val occurredAt: Instant,
         val userId: String
-    ) {
-
-        @Serializable
-        enum class Kind(override val wireValue: String) : KizunaQueryValue {
-            @SerialName("login") LOGIN("login"),
-            @SerialName("logout") LOGOUT("logout"),
-            @SerialName("signup") SIGNUP("signup")
-        }
-    }
+    )
 }
 
 class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
@@ -639,13 +638,6 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     object NotificationsListEvents {
 
         @Serializable
-        enum class QueryKind(override val wireValue: String) : KizunaQueryValue {
-            @SerialName("login") LOGIN("login"),
-            @SerialName("logout") LOGOUT("logout"),
-            @SerialName("signup") SIGNUP("signup")
-        }
-
-        @Serializable
         data class Response(
             val events: List<API.EventRecord>,
             val echo: ResponseEcho
@@ -654,23 +646,16 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         @Serializable
         data class ResponseEcho(
             val since: Instant? = null,
-            val kind: ResponseEchoKind? = null,
+            val kind: API.EventKind? = null,
             val ids: List<String>? = null,
             val label: String? = null,
             val tagIds: List<String>? = null,
             val sessionId: String? = null
         )
 
-        @Serializable
-        enum class ResponseEchoKind(override val wireValue: String) : KizunaQueryValue {
-            @SerialName("login") LOGIN("login"),
-            @SerialName("logout") LOGOUT("logout"),
-            @SerialName("signup") SIGNUP("signup")
-        }
-
         data class Query(
             val since: Instant? = null,
-            val kind: QueryKind? = null,
+            val kind: API.EventKind? = null,
             val ids: List<String>? = null,
             val label: String? = null,
             val tagIds: List<String>? = null
@@ -681,7 +666,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         object Scope {
-            fun query(since: Instant? = null, kind: QueryKind? = null, ids: List<String>? = null, label: String? = null, tagIds: List<String>? = null): AfterQuery = AfterQuery(query = Query(since = since, kind = kind, ids = ids, label = label, tagIds = tagIds))
+            fun query(since: Instant? = null, kind: API.EventKind? = null, ids: List<String>? = null, label: String? = null, tagIds: List<String>? = null): AfterQuery = AfterQuery(query = Query(since = since, kind = kind, ids = ids, label = label, tagIds = tagIds))
         }
 
         class AfterQuery internal constructor(override val query: Query?) : Args

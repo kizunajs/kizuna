@@ -1,6 +1,6 @@
 ---
 title: Kizuna.model
-description: Give a Zod schema a name so OpenAPI and Swift generators produce named types instead of inline definitions.
+description: Give a Zod schema a name so the OpenAPI, Swift and Kotlin generators produce named types instead of inline definitions.
 ---
 
 Give a Zod schema a name, so OpenAPI and the Swift and Kotlin generators emit a named type for it.
@@ -49,8 +49,8 @@ export const UserSchema = Kizuna.model({
 With `Kizuna.model`:
 
 - **OpenAPI**: the schema is extracted into `components.schemas.User` and every usage becomes a `$ref` reference
-- **Swift**: the schema becomes a named `public struct User` in the generated client, shared across all routes that reference it
-- **Kotlin**: the schema becomes a named `@Serializable data class User` in the generated client, shared across all routes that reference it
+- **Swift**: an object becomes `public struct User`, a `z.enum` becomes `public enum EventKind`, shared across all routes that reference it
+- **Kotlin**: an object becomes `@Serializable data class User`, a `z.enum` becomes `enum class EventKind`, shared across all routes that reference it
 
 ## Extracting TypeScript types
 

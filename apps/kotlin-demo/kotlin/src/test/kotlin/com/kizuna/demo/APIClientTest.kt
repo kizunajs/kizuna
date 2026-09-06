@@ -219,10 +219,10 @@ class APIClientTest {
     fun testListEventsEnumQuerySerializesRawValue() = runTest {
         val response = client.notifications.listEvents {
             query(
-                kind = APIClient.NotificationsListEvents.QueryKind.LOGIN,
+                kind = API.EventKind.LOGIN,
             )
         }
-        assertEquals(APIClient.NotificationsListEvents.ResponseEchoKind.LOGIN, response.body.echo.kind)
+        assertEquals(API.EventKind.LOGIN, response.body.echo.kind)
     }
 
     @Test

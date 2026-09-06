@@ -355,7 +355,8 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
             };
         }
         case 'enum': {
-            const enumName = sanitizeIdentifier(toPascalCase(hint));
+            const enumName = id ?? sanitizeIdentifier(toPascalCase(hint));
+            if (id) registry.markExplicitId(enumName);
             const entries = def.entries ?? {};
             const cases = Object.values(entries);
             if (!registry.has(enumName)) {

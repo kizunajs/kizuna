@@ -128,45 +128,44 @@ object OpenEnumAPI {
         val text: String
     ) : NotificationEvent
 
-    @Serializable
-    data class EventRecord(
-        val id: String,
-        val kind: Kind,
-        val occurredAt: Instant,
-        val userId: String
-    ) {
+    @Serializable(with = EventKind.Serializer::class)
+    sealed interface EventKind : KizunaQueryValue {
+        data object LOGIN : EventKind {
+            override val wireValue: String = "login"
+        }
+        data object LOGOUT : EventKind {
+            override val wireValue: String = "logout"
+        }
+        data object SIGNUP : EventKind {
+            override val wireValue: String = "signup"
+        }
+        data class Unknown(override val wireValue: String) : EventKind
 
-        @Serializable(with = Kind.Serializer::class)
-        sealed interface Kind : KizunaQueryValue {
-            data object LOGIN : Kind {
-                override val wireValue: String = "login"
+        companion object {
+            fun fromWireValue(wireValue: String): EventKind = when (wireValue) {
+                "login" -> LOGIN
+                "logout" -> LOGOUT
+                "signup" -> SIGNUP
+                else -> Unknown(wireValue)
             }
-            data object LOGOUT : Kind {
-                override val wireValue: String = "logout"
-            }
-            data object SIGNUP : Kind {
-                override val wireValue: String = "signup"
-            }
-            data class Unknown(override val wireValue: String) : Kind
+        }
 
-            companion object {
-                fun fromWireValue(wireValue: String): Kind = when (wireValue) {
-                    "login" -> LOGIN
-                    "logout" -> LOGOUT
-                    "signup" -> SIGNUP
-                    else -> Unknown(wireValue)
-                }
-            }
-
-            object Serializer : KSerializer<Kind> {
-                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Kind", PrimitiveKind.STRING)
-                override fun deserialize(decoder: Decoder): Kind = Kind.fromWireValue(decoder.decodeString())
-                override fun serialize(encoder: Encoder, value: Kind) {
-                    encoder.encodeString(value.wireValue)
-                }
+        object Serializer : KSerializer<EventKind> {
+            override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("EventKind", PrimitiveKind.STRING)
+            override fun deserialize(decoder: Decoder): EventKind = EventKind.fromWireValue(decoder.decodeString())
+            override fun serialize(encoder: Encoder, value: EventKind) {
+                encoder.encodeString(value.wireValue)
             }
         }
     }
+
+    @Serializable
+    data class EventRecord(
+        val id: String,
+        val kind: EventKind,
+        val occurredAt: Instant,
+        val userId: String
+    )
 }
 
 class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
@@ -712,37 +711,6 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
     object NotificationsListEvents {
 
-        @Serializable(with = QueryKind.Serializer::class)
-        sealed interface QueryKind : KizunaQueryValue {
-            data object LOGIN : QueryKind {
-                override val wireValue: String = "login"
-            }
-            data object LOGOUT : QueryKind {
-                override val wireValue: String = "logout"
-            }
-            data object SIGNUP : QueryKind {
-                override val wireValue: String = "signup"
-            }
-            data class Unknown(override val wireValue: String) : QueryKind
-
-            companion object {
-                fun fromWireValue(wireValue: String): QueryKind = when (wireValue) {
-                    "login" -> LOGIN
-                    "logout" -> LOGOUT
-                    "signup" -> SIGNUP
-                    else -> Unknown(wireValue)
-                }
-            }
-
-            object Serializer : KSerializer<QueryKind> {
-                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("QueryKind", PrimitiveKind.STRING)
-                override fun deserialize(decoder: Decoder): QueryKind = QueryKind.fromWireValue(decoder.decodeString())
-                override fun serialize(encoder: Encoder, value: QueryKind) {
-                    encoder.encodeString(value.wireValue)
-                }
-            }
-        }
-
         @Serializable
         data class Response(
             val events: List<OpenEnumAPI.EventRecord>,
@@ -752,47 +720,16 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class ResponseEcho(
             val since: Instant? = null,
-            val kind: ResponseEchoKind? = null,
+            val kind: OpenEnumAPI.EventKind? = null,
             val ids: List<String>? = null,
             val label: String? = null,
             val tagIds: List<String>? = null,
             val sessionId: String? = null
         )
 
-        @Serializable(with = ResponseEchoKind.Serializer::class)
-        sealed interface ResponseEchoKind : KizunaQueryValue {
-            data object LOGIN : ResponseEchoKind {
-                override val wireValue: String = "login"
-            }
-            data object LOGOUT : ResponseEchoKind {
-                override val wireValue: String = "logout"
-            }
-            data object SIGNUP : ResponseEchoKind {
-                override val wireValue: String = "signup"
-            }
-            data class Unknown(override val wireValue: String) : ResponseEchoKind
-
-            companion object {
-                fun fromWireValue(wireValue: String): ResponseEchoKind = when (wireValue) {
-                    "login" -> LOGIN
-                    "logout" -> LOGOUT
-                    "signup" -> SIGNUP
-                    else -> Unknown(wireValue)
-                }
-            }
-
-            object Serializer : KSerializer<ResponseEchoKind> {
-                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ResponseEchoKind", PrimitiveKind.STRING)
-                override fun deserialize(decoder: Decoder): ResponseEchoKind = ResponseEchoKind.fromWireValue(decoder.decodeString())
-                override fun serialize(encoder: Encoder, value: ResponseEchoKind) {
-                    encoder.encodeString(value.wireValue)
-                }
-            }
-        }
-
         data class Query(
             val since: Instant? = null,
-            val kind: QueryKind? = null,
+            val kind: OpenEnumAPI.EventKind? = null,
             val ids: List<String>? = null,
             val label: String? = null,
             val tagIds: List<String>? = null
@@ -803,7 +740,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
 
         object Scope {
-            fun query(since: Instant? = null, kind: QueryKind? = null, ids: List<String>? = null, label: String? = null, tagIds: List<String>? = null): AfterQuery = AfterQuery(query = Query(since = since, kind = kind, ids = ids, label = label, tagIds = tagIds))
+            fun query(since: Instant? = null, kind: OpenEnumAPI.EventKind? = null, ids: List<String>? = null, label: String? = null, tagIds: List<String>? = null): AfterQuery = AfterQuery(query = Query(since = since, kind = kind, ids = ids, label = label, tagIds = tagIds))
         }
 
         class AfterQuery internal constructor(override val query: Query?) : Args
