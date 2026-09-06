@@ -1436,6 +1436,141 @@ describe('deprecation and sunset headers', () => {
     });
 });
 
+describe('cache headers', () => {
+    const cachedContract = k.contract({
+        routes: k.routes('api', {
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: {
+                        body: z.object({
+                            id: z.string(),
+                        }),
+                        cache: {
+                            scope: 'private',
+                            maxAge: 300,
+                            vary: ['authorization'],
+                        },
+                    },
+                    404: ProblemDetailsSchema,
+                },
+            },
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                    404: {
+                        body: ProblemDetailsSchema,
+                        cache: {
+                            scope: 'public',
+                            maxAge: 10,
+                        },
+                    },
+                },
+            },
+            health: {
+                method: 'GET',
+                path: '/health',
+                responses: {
+                    200: {
+                        body: z.object({
+                            ok: z.boolean(),
+                        }),
+                        cache: 'no-store',
+                    },
+                },
+            },
+            taggedUser: {
+                method: 'GET',
+                path: '/tagged-users/:id',
+                responses: {
+                    200: {
+                        body: z.object({
+                            id: z.string(),
+                        }),
+                        cache: {
+                            scope: 'private',
+                            noCache: true,
+                        },
+                        etag: true,
+                    },
+                },
+            },
+        }),
+    });
+    const spec = generateJson(cachedContract, baseConfig);
+
+    it('documents Cache-Control and Vary on the response that declares them', () => {
+        const response = spec.paths['/users']?.get?.responses['200'];
+        expect(Object.keys(response?.headers ?? {})).toEqual(['Cache-Control', 'Vary']);
+        expect(response?.headers?.['Cache-Control']?.schema).toEqual({
+            type: 'string',
+            example: 'private, max-age=300',
+        });
+        expect(response?.headers?.['Vary']?.schema).toEqual({
+            type: 'string',
+            example: 'authorization',
+        });
+    });
+
+    it('documents nothing on a sibling response that declares no policy', () => {
+        expect(spec.paths['/users']?.get?.responses['404']?.headers).toBeUndefined();
+    });
+
+    it('documents a policy declared on an error response', () => {
+        const response = spec.paths['/users/{id}']?.get?.responses['404'];
+        expect(Object.keys(response?.headers ?? {})).toEqual(['Cache-Control']);
+        expect(response?.headers?.['Cache-Control']?.schema).toEqual({
+            type: 'string',
+            example: 'public, max-age=10',
+        });
+        expect(spec.paths['/users/{id}']?.get?.responses['200']?.headers).toBeUndefined();
+    });
+
+    it('documents an ETag on a response that declares one', () => {
+        const response = spec.paths['/tagged-users/{id}']?.get?.responses['200'];
+        expect(Object.keys(response?.headers ?? {})).toEqual(['Cache-Control', 'ETag']);
+        expect(response?.headers?.['ETag']?.schema).toEqual({ type: 'string' });
+    });
+
+    it('documents a no-store policy', () => {
+        const response = spec.paths['/health']?.get?.responses['200'];
+        expect(Object.keys(response?.headers ?? {})).toEqual(['Cache-Control']);
+        expect(response?.headers?.['Cache-Control']?.schema).toEqual({
+            type: 'string',
+            example: 'no-store',
+        });
+    });
+
+    it('documents no cache headers on a route with no policy', () => {
+        const plain = generateJson(
+            k.contract({
+                routes: k.routes('api', {
+                    getUser: {
+                        method: 'GET',
+                        path: '/users/:id',
+                        responses: {
+                            200: z.object({
+                                id: z.string(),
+                            }),
+                        },
+                    },
+                }),
+            }),
+            baseConfig
+        );
+        expect(plain.paths['/users/{id}']?.get?.responses['200']?.headers).toBeUndefined();
+    });
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+});
+
 describe('error response media type (RFC 9457)', () => {
     const contractWithErrorsRoutes = k.routes('api', {
         getUser: {

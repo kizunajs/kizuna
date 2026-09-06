@@ -10,6 +10,10 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 - **RFC 3986** (URI Syntax, January 2005): paths match exactly, so `/users/1` and `/users/1/` differ
 - **RFC 8594** (Sunset HTTP Header, May 2019): the `Sunset` response header and the `sunset` link relation on routes with a `sunset` date
 - **RFC 9745** (Deprecation HTTP Header, March 2025): the `Deprecation` response header and the `deprecation` link relation on routes with a deprecation date
+- **RFC 9111** (HTTP Caching, June 2022): the `Cache-Control` and `Vary` response headers a response's `cache` policy sends
+- **RFC 5861** (Stale Content, May 2010): the `stale-while-revalidate` and `stale-if-error` cache directives
+- **RFC 8246** (Immutable Responses, September 2017): the `immutable` cache directive
+- **RFC 9110** (Conditional Requests, June 2022): the `ETag` a response's `etag` sends, the `If-None-Match` it is compared against, and the `304 Not Modified` a match answers with
 - **OpenAPI 3.1.0**: spec generation
 - **OAuth 2.1**: the resource server model, for an API that verifies tokens rather than issuing them
 - **RFC 9728** (OAuth 2.0 Protected Resource Metadata, April 2025): the discovery document

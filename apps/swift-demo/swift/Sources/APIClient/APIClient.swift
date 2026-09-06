@@ -749,6 +749,39 @@ public final class APIClient: Sendable {
         }
     }
 
+    public enum UsersUserProfile {
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: API.User
+
+            public init(body: API.User) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case notFound(API.ProblemDetails)
+        }
+    }
+
     public enum UsersCreateUser {
 
         public struct Body: Sendable {
@@ -1765,7 +1798,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Download a user badge, exercises a binary (BinarySchema) response body
+    /// Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag
     public func userBadge(_ params: APIClient.UsersUserBadge.Params) async throws(APIClient.UsersUserBadge.Failure) -> APIClient.UsersUserBadge.Result {
         var path = "/users/:id/badge"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -1854,7 +1887,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Get a year of user activity, exercising two typed path params (a string id and a coerced int year)
+    /// Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response
     public func userActivity(_ params: APIClient.UsersUserActivity.Params) async throws(APIClient.UsersUserActivity.Failure) -> APIClient.UsersUserActivity.Result {
         var path = "/users/:id/activity/:year"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -1873,6 +1906,27 @@ public struct APIUsersClient: Sendable {
             throw APIClient.UsersUserActivity.Failure.notFound(payload)
         default:
             throw APIClient.UsersUserActivity.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with
+    public func userProfile(_ params: APIClient.UsersUserProfile.Params) async throws(APIClient.UsersUserProfile.Failure) -> APIClient.UsersUserProfile.Result {
+        var path = "/users/:id/profile"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersUserProfile.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersUserProfile.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(API.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserProfile.Failure.self)
+            return APIClient.UsersUserProfile.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUserProfile.Failure.self)
+            throw APIClient.UsersUserProfile.Failure.notFound(payload)
+        default:
+            throw APIClient.UsersUserProfile.Failure.unexpectedStatus(statusCode, data)
         }
     }
 

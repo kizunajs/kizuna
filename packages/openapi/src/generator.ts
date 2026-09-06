@@ -15,7 +15,10 @@ import {
     resolveResponseBody,
     resolveResponseHeaders,
     resolveResponseContentType,
+    resolveResponseCache,
+    resolveResponseEtag,
     deprecationHeaders,
+    cacheHeaders,
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
 import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
@@ -397,6 +400,36 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                         ...response.headers,
                     };
                 }
+            }
+
+            for (const [statusKey, response] of Object.entries(operation.responses)) {
+                const declared = route.responses[Number(statusKey)];
+                const policy = cacheHeaders(resolveResponseCache(declared));
+                const documented: Record<string, { description: string; schema: Record<string, unknown> }> = {};
+                if (policy['cache-control']) {
+                    documented['Cache-Control'] = {
+                        description: 'How this response may be cached, per RFC 9111.',
+                        schema: { type: 'string', example: policy['cache-control'] },
+                    };
+                }
+                if (policy['vary']) {
+                    documented['Vary'] = {
+                        description: 'The request headers that change this response, which a cache keys on.',
+                        schema: { type: 'string', example: policy['vary'] },
+                    };
+                }
+                if (resolveResponseEtag(declared)) {
+                    documented['ETag'] = {
+                        description:
+                            'The entity tag of this response, per RFC 9110. Send it back as `If-None-Match` to be answered `304 Not Modified` when it still holds.',
+                        schema: { type: 'string' },
+                    };
+                }
+                if (Object.keys(documented).length === 0) continue;
+                response.headers = {
+                    ...documented,
+                    ...response.headers,
+                };
             }
 
             if (options.operationMapper) {

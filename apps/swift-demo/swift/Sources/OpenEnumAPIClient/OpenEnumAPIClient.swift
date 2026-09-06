@@ -805,6 +805,39 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
+    public enum UsersUserProfile {
+
+        public struct Params: Sendable {
+            public let id: String
+
+            public init(id: String) {
+                self.id = id
+            }
+
+            public static func params(id: String) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: OpenEnumAPI.User
+
+            public init(body: OpenEnumAPI.User) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case notFound(OpenEnumAPI.ProblemDetails)
+        }
+    }
+
     public enum UsersCreateUser {
 
         public struct Body: Sendable {
@@ -1910,7 +1943,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Download a user badge, exercises a binary (BinarySchema) response body
+    /// Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag
     public func userBadge(_ params: OpenEnumAPIClient.UsersUserBadge.Params) async throws(OpenEnumAPIClient.UsersUserBadge.Failure) -> OpenEnumAPIClient.UsersUserBadge.Result {
         var path = "/users/:id/badge"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -1999,7 +2032,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Get a year of user activity, exercising two typed path params (a string id and a coerced int year)
+    /// Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response
     public func userActivity(_ params: OpenEnumAPIClient.UsersUserActivity.Params) async throws(OpenEnumAPIClient.UsersUserActivity.Failure) -> OpenEnumAPIClient.UsersUserActivity.Result {
         var path = "/users/:id/activity/:year"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
@@ -2018,6 +2051,27 @@ public struct OpenEnumAPIUsersClient: Sendable {
             throw OpenEnumAPIClient.UsersUserActivity.Failure.notFound(payload)
         default:
             throw OpenEnumAPIClient.UsersUserActivity.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with
+    public func userProfile(_ params: OpenEnumAPIClient.UsersUserProfile.Params) async throws(OpenEnumAPIClient.UsersUserProfile.Failure) -> OpenEnumAPIClient.UsersUserProfile.Result {
+        var path = "/users/:id/profile"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPI.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
+            return OpenEnumAPIClient.UsersUserProfile.Result(body: body)
+        case 404:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
+            throw OpenEnumAPIClient.UsersUserProfile.Failure.notFound(payload)
+        default:
+            throw OpenEnumAPIClient.UsersUserProfile.Failure.unexpectedStatus(statusCode, data)
         }
     }
 

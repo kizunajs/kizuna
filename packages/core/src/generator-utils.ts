@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { ResponseDefinition } from './types.js';
+import type { CachePolicy, ResponseDefinition } from './types.js';
 
 // Kept out of generator.ts so importing these doesn't pull in its node:fs dependency.
 
@@ -11,6 +11,12 @@ export const resolveResponseHeaders = (value: ResponseDefinition): z.ZodType | u
 
 export const resolveResponseContentType = (value: ResponseDefinition | undefined): string | undefined =>
     value && typeof value === 'object' && 'body' in value ? value.contentType : undefined;
+
+export const resolveResponseCache = (value: ResponseDefinition | undefined): CachePolicy | undefined =>
+    value && typeof value === 'object' && 'body' in value ? value.cache : undefined;
+
+export const resolveResponseEtag = (value: ResponseDefinition | undefined): boolean =>
+    value && typeof value === 'object' && 'body' in value ? value.etag === true : false;
 
 export const toPascalCase = (input: string): string => {
     if (!input) return input;

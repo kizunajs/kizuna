@@ -27,8 +27,73 @@ export type ResponseContentType =
     | (string & {});
 
 /**
+ * How one response may be cached, sent as its `Cache-Control` header.
+ *
+ * `'no-store'` forbids every cache from keeping the response at all, and rules
+ * out every other directive.
+ */
+export type CachePolicy =
+    | 'no-store'
+    | {
+          /**
+           * Which caches may store the response. `private` is the caller's own
+           * browser; `public` is any cache in between, including a CDN or a
+           * corporate proxy. A response on a route behind `security` wants
+           * `private`, and `k.contract` throws on `public` there.
+           */
+          scope?: 'public' | 'private';
+          /**
+           * How long the response stays fresh, in seconds.
+           *
+           * @example
+           * 300
+           */
+          maxAge?: number;
+          /**
+           * How long a shared cache may keep the response, in seconds. Takes
+           * precedence over `maxAge` for CDNs and proxies, which lets a browser
+           * and a CDN hold the response for different lengths of time.
+           */
+          sharedMaxAge?: number;
+          /**
+           * How long a cache may keep serving the response after it goes stale
+           * while it fetches a fresh one in the background, in seconds.
+           * RFC 5861.
+           */
+          staleWhileRevalidate?: number;
+          /**
+           * How long a cache may keep serving the stale response when this API
+           * is erroring, in seconds. RFC 5861.
+           */
+          staleIfError?: number;
+          /**
+           * Store the response, but check back before every reuse.
+           */
+          noCache?: true;
+          /**
+           * Once the response goes stale, do not serve it again without
+           * checking back.
+           */
+          mustRevalidate?: true;
+          /**
+           * The response will not change while it is fresh, so a reload need
+           * not check back. RFC 8246.
+           */
+          immutable?: true;
+          /**
+           * The request headers that change the response, sent as `Vary`. A
+           * cache keys on them instead of serving one caller's response to the
+           * next.
+           *
+           * @example
+           * ['authorization']
+           */
+          vary?: readonly string[];
+      };
+
+/**
  * A response: either a schema for the body, or an object declaring the body
- * schema with optional response `headers` and `contentType`.
+ * schema with an optional `headers` schema, `contentType`, and `cache` policy.
  */
 export type ResponseDefinition =
     | z.ZodType
@@ -48,6 +113,33 @@ export type ResponseDefinition =
            * @default 'application/json'
            */
           contentType?: ResponseContentType;
+          /**
+           * How this response may be cached, sent as its `Cache-Control` and
+           * `Vary` headers. A handler returning its own `cache-control` header
+           * wins for that request.
+           *
+           * @example
+           * cache: 'no-store'
+           *
+           * @example
+           * cache: {
+           *     scope: 'private',
+           *     maxAge: 300,
+           *     vary: ['authorization'],
+           * }
+           */
+          cache?: CachePolicy;
+          /**
+           * Send an `ETag` for this response, and answer `304 Not Modified`
+           * when the caller's `If-None-Match` already holds it. The tag hashes
+           * the body, so the handler still runs; what it saves is sending the
+           * body again. Pairs with a `cache` policy that revalidates, such as
+           * `noCache` or `maxAge: 0` with `mustRevalidate`.
+           *
+           * Successful responses only, since `304` says the representation the
+           * caller holds is still current.
+           */
+          etag?: true;
       };
 
 /**

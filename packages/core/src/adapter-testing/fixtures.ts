@@ -239,6 +239,10 @@ export const securedRoutes = securedK.routes({
             200: z.object({
                 userId: z.string(),
             }),
+            401: {
+                body: ProblemDetailsSchema,
+                cache: 'no-store',
+            },
         },
     },
     ownerOnly: {
@@ -546,6 +550,217 @@ export const createDeprecatedRouter = <Context>(): Router<typeof deprecatedRoute
         status: 200,
         body: {
             ok: true,
+        },
+    }),
+});
+
+export const cachedRoutes = k.routes('api', {
+    listUsers: {
+        method: 'GET',
+        path: '/cached-users',
+        responses: {
+            200: {
+                body: z.object({
+                    users: z.array(z.string()),
+                }),
+                cache: {
+                    scope: 'private',
+                    maxAge: 300,
+                    vary: ['authorization'],
+                },
+            },
+        },
+    },
+    getUser: {
+        method: 'GET',
+        path: '/cached-users/:id',
+        responses: {
+            200: {
+                body: z.object({
+                    id: z.string(),
+                }),
+                cache: {
+                    scope: 'private',
+                    maxAge: 300,
+                },
+            },
+            404: {
+                body: ProblemDetailsSchema,
+                cache: {
+                    scope: 'public',
+                    maxAge: 10,
+                },
+            },
+        },
+    },
+    findUser: {
+        method: 'GET',
+        path: '/cached-lookup/:id',
+        responses: {
+            200: {
+                body: z.object({
+                    id: z.string(),
+                }),
+                cache: {
+                    scope: 'private',
+                    maxAge: 300,
+                },
+            },
+            404: ProblemDetailsSchema,
+        },
+    },
+    health: {
+        method: 'GET',
+        path: '/cached-health',
+        responses: {
+            200: {
+                body: z.object({
+                    ok: z.boolean(),
+                }),
+                cache: 'no-store',
+            },
+        },
+    },
+    /**
+     * Its handler returns a `cache-control` of its own, which the declared
+     * policy overrules.
+     */
+    freshReport: {
+        method: 'GET',
+        path: '/cached-report',
+        responses: {
+            200: {
+                body: z.object({
+                    ok: z.boolean(),
+                }),
+                cache: {
+                    scope: 'private',
+                    maxAge: 300,
+                },
+            },
+        },
+    },
+    guardedReport: {
+        method: 'GET',
+        path: '/cached-guarded',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+            403: {
+                body: ProblemDetailsSchema,
+                cache: 'no-store',
+            },
+        },
+    },
+    validatedReport: {
+        method: 'GET',
+        path: '/cached-validated',
+        query: z.object({
+            page: z.number().int(),
+        }),
+        responses: {
+            200: z.object({
+                page: z.number(),
+            }),
+            400: {
+                body: ProblemDetailsSchema,
+                cache: 'no-store',
+            },
+        },
+    },
+    taggedUser: {
+        method: 'GET',
+        path: '/tagged-users/:id',
+        responses: {
+            200: {
+                body: z.object({
+                    id: z.string(),
+                }),
+                cache: {
+                    scope: 'private',
+                    noCache: true,
+                },
+                etag: true,
+            },
+        },
+    },
+});
+
+export const cachedContract = k.contract({
+    routes: cachedRoutes,
+});
+
+export const createCachedRouter = <Context>(): Router<typeof cachedRoutes, Context> => ({
+    listUsers: () => ({
+        status: 200,
+        body: {
+            users: ['alice'],
+        },
+    }),
+    getUser: ({ params }) => {
+        if (params.id !== '1') {
+            return {
+                status: 404,
+                body: {
+                    detail: 'Not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: {
+                id: params.id,
+            },
+        };
+    },
+    findUser: ({ params }) => {
+        if (params.id !== '1') {
+            return {
+                status: 404,
+                body: {
+                    detail: 'Not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: {
+                id: params.id,
+            },
+        };
+    },
+    health: () => ({
+        status: 200,
+        body: {
+            ok: true,
+        },
+    }),
+    freshReport: () => ({
+        status: 200,
+        body: {
+            ok: true,
+        },
+        headers: {
+            'cache-control': 'no-store',
+        },
+    }),
+    guardedReport: () => ({
+        status: 403,
+        body: {
+            detail: 'Forbidden',
+        },
+    }),
+    validatedReport: ({ query }) => ({
+        status: 200,
+        body: {
+            page: query.page,
+        },
+    }),
+    taggedUser: ({ params }) => ({
+        status: 200,
+        body: {
+            id: params.id,
         },
     }),
 });

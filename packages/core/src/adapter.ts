@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ResponseHeaders, RouteDefinition, Routes, Method } from './types.js';
+import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method } from './types.js';
 import type { OpenApiSecuritySchemeObject, SecurityScheme } from './security-scheme.js';
 import type { Credential, NoCredential } from './identity.js';
 import {
@@ -16,6 +16,8 @@ import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes 
 import { parsePath } from './path-params.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { deprecationHeaders } from './deprecation.js';
+import { cacheHeaders } from './cache.js';
+import { computeEtag, etagMatches } from './etag.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
 import { STATUS_TITLES } from './status-titles.js';
@@ -24,7 +26,13 @@ import { resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
 import { resolvePluginServers, type PluginImplementation } from './plugin-server.js';
-import { resolveResponseBody, resolveResponseContentType, isJsonMediaType } from './generator-utils.js';
+import {
+    resolveResponseBody,
+    resolveResponseContentType,
+    resolveResponseCache,
+    resolveResponseEtag,
+    isJsonMediaType,
+} from './generator-utils.js';
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
 import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
 import {
@@ -901,6 +909,111 @@ const withDeprecationHeaders = (result: AdapterResult, route: RouteDefinition): 
     }
 };
 
+/**
+ * The status an outcome will be rendered with, so a policy declared on that
+ * response reaches it whether the handler returned the status or kizuna raised
+ * it. `undefined` for a raw response, which the handler owns outright.
+ */
+const statusOf = (result: AdapterResult): number | undefined => {
+    switch (result.kind) {
+        // A route that did not match carries no declaration to read a policy from.
+        case 'raw-response':
+        case 'not-found':
+        case 'method-not-allowed':
+            return undefined;
+        case 'success':
+        case 'guard-denied':
+            return result.status;
+        case 'invalid-body':
+        case 'validation-failed':
+            return 400;
+        case 'unsupported-media-type':
+            return 415;
+        case 'not-acceptable':
+            return 406;
+        case 'no-handler':
+        case 'handler-error':
+            return 500;
+    }
+};
+
+/**
+ * Attach the `Cache-Control` and `Vary` headers declared on the response being
+ * rendered. A cache policy describes one representation, so it reaches the
+ * status it was declared under and no other. The declaration wins over a header
+ * of the same name from the handler, so what the OpenAPI document publishes is
+ * what goes on the wire. A response declaring no policy leaves the handler's own
+ * headers alone.
+ */
+const withCacheHeaders = (result: AdapterResult, route: RouteDefinition): AdapterResult => {
+    if (result.kind === 'raw-response' || result.kind === 'not-found' || result.kind === 'method-not-allowed') return result;
+    const status = statusOf(result);
+    if (status === undefined) return result;
+    const policy = cacheHeaders(resolveResponseCache(route.responses[status]));
+    if (Object.keys(policy).length === 0) return result;
+    return {
+        ...result,
+        headers: {
+            ...result.headers,
+            ...policy,
+        },
+    };
+};
+
+/**
+ * The bytes a successful body will be sent as, which is what an entity tag
+ * hashes. Mirrors the content-type decision `renderResult` makes, so the tag
+ * covers what actually goes on the wire.
+ */
+const responseBytes = (body: unknown, response: ResponseDefinition | undefined): string | Uint8Array | undefined => {
+    if (typeof body === 'string' || body instanceof Uint8Array) return body;
+    const isBinary = response !== undefined && isBinarySchema(resolveResponseBody(response));
+    const contentType = resolveResponseContentType(response) ?? (isBinary ? 'application/octet-stream' : 'application/json');
+    return isJsonMediaType(contentType) ? JSON.stringify(body) : undefined;
+};
+
+/**
+ * Send the `ETag` a response declares, and turn the request into a
+ * `304 Not Modified` when the caller's `If-None-Match` already covers it.
+ * RFC 9110 section 15.4.5 keeps the cache headers on the 304, since the caller
+ * needs them to know how long to hold what it already has.
+ */
+const withEtag = async (result: AdapterResult, route: RouteDefinition, request: AdapterRequest<unknown>): Promise<AdapterResult> => {
+    if (result.kind !== 'success' || result.status >= 300 || result.body === undefined) return result;
+    const response = route.responses[result.status];
+    if (!resolveResponseEtag(response)) return result;
+    const bytes = responseBytes(result.body, response);
+    if (bytes === undefined) return result;
+
+    const etag = await computeEtag(bytes);
+    const headers: ResponseHeaders = {
+        ...result.headers,
+        etag,
+    };
+
+    const requestHeaders = (request.headers ?? {}) as Record<string, string | string[] | undefined>;
+    if (!etagMatches(getHeaderValue(requestHeaders['if-none-match']), etag)) {
+        return {
+            ...result,
+            headers,
+        };
+    }
+    return {
+        ...result,
+        status: 304,
+        body: undefined,
+        headers: omitHeaders(headers, ['content-type', 'content-length']),
+    };
+};
+
+const omitHeaders = (headers: ResponseHeaders, names: readonly string[]): ResponseHeaders => {
+    const kept: ResponseHeaders = {};
+    for (const [name, value] of Object.entries(headers)) {
+        if (!names.includes(name.toLowerCase())) kept[name] = value;
+    }
+    return kept;
+};
+
 const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     request: AdapterRequest<NativeRequest>,
     routes: Routes,
@@ -932,7 +1045,8 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         jobRunner,
         responseValidation
     );
-    return withDeprecationHeaders(result, resolution.resolved.route);
+    const { route } = resolution.resolved;
+    return withEtag(withCacheHeaders(withDeprecationHeaders(result, route), route), route, request as AdapterRequest<unknown>);
 };
 
 const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(

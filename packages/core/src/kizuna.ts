@@ -4,6 +4,7 @@ import { assembleContract, type Contract } from './contract.js';
 import { pluginRouteTree, type ContractPlugins, type ContractPluginsArg, type PluginArgs } from './plugin.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { assertValidDeprecationDates } from './deprecation.js';
+import { assertValidCache } from './cache.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
@@ -416,6 +417,9 @@ const createSurface = <
                 }
             }
         }
+        // After the auth map resolves, so the public-cache check can read `security`.
+        assertValidCache(contractRoutes);
+        assertValidCache(pluginRouteTree(plugins));
         return assembleContract({
             routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
             jobs: contractJobs,
