@@ -145,6 +145,25 @@ export {
 export { ResponseError } from './response-error.js';
 export { STATUS_TITLES, getStatusText } from './status-titles.js';
 export { getHeaderValue } from './adapter.js';
+export { isStreamResponse, isZodSchema } from './generator-utils.js';
+export {
+    streamMode,
+    streamContentType,
+    isNamedStream,
+    streamStatuses,
+    routeStreams,
+    soleStreamResponse,
+    EVENT_STREAM_MEDIA_TYPE,
+    type StreamMode,
+    type StreamContext,
+    type StreamComment,
+    type StreamYield,
+    type StreamMessage,
+    type StreamChunk,
+    type StreamMessageOf,
+    type StreamBodyOf,
+    type StreamBody,
+} from './stream.js';
 
 export { METHODS } from './types.js';
 export {
@@ -152,6 +171,8 @@ export {
     type Method,
     type ResponseContentType,
     type ResponseDefinition,
+    type StreamDefinition,
+    type StreamResponseDefinition,
     type SecurityRequirement,
     type SchemeNameOf,
     type AccessGate,
@@ -165,6 +186,7 @@ export { type ExtractPathParams, type PathParamName, type HasPathParams } from '
 export {
     type HandlerArgs,
     type HandlerReturn,
+    type ThrowableReturn,
     type GuardSuccess,
     type RoutesWithHandlerContext,
     type BrandedHandlerContext,

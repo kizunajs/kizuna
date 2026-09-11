@@ -236,6 +236,10 @@ uploadAvatar: async ({ body }) => {
 },
 ```
 
+## Streams
+
+A [stream](/docs/streaming) response is returned as a `NextResponse` with a `ReadableStream` body. The generator's `signal` is `request.signal`.
+
 ## Reference
 
 - [`new KizunaServer()`](/docs/reference/kizuna-server)

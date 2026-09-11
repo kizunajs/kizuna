@@ -785,3 +785,169 @@ describe('discriminated union response built from named models', () => {
         }
     });
 });
+
+describe('streams', () => {
+    const streamRoutes = k.routes('api', {
+        reply: {
+            method: 'POST',
+            path: '/reply',
+            body: z.object({
+                prompt: z.string(),
+            }),
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                        done: z.object({
+                            count: z.int(),
+                        }),
+                    },
+                },
+                400: z.object({
+                    type: z.string(),
+                    title: z.string(),
+                    status: z.number(),
+                    detail: z.string(),
+                }),
+            },
+        },
+        ticks: {
+            method: 'GET',
+            path: '/ticks',
+            responses: {
+                200: {
+                    stream: z.object({
+                        tick: z.int(),
+                    }),
+                },
+            },
+        },
+        lines: {
+            method: 'GET',
+            path: '/lines',
+            responses: {
+                200: {
+                    stream: z.string(),
+                    contentType: 'text/plain',
+                },
+            },
+        },
+    });
+    const streamContract = k.contract({
+        routes: streamRoutes,
+    });
+
+    const streamOf = (chunks: string[]): ReadableStream<Uint8Array> => {
+        const encoder = new TextEncoder();
+        return new ReadableStream({
+            start(controller) {
+                for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+                controller.close();
+            },
+        });
+    };
+
+    const clientFor = (chunks: string[], status = 200, contentType = 'text/event-stream') =>
+        new KizunaClient(streamContract, {
+            baseUrl: 'http://api',
+            fetch: async () =>
+                new Response(streamOf(chunks), {
+                    status,
+                    headers: {
+                        'content-type': contentType,
+                    },
+                }),
+        });
+
+    const collect = async <T>(iterable: AsyncIterable<T>): Promise<T[]> => {
+        const items: T[] = [];
+        for await (const item of iterable) items.push(item);
+        return items;
+    };
+
+    it('parses named events split across chunks, with comments dropped and id and retry kept', async () => {
+        const result = await clientFor([
+            'event: delta\ndata: {"te',
+            'xt":"a"}\n\n: keep-alive\n\nevent: done\r\ndata: {"count":1}\r\nid: evt-1\r\nretry: 5000\r\n\r\n',
+        ]).reply({
+            body: {
+                prompt: 'hi',
+            },
+        });
+        expect(result.status).toBe(200);
+        if (result.status !== 200) return;
+        expect(await collect(result.body)).toEqual([
+            {
+                event: 'delta',
+                data: {
+                    text: 'a',
+                },
+            },
+            {
+                event: 'done',
+                data: {
+                    count: 1,
+                },
+                id: 'evt-1',
+                retry: 5000,
+            },
+        ]);
+    });
+
+    it('joins multi-line data and discards an incomplete trailing event', async () => {
+        const result = await clientFor(['data: {"tick":\ndata: 1}\n\ndata: {"tick":2}']).ticks();
+        if (result.status !== 200) return;
+        expect(await collect(result.body)).toEqual([
+            {
+                data: {
+                    tick: 1,
+                },
+            },
+        ]);
+    });
+
+    it('reads a text stream as string chunks', async () => {
+        const result = await clientFor(['one\n', 'two\n'], 200, 'text/plain').lines();
+        if (result.status !== 200) return;
+        expect(await collect(result.body)).toEqual(['one\n', 'two\n']);
+    });
+
+    it('buffers a non-stream status as before', async () => {
+        const result = await clientFor(
+            ['{"type":"about:blank","title":"Bad Request","status":400,"detail":"nope"}'],
+            400,
+            'application/problem+json'
+        ).reply({
+            body: {
+                prompt: 'hi',
+            },
+        });
+        expect(result.status).toBe(400);
+        if (result.status !== 400) return;
+        expect(result.body.detail).toBe('nope');
+    });
+
+    it('rejects the loop when the connection ends with an error', async () => {
+        const failing = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(new TextEncoder().encode('data: {"tick":1}\n\n'));
+                controller.error(new Error('terminated'));
+            },
+        });
+        const client = new KizunaClient(streamContract, {
+            baseUrl: 'http://api',
+            fetch: async () =>
+                new Response(failing, {
+                    status: 200,
+                    headers: {
+                        'content-type': 'text/event-stream',
+                    },
+                }),
+        });
+        const result = await client.ticks();
+        if (result.status !== 200) return;
+        await expect(collect(result.body)).rejects.toThrow('terminated');
+    });
+});

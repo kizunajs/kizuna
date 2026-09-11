@@ -1,26 +1,33 @@
 import type { z } from 'zod';
-import type {
-    RouteDefinition,
-    Routes,
-    ValidationError,
-    ValidationErrorFor,
-    Contract,
-    TagOptions,
-    RequestContextSchema,
-    RequestContextHeaderInputs,
-    SecurityScheme,
+import {
+    isStreamResponse,
+    streamMode,
+    type RouteDefinition,
+    type Routes,
+    type ValidationError,
+    type ValidationErrorFor,
+    type Contract,
+    type TagOptions,
+    type RequestContextSchema,
+    type RequestContextHeaderInputs,
+    type SecurityScheme,
+    type StreamMessageOf,
+    type StreamResponseDefinition,
 } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
 import { buildPath, isRouteDefinition } from '@ts-kizuna/core/adapter';
+import { parseServerSentEvents, readByteChunks, readTextChunks } from './sse.js';
 
 type ResponseUnion<R extends RouteDefinition> = {
     [S in keyof R['responses']]: {
         status: S extends number ? S : never;
         body: R['responses'][S] extends z.ZodType
             ? z.infer<R['responses'][S]>
-            : R['responses'][S] extends { body: z.ZodType }
-              ? z.infer<R['responses'][S]['body']>
-              : never;
+            : R['responses'][S] extends StreamResponseDefinition
+              ? AsyncIterable<StreamMessageOf<R['responses'][S]>>
+              : R['responses'][S] extends { body: z.ZodType }
+                ? z.infer<R['responses'][S]['body']>
+                : never;
         headers: R['responses'][S] extends { headers: z.ZodType } ? z.infer<R['responses'][S]['headers']> : Record<string, string>;
     };
 }[keyof R['responses']];
@@ -207,6 +214,18 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             credentials: config.credentials,
             ...args.fetchOptions,
         });
+        const responseHeaders: Record<string, string> = {};
+        res.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+        });
+        const responseSpec = route.responses[res.status];
+        if (isStreamResponse(responseSpec) && res.body !== null) {
+            return {
+                status: res.status,
+                body: readStream(res.body, responseSpec),
+                headers: responseHeaders,
+            };
+        }
         const text = await res.text();
         let parsed: unknown;
         try {
@@ -214,16 +233,23 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
         } catch {
             parsed = text;
         }
-        const responseHeaders: Record<string, string> = {};
-        res.headers.forEach((value, key) => {
-            responseHeaders[key] = value;
-        });
         return {
             status: res.status,
             body: parsed,
             headers: responseHeaders,
         };
     };
+};
+
+const readStream = (body: ReadableStream<Uint8Array>, definition: StreamResponseDefinition): AsyncIterable<unknown> => {
+    switch (streamMode(definition)) {
+        case 'events':
+            return parseServerSentEvents(body);
+        case 'text':
+            return readTextChunks(body);
+        case 'binary':
+            return readByteChunks(body);
+    }
 };
 
 const buildClientTree = (router: Routes, config: ClientConfig): Record<string, unknown> => {

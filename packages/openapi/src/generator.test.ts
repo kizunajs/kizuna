@@ -2101,3 +2101,115 @@ describe('custom identities (no OpenAPI scheme)', () => {
         expect(operation?.['x-kizuna-guarded']).toBeUndefined();
     });
 });
+
+describe('streams', () => {
+    const streamRoutes = k.routes('api', {
+        reply: {
+            method: 'POST',
+            path: '/reply',
+            body: z.object({
+                prompt: z.string(),
+            }),
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                        done: z.object({
+                            count: z.int(),
+                        }),
+                    },
+                },
+                400: ProblemDetailsSchema,
+            },
+        },
+        ticks: {
+            method: 'GET',
+            path: '/ticks',
+            responses: {
+                200: {
+                    stream: z.object({
+                        tick: z.int(),
+                    }),
+                },
+            },
+        },
+        lines: {
+            method: 'GET',
+            path: '/lines',
+            responses: {
+                200: {
+                    stream: z.string(),
+                    contentType: 'text/plain',
+                },
+            },
+        },
+    });
+    const streamContract = k.contract({
+        routes: streamRoutes,
+    });
+    const spec = generateJson(streamContract, {
+        info: {
+            title: 'Streams',
+            version: '1.0.0',
+        },
+    });
+
+    it('documents named events under text/event-stream as a oneOf of messages', () => {
+        const response = spec.paths['/reply']!.post!.responses['200'] as { content: Record<string, { schema: Record<string, unknown> }> };
+        const schema = response.content['text/event-stream']!.schema;
+        expect(schema).toEqual({
+            oneOf: [
+                {
+                    type: 'object',
+                    required: ['event', 'data'],
+                    properties: {
+                        event: { const: 'delta' },
+                        data: {
+                            type: 'object',
+                            properties: {
+                                text: { type: 'string' },
+                            },
+                            required: ['text'],
+                            additionalProperties: false,
+                        },
+                        id: { type: 'string' },
+                        retry: { type: 'integer' },
+                    },
+                },
+                {
+                    type: 'object',
+                    required: ['event', 'data'],
+                    properties: {
+                        event: { const: 'done' },
+                        data: {
+                            type: 'object',
+                            properties: {
+                                count: { type: 'integer', minimum: -9007199254740991, maximum: 9007199254740991 },
+                            },
+                            required: ['count'],
+                            additionalProperties: false,
+                        },
+                        id: { type: 'string' },
+                        retry: { type: 'integer' },
+                    },
+                },
+            ],
+        });
+    });
+
+    it('documents an unnamed stream as one message and a text stream as a string', () => {
+        const ticks = spec.paths['/ticks']!.get!.responses['200'] as { content: Record<string, { schema: Record<string, unknown> }> };
+        expect(ticks.content['text/event-stream']!.schema).toMatchObject({
+            type: 'object',
+            required: ['data'],
+        });
+        const lines = spec.paths['/lines']!.get!.responses['200'] as { content: Record<string, { schema: Record<string, unknown> }> };
+        expect(lines.content['text/plain']!.schema).toEqual({ type: 'string' });
+    });
+
+    it('is a valid OpenAPI document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+});

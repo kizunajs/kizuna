@@ -261,6 +261,26 @@ suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.Us
 }
 ```
 
+## Streams
+
+A route whose response [streams](/docs/streaming) returns its `body` as a `Flow`. Named events become a sealed `Event` interface with one class per event, each carrying its decoded payload as `data`:
+
+```kotlin title="AssistantScreen.kt"
+val result = client.assistant.reply {
+    body(
+        prompt = "hello",
+    )
+}
+result.body.collect { event ->
+    when (event) {
+        is APIClient.AssistantReply.Event.Delta -> text.append(event.data.text)
+        is APIClient.AssistantReply.Event.Done -> println(event.data.outputTokens)
+    }
+}
+```
+
+A stream of one schema yields that type directly, a `text/*` stream yields one `String` per line, and a binary stream yields `ByteArray` chunks. The status and headers are checked before the method returns, so a `400` throws its `Failure` as on any route. The connection is open when the method returns, so collect the flow; cancelling the collector closes it. A route that mixes a streamed status with another `2xx` is left out of the client, with a warning.
+
 ## Tip: automate with a script
 
 You can add a script to your `package.json` to regenerate the client whenever the contract changes:

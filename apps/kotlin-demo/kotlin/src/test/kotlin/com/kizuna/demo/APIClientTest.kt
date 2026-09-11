@@ -388,6 +388,37 @@ class APIClientTest {
     }
 
     @Test
+    fun testAssistantReplyStreamsEvents() = runTest {
+        val result = client.assistant.reply {
+            body(
+                prompt = "hello there",
+            )
+        }
+        val text = StringBuilder()
+        var done: APIClient.AssistantReply.Done? = null
+        result.body.collect { event ->
+            when (event) {
+                is APIClient.AssistantReply.Event.Delta -> text.append(event.data.text)
+                is APIClient.AssistantReply.Event.Done -> done = event.data
+            }
+        }
+        assertTrue(text.startsWith("You asked: hello there"), text.toString())
+        assertEquals(2, done?.inputTokens)
+        assertTrue((done?.outputTokens ?: 0) > 5)
+    }
+
+    @Test
+    fun testAssistantReplyErrorStatusThrowsBeforeStreaming() = runTest {
+        assertFailsWith<APIClient.AssistantReply.Failure.BadRequest> {
+            client.assistant.reply {
+                body(
+                    prompt = "",
+                )
+            }
+        }
+    }
+
+    @Test
     fun testGetUserPathParamWithSlashIsEncoded() = runTest {
         assertFailsWith<APIClient.UsersGetUser.Failure.NotFound> {
             client.users.getUser {

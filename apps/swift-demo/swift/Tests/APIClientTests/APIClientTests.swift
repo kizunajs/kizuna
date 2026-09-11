@@ -11,7 +11,12 @@ final class APIClientTests: XCTestCase {
             XCTFail("Invalid API_BASE_URL: \(raw)")
             return
         }
-        client = APIClient(baseURL: url)
+        // Routes declare cache policies and ETags, so a shared URLSession would answer a revalidated
+        // request from its own cache, headers included. Every test goes to the wire.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        client = APIClient(baseURL: url, session: URLSession(configuration: configuration))
     }
 
     func testListUsersReturnsSeededUsers() async throws {
@@ -461,6 +466,34 @@ final class APIClientTests: XCTestCase {
             default:
                 XCTFail("expected .badRequest, got \(failure)")
             }
+        }
+    }
+
+    func testAssistantReplyStreamsEvents() async throws {
+        let result = try await client.assistant.reply(.body(prompt: "hello there"))
+        var text = ""
+        var done: APIClient.AssistantReply.Done?
+        for try await event in result.body {
+            switch event {
+            case .delta(let delta):
+                text += delta.text
+            case .done(let payload):
+                done = payload
+            }
+        }
+        XCTAssertTrue(text.hasPrefix("You asked: hello there"), "got \(text)")
+        XCTAssertEqual(done?.inputTokens, 2)
+        XCTAssertGreaterThan(done?.outputTokens ?? 0, 5)
+    }
+
+    func testAssistantReplyErrorStatusThrowsBeforeStreaming() async throws {
+        do {
+            _ = try await client.assistant.reply(.body(prompt: ""))
+            XCTFail("expected a 400 to be thrown")
+        } catch .badRequest(let problem) {
+            XCTAssertEqual(problem.status, 400)
+        } catch {
+            XCTFail("expected .badRequest, got \(error)")
         }
     }
 

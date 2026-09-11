@@ -21,6 +21,11 @@ import {
     mergeHeaderFields,
     type Routes,
     type RouteDefinition,
+    isStreamResponse,
+    isNamedStream,
+    streamMode,
+    routeStreams,
+    soleStreamResponse,
 } from '@ts-kizuna/core/generator';
 import type { Contract } from '@ts-kizuna/core';
 import { SwiftWriter, stringLiteral } from './emit.js';
@@ -95,6 +100,14 @@ interface RouteMethod {
         isRaw: boolean;
         isBinary: boolean;
     }>;
+    stream?: StreamDescriptor;
+}
+
+interface StreamDescriptor {
+    status: number;
+    mode: 'events' | 'text' | 'binary';
+    events?: Array<{ name: string; caseName: string; type: string }>;
+    messageType?: string;
 }
 
 interface RouteGroup {
@@ -214,10 +227,47 @@ const buildRouteMethod = (
     const successResponses: RouteMethod['successResponses'] = [];
     const errorCases: RouteMethod['errorCases'] = [];
 
+    let stream: StreamDescriptor | undefined;
     for (const [statusKey, responseValue] of Object.entries(route.responses)) {
         const status = Number(statusKey);
         const responseHint = `${baseHint}Response${status === 200 ? '' : status}`;
-        const bodySchema = resolveResponseBody(responseValue);
+        if (isStreamResponse(responseValue)) {
+            const mode = streamMode(responseValue);
+            if (mode === 'events' && isNamedStream(responseValue.stream)) {
+                stream = {
+                    status,
+                    mode,
+                    events: Object.entries(responseValue.stream).map(([name, schema]) => ({
+                        name,
+                        caseName: sanitizeEnumCaseName(name),
+                        type: mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression,
+                    })),
+                };
+            } else if (mode === 'events') {
+                stream = {
+                    status,
+                    mode,
+                    messageType: mapType(responseValue.stream as z.ZodType, registry, `${baseHint}Message`).expression,
+                };
+            } else {
+                stream = {
+                    status,
+                    mode,
+                };
+            }
+            const headersSchema = resolveResponseHeaders(responseValue);
+            successResponses.push({
+                status,
+                type: stream.messageType ?? 'Event',
+                responseHeaders: headersSchema
+                    ? collectObjectFields(headersSchema as z.ZodType, registry, `${baseHint}ResponseHeaders`)
+                    : [],
+                isRaw: false,
+                isBinary: false,
+            });
+            continue;
+        }
+        const bodySchema = resolveResponseBody(responseValue)!;
         const responseContentType = resolveResponseContentType(responseValue);
         const isBinary = isBinarySchema(bodySchema as z.core.$ZodType);
         const isRaw = isBinary || (responseContentType !== undefined && !isJsonMediaType(responseContentType));
@@ -296,6 +346,7 @@ const buildRouteMethod = (
         successSumEnumName,
         failureEnumName: 'Failure',
         errorCases,
+        stream,
     };
 };
 
@@ -305,6 +356,12 @@ const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeR
 
     return {
         processRoute({ routeKey, route, deprecated, deprecationMessage }) {
+            if (routeStreams(route) && soleStreamResponse(route) === undefined) {
+                console.warn(
+                    `[ts-kizuna/swift] Skipping route "${routeKey}": a streamed status beside another 2xx status is not generated.`
+                );
+                return;
+            }
             const dotIndex = routeKey.indexOf('.');
             if (dotIndex !== -1) {
                 const groupKey = routeKey.slice(0, dotIndex);
@@ -893,13 +950,36 @@ const localizeType = (type: SwiftType, operationName: string, context: EmitConte
     };
 };
 
+const streamElementType = (method: RouteMethod, context: EmitContext, scope: 'operation-enum' | 'actor'): string => {
+    const stream = method.stream!;
+    if (stream.mode === 'text') return 'String';
+    if (stream.mode === 'binary') return 'Foundation.Data';
+    if (stream.events) return scope === 'operation-enum' ? 'Event' : `${context.clientName}.${method.operationName}.Event`;
+    return resolveType(stream.messageType!, method.operationName, context, scope);
+};
+
+const emitEventEnum = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
+    const events = method.stream?.events;
+    if (!events) return;
+    writer.blank();
+    writer.block('public enum Event: Sendable, Equatable', () => {
+        for (const event of events) {
+            writer.line(
+                `case ${escapeKeyword(event.caseName)}(${resolveType(event.type, method.operationName, context, 'operation-enum')})`
+            );
+        }
+    });
+};
+
 const emitResultStruct = (writer: SwiftWriter, method: RouteMethod, context: EmitContext): void => {
     if (!method.resultWrapperName) return;
     writer.blank();
     writer.block('public struct Result: Sendable', () => {
-        const bodyType = method.successSumEnumName
-            ? 'Success'
-            : resolveType(method.successReturnType, method.operationName, context, 'operation-enum');
+        const bodyType = method.stream
+            ? `AsyncThrowingStream<${streamElementType(method, context, 'operation-enum')}, Swift.Error>`
+            : method.successSumEnumName
+              ? 'Success'
+              : resolveType(method.successReturnType, method.operationName, context, 'operation-enum');
         const hasHeaders = method.resultHeaderFields.length > 0;
         writer.line(`public let body: ${bodyType}`);
         if (hasHeaders) {
@@ -1068,7 +1148,178 @@ const emitKizunaFailureProtocols = (writer: SwiftWriter): void => {
     });
 };
 
-const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean; multiError: boolean; clientName: string }): void => {
+// An opener that already carries its `{`, such as a trailing closure, so `block` must not add one.
+const closure = (writer: SwiftWriter, opener: string, body: () => void): void => {
+    writer.line(opener);
+    writer.indent(body);
+    writer.line('}');
+};
+
+const emitKizunaStreaming = (writer: SwiftWriter): void => {
+    writer.blank();
+    writer.block('struct ServerSentEvent: Sendable', () => {
+        writer.line('let event: String?');
+        writer.line('let data: String');
+        writer.line('let id: String?');
+        writer.line('let retry: Int?');
+    });
+    writer.blank();
+    writer.block(
+        'static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse)',
+        () => {
+            writer.line('if let requestMiddleware {');
+            writer.line('    do { try await requestMiddleware(&request) }');
+            writer.line('    catch is CancellationError { throw Failure.cancelled }');
+            writer.line('    catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
+            writer.line('    catch { throw Failure.requestFailed(error) }');
+            writer.line('}');
+            writer.line('let bytes: URLSession.AsyncBytes');
+            writer.line('let response: URLResponse');
+            writer.line('do { (bytes, response) = try await session.bytes(for: request) }');
+            writer.line('catch is CancellationError { throw Failure.cancelled }');
+            writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
+            writer.line('catch { throw Failure.requestFailed(error) }');
+            writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
+            writer.line('return (bytes, httpResponse.statusCode, httpResponse)');
+        }
+    );
+    writer.blank();
+    writer.block(
+        'static func collect<Failure: KizunaFailure>(_ bytes: URLSession.AsyncBytes, failure: Failure.Type) async throws(Failure) -> Foundation.Data',
+        () => {
+            writer.line('var data = Foundation.Data()');
+            writer.line('do { for try await byte in bytes { data.append(byte) } }');
+            writer.line('catch is CancellationError { throw Failure.cancelled }');
+            writer.line('catch { throw Failure.requestFailed(error) }');
+            writer.line('return data');
+        }
+    );
+    writer.blank();
+    // Lines split on LF, CR, and CRLF, blank lines included, which is what server-sent events dispatch on.
+    writer.block('static func lines(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<String, Swift.Error>', () => {
+        closure(writer, 'AsyncThrowingStream { continuation in', () => {
+            writer.block('let task = Task', () => {
+                writer.line('var buffer: [UInt8] = []');
+                writer.line('var pendingCarriageReturn = false');
+                writer.block('do', () => {
+                    writer.block('for try await byte in bytes', () => {
+                        writer.line('if pendingCarriageReturn {');
+                        writer.line('    pendingCarriageReturn = false');
+                        writer.line('    if byte == 0x0A { continue }');
+                        writer.line('}');
+                        writer.line('if byte == 0x0A || byte == 0x0D {');
+                        writer.line('    pendingCarriageReturn = byte == 0x0D');
+                        writer.line('    continuation.yield(String(decoding: buffer, as: UTF8.self))');
+                        writer.line('    buffer.removeAll(keepingCapacity: true)');
+                        writer.line('    continue');
+                        writer.line('}');
+                        writer.line('buffer.append(byte)');
+                    });
+                    writer.line('if !buffer.isEmpty { continuation.yield(String(decoding: buffer, as: UTF8.self)) }');
+                    writer.line('continuation.finish()');
+                });
+                writer.line('catch { continuation.finish(throwing: error) }');
+            });
+            writer.line('continuation.onTermination = { _ in task.cancel() }');
+        });
+    });
+    writer.blank();
+    writer.block('static func chunks(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<Foundation.Data, Swift.Error>', () => {
+        closure(writer, 'AsyncThrowingStream { continuation in', () => {
+            writer.block('let task = Task', () => {
+                writer.line('var buffer = Foundation.Data()');
+                writer.block('do', () => {
+                    writer.block('for try await byte in bytes', () => {
+                        writer.line('buffer.append(byte)');
+                        writer.line('if buffer.count >= 16_384 {');
+                        writer.line('    continuation.yield(buffer)');
+                        writer.line('    buffer = Foundation.Data()');
+                        writer.line('}');
+                    });
+                    writer.line('if !buffer.isEmpty { continuation.yield(buffer) }');
+                    writer.line('continuation.finish()');
+                });
+                writer.line('catch { continuation.finish(throwing: error) }');
+            });
+            writer.line('continuation.onTermination = { _ in task.cancel() }');
+        });
+    });
+    writer.blank();
+    writer.block(
+        'static func serverSentEvents(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<ServerSentEvent, Swift.Error>',
+        () => {
+            closure(writer, 'AsyncThrowingStream { continuation in', () => {
+                writer.block('let task = Task', () => {
+                    writer.line('var eventType = ""');
+                    writer.line('var dataLines: [String] = []');
+                    writer.line('var lastEventId = ""');
+                    writer.line('var retry: Int? = nil');
+                    writer.block('do', () => {
+                        writer.block('for try await line in lines(bytes)', () => {
+                            writer.line('if line.isEmpty {');
+                            writer.line('    if !dataLines.isEmpty {');
+                            writer.line(
+                                '        continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))'
+                            );
+                            writer.line('        dataLines = []');
+                            writer.line('        retry = nil');
+                            writer.line('    }');
+                            writer.line('    eventType = ""');
+                            writer.line('    continue');
+                            writer.line('}');
+                            writer.line('if line.hasPrefix(":") { continue }');
+                            writer.line('let field: Substring');
+                            writer.line('var value: Substring');
+                            writer.line('if let separator = line.firstIndex(of: ":") {');
+                            writer.line('    field = line[..<separator]');
+                            writer.line('    value = line[line.index(after: separator)...]');
+                            writer.line('    if value.hasPrefix(" ") { value = value.dropFirst() }');
+                            writer.line('} else {');
+                            writer.line('    field = Substring(line)');
+                            writer.line('    value = ""');
+                            writer.line('}');
+                            writer.line('switch field {');
+                            writer.line('case "event": eventType = String(value)');
+                            writer.line('case "data": dataLines.append(String(value))');
+                            writer.line('case "id": if !value.contains("\\0") { lastEventId = String(value) }');
+                            writer.line(
+                                'case "retry": if !value.isEmpty, value.allSatisfy(\\.isNumber), let milliseconds = Int(value) { retry = milliseconds }'
+                            );
+                            writer.line('default: break');
+                            writer.line('}');
+                        });
+                        writer.line('continuation.finish()');
+                    });
+                    writer.line('catch { continuation.finish(throwing: error) }');
+                });
+                writer.line('continuation.onTermination = { _ in task.cancel() }');
+            });
+        }
+    );
+    writer.blank();
+    writer.block(
+        'static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error>',
+        () => {
+            closure(writer, 'AsyncThrowingStream { continuation in', () => {
+                writer.block('let task = Task', () => {
+                    writer.block('do', () => {
+                        writer.block('for try await event in serverSentEvents(bytes)', () => {
+                            writer.line('if let decoded = try decode(event, decoder) { continuation.yield(decoded) }');
+                        });
+                        writer.line('continuation.finish()');
+                    });
+                    writer.line('catch { continuation.finish(throwing: error) }');
+                });
+                writer.line('continuation.onTermination = { _ in task.cancel() }');
+            });
+        }
+    );
+};
+
+const emitKizunaNamespace = (
+    writer: SwiftWriter,
+    options: { multipart: boolean; multiError: boolean; streaming: boolean; clientName: string }
+): void => {
     writer.blank();
     writer.block('private enum Kizuna', () => {
         writer.block('@Sendable static func decodeDate(_ decoder: Decoder) throws -> Date', () => {
@@ -1204,6 +1455,7 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
                 }
             );
         }
+        if (options.streaming) emitKizunaStreaming(writer);
         if (options.multipart) {
             writer.blank();
             writer.block('struct MultipartBuilder', () => {
@@ -1389,6 +1641,10 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     }
 
     const responseBinding = method.resultHeaderFields.length > 0 ? 'httpResponse' : '_';
+    if (method.stream) {
+        emitStreamMethodTail(writer, method, context, receiver, responseBinding);
+        return;
+    }
     writer.line(
         `let (data, statusCode, ${responseBinding}) = try await Kizuna.send(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
     );
@@ -1450,6 +1706,16 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
             writer.line('    return');
         }
     }
+    emitErrorCases(writer, method, context, receiver);
+    writer.line('default:');
+    writer.line(`    throw ${failure}.unexpectedStatus(statusCode, data)`);
+    writer.line('}');
+};
+
+// The `case <status>:` arms for every declared error, reading the body from `data`. `prelude` runs first in
+// each arm, which is how a streamed method collects the bytes it has not read yet.
+const emitErrorCases = (writer: SwiftWriter, method: RouteMethod, context: EmitContext, receiver: string, prelude?: string): void => {
+    const failure = failureRef(method, context);
     const grouped = new Map<number, typeof method.errorCases>();
     for (const errorCase of method.errorCases) {
         const existing = grouped.get(errorCase.status);
@@ -1461,6 +1727,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     }
     for (const [status, cases] of grouped) {
         writer.line(`case ${status}:`);
+        if (prelude) writer.line(`    ${prelude}`);
         const firstCase = cases[0];
         if (cases.length === 1 && firstCase) {
             if (firstCase.type === 'Void') {
@@ -1488,7 +1755,66 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
             writer.line('    ])');
         }
     }
+};
+
+const emitStreamMethodTail = (
+    writer: SwiftWriter,
+    method: RouteMethod,
+    context: EmitContext,
+    receiver: string,
+    responseBinding: string
+): void => {
+    const failure = failureRef(method, context);
+    const stream = method.stream!;
+    const successResponse = method.successResponses.find((candidate) => candidate.status === stream.status)!;
+    const qualifiedResult = `${context.clientName}.${method.operationName}.${method.resultWrapperName}`;
+    const hasHeaders = method.resultHeaderFields.length > 0;
+    const collect = `let data = try await Kizuna.collect(bytes, failure: ${failure}.self)`;
+    writer.line(
+        `let (bytes, statusCode, ${responseBinding}) = try await Kizuna.open(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, failure: ${failure}.self)`
+    );
+    writer.line('switch statusCode {');
+    writer.line(`case ${stream.status}:`);
+    writer.indent(() => {
+        if (stream.mode === 'text') {
+            writer.line('let body = Kizuna.lines(bytes)');
+        } else if (stream.mode === 'binary') {
+            writer.line('let body = Kizuna.chunks(bytes)');
+        } else if (stream.events) {
+            const events = stream.events;
+            const elementType = streamElementType(method, context, 'actor');
+            closure(writer, `let body = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
+                writer.line('switch event.event {');
+                for (const event of events) {
+                    const payloadType = resolveType(event.type, method.operationName, context);
+                    writer.line(
+                        `case ${stringLiteral(event.name)}: return .${escapeKeyword(event.caseName)}(try decoder.decode(${payloadType}.self, from: Foundation.Data(event.data.utf8)))`
+                    );
+                }
+                writer.line('default: return nil');
+                writer.line('}');
+            });
+        } else {
+            const elementType = streamElementType(method, context, 'actor');
+            closure(writer, `let body = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
+                writer.line(`try decoder.decode(${elementType}.self, from: Foundation.Data(event.data.utf8))`);
+            });
+        }
+        for (const field of successResponse.responseHeaders) {
+            writer.line(`let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`);
+        }
+        if (hasHeaders) {
+            const headersInitArgs = method.resultHeaderFields
+                .map((field) => `${escapeKeyword(field.name)}: ${escapeKeyword(field.name)}`)
+                .join(', ');
+            writer.line(`return ${qualifiedResult}(body: body, headers: .init(${headersInitArgs}))`);
+        } else {
+            writer.line(`return ${qualifiedResult}(body: body)`);
+        }
+    });
+    emitErrorCases(writer, method, context, receiver, collect);
     writer.line('default:');
+    writer.line(`    ${collect}`);
     writer.line(`    throw ${failure}.unexpectedStatus(statusCode, data)`);
     writer.line('}');
 };
@@ -1769,6 +2095,7 @@ const emitClient = (
                 emitTypes(writer, localTypes, context);
                 emitRequestGroupStructs(writer, method, context);
                 emitSuccessSumEnum(writer, method, context);
+                emitEventEnum(writer, method, context);
                 emitResultStruct(writer, method, context);
                 emitFailureEnum(writer, method, context);
             });
@@ -1885,6 +2212,7 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
     emitKizunaNamespace(writer, {
         multipart: usesMultipart,
         multiError: usesMultiError,
+        streaming: allMethods.some((method) => method.stream !== undefined),
         clientName,
     });
 

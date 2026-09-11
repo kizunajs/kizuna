@@ -1,5 +1,5 @@
 import type { FlattenedRoute } from '@ts-kizuna/core/adapter';
-import type { RouteDefinition, Routes } from '@ts-kizuna/core';
+import { routeStreams, type RouteDefinition, type Routes } from '@ts-kizuna/core';
 import { isSafeMethod } from './method.js';
 
 /**
@@ -70,7 +70,8 @@ export interface ToolSelection<R extends Routes = Routes> {
 
 export const selectToolRoutes = (routes: FlattenedRoute[], selection: ToolSelection | undefined): FlattenedRoute[] =>
     routes.filter(({ route, routeKey }) => {
-        if (!takesJsonInput(route)) return false;
+        // A tool result is one value, so a route that streams has nothing to return.
+        if (!takesJsonInput(route) || routeStreams(route)) return false;
         if (selection?.onlyReadOnly && !isSafeMethod(route.method)) return false;
         return isExposed(selection?.tools, routeKey);
     });

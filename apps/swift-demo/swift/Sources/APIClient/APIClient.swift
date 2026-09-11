@@ -443,6 +443,10 @@ public final class APIClient: Sendable {
         APIInvitesClient(client: self)
     }
 
+    public var assistant: APIAssistantClient {
+        APIAssistantClient(client: self)
+    }
+
     public enum UsersListUsers {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -814,6 +818,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1882,6 +1891,79 @@ public final class APIClient: Sendable {
             }
         }
     }
+
+    public enum AssistantReply {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let prompt: String
+
+            public init(prompt: String) {
+                self.prompt = prompt
+            }
+        }
+
+        public struct Delta: Codable, Sendable, Equatable {
+            public let text: String
+
+            public init(text: String) {
+                self.text = text
+            }
+        }
+
+        public struct Done: Codable, Sendable, Equatable {
+            public let inputTokens: Int
+            public let outputTokens: Int
+
+            public init(
+                inputTokens: Int,
+                outputTokens: Int
+            ) {
+                self.inputTokens = inputTokens
+                self.outputTokens = outputTokens
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(prompt: String) -> Self {
+                .init(payload: Input(prompt: prompt))
+            }
+        }
+
+        public enum Event: Sendable, Equatable {
+            case delta(Delta)
+            case done(Done)
+        }
+
+        public struct Result: Sendable {
+            public let body: AsyncThrowingStream<Event, Swift.Error>
+
+            public init(body: AsyncThrowingStream<Event, Swift.Error>) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(API.ProblemDetails)
+            case validationError(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
 }
 
 public struct APIUsersClient: Sendable {
@@ -2564,6 +2646,46 @@ public struct APIInvitesClient: Sendable {
     }
 }
 
+public struct APIAssistantClient: Sendable {
+    private let client: APIClient
+
+    init(client: APIClient) {
+        self.client = client
+    }
+
+    /// Stream an assistant reply, exercises a server-sent events response
+    public func reply(_ body: APIClient.AssistantReply.Body) async throws(APIClient.AssistantReply.Failure) -> APIClient.AssistantReply.Result {
+        let path = "/assistant/reply"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.AssistantReply.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.AssistantReply.Failure.self)
+        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, failure: APIClient.AssistantReply.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = Kizuna.events(bytes, using: client.decoder) { event, decoder -> APIClient.AssistantReply.Event? in
+                switch event.event {
+                case "delta": return .delta(try decoder.decode(APIClient.AssistantReply.Delta.self, from: Foundation.Data(event.data.utf8)))
+                case "done": return .done(try decoder.decode(APIClient.AssistantReply.Done.self, from: Foundation.Data(event.data.utf8)))
+                default: return nil
+                }
+            }
+            return APIClient.AssistantReply.Result(body: body)
+        case 400:
+            let data = try await Kizuna.collect(bytes, failure: APIClient.AssistantReply.Failure.self)
+            throw Kizuna.firstError(statusCode: statusCode, data: data, [
+                { (try? client.decoder.decode(API.ProblemDetails.self, from: data)).map(APIClient.AssistantReply.Failure.badRequest) },
+                { (try? client.decoder.decode(APIClient.ValidationError.self, from: data)).map(APIClient.AssistantReply.Failure.validationError) },
+            ])
+        default:
+            let data = try await Kizuna.collect(bytes, failure: APIClient.AssistantReply.Failure.self)
+            throw APIClient.AssistantReply.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
 public protocol KizunaFailure: Swift.Error {
     static func requestFailed(_ error: Swift.Error) -> Self
     static var invalidRequest: Self { get }
@@ -2687,6 +2809,147 @@ private enum Kizuna {
             if let failure = attempt() { return failure }
         }
         return Failure.decoding(DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "No matching type for status \(statusCode)")), statusCode: statusCode, data: data)
+    }
+
+    struct ServerSentEvent: Sendable {
+        let event: String?
+        let data: String
+        let id: String?
+        let retry: Int?
+    }
+
+    static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse) {
+        if let requestMiddleware {
+            do { try await requestMiddleware(&request) }
+            catch is CancellationError { throw Failure.cancelled }
+            catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
+            catch { throw Failure.requestFailed(error) }
+        }
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+        do { (bytes, response) = try await session.bytes(for: request) }
+        catch is CancellationError { throw Failure.cancelled }
+        catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
+        catch { throw Failure.requestFailed(error) }
+        guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }
+        return (bytes, httpResponse.statusCode, httpResponse)
+    }
+
+    static func collect<Failure: KizunaFailure>(_ bytes: URLSession.AsyncBytes, failure: Failure.Type) async throws(Failure) -> Foundation.Data {
+        var data = Foundation.Data()
+        do { for try await byte in bytes { data.append(byte) } }
+        catch is CancellationError { throw Failure.cancelled }
+        catch { throw Failure.requestFailed(error) }
+        return data
+    }
+
+    static func lines(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<String, Swift.Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                var buffer: [UInt8] = []
+                var pendingCarriageReturn = false
+                do {
+                    for try await byte in bytes {
+                        if pendingCarriageReturn {
+                            pendingCarriageReturn = false
+                            if byte == 0x0A { continue }
+                        }
+                        if byte == 0x0A || byte == 0x0D {
+                            pendingCarriageReturn = byte == 0x0D
+                            continuation.yield(String(decoding: buffer, as: UTF8.self))
+                            buffer.removeAll(keepingCapacity: true)
+                            continue
+                        }
+                        buffer.append(byte)
+                    }
+                    if !buffer.isEmpty { continuation.yield(String(decoding: buffer, as: UTF8.self)) }
+                    continuation.finish()
+                }
+                catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    static func chunks(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<Foundation.Data, Swift.Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                var buffer = Foundation.Data()
+                do {
+                    for try await byte in bytes {
+                        buffer.append(byte)
+                        if buffer.count >= 16_384 {
+                            continuation.yield(buffer)
+                            buffer = Foundation.Data()
+                        }
+                    }
+                    if !buffer.isEmpty { continuation.yield(buffer) }
+                    continuation.finish()
+                }
+                catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    static func serverSentEvents(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<ServerSentEvent, Swift.Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                var eventType = ""
+                var dataLines: [String] = []
+                var lastEventId = ""
+                var retry: Int? = nil
+                do {
+                    for try await line in lines(bytes) {
+                        if line.isEmpty {
+                            if !dataLines.isEmpty {
+                                continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))
+                                dataLines = []
+                                retry = nil
+                            }
+                            eventType = ""
+                            continue
+                        }
+                        if line.hasPrefix(":") { continue }
+                        let field: Substring
+                        var value: Substring
+                        if let separator = line.firstIndex(of: ":") {
+                            field = line[..<separator]
+                            value = line[line.index(after: separator)...]
+                            if value.hasPrefix(" ") { value = value.dropFirst() }
+                        } else {
+                            field = Substring(line)
+                            value = ""
+                        }
+                        switch field {
+                        case "event": eventType = String(value)
+                        case "data": dataLines.append(String(value))
+                        case "id": if !value.contains("\0") { lastEventId = String(value) }
+                        case "retry": if !value.isEmpty, value.allSatisfy(\.isNumber), let milliseconds = Int(value) { retry = milliseconds }
+                        default: break
+                        }
+                    }
+                    continuation.finish()
+                }
+                catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    for try await event in serverSentEvents(bytes) {
+                        if let decoded = try decode(event, decoder) { continuation.yield(decoded) }
+                    }
+                    continuation.finish()
+                }
+                catch { continuation.finish(throwing: error) }
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
     }
 
     struct MultipartBuilder {

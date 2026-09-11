@@ -186,6 +186,24 @@ public func deleteUser(_ params: APIClient.DeleteUser.Params) async throws(APICl
 }
 ```
 
+## Streams
+
+A route whose response [streams](/docs/streaming) returns its `body` as an `AsyncThrowingStream`. Named events become an `Event` enum with one case per event, each carrying its decoded payload:
+
+```swift title="AssistantView.swift"
+let result = try await client.assistant.reply(.body(prompt: "hello"))
+for try await event in result.body {
+    switch event {
+    case .delta(let delta):
+        text += delta.text
+    case .done(let done):
+        print(done.outputTokens)
+    }
+}
+```
+
+A stream of one schema yields that type directly, a `text/*` stream yields one `String` per line, and a binary stream yields `Data` chunks. The status and headers are checked before the method returns, so a `400` throws its `Failure` as on any route. Cancelling the task that reads the stream closes the connection. A route that mixes a streamed status with another `2xx` is left out of the client, with a warning.
+
 ## Tip: automate with a script
 
 You can add a script to your `package.json` to regenerate the client whenever the contract changes:

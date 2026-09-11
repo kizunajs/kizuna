@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { generateSwiftClient } from './generator.js';
@@ -1865,5 +1865,101 @@ describe('Swift generator: union variants nest under their union', () => {
         const output = generateSwiftClient(collidingContract(), baseConfig);
         expect(output).toContain('public static func started(at: String) -> UserActivityEvent');
         expect(output).toContain('.started(Started(kind: "started", at: at))');
+    });
+});
+
+describe('Swift generator: streamed responses', () => {
+    const contractRoutes = k.routes('api', {
+        reply: {
+            method: 'POST',
+            path: '/reply',
+            body: z.object({
+                prompt: z.string(),
+            }),
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                        done: z.object({
+                            count: z.int(),
+                        }),
+                    },
+                },
+                400: z.object({
+                    type: z.string(),
+                    title: z.string(),
+                    status: z.number(),
+                    detail: z.string(),
+                }),
+            },
+        },
+        lines: {
+            method: 'GET',
+            path: '/lines',
+            responses: {
+                200: {
+                    stream: z.string(),
+                    contentType: 'text/plain',
+                },
+            },
+        },
+    });
+
+    it('emits an event type per named event and reads the body as a stream', () => {
+        const output = generateSwiftClient(
+            k.contract({
+                routes: contractRoutes,
+            }),
+            baseConfig
+        );
+        expect(output).toContain('public enum Event: Sendable, Equatable');
+        expect(output).toContain('case delta(Delta)');
+        expect(output).toContain('public let body: AsyncThrowingStream<Event, Swift.Error>');
+        expect(output).toContain('try await Kizuna.open(&request');
+        expect(output).toContain(
+            'case "delta": return .delta(try decoder.decode(TestAPIClient.Reply.Delta.self, from: Foundation.Data(event.data.utf8)))'
+        );
+        expect(output).toContain('let data = try await Kizuna.collect(bytes, failure: TestAPIClient.Reply.Failure.self)');
+        expect(output).toContain('static func serverSentEvents(_ bytes: URLSession.AsyncBytes)');
+    });
+
+    it('reads a text stream line by line', () => {
+        const output = generateSwiftClient(
+            k.contract({
+                routes: contractRoutes,
+            }),
+            baseConfig
+        );
+        expect(output).toContain('AsyncThrowingStream<String, Swift.Error>');
+        expect(output).toContain('Kizuna.lines(bytes)');
+    });
+
+    it('skips a route that mixes a streamed status with another success status', () => {
+        const mixed = k.routes('api', {
+            mixed: {
+                method: 'GET',
+                path: '/mixed',
+                responses: {
+                    200: {
+                        stream: z.string(),
+                    },
+                    202: z.object({
+                        queued: z.boolean(),
+                    }),
+                },
+            },
+        });
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const output = generateSwiftClient(
+            k.contract({
+                routes: mixed,
+            }),
+            baseConfig
+        );
+        expect(output).not.toContain('mixed(');
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('mixed'));
+        warn.mockRestore();
     });
 });

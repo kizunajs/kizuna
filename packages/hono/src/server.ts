@@ -103,9 +103,14 @@ export interface HonoOptions {
  * keyed by name. Each runs on every route and returns its schema's value.
  */
 
-const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { c: Context<Env>; formatError?: ErrorFormatter<Request> }>({
+const honoAdapter = createAdapter<
+    Request,
+    Response,
+    HonoHandlerContext<Env>,
+    { c: Context<Env>; formatError?: ErrorFormatter<Request>; responseValidation?: boolean }
+>({
     buildHandlerContext: (_adapterRequest, { c }) => ({ c }),
-    respond: (result, { c, formatError }) => {
+    respond: (result, { c, formatError, responseValidation }) => {
         if (result.kind === 'handler-error') {
             throw result.error;
         }
@@ -113,6 +118,16 @@ const honoAdapter = createAdapter<Request, Response, HonoHandlerContext<Env>, { 
             return result.response as Response;
         }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, c.req.raw, c.req.method);
+        if (rendered.stream) {
+            return c.body(
+                rendered.stream({
+                    signal: c.req.raw.signal,
+                    validate: responseValidation,
+                }),
+                rendered.status as ContentfulStatusCode,
+                rendered.headers
+            );
+        }
         if (rendered.body === undefined) {
             return c.body(null, rendered.status as ContentfulStatusCode, rendered.headers);
         }
@@ -170,6 +185,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                 responseContext: {
                     c: c as unknown as Context<Env>,
                     formatError: options?.formatError,
+                    responseValidation: options?.responseValidation,
                 },
                 guards,
                 schemes,

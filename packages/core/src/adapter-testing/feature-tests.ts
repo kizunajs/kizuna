@@ -28,8 +28,22 @@ import {
     pluginContract,
     createPluginRouter,
     pluginImplementations,
+    streamContract,
+    createStreamRouter,
+    streamGate,
+    streamedEventsText,
+    streamedTicksText,
+    streamedLinesText,
 } from './fixtures.js';
-import { toMountedApi, type MountedApi, type Transport, type TestResponse } from './transport.js';
+import {
+    collectStreamText,
+    readStreamText,
+    readStreamUntil,
+    toMountedApi,
+    type MountedApi,
+    type Transport,
+    type TestResponse,
+} from './transport.js';
 
 /**
  * One adapter, described by its parts. The `never` parameters are what let a contract known only at runtime reach a
@@ -117,6 +131,26 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             },
             use
         );
+
+    const usingStreams = <T>(use: (mounted: MountedApi) => Promise<T>, responseValidation?: boolean) => {
+        streamGate.reset();
+        return using(
+            {
+                contract: streamContract,
+                router: createStreamRouter(),
+                responseValidation,
+            },
+            use
+        );
+    };
+
+    const withTimeout = <T>(promise: Promise<T>, milliseconds: number, what: string): Promise<T> =>
+        Promise.race([
+            promise,
+            new Promise<T>((_, reject) =>
+                setTimeout(() => reject(new Error(`${what} did not happen within ${milliseconds}ms`)), milliseconds)
+            ),
+        ]);
 
     const usingCached = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
@@ -904,6 +938,126 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     } as never
                 )
             ).toThrow(/Plugin 'probe' is declared on the contract but has no server/);
+        },
+        'streams.sseFraming': async () => {
+            await usingStreams(async (streams) => {
+                const response = await streams.request({
+                    method: 'GET',
+                    path: '/events',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('content-type')).toContain('text/event-stream');
+                expect(response.headers.get('cache-control')).toBe('no-store');
+                expect(response.text).toBe(streamedEventsText);
+            });
+        },
+        'streams.unnamedData': async () => {
+            await usingStreams(async (streams) => {
+                const response = await streams.request({
+                    method: 'GET',
+                    path: '/ticks',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('content-type')).toContain('text/event-stream');
+                expect(response.text).toBe(streamedTicksText);
+            });
+        },
+        'streams.incrementalDelivery': async () => {
+            await usingStreams(async (streams) => {
+                streamGate.hold();
+                const response = await streams.stream({
+                    method: 'GET',
+                    path: '/events',
+                });
+                expect(response.status).toBe(200);
+                const reader = response.body.getReader();
+                const first = await withTimeout(
+                    readStreamUntil(reader, (text) => text.includes(': keep-alive')),
+                    2000,
+                    'the first message'
+                );
+                expect(first).toContain('event: delta');
+                expect(first).not.toContain('event: done');
+                streamGate.release();
+                const rest = await readStreamUntil(reader, (text) => text.includes('event: done'));
+                expect(first + rest).toBe(streamedEventsText);
+            });
+        },
+        'streams.clientDisconnectSignal': async () => {
+            await usingStreams(async (streams) => {
+                streamGate.hold();
+                const response = await streams.stream({
+                    method: 'GET',
+                    path: '/events',
+                });
+                const reader = response.body.getReader();
+                await readStreamUntil(reader, (text) => text.includes(': keep-alive'));
+                response.abort();
+                await withTimeout(streamGate.aborted, 2000, 'the abort signal');
+                streamGate.release();
+            });
+        },
+        'streams.rawChunks': async () => {
+            await usingStreams(async (streams) => {
+                const response = await streams.request({
+                    method: 'GET',
+                    path: '/lines.txt',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('content-type')).toContain('text/plain');
+                expect(response.headers.get('cache-control')).toBe('no-store');
+                expect(response.text).toBe(streamedLinesText);
+            });
+        },
+        'streams.headNoBody': async () => {
+            await usingStreams(async (streams) => {
+                const response = await streams.request({
+                    method: 'HEAD',
+                    path: '/events',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('content-type')).toContain('text/event-stream');
+                expect(response.text).toBe('');
+            });
+        },
+        'streams.errorStatusBuffered': async () => {
+            await usingStreams(async (streams) => {
+                const response = await streams.request({
+                    method: 'GET',
+                    path: '/events?fail=1',
+                });
+                expect(response.status).toBe(400);
+                expect(response.headers.get('content-type')).toContain('application/problem+json');
+                expect(response.body).toMatchObject({
+                    status: 400,
+                    detail: 'asked to fail',
+                });
+            });
+        },
+        'streams.midStreamErrorTruncates': async () => {
+            await usingStreams(async (streams) => {
+                const response = await streams.stream({
+                    method: 'GET',
+                    path: '/events?boom=1',
+                });
+                expect(response.status).toBe(200);
+                const { text, error } = await withTimeout(collectStreamText(response.body), 2000, 'the truncated read');
+                expect(text).toContain('event: delta');
+                expect(error).toBeDefined();
+            });
+        },
+        'streams.itemValidation': async () => {
+            await usingStreams(async (streams) => {
+                const response = await streams.stream({
+                    method: 'GET',
+                    path: '/events?invalid=1',
+                });
+                expect(response.status).toBe(200);
+                const { text, error } = await withTimeout(collectStreamText(response.body), 2000, 'the truncated read');
+                expect(text).toContain('data: {"text":"a"}');
+                expect(text).not.toContain('42');
+                expect(error).toBeDefined();
+            }, true);
         },
     };
 

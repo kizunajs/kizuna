@@ -995,3 +995,166 @@ export const createPluginRouter = <Context>(): Router<typeof pluginRoutes, Conte
             },
         }),
     }) as unknown as Router<typeof pluginRoutes, Context>;
+
+// Holds the generator before its last event. Open by default; `hold()` arms it for one test.
+const createStreamGate = () => {
+    let open: Promise<void> = Promise.resolve();
+    let release: () => void = () => undefined;
+    let markAborted: () => void = () => undefined;
+    let aborted: Promise<void> = new Promise((resolve) => {
+        markAborted = resolve;
+    });
+    return {
+        reset(): void {
+            open = Promise.resolve();
+            release = () => undefined;
+            aborted = new Promise((resolve) => {
+                markAborted = resolve;
+            });
+        },
+        hold(): void {
+            open = new Promise((resolve) => {
+                release = resolve;
+            });
+        },
+        release(): void {
+            release();
+        },
+        wait(): Promise<void> {
+            return open;
+        },
+        markAborted(): void {
+            markAborted();
+        },
+        get aborted(): Promise<void> {
+            return aborted;
+        },
+    };
+};
+
+export const streamGate = createStreamGate();
+
+export const streamRoutes = k.routes('api', {
+    watchEvents: {
+        method: 'GET',
+        path: '/events',
+        query: z.object({
+            fail: z.string().optional(),
+            boom: z.string().optional(),
+            invalid: z.string().optional(),
+        }),
+        responses: {
+            200: {
+                stream: {
+                    delta: z.object({
+                        text: z.string(),
+                    }),
+                    done: z.object({
+                        count: z.int(),
+                    }),
+                },
+            },
+            400: ProblemDetailsSchema,
+        },
+    },
+    watchTicks: {
+        method: 'GET',
+        path: '/ticks',
+        responses: {
+            200: {
+                stream: z.object({
+                    tick: z.int(),
+                }),
+            },
+        },
+    },
+    exportLines: {
+        method: 'GET',
+        path: '/lines.txt',
+        responses: {
+            200: {
+                stream: z.string(),
+                contentType: 'text/plain',
+            },
+        },
+    },
+});
+
+export const streamContract = k.contract({
+    routes: streamRoutes,
+});
+
+export const streamedEventsText =
+    'event: delta\ndata: {"text":"a"}\n\n: keep-alive\n\nevent: done\ndata: {"count":1}\nid: evt-1\nretry: 5000\n\n';
+export const streamedTicksText = 'data: {"tick":1}\n\ndata: {"tick":2}\n\n';
+export const streamedLinesText = 'one\ntwo\n';
+
+export const createStreamRouter = <Context>(): Router<typeof streamRoutes, Context> => ({
+    watchEvents: ({ query, throwError }) => {
+        if (query.fail === '1') {
+            return throwError({
+                status: 400,
+                body: {
+                    detail: 'asked to fail',
+                },
+            });
+        }
+        return {
+            status: 200,
+            body: async function* ({ signal }) {
+                signal.addEventListener('abort', () => streamGate.markAborted(), {
+                    once: true,
+                });
+                yield {
+                    event: 'delta',
+                    data: {
+                        text: 'a',
+                    },
+                };
+                yield {
+                    comment: 'keep-alive',
+                };
+                if (query.boom === '1') throw new Error('boom');
+                if (query.invalid === '1') {
+                    yield {
+                        event: 'delta',
+                        data: {
+                            text: 42 as unknown as string,
+                        },
+                    };
+                }
+                await streamGate.wait();
+                yield {
+                    event: 'done',
+                    data: {
+                        count: 1,
+                    },
+                    id: 'evt-1',
+                    retry: 5000,
+                };
+            },
+        };
+    },
+    watchTicks: () => ({
+        status: 200,
+        body: async function* () {
+            yield {
+                data: {
+                    tick: 1,
+                },
+            };
+            yield {
+                data: {
+                    tick: 2,
+                },
+            };
+        },
+    }),
+    exportLines: () => ({
+        status: 200,
+        body: async function* () {
+            yield 'one\n';
+            yield 'two\n';
+        },
+    }),
+});

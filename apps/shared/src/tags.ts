@@ -22,4 +22,8 @@ export const tags = Kizuna.tags({
         title: 'Invites',
         description: 'Invite capability URLs, guarded by a path-token custom identity',
     },
+    assistant: {
+        title: 'Assistant',
+        description: 'A reply that streams as server-sent events',
+    },
 });

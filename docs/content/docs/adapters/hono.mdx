@@ -208,6 +208,10 @@ const router: Router<typeof contract> = { ... };
 
 `RouteHandler` carries the route's `auth` and request context, nested groups included.
 
+## Streams
+
+A [stream](/docs/streaming) response is returned as a `ReadableStream` body. The generator's `signal` is `c.req.raw.signal`, which the Node server aborts when the client goes away.
+
 ## Reference
 
 - [`new KizunaServer()`](/docs/reference/kizuna-server)

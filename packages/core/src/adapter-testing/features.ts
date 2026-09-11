@@ -144,6 +144,33 @@ export const ADAPTER_FEATURES = {
     'plugins.serverRequired': {
         summary: 'A plugin declared on the contract with no server half passed to `server.api` throws, naming the module to import.',
     },
+    'streams.sseFraming': {
+        summary: 'A streamed status writes each yield as a server-sent event under `text/event-stream` with `Cache-Control: no-store`.',
+    },
+    'streams.unnamedData': {
+        summary: 'A stream of one schema writes `data` lines alone.',
+    },
+    'streams.incrementalDelivery': {
+        summary: 'The first message reaches the client before the generator has finished.',
+    },
+    'streams.clientDisconnectSignal': {
+        summary: 'The generator’s `signal` fires when the client goes away.',
+    },
+    'streams.rawChunks': {
+        summary: 'A `text/*` stream writes each yield as-is, with no framing.',
+    },
+    'streams.headNoBody': {
+        summary: 'A HEAD of a streamed GET answers its headers and no body.',
+    },
+    'streams.errorStatusBuffered': {
+        summary: 'A non-stream status on a streaming route is sent whole, as Problem Details.',
+    },
+    'streams.midStreamErrorTruncates': {
+        summary: 'A throw after the first message ends the connection, so the client’s read fails.',
+    },
+    'streams.itemValidation': {
+        summary: 'With `responseValidation` on, a message failing its schema ends the stream.',
+    },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 
 export type AdapterFeature = keyof typeof ADAPTER_FEATURES;

@@ -7,6 +7,7 @@ package com.kizuna.demo
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlinx.datetime.Instant
+import kotlinx.coroutines.flow.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -931,6 +932,47 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object AssistantReply {
+
+        @Serializable
+        data class Input(val prompt: String)
+
+        @Serializable
+        data class Delta(val text: String)
+
+        @Serializable
+        data class Done(
+            val inputTokens: Int,
+            val outputTokens: Int
+        )
+
+        data class Body(val prompt: String)
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(prompt: String): AfterBody = AfterBody(body = Body(prompt = prompt))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        sealed interface Event {
+            data class Delta(val data: APIClient.AssistantReply.Delta) : Event
+            data class Done(val data: APIClient.AssistantReply.Done) : Event
+        }
+
+        data class Result(val body: Flow<Event>)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: API.ProblemDetails) : Failure()
+            data class ValidationError(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
@@ -942,6 +984,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val invites = APIInvitesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val assistant = APIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 }
 
 class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -2046,7 +2090,118 @@ class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: St
     }
 }
 
+class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** Stream an assistant reply, exercises a server-sent events response */
+    @Throws(APIClient.AssistantReply.Failure::class)
+    suspend fun reply(build: APIClient.AssistantReply.Scope.() -> APIClient.AssistantReply.Args): APIClient.AssistantReply.Result {
+        val args = APIClient.AssistantReply.Scope.build()
+        val body = args.body
+        val path = "/assistant/reply"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = APIClient.AssistantReply.Input(prompt = body.prompt)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+        if (httpResponse.code == 200) {
+            val body = Kizuna.events<APIClient.AssistantReply.Event>(httpResponse) { event ->
+                when (event.event) {
+                    "delta" -> APIClient.AssistantReply.Event.Delta(json.decodeFromString<APIClient.AssistantReply.Delta>(event.data))
+                    "done" -> APIClient.AssistantReply.Event.Done(json.decodeFromString<APIClient.AssistantReply.Done>(event.data))
+                    else -> null
+                }
+            }
+            return APIClient.AssistantReply.Result(body = body)
+        }
+        return httpResponse.use {
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                400 -> {
+                    val badRequest = try {
+                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                    } catch (_: Exception) { null }
+                    if (badRequest != null) throw APIClient.AssistantReply.Failure.BadRequest(body = badRequest)
+                    val validationError = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (_: Exception) { null }
+                    if (validationError != null) throw APIClient.AssistantReply.Failure.ValidationError(body = validationError)
+                    throw APIClient.AssistantReply.Failure.Unexpected(statusCode = statusCode, data = data)
+                }
+                else -> throw APIClient.AssistantReply.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
 private object Kizuna {
+
+    data class ServerSentEvent(val event: String?, val data: String, val id: String?, val retry: Int?)
+
+    private suspend fun readLine(source: okio.BufferedSource): String? {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { source.readUtf8Line() }
+    }
+
+    fun lines(response: Response): Flow<String> = flow {
+        response.use { open ->
+            val source = open.body?.source() ?: return@use
+            while (true) {
+                val line = readLine(source) ?: break
+                emit(line)
+            }
+        }
+    }
+
+    fun chunks(response: Response): Flow<ByteArray> = flow {
+        response.use { open ->
+            val source = open.body?.source() ?: return@use
+            val buffer = ByteArray(16_384)
+            while (true) {
+                val read = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { source.read(buffer) }
+                if (read == -1) break
+                emit(buffer.copyOf(read))
+            }
+        }
+    }
+
+    fun serverSentEvents(response: Response): Flow<ServerSentEvent> = flow {
+        response.use { open ->
+            val source = open.body?.source() ?: return@use
+            var eventType = ""
+            val dataLines = mutableListOf<String>()
+            var lastEventId = ""
+            var retry: Int? = null
+            while (true) {
+                val line = readLine(source) ?: break
+                if (line.isEmpty()) {
+                    if (dataLines.isNotEmpty()) {
+                        emit(ServerSentEvent(eventType.ifEmpty { null }, dataLines.joinToString("\n"), lastEventId.ifEmpty { null }, retry))
+                        dataLines.clear()
+                        retry = null
+                    }
+                    eventType = ""
+                    continue
+                }
+                if (line.startsWith(":")) continue
+                val separator = line.indexOf(':')
+                val field = if (separator == -1) line else line.substring(0, separator)
+                val value = (if (separator == -1) "" else line.substring(separator + 1)).removePrefix(" ")
+                when (field) {
+                    "event" -> eventType = value
+                    "data" -> dataLines.add(value)
+                    "id" -> if (!value.contains('\u0000')) lastEventId = value
+                    "retry" -> if (value.isNotEmpty() && value.all { it.isDigit() }) retry = value.toIntOrNull()
+                }
+            }
+        }
+    }
+
+    fun <Event : Any> events(response: Response, decode: (ServerSentEvent) -> Event?): Flow<Event> = serverSentEvents(response).mapNotNull(decode)
     fun resolveUrl(baseUrl: String, path: String): HttpUrl.Builder {
         val base = baseUrl.toHttpUrl()
         val trimmedPath = path.trimStart('/')

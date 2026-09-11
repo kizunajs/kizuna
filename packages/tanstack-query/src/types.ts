@@ -4,14 +4,15 @@ import type {
     InfiniteData,
     InfiniteQueryObserverOptions,
     MutationObserverOptions,
+    QueryFunction,
     QueryFunctionContext,
     QueryObserverOptions,
     SkipToken,
 } from '@tanstack/query-core';
-import type { RouteDefinition, Routes } from '@ts-kizuna/core';
+import type { RouteDefinition, Routes, StreamMessageOf, StreamResponseDefinition } from '@ts-kizuna/core';
 import type { Client, ClientArgs, ClientResponse } from '@ts-kizuna/fetch';
 
-export type KizunaQueryKeyType = 'query' | 'infinite';
+export type KizunaQueryKeyType = 'query' | 'infinite' | 'stream';
 
 /**
  * `[segments, { input, type }]`, for example
@@ -154,9 +155,63 @@ export interface PathProcedures {
     key: () => KizunaPathKey;
 }
 
-type Procedure<R extends RouteDefinition, Codes extends string> = R['method'] extends 'GET' | 'HEAD'
-    ? QueryProcedure<R, Codes>
-    : MutationProcedure<R, Codes>;
+type StreamMessageOfRoute<R extends RouteDefinition> = {
+    [Status in keyof R['responses']]: R['responses'][Status] extends StreamResponseDefinition
+        ? StreamMessageOf<R['responses'][Status]>
+        : never;
+}[keyof R['responses']];
+
+type StreamExtras<TData, TError> = Omit<QueryObserverOptions<TData, TError, unknown, TData, KizunaQueryKey>, 'queryKey' | 'queryFn'> & {
+    /**
+     * What a refetch does with the messages already held: `'reset'` clears them
+     * first, `'append'` adds to them, `'replace'` swaps them in once the stream ends.
+     *
+     * @default 'reset'
+     */
+    refetchMode?: 'append' | 'reset' | 'replace';
+};
+
+type StreamOptionsOut<U, TData, TError> = Omit<NoInfer<U>, 'input' | 'refetchMode'> & {
+    queryKey: DataTag<KizunaQueryKey, TData, TError>;
+    queryFn: U extends { input: SkipToken } ? SkipToken : QueryFunction<TData, KizunaQueryKey>;
+};
+
+type StreamOptionsFn<R extends RouteDefinition, Codes extends string> = <
+    U extends QueryInput<R> & StreamExtras<StreamMessageOfRoute<R>[], DefaultError>,
+>(
+    options: U
+) => StreamOptionsOut<U, StreamMessageOfRoute<R>[], DefaultError>;
+
+/**
+ * A route whose response streams. `data` is the list of messages received so
+ * far, growing as they arrive.
+ */
+export interface StreamProcedure<R extends RouteDefinition, Codes extends string> {
+    /**
+     * Options for `useQuery`, over TanStack's `streamedQuery`. A status other than
+     * the streamed one throws `NonStreamResponseError`.
+     */
+    streamOptions: StreamOptionsFn<R, Codes>;
+    /**
+     * The stream query's full key.
+     */
+    streamKey: KeyFn<R>;
+    key: () => KizunaPathKey;
+    call: CallFn<R, Codes>;
+}
+
+type HasStream<R extends RouteDefinition> = {
+    [Status in keyof R['responses']]: R['responses'][Status] extends StreamResponseDefinition ? true : never;
+}[keyof R['responses']] extends never
+    ? false
+    : true;
+
+type Procedure<R extends RouteDefinition, Codes extends string> =
+    HasStream<R> extends true
+        ? StreamProcedure<R, Codes>
+        : R['method'] extends 'GET' | 'HEAD'
+          ? QueryProcedure<R, Codes>
+          : MutationProcedure<R, Codes>;
 
 /**
  * The route tree, each route carrying its query or mutation factories.

@@ -18,11 +18,16 @@ import {
     resolveResponseCache,
     resolveResponseEtag,
     deprecationHeaders,
+    isStreamResponse,
+    isNamedStream,
+    streamMode,
+    streamContentType,
     cacheHeaders,
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
 import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
 import { OPENAPI_PLUGIN_NAME } from './plugin.js';
+import type { StreamResponseDefinition } from '@ts-kizuna/core';
 import type {
     GenerateOpenApiOptions,
     OpenApiDocument,
@@ -32,6 +37,35 @@ import type {
     OpenApiResponseObject,
     OpenApiTag,
 } from './types.js';
+
+// One message, the shape OpenAPI 3.2's `itemSchema` uses; 3.1 has no field for a sequence.
+const streamJsonSchema = (
+    response: StreamResponseDefinition,
+    toJsonSchema: (schema: z.ZodType, io: 'input' | 'output') => Record<string, unknown>
+): Record<string, unknown> => {
+    const mode = streamMode(response);
+    if (mode === 'text') return { type: 'string' };
+    if (mode === 'binary') return { type: 'string', format: 'binary' };
+    const eventFields = {
+        id: { type: 'string' },
+        retry: { type: 'integer' },
+    };
+    const message = (data: Record<string, unknown>, event?: string) => ({
+        type: 'object',
+        required: event === undefined ? ['data'] : ['event', 'data'],
+        properties: {
+            ...(event === undefined ? {} : { event: { const: event } }),
+            data,
+            ...eventFields,
+        },
+    });
+    if (isNamedStream(response.stream)) {
+        return {
+            oneOf: Object.entries(response.stream).map(([event, schema]) => message(toJsonSchema(schema, 'output'), event)),
+        };
+    }
+    return message(toJsonSchema(response.stream, 'output'));
+};
 
 const convertPath = (path: string): string => {
     const { segments } = parsePath(path);
@@ -290,7 +324,6 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
             }
 
             for (const [statusKey, responseValue] of Object.entries(route.responses)) {
-                const bodySchema = resolveResponseBody(responseValue);
                 const headersSchema = resolveResponseHeaders(responseValue);
                 const description = getStatusText(Number(statusKey));
                 const headersObject: OpenApiResponseObject['headers'] = headersSchema
@@ -301,6 +334,19 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                           ).map(([name, schema]) => [name, { schema, required: false }])
                       )
                     : undefined;
+                if (isStreamResponse(responseValue)) {
+                    operation.responses[statusKey] = {
+                        description,
+                        ...(headersObject ? { headers: headersObject } : {}),
+                        content: {
+                            [streamContentType(responseValue)]: {
+                                schema: streamJsonSchema(responseValue, toJsonSchema),
+                            },
+                        },
+                    };
+                    continue;
+                }
+                const bodySchema = resolveResponseBody(responseValue)!;
                 const mediaType =
                     resolveResponseContentType(responseValue) ??
                     (Number(statusKey) >= 400 ? 'application/problem+json' : 'application/json');

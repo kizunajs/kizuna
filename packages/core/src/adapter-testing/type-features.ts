@@ -85,6 +85,12 @@ export const ADAPTER_TYPE_FEATURES = {
     'plugins.absentWhenUninstalled': {
         summary: 'A contract with no plugins gives handlers no `plugins` key at all.',
     },
+    'streams.bodyGenerator': {
+        summary: 'An inline async generator on a streamed status infers its event names as literals and checks each `data` payload.',
+    },
+    'streams.bodyRejectsValue': {
+        summary: 'A plain value is refused as the body of a streamed status, and `throwError` refuses a streamed status.',
+    },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 
 export type AdapterTypeFeature = keyof typeof ADAPTER_TYPE_FEATURES;

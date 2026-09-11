@@ -152,6 +152,24 @@ return {
 };
 ```
 
+A status declared with [`stream`](/docs/streaming) takes an async generator function as `body`. kizuna sends the status and headers, then writes each `yield` as it happens:
+
+```ts
+return {
+    status: 200,
+    body: async function* ({ signal }) {
+        yield {
+            event: 'delta',
+            data: {
+                text: 'Hello',
+            },
+        };
+    },
+};
+```
+
+`signal` fires when the client goes away. `throwError` takes no streamed status.
+
 A response with a [cache policy](/docs/caching) sends its `Cache-Control` whenever your handler returns that status. The declaration wins, so returning a `cache-control` of your own does not change it.
 
 ## Error responses

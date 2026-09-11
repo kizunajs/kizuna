@@ -5,6 +5,7 @@ import { notifications } from './notifications';
 import { members } from './members';
 import { workspace } from './workspace';
 import { invites } from './invites';
+import { assistant } from './assistant';
 
 export const router = server.router({
     users,
@@ -13,4 +14,5 @@ export const router = server.router({
     members,
     workspace,
     invites,
+    assistant,
 });

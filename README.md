@@ -22,6 +22,7 @@ Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typ
 - **Type-safe everywhere**: full inference on both sides, no casting
 - **Typed authentication**: identities and per-route authentication declared on the contract
 - **RPC-like client**: call your API like a function, get fully typed responses back
+- **Streaming**: declare a response as a stream of typed events, yield them from an async generator, and read them with `for await` in the fetch client
 - **TanStack Query**: typed query and mutation options with caching and invalidation
 - **Adapters**: mount your API on Express, Fastify, Hono, or Next.js
 - **HTTP/REST**: follows HTTP and REST standards. RFC 9110 semantics, RFC 9457 Problem Details

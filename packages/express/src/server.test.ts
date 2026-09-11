@@ -1,7 +1,9 @@
 import express from 'express';
 import request from 'supertest';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { KizunaServer } from './server.js';
-import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 testAdapterFeatures({
     name: 'express',
@@ -12,7 +14,23 @@ testAdapterFeatures({
         api.mount(app, {
             responseValidation,
         });
+        let server: Server | undefined;
+        const baseUrl = async (): Promise<string> => {
+            if (!server) {
+                const started = createServer(app);
+                await new Promise<void>((resolve) => started.listen(0, '127.0.0.1', resolve));
+                server = started;
+            }
+            return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+        };
         return {
+            close: async () => {
+                const started = server;
+                if (!started) return;
+                started.closeAllConnections();
+                await new Promise<void>((resolve) => started.close(() => resolve()));
+            },
+            stream: async (mountRequest) => fetchStream(await baseUrl(), mountRequest),
             request: async ({ method, path, body, headers }) => {
                 let call = request(app)[method.toLowerCase() as 'get'](path).buffer(true);
                 for (const [name, value] of Object.entries(headers)) call = call.set(name, value);

@@ -1,7 +1,7 @@
-import { skipToken } from '@tanstack/query-core';
-import type { RouteDefinition, Routes } from '@ts-kizuna/core';
+import { experimental_streamedQuery as streamedQuery, skipToken } from '@tanstack/query-core';
+import { routeStreams, streamStatuses, type RouteDefinition, type Routes } from '@ts-kizuna/core';
 import { isRouteDefinition } from '@ts-kizuna/core/adapter';
-import { UndeclaredResponseError } from './errors.js';
+import { NonStreamResponseError, UndeclaredResponseError } from './errors.js';
 import { buildPathKey, buildQueryKey } from './keys.js';
 import type { KizunaTanstackQueryConstructor } from './types.js';
 
@@ -54,9 +54,39 @@ const runRoute = async (
 
 const isQueryMethod = (route: RouteDefinition): boolean => route.method === 'GET' || route.method === 'HEAD';
 
+type StreamRefetchMode = 'append' | 'reset' | 'replace';
+
 const buildProcedure = (segments: readonly string[], route: RouteDefinition, clientFn: ClientNode): Record<string, unknown> => {
     const routeKey = segments.join('.');
     const call = (args?: unknown) => clientFn(args);
+
+    if (routeStreams(route)) {
+        return {
+            streamOptions: (options: Record<string, unknown>) => {
+                const { input, refetchMode, ...rest } = options;
+                const skipped = input === skipToken;
+                return {
+                    queryKey: buildQueryKey(segments, skipped ? undefined : input, 'stream'),
+                    queryFn: skipped
+                        ? skipToken
+                        : streamedQuery({
+                              streamFn: async ({ signal }: { signal: AbortSignal }) => {
+                                  const result = (await runRoute(clientFn, route, routeKey, input, signal)) as ClientResult;
+                                  if (!streamStatuses(route).includes(result.status)) {
+                                      throw new NonStreamResponseError(routeKey, result.status, result.body, result.headers);
+                                  }
+                                  return result.body as AsyncIterable<unknown>;
+                              },
+                              ...(refetchMode === undefined ? {} : { refetchMode: refetchMode as StreamRefetchMode }),
+                          }),
+                    ...rest,
+                };
+            },
+            streamKey: (options?: { input?: unknown }) => buildQueryKey(segments, options?.input, 'stream'),
+            key: () => buildPathKey(segments),
+            call,
+        };
+    }
 
     if (!isQueryMethod(route)) {
         return {

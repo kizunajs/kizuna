@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { generateKotlinClient } from './generator.js';
@@ -1897,5 +1897,101 @@ describe('Kotlin generator: union variants owned by a name-prefix class', () => 
         expect(output).toContain('enum class Reason');
         expect(output).not.toContain('UserSessionEventLogoutReason');
         expect(output).not.toContain('User.SessionEventLogoutReason');
+    });
+});
+
+describe('Kotlin generator: streamed responses', () => {
+    const contractRoutes = k.routes({
+        reply: {
+            method: 'POST',
+            path: '/reply',
+            body: z.object({
+                prompt: z.string(),
+            }),
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                        done: z.object({
+                            count: z.int(),
+                        }),
+                    },
+                },
+                400: z.object({
+                    type: z.string(),
+                    title: z.string(),
+                    status: z.number(),
+                    detail: z.string(),
+                }),
+            },
+        },
+        lines: {
+            method: 'GET',
+            path: '/lines',
+            responses: {
+                200: {
+                    stream: z.string(),
+                    contentType: 'text/plain',
+                },
+            },
+        },
+    });
+
+    it('emits an event type per named event and reads the body as a stream', () => {
+        const output = generateKotlinClient(
+            k.contract({
+                routes: contractRoutes,
+            }),
+            baseConfig
+        );
+        expect(output).toContain('sealed interface Event');
+        expect(output).toContain('data class Delta(val data: TestAPIClient.Reply.Delta) : Event');
+        expect(output).toContain('data class Result(val body: Flow<Event>)');
+        expect(output).toContain('if (httpResponse.code == 200)');
+        expect(output).toContain(
+            '"delta" -> TestAPIClient.Reply.Event.Delta(json.decodeFromString<TestAPIClient.Reply.Delta>(event.data))'
+        );
+        expect(output).toContain('fun serverSentEvents(response: Response): Flow<ServerSentEvent>');
+        expect(output).toContain('import kotlinx.coroutines.flow.*');
+    });
+
+    it('reads a text stream line by line', () => {
+        const output = generateKotlinClient(
+            k.contract({
+                routes: contractRoutes,
+            }),
+            baseConfig
+        );
+        expect(output).toContain('Flow<String>');
+        expect(output).toContain('Kizuna.lines(httpResponse)');
+    });
+
+    it('skips a route that mixes a streamed status with another success status', () => {
+        const mixed = k.routes({
+            mixed: {
+                method: 'GET',
+                path: '/mixed',
+                responses: {
+                    200: {
+                        stream: z.string(),
+                    },
+                    202: z.object({
+                        queued: z.boolean(),
+                    }),
+                },
+            },
+        });
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        const output = generateKotlinClient(
+            k.contract({
+                routes: mixed,
+            }),
+            baseConfig
+        );
+        expect(output).not.toContain('mixed(');
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('mixed'));
+        warn.mockRestore();
     });
 });

@@ -15,6 +15,11 @@ import {
     isSuccessStatus,
     mergeHeaderFields,
     type RouteDefinition,
+    isStreamResponse,
+    isNamedStream,
+    streamMode,
+    routeStreams,
+    soleStreamResponse,
 } from '@ts-kizuna/core/generator';
 import type { Contract } from '@ts-kizuna/core';
 import { KotlinWriter, stringLiteral } from './emit.js';
@@ -96,6 +101,14 @@ interface RouteMethod {
         status: number;
         type: string;
     }>;
+    stream?: StreamDescriptor;
+}
+
+interface StreamDescriptor {
+    status: number;
+    mode: 'events' | 'text' | 'binary';
+    events?: Array<{ name: string; caseName: string; type: string }>;
+    messageType?: string;
 }
 
 interface RouteGroup {
@@ -212,10 +225,45 @@ const buildRouteMethod = (
     const successResponses: RouteMethod['successResponses'] = [];
     const errorCases: RouteMethod['errorCases'] = [];
 
+    let stream: StreamDescriptor | undefined;
     for (const [statusKey, responseValue] of Object.entries(route.responses)) {
         const status = Number(statusKey);
         const responseHint = `${baseHint}Response${status === 200 ? '' : status}`;
-        const bodySchema = resolveResponseBody(responseValue);
+        if (isStreamResponse(responseValue)) {
+            const mode = streamMode(responseValue);
+            if (mode === 'events' && isNamedStream(responseValue.stream)) {
+                stream = {
+                    status,
+                    mode,
+                    events: Object.entries(responseValue.stream).map(([name, schema]) => ({
+                        name,
+                        caseName: toPascalCase(name),
+                        type: mapType(schema, registry, `${baseHint}${toPascalCase(name)}`).expression,
+                    })),
+                };
+            } else if (mode === 'events') {
+                stream = {
+                    status,
+                    mode,
+                    messageType: mapType(responseValue.stream as z.ZodType, registry, `${baseHint}Message`).expression,
+                };
+            } else {
+                stream = {
+                    status,
+                    mode,
+                };
+            }
+            const headersSchema = resolveResponseHeaders(responseValue);
+            successResponses.push({
+                status,
+                type: stream.messageType ?? 'Event',
+                responseHeaders: headersSchema
+                    ? collectObjectFields(headersSchema as z.ZodType, registry, `${baseHint}ResponseHeaders`)
+                    : [],
+            });
+            continue;
+        }
+        const bodySchema = resolveResponseBody(responseValue)!;
         const result = mapType(bodySchema as z.ZodType, registry, responseHint);
         const typeExpression = result.expression;
         if (isSuccessStatus(status)) {
@@ -285,6 +333,7 @@ const buildRouteMethod = (
         successSumClassName,
         failureClassName: 'Failure',
         errorCases,
+        stream,
     };
 };
 
@@ -294,6 +343,12 @@ const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: Typ
 
     return {
         processRoute({ routeKey, route, deprecated, deprecationMessage }) {
+            if (routeStreams(route) && soleStreamResponse(route) === undefined) {
+                console.warn(
+                    `[ts-kizuna/kotlin] Skipping route "${routeKey}": a streamed status beside another 2xx status is not generated.`
+                );
+                return;
+            }
             const dotIndex = routeKey.indexOf('.');
             if (dotIndex !== -1) {
                 const groupKey = routeKey.slice(0, dotIndex);
@@ -800,10 +855,23 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
         });
     }
 
+    const streamEvents = method.stream?.events;
+    if (streamEvents) {
+        writer.blank();
+        writer.block('sealed interface Event', () => {
+            for (const event of streamEvents) {
+                const payloadType = resolveType(event.type, method.operationName, context);
+                writer.line(`data class ${event.caseName}(val data: ${payloadType}) : Event`);
+            }
+        });
+    }
+
     if (!isVoidSuccess) {
-        const bodyType = isMultiSuccess
-            ? 'Success'
-            : resolveType(method.successReturnType, method.operationName, context, 'operation-object');
+        const bodyType = method.stream
+            ? `Flow<${streamElementType(method, context, 'operation-object')}>`
+            : isMultiSuccess
+              ? 'Success'
+              : resolveType(method.successReturnType, method.operationName, context, 'operation-object');
         writer.blank();
         const params = [`val body: ${bodyType}`];
         if (hasHeaders) params.push('val headers: Headers');
@@ -838,6 +906,14 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
         writer.line('class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")');
         writer.line('class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)');
     });
+};
+
+const streamElementType = (method: RouteMethod, context: EmitContext, scope: 'operation-object' | 'client'): string => {
+    const stream = method.stream!;
+    if (stream.mode === 'text') return 'String';
+    if (stream.mode === 'binary') return 'ByteArray';
+    if (stream.events) return scope === 'operation-object' ? 'Event' : `${context.clientName}.${method.operationName}.Event`;
+    return resolveType(stream.messageType!, method.operationName, context, scope);
 };
 
 const groupTypeRef = (operationName: string, className: string, context: EmitContext): string =>
@@ -1221,6 +1297,10 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
     writer.line('requestInterceptor?.invoke(requestBuilder)');
 
     writer.line('val httpResponse = Kizuna.execute(client, requestBuilder.build())');
+    if (method.stream) {
+        emitStreamMethodTail(writer, method, context);
+        return;
+    }
     writer.line(`${isVoidSuccess ? '' : 'return '}httpResponse.use {`);
     writer.indent(() => {
         writer.line('responseInterceptor?.invoke(requestBuilder.build(), httpResponse)');
@@ -1259,55 +1339,117 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
                 writer.line('}');
             }
 
-            const grouped = new Map<number, typeof method.errorCases>();
-            for (const errorCase of method.errorCases) {
-                const existing = grouped.get(errorCase.status);
-                if (existing) {
-                    existing.push(errorCase);
+            emitErrorBranches(writer, method, context);
+        });
+        writer.line('}');
+    });
+    writer.line('}');
+};
+
+// The `<status> -> { ... }` branches for every declared error plus the `else`, reading the body from `data`.
+const emitErrorBranches = (writer: KotlinWriter, method: RouteMethod, context: EmitContext): void => {
+    const operationRef = `${context.clientName}.${method.operationName}`;
+    const failureRef = `${operationRef}.Failure`;
+    const grouped = new Map<number, typeof method.errorCases>();
+    for (const errorCase of method.errorCases) {
+        const existing = grouped.get(errorCase.status);
+        if (existing) {
+            existing.push(errorCase);
+        } else {
+            grouped.set(errorCase.status, [errorCase]);
+        }
+    }
+    for (const [status, cases] of grouped) {
+        writer.line(`${status} -> {`);
+        writer.indent(() => {
+            if (cases.length === 1) {
+                const errorCase = cases[0]!;
+                const caseName = toPascalCase(errorCase.caseName);
+                if (errorCase.type === 'Unit') {
+                    writer.line(`throw ${failureRef}.${caseName}`);
                 } else {
-                    grouped.set(errorCase.status, [errorCase]);
+                    const resolved = resolveType(errorCase.type, method.operationName, context);
+                    writer.line('val payload = try {');
+                    writer.indent(() => {
+                        writer.line(`json.decodeFromString<${resolved}>(data.decodeToString())`);
+                    });
+                    writer.line(`} catch (error: Exception) { throw ${failureRef}.Decoding(error, statusCode, data) }`);
+                    writer.line(`throw ${failureRef}.${caseName}(body = payload)`);
                 }
-            }
-            for (const [status, cases] of grouped) {
-                writer.line(`${status} -> {`);
-                writer.indent(() => {
-                    if (cases.length === 1) {
-                        const errorCase = cases[0]!;
-                        const caseName = toPascalCase(errorCase.caseName);
-                        if (errorCase.type === 'Unit') {
-                            writer.line(`throw ${failureRef}.${caseName}`);
-                        } else {
-                            const resolved = resolveType(errorCase.type, method.operationName, context);
-                            writer.line('val payload = try {');
-                            writer.indent(() => {
-                                writer.line(`json.decodeFromString<${resolved}>(data.decodeToString())`);
-                            });
-                            writer.line(`} catch (error: Exception) { throw ${failureRef}.Decoding(error, statusCode, data) }`);
-                            writer.line(`throw ${failureRef}.${caseName}(body = payload)`);
-                        }
+            } else {
+                for (const errorCase of cases) {
+                    const caseName = toPascalCase(errorCase.caseName);
+                    if (errorCase.type === 'Unit') {
+                        writer.line(`throw ${failureRef}.${caseName}`);
                     } else {
-                        for (const errorCase of cases) {
-                            const caseName = toPascalCase(errorCase.caseName);
-                            if (errorCase.type === 'Unit') {
-                                writer.line(`throw ${failureRef}.${caseName}`);
-                            } else {
-                                const resolved = resolveType(errorCase.type, method.operationName, context);
-                                writer.line(`val ${errorCase.caseName} = try {`);
-                                writer.indent(() => {
-                                    writer.line(`json.decodeFromString<${resolved}>(data.decodeToString())`);
-                                });
-                                writer.line('} catch (_: Exception) { null }');
-                                writer.line(
-                                    `if (${errorCase.caseName} != null) throw ${failureRef}.${caseName}(body = ${errorCase.caseName})`
-                                );
-                            }
-                        }
-                        writer.line(`throw ${failureRef}.Unexpected(statusCode = statusCode, data = data)`);
+                        const resolved = resolveType(errorCase.type, method.operationName, context);
+                        writer.line(`val ${errorCase.caseName} = try {`);
+                        writer.indent(() => {
+                            writer.line(`json.decodeFromString<${resolved}>(data.decodeToString())`);
+                        });
+                        writer.line('} catch (_: Exception) { null }');
+                        writer.line(`if (${errorCase.caseName} != null) throw ${failureRef}.${caseName}(body = ${errorCase.caseName})`);
                     }
-                });
-                writer.line('}');
+                }
+                writer.line(`throw ${failureRef}.Unexpected(statusCode = statusCode, data = data)`);
             }
-            writer.line(`else -> throw ${failureRef}.Unexpected(statusCode = statusCode, data = data)`);
+        });
+        writer.line('}');
+    }
+    writer.line(`else -> throw ${failureRef}.Unexpected(statusCode = statusCode, data = data)`);
+};
+
+const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context: EmitContext): void => {
+    const operationRef = `${context.clientName}.${method.operationName}`;
+    const stream = method.stream!;
+    const successResponse = method.successResponses.find((candidate) => candidate.status === stream.status)!;
+    const hasHeaders = method.resultHeaderFields.length > 0;
+    writer.line('responseInterceptor?.invoke(requestBuilder.build(), httpResponse)');
+    writer.block(`if (httpResponse.code == ${stream.status})`, () => {
+        if (stream.mode === 'text') {
+            writer.line('val body = Kizuna.lines(httpResponse)');
+        } else if (stream.mode === 'binary') {
+            writer.line('val body = Kizuna.chunks(httpResponse)');
+        } else if (stream.events) {
+            const events = stream.events;
+            const elementType = streamElementType(method, context, 'client');
+            closure(writer, `val body = Kizuna.events<${elementType}>(httpResponse) { event ->`, () => {
+                writer.block('when (event.event)', () => {
+                    for (const event of events) {
+                        const payloadType = resolveType(event.type, method.operationName, context);
+                        writer.line(
+                            `${stringLiteral(event.name)} -> ${elementType}.${event.caseName}(json.decodeFromString<${payloadType}>(event.data))`
+                        );
+                    }
+                    writer.line('else -> null');
+                });
+            });
+        } else {
+            const elementType = streamElementType(method, context, 'client');
+            writer.line(
+                `val body = Kizuna.events<${elementType}>(httpResponse) { event -> json.decodeFromString<${elementType}>(event.data) }`
+            );
+        }
+        if (hasHeaders) {
+            for (const field of successResponse.responseHeaders) {
+                writer.line(`val ${escapeKeyword(field.name)} = httpResponse.header(${stringLiteral(field.wireName)})`);
+            }
+            const headersArgs = method.resultHeaderFields
+                .map((field) => `${escapeKeyword(field.name)} = ${escapeKeyword(field.name)}`)
+                .join(', ');
+            writer.line(`return ${operationRef}.Result(body = body, headers = ${operationRef}.Result.Headers(${headersArgs}))`);
+        } else {
+            writer.line(`return ${operationRef}.Result(body = body)`);
+        }
+    });
+    writer.line('return httpResponse.use {');
+    writer.indent(() => {
+        writer.line(
+            'val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }'
+        );
+        writer.line('when (val statusCode = httpResponse.code) {');
+        writer.indent(() => {
+            emitErrorBranches(writer, method, context);
         });
         writer.line('}');
     });
@@ -1361,9 +1503,86 @@ const emitSubClientClass = (writer: KotlinWriter, group: RouteGroup, clientName:
     );
 };
 
-const emitKizunaObject = (writer: KotlinWriter): void => {
+// An opener that already carries its `{`, such as a lambda, so `block` must not add one.
+const closure = (writer: KotlinWriter, opener: string, body: () => void): void => {
+    writer.line(opener);
+    writer.indent(body);
+    writer.line('}');
+};
+
+const emitKizunaStreaming = (writer: KotlinWriter): void => {
+    writer.blank();
+    writer.line('data class ServerSentEvent(val event: String?, val data: String, val id: String?, val retry: Int?)');
+    writer.blank();
+    writer.block('private suspend fun readLine(source: okio.BufferedSource): String?', () => {
+        writer.line('return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { source.readUtf8Line() }');
+    });
+    writer.blank();
+    writer.block('fun lines(response: Response): Flow<String> = flow', () => {
+        closure(writer, 'response.use { open ->', () => {
+            writer.line('val source = open.body?.source() ?: return@use');
+            writer.block('while (true)', () => {
+                writer.line('val line = readLine(source) ?: break');
+                writer.line('emit(line)');
+            });
+        });
+    });
+    writer.blank();
+    writer.block('fun chunks(response: Response): Flow<ByteArray> = flow', () => {
+        closure(writer, 'response.use { open ->', () => {
+            writer.line('val source = open.body?.source() ?: return@use');
+            writer.line('val buffer = ByteArray(16_384)');
+            writer.block('while (true)', () => {
+                writer.line('val read = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { source.read(buffer) }');
+                writer.line('if (read == -1) break');
+                writer.line('emit(buffer.copyOf(read))');
+            });
+        });
+    });
+    writer.blank();
+    writer.block('fun serverSentEvents(response: Response): Flow<ServerSentEvent> = flow', () => {
+        closure(writer, 'response.use { open ->', () => {
+            writer.line('val source = open.body?.source() ?: return@use');
+            writer.line('var eventType = ""');
+            writer.line('val dataLines = mutableListOf<String>()');
+            writer.line('var lastEventId = ""');
+            writer.line('var retry: Int? = null');
+            writer.block('while (true)', () => {
+                writer.line('val line = readLine(source) ?: break');
+                writer.block('if (line.isEmpty())', () => {
+                    writer.block('if (dataLines.isNotEmpty())', () => {
+                        writer.line(
+                            'emit(ServerSentEvent(eventType.ifEmpty { null }, dataLines.joinToString("\\n"), lastEventId.ifEmpty { null }, retry))'
+                        );
+                        writer.line('dataLines.clear()');
+                        writer.line('retry = null');
+                    });
+                    writer.line('eventType = ""');
+                    writer.line('continue');
+                });
+                writer.line('if (line.startsWith(":")) continue');
+                writer.line("val separator = line.indexOf(':')");
+                writer.line('val field = if (separator == -1) line else line.substring(0, separator)');
+                writer.line('val value = (if (separator == -1) "" else line.substring(separator + 1)).removePrefix(" ")');
+                writer.block('when (field)', () => {
+                    writer.line('"event" -> eventType = value');
+                    writer.line('"data" -> dataLines.add(value)');
+                    writer.line('"id" -> if (!value.contains(\'\\u0000\')) lastEventId = value');
+                    writer.line('"retry" -> if (value.isNotEmpty() && value.all { it.isDigit() }) retry = value.toIntOrNull()');
+                });
+            });
+        });
+    });
+    writer.blank();
+    writer.line(
+        'fun <Event : Any> events(response: Response, decode: (ServerSentEvent) -> Event?): Flow<Event> = serverSentEvents(response).mapNotNull(decode)'
+    );
+};
+
+const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean }): void => {
     writer.blank();
     writer.block('private object Kizuna', () => {
+        if (options.streaming) emitKizunaStreaming(writer);
         writer.block('fun resolveUrl(baseUrl: String, path: String): HttpUrl.Builder', () => {
             writer.line('val base = baseUrl.toHttpUrl()');
             writer.line("val trimmedPath = path.trimStart('/')");
@@ -1566,6 +1785,10 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
         writer.line('import kotlinx.serialization.encoding.*');
     }
     writer.line('import kotlinx.datetime.Instant');
+    const usesStreaming = allMethods.some((method) => method.stream !== undefined);
+    if (usesStreaming) {
+        writer.line('import kotlinx.coroutines.flow.*');
+    }
     writer.line('import okhttp3.*');
     writer.line('import okhttp3.MediaType.Companion.toMediaType');
     writer.line('import okhttp3.RequestBody.Companion.toRequestBody');
@@ -1637,7 +1860,9 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
         emitSubClientClass(writer, group, clientName, context);
     }
 
-    emitKizunaObject(writer);
+    emitKizunaObject(writer, {
+        streaming: usesStreaming,
+    });
 
     for (const warning of registry.warnings()) {
         process.stderr.write(`[ts-kizuna/kotlin] JsonElement fallback at ${warning}\n`);

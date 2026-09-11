@@ -60,7 +60,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@tanstack/query-core": "^5.0.0",
+    "@tanstack/query-core": "^5.69.0",
     "@ts-kizuna/core": "workspace:*",
     "@ts-kizuna/fetch": "workspace:*",
     "zod": "^4.0.0"

@@ -27,4 +27,5 @@ export const auth = k.auth(routes, {
         },
     },
     invites: 'inviteToken',
+    assistant: false,
 });

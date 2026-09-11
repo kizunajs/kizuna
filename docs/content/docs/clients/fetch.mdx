@@ -162,6 +162,26 @@ type ListUsersResponse = {
 
 `ClientArgs<Route>` and `ClientResponse<Route>` are exported for building on top of the client, as [`@ts-kizuna/tanstack-query`](/docs/clients/tanstack-query) does. Reach for them when writing your own wrapper; calling routes needs neither.
 
+## Streams
+
+On a status the route declares with [`stream`](/docs/streaming), `body` is an async iterable in place of a value. Read it with `for await`, and each message narrows on `event` to its own `data`:
+
+```ts title="chat.ts"
+const result = await apiClient.assistant.reply({
+    body: {
+        prompt,
+    },
+});
+
+if (result.status === 200) {
+    for await (const message of result.body) {
+        if (message.event === 'delta') console.log(message.data.text);
+    }
+}
+```
+
+The other statuses arrive parsed as they do today. Aborting the `signal` in `fetchOptions` closes the connection.
+
 ## Validation errors
 
 A route with a `body` or `query` schema can answer `400` when the request fails validation. It is in the response type already, without you declaring it.

@@ -16,6 +16,7 @@ export type ResponseContentType =
     | 'application/xml'
     | 'application/zip'
     | 'text/plain'
+    | 'text/event-stream'
     | 'text/html'
     | 'text/csv'
     | 'text/markdown'
@@ -25,6 +26,37 @@ export type ResponseContentType =
     | 'image/svg+xml'
     | 'image/webp'
     | (string & {});
+
+/**
+ * What a `stream` response carries per message: one schema when the messages
+ * are all alike, or a record of server-sent event name to schema for named
+ * events.
+ */
+export type StreamDefinition = z.ZodType | Record<string, z.ZodType>;
+
+/**
+ * A response sent piece by piece. Framed as server-sent events unless
+ * `contentType` names a `text/*` type (chunks of `z.string()`) or a binary one
+ * (chunks of `BinarySchema`).
+ */
+export interface StreamResponseDefinition {
+    /**
+     * The schema of one message, or a record of event name to schema.
+     */
+    stream: StreamDefinition;
+    /**
+     * Schema for the response headers. Each property becomes one
+     * response header.
+     */
+    headers?: z.ZodType;
+    /**
+     * The `Content-Type` of this response.
+     *
+     * @default 'text/event-stream'
+     */
+    contentType?: ResponseContentType;
+    body?: never;
+}
 
 /**
  * How one response may be cached, sent as its `Cache-Control` header.
@@ -92,8 +124,9 @@ export type CachePolicy =
       };
 
 /**
- * A response: either a schema for the body, or an object declaring the body
- * schema with an optional `headers` schema, `contentType`, and `cache` policy.
+ * A response: a schema for the body, an object declaring the body schema with
+ * optional response `headers`, `contentType`, `cache` policy, and `etag`, or a
+ * {@link StreamResponseDefinition} sent piece by piece.
  */
 export type ResponseDefinition =
     | z.ZodType
@@ -140,7 +173,9 @@ export type ResponseDefinition =
            * caller holds is still current.
            */
           etag?: true;
-      };
+          stream?: never;
+      }
+    | StreamResponseDefinition;
 
 /**
  * A single security requirement on a route: either a scheme name (sugar for the
@@ -272,9 +307,9 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
     pathParams?: z.ZodType;
     headers?: z.ZodType;
     /**
-     * Responses keyed by HTTP status code. Each value is either a schema for
-     * the body, or an object declaring the body schema with optional response
-     * `headers` and `contentType`.
+     * Responses keyed by HTTP status code. Each value is a schema for the body,
+     * an object declaring the body schema with optional response `headers` and
+     * `contentType`, or an object declaring a `stream` sent piece by piece.
      *
      * @example
      * ```ts
@@ -286,6 +321,13 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
      *         body: UserSchema,
      *         headers: z.object({ 'x-request-id': z.string() }),
      *         contentType: 'application/json',
+     *     },
+     *     // Stream form, server-sent events named delta and done
+     *     202: {
+     *         stream: {
+     *             delta: z.object({ text: z.string() }),
+     *             done: z.object({ outputTokens: z.int() }),
+     *         },
      *     },
      * }
      * ```

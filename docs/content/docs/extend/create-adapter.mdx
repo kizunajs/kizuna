@@ -49,9 +49,15 @@ const adapter = createAdapter<Request, Response, HandlerContext>({
         request: adapterRequest.request,
     }),
 
-    respond: (result) => {
+    respond: (result, { request }) => {
         if (result.kind === 'raw-response') return result.response as Response;
         const rendered = renderJsonResult(result);
+        if (rendered.stream) {
+            return new Response(rendered.stream({ signal: request.signal }), {
+                status: rendered.status,
+                headers: rendered.headers,
+            });
+        }
         return new Response(rendered.body === null || rendered.body === undefined ? null : JSON.stringify(rendered.body), {
             status: rendered.status,
             headers: rendered.headers,
@@ -153,6 +159,8 @@ Pass the request's method as the fourth argument when your adapter writes the wi
 ```ts
 const rendered = renderJsonResult(result, formatError, request, request.method);
 ```
+
+A `success` result on a status declared with [`stream`](/docs/streaming) renders with `body` undefined and a `stream` function in its place. Check `stream` before `body`, hand it the signal that fires when the client goes away, and write the `ReadableStream` it returns. `encodeStreamBody(result, { signal })` does the same for an adapter that renders results itself.
 
 ### `parseFetchBody`
 

@@ -7,7 +7,9 @@ import {
     type RouteDefinition,
     type Routes,
     type Method,
+    type StreamResponseDefinition,
 } from './types.js';
+import type { StreamBodyOf } from './stream.js';
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
@@ -40,20 +42,38 @@ type ApplyErrorEnvelope<Input, Status> =
 
 type HandlerBody<S, Status> = S extends z.ZodType
     ? ApplyErrorEnvelope<z.input<S>, Status>
-    : S extends { body: z.ZodType }
-      ? ApplyErrorEnvelope<z.input<S['body']>, Status>
-      : never;
+    : S extends StreamResponseDefinition
+      ? IsErrorStatus<Status> extends true
+          ? never
+          : StreamBodyOf<S>
+      : S extends { body: z.ZodType }
+        ? ApplyErrorEnvelope<z.input<S['body']>, Status>
+        : never;
+
+type ResponseReturn<R extends Pick<RouteDefinition, 'responses'>, Status extends keyof R['responses']> = {
+    status: Status extends number ? Status : never;
+    body: HandlerBody<R['responses'][Status], Status>;
+    headers?: ResponseHeaders;
+};
 
 /**
  * Constrained to `responses` alone so a job, which has no method or path, reuses it.
  */
 export type HandlerReturn<R extends Pick<RouteDefinition, 'responses'>> = {
-    [Status in keyof R['responses']]: {
-        status: Status extends number ? Status : never;
-        body: HandlerBody<R['responses'][Status], Status>;
-        headers?: ResponseHeaders;
-    };
+    [Status in keyof R['responses']]: ResponseReturn<R, Status>;
 }[keyof R['responses']];
+
+type StreamStatuses<R extends Pick<RouteDefinition, 'responses'>> = {
+    [Status in keyof R['responses']]: R['responses'][Status] extends StreamResponseDefinition ? Status : never;
+}[keyof R['responses']];
+
+/**
+ * The responses `throwError` takes: every declared status except the streamed
+ * ones. A stream is a body to produce, and bailing out is what `throwError` is for.
+ */
+export type ThrowableReturn<R extends Pick<RouteDefinition, 'responses'>> = {
+    [Status in Exclude<keyof R['responses'], StreamStatuses<R>>]: ResponseReturn<R, Status>;
+}[Exclude<keyof R['responses'], StreamStatuses<R>>];
 
 export type HandlerArgs<R extends RouteDefinition> = {
     params: R extends { pathParams: z.ZodType } ? z.output<R['pathParams']> : ExtractPathParams<R['path']>;
@@ -65,7 +85,7 @@ export type HandlerArgs<R extends RouteDefinition> = {
      *
      * This function throws internally and never returns.
      */
-    throwError: (response: HandlerReturn<R>) => never;
+    throwError: (response: ThrowableReturn<R>) => never;
 };
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (
