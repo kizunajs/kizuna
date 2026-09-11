@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Clock, FileText, KeyRound, Plug, Puzzle, Section, TriangleAlert, Zap } from 'lucide-react';
+import { ArrowLeftRight, Clock, FileText, KeyRound, Layers, Plug, Puzzle, Radio, Section, Timer, TriangleAlert, Zap } from 'lucide-react';
 import KotlinLogo from '@/icons/Kotlin.svg';
 import McpLogo from '@/icons/Mcp.svg';
 import SwiftLogo from '@/icons/Swift.svg';
@@ -56,10 +56,22 @@ export const features: Feature[] = [
         description: 'Identities and per-route authentication declared on the contract.',
     },
     {
+        icons: [Radio],
+        title: 'Streaming',
+        href: '/docs/streaming',
+        description: 'Stream an AI reply as typed events. Yield them from the handler, read them with for await in the client.',
+    },
+    {
         icons: [Puzzle],
         title: 'Plugins',
         href: '/docs/plugins',
         description: 'Extend your API with features built on the contract you already wrote, fully typed in your handlers.',
+    },
+    {
+        icons: [Layers],
+        title: 'Request context',
+        href: '/docs/request-context',
+        description: 'Declare request-scoped values once, and every handler receives them typed, resolved once per request.',
     },
     {
         icons: [Clock],
@@ -68,10 +80,16 @@ export const features: Feature[] = [
         description: 'Declare cron work next to its handler and tick it from any platform scheduler, or run it in process.',
     },
     {
+        icons: [Timer],
+        title: 'Caching',
+        href: '/docs/caching',
+        description: 'Declare a cache policy on a response and every adapter sends Cache-Control and Vary.',
+    },
+    {
         icons: [Zap],
         title: 'RPC-like client',
         href: '/docs/clients/fetch',
-        description: 'Call your API like a function, get fully typed responses back.',
+        description: 'Call your API like a function. Every route is a method with typed inputs and a response typed by status code.',
     },
     {
         icons: [Section],

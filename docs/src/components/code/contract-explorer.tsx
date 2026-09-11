@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import { FileText, Globe, Server, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { FileText, Globe, Radio, Server, ShieldCheck, Timer, TriangleAlert } from 'lucide-react';
 import { CodeWindow } from './code-window';
 import { ClaudeWindow } from './claude-window';
 import KotlinLogo from '@/icons/Kotlin.svg';
@@ -16,6 +16,8 @@ const icons = {
     alert: <TriangleAlert className={styles.icon} />,
     globe: <Globe className={styles.icon} />,
     shield: <ShieldCheck className={styles.icon} />,
+    radio: <Radio className={styles.icon} />,
+    timer: <Timer className={styles.icon} />,
 };
 
 const brandIcons = {
@@ -277,6 +279,68 @@ Content-Type: application/problem+json
 // Kotlin @Deprecated("use listUsers instead")
 // HTTP Deprecation: @1772323200
 // HTTP Sunset: Fri, 01 Jan 2027 00:00:00 GMT`,
+    },
+    {
+        icon: icons.radio,
+        label: 'Streaming',
+        description: 'Typed events sent as they happen',
+        file: 'router.ts',
+        fileIcon: brandIcons.typescript,
+        lang: 'ts',
+        code: `reply: async ({ body }) => ({
+  status: 200,
+  body: async function* ({ signal }) {
+    const stream = anthropic.messages.stream(
+      {
+        model: 'claude-opus-5',
+        max_tokens: 64000,
+        messages: [
+          {
+            role: 'user',
+            content: body.prompt,
+          },
+        ],
+      },
+      { signal }
+    );
+    for await (const text of textDeltas(stream)) {
+      yield { event: 'delta', data: { text } };
+    }
+    const { usage } = await stream.finalMessage();
+    yield { event: 'done', data: { outputTokens: usage.output_tokens } };
+  },
+}),`,
+    },
+    {
+        icon: icons.timer,
+        label: 'Caching',
+        description: 'Cache headers declared on the response',
+        file: 'routes.ts',
+        fileIcon: brandIcons.typescript,
+        lang: 'ts',
+        code: `listEvents: {
+  method: 'GET',
+  path: '/events',
+  responses: {
+    200: {
+      body: z.array(EventSchema),
+      cache: {
+        scope: 'public',
+        sharedMaxAge: 600, // ten minutes on the CDN
+        staleWhileRevalidate: 60,
+      },
+    },
+    404: {
+      body: ProblemDetailsSchema,
+      cache: {
+        scope: 'public',
+        maxAge: 60, // misses are cached too
+      },
+    },
+  },
+}
+
+// Cache-Control: public, s-maxage=600, stale-while-revalidate=60`,
     },
 ];
 
