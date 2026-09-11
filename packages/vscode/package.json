@@ -1,7 +1,7 @@
 {
   "name": "ts-kizuna-vscode",
   "displayName": "ts-kizuna",
-  "version": "1.59.1",
+  "version": "1.60.0",
   "private": true,
   "description": "Deprecation strikethroughs and hovers for ts-kizuna contracts",
   "license": "MIT",
