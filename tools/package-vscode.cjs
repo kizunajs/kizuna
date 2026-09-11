@@ -18,10 +18,11 @@ const run = (command, commandArguments, cwd) =>
         stdio: 'inherit',
     });
 
+const plugin = readJson(path.join(pluginDirectory, 'package.json'));
+
 // `npm ls`, which vsce runs, fails on the plugin's workspace symlink.
 const stage = () => {
     const extension = readJson(path.join(extensionDirectory, 'package.json'));
-    const plugin = readJson(path.join(pluginDirectory, 'package.json'));
 
     fs.rmSync(stagingDirectory, { recursive: true, force: true });
     fs.mkdirSync(stagingDirectory, { recursive: true });
@@ -37,9 +38,25 @@ const stage = () => {
     };
 
     fs.writeFileSync(path.join(stagingDirectory, 'package.json'), JSON.stringify(extension, null, 2) + '\n');
-    fs.writeFileSync(path.join(stagingDirectory, '.vscodeignore'), 'package-lock.json\n');
+
+    // vsce warns when the file is missing.
+    fs.writeFileSync(path.join(stagingDirectory, '.vscodeignore'), '# Nothing to ignore.\n');
 
     return extension.version;
+};
+
+// npm serves a new version a minute or two after `pnpm publish` returns, so installing the
+// plugin by version races the release that just published it.
+const copyPlugin = () => {
+    const distributionDirectory = path.join(pluginDirectory, 'dist');
+    if (!fs.existsSync(distributionDirectory)) {
+        throw new Error(`${plugin.name} is not built. Run: pnpm --filter ${plugin.name} build`);
+    }
+
+    const destination = path.join(stagingDirectory, 'node_modules', plugin.name);
+    fs.mkdirSync(destination, { recursive: true });
+    fs.cpSync(distributionDirectory, path.join(destination, 'dist'), { recursive: true });
+    fs.copyFileSync(path.join(pluginDirectory, 'package.json'), path.join(destination, 'package.json'));
 };
 
 const assertPluginPackaged = (version) => {
@@ -52,7 +69,7 @@ const assertPluginPackaged = (version) => {
 };
 
 const version = stage();
-run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'], stagingDirectory);
+copyPlugin();
 run('npx', ['@vscode/vsce', 'package'], stagingDirectory);
 const vsix = assertPluginPackaged(version);
 
