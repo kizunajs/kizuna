@@ -263,7 +263,7 @@ suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.Us
 
 ## Streams
 
-A route whose response [streams](/docs/streaming) returns its `body` as a `Flow`. Named events become a sealed `Event` interface with one class per event, each carrying its decoded payload as `data`:
+A route whose response [streams](/docs/streaming) returns its `stream` as a `Flow`. Named events become a sealed `Event` interface with one class per event, each carrying its decoded payload as `data`:
 
 ```kotlin title="AssistantScreen.kt"
 val result = client.assistant.reply {
@@ -271,7 +271,7 @@ val result = client.assistant.reply {
         prompt = "hello",
     )
 }
-result.body.collect { event ->
+result.stream.collect { event ->
     when (event) {
         is APIClient.AssistantReply.Event.Delta -> text.append(event.data.text)
         is APIClient.AssistantReply.Event.Done -> println(event.data.outputTokens)

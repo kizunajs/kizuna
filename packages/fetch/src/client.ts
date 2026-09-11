@@ -18,19 +18,42 @@ import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
 import { buildPath, isRouteDefinition } from '@ts-kizuna/core/adapter';
 import { parseServerSentEvents, readByteChunks, readTextChunks } from './sse.js';
 
-type ResponseUnion<R extends RouteDefinition> = {
-    [S in keyof R['responses']]: {
-        status: S extends number ? S : never;
-        body: R['responses'][S] extends z.ZodType
-            ? z.infer<R['responses'][S]>
-            : R['responses'][S] extends StreamResponseDefinition
-              ? AsyncIterable<StreamMessageOf<R['responses'][S]>>
-              : R['responses'][S] extends { body: z.ZodType }
-                ? z.infer<R['responses'][S]['body']>
-                : never;
-        headers: R['responses'][S] extends { headers: z.ZodType } ? z.infer<R['responses'][S]['headers']> : Record<string, string>;
-    };
+type ResponseHeadersOf<R extends RouteDefinition, S extends keyof R['responses']> = R['responses'][S] extends { headers: z.ZodType }
+    ? z.infer<R['responses'][S]['headers']>
+    : Record<string, string>;
+
+type StreamedStatuses<R extends RouteDefinition> = {
+    [S in keyof R['responses']]: R['responses'][S] extends z.ZodType
+        ? never
+        : R['responses'][S] extends StreamResponseDefinition
+          ? S
+          : never;
 }[keyof R['responses']];
+
+/**
+ * A status arrives at once, under `body`, or piece by piece, under `stream`. Neither arm
+ * carries the other's key, so a streamed route has to be narrowed on `status` before its
+ * payload is readable, and a route with no streamed status keeps exactly the shape it had.
+ */
+type ResponseUnion<R extends RouteDefinition> =
+    | {
+          [S in Exclude<keyof R['responses'], StreamedStatuses<R>>]: {
+              status: S extends number ? S : never;
+              body: R['responses'][S] extends z.ZodType
+                  ? z.infer<R['responses'][S]>
+                  : R['responses'][S] extends { body: z.ZodType }
+                    ? z.infer<R['responses'][S]['body']>
+                    : never;
+              headers: ResponseHeadersOf<R, S>;
+          };
+      }[Exclude<keyof R['responses'], StreamedStatuses<R>>]
+    | {
+          [S in StreamedStatuses<R>]: {
+              status: S extends number ? S : never;
+              stream: R['responses'][S] extends StreamResponseDefinition ? AsyncIterable<StreamMessageOf<R['responses'][S]>> : never;
+              headers: ResponseHeadersOf<R, S>;
+          };
+      }[StreamedStatuses<R>];
 
 /**
  * The type a caller passes for a body, query, or headers argument, the schema's
@@ -222,7 +245,7 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
         if (isStreamResponse(responseSpec) && res.body !== null) {
             return {
                 status: res.status,
-                body: readStream(res.body, responseSpec),
+                stream: readStream(res.body, responseSpec),
                 headers: responseHeaders,
             };
         }

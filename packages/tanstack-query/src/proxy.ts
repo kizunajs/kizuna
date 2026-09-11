@@ -9,7 +9,8 @@ type ClientNode = (args?: unknown) => Promise<unknown>;
 
 interface ClientResult {
     status: number;
-    body: unknown;
+    body?: unknown;
+    stream?: unknown;
     headers: Record<string, string>;
 }
 
@@ -75,7 +76,7 @@ const buildProcedure = (segments: readonly string[], route: RouteDefinition, cli
                                   if (!streamStatuses(route).includes(result.status)) {
                                       throw new NonStreamResponseError(routeKey, result.status, result.body, result.headers);
                                   }
-                                  return result.body as AsyncIterable<unknown>;
+                                  return result.stream as AsyncIterable<unknown>;
                               },
                               ...(refetchMode === undefined ? {} : { refetchMode: refetchMode as StreamRefetchMode }),
                           }),

@@ -46,18 +46,18 @@ export type StreamMessageOf<Def extends StreamResponseDefinition> =
           : never;
 
 /**
- * The `body` of a streamed status: an async generator function receiving `{ signal }`, or any async iterable.
+ * The `stream` of a streamed status: an async generator function receiving `{ signal }`, or any async iterable.
  */
-export type StreamBodyOf<Def extends StreamResponseDefinition> =
+export type RouteStreamOf<Def extends StreamResponseDefinition> =
     | ((context: StreamContext) => AsyncIterable<StreamChunk<Def>>)
     | AsyncIterable<StreamChunk<Def>>;
 
 /**
- * The `body` type of one streamed status, for a generator written outside its handler.
+ * The `stream` type of one streamed status, for a generator written outside its handler.
  *
  * @example
  * ```ts
- * const cannedReply: StreamBody<typeof contract.routes.assistant.reply, 200> = async function* () {
+ * const cannedReply: RouteStream<typeof contract.routes.assistant.reply, 200> = async function* () {
  *     yield {
  *         event: 'delta',
  *         data: {
@@ -67,10 +67,10 @@ export type StreamBodyOf<Def extends StreamResponseDefinition> =
  * };
  * ```
  */
-export type StreamBody<
+export type RouteStream<
     R extends Pick<RouteDefinition, 'responses'>,
     Status extends keyof R['responses'],
-> = R['responses'][Status] extends StreamResponseDefinition ? StreamBodyOf<R['responses'][Status]> : never;
+> = R['responses'][Status] extends StreamResponseDefinition ? RouteStreamOf<R['responses'][Status]> : never;
 
 export const EVENT_STREAM_MEDIA_TYPE = 'text/event-stream';
 
@@ -223,27 +223,29 @@ interface StreamSource {
     routeKey: string;
     route: RouteDefinition;
     status: number;
-    body: unknown;
+    stream?: unknown;
 }
 
 const encoder = new TextEncoder();
 
 /**
- * The bytes of a streamed response, pulled from the handler's body as the consumer reads.
+ * The bytes of a streamed response, pulled from the handler's stream as the consumer reads.
  */
-export const encodeStreamBody = (source: StreamSource, options: EncodeStreamOptions): ReadableStream<Uint8Array> => {
+export const encodeStream = (source: StreamSource, options: EncodeStreamOptions): ReadableStream<Uint8Array> => {
     const definition = source.route.responses[source.status];
     if (definition === undefined || !isStreamResponse(definition)) {
         throw new Error(`${source.routeKey} (status ${source.status}) does not declare a stream.`);
     }
     const mode = streamMode(definition);
-    const stream = definition.stream;
-    const named = isNamedStream(stream);
+    const messageSchema = definition.stream;
+    const named = isNamedStream(messageSchema);
     const iterable =
-        typeof source.body === 'function' ? (source.body as (context: StreamContext) => unknown)({ signal: options.signal }) : source.body;
+        typeof source.stream === 'function'
+            ? (source.stream as (context: StreamContext) => unknown)({ signal: options.signal })
+            : source.stream;
     if (!isAsyncIterable(iterable)) {
         throw new Error(
-            `${source.routeKey} (status ${source.status}) is declared as a stream, so its body must be an async generator function or an async iterable, but the handler returned ${describe(source.body)}.`
+            `${source.routeKey} (status ${source.status}) is declared as a stream, so its stream must be an async generator function or an async iterable, but the handler returned ${describe(source.stream)}.`
         );
     }
     const iterator = iterable[Symbol.asyncIterator]();
@@ -267,7 +269,7 @@ export const encodeStreamBody = (source: StreamSource, options: EncodeStreamOpti
                 }
                 if ('comment' in item) return encoder.encode(formatEvent(item as StreamComment, named));
                 const event = item as EventItem;
-                const schema = named ? stream[event.event ?? ''] : stream;
+                const schema = named ? messageSchema[event.event ?? ''] : messageSchema;
                 if (schema === undefined) {
                     throw new Error(`${source.routeKey} yielded event ${JSON.stringify(event.event)}, which its stream does not declare.`);
                 }
@@ -278,13 +280,13 @@ export const encodeStreamBody = (source: StreamSource, options: EncodeStreamOpti
                 if (typeof item !== 'string') {
                     throw new Error(`${source.routeKey} yielded ${describe(item)}, but a text stream yields strings.`);
                 }
-                validate(stream as z.ZodType, item);
+                validate(messageSchema as z.ZodType, item);
                 return encoder.encode(item);
             case 'binary':
                 if (!(item instanceof Uint8Array)) {
                     throw new Error(`${source.routeKey} yielded ${describe(item)}, but a binary stream yields Uint8Array chunks.`);
                 }
-                validate(stream as z.ZodType, item);
+                validate(messageSchema as z.ZodType, item);
                 return item;
         }
     };

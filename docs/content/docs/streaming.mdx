@@ -49,7 +49,7 @@ export const assistantRoutes = k.routes('assistant', {
 });
 ```
 
-Two `body`s meet on a route like this. The route's own `body` is the request body, the prompt the caller posts, and a streaming route takes one like any other route. The `body` a status would declare under `responses` is the response body, and `stream` takes its place there: a status is sent at once or piece by piece. The `400` is an ordinary Problem Details body, returned or thrown as always. The `200` alone streams.
+The route's own `body` is the request body, the prompt the caller posts, and a streaming route takes one like any other route. Under `responses`, `stream` takes the place a `body` would hold: a status is sent at once or piece by piece. The `400` is an ordinary Problem Details body, returned or thrown as always. The `200` alone streams.
 
 `stream` is a record of event name to schema, so every message the route sends has a name and a shape. Give it one schema instead when the messages are all alike.
 
@@ -59,7 +59,7 @@ Two `body`s meet on a route like this. The route's own `body` is the request bod
 
 ## Write the handler
 
-The handler returns the status, and for `body` an async generator function. kizuna sends the status and headers, calls the function, and writes each `yield` the moment it happens:
+The handler returns the status, and for `stream` an async generator function. kizuna sends the status and headers, calls the function, and writes each `yield` the moment it happens:
 
 ```ts title="router/assistant.ts"
 import Anthropic from '@anthropic-ai/sdk';
@@ -71,8 +71,8 @@ const anthropic = new Anthropic();
 export const assistant: Router<typeof contract.routes.assistant> = {
     reply: async ({ body }) => ({
         status: 200,
-        body: async function* ({ signal }) {
-            const stream = anthropic.messages.stream(
+        stream: async function* ({ signal }) {
+            const upstream = anthropic.messages.stream(
                 {
                     model: 'claude-opus-5',
                     max_tokens: 64000,
@@ -87,7 +87,7 @@ export const assistant: Router<typeof contract.routes.assistant> = {
                     signal,
                 }
             );
-            for await (const event of stream) {
+            for await (const event of upstream) {
                 if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
                     yield {
                         event: 'delta',
@@ -97,7 +97,7 @@ export const assistant: Router<typeof contract.routes.assistant> = {
                     };
                 }
             }
-            const message = await stream.finalMessage();
+            const message = await upstream.finalMessage();
             yield {
                 event: 'done',
                 data: {
@@ -132,7 +132,7 @@ data: {"inputTokens":12,"outputTokens":2}
 
 ## Read it
 
-On the streamed status the fetch client hands back `body` as an async iterable. Read it with `for await`, and each message narrows on `event` to its own `data`:
+On the streamed status the fetch client hands back `stream` as an async iterable. Read it with `for await`, and each message narrows on `event` to its own `data`:
 
 ```ts title="chat.ts"
 const result = await apiClient.assistant.reply({
@@ -143,7 +143,7 @@ const result = await apiClient.assistant.reply({
 
 if (result.status === 200) {
     let reply = '';
-    for await (const message of result.body) {
+    for await (const message of result.stream) {
         if (message.event === 'delta') reply += message.data.text;
         if (message.event === 'done') console.log(`${message.data.outputTokens} tokens`);
     }
@@ -165,7 +165,7 @@ const ask = async (prompt: string) => {
         },
     });
     if (result.status !== 200) return;
-    for await (const message of result.body) {
+    for await (const message of result.stream) {
         if (message.event === 'delta') setReply((current) => current + message.data.text);
     }
 };
@@ -215,7 +215,7 @@ watchEvents: {
 ```ts title="router/notifications.ts"
 watchEvents: async () => ({
     status: 200,
-    body: async function* ({ signal }) {
+    stream: async function* ({ signal }) {
         for await (const record of db.events.watch(signal)) {
             yield {
                 data: record,
@@ -291,7 +291,7 @@ exportEvents: {
 ```ts title="router/reports.ts"
 exportEvents: async () => ({
     status: 200,
-    body: async function* () {
+    stream: async function* () {
         yield 'id,kind,occurredAt\n';
         for await (const record of db.events.all()) {
             yield `${record.id},${record.kind},${record.occurredAt}\n`;
@@ -320,7 +320,7 @@ downloadArchive: async ({ params }) => {
     const upstream = await fetch(storage.archiveUrl(params.id));
     return {
         status: 200,
-        body: upstream.body,
+        stream: upstream.body,
     };
 },
 ```
@@ -329,12 +329,12 @@ The client iterates strings for a text stream and `Uint8Array` chunks for a bina
 
 ## Building the generator elsewhere
 
-An inline generator function sits inside the route's return type, so its event names infer as literals. One declared on its own has nothing to infer from, and TypeScript widens `event` to `string`. Annotate it with `StreamBody`, naming the route and the status:
+An inline generator function sits inside the route's return type, so its event names infer as literals. One declared on its own has nothing to infer from, and TypeScript widens `event` to `string`. Annotate it with `RouteStream`, naming the route and the status:
 
 ```ts title="router/assistant.ts"
-import type { StreamBody } from '@ts-kizuna/core';
+import type { RouteStream } from '@ts-kizuna/core';
 
-const cannedReply: StreamBody<typeof contract.routes.assistant.reply, 200> = async function* () {
+const cannedReply: RouteStream<typeof contract.routes.assistant.reply, 200> = async function* () {
     yield {
         event: 'delta',
         data: {
@@ -353,14 +353,14 @@ const cannedReply: StreamBody<typeof contract.routes.assistant.reply, 200> = asy
 export const assistant: Router<typeof contract.routes.assistant> = {
     reply: async () => ({
         status: 200,
-        body: cannedReply,
+        stream: cannedReply,
     }),
 };
 ```
 
 ## Errors
 
-Before the first message, everything works as on any route: validation answers `400`, a guard `401` or `403`, and `throwError` any status the route declares, all as Problem Details. `throwError` takes no streamed status. A stream is a body to produce, and bailing out is what `throwError` is for.
+Before the first message, everything works as on any route: validation answers `400`, a guard `401` or `403`, and `throwError` any status the route declares, all as Problem Details. `throwError` takes no streamed status. A stream is content to produce, and bailing out is what `throwError` is for.
 
 Once the handler has returned, the status and headers are on the wire. A throw inside the generator after that cannot become a `500`, so kizuna ends the connection. The client's loop rejects instead of finishing quietly, and the adapter's error callback is told. Declare a terminal event like `done` when the reader must know the reply is whole, and an `error` event of your own when it must know why it stopped short.
 

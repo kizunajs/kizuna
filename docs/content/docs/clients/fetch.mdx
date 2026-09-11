@@ -164,7 +164,7 @@ type ListUsersResponse = {
 
 ## Streams
 
-On a status the route declares with [`stream`](/docs/streaming), `body` is an async iterable in place of a value. Read it with `for await`, and each message narrows on `event` to its own `data`:
+On a status the route declares with [`stream`](/docs/streaming), the result carries `stream`, an async iterable, in place of `body`. Read it with `for await`, and each message narrows on `event` to its own `data`:
 
 ```ts title="chat.ts"
 const result = await apiClient.assistant.reply({
@@ -174,7 +174,7 @@ const result = await apiClient.assistant.reply({
 });
 
 if (result.status === 200) {
-    for await (const message of result.body) {
+    for await (const message of result.stream) {
         if (message.event === 'delta') console.log(message.data.text);
     }
 }

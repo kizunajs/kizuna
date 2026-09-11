@@ -152,12 +152,12 @@ return {
 };
 ```
 
-A status declared with [`stream`](/docs/streaming) takes an async generator function as `body`. kizuna sends the status and headers, then writes each `yield` as it happens:
+A status declared with [`stream`](/docs/streaming) takes an async generator function as `stream`. kizuna sends the status and headers, then writes each `yield` as it happens:
 
 ```ts
 return {
     status: 200,
-    body: async function* ({ signal }) {
+    stream: async function* ({ signal }) {
         yield {
             event: 'delta',
             data: {

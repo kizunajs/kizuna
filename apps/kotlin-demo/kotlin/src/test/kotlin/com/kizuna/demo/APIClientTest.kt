@@ -397,7 +397,7 @@ class APIClientTest {
         val text = StringBuilder()
         var done: APIClient.AssistantReply.Done? = null
         val events = mutableListOf<APIClient.AssistantReply.Event>()
-        result.body.collect { event ->
+        result.stream.collect { event ->
             events.add(event)
             when (event) {
                 is APIClient.AssistantReply.Event.Delta -> text.append(event.data.text)

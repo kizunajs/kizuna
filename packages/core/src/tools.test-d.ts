@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
-import type { StreamBody, StreamMessageOf } from './stream.js';
+import type { RouteStream, StreamMessageOf } from './stream.js';
 import { readToolCalls } from './tool-records.js';
 import { createToolRunner } from './tool-runner.js';
 
@@ -53,9 +53,9 @@ const contract = k.contract({
 
 describe('tool events on a stream', () => {
     it('narrows a tool call to the named tool', () => {
-        type Body = StreamBody<typeof contract.routes.assistant.reply, 200>;
+        type Stream = RouteStream<typeof contract.routes.assistant.reply, 200>;
 
-        const body: Body = async function* () {
+        const reply: Stream = async function* () {
             yield {
                 event: 'tool_call',
                 data: {
@@ -86,14 +86,14 @@ describe('tool events on a stream', () => {
             };
         };
 
-        expectTypeOf(body).toBeFunction();
+        expectTypeOf(reply).toBeFunction();
     });
 
     it('refuses an input that is not the named tool own', () => {
-        type Body = StreamBody<typeof contract.routes.assistant.reply, 200>;
+        type Stream = RouteStream<typeof contract.routes.assistant.reply, 200>;
 
         // @ts-expect-error `region` is not a field of this tool's input
-        const body: Body = async function* () {
+        const reply: Stream = async function* () {
             yield {
                 event: 'tool_call',
                 data: {
@@ -106,13 +106,13 @@ describe('tool events on a stream', () => {
             };
         };
 
-        expectTypeOf<typeof body>().toEqualTypeOf<Body>();
+        expectTypeOf<typeof reply>().toEqualTypeOf<Stream>();
     });
 
     it('gives a tool with no input no input field', () => {
-        type Body = StreamBody<typeof contract.routes.assistant.reply, 200>;
+        type Stream = RouteStream<typeof contract.routes.assistant.reply, 200>;
 
-        const body: Body = async function* () {
+        const reply: Stream = async function* () {
             yield {
                 event: 'tool_call',
                 data: {
@@ -122,7 +122,7 @@ describe('tool events on a stream', () => {
             };
         };
 
-        expectTypeOf(body).toBeFunction();
+        expectTypeOf(reply).toBeFunction();
     });
 });
 

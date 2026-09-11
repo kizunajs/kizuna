@@ -35,7 +35,7 @@ import {
     isStreamResponse,
     isSuccessStatus,
 } from './generator-utils.js';
-import { encodeStreamBody, EVENT_STREAM_MEDIA_TYPE, streamContentType, type EncodeStreamOptions } from './stream.js';
+import { encodeStream, EVENT_STREAM_MEDIA_TYPE, streamContentType, type EncodeStreamOptions } from './stream.js';
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
 import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
 import type { Tools } from './tools.js';
@@ -54,7 +54,7 @@ import type { JobTransport } from './job-transport.js';
 
 export type { ResponseHeaders, RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
-export { encodeStreamBody, type EncodeStreamOptions, type StreamContext } from './stream.js';
+export { encodeStream, type EncodeStreamOptions, type StreamContext } from './stream.js';
 export { isStreamResponse } from './generator-utils.js';
 export {
     createPlugin,
@@ -673,6 +673,10 @@ export type AdapterResult =
           route: RouteDefinition;
           status: number;
           body: unknown;
+          /**
+           * The generator a streamed status returned, in place of `body`.
+           */
+          stream?: unknown;
           headers?: ResponseHeaders;
       }
     | {
@@ -1245,7 +1249,9 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             throw new ResponseError(response);
         };
         const handlerResult = await (
-            handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: ResponseHeaders } | RawResponse>
+            handler as (
+                args: unknown
+            ) => Promise<{ status: number; body?: unknown; stream?: unknown; headers?: ResponseHeaders } | RawResponse>
         )({
             params: validation.parsed.params,
             query: validation.parsed.query,
@@ -1301,6 +1307,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             route,
             status: handlerResult.status,
             body: handlerResult.body,
+            ...(handlerResult.stream === undefined ? {} : { stream: handlerResult.stream }),
             headers: successHeaders,
         };
     } catch (error) {
@@ -1530,7 +1537,7 @@ const renderResult = (
                         ...(result.headers ?? {}),
                     },
                     body: undefined,
-                    stream: (options) => encodeStreamBody(streamResult, options),
+                    stream: (options) => encodeStream(streamResult, options),
                 };
             }
             if (result.body === undefined) {

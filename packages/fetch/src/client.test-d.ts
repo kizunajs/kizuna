@@ -844,7 +844,7 @@ test('a streamed status hands back an async iterable of typed messages', () => {
             },
         });
         if (result.status === 200) {
-            for await (const message of result.body) {
+            for await (const message of result.stream) {
                 if (message.event === 'delta') expectTypeOf(message.data).toEqualTypeOf<{ text: string }>();
                 if (message.event === 'done') expectTypeOf(message.data).toEqualTypeOf<{ count: number }>();
                 expectTypeOf(message.id).toEqualTypeOf<string | undefined>();
@@ -853,6 +853,6 @@ test('a streamed status hands back an async iterable of typed messages', () => {
         if (result.status === 404) expectTypeOf(result.body.detail).toEqualTypeOf<string>();
 
         const lines = await streamClient.lines();
-        if (lines.status === 200) expectTypeOf(lines.body).toEqualTypeOf<AsyncIterable<string>>();
+        if (lines.status === 200) expectTypeOf(lines.stream).toEqualTypeOf<AsyncIterable<string>>();
     })();
 });

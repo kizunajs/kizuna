@@ -9,7 +9,7 @@ import {
     type Method,
     type StreamResponseDefinition,
 } from './types.js';
-import type { StreamBodyOf } from './stream.js';
+import type { RouteStreamOf } from './stream.js';
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
@@ -40,21 +40,46 @@ type IsErrorStatus<Status> = `${Status & number}` extends `4${string}` | `5${str
 type ApplyErrorEnvelope<Input, Status> =
     IsErrorStatus<Status> extends true ? (Input extends ProblemDetailsEnvelope ? StripProblemEnvelope<Input> : never) : Input;
 
+/**
+ * Whether a declared response streams. A bare schema is checked first, so a
+ * `z.ZodType` response never falls into the stream arm.
+ */
+type IsStreamResponse<S> = S extends z.ZodType ? false : S extends StreamResponseDefinition ? true : false;
+
 type HandlerBody<S, Status> = S extends z.ZodType
     ? ApplyErrorEnvelope<z.input<S>, Status>
-    : S extends StreamResponseDefinition
-      ? IsErrorStatus<Status> extends true
-          ? never
-          : StreamBodyOf<S>
-      : S extends { body: z.ZodType }
-        ? ApplyErrorEnvelope<z.input<S['body']>, Status>
-        : never;
+    : S extends { body: z.ZodType }
+      ? ApplyErrorEnvelope<z.input<S['body']>, Status>
+      : never;
 
-type ResponseReturn<R extends Pick<RouteDefinition, 'responses'>, Status extends keyof R['responses']> = {
-    status: Status extends number ? Status : never;
-    body: HandlerBody<R['responses'][Status], Status>;
-    headers?: ResponseHeaders;
-};
+/**
+ * The generator a streamed status takes. A 4xx/5xx resolves to `never`, so a stream
+ * declared on an error status has nothing a handler can return.
+ */
+type HandlerStream<S, Status> = S extends StreamResponseDefinition
+    ? IsErrorStatus<Status> extends true
+        ? never
+        : RouteStreamOf<S>
+    : never;
+
+/**
+ * A status is sent at once, under `body`, or piece by piece, under `stream`. Each arm
+ * forbids the other key, mirroring the contract's own `body?: never` / `stream?: never`.
+ */
+type ResponseReturn<R extends Pick<RouteDefinition, 'responses'>, Status extends keyof R['responses']> =
+    IsStreamResponse<R['responses'][Status]> extends true
+        ? {
+              status: Status extends number ? Status : never;
+              stream: HandlerStream<R['responses'][Status], Status>;
+              body?: never;
+              headers?: ResponseHeaders;
+          }
+        : {
+              status: Status extends number ? Status : never;
+              body: HandlerBody<R['responses'][Status], Status>;
+              stream?: never;
+              headers?: ResponseHeaders;
+          };
 
 /**
  * Constrained to `responses` alone so a job, which has no method or path, reuses it.
@@ -64,7 +89,7 @@ export type HandlerReturn<R extends Pick<RouteDefinition, 'responses'>> = {
 }[keyof R['responses']];
 
 type StreamStatuses<R extends Pick<RouteDefinition, 'responses'>> = {
-    [Status in keyof R['responses']]: R['responses'][Status] extends StreamResponseDefinition ? Status : never;
+    [Status in keyof R['responses']]: IsStreamResponse<R['responses'][Status]> extends true ? Status : never;
 }[keyof R['responses']];
 
 /**

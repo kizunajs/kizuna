@@ -207,8 +207,8 @@ export {
     type StreamMessage,
     type StreamChunk,
     type StreamMessageOf,
-    type StreamBodyOf,
-    type StreamBody,
+    type RouteStreamOf,
+    type RouteStream,
 } from './stream.js';
 
 export { METHODS } from './types.js';

@@ -41,7 +41,7 @@ new KizunaClient(contract: Contract, config: ClientConfig): Client
 
 `params` is typed from the route's `pathParams` schema output when one is declared (matching the server-side handler), otherwise from the `:param` placeholders in the path.
 
-The response is a discriminated union over the route's declared status codes. Narrow on `status` to access the correctly typed `body`.
+The response is a discriminated union over the route's declared status codes. Narrow on `status` to access the correctly typed `body`, or `stream` on a status declared with [`stream`](/docs/streaming).
 
 ## Example
 

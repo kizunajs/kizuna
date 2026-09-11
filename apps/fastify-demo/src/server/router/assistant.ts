@@ -5,7 +5,7 @@ import type { contract } from '@ts-kizuna-demo/shared';
 export const assistant: Router<typeof contract.routes.assistant> = {
     reply: async ({ body }) => ({
         status: 200,
-        body: async function* ({ signal }) {
+        stream: async function* ({ signal }) {
             let outputTokens = 0;
             for await (const word of replyWords(body.prompt, signal)) {
                 outputTokens += 1;

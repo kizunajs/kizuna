@@ -37,11 +37,11 @@ test('conforms to the shared adapter type catalogue', () => {
                 },
             });
         },
-        'streams.bodyGenerator': () => {
+        'streams.generator': () => {
             new KizunaServer(streamInferenceContract).router({
                 reply: async ({ body }) => ({
                     status: 200,
-                    body: async function* ({ signal }) {
+                    stream: async function* ({ signal }) {
                         expectTypeOf(signal).toEqualTypeOf<AbortSignal>();
                         yield {
                             event: 'delta',
@@ -66,7 +66,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 // @ts-expect-error `done` carries a count, not text
                 reply: async () => ({
                     status: 200,
-                    body: async function* () {
+                    stream: async function* () {
                         yield {
                             event: 'done',
                             data: {
@@ -77,9 +77,18 @@ test('conforms to the shared adapter type catalogue', () => {
                 }),
             });
         },
-        'streams.bodyRejectsValue': () => {
+        'streams.rejectsValue': () => {
             new KizunaServer(streamInferenceContract).router({
-                // @ts-expect-error a streamed status takes a generator, not a value
+                // @ts-expect-error a streamed status takes a generator under `stream`, not a value
+                reply: async () => ({
+                    status: 200,
+                    stream: {
+                        text: 'x',
+                    },
+                }),
+            });
+            new KizunaServer(streamInferenceContract).router({
+                // @ts-expect-error a streamed status has no body
                 reply: async () => ({
                     status: 200,
                     body: {

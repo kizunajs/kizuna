@@ -145,8 +145,8 @@ const anthropic = new Anthropic();
 
 reply: ({ body, tools }) => ({
     status: 200,
-    body: async function* () {
-        const stream = anthropic.messages.stream({
+    stream: async function* () {
+        const upstream = anthropic.messages.stream({
             model: 'claude-opus-5',
             max_tokens: 1024,
             messages: [{ role: 'user', content: body.prompt }],
@@ -157,7 +157,7 @@ reply: ({ body, tools }) => ({
             })),
         });
 
-        for await (const event of stream) {
+        for await (const event of upstream) {
             if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
                 yield { event: 'delta', data: { text: event.delta.text } };
             }

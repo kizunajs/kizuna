@@ -447,7 +447,7 @@ describe('streams', () => {
     };
 
     it('offers streamOptions and keys typed stream, and nothing for the cache to hold', () => {
-        const api = buildStreamApi({ status: 200, body: streamedBody(), headers: {} });
+        const api = buildStreamApi({ status: 200, stream: streamedBody(), headers: {} });
         expect(api.assistant.reply.streamKey({ input })).toEqual([['assistant', 'reply'], { input, type: 'stream' }]);
         expect(api.assistant.reply.key()).toEqual([['assistant', 'reply']]);
         expect('queryOptions' in api.assistant.reply).toBe(false);
@@ -455,7 +455,7 @@ describe('streams', () => {
     });
 
     it('accumulates the messages as data through TanStack streamedQuery', async () => {
-        const api = buildStreamApi({ status: 200, body: streamedBody(), headers: {} });
+        const api = buildStreamApi({ status: 200, stream: streamedBody(), headers: {} });
         const queryClient = new QueryClient();
         const data = await queryClient.fetchQuery(api.assistant.reply.streamOptions({ input }));
         expect(data).toEqual(messages);
@@ -472,7 +472,7 @@ describe('streams', () => {
     });
 
     it('honours skipToken', () => {
-        const api = buildStreamApi({ status: 200, body: streamedBody(), headers: {} });
+        const api = buildStreamApi({ status: 200, stream: streamedBody(), headers: {} });
         const options = api.assistant.reply.streamOptions({ input: skipToken });
         expect(options.queryFn).toBe(skipToken);
         expect(options.queryKey).toEqual([['assistant', 'reply'], { type: 'stream' }]);

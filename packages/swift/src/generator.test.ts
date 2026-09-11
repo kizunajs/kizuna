@@ -1916,7 +1916,8 @@ describe('Swift generator: streamed responses', () => {
         );
         expect(output).toContain('public enum Event: Sendable, Equatable');
         expect(output).toContain('case delta(Delta)');
-        expect(output).toContain('public let body: AsyncThrowingStream<Event, Swift.Error>');
+        expect(output).toContain('public let stream: AsyncThrowingStream<Event, Swift.Error>');
+        expect(output).toContain('return TestAPIClient.Reply.Result(stream: stream)');
         expect(output).toContain('try await Kizuna.open(&request');
         expect(output).toContain(
             'case "delta": return .delta(try decoder.decode(TestAPIClient.Reply.Delta.self, from: Foundation.Data(event.data.utf8)))'

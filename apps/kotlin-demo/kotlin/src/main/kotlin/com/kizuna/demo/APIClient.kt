@@ -1149,7 +1149,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             data class ToolError(val data: APIClient.AssistantReply.ToolError) : Event
         }
 
-        data class Result(val body: Flow<Event>)
+        data class Result(val stream: Flow<Event>)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: API.ProblemDetails) : Failure()
@@ -2296,7 +2296,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
         if (httpResponse.code == 200) {
-            val body = Kizuna.events<APIClient.AssistantReply.Event>(httpResponse) { event ->
+            val stream = Kizuna.events<APIClient.AssistantReply.Event>(httpResponse) { event ->
                 when (event.event) {
                     "delta" -> APIClient.AssistantReply.Event.Delta(json.decodeFromString<APIClient.AssistantReply.Delta>(event.data))
                     "done" -> APIClient.AssistantReply.Event.Done(json.decodeFromString<APIClient.AssistantReply.Done>(event.data))
@@ -2306,7 +2306,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
                     else -> null
                 }
             }
-            return APIClient.AssistantReply.Result(body = body)
+            return APIClient.AssistantReply.Result(stream = stream)
         }
         return httpResponse.use {
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }

@@ -82,7 +82,7 @@ const main = async () => {
         },
     });
     if (reply.status === 200) {
-        for await (const message of reply.body) {
+        for await (const message of reply.stream) {
             if (message.event === 'delta') process.stdout.write(message.data.text);
             if (message.event === 'done') console.log(`\n(${message.data.outputTokens} tokens)`);
         }

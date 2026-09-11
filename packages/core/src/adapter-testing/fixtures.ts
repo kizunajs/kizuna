@@ -1101,7 +1101,7 @@ export const createStreamRouter = <Context>(): Router<typeof streamRoutes, Conte
         }
         return {
             status: 200,
-            body: async function* ({ signal }) {
+            stream: async function* ({ signal }) {
                 signal.addEventListener('abort', () => streamGate.markAborted(), {
                     once: true,
                 });
@@ -1137,7 +1137,7 @@ export const createStreamRouter = <Context>(): Router<typeof streamRoutes, Conte
     },
     watchTicks: () => ({
         status: 200,
-        body: async function* () {
+        stream: async function* () {
             yield {
                 data: {
                     tick: 1,
@@ -1152,7 +1152,7 @@ export const createStreamRouter = <Context>(): Router<typeof streamRoutes, Conte
     }),
     exportLines: () => ({
         status: 200,
-        body: async function* () {
+        stream: async function* () {
             yield 'one\n';
             yield 'two\n';
         },

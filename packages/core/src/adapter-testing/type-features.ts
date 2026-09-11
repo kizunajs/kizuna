@@ -85,11 +85,12 @@ export const ADAPTER_TYPE_FEATURES = {
     'plugins.absentWhenUninstalled': {
         summary: 'A contract with no plugins gives handlers no `plugins` key at all.',
     },
-    'streams.bodyGenerator': {
+    'streams.generator': {
         summary: 'An inline async generator on a streamed status infers its event names as literals and checks each `data` payload.',
     },
-    'streams.bodyRejectsValue': {
-        summary: 'A plain value is refused as the body of a streamed status, and `throwError` refuses a streamed status.',
+    'streams.rejectsValue': {
+        summary:
+            'A plain value is refused as the `stream` of a streamed status, a `body` is refused outright, and `throwError` refuses a streamed status.',
     },
     'tools.handlerArg': {
         summary: "A contract declaring tools gives every handler a `tools` argument typed against each tool's own input and output.",

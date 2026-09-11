@@ -880,8 +880,8 @@ const isVoidSuccessMethod = (method: RouteMethod): boolean => method.successRetu
 /**
  * Emit the per-operation result types for the throw-on-error model:
  *
- *   - `Result`: returned on success, exposing `body` (and `headers`). Omitted for
- *     void-success routes, which return `Unit`.
+ *   - `Result`: returned on success, exposing `body`, or `stream` on a streamed route,
+ *     plus `headers`. Omitted for void-success routes, which return `Unit`.
  *   - `Success`: a sealed sum of the success statuses, used as `Result.body` when a
  *     route has more than one success status.
  *   - `Failure`: a sealed `Exception` thrown for declared error statuses, decode
@@ -964,13 +964,15 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
     }
 
     if (!isVoidSuccess) {
-        const bodyType = method.stream
+        // A status sent piece by piece is a `stream`, matching the contract; one sent at once is a `body`.
+        const valueName = method.stream ? 'stream' : 'body';
+        const valueType = method.stream
             ? `Flow<${streamElementType(method, context, 'operation-object')}>`
             : isMultiSuccess
               ? 'Success'
               : resolveType(method.successReturnType, method.operationName, context, 'operation-object');
         writer.blank();
-        const params = [`val body: ${bodyType}`];
+        const params = [`val ${valueName}: ${valueType}`];
         if (hasHeaders) params.push('val headers: Headers');
         emitConstructorClass(writer, 'data class Result', params);
 
@@ -1504,13 +1506,13 @@ const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context
     writer.line('responseInterceptor?.invoke(requestBuilder.build(), httpResponse)');
     writer.block(`if (httpResponse.code == ${stream.status})`, () => {
         if (stream.mode === 'text') {
-            writer.line('val body = Kizuna.lines(httpResponse)');
+            writer.line('val stream = Kizuna.lines(httpResponse)');
         } else if (stream.mode === 'binary') {
-            writer.line('val body = Kizuna.chunks(httpResponse)');
+            writer.line('val stream = Kizuna.chunks(httpResponse)');
         } else if (stream.events) {
             const events = stream.events;
             const elementType = streamElementType(method, context, 'client');
-            closure(writer, `val body = Kizuna.events<${elementType}>(httpResponse) { event ->`, () => {
+            closure(writer, `val stream = Kizuna.events<${elementType}>(httpResponse) { event ->`, () => {
                 writer.block('when (event.event)', () => {
                     for (const event of events) {
                         const payloadType = resolveType(event.type, method.operationName, context);
@@ -1524,7 +1526,7 @@ const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context
         } else {
             const elementType = streamElementType(method, context, 'client');
             writer.line(
-                `val body = Kizuna.events<${elementType}>(httpResponse) { event -> json.decodeFromString<${elementType}>(event.data) }`
+                `val stream = Kizuna.events<${elementType}>(httpResponse) { event -> json.decodeFromString<${elementType}>(event.data) }`
             );
         }
         if (hasHeaders) {
@@ -1534,9 +1536,9 @@ const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context
             const headersArgs = method.resultHeaderFields
                 .map((field) => `${escapeKeyword(field.name)} = ${escapeKeyword(field.name)}`)
                 .join(', ');
-            writer.line(`return ${operationRef}.Result(body = body, headers = ${operationRef}.Result.Headers(${headersArgs}))`);
+            writer.line(`return ${operationRef}.Result(stream = stream, headers = ${operationRef}.Result.Headers(${headersArgs}))`);
         } else {
-            writer.line(`return ${operationRef}.Result(body = body)`);
+            writer.line(`return ${operationRef}.Result(stream = stream)`);
         }
     });
     writer.line('return httpResponse.use {');

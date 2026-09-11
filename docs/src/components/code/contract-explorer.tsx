@@ -289,8 +289,8 @@ Content-Type: application/problem+json
         lang: 'ts',
         code: `reply: async ({ body }) => ({
   status: 200,
-  body: async function* ({ signal }) {
-    const stream = anthropic.messages.stream(
+  stream: async function* ({ signal }) {
+    const upstream = anthropic.messages.stream(
       {
         model: 'claude-opus-5',
         max_tokens: 64000,
@@ -303,10 +303,10 @@ Content-Type: application/problem+json
       },
       { signal }
     );
-    for await (const text of textDeltas(stream)) {
+    for await (const text of textDeltas(upstream)) {
       yield { event: 'delta', data: { text } };
     }
-    const { usage } = await stream.finalMessage();
+    const { usage } = await upstream.finalMessage();
     yield { event: 'done', data: { outputTokens: usage.output_tokens } };
   },
 }),`,

@@ -160,7 +160,7 @@ Pass the request's method as the fourth argument when your adapter writes the wi
 const rendered = renderJsonResult(result, formatError, request, request.method);
 ```
 
-A `success` result on a status declared with [`stream`](/docs/streaming) renders with `body` undefined and a `stream` function in its place. Check `stream` before `body`, hand it the signal that fires when the client goes away, and write the `ReadableStream` it returns. `encodeStreamBody(result, { signal })` does the same for an adapter that renders results itself.
+A `success` result on a status declared with [`stream`](/docs/streaming) renders with `body` undefined and a `stream` function in its place. Check `stream` before `body`, hand it the signal that fires when the client goes away, and write the `ReadableStream` it returns. `encodeStream(result, { signal })` does the same for an adapter that renders results itself.
 
 ### `parseFetchBody`
 

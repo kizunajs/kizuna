@@ -2347,10 +2347,10 @@ public final class APIClient: Sendable {
         }
 
         public struct Result: Sendable {
-            public let body: AsyncThrowingStream<Event, Swift.Error>
+            public let stream: AsyncThrowingStream<Event, Swift.Error>
 
-            public init(body: AsyncThrowingStream<Event, Swift.Error>) {
-                self.body = body
+            public init(stream: AsyncThrowingStream<Event, Swift.Error>) {
+                self.stream = stream
             }
         }
 
@@ -3071,7 +3071,7 @@ public struct APIAssistantClient: Sendable {
         let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, failure: APIClient.AssistantReply.Failure.self)
         switch statusCode {
         case 200:
-            let body = Kizuna.events(bytes, using: client.decoder) { event, decoder -> APIClient.AssistantReply.Event? in
+            let stream = Kizuna.events(bytes, using: client.decoder) { event, decoder -> APIClient.AssistantReply.Event? in
                 switch event.event {
                 case "delta": return .delta(try decoder.decode(APIClient.AssistantReply.Delta.self, from: Foundation.Data(event.data.utf8)))
                 case "done": return .done(try decoder.decode(APIClient.AssistantReply.Done.self, from: Foundation.Data(event.data.utf8)))
@@ -3081,7 +3081,7 @@ public struct APIAssistantClient: Sendable {
                 default: return nil
                 }
             }
-            return APIClient.AssistantReply.Result(body: body)
+            return APIClient.AssistantReply.Result(stream: stream)
         case 400:
             let data = try await Kizuna.collect(bytes, failure: APIClient.AssistantReply.Failure.self)
             throw Kizuna.firstError(statusCode: statusCode, data: data, [

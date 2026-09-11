@@ -1078,13 +1078,15 @@ const emitResultStruct = (writer: SwiftWriter, method: RouteMethod, context: Emi
     if (!method.resultWrapperName) return;
     writer.blank();
     writer.block('public struct Result: Sendable', () => {
-        const bodyType = method.stream
+        // A status sent piece by piece is a `stream`, matching the contract; one sent at once is a `body`.
+        const valueName = method.stream ? 'stream' : 'body';
+        const valueType = method.stream
             ? `AsyncThrowingStream<${streamElementType(method, context, 'operation-enum')}, Swift.Error>`
             : method.successSumEnumName
               ? 'Success'
               : resolveType(method.successReturnType, method.operationName, context, 'operation-enum');
         const hasHeaders = method.resultHeaderFields.length > 0;
-        writer.line(`public let body: ${bodyType}`);
+        writer.line(`public let ${valueName}: ${valueType}`);
         if (hasHeaders) {
             writer.line('public let headers: Headers');
             writer.blank();
@@ -1097,13 +1099,13 @@ const emitResultStruct = (writer: SwiftWriter, method: RouteMethod, context: Emi
         }
         writer.blank();
         if (hasHeaders) {
-            writer.block(`public init(body: ${bodyType}, headers: Headers)`, () => {
-                writer.line('self.body = body');
+            writer.block(`public init(${valueName}: ${valueType}, headers: Headers)`, () => {
+                writer.line(`self.${valueName} = ${valueName}`);
                 writer.line('self.headers = headers');
             });
         } else {
-            writer.block(`public init(body: ${bodyType})`, () => {
-                writer.line('self.body = body');
+            writer.block(`public init(${valueName}: ${valueType})`, () => {
+                writer.line(`self.${valueName} = ${valueName}`);
             });
         }
     });
@@ -1880,13 +1882,13 @@ const emitStreamMethodTail = (
     writer.line(`case ${stream.status}:`);
     writer.indent(() => {
         if (stream.mode === 'text') {
-            writer.line('let body = Kizuna.lines(bytes)');
+            writer.line('let stream = Kizuna.lines(bytes)');
         } else if (stream.mode === 'binary') {
-            writer.line('let body = Kizuna.chunks(bytes)');
+            writer.line('let stream = Kizuna.chunks(bytes)');
         } else if (stream.events) {
             const events = stream.events;
             const elementType = streamElementType(method, context, 'actor');
-            closure(writer, `let body = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
+            closure(writer, `let stream = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
                 writer.line('switch event.event {');
                 for (const event of events) {
                     const payloadType = resolveType(event.type, method.operationName, context);
@@ -1899,7 +1901,7 @@ const emitStreamMethodTail = (
             });
         } else {
             const elementType = streamElementType(method, context, 'actor');
-            closure(writer, `let body = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
+            closure(writer, `let stream = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
                 writer.line(`try decoder.decode(${elementType}.self, from: Foundation.Data(event.data.utf8))`);
             });
         }
@@ -1910,9 +1912,9 @@ const emitStreamMethodTail = (
             const headersInitArgs = method.resultHeaderFields
                 .map((field) => `${escapeKeyword(field.name)}: ${escapeKeyword(field.name)}`)
                 .join(', ');
-            writer.line(`return ${qualifiedResult}(body: body, headers: .init(${headersInitArgs}))`);
+            writer.line(`return ${qualifiedResult}(stream: stream, headers: .init(${headersInitArgs}))`);
         } else {
-            writer.line(`return ${qualifiedResult}(body: body)`);
+            writer.line(`return ${qualifiedResult}(stream: stream)`);
         }
     });
     emitErrorCases(writer, method, context, receiver, collect);

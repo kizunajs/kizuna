@@ -2517,10 +2517,10 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public struct Result: Sendable {
-            public let body: AsyncThrowingStream<Event, Swift.Error>
+            public let stream: AsyncThrowingStream<Event, Swift.Error>
 
-            public init(body: AsyncThrowingStream<Event, Swift.Error>) {
-                self.body = body
+            public init(stream: AsyncThrowingStream<Event, Swift.Error>) {
+                self.stream = stream
             }
         }
 
@@ -3241,7 +3241,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, failure: OpenEnumAPIClient.AssistantReply.Failure.self)
         switch statusCode {
         case 200:
-            let body = Kizuna.events(bytes, using: client.decoder) { event, decoder -> OpenEnumAPIClient.AssistantReply.Event? in
+            let stream = Kizuna.events(bytes, using: client.decoder) { event, decoder -> OpenEnumAPIClient.AssistantReply.Event? in
                 switch event.event {
                 case "delta": return .delta(try decoder.decode(OpenEnumAPIClient.AssistantReply.Delta.self, from: Foundation.Data(event.data.utf8)))
                 case "done": return .done(try decoder.decode(OpenEnumAPIClient.AssistantReply.Done.self, from: Foundation.Data(event.data.utf8)))
@@ -3251,7 +3251,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
                 default: return nil
                 }
             }
-            return OpenEnumAPIClient.AssistantReply.Result(body: body)
+            return OpenEnumAPIClient.AssistantReply.Result(stream: stream)
         case 400:
             let data = try await Kizuna.collect(bytes, failure: OpenEnumAPIClient.AssistantReply.Failure.self)
             throw Kizuna.firstError(statusCode: statusCode, data: data, [

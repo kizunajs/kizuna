@@ -474,7 +474,7 @@ final class APIClientTests: XCTestCase {
         var text = ""
         var done: APIClient.AssistantReply.Done?
         var events: [APIClient.AssistantReply.Event] = []
-        for try await event in result.body {
+        for try await event in result.stream {
             events.append(event)
             switch event {
             case .delta(let delta):

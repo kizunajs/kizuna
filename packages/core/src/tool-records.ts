@@ -66,7 +66,7 @@ const started = (id: string, name: string): MutableCall => ({
  *
  * @example
  * ```ts
- * for await (const message of result.body) {
+ * for await (const message of result.stream) {
  *     messages.push(message);
  * }
  *

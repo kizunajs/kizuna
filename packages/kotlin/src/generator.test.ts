@@ -1948,7 +1948,8 @@ describe('Kotlin generator: streamed responses', () => {
         );
         expect(output).toContain('sealed interface Event');
         expect(output).toContain('data class Delta(val data: TestAPIClient.Reply.Delta) : Event');
-        expect(output).toContain('data class Result(val body: Flow<Event>)');
+        expect(output).toContain('data class Result(val stream: Flow<Event>)');
+        expect(output).toContain('return TestAPIClient.Reply.Result(stream = stream)');
         expect(output).toContain('if (httpResponse.code == 200)');
         expect(output).toContain(
             '"delta" -> TestAPIClient.Reply.Event.Delta(json.decodeFromString<TestAPIClient.Reply.Delta>(event.data))'

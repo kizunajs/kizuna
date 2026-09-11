@@ -1289,7 +1289,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             data class ToolError(val data: OpenEnumAPIClient.AssistantReply.ToolError) : Event
         }
 
-        data class Result(val body: Flow<Event>)
+        data class Result(val stream: Flow<Event>)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: OpenEnumAPI.ProblemDetails) : Failure()
@@ -2436,7 +2436,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
         val httpResponse = Kizuna.execute(client, requestBuilder.build())
         responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
         if (httpResponse.code == 200) {
-            val body = Kizuna.events<OpenEnumAPIClient.AssistantReply.Event>(httpResponse) { event ->
+            val stream = Kizuna.events<OpenEnumAPIClient.AssistantReply.Event>(httpResponse) { event ->
                 when (event.event) {
                     "delta" -> OpenEnumAPIClient.AssistantReply.Event.Delta(json.decodeFromString<OpenEnumAPIClient.AssistantReply.Delta>(event.data))
                     "done" -> OpenEnumAPIClient.AssistantReply.Event.Done(json.decodeFromString<OpenEnumAPIClient.AssistantReply.Done>(event.data))
@@ -2446,7 +2446,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
                     else -> null
                 }
             }
-            return OpenEnumAPIClient.AssistantReply.Result(body = body)
+            return OpenEnumAPIClient.AssistantReply.Result(stream = stream)
         }
         return httpResponse.use {
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }

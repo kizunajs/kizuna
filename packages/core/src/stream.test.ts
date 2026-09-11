@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { BinarySchema } from './binary.js';
 import { ProblemDetailsSchema } from './error-response.js';
-import { encodeStreamBody, formatEvent, streamMode } from './stream.js';
+import { encodeStream, formatEvent, streamMode } from './stream.js';
 import type { RouteDefinition } from './types.js';
 
 const k = new Kizuna({
@@ -132,14 +132,14 @@ describe('streamMode', () => {
     });
 });
 
-describe('encodeStreamBody', () => {
+describe('encodeStream', () => {
     it('pulls events from a generator function and frames each one', async () => {
-        const stream = encodeStreamBody(
+        const stream = encodeStream(
             {
                 routeKey: 'watch',
                 route: eventsRoute,
                 status: 200,
-                body: async function* () {
+                stream: async function* () {
                     yield {
                         event: 'delta',
                         data: {
@@ -167,12 +167,12 @@ describe('encodeStreamBody', () => {
     it('hands the generator the signal', async () => {
         const controller = new AbortController();
         let received: AbortSignal | undefined;
-        const stream = encodeStreamBody(
+        const stream = encodeStream(
             {
                 routeKey: 'watch',
                 route: eventsRoute,
                 status: 200,
-                body: async function* ({ signal }: { signal: AbortSignal }) {
+                stream: async function* ({ signal }: { signal: AbortSignal }) {
                     received = signal;
                     yield {
                         event: 'done',
@@ -193,12 +193,12 @@ describe('encodeStreamBody', () => {
     it('runs the generator’s finally block when the signal aborts', async () => {
         const controller = new AbortController();
         let finished = false;
-        const stream = encodeStreamBody(
+        const stream = encodeStream(
             {
                 routeKey: 'watch',
                 route: eventsRoute,
                 status: 200,
-                body: async function* () {
+                stream: async function* () {
                     try {
                         yield {
                             event: 'delta',
@@ -230,12 +230,12 @@ describe('encodeStreamBody', () => {
 
     it('errors the stream and reports when the generator throws', async () => {
         const seen: unknown[] = [];
-        const stream = encodeStreamBody(
+        const stream = encodeStream(
             {
                 routeKey: 'watch',
                 route: eventsRoute,
                 status: 200,
-                body: async function* () {
+                stream: async function* () {
                     yield {
                         event: 'delta',
                         data: {
@@ -255,12 +255,12 @@ describe('encodeStreamBody', () => {
     });
 
     it('refuses an event the stream does not declare', async () => {
-        const stream = encodeStreamBody(
+        const stream = encodeStream(
             {
                 routeKey: 'watch',
                 route: eventsRoute,
                 status: 200,
-                body: async function* () {
+                stream: async function* () {
                     yield {
                         event: 'nope',
                         data: {},
@@ -275,12 +275,12 @@ describe('encodeStreamBody', () => {
     });
 
     it('validates each message when asked', async () => {
-        const stream = encodeStreamBody(
+        const stream = encodeStream(
             {
                 routeKey: 'watch',
                 route: eventsRoute,
                 status: 200,
-                body: async function* () {
+                stream: async function* () {
                     yield {
                         event: 'delta',
                         data: {
@@ -298,7 +298,7 @@ describe('encodeStreamBody', () => {
     });
 
     it('writes text chunks as they are', async () => {
-        const stream = encodeStreamBody(
+        const stream = encodeStream(
             {
                 routeKey: 'lines',
                 route: {
@@ -312,7 +312,7 @@ describe('encodeStreamBody', () => {
                     },
                 },
                 status: 200,
-                body: async function* () {
+                stream: async function* () {
                     yield 'one\n';
                     yield 'two\n';
                 },
@@ -332,7 +332,7 @@ describe('encodeStreamBody', () => {
                 controller.close();
             },
         });
-        const stream = encodeStreamBody(
+        const stream = encodeStream(
             {
                 routeKey: 'bytes',
                 route: {
@@ -346,7 +346,7 @@ describe('encodeStreamBody', () => {
                     },
                 },
                 status: 200,
-                body: upstream,
+                stream: upstream,
             },
             {
                 signal: new AbortController().signal,
@@ -362,14 +362,14 @@ describe('encodeStreamBody', () => {
         expect(chunks).toEqual([1, 2, 3]);
     });
 
-    it('refuses a body that is neither a function nor an async iterable', () => {
+    it('refuses a stream that is neither a function nor an async iterable', () => {
         expect(() =>
-            encodeStreamBody(
+            encodeStream(
                 {
                     routeKey: 'watch',
                     route: eventsRoute,
                     status: 200,
-                    body: {
+                    stream: {
                         text: 'x',
                     },
                 },

@@ -878,7 +878,7 @@ describe('streams', () => {
         });
         expect(result.status).toBe(200);
         if (result.status !== 200) return;
-        expect(await collect(result.body)).toEqual([
+        expect(await collect(result.stream)).toEqual([
             {
                 event: 'delta',
                 data: {
@@ -899,7 +899,7 @@ describe('streams', () => {
     it('joins multi-line data and discards an incomplete trailing event', async () => {
         const result = await clientFor(['data: {"tick":\ndata: 1}\n\ndata: {"tick":2}']).ticks();
         if (result.status !== 200) return;
-        expect(await collect(result.body)).toEqual([
+        expect(await collect(result.stream)).toEqual([
             {
                 data: {
                     tick: 1,
@@ -911,7 +911,7 @@ describe('streams', () => {
     it('reads a text stream as string chunks', async () => {
         const result = await clientFor(['one\n', 'two\n'], 200, 'text/plain').lines();
         if (result.status !== 200) return;
-        expect(await collect(result.body)).toEqual(['one\n', 'two\n']);
+        expect(await collect(result.stream)).toEqual(['one\n', 'two\n']);
     });
 
     it('buffers a non-stream status as before', async () => {
@@ -948,6 +948,6 @@ describe('streams', () => {
         });
         const result = await client.ticks();
         if (result.status !== 200) return;
-        await expect(collect(result.body)).rejects.toThrow('terminated');
+        await expect(collect(result.stream)).rejects.toThrow('terminated');
     });
 });
