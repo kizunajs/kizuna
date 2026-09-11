@@ -8,6 +8,8 @@ import { assertValidCache } from './cache.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { isRouteDefinition, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
+import { buildTools, type AuthoredTools, type CompiledTools, type Tools } from './tools.js';
+import type { ToolsArg } from './tool-runner.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity } from './identity.js';
 import { createRequestContext } from './request-context.js';
@@ -257,6 +259,36 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
     jobs<const J extends AuthoredJobs, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: J): CompiledJobs<J, Name>;
     jobs<const J extends AuthoredJobs>(definitions: J): CompiledJobs<J, undefined>;
     /**
+     * Declare tools a model may call. Pass the identity every tool requires,
+     * then the tools themselves.
+     *
+     * Tools are their own concept, not routes. A tool declares no path and no
+     * method, and never appears in `contract.routes`, the OpenAPI document, or
+     * the generated Swift and Kotlin clients. A streamed response names them
+     * under `tools`, and the MCP plugin publishes them.
+     *
+     * @example
+     * export const tools = k.tools({
+     *     weather: {
+     *         getForecast: {
+     *             description: 'Look up tomorrow forecast for one city',
+     *             input: z.object({
+     *                 city: z.string(),
+     *             }),
+     *             output: z.object({
+     *                 temperature: z.number(),
+     *                 summary: z.string(),
+     *             }),
+     *             annotations: {
+     *                 readOnlyHint: true,
+     *             },
+     *         },
+     *     },
+     * });
+     */
+    tools<const T extends AuthoredTools, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: T): CompiledTools<T, Name>;
+    tools<const T extends AuthoredTools>(definitions: T): CompiledTools<T, undefined>;
+    /**
      * Assemble route groups into a contract. The `auth` map assigns each group
      * (and optionally each route, via a `'*'` cascade) the identity it requires;
      * `k.contract` resolves it onto every route's `security` and `accessGate`.
@@ -269,39 +301,45 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const A extends AuthMap<IdentityNamesOf<Spec>, R>,
         const J extends Jobs = Record<string, never>,
+        const T extends Tools = Record<string, never>,
         const P extends ContractPlugins = Record<string, never>,
     >(definition: {
         routes: R;
         jobs?: J;
-        plugins?: ContractPluginsArg<R, P>;
+        tools?: T;
+        plugins?: ContractPluginsArg<R, P, T>;
         auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
     }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext'], PluginArgs<P> & JobsArg<J>>,
+        RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext'], PluginArgs<P> & JobsArg<J> & ToolsArg<T>>,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
         A,
         Spec['requestContext'],
         P,
-        J
+        J,
+        T
     >;
     contract<
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
         const J extends Jobs = Record<string, never>,
+        const T extends Tools = Record<string, never>,
         const P extends ContractPlugins = Record<string, never>,
     >(definition: {
         routes: R;
         jobs?: J;
-        plugins?: ContractPluginsArg<R, P>;
+        tools?: T;
+        plugins?: ContractPluginsArg<R, P, T>;
     }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext'], PluginArgs<P> & JobsArg<J>>,
+        RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext'], PluginArgs<P> & JobsArg<J> & ToolsArg<T>>,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
         unknown,
         Spec['requestContext'],
         P,
-        J
+        J,
+        T
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
@@ -381,17 +419,24 @@ const createSurface = <
             ? buildJobs(undefined, identityOrDefinitions as AuthoredJobs)
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
+    const tools = ((identityOrDefinitions: string | AuthoredTools, definitions?: AuthoredTools) =>
+        definitions === undefined
+            ? buildTools(undefined, identityOrDefinitions as AuthoredTools)
+            : buildTools(identityOrDefinitions as string, definitions)) as K<Spec>['tools'];
+
     const contract = (definition: {
         routes: Routes;
         jobs?: Jobs;
+        tools?: Tools;
         plugins?: ContractPluginsArg<Routes, ContractPlugins>;
         auth?: Record<string, GroupAuth>;
     }) => {
-        const { routes: contractRoutes, jobs: contractJobs, auth } = definition;
+        const { routes: contractRoutes, jobs: contractJobs, tools: contractTools, auth } = definition;
         const plugins =
             typeof definition.plugins === 'function'
                 ? definition.plugins({
                       routes: contractRoutes,
+                      tools: contractTools ?? {},
                   })
                 : definition.plugins;
         assertNoPathCollisions([
@@ -423,6 +468,7 @@ const createSurface = <
         return assembleContract({
             routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
             jobs: contractJobs,
+            tools: contractTools,
             auth,
             tags: config?.tags,
             securitySchemes: config?.identities,
@@ -436,6 +482,7 @@ const createSurface = <
     const k: K<Spec> = {
         routes,
         jobs,
+        tools,
         auth: (_routes, map) => map,
         contract: contract as K<Spec>['contract'],
         issue: addCodedIssue,
@@ -477,6 +524,7 @@ export class Kizuna<
     declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext>>['routes'];
     declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext>>['auth'];
     declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext>>['jobs'];
+    declare readonly tools: K<SpecOf<Tags, Codes, Identities, RequestContext>>['tools'];
     declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext>>['contract'];
     declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext>>['issue'];
 

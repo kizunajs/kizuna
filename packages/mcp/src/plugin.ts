@@ -1,11 +1,28 @@
 import { z } from 'zod';
 import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
 import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
-import type { Routes } from '@ts-kizuna/core';
+import type { Routes, Tools } from '@ts-kizuna/core';
 import type { ToolSelection } from './tool-selection.js';
 import { protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
 
-export interface McpPluginProps<R extends Routes = Routes> extends ToolSelection<R> {
+export interface McpPluginProps<R extends Routes = Routes, T extends Tools = Tools> {
+    /**
+     * The contract's routes. Name the ones to publish under `options.publishRoutes`.
+     */
+    routes?: R;
+
+    /**
+     * The contract's tools. Every one is published; drop any under
+     * `options.hideTools`.
+     */
+    tools?: T;
+
+    /**
+     * What the server offers: which routes to publish as tools, and which tools
+     * to hide.
+     */
+    options?: ToolSelection<R, T>;
+
     /**
      * Path the endpoint is served from.
      *
@@ -78,49 +95,42 @@ const declare = (props: McpPluginProps) => {
  * endpoint where every route is a tool an assistant can discover and call,
  * behind the same guards as the HTTP endpoints.
  *
+ * Everything `k.tools` declares is published, because a tool is a tool.
+ * A route is an HTTP endpoint rather than a tool, so name the ones worth
+ * publishing under `options.publishRoutes`. `options.hideTools` drops a declared
+ * tool you would rather keep to yourself.
+ *
  * The endpoint is an ordinary kizuna route, so `api.mount` serves it on any
  * adapter, and it stays out of `contract.routes` so the client and the
  * generators do not see it.
  *
- * Pass `mcpPluginServer()` from `@ts-kizuna/mcp/server` to `server.api({ plugins })`
- * to serve it.
+ * Pass `mcpPluginServer()` from `@ts-kizuna/mcp/server` to
+ * `server.api({ plugins })` to serve it.
  *
  * @example
  * ```ts
  * export const contract = k.contract({
  *     routes,
- *     plugins: {
+ *     tools,
+ *     plugins: ({ routes, tools }) => ({
  *         mcp: mcpPlugin({
  *             name: 'My API',
- *         }),
- *     },
- * });
- * ```
- */
-export function mcpPlugin(props?: McpPluginProps): ReturnType<typeof declare>;
-
-/**
- * Pass the contract's routes to have `tools` checked against them, so a name
- * the routes do not have is a compile error. Write `plugins` as a function and
- * `k.contract` hands the routes over.
- *
- * @example
- * ```ts
- * export const contract = k.contract({
- *     routes,
- *     plugins: ({ routes }) => ({
- *         mcp: mcpPlugin(routes, {
- *             name: 'My API',
- *             tools: {
- *                 health: false,
+ *             routes,
+ *             tools,
+ *             options: {
+ *                 publishRoutes: {
+ *                     users: {
+ *                         '*': true,
+ *                     },
+ *                 },
  *             },
  *         }),
  *     }),
  * });
  * ```
  */
-export function mcpPlugin<const R extends Routes>(routes: R, props?: McpPluginProps<R>): ReturnType<typeof declare>;
-
-export function mcpPlugin(routesOrProps: Routes | McpPluginProps = {}, props?: McpPluginProps): ReturnType<typeof declare> {
-    return declare(props ?? (routesOrProps as McpPluginProps));
+export function mcpPlugin<const R extends Routes = Routes, const T extends Tools = Tools>(
+    props?: McpPluginProps<R, T>
+): ReturnType<typeof declare> {
+    return declare((props ?? {}) as McpPluginProps);
 }

@@ -817,6 +817,35 @@ const emitDiscriminatedEnum = (
                 writer.line(`.${escapeKeyword(variant.caseName)}(${variant.payloadType}(${payloadArgs}))`);
             });
         }
+        // Fields every variant carries, reachable without switching on the case first. The
+        // discriminator is always one of them, so `value.name` reads without a switch.
+        const variantStructs = type.variants.map((variant) => ({
+            variant,
+            struct: registryStruct(variant.payloadRegistryName, context),
+        }));
+        const firstStruct = variantStructs[0]?.struct;
+        if (firstStruct && variantStructs.every(({ struct }) => struct !== undefined)) {
+            const shared = firstStruct.fields.filter((field) =>
+                variantStructs.every(({ struct }) =>
+                    struct!.fields.some(
+                        (other) => other.name === field.name && other.type === field.type && other.optional === field.optional
+                    )
+                )
+            );
+            for (const field of shared) {
+                const relative = ownedTypeMap && relativeOwnedPath(field.type, ownedTypeMap, lookupName);
+                const fieldType = optionalize(relative ?? resolveType(field.type, undefined, context), field.optional);
+                writer.blank();
+                writer.block(`public var ${escapeKeyword(field.name)}: ${fieldType}`, () => {
+                    writer.line('switch self {');
+                    for (const { variant } of variantStructs) {
+                        writer.line(`case .${escapeKeyword(variant.caseName)}(let payload): return payload.${escapeKeyword(field.name)}`);
+                    }
+                    writer.line('}');
+                });
+            }
+        }
+
         writer.blank();
         writer.block('private enum DiscriminatorKey: String, CodingKey', () => {
             writer.line(`case discriminator = ${stringLiteral(type.discriminator)}`);
@@ -968,6 +997,80 @@ const emitEventEnum = (writer: SwiftWriter, method: RouteMethod, context: EmitCo
                 `case ${escapeKeyword(event.caseName)}(${resolveType(event.type, method.operationName, context, 'operation-enum')})`
             );
         }
+    });
+};
+
+/**
+ * The per-route call tracker, for a stream that carries tool events. It folds
+ * the events into one row per call, keyed by the `id` tying a call to its
+ * result, so a view renders a list rather than a switch.
+ */
+const emitToolTracking = (writer: SwiftWriter, method: RouteMethod): void => {
+    const events = method.stream?.events;
+    if (!events) return;
+    const names = new Set(events.map((event) => event.name));
+    if (!names.has('tool_call') || !names.has('tool_result')) return;
+
+    writer.blank();
+    writer.block('public struct ToolCallRecord: Identifiable, Sendable, Equatable', () => {
+        writer.line('/// How far along the call is.');
+        writer.block('public enum State: Sendable, Equatable', () => {
+            writer.line('case running');
+            writer.line('case done');
+            writer.line('case failed');
+        });
+        writer.blank();
+        writer.line('public let id: String');
+        writer.line('public let name: String');
+        writer.line('public var state: State');
+        writer.line('/// The call as it arrived, to read its input.');
+        writer.line('public var call: ToolCall?');
+        writer.line('/// The result once it answered, to read its output.');
+        writer.line('public var result: ToolResult?');
+        writer.line('/// What the tool reported when it failed.');
+        writer.line('public var message: String?');
+    });
+
+    writer.blank();
+    writer.line("/// Fold a stream's events into one row per tool call, in the order the calls arrived.");
+    writer.block('public static func readToolCalls(_ events: [Event]) -> [ToolCallRecord]', () => {
+        writer.line('var order: [String] = []');
+        writer.line('var calls: [String: ToolCallRecord] = [:]');
+        writer.blank();
+        writer.block('func at(_ id: String, _ name: String) -> ToolCallRecord', () => {
+            writer.line('if let existing = calls[id] { return existing }');
+            writer.line('order.append(id)');
+            writer.line('return ToolCallRecord(id: id, name: name, state: .running, call: nil, result: nil, message: nil)');
+        });
+        writer.blank();
+        writer.block('for event in events', () => {
+            writer.line('switch event {');
+            if (names.has('tool_call')) {
+                writer.line('case .tool_call(let payload):');
+                writer.line('    var tracked = at(payload.id, payload.name)');
+                writer.line('    tracked.call = payload');
+                writer.line('    calls[payload.id] = tracked');
+            }
+            if (names.has('tool_result')) {
+                writer.line('case .tool_result(let payload):');
+                writer.line('    var tracked = at(payload.id, payload.name)');
+                writer.line('    tracked.state = .done');
+                writer.line('    tracked.result = payload');
+                writer.line('    calls[payload.id] = tracked');
+            }
+            if (names.has('tool_error')) {
+                writer.line('case .tool_error(let payload):');
+                writer.line('    var tracked = at(payload.id, payload.name.rawValue)');
+                writer.line('    tracked.state = .failed');
+                writer.line('    tracked.message = payload.message');
+                writer.line('    calls[payload.id] = tracked');
+            }
+            writer.line('default:');
+            writer.line('    continue');
+            writer.line('}');
+        });
+        writer.blank();
+        writer.line('return order.compactMap { calls[$0] }');
     });
 };
 
@@ -2096,6 +2199,7 @@ const emitClient = (
                 emitRequestGroupStructs(writer, method, context);
                 emitSuccessSumEnum(writer, method, context);
                 emitEventEnum(writer, method, context);
+                emitToolTracking(writer, method);
                 emitResultStruct(writer, method, context);
                 emitFailureEnum(writer, method, context);
             });

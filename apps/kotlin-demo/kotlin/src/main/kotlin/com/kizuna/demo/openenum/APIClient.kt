@@ -1020,6 +1020,225 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             val outputTokens: Int
         )
 
+        @OptIn(ExperimentalSerializationApi::class)
+        @JsonClassDiscriminator("name")
+        @Serializable
+        sealed interface ToolCall {
+            val id: String
+            val name: String
+
+            @SerialName("weather.getForecast")
+            @Serializable
+            data class Weather_getForecast(val value: ToolCallWeatherGetForecast) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("charts.plotSignups")
+            @Serializable
+            data class Charts_plotSignups(val value: ToolCallChartsPlotSignups) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("countWords")
+            @Serializable
+            data class CountWords(val value: ToolCallCountWords) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+        }
+
+        @Serializable
+        data class ToolCallWeatherGetForecast(
+            val id: String,
+            val name: String,
+            val input: ToolCallWeatherGetForecastInput
+        )
+
+        @Serializable
+        data class ToolCallWeatherGetForecastInput(
+            val city: String,
+            val unit: ToolCallWeatherGetForecastInputUnit? = null
+        )
+
+        @Serializable(with = ToolCallWeatherGetForecastInputUnit.Serializer::class)
+        sealed interface ToolCallWeatherGetForecastInputUnit : KizunaQueryValue {
+            data object CELSIUS : ToolCallWeatherGetForecastInputUnit {
+                override val wireValue: String = "celsius"
+            }
+            data object FAHRENHEIT : ToolCallWeatherGetForecastInputUnit {
+                override val wireValue: String = "fahrenheit"
+            }
+            data class Unknown(override val wireValue: String) : ToolCallWeatherGetForecastInputUnit
+
+            companion object {
+                fun fromWireValue(wireValue: String): ToolCallWeatherGetForecastInputUnit = when (wireValue) {
+                    "celsius" -> CELSIUS
+                    "fahrenheit" -> FAHRENHEIT
+                    else -> Unknown(wireValue)
+                }
+            }
+
+            object Serializer : KSerializer<ToolCallWeatherGetForecastInputUnit> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ToolCallWeatherGetForecastInputUnit", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): ToolCallWeatherGetForecastInputUnit = ToolCallWeatherGetForecastInputUnit.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: ToolCallWeatherGetForecastInputUnit) {
+                    encoder.encodeString(value.wireValue)
+                }
+            }
+        }
+
+        @Serializable
+        data class ToolCallChartsPlotSignups(
+            val id: String,
+            val name: String,
+            val input: ToolCallChartsPlotSignupsInput
+        )
+
+        @Serializable
+        data class ToolCallChartsPlotSignupsInput(val days: Int)
+
+        @Serializable
+        data class ToolCallCountWords(
+            val id: String,
+            val name: String,
+            val input: ToolCallCountWordsInput
+        )
+
+        @Serializable
+        data class ToolCallCountWordsInput(val text: String)
+
+        @OptIn(ExperimentalSerializationApi::class)
+        @JsonClassDiscriminator("name")
+        @Serializable
+        sealed interface ToolResult {
+            val id: String
+            val name: String
+
+            @SerialName("weather.getForecast")
+            @Serializable
+            data class Weather_getForecast(val value: ToolResultWeatherGetForecast) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("charts.plotSignups")
+            @Serializable
+            data class Charts_plotSignups(val value: ToolResultChartsPlotSignups) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("countWords")
+            @Serializable
+            data class CountWords(val value: ToolResultCountWords) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+        }
+
+        @Serializable
+        data class ToolResultWeatherGetForecast(
+            val id: String,
+            val name: String,
+            val output: ToolResultWeatherGetForecastOutput
+        )
+
+        @Serializable
+        data class ToolResultWeatherGetForecastOutput(
+            val temperature: Double,
+            val unit: ToolResultWeatherGetForecastOutputUnit,
+            val summary: String
+        )
+
+        @Serializable(with = ToolResultWeatherGetForecastOutputUnit.Serializer::class)
+        sealed interface ToolResultWeatherGetForecastOutputUnit : KizunaQueryValue {
+            data object CELSIUS : ToolResultWeatherGetForecastOutputUnit {
+                override val wireValue: String = "celsius"
+            }
+            data object FAHRENHEIT : ToolResultWeatherGetForecastOutputUnit {
+                override val wireValue: String = "fahrenheit"
+            }
+            data class Unknown(override val wireValue: String) : ToolResultWeatherGetForecastOutputUnit
+
+            companion object {
+                fun fromWireValue(wireValue: String): ToolResultWeatherGetForecastOutputUnit = when (wireValue) {
+                    "celsius" -> CELSIUS
+                    "fahrenheit" -> FAHRENHEIT
+                    else -> Unknown(wireValue)
+                }
+            }
+
+            object Serializer : KSerializer<ToolResultWeatherGetForecastOutputUnit> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ToolResultWeatherGetForecastOutputUnit", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): ToolResultWeatherGetForecastOutputUnit = ToolResultWeatherGetForecastOutputUnit.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: ToolResultWeatherGetForecastOutputUnit) {
+                    encoder.encodeString(value.wireValue)
+                }
+            }
+        }
+
+        @Serializable
+        data class ToolResultChartsPlotSignups(
+            val id: String,
+            val name: String,
+            val output: ToolResultChartsPlotSignupsOutput
+        )
+
+        @Serializable
+        data class ToolResultChartsPlotSignupsOutput(val points: List<ToolResultChartsPlotSignupsOutputPointsItem>)
+
+        @Serializable
+        data class ToolResultChartsPlotSignupsOutputPointsItem(
+            val date: String,
+            val signups: Int
+        )
+
+        @Serializable
+        data class ToolResultCountWords(
+            val id: String,
+            val name: String,
+            val output: ToolResultCountWordsOutput
+        )
+
+        @Serializable
+        data class ToolResultCountWordsOutput(val words: Int)
+
+        @Serializable
+        data class ToolError(
+            val id: String,
+            val name: ToolErrorName,
+            val message: String
+        )
+
+        @Serializable(with = ToolErrorName.Serializer::class)
+        sealed interface ToolErrorName : KizunaQueryValue {
+            data object WEATHER_GETFORECAST : ToolErrorName {
+                override val wireValue: String = "weather.getForecast"
+            }
+            data object CHARTS_PLOTSIGNUPS : ToolErrorName {
+                override val wireValue: String = "charts.plotSignups"
+            }
+            data object COUNTWORDS : ToolErrorName {
+                override val wireValue: String = "countWords"
+            }
+            data class Unknown(override val wireValue: String) : ToolErrorName
+
+            companion object {
+                fun fromWireValue(wireValue: String): ToolErrorName = when (wireValue) {
+                    "weather.getForecast" -> WEATHER_GETFORECAST
+                    "charts.plotSignups" -> CHARTS_PLOTSIGNUPS
+                    "countWords" -> COUNTWORDS
+                    else -> Unknown(wireValue)
+                }
+            }
+
+            object Serializer : KSerializer<ToolErrorName> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ToolErrorName", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): ToolErrorName = ToolErrorName.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: ToolErrorName) {
+                    encoder.encodeString(value.wireValue)
+                }
+            }
+        }
+
         data class Body(val prompt: String)
 
         sealed interface Args {
@@ -1032,9 +1251,42 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         class AfterBody internal constructor(override val body: Body) : Args
 
+        /** One tool call, with its result once it answered. */
+        data class ToolCallRecord(
+            val id: String,
+            val name: String,
+            val state: State = State.Running,
+            /** The call as it arrived, to read its input. */
+            val call: ToolCall? = null,
+            /** The result once it answered, to read its output. */
+            val result: ToolResult? = null,
+            /** What the tool reported when it failed. */
+            val message: String? = null,
+        ) {
+            /** How far along the call is. */
+            enum class State { Running, Done, Failed }
+        }
+
+        /** Fold a stream's events into one row per tool call, in the order the calls arrived. */
+        fun readToolCalls(events: List<Event>): List<ToolCallRecord> {
+            val calls = LinkedHashMap<String, ToolCallRecord>()
+            for (event in events) {
+                when (event) {
+                    is Event.ToolCall -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
+                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
+                    else -> Unit
+                }
+            }
+            return calls.values.toList()
+        }
+
         sealed interface Event {
             data class Delta(val data: OpenEnumAPIClient.AssistantReply.Delta) : Event
             data class Done(val data: OpenEnumAPIClient.AssistantReply.Done) : Event
+            data class ToolCall(val data: OpenEnumAPIClient.AssistantReply.ToolCall) : Event
+            data class ToolResult(val data: OpenEnumAPIClient.AssistantReply.ToolResult) : Event
+            data class ToolError(val data: OpenEnumAPIClient.AssistantReply.ToolError) : Event
         }
 
         data class Result(val body: Flow<Event>)
@@ -2188,6 +2440,9 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
                 when (event.event) {
                     "delta" -> OpenEnumAPIClient.AssistantReply.Event.Delta(json.decodeFromString<OpenEnumAPIClient.AssistantReply.Delta>(event.data))
                     "done" -> OpenEnumAPIClient.AssistantReply.Event.Done(json.decodeFromString<OpenEnumAPIClient.AssistantReply.Done>(event.data))
+                    "tool_call" -> OpenEnumAPIClient.AssistantReply.Event.ToolCall(json.decodeFromString<OpenEnumAPIClient.AssistantReply.ToolCall>(event.data))
+                    "tool_result" -> OpenEnumAPIClient.AssistantReply.Event.ToolResult(json.decodeFromString<OpenEnumAPIClient.AssistantReply.ToolResult>(event.data))
+                    "tool_error" -> OpenEnumAPIClient.AssistantReply.Event.ToolError(json.decodeFromString<OpenEnumAPIClient.AssistantReply.ToolError>(event.data))
                     else -> null
                 }
             }

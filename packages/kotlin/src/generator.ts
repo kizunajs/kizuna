@@ -717,7 +717,42 @@ const emitSealedClass = (
         return;
     }
 
+    // Fields every variant carries, reachable without a `when` first. The discriminator is
+    // always one of them, so `call.name` reads straight off the interface.
+    // The registry prefixes a payload with its operation, e.g. `AssistantReplyToolCallCountWords`,
+    // while the variant carries the short name the emitted class uses.
+    const payloadFor = (payloadName: string): Extract<KotlinType, { kind: 'data-class' }> | undefined => {
+        const found =
+            registry.all().find((candidate) => candidate.name === payloadName) ??
+            registry.all().find((candidate) => candidate.name.endsWith(payloadName));
+        return found && found.kind === 'data-class' ? found : undefined;
+    };
+    const wrapped = nestedVariants.map((variant) => ({
+        variant,
+        payload: payloadFor(variant.payloadType),
+        inlined: (() => {
+            const candidate = registry.all().find((entry) => entry.name === variant.payloadType);
+            return !!candidate && candidate.kind === 'data-class' && candidate.fields.length > 0;
+        })(),
+    }));
+    const sharedFields =
+        wrapped.length > 0 && wrapped.every(({ payload, inlined }) => payload !== undefined && !inlined)
+            ? wrapped[0]!.payload!.fields.filter((field) =>
+                  wrapped.every(({ payload }) =>
+                      payload!.fields.some(
+                          (other) => other.name === field.name && other.type === field.type && other.optional === field.optional
+                      )
+                  )
+              )
+            : [];
+
     writer.block(`sealed interface ${type.name}`, () => {
+        for (const field of sharedFields) {
+            const typeExpression = optionalize(ownedTypePath(field.type, ownedTypeMap, registry), field.optional);
+            writer.line(`val ${escapeKeyword(field.name)}: ${typeExpression}`);
+        }
+        if (sharedFields.length > 0) writer.blank();
+
         for (const variant of nestedVariants) {
             const payloadType = registry.all().find((candidate) => candidate.name === variant.payloadType);
             writer.line(`@SerialName(${stringLiteral(variant.literal)})`);
@@ -756,6 +791,18 @@ const emitSealedClass = (
                         writer.line('}');
                     }
                 }
+            } else if (sharedFields.length > 0) {
+                writer.block(
+                    `data class ${variant.caseName}(val value: ${ownedTypePath(variant.payloadType, ownedTypeMap, registry)}) : ${type.name}`,
+                    () => {
+                        for (const field of sharedFields) {
+                            const typeExpression = optionalize(ownedTypePath(field.type, ownedTypeMap, registry), field.optional);
+                            writer.line(
+                                `override val ${escapeKeyword(field.name)}: ${typeExpression} get() = value.${escapeKeyword(field.name)}`
+                            );
+                        }
+                    }
+                );
             } else {
                 writer.line(
                     `data class ${variant.caseName}(val value: ${ownedTypePath(variant.payloadType, ownedTypeMap, registry)}) : ${type.name}`
@@ -857,6 +904,56 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
 
     const streamEvents = method.stream?.events;
     if (streamEvents) {
+        const eventNames = new Set(streamEvents.map((event) => event.name));
+        const tracksTools = eventNames.has('tool_call') && eventNames.has('tool_result');
+        if (tracksTools) {
+            writer.blank();
+            writer.line('/** One tool call, with its result once it answered. */');
+            writer.line('data class ToolCallRecord(');
+            writer.indent(() => {
+                writer.line('val id: String,');
+                writer.line('val name: String,');
+                writer.line('val state: State = State.Running,');
+                writer.line('/** The call as it arrived, to read its input. */');
+                writer.line('val call: ToolCall? = null,');
+                writer.line('/** The result once it answered, to read its output. */');
+                writer.line('val result: ToolResult? = null,');
+                writer.line('/** What the tool reported when it failed. */');
+                writer.line('val message: String? = null,');
+            });
+            writer.line(') {');
+            writer.indent(() => {
+                writer.line('/** How far along the call is. */');
+                writer.line('enum class State { Running, Done, Failed }');
+            });
+            writer.line('}');
+
+            writer.blank();
+            writer.line("/** Fold a stream's events into one row per tool call, in the order the calls arrived. */");
+            writer.block('fun readToolCalls(events: List<Event>): List<ToolCallRecord>', () => {
+                writer.line('val calls = LinkedHashMap<String, ToolCallRecord>()');
+                writer.block('for (event in events)', () => {
+                    writer.line('when (event) {');
+                    writer.indent(() => {
+                        writer.line(
+                            'is Event.ToolCall -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)'
+                        );
+                        writer.line(
+                            'is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)'
+                        );
+                        if (eventNames.has('tool_error')) {
+                            writer.line(
+                                'is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)'
+                            );
+                        }
+                        writer.line('else -> Unit');
+                    });
+                    writer.line('}');
+                });
+                writer.line('return calls.values.toList()');
+            });
+        }
+
         writer.blank();
         writer.block('sealed interface Event', () => {
             for (const event of streamEvents) {

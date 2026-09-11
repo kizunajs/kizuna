@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { RouteDefinition, StreamDefinition, StreamResponseDefinition } from './types.js';
 import { isBinarySchema, resolveBaseType } from './zod-internals.js';
+import type { StreamWithTools } from './tool-events.js';
 import { isJsonMediaType, isStreamResponse, isSuccessStatus, isZodSchema } from './generator-utils.js';
 
 export interface StreamContext {
@@ -35,10 +36,14 @@ export type StreamMessage<Stream extends StreamDefinition> = Stream extends z.Zo
 type IsEventStream<Def> = Def extends { contentType: infer ContentType } ? (ContentType extends 'text/event-stream' ? true : false) : true;
 
 export type StreamChunk<Def extends StreamResponseDefinition> =
-    IsEventStream<Def> extends true ? StreamYield<Def['stream']> : Def['stream'] extends z.ZodType ? z.input<Def['stream']> : never;
+    IsEventStream<Def> extends true ? StreamYield<StreamWithTools<Def>> : Def['stream'] extends z.ZodType ? z.input<Def['stream']> : never;
 
 export type StreamMessageOf<Def extends StreamResponseDefinition> =
-    IsEventStream<Def> extends true ? StreamMessage<Def['stream']> : Def['stream'] extends z.ZodType ? z.output<Def['stream']> : never;
+    IsEventStream<Def> extends true
+        ? StreamMessage<StreamWithTools<Def>>
+        : Def['stream'] extends z.ZodType
+          ? z.output<Def['stream']>
+          : never;
 
 /**
  * The `body` of a streamed status: an async generator function receiving `{ signal }`, or any async iterable.

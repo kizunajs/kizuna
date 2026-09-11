@@ -20,11 +20,19 @@ import {
 import { contractOf } from '@ts-kizuna/core/adapter';
 import type { Contract, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
-import { deriveToolNames } from './tool-name.js';
+import { deriveToolNames } from '@ts-kizuna/core/generator';
+import { flattenTools, toolRunnerFrom, TOOLS_META, type ToolsMeta, type ToolRunner } from '@ts-kizuna/core/adapter';
+import { publishedTools, ToolExecutionError, ToolInputError, ToolOutputError, type PublishedTool, type Tools } from '@ts-kizuna/core';
 import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
-import { selectToolRoutes, type ToolMap, type ToolSelection } from './tool-selection.js';
+import { selectToolRoutes, selectTools, type ToolSelection } from './tool-selection.js';
 
 export interface McpServerOptions {
+    /**
+     * What the server offers: the contract's routes and tools, which routes to
+     * publish, and which tools to hide.
+     */
+    options?: ToolSelection;
+
     /**
      * Human-readable name for the MCP server.
      *
@@ -38,12 +46,6 @@ export interface McpServerOptions {
      * @default '1.0.0'
      */
     version?: string;
-
-    /**
-     * Which routes become tools. Pass the contract's routes to `mcpPlugin` to
-     * have the keys checked against them.
-     */
-    tools?: ToolMap;
 
     /**
      * Keep only the methods RFC 9110 calls safe, so no tool an assistant calls
@@ -144,8 +146,13 @@ export interface ToolDefinition {
 }
 
 export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions): ToolDefinition[] => {
-    const selected = selectToolRoutes(flattenRoutes(routes), options);
-    const names = deriveToolNames(selected);
+    const selected = selectToolRoutes(flattenRoutes(routes), options?.options);
+    const names = deriveToolNames(
+        selected.map(({ routeKey }) => ({
+            key: routeKey,
+            origin: 'route',
+        }))
+    );
     const definitions: ToolDefinition[] = [];
 
     for (const { routeKey, route, routeTags } of selected) {
@@ -166,16 +173,46 @@ export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions)
 };
 
 /**
+ * The declared tools a selection publishes. Everything handed over, unless
+ * `expose` says otherwise. `publishedTools` does the naming, so a tool is named
+ * in one place whichever surface publishes it.
+ */
+export const buildDeclaredToolDefinitions = (tools: Tools | undefined, options?: McpServerOptions): PublishedTool[] => {
+    if (!tools) return [];
+    const selected = publishedTools(selectTools(flattenTools(tools), options?.options));
+    // Names are derived once more here so a bad key fails at startup, not at call time.
+    deriveToolNames(
+        selected.map(({ toolKey }) => ({
+            key: toolKey,
+            origin: 'tool',
+        }))
+    );
+    return selected;
+};
+
+/**
+ * A declared tool's description, with the identity it needs appended the way a
+ * route's requirements are.
+ */
+const declaredDescription = (published: PublishedTool): string =>
+    published.identity === undefined ? published.description : `${published.description}\nRequires: ${published.identity}`;
+
+/**
  * What a client puts in front of the model before it picks a tool.
  */
 export const buildInstructions = (
     contract: Contract | undefined,
     definitions: readonly ToolDefinition[],
+    declared: readonly PublishedTool[],
     authored: string | undefined
 ): string => {
-    const sections: string[] = [
-        'Every tool calls one HTTP route and returns `{ status, body }`. A status of 400 or more means the call failed.',
-    ];
+    const sections: string[] = [];
+    if (definitions.length > 0) {
+        sections.push('Every tool named after an HTTP route returns `{ status, body }`. A status of 400 or more means the call failed.');
+    }
+    if (declared.length > 0) {
+        sections.push('The remaining tools return their own result directly.');
+    }
 
     const tags = contract?.tags?.tags;
     if (tags !== undefined) {
@@ -257,8 +294,9 @@ const toolError = (status: number, detail: string): ToolCallResult => ({
  * args, or a {@link ToolCallResult} error when a guard denies or a gate fails.
  */
 const runGuards = async (
-    route: RouteDefinition,
-    routeKey: string,
+    requirements: ReturnType<typeof resolveSecurityRequirements>,
+    accessGate: RouteDefinition['accessGate'],
+    label: string,
     params: Record<string, string>,
     guards: GuardMap | undefined,
     schemes: Record<string, SecurityScheme> | undefined,
@@ -272,7 +310,7 @@ const runGuards = async (
         query: {},
     } as unknown as AdapterRequest<unknown>;
 
-    for (const { scheme, scopes } of resolveSecurityRequirements(route)) {
+    for (const { scheme, scopes } of requirements) {
         if (scheme === transportAuth?.scheme) {
             if (transportAuth.context !== undefined) securityContext[scheme] = transportAuth.context;
             continue;
@@ -281,7 +319,7 @@ const runGuards = async (
         if (!guard) {
             return {
                 ok: false,
-                result: toolError(500, `No guard registered for security scheme "${scheme}" required by route "${routeKey}".`),
+                result: toolError(500, `No guard registered for security scheme "${scheme}" required by ${label}.`),
             };
         }
         const schemeDefinition = schemes?.[scheme];
@@ -299,7 +337,7 @@ const runGuards = async (
                 result: toolError(guardResult.status, guardResult.detail),
             };
         }
-        for (const [field, allowed] of Object.entries(route.accessGate?.[scheme] ?? {})) {
+        for (const [field, allowed] of Object.entries(accessGate?.[scheme] ?? {})) {
             if (gatePermits((guardResult ?? {})[field as never], allowed)) continue;
             return {
                 ok: false,
@@ -395,7 +433,17 @@ const executeToolCall = async (
         }
     }
 
-    const guardOutcome = await runGuards(route, routeKey, params, guards, schemes, handlerContext, credentialHeaders, transportAuth);
+    const guardOutcome = await runGuards(
+        resolveSecurityRequirements(route),
+        route.accessGate,
+        `route "${routeKey}"`,
+        params,
+        guards,
+        schemes,
+        handlerContext,
+        credentialHeaders,
+        transportAuth
+    );
     if (!guardOutcome.ok) {
         return guardOutcome.result;
     }
@@ -444,6 +492,86 @@ const executeToolCall = async (
 };
 
 /**
+ * Run one declared tool. There is no HTTP envelope here, so the result carries
+ * the tool's own output and nothing more.
+ */
+const executeDeclaredToolCall = async (
+    definition: PublishedTool,
+    args: Record<string, unknown>,
+    runner: ToolRunner<Tools> | undefined,
+    handlerContext?: Record<string, unknown>,
+    guards?: GuardMap,
+    schemes?: Record<string, SecurityScheme>,
+    credentialHeaders?: Record<string, string | string[] | undefined>,
+    transportAuth?: McpServerOptions['transportAuth']
+): Promise<ToolCallResult> => {
+    if (!runner) {
+        return toolError(500, `No handler was bound for tool "${definition.toolKey}".`);
+    }
+
+    const { identity } = definition;
+    if (identity !== undefined) {
+        const guardOutcome = await runGuards(
+            [
+                {
+                    scheme: identity,
+                    scopes: [],
+                },
+            ],
+            undefined,
+            `tool "${definition.toolKey}"`,
+            {},
+            guards,
+            schemes,
+            handlerContext,
+            credentialHeaders,
+            transportAuth
+        );
+        if (!guardOutcome.ok) return guardOutcome.result;
+    }
+
+    try {
+        const output = await runner.call({
+            id: definition.name,
+            name: definition.toolKey,
+            input: args,
+        } as never);
+        const value = (output as { output?: unknown }).output;
+
+        return {
+            content: [
+                {
+                    type: 'text' as const,
+                    text: definition.output ? JSON.stringify(value, null, 2) : `${definition.toolKey} ran.`,
+                },
+            ],
+            ...(definition.output
+                ? {
+                      structuredContent: value as Record<string, unknown>,
+                  }
+                : {}),
+            isError: false,
+        };
+    } catch (error) {
+        if (error instanceof ToolExecutionError) {
+            return {
+                content: [
+                    {
+                        type: 'text' as const,
+                        text: error.message,
+                    },
+                ],
+                isError: true,
+            };
+        }
+        if (error instanceof ToolInputError || error instanceof ToolOutputError) {
+            return toolError(400, error.message);
+        }
+        return toolError(500, error instanceof Error ? error.message : 'Internal Server Error');
+    }
+};
+
+/**
  * Create an MCP server from a kizuna API.
  *
  * Each route in the routes becomes an MCP tool. When an AI assistant calls
@@ -462,7 +590,23 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
     const contextResolvers = (api as unknown as Record<typeof REQUEST_CONTEXT_META, RequestContextMap | undefined>)[REQUEST_CONTEXT_META];
 
+    const contract = contractOf<Contract | undefined>(api);
+    const toolsMeta = (api as unknown as Record<typeof TOOLS_META, ToolsMeta | undefined>)[TOOLS_META];
+    const toolRunner = toolRunnerFrom(toolsMeta);
+
     const definitions = buildToolDefinitions(api.routes, options);
+    const declared = buildDeclaredToolDefinitions(contract?.tools, options);
+
+    // Routes and declared tools share one name space, so a clash has to surface at startup.
+    const claimed = new Map(definitions.map((definition) => [definition.name, definition.routeKey]));
+    for (const definition of declared) {
+        const claimant = claimed.get(definition.name);
+        if (claimant !== undefined) {
+            throw new Error(
+                `Route "${claimant}" and tool "${definition.toolKey}" both publish as "${definition.name}". Rename one of them.`
+            );
+        }
+    }
 
     const server = new McpServer(
         {
@@ -470,7 +614,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
             version: options?.version ?? '1.0.0',
         },
         {
-            instructions: buildInstructions(contractOf<Contract | undefined>(api), definitions, options?.instructions),
+            instructions: buildInstructions(contract, definitions, declared, options?.instructions),
         }
     );
 
@@ -499,6 +643,34 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     schemes,
                     options?.credentialHeaders,
                     contextResolvers,
+                    options?.transportAuth
+                )
+        );
+    }
+
+    for (const definition of declared) {
+        server.registerTool(
+            definition.name,
+            {
+                ...(definition.title === undefined
+                    ? {}
+                    : {
+                          title: definition.title,
+                      }),
+                description: declaredDescription(definition),
+                inputSchema: definition.input,
+                outputSchema: definition.output,
+                annotations: definition.annotations ?? {},
+            },
+            async (args: unknown) =>
+                executeDeclaredToolCall(
+                    definition,
+                    (args ?? {}) as Record<string, unknown>,
+                    toolRunner,
+                    options?.handlerContext,
+                    guards,
+                    schemes,
+                    options?.credentialHeaders,
                     options?.transportAuth
                 )
         );

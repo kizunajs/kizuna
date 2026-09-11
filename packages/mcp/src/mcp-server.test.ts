@@ -205,9 +205,18 @@ const buildApi = (testRouter: Record<string, unknown> = router) =>
 
 const api = buildApi();
 
+const publishAllRoutes = {
+    options: {
+        publishRoutes: {
+            '*': true,
+        },
+    },
+};
+
 const baseOptions = {
     name: 'Test API',
     version: '1.0.0',
+    ...publishAllRoutes,
 };
 
 const connectMcpClient = async (testApi: Parameters<typeof createMcpServer>[0] = api, options?: Parameters<typeof createMcpServer>[1]) => {
@@ -266,56 +275,82 @@ describe('buildToolDefinitions: selection', () => {
     const names = (options: Parameters<typeof buildToolDefinitions>[1]) =>
         buildToolDefinitions(contract.routes, options).map((definition) => definition.name);
 
-    it('takes every route when nothing is selected', () => {
+    it('takes no route unless the map names one', () => {
+        expect(names({})).toEqual([]);
+    });
+
+    it('takes every route under a top level star', () => {
         expect(names(baseOptions)).toEqual(
             expect.arrayContaining(['users_list_users', 'users_get_user', 'users_create_user', 'health', 'delete_user'])
         );
     });
 
-    it('drops a route the map sets to false', () => {
+    it('publishes just the route the map names', () => {
+        expect(
+            names({
+                options: {
+                    publishRoutes: {
+                        deleteUser: true,
+                    },
+                },
+            })
+        ).toEqual(['delete_user']);
+    });
+
+    it('publishes a whole group with a star', () => {
         const selected = names({
-            tools: {
-                deleteUser: false,
+            options: {
+                publishRoutes: {
+                    users: true,
+                },
             },
         });
 
-        expect(selected).not.toContain('delete_user');
         expect(selected).toContain('users_get_user');
+        expect(selected).toContain('users_create_user');
+        expect(selected).not.toContain('health');
     });
 
-    it('drops a whole group set to false', () => {
+    it('lets a route opt out of its group star', () => {
         const selected = names({
-            tools: {
-                users: false,
-            },
-        });
-
-        expect(selected).not.toContain('users_get_user');
-        expect(selected).not.toContain('users_create_user');
-        expect(selected).toContain('health');
-    });
-
-    it('lets a route override its group default', () => {
-        const selected = names({
-            tools: {
-                users: {
-                    '*': false,
-                    getUser: true,
+            options: {
+                publishRoutes: {
+                    users: {
+                        '*': true,
+                        createUser: false,
+                    },
                 },
             },
         });
 
         expect(selected).toContain('users_get_user');
         expect(selected).not.toContain('users_create_user');
-        expect(selected).toContain('health');
+    });
+
+    it('lets a route override a false group', () => {
+        const selected = names({
+            options: {
+                publishRoutes: {
+                    users: {
+                        '*': false,
+                        getUser: true,
+                    },
+                },
+            },
+        });
+
+        expect(selected).toContain('users_get_user');
+        expect(selected).not.toContain('users_create_user');
     });
 
     it('curates down to a few tools with a top level star', () => {
         const selected = names({
-            tools: {
-                '*': false,
-                users: {
-                    getUser: true,
+            options: {
+                publishRoutes: {
+                    '*': false,
+                    users: {
+                        getUser: true,
+                    },
                 },
             },
         });
@@ -323,20 +358,12 @@ describe('buildToolDefinitions: selection', () => {
         expect(selected).toEqual(['users_get_user']);
     });
 
-    it('exposes a route the map never mentions', () => {
-        const selected = names({
-            tools: {
-                deleteUser: false,
-            },
-        });
-
-        expect(selected).toContain('health');
-    });
-
     it('keeps multipart routes out whatever the map says', () => {
         const selected = names({
-            tools: {
-                uploadAvatar: true,
+            options: {
+                publishRoutes: {
+                    uploadAvatar: true,
+                },
             },
         });
 
@@ -345,8 +372,10 @@ describe('buildToolDefinitions: selection', () => {
 
     it('keeps multipart routes out even when the map asks for them', () => {
         const selected = names({
-            tools: {
-                uploadAvatar: true,
+            options: {
+                publishRoutes: {
+                    uploadAvatar: true,
+                },
             },
         });
 
@@ -355,7 +384,10 @@ describe('buildToolDefinitions: selection', () => {
 
     it('keeps only safe methods under onlyReadOnly', () => {
         const selected = names({
-            onlyReadOnly: true,
+            options: {
+                ...publishAllRoutes.options,
+                onlyReadOnly: true,
+            },
         });
 
         expect(selected).toContain('users_get_user');
@@ -448,7 +480,7 @@ describe('buildToolDefinitions: input schema', () => {
             routes: unionContractRoutes,
         });
 
-        const definitions = buildToolDefinitions(unionContract.routes);
+        const definitions = buildToolDefinitions(unionContract.routes, publishAllRoutes);
         const send = definitions.find((definition) => definition.name === 'send_notification')!;
 
         expect(send.inputSchema.hasBody).toBe(true);
@@ -478,7 +510,7 @@ describe('buildToolDefinitions: input schema', () => {
             routes: complexContractRoutes,
         });
 
-        const definitions = buildToolDefinitions(complexContract.routes);
+        const definitions = buildToolDefinitions(complexContract.routes, publishAllRoutes);
         const update = definitions.find((definition) => definition.name === 'update_item')!;
 
         expect(update.inputSchema.hasParams).toBe(true);
@@ -509,7 +541,8 @@ describe('buildToolDefinitions: input schema', () => {
         const definitions = buildToolDefinitions(
             k.contract({
                 routes: contractRoutesWithRequiredQuery,
-            }).routes
+            }).routes,
+            publishAllRoutes
         );
         const search = definitions.find((definition) => definition.name === 'search_items')!;
 
@@ -633,26 +666,28 @@ describe('buildToolDefinitions: output schema', () => {
 
 describe('instructions', () => {
     it('lists the contract tag groups', () => {
-        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), undefined);
+        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), [], undefined);
 
         expect(instructions).toContain('{ status, body }');
         expect(instructions).toContain('- API');
     });
 
     it('appends the authored text after the generated overview', () => {
-        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), 'Every timestamp is UTC.');
+        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), [], 'Every timestamp is UTC.');
 
         expect(instructions.indexOf('- API')).toBeLessThan(instructions.indexOf('Every timestamp is UTC.'));
     });
 
     it('leaves out a group whose every route was excluded', () => {
         const trimmed = buildToolDefinitions(contract.routes, {
-            tools: {
-                '*': false,
+            options: {
+                publishRoutes: {
+                    '*': false,
+                },
             },
         });
 
-        expect(buildInstructions(contract, trimmed, undefined)).not.toContain('- API');
+        expect(buildInstructions(contract, trimmed, [], undefined)).not.toContain('- API');
     });
 
     it('reaches the client over the protocol', async () => {
@@ -1185,7 +1220,7 @@ describe('streamed routes', () => {
                 },
             },
         });
-        const definitions = buildToolDefinitions(streamRoutes);
+        const definitions = buildToolDefinitions(streamRoutes, publishAllRoutes);
         expect(definitions.map((definition) => definition.name)).toEqual(['ping']);
     });
 });

@@ -146,6 +146,20 @@ public enum API {
             .logout(Logout(kind: "logout", at: at, reason: reason))
         }
 
+        public var kind: String {
+            switch self {
+            case .login(let payload): return payload.kind
+            case .logout(let payload): return payload.kind
+            }
+        }
+
+        public var at: Date {
+            switch self {
+            case .login(let payload): return payload.at
+            case .logout(let payload): return payload.at
+            }
+        }
+
         private enum DiscriminatorKey: String, CodingKey {
             case discriminator = "kind"
         }
@@ -206,6 +220,13 @@ public enum API {
         }
         public static func sms(phone: String, text: String) -> NotificationEvent {
             .sms(SmsEvent(channel: "sms", phone: phone, text: text))
+        }
+
+        public var channel: String {
+            switch self {
+            case .email(let payload): return payload.channel
+            case .sms(let payload): return payload.channel
+            }
         }
 
         private enum DiscriminatorKey: String, CodingKey {
@@ -1923,6 +1944,334 @@ public final class APIClient: Sendable {
             }
         }
 
+        public enum ToolCall: Codable, Sendable, Equatable {
+            case weather_getForecast(ToolCallWeatherGetForecast)
+            case charts_plotSignups(ToolCallChartsPlotSignups)
+            case countWords(ToolCallCountWords)
+            public static func weather_getForecast(id: String, input: APIClient.AssistantReply.ToolCallWeatherGetForecastInput) -> ToolCall {
+                .weather_getForecast(ToolCallWeatherGetForecast(id: id, name: "weather.getForecast", input: input))
+            }
+            public static func charts_plotSignups(id: String, input: APIClient.AssistantReply.ToolCallChartsPlotSignupsInput) -> ToolCall {
+                .charts_plotSignups(ToolCallChartsPlotSignups(id: id, name: "charts.plotSignups", input: input))
+            }
+            public static func countWords(id: String, input: APIClient.AssistantReply.ToolCallCountWordsInput) -> ToolCall {
+                .countWords(ToolCallCountWords(id: id, name: "countWords", input: input))
+            }
+
+            public var id: String {
+                switch self {
+                case .weather_getForecast(let payload): return payload.id
+                case .charts_plotSignups(let payload): return payload.id
+                case .countWords(let payload): return payload.id
+                }
+            }
+
+            public var name: String {
+                switch self {
+                case .weather_getForecast(let payload): return payload.name
+                case .charts_plotSignups(let payload): return payload.name
+                case .countWords(let payload): return payload.name
+                }
+            }
+
+            private enum DiscriminatorKey: String, CodingKey {
+                case discriminator = "name"
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: DiscriminatorKey.self)
+                let kind = try container.decode(String.self, forKey: .discriminator)
+                let single = try decoder.singleValueContainer()
+                switch kind {
+                case "weather.getForecast":
+                    self = .weather_getForecast(try single.decode(ToolCallWeatherGetForecast.self))
+                case "charts.plotSignups":
+                    self = .charts_plotSignups(try single.decode(ToolCallChartsPlotSignups.self))
+                case "countWords":
+                    self = .countWords(try single.decode(ToolCallCountWords.self))
+                default:
+                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                }
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var single = encoder.singleValueContainer()
+                switch self {
+                case .weather_getForecast(let payload):
+                    try single.encode(payload)
+                case .charts_plotSignups(let payload):
+                    try single.encode(payload)
+                case .countWords(let payload):
+                    try single.encode(payload)
+                }
+            }
+        }
+
+        public struct ToolCallWeatherGetForecast: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallWeatherGetForecastInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallWeatherGetForecastInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallWeatherGetForecastInput: Codable, Sendable, Equatable {
+            public let city: String
+            public let unit: ToolCallWeatherGetForecastInputUnit?
+
+            public init(
+                city: String,
+                unit: ToolCallWeatherGetForecastInputUnit? = nil
+            ) {
+                self.city = city
+                self.unit = unit
+            }
+        }
+
+        public enum ToolCallWeatherGetForecastInputUnit: String, Codable, Sendable {
+            case celsius = "celsius"
+            case fahrenheit = "fahrenheit"
+        }
+
+        public struct ToolCallChartsPlotSignups: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallChartsPlotSignupsInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallChartsPlotSignupsInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallChartsPlotSignupsInput: Codable, Sendable, Equatable {
+            public let days: Int
+
+            public init(days: Int) {
+                self.days = days
+            }
+        }
+
+        public struct ToolCallCountWords: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: ToolCallCountWordsInput
+
+            public init(
+                id: String,
+                name: String,
+                input: ToolCallCountWordsInput
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct ToolCallCountWordsInput: Codable, Sendable, Equatable {
+            public let text: String
+
+            public init(text: String) {
+                self.text = text
+            }
+        }
+
+        public enum ToolResult: Codable, Sendable, Equatable {
+            case weather_getForecast(ToolResultWeatherGetForecast)
+            case charts_plotSignups(ToolResultChartsPlotSignups)
+            case countWords(ToolResultCountWords)
+            public static func weather_getForecast(id: String, output: APIClient.AssistantReply.ToolResultWeatherGetForecastOutput) -> ToolResult {
+                .weather_getForecast(ToolResultWeatherGetForecast(id: id, name: "weather.getForecast", output: output))
+            }
+            public static func charts_plotSignups(id: String, output: APIClient.AssistantReply.ToolResultChartsPlotSignupsOutput) -> ToolResult {
+                .charts_plotSignups(ToolResultChartsPlotSignups(id: id, name: "charts.plotSignups", output: output))
+            }
+            public static func countWords(id: String, output: APIClient.AssistantReply.ToolResultCountWordsOutput) -> ToolResult {
+                .countWords(ToolResultCountWords(id: id, name: "countWords", output: output))
+            }
+
+            public var id: String {
+                switch self {
+                case .weather_getForecast(let payload): return payload.id
+                case .charts_plotSignups(let payload): return payload.id
+                case .countWords(let payload): return payload.id
+                }
+            }
+
+            public var name: String {
+                switch self {
+                case .weather_getForecast(let payload): return payload.name
+                case .charts_plotSignups(let payload): return payload.name
+                case .countWords(let payload): return payload.name
+                }
+            }
+
+            private enum DiscriminatorKey: String, CodingKey {
+                case discriminator = "name"
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: DiscriminatorKey.self)
+                let kind = try container.decode(String.self, forKey: .discriminator)
+                let single = try decoder.singleValueContainer()
+                switch kind {
+                case "weather.getForecast":
+                    self = .weather_getForecast(try single.decode(ToolResultWeatherGetForecast.self))
+                case "charts.plotSignups":
+                    self = .charts_plotSignups(try single.decode(ToolResultChartsPlotSignups.self))
+                case "countWords":
+                    self = .countWords(try single.decode(ToolResultCountWords.self))
+                default:
+                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                }
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var single = encoder.singleValueContainer()
+                switch self {
+                case .weather_getForecast(let payload):
+                    try single.encode(payload)
+                case .charts_plotSignups(let payload):
+                    try single.encode(payload)
+                case .countWords(let payload):
+                    try single.encode(payload)
+                }
+            }
+        }
+
+        public struct ToolResultWeatherGetForecast: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultWeatherGetForecastOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultWeatherGetForecastOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultWeatherGetForecastOutput: Codable, Sendable, Equatable {
+            public let temperature: Double
+            public let unit: ToolResultWeatherGetForecastOutputUnit
+            public let summary: String
+
+            public init(
+                temperature: Double,
+                unit: ToolResultWeatherGetForecastOutputUnit,
+                summary: String
+            ) {
+                self.temperature = temperature
+                self.unit = unit
+                self.summary = summary
+            }
+        }
+
+        public enum ToolResultWeatherGetForecastOutputUnit: String, Codable, Sendable {
+            case celsius = "celsius"
+            case fahrenheit = "fahrenheit"
+        }
+
+        public struct ToolResultChartsPlotSignups: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultChartsPlotSignupsOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultChartsPlotSignupsOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultChartsPlotSignupsOutput: Codable, Sendable, Equatable {
+            public let points: [ToolResultChartsPlotSignupsOutputPointsItem]
+
+            public init(points: [ToolResultChartsPlotSignupsOutputPointsItem]) {
+                self.points = points
+            }
+        }
+
+        public struct ToolResultChartsPlotSignupsOutputPointsItem: Codable, Sendable, Equatable {
+            public let date: String
+            public let signups: Int
+
+            public init(
+                date: String,
+                signups: Int
+            ) {
+                self.date = date
+                self.signups = signups
+            }
+        }
+
+        public struct ToolResultCountWords: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultCountWordsOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultCountWordsOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultCountWordsOutput: Codable, Sendable, Equatable {
+            public let words: Int
+
+            public init(words: Int) {
+                self.words = words
+            }
+        }
+
+        public struct ToolError: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: ToolErrorName
+            public let message: String
+
+            public init(
+                id: String,
+                name: ToolErrorName,
+                message: String
+            ) {
+                self.id = id
+                self.name = name
+                self.message = message
+            }
+        }
+
+        public enum ToolErrorName: String, Codable, Sendable {
+            case weatherGetForecast = "weather.getForecast"
+            case chartsPlotSignups = "charts.plotSignups"
+            case countWords = "countWords"
+        }
+
         public struct Body: Sendable {
             public let payload: Input
 
@@ -1938,6 +2287,63 @@ public final class APIClient: Sendable {
         public enum Event: Sendable, Equatable {
             case delta(Delta)
             case done(Done)
+            case tool_call(ToolCall)
+            case tool_result(ToolResult)
+            case tool_error(ToolError)
+        }
+
+        public struct ToolCallRecord: Identifiable, Sendable, Equatable {
+            /// How far along the call is.
+            public enum State: Sendable, Equatable {
+                case running
+                case done
+                case failed
+            }
+
+            public let id: String
+            public let name: String
+            public var state: State
+            /// The call as it arrived, to read its input.
+            public var call: ToolCall?
+            /// The result once it answered, to read its output.
+            public var result: ToolResult?
+            /// What the tool reported when it failed.
+            public var message: String?
+        }
+
+        /// Fold a stream's events into one row per tool call, in the order the calls arrived.
+        public static func readToolCalls(_ events: [Event]) -> [ToolCallRecord] {
+            var order: [String] = []
+            var calls: [String: ToolCallRecord] = [:]
+
+            func at(_ id: String, _ name: String) -> ToolCallRecord {
+                if let existing = calls[id] { return existing }
+                order.append(id)
+                return ToolCallRecord(id: id, name: name, state: .running, call: nil, result: nil, message: nil)
+            }
+
+            for event in events {
+                switch event {
+                case .tool_call(let payload):
+                    var tracked = at(payload.id, payload.name)
+                    tracked.call = payload
+                    calls[payload.id] = tracked
+                case .tool_result(let payload):
+                    var tracked = at(payload.id, payload.name)
+                    tracked.state = .done
+                    tracked.result = payload
+                    calls[payload.id] = tracked
+                case .tool_error(let payload):
+                    var tracked = at(payload.id, payload.name.rawValue)
+                    tracked.state = .failed
+                    tracked.message = payload.message
+                    calls[payload.id] = tracked
+                default:
+                    continue
+                }
+            }
+
+            return order.compactMap { calls[$0] }
         }
 
         public struct Result: Sendable {
@@ -2669,6 +3075,9 @@ public struct APIAssistantClient: Sendable {
                 switch event.event {
                 case "delta": return .delta(try decoder.decode(APIClient.AssistantReply.Delta.self, from: Foundation.Data(event.data.utf8)))
                 case "done": return .done(try decoder.decode(APIClient.AssistantReply.Done.self, from: Foundation.Data(event.data.utf8)))
+                case "tool_call": return .tool_call(try decoder.decode(APIClient.AssistantReply.ToolCall.self, from: Foundation.Data(event.data.utf8)))
+                case "tool_result": return .tool_result(try decoder.decode(APIClient.AssistantReply.ToolResult.self, from: Foundation.Data(event.data.utf8)))
+                case "tool_error": return .tool_error(try decoder.decode(APIClient.AssistantReply.ToolError.self, from: Foundation.Data(event.data.utf8)))
                 default: return nil
                 }
             }

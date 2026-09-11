@@ -1,5 +1,5 @@
-import type { FlattenedRoute } from '@ts-kizuna/core/adapter';
-import { routeStreams, type RouteDefinition, type Routes } from '@ts-kizuna/core';
+import type { FlattenedRoute, FlattenedTool } from '@ts-kizuna/core/adapter';
+import { routeStreams, type RouteDefinition, type Routes, type ToolKeys, type Tools } from '@ts-kizuna/core';
 import { isSafeMethod } from './method.js';
 
 /**
@@ -17,21 +17,22 @@ export type ToolEntry<GroupOrRoute> = GroupOrRoute extends RouteDefinition
             });
 
 /**
- * Which routes become tools, keyed by the route tree. A route the map never
- * mentions is a tool, so a map only says what differs from that.
+ * Which routes become tools, keyed by the route tree. `'*'` at the root sets
+ * the default for every route, then name the ones that differ.
  */
 export type ToolMap<R extends Routes = Routes> = {
+    '*'?: boolean;
+} & {
     [Key in keyof R & string]?: ToolEntry<R[Key]>;
 };
 
 /**
  * The deepest explicit answer wins, then the nearest `'*'`.
  */
-const isExposed = (map: ToolMap | undefined, routeKey: string): boolean => {
-    if (map === undefined) return true;
+const resolveEntry = (map: ToolMap | undefined, routeKey: string, fallback: boolean): boolean => {
+    if (map === undefined) return fallback;
 
     let node: unknown = map;
-    let fallback = true;
 
     for (const segment of routeKey.split('.')) {
         if (typeof node === 'boolean') return node;
@@ -52,26 +53,71 @@ const isExposed = (map: ToolMap | undefined, routeKey: string): boolean => {
  */
 const takesJsonInput = (route: RouteDefinition): boolean => route.contentType === undefined || route.contentType === 'application/json';
 
-export interface ToolSelection<R extends Routes = Routes> {
+/**
+ * The dotted keys of a tool tree, falling back to any string for the wide
+ * default, which names no tools of its own.
+ */
+type HiddenToolKey<T extends Tools> = [ToolKeys<T>] extends [never] ? string : ToolKeys<T>;
+
+/**
+ * The choices about what an MCP server offers, passed under `options`. The
+ * routes and tools themselves sit beside it.
+ */
+export interface ToolSelection<R extends Routes = Routes, T extends Tools = Tools> {
     /**
-     * Which routes become tools. Keys are checked against the routes passed
-     * alongside, so a name the routes do not have is a type error.
+     * Which routes to publish as tools. A route is an HTTP endpoint rather than
+     * a tool, so none are published until named here. `'*'` sets the default
+     * for a group, or for the whole tree at the root.
+     *
+     * @example
+     * publishRoutes: {
+     *     users: {
+     *         '*': true,
+     *         deleteUser: false,
+     *     },
+     * }
      */
-    tools?: ToolMap<R>;
+    publishRoutes?: ToolMap<R>;
 
     /**
-     * Keep only the methods RFC 9110 calls safe, so no tool an assistant calls
-     * can change data.
+     * Tools to leave out, by dotted key. Everything `k.tools` declares is
+     * already a tool, so all of them are published unless listed here.
+     *
+     * @example
+     * hideTools: ['countWords']
+     */
+    hideTools?: readonly HiddenToolKey<T>[];
+
+    /**
+     * Keep only what cannot change data: the routes RFC 9110 calls safe, and
+     * the tools declaring `readOnlyHint`.
      *
      * @default false
      */
     onlyReadOnly?: boolean;
 }
 
+/**
+ * The routes a selection publishes as tools. None, unless `publishRoutes` names
+ * them.
+ */
 export const selectToolRoutes = (routes: FlattenedRoute[], selection: ToolSelection | undefined): FlattenedRoute[] =>
     routes.filter(({ route, routeKey }) => {
         // A tool result is one value, so a route that streams has nothing to return.
         if (!takesJsonInput(route) || routeStreams(route)) return false;
         if (selection?.onlyReadOnly && !isSafeMethod(route.method)) return false;
-        return isExposed(selection?.tools, routeKey);
+        return resolveEntry(selection?.publishRoutes, routeKey, false);
     });
+
+/**
+ * The declared tools a selection publishes: all of them, less whatever
+ * `hideTools` names.
+ */
+export const selectTools = (tools: FlattenedTool[], selection: ToolSelection | undefined): FlattenedTool[] => {
+    const hidden = new Set<string>(selection?.hideTools ?? []);
+    return tools.filter(({ toolKey, tool }) => {
+        // A declared tool has no method, so `readOnlyHint` is what it says about itself.
+        if (selection?.onlyReadOnly && tool.definition.annotations?.readOnlyHint !== true) return false;
+        return !hidden.has(toolKey);
+    });
+};

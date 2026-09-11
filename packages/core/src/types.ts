@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { Tools } from './tools.js';
 
 export const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
 
@@ -44,6 +45,12 @@ export interface StreamResponseDefinition {
      * The schema of one message, or a record of event name to schema.
      */
     stream: StreamDefinition;
+    /**
+     * Tools declared with `k.tools`. Their `tool_call`, `tool_result` and
+     * `tool_error` events join the ones `stream` names, each discriminated on
+     * the tool's dotted key.
+     */
+    tools?: Tools;
     /**
      * Schema for the response headers. Each property becomes one
      * response header.

@@ -76,6 +76,36 @@ export const streamInferenceContract = k.contract({
     routes: streamInferenceRoutes,
 });
 
+export const toolInferenceTools = k.tools({
+    countWords: {
+        description: 'Count the words in a piece of text',
+        input: z.object({
+            text: z.string(),
+        }),
+        output: z.object({
+            words: z.int(),
+        }),
+    },
+});
+
+export const toolInferenceContract = k.contract({
+    routes: k.routes('api', {
+        summarize: {
+            method: 'POST',
+            path: '/summarize',
+            body: z.object({
+                text: z.string(),
+            }),
+            responses: {
+                200: z.object({
+                    words: z.int(),
+                }),
+            },
+        },
+    }),
+    tools: toolInferenceTools,
+});
+
 export const inferenceGroupContract = k.contract({
     routes: {
         users: inferenceRoutes,

@@ -473,17 +473,41 @@ final class APIClientTests: XCTestCase {
         let result = try await client.assistant.reply(.body(prompt: "hello there"))
         var text = ""
         var done: APIClient.AssistantReply.Done?
+        var events: [APIClient.AssistantReply.Event] = []
         for try await event in result.body {
+            events.append(event)
             switch event {
             case .delta(let delta):
                 text += delta.text
             case .done(let payload):
                 done = payload
+            case .tool_call, .tool_result, .tool_error:
+                continue
             }
         }
         XCTAssertTrue(text.hasPrefix("You asked: hello there"), "got \(text)")
         XCTAssertEqual(done?.inputTokens, 2)
         XCTAssertGreaterThan(done?.outputTokens ?? 0, 5)
+        XCTAssertTrue(APIClient.AssistantReply.readToolCalls(events).isEmpty)
+    }
+
+    func testTrackToolCallsFoldsCallsAndResults() throws {
+        let events: [APIClient.AssistantReply.Event] = [
+            .tool_call(.countWords(id: "toolu_01", input: .init(text: "one two three"))),
+            .tool_result(.countWords(id: "toolu_01", output: .init(words: 3))),
+            .tool_call(.weather_getForecast(id: "toolu_02", input: .init(city: "Oslo", unit: .celsius))),
+        ]
+
+        let tracked = APIClient.AssistantReply.readToolCalls(events)
+
+        XCTAssertEqual(tracked.map(\.id), ["toolu_01", "toolu_02"])
+        XCTAssertEqual(tracked[0].state, .done)
+        XCTAssertEqual(tracked[1].state, .running)
+
+        guard case .countWords(let counted)? = tracked[0].result else {
+            return XCTFail("expected the countWords result, got \(String(describing: tracked[0].result))")
+        }
+        XCTAssertEqual(counted.output.words, 3)
     }
 
     func testAssistantReplyErrorStatusThrowsBeforeStreaming() async throws {

@@ -52,7 +52,9 @@ See [authentication](/docs/authentication) for identities, guards, and access ga
 | [Model Context Protocol](https://modelcontextprotocol.io/specification/latest)                | The MCP endpoint, its tools, and their input and output schemas |
 | [MCP authorization](https://modelcontextprotocol.io/specification/latest/basic/authorization) | Serving the endpoint as an OAuth 2.1 resource server            |
 
-See [MCP](/docs/mcp) for the plugin and the tools it generates.
+See [MCP](/docs/mcp) for the endpoint, and [tools](/docs/tools) for declaring your own.
+
+No standard covers streamed tool calls. MCP deliberately has none, having replaced interactive tool flows with multi round-trip requests in its `2026-07-28` revision, so the `tool_call`, `tool_result` and `tool_error` events a streamed response carries are kizuna's own vocabulary. Their framing follows the WHATWG server-sent events specification like any other stream.
 
 ## Deliberate omissions
 

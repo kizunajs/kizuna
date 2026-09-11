@@ -6,6 +6,7 @@ import {
     inferenceContract,
     inferenceGroupContract,
     streamInferenceContract,
+    toolInferenceContract,
     inferenceRoutes,
     pluginTypeContract,
     requestContextContract,
@@ -21,6 +22,21 @@ const requestContextServer = new KizunaServer(requestContextContract);
 
 test('conforms to the shared adapter type catalogue', () => {
     checkAdapterTypeFeatures('next', {
+        'tools.handlerArg': () => {
+            new KizunaServer(toolInferenceContract).router({
+                summarize: async ({ body, tools }) => {
+                    expectTypeOf(tools.countWords.run).parameter(0).toEqualTypeOf<{ text: string }>();
+                    const counted = await tools.countWords.run({
+                        text: body.text,
+                    });
+                    expectTypeOf(counted).toEqualTypeOf<{ words: number }>();
+                    return {
+                        status: 200,
+                        body: counted,
+                    };
+                },
+            });
+        },
         'streams.bodyGenerator': () => {
             new KizunaServer(streamInferenceContract).router({
                 reply: async ({ body }) => ({

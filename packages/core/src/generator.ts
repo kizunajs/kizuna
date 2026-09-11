@@ -34,6 +34,7 @@ export {
 } from './zod-internals.js';
 
 export { deprecationHeaders } from './deprecation.js';
+export { toToolName, deriveToolNames, type ToolOrigin, type ToolNameEntry } from './tool-name.js';
 export {
     streamMode,
     streamContentType,

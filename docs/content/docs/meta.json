@@ -9,6 +9,7 @@
         "authentication",
         "request-context",
         "streaming",
+        "tools",
         "caching",
         "jobs",
         "deprecations",
