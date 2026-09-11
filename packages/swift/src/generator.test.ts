@@ -1705,6 +1705,22 @@ describe('Swift generator: failure surface', () => {
         expect(output).toContain('guard let url = components.url else { throw Failure.invalidRequest }');
         expect(output).toContain('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
     });
+
+    it('maps the URLSession form of cancellation to .cancelled, not .requestFailed', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        // URLSession reports a cancelled task as URLError(.cancelled), never CancellationError, so
+        // catching only the latter leaves every real cancellation looking like a request failure.
+        const catches = output.match(/catch let error as URLError where error\.code == \.cancelled \{ throw Failure\.cancelled \}/g);
+        expect(catches).toHaveLength(2);
+        expect(output).toContain('catch is CancellationError { throw Failure.cancelled }');
+    });
+
+    it('exposes isCancelled on the protocol and every failure enum so a generic catch can test it', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('var isCancelled: Bool { get }');
+        expect(output).toContain('public var isCancelled: Bool {');
+        expect(output).toContain('if case .cancelled = self { return true }');
+    });
 });
 
 describe('Swift generator: Result init', () => {

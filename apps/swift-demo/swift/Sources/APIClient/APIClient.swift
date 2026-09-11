@@ -494,6 +494,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -514,6 +519,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -547,6 +557,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -580,6 +595,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -638,6 +658,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -689,6 +714,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -746,6 +776,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -785,6 +820,11 @@ public final class APIClient: Sendable {
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(API.ProblemDetails)
             case validationError(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -826,6 +866,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -889,6 +934,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -956,6 +1006,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -981,6 +1036,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1026,6 +1086,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1059,6 +1124,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1087,6 +1157,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1115,6 +1190,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1143,6 +1223,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1176,6 +1261,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1217,6 +1307,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1308,6 +1403,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1373,6 +1473,11 @@ public final class APIClient: Sendable {
             case badRequest(API.ProblemDetails)
             case unauthorized
             case validationError(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1414,6 +1519,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1442,6 +1552,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1484,6 +1599,11 @@ public final class APIClient: Sendable {
             case unexpectedStatus(Int, Foundation.Data)
             case conflict(API.ProblemDetails)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1517,6 +1637,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1545,6 +1670,11 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1594,6 +1724,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1640,6 +1775,11 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 
@@ -1702,6 +1842,11 @@ public final class APIClient: Sendable {
             case unexpectedStatus(Int, Foundation.Data)
             case notFound(API.ProblemDetails)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
         }
     }
 }
@@ -2371,6 +2516,7 @@ public protocol KizunaFailure: Swift.Error {
     static var cancelled: Self { get }
     static var invalidResponse: Self { get }
     static func unexpectedStatus(_ status: Int, _ data: Foundation.Data) -> Self
+    var isCancelled: Bool { get }
 }
 
 public protocol KizunaDecodableFailure: KizunaFailure {
@@ -2463,12 +2609,14 @@ private enum Kizuna {
         if let requestMiddleware {
             do { try await requestMiddleware(&request) }
             catch is CancellationError { throw Failure.cancelled }
+            catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
             catch { throw Failure.requestFailed(error) }
         }
         let data: Foundation.Data
         let response: URLResponse
         do { (data, response) = try await session.data(for: request) }
         catch is CancellationError { throw Failure.cancelled }
+        catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
         catch { throw Failure.requestFailed(error) }
         if let responseMiddleware { await responseMiddleware(request, data, response) }
         guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }
