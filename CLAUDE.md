@@ -21,7 +21,7 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 - **RFC 8414** (OAuth 2.0 Authorization Server Metadata, June 2018): an identity's `issuer`
 - **RFC 8707** (Resource Indicators for OAuth 2.0, February 2020): the canonical `resource` URI and the audience a guard checks
 - **RFC 6750** (OAuth 2.0 Bearer Token Usage, October 2012): the `WWW-Authenticate` challenge, including `insufficient_scope`
-- **Model Context Protocol**: the MCP endpoint, its tools, their names, and its authorization
+- **Model Context Protocol**: the MCP endpoint, its tools, their names, and its authorization. A tool declared with `k.tools` follows the `Tool` object field for field
 
 ### MCP tool names
 
@@ -47,6 +47,21 @@ Jobs (`k.jobs`) are the one non-HTTP-shaped concept. Settled; don't relitigate.
 - `run` and `queue`, never a bare call. `run` takes the input; `queue` takes a message (`input`, `runAt`, `dedupeKey`).
 
 Deliberate omissions: no first-party transports, no stored state, and no per-job cron generation. Retries, deduplication, and run history belong to the transport. An occurrence's dedupe key is `job@occurrenceISO`.
+
+# Tools
+
+Tools (`k.tools`) are what a model calls. Settled; don't relitigate.
+
+- A tool is a sibling of a route, never inside one. It declares no path and no method, and nothing that walks `contract.routes` sees one.
+- The fields are MCP's `Tool`, field for field: `title`, `description`, `input`, `output`, `annotations`. `description` is required, because it is the one thing a model reads before calling.
+- A handler receives only `input` and `throwError`. Anything more it imports, as a route handler would. `throwError` takes the message the model reads, not a `{ status, body }` envelope, because a tool has no HTTP status.
+- A tool is addressed by its dotted key, `weather.getForecast`, and publishes as `weather_get_forecast`.
+- A streamed response names them under `tools`, adding `tool_call`, `tool_result` and `tool_error` to the events it declares.
+- Every declared tool publishes over MCP, because a tool is a tool. `options.hideTools` drops one.
+- A route is an HTTP endpoint rather than a tool, so publishing one is the opt in, through `options.publishRoutes`.
+- `readToolCalls` folds a message list into one row per call. Core exports it; the Swift and Kotlin generators emit it per route.
+
+Deliberate omissions: no LLM clients, no agent loop, no provider wire shapes, and no progressive tool input.
 
 # Naming
 

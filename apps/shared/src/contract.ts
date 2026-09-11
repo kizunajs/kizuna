@@ -3,23 +3,29 @@ import { openApiPlugin } from '@ts-kizuna/openapi';
 import { k } from './k';
 import { routes } from './routes/index';
 import { jobs } from './jobs';
+import { tools } from './tools';
 import { auth } from './auth';
 
 export const contract = k.contract({
     routes,
     jobs,
+    tools,
     auth,
-    plugins: ({ routes }) => ({
-        mcp: mcpPlugin(routes, {
+    plugins: ({ routes, tools }) => ({
+        mcp: mcpPlugin({
             name: 'ts-kizuna demo',
-            tools: {
-                health: false,
-                users: {
-                    exportUsers: false,
+            routes,
+            tools,
+            options: {
+                publishRoutes: {
+                    users: {
+                        '*': true,
+                        exportUsers: false,
+                    },
+                    workspace: true,
+                    members: true,
                 },
-                notifications: {
-                    webhook: false,
-                },
+                hideTools: ['countWords'],
             },
         }),
         openApi: openApiPlugin({

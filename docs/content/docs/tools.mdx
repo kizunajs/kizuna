@@ -1,0 +1,475 @@
+---
+title: Tools
+description: Declare the tools an AI assistant can call. Run them on the server, and read each call typed in your client.
+---
+
+<BetaNotice>
+
+Tools are new and still settling. `k.tools`, the `tools` field on a streamed response, and the event names may change before v2, so pin your version if you depend on them.
+
+</BetaNotice>
+
+A tool is usually written three times: a JSON Schema for the model, a typed event for the client, and a function that runs it. Declare it once and all three follow.
+
+<Steps>
+
+<Step>
+
+## Declare the tools
+
+The fields mirror the [Model Context Protocol](https://modelcontextprotocol.io/specification/latest/server/tools) `Tool` object.
+
+```ts title="contract/tools.ts"
+import { z } from 'zod';
+import { k } from './k';
+
+export const tools = k.tools({
+    weather: {
+        getForecast: {
+            title: 'Weather forecast',
+            description: 'Look up tomorrow forecast for one city',
+            input: z.object({
+                city: z.string().min(1),
+                unit: z.enum(['celsius', 'fahrenheit']).default('celsius'),
+            }),
+            output: z.object({
+                temperature: z.number(),
+                unit: z.enum(['celsius', 'fahrenheit']),
+                summary: z.string(),
+            }),
+        },
+    },
+});
+```
+
+| Field         | Meaning                                                              |
+| ------------- | -------------------------------------------------------------------- |
+| `description` | What the model reads when it decides whether to call. Required       |
+| `input`       | Schema for the arguments the model sends                             |
+| `output`      | Schema for what the tool answers                                     |
+| `title`       | A human-readable name for display                                    |
+| `annotations` | `readOnlyHint`, `idempotentHint`, `destructiveHint`, `openWorldHint` |
+
+Tools nest like routes, and a tool is addressed by its dotted key. Install them beside `routes`:
+
+```ts title="contract/index.ts"
+export const contract = k.contract({
+    routes,
+    tools,
+    auth,
+});
+```
+
+A tool declares no path and no method, so nothing that walks `contract.routes` sees one.
+
+</Step>
+
+<Step>
+
+## Put them on a stream
+
+Naming `tools` on a streamed response adds three events:
+
+```ts title="contract/assistant.ts"
+responses: {
+    200: {
+        stream: {
+            delta: z.object({
+                text: z.string(),
+            }),
+        },
+        tools,
+    },
+},
+```
+
+| Event         | Payload                 |
+| ------------- | ----------------------- |
+| `tool_call`   | `{ id, name, input }`   |
+| `tool_result` | `{ id, name, output }`  |
+| `tool_error`  | `{ id, name, message }` |
+
+`id` ties a result back to its call.
+
+</Step>
+
+<Step>
+
+## Write the handlers
+
+A handler receives the validated `input` and `throwError`. Anything else it imports, the way a route handler does.
+
+```ts title="server/tools.ts"
+import { forecastFor } from '../weather';
+import { server } from './server';
+
+export const toolHandlers = server.tools({
+    weather: {
+        getForecast: ({ input, throwError }) => {
+            if (input.city.trim() === '') {
+                throwError('Name a city to look the forecast up for.');
+            }
+            return forecastFor(input.city, input.unit);
+        },
+    },
+});
+```
+
+`throwError` takes a message rather than a `{ status, body }` envelope, since a tool has no HTTP status. It reaches the client as a `tool_error`, and a model over MCP reads it as an execution error it can retry.
+
+</Step>
+
+<Step>
+
+## Register them on the api
+
+```ts title="server/api.ts"
+export const api = server.api({
+    router,
+    tools: toolHandlers,
+});
+```
+
+</Step>
+
+</Steps>
+
+## Driving the model
+
+Every handler receives the contract's tools under `tools`:
+
+```ts title="server/router/assistant.ts"
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic();
+
+reply: ({ body, tools }) => ({
+    status: 200,
+    body: async function* () {
+        const stream = anthropic.messages.stream({
+            model: 'claude-opus-5',
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: body.prompt }],
+            tools: tools.definitions.map((tool) => ({
+                name: tool.name,
+                description: tool.description,
+                input_schema: tool.inputSchema,
+            })),
+        });
+
+        for await (const event of stream) {
+            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                yield { event: 'delta', data: { text: event.delta.text } };
+            }
+
+            if (event.type === 'content_block_stop' && event.content_block.type === 'tool_use') {
+                const call = {
+                    id: event.content_block.id,
+                    name: tools.keyOf(event.content_block.name),
+                    input: event.content_block.input,
+                };
+
+                yield { event: 'tool_call', data: call };
+                yield { event: 'tool_result', data: await tools.call(call) };
+            }
+        }
+    },
+}),
+```
+
+- `tools.definitions` is every tool in MCP's shape, `inputSchema` as JSON Schema.
+- `tools.keyOf` turns `weather_get_forecast` into the dotted key.
+- `tools.call` validates the input, runs the handler, validates the output, and answers the `tool_result` payload.
+
+Reach one directly from a script or a test:
+
+```ts
+await tools.weather.getForecast.run({
+    city: 'Oslo',
+});
+```
+
+## Reading the calls
+
+A call arrives as one event and its answer as another. `readToolCalls` folds them back into one row per call, carrying the tool's `name`, a `state` of `running`, `done` or `failed`, and the payloads narrowed to that tool.
+
+TypeScript imports it from `@ts-kizuna/core`; the Swift and Kotlin generators emit it beside the route's `Event` type.
+
+<Tabs items={['React', 'SwiftUI', 'Compose']}>
+
+<Tab value="React">
+
+`streamOptions` from [`@ts-kizuna/tanstack-query`](/docs/clients/tanstack-query) already holds the messages received so far, so there is no state to keep at all.
+
+```tsx title="components/Chat.tsx"
+import { useQuery } from '@tanstack/react-query';
+import { readToolCalls } from '@ts-kizuna/core';
+import { api } from '../api';
+
+export function Chat({ prompt }: { prompt: string }) {
+    const { data } = useQuery(
+        api.assistant.reply.streamOptions({
+            input: {
+                body: {
+                    prompt,
+                },
+            },
+        })
+    );
+
+    const messages = data ?? [];
+
+    return (
+        <article>
+            {readToolCalls(messages).map((call) => (
+                <ToolCallView key={call.id} call={call} />
+            ))}
+            <p>{messages.flatMap((message) => (message.event === 'delta' ? [message.data.text] : [])).join('')}</p>
+        </article>
+    );
+}
+```
+
+```tsx title="components/ToolCallView.tsx"
+import type { ToolCallRecord } from '@ts-kizuna/core';
+
+type Call = ToolCallRecord<AssistantMessage>;
+
+export function ToolCallView({ call }: { call: Call }) {
+    switch (call.name) {
+        case 'charts.plotSignups':
+            return call.state === 'done' ? <SignupChart points={call.output.points} /> : <ChartSkeleton />;
+        default:
+            return <ToolPill name={call.name} state={call.state} />;
+    }
+}
+```
+
+</Tab>
+
+<Tab value="SwiftUI">
+
+```swift title="ChatModel.swift"
+@Observable
+@MainActor
+final class ChatModel {
+    var messages: [AssistantReply.Event] = []
+
+    func send(_ prompt: String) async throws {
+        messages = []
+        let result = try await client.assistantReply(body: .init(prompt: prompt))
+
+        for try await event in result.body {
+            messages.append(event)
+        }
+    }
+}
+```
+
+```swift title="ChatView.swift"
+import APIClient
+
+struct ChatView: View {
+    @State private var model = ChatModel()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(APIClient.AssistantReply.readToolCalls(model.messages)) { call in
+                ToolCallView(call: call)
+            }
+            Text(model.messages.text)
+        }
+    }
+}
+```
+
+```swift title="ToolCallView.swift"
+struct ToolCallView: View {
+    let call: ToolCallRecord
+
+    var body: some View {
+        switch call.name {
+        case "charts.plotSignups":
+            SignupChart(points: call.points)
+        default:
+            ToolPill(name: call.name, state: call.state)
+        }
+    }
+}
+```
+
+</Tab>
+
+<Tab value="Compose">
+
+```kotlin title="ChatViewModel.kt"
+class ChatViewModel(private val client: APIClient) : ViewModel() {
+    private val _messages = MutableStateFlow(emptyList<Event>())
+    val messages: StateFlow<List<Event>> = _messages.asStateFlow()
+
+    fun send(prompt: String) = viewModelScope.launch {
+        _messages.value = emptyList()
+        client.assistantReply(AssistantReplyBody(prompt)).body.collect { event ->
+            _messages.update { it + event }
+        }
+    }
+}
+```
+
+```kotlin title="ChatScreen.kt"
+import com.kizuna.demo.APIClient
+
+@Composable
+fun ChatScreen(model: ChatViewModel = viewModel()) {
+    val messages by model.messages.collectAsStateWithLifecycle()
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        APIClient.AssistantReply.readToolCalls(messages).forEach { call -> ToolCallView(call) }
+        Text(messages.text())
+    }
+}
+```
+
+```kotlin title="ToolCallView.kt"
+@Composable
+fun ToolCallView(call: ToolCallRecord) {
+    when (call.name) {
+        "charts.plotSignups" -> SignupChart(call.points)
+        else -> ToolPill(call.name, call.state)
+    }
+}
+```
+
+</Tab>
+
+</Tabs>
+
+### Reaching one tool payload
+
+Narrow on the tool name where you want its own data. The generated types carry the payload, so there is no cast.
+
+<Tabs items={['TypeScript', 'Swift', 'Kotlin']}>
+
+<Tab value="TypeScript">
+
+```ts
+if (message.event === 'tool_result') {
+    switch (message.data.name) {
+        case 'charts.plotSignups':
+            // { points: Array<{ date: string; signups: number }> }
+            points = message.data.output.points;
+            break;
+        case 'weather.getForecast':
+            // { temperature: number; unit: 'celsius' | 'fahrenheit'; summary: string }
+            temperature = message.data.output.temperature;
+            break;
+        case 'countWords':
+            // { words: number }
+            words = message.data.output.words;
+            break;
+    }
+}
+```
+
+</Tab>
+
+<Tab value="Swift">
+
+```swift
+case .tool_result(let result):
+    switch result {
+    case .charts_plotSignups(let plotted):
+        points = plotted.output.points
+    case .weather_getForecast(let forecast):
+        temperature = forecast.output.temperature
+    case .countWords(let counted):
+        words = counted.output.words
+    }
+```
+
+</Tab>
+
+<Tab value="Kotlin">
+
+```kotlin
+is Event.ToolResult -> when (val result = event.data) {
+    is ToolResult.Charts_plotSignups -> points = result.value.output.points
+    is ToolResult.Weather_getForecast -> temperature = result.value.output.temperature
+    is ToolResult.CountWords -> words = result.value.output.words
+}
+```
+
+</Tab>
+
+</Tabs>
+
+Rename a field in the contract and every one of these stops compiling.
+
+## Publishing over MCP
+
+A declared tool already has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is. Every one is published, because a tool is a tool:
+
+```ts title="contract/index.ts"
+import { mcpPlugin } from '@ts-kizuna/mcp';
+import { k } from './k';
+import { routes } from './routes';
+import { tools } from './tools';
+
+export const contract = k.contract({
+    routes,
+    tools,
+    plugins: ({ routes, tools }) => ({
+        mcp: mcpPlugin({
+            routes,
+            tools,
+            options: {
+                publishRoutes: {
+                    users: {
+                        '*': true,
+                        exportUsers: false,
+                    },
+                },
+                hideTools: ['countWords'],
+            },
+        }),
+    }),
+});
+```
+
+A route is an HTTP endpoint rather than a tool, so turning one into a tool is the opt in: name it under `publishRoutes`, with `'*'` to take a whole group. `hideTools` goes the other way, dropping a declared tool you would rather keep to yourself.
+
+A published tool answers with its own output, where a route published as a tool answers with the `{ status, body }` envelope its HTTP shape implies. Give the group an identity and its guard runs on every call:
+
+```ts
+export const tools = k.tools('user', {
+    weather: {
+        getForecast: { ... },
+    },
+});
+```
+
+See [MCP](/docs/mcp) for the rest of the endpoint, including OAuth.
+
+## How it works underneath
+
+Nothing here is a new transport. Every piece reduces to something kizuna already had.
+
+**The events are folded into the stream at `k.routes` time.** `tools` on a response is authoring sugar. Before a route is validated, `expandStreamTools` turns each tool into three Zod schemas and merges them into the response's `stream` record, then deletes the `tools` field. From that point on the response is an ordinary named-event stream, which is why the four adapters, the OpenAPI generator, the fetch client, and the Swift and Kotlin generators needed no changes to carry tools.
+
+**Each event is a discriminated union on the tool's dotted key.** `tool_call` is `z.discriminatedUnion('name', [...])` with one arm per tool, each carrying that tool's own `input` schema. The type-level side walks the tool tree to the same dotted keys, so `message.data.input` narrows in TypeScript, the Swift generator emits an `enum` with one case per tool, and the Kotlin generator emits a `sealed interface`. The `id` and `name` accessors you read without switching are generated from the fields every arm shares.
+
+**The dotted key is the discriminator, not the published name.** `weather.getForecast` on the wire, `weather_get_forecast` over MCP. Deriving the snake-case name at the type level would need a string algorithm that has to agree exactly with the runtime one, and disagreeing silently would be worse than the one `tools.keyOf` call it costs you.
+
+**Execution is one runner.** `createToolRunner` pairs the contract's tools with their handlers and hands the result to every route handler as `tools`, the same way `jobs` is threaded. `tools.call`, `tools.<key>.run` and the MCP endpoint all go through it, so input validation, the handler, and output validation happen in one place whoever asked.
+
+**Publishing is a projection.** `publishedTools` resolves the MCP name and the declaration behind it. `tools.definitions` converts its schemas to JSON Schema for a model; the MCP plugin hands the Zod schemas to the MCP SDK, which converts them itself. Both read the same derivation, so a tool is named and described in one place.
+
+## What kizuna leaves out
+
+- **Models.** kizuna never calls one, holds a conversation, or runs an agent loop. It validates input, runs a handler, validates output. The loop lives in your route handler, the way a job's transport lives outside kizuna.
+- **Provider wire shapes.** There is no `toAnthropicTools` or `toOpenAITools`, because those track a vendor changelog. `tools.definitions` hands you MCP's shape and the `.map` to a provider is a few lines you can read.
+- **Progressive tool input.** A model streams a tool's arguments as partial JSON, which has no schema until it is whole. A half-parsed `{ city: "Os" }` would type-check as a finished value while being wrong, so kizuna emits `tool_call` once the arguments are complete.
+
+## A note on standards
+
+The declaration follows the Model Context Protocol `Tool` object, and its schemas follow JSON Schema 2020-12. The three event names are kizuna's own, since no standard covers streamed tool calls. See [standards](/docs/standards).

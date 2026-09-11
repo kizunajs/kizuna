@@ -7,6 +7,7 @@ import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
 import { isStreamResponse, isZodSchema } from './generator-utils.js';
 import { assertValidStreams, streamSchemas } from './stream.js';
+import { expandStreamTools } from './tool-events.js';
 
 const isEmptyObjectSchema = (schema: unknown): boolean => {
     if (!schema || typeof schema !== 'object') return false;
@@ -97,6 +98,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             if (isEmptyObjectSchema(value.body)) {
                 throw new Error(`Route "${fullKey}" has an empty body schema (z.object({})). Use z.void() or omit the body field.`);
             }
+            expandStreamTools(value, fullKey);
             assertPathParamsMatchPath(value, fullKey);
             assertPathParamsAreScalar(value, fullKey);
             assertNoCoercion(value, fullKey);

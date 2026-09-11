@@ -23,6 +23,7 @@ Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typ
 - **Typed authentication**: identities and per-route authentication declared on the contract
 - **RPC-like client**: call your API like a function, get fully typed responses back
 - **Streaming**: stream an AI reply as typed events, yielded from the handler and read with `for await` in the client
+- **Tools**: declare the tools an AI assistant can call, run them on the server, and read each call typed in your client
 - **Caching**: declare a cache policy on a response and every adapter sends `Cache-Control` and `Vary`
 - **TanStack Query**: typed query and mutation options with caching and invalidation
 - **Adapters**: mount your API on Express, Fastify, Hono, or Next.js

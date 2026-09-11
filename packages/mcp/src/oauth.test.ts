@@ -159,6 +159,11 @@ const contract = k.contract({
     plugins: {
         mcp: mcpPlugin({
             name: 'OAuth API',
+            options: {
+                publishRoutes: {
+                    '*': true,
+                },
+            },
             oauth: {
                 resource: 'https://api.example.com/mcp',
                 scheme: 'user',

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from '../k';
+import { tools } from '../tools';
 
 export const assistantRoutes = k.routes('assistant', {
     reply: {
@@ -20,6 +21,7 @@ export const assistantRoutes = k.routes('assistant', {
                         outputTokens: z.int(),
                     }),
                 },
+                tools,
             },
             400: ProblemDetailsSchema,
         },

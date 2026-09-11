@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Clock, FileText, KeyRound, Layers, Plug, Puzzle, Radio, Section, Timer, TriangleAlert, Zap } from 'lucide-react';
+import { Clock, FileText, KeyRound, Layers, Plug, Puzzle, Radio, Section, Timer, TriangleAlert, Wrench, Zap } from 'lucide-react';
 import KotlinLogo from '@/icons/Kotlin.svg';
 import McpLogo from '@/icons/Mcp.svg';
 import SwiftLogo from '@/icons/Swift.svg';
@@ -62,6 +62,12 @@ export const features: Feature[] = [
         description: 'Stream an AI reply as typed events. Yield them from the handler, read them with for await in the client.',
     },
     {
+        icons: [Wrench],
+        title: 'Tools',
+        href: '/docs/tools',
+        description: 'Declare the tools an AI assistant can call. Run them on the server, and read each call typed in your client.',
+    },
+    {
         icons: [Puzzle],
         title: 'Plugins',
         href: '/docs/plugins',
@@ -92,21 +98,15 @@ export const features: Feature[] = [
         description: 'Call your API like a function. Every route is a method with typed inputs and a response typed by status code.',
     },
     {
-        icons: [Section],
-        title: 'Spec-driven everything',
-        href: '/docs/standards',
-        description: 'HTTP, OpenAPI, OAuth, and MCP: every status code, error body, and header sits where the spec says it should.',
-    },
-    {
-        icons: [ArrowLeftRight],
-        title: 'Built-in coercion',
-        href: '/docs/building/contract',
-        description: 'Query, path, and header params are coerced to their declared types, so you never reach for z.coerce.',
-    },
-    {
         icons: [TriangleAlert],
         title: 'Deprecation and sunset',
         href: '/docs/deprecations',
         description: 'Deprecate routes and fields, and it shows up in your editor, OpenAPI, Swift, Kotlin, and the response headers.',
+    },
+    {
+        icons: [Section],
+        title: 'Spec-driven everything',
+        href: '/docs/standards',
+        description: 'HTTP, OpenAPI, OAuth, and MCP: every status code, error body, and header sits where the spec says it should.',
     },
 ];

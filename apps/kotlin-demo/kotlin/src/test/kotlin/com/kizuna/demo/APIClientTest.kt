@@ -396,15 +396,52 @@ class APIClientTest {
         }
         val text = StringBuilder()
         var done: APIClient.AssistantReply.Done? = null
+        val events = mutableListOf<APIClient.AssistantReply.Event>()
         result.body.collect { event ->
+            events.add(event)
             when (event) {
                 is APIClient.AssistantReply.Event.Delta -> text.append(event.data.text)
                 is APIClient.AssistantReply.Event.Done -> done = event.data
+                else -> Unit
             }
         }
         assertTrue(text.startsWith("You asked: hello there"), text.toString())
         assertEquals(2, done?.inputTokens)
         assertTrue((done?.outputTokens ?: 0) > 5)
+        assertTrue(APIClient.AssistantReply.readToolCalls(events).isEmpty())
+    }
+
+    @Test
+    fun testTrackToolCallsFoldsCallsAndResults() {
+        val events = listOf(
+            APIClient.AssistantReply.Event.ToolCall(
+                APIClient.AssistantReply.ToolCall.CountWords(
+                    APIClient.AssistantReply.ToolCallCountWords(
+                        id = "toolu_01",
+                        name = "countWords",
+                        input = APIClient.AssistantReply.ToolCallCountWordsInput(text = "one two three"),
+                    )
+                )
+            ),
+            APIClient.AssistantReply.Event.ToolResult(
+                APIClient.AssistantReply.ToolResult.CountWords(
+                    APIClient.AssistantReply.ToolResultCountWords(
+                        id = "toolu_01",
+                        name = "countWords",
+                        output = APIClient.AssistantReply.ToolResultCountWordsOutput(words = 3),
+                    )
+                )
+            ),
+        )
+
+        val tracked = APIClient.AssistantReply.readToolCalls(events)
+
+        assertEquals(listOf("toolu_01"), tracked.map { it.id })
+        assertEquals(APIClient.AssistantReply.ToolCallRecord.State.Done, tracked[0].state)
+
+        val result = tracked[0].result
+        assertTrue(result is APIClient.AssistantReply.ToolResult.CountWords)
+        assertEquals(3, result.value.output.words)
     }
 
     @Test

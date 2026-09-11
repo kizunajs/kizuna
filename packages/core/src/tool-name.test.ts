@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { FlattenedRoute } from '@ts-kizuna/core/adapter';
-import { deriveToolNames, toToolName } from './tool-name.js';
+import { deriveToolNames, toToolName, type ToolNameEntry } from './tool-name.js';
 
-const routesOf = (...routeKeys: string[]): FlattenedRoute[] =>
-    routeKeys.map((routeKey) => ({
-        routeKey,
-        route: {
-            method: 'get',
-            path: '/',
-        },
-        routeTags: [],
-    })) as unknown as FlattenedRoute[];
+const routesOf = (...keys: string[]): ToolNameEntry[] =>
+    keys.map((key) => ({
+        key,
+        origin: 'route',
+    }));
+
+const toolsOf = (...keys: string[]): ToolNameEntry[] =>
+    keys.map((key) => ({
+        key,
+        origin: 'tool',
+    }));
 
 describe('toToolName', () => {
     it('splits camelCase humps and dotted groups on underscores', () => {
@@ -49,6 +50,16 @@ describe('deriveToolNames', () => {
         );
     });
 
+    it('throws when a route and a declared tool converge on one tool name', () => {
+        expect(() => deriveToolNames([...routesOf('users.getUser'), ...toolsOf('users.getUser')])).toThrow(
+            /Route "users.getUser" and tool "users.getUser" both become the tool name "users_get_user"/
+        );
+    });
+
+    it('names a declared tool the way it names a route', () => {
+        expect(deriveToolNames(toolsOf('weather.getForecast'))).toEqual(new Map([['weather.getForecast', 'weather_get_forecast']]));
+    });
+
     it('takes a name at the 128 character maximum', () => {
         expect(() => deriveToolNames(routesOf('a'.repeat(128)))).not.toThrow();
     });
@@ -59,5 +70,9 @@ describe('deriveToolNames', () => {
 
     it('throws when a route key carries a character no client accepts', () => {
         expect(() => deriveToolNames(routesOf('users.get user'))).toThrow(/outside the letters, digits, underscore, and dash/);
+    });
+
+    it('names the tool in the message when a declared tool carries a bad character', () => {
+        expect(() => deriveToolNames(toolsOf('weather.get forecast'))).toThrow(/^Tool "weather.get forecast"/);
     });
 });

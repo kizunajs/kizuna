@@ -1,4 +1,5 @@
 import type { RouteDefinition, Routes } from './types.js';
+import type { Tools } from './tools.js';
 
 export type { RoutePath } from './types.js';
 
@@ -102,12 +103,17 @@ export type ContractPlugins = Record<string, PluginDeclaration<PluginRoutes, unk
  * What `k.contract` hands the `plugins` function. An object so it can carry more
  * later without changing every call.
  */
-export interface PluginContext<R extends Routes = Routes> {
+export interface PluginContext<R extends Routes = Routes, T extends Tools = Tools> {
     /**
      * The contract's routes, typed. Pass them to a plugin whose props name
      * routes, so those names are checked.
      */
     routes: R;
+    /**
+     * The contract's tools, typed. Pass them to a plugin whose props name
+     * tools, so those names are checked.
+     */
+    tools: T;
 }
 
 /**
@@ -115,7 +121,9 @@ export interface PluginContext<R extends Routes = Routes> {
  * {@link PluginContext} returning it. Written as a function, its parameter is
  * contextually typed with the contract's own routes.
  */
-export type ContractPluginsArg<R extends Routes, P extends ContractPlugins> = P | ((context: PluginContext<R>) => P);
+export type ContractPluginsArg<R extends Routes, P extends ContractPlugins, T extends Tools = Tools> =
+    | P
+    | ((context: PluginContext<R, T>) => P);
 
 export type PluginRoutesOf<Declaration> = Declaration extends PluginDeclaration<infer R, unknown, unknown> ? R : never;
 

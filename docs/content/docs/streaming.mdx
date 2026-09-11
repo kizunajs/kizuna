@@ -11,7 +11,13 @@ Streaming is new and still settling. The `stream` response form, the handler sha
 
 An assistant's reply arrives one token at a time, and a caller who has to wait for the last token before seeing the first stops reading. A long export, a progress report, and a feed of events that has no end share the shape. The route declares what each piece looks like, the handler yields the pieces, and the client reads them as they come.
 
-Declare a `stream` on the response in place of a `body`:
+<Steps>
+
+<Step>
+
+## Declare the stream
+
+A `stream` takes the place of a `body` on the response:
 
 ```ts title="contract/assistant.ts"
 import { z } from 'zod';
@@ -47,7 +53,11 @@ Two `body`s meet on a route like this. The route's own `body` is the request bod
 
 `stream` is a record of event name to schema, so every message the route sends has a name and a shape. Give it one schema instead when the messages are all alike.
 
-## Writing the handler
+</Step>
+
+<Step>
+
+## Write the handler
 
 The handler returns the status, and for `body` an async generator function. kizuna sends the status and headers, calls the function, and writes each `yield` the moment it happens:
 
@@ -116,7 +126,11 @@ data: {"inputTokens":12,"outputTokens":2}
 
 ```
 
-## Reading it
+</Step>
+
+<Step>
+
+## Read it
 
 On the streamed status the fetch client hands back `body` as an async iterable. Read it with `for await`, and each message narrows on `event` to its own `data`:
 
@@ -177,6 +191,10 @@ stopButton.onclick = () => controller.abort();
 ```
 
 On the server the generator's `signal` fires, so an upstream call that took it stops too, and kizuna returns the generator so a `finally` block runs. The handler above hands `signal` to the Anthropic SDK for this reason.
+
+</Step>
+
+</Steps>
 
 ## Messages without names
 
@@ -353,6 +371,23 @@ With `responseValidation` on, kizuna validates each message against its schema b
 A streamed response goes out with `Content-Type: text/event-stream` and `Cache-Control: no-store`, since a cache stores a complete representation and a stream has none. Return your own `headers` to add to what kizuna sends, the way you would on any response. `X-Accel-Buffering: no` tells nginx to pass each message through rather than collect them.
 
 Every `GET` route answers `HEAD`, a stream route included: the status and headers, no body, and no `Content-Length`, since the length is unknown. The handler runs, and the generator is never called.
+
+## Tools
+
+A streamed response can name the tools the model may call, adding `tool_call`, `tool_result` and `tool_error` to the events it declares:
+
+```ts
+200: {
+    stream: {
+        delta: z.object({
+            text: z.string(),
+        }),
+    },
+    tools,
+},
+```
+
+Each is discriminated on the tool's dotted key. See [tools](/docs/tools).
 
 ## Reference
 

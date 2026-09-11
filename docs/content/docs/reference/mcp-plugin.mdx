@@ -22,14 +22,12 @@ import { mcpPluginServer } from '@ts-kizuna/mcp/server';
 
 ```ts
 mcpPlugin(props?: McpPluginProps): PluginDeclaration
-mcpPlugin(routes: Routes, props?: McpPluginProps<Routes>): PluginDeclaration
 mcpPluginServer(): PluginImplementation
 ```
 
-| Parameter | Type             | Required | Description                               |
-| --------- | ---------------- | -------- | ----------------------------------------- |
-| `routes`  | `Routes`         | No       | The contract's routes, which type `tools` |
-| `props`   | `McpPluginProps` | No       | Configuration options                     |
+| Parameter | Type             | Required | Description           |
+| --------- | ---------------- | -------- | --------------------- |
+| `props`   | `McpPluginProps` | No       | Configuration options |
 
 ## Props
 
@@ -39,36 +37,43 @@ mcpPluginServer(): PluginImplementation
 | `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                                    |
 | `version`      | `'1.0.0'`            | Semantic version string                                                       |
 | `instructions` | built from your tags | Appended to the generated overview                                            |
-| `tools`        | every route          | Which routes become tools, keyed by route tree                                |
-| `onlyReadOnly` | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`                                        |
+| `routes`       | none                 | The contract's routes, so `options.publishRoutes` is checked against them     |
+| `tools`        | none                 | The contract's tools, so `options.hideTools` is checked against them          |
+| `options`      | none                 | `publishRoutes`, `hideTools`, and `onlyReadOnly`                              |
 | `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([guide](/docs/mcp#oauth)) |
 
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, whatever `tools` says, because tool input is JSON.
+Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, whatever `publishRoutes` says, because tool input is JSON.
 
 Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is where it is configured.
 
-## Typing `tools` against the routes
+## Options
 
-Pass the routes and a key that is not a route is a compile error. Write `plugins` as a function and `k.contract` hands them over:
+`options` holds the choices; `routes` and `tools` beside it are what those choices are checked against. Write `plugins` as a function and `k.contract` hands both over:
 
 ```ts title="contract.ts"
 export const contract = k.contract({
     routes,
+    tools,
     auth,
-    plugins: ({ routes }) => ({
-        mcp: mcpPlugin(routes, {
-            tools: {
-                health: false,
-                users: {
-                    exportUsers: false,
+    plugins: ({ routes, tools }) => ({
+        mcp: mcpPlugin({
+            routes,
+            tools,
+            options: {
+                publishRoutes: {
+                    users: {
+                        '*': true,
+                        exportUsers: false,
+                    },
                 },
+                hideTools: ['countWords'],
             },
         }),
     }),
 });
 ```
 
-A group takes `'*'` for its own default, then names the routes that differ. See [Choosing which routes become tools](/docs/mcp#choosing-which-routes-become-tools).
+A route is an HTTP endpoint rather than a tool, so none are published until `publishRoutes` names them, and a group takes `'*'` for its own default. Every declared tool is published, and `hideTools` drops one by dotted key. Both are checked against the trees, so a name that does not exist is a compile error naming the one you meant.
 
 ## Example
 

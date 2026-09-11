@@ -33,6 +33,11 @@ const contract = k.contract({
     plugins: {
         mcp: mcpPlugin({
             name: 'Test API',
+            options: {
+                publishRoutes: {
+                    '*': true,
+                },
+            },
         }),
     },
     routes,
@@ -161,10 +166,14 @@ const selective = k.routes('api', {
 const selectiveContract = k.contract({
     routes: selective,
     plugins: ({ routes: contractRoutes }) => ({
-        mcp: mcpPlugin(contractRoutes, {
+        mcp: mcpPlugin({
             name: 'Selective API',
-            tools: {
-                health: false,
+            routes: contractRoutes,
+            options: {
+                publishRoutes: {
+                    '*': true,
+                    health: false,
+                },
             },
         }),
     }),
