@@ -171,6 +171,10 @@ public final class APIClient: Sendable {
 }
 ```
 
+## Cancellation
+
+`Failure.cancelled` covers a cancelled request, which SwiftUI produces routinely: a view carrying a `.task` cancels it on disappear, so a screen that loads and then closes arrives in your error path. An error path shared across several routes can check `(error as? any KizunaFailure)?.isCancelled` instead of matching each route's own enum.
+
 ## Deprecation
 
 Routes with `deprecated` and fields with `.meta({ deprecated: ... })` emit `@available(*, deprecated)` in the generated Swift code, with the message when one is set:

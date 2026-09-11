@@ -463,6 +463,65 @@ final class APIClientTests: XCTestCase {
             }
         }
     }
+
+    func testCancellingAnInFlightRequestThrowsCancelled() async throws {
+        // URLSession reports a cancelled task as URLError(.cancelled), so the send path has to
+        // recognise that form and not just CancellationError.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StallingURLProtocol.self]
+        let stalled = APIClient(baseURL: client.baseURL, session: URLSession(configuration: configuration))
+
+        let request = Task { () -> (any Error)? in
+            do {
+                _ = try await stalled.users.getUser(
+                    .params(id: "1"),
+                    .headers(xRequestId: "cancel-1")
+                )
+                return nil
+            } catch {
+                return error
+            }
+        }
+        // Give the request time to reach the session, so the cancellation lands mid-flight.
+        try await Task.sleep(for: .milliseconds(100))
+        request.cancel()
+
+        let thrown = await request.value
+        guard let failure = thrown as? APIClient.UsersGetUser.Failure else {
+            XCTFail("expected the cancelled request to throw a typed failure, got \(String(describing: thrown))")
+            return
+        }
+        switch failure {
+        case .cancelled:
+            break
+        default:
+            XCTFail("expected .cancelled, got \(failure)")
+        }
+        XCTAssertTrue(failure.isCancelled)
+        XCTAssertEqual((thrown as? any KizunaFailure)?.isCancelled, true)
+    }
+
+    func testIsCancelledIsFalseForOtherFailures() async throws {
+        do {
+            _ = try await client.users.getUser(
+                .params(id: "does-not-exist"),
+                .headers(xRequestId: "cancel-2")
+            )
+            XCTFail("expected .notFound to be thrown")
+        } catch {
+            XCTAssertFalse(error.isCancelled)
+            let thrown: any Error = error
+            XCTAssertEqual((thrown as? any KizunaFailure)?.isCancelled, false)
+        }
+    }
+}
+
+/// Accepts a request and never answers it, so a test can cancel a request that is really in flight.
+private final class StallingURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {}
+    override func stopLoading() {}
 }
 
 private actor MiddlewareCounter {

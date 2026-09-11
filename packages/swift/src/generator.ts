@@ -1029,6 +1029,11 @@ const emitFailureEnum = (writer: SwiftWriter, method: RouteMethod, context: Emit
                 writer.line(`case ${escapeKeyword(errorCase.caseName)}(${resolved})`);
             }
         }
+        writer.blank();
+        writer.block('public var isCancelled: Bool', () => {
+            writer.line('if case .cancelled = self { return true }');
+            writer.line('return false');
+        });
     });
 };
 
@@ -1055,6 +1060,7 @@ const emitKizunaFailureProtocols = (writer: SwiftWriter): void => {
         writer.line('static var cancelled: Self { get }');
         writer.line('static var invalidResponse: Self { get }');
         writer.line('static func unexpectedStatus(_ status: Int, _ data: Foundation.Data) -> Self');
+        writer.line('var isCancelled: Bool { get }');
     });
     writer.blank();
     writer.block('public protocol KizunaDecodableFailure: KizunaFailure', () => {
@@ -1160,12 +1166,14 @@ const emitKizunaNamespace = (writer: SwiftWriter, options: { multipart: boolean;
                 writer.line('if let requestMiddleware {');
                 writer.line('    do { try await requestMiddleware(&request) }');
                 writer.line('    catch is CancellationError { throw Failure.cancelled }');
+                writer.line('    catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
                 writer.line('    catch { throw Failure.requestFailed(error) }');
                 writer.line('}');
                 writer.line('let data: Foundation.Data');
                 writer.line('let response: URLResponse');
                 writer.line('do { (data, response) = try await session.data(for: request) }');
                 writer.line('catch is CancellationError { throw Failure.cancelled }');
+                writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
                 writer.line('catch { throw Failure.requestFailed(error) }');
                 writer.line('if let responseMiddleware { await responseMiddleware(request, data, response) }');
                 writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
