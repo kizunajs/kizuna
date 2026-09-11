@@ -1,0 +1,205 @@
+---
+title: Caching
+description: Declare on a response how it may be cached, and have kizuna send the Cache-Control and Vary headers and document them in OpenAPI.
+---
+
+<BetaNotice>
+
+Caching is new and still settling, so `cache` and `etag` may change before v2. A policy is also hard to take back once callers hold a response, so reach for it deliberately rather than by default.
+
+</BetaNotice>
+
+Declare a cache policy on the response it describes, and every adapter sends it:
+
+```ts title="contract/index.ts"
+export const usersRoutes = k.routes('users', {
+    getUser: {
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: {
+                body: UserSchema,
+                cache: {
+                    scope: 'private',
+                    maxAge: 300,
+                    vary: ['authorization'],
+                },
+            },
+            404: ProblemDetailsSchema,
+        },
+    },
+});
+```
+
+The 200 goes out with `Cache-Control: private, max-age=300` and `Vary: Authorization`. The 404 declares no policy, so it sends no cache headers, which is what you want almost every time.
+
+## When you should cache
+
+**An avatar, a badge, a generated chart.** Large, changes rarely, and the browser fetches it through `<img src>` where the HTTP cache actually applies. Put the version in the path and cache it forever:
+
+```ts
+userBadge: {
+    method: 'GET',
+    path: '/users/:id/badge/:version',
+    responses: {
+        200: {
+            body: BinarySchema,
+            contentType: 'image/png',
+            cache: {
+                scope: 'public',
+                maxAge: 31536000,
+                immutable: true,
+            },
+        },
+    },
+},
+```
+
+Give `:version` whatever changes when the image does, an upload timestamp or a content hash, and hand callers the URL alongside the user. A new image is a new URL, so nothing is ever stale and nothing needs invalidating.
+
+Without that, the image lives at one URL forever and every cache holding it is beyond your reach. `noCache` with an `etag` is the safe fallback, since the browser checks before every reuse and gets a few hundred bytes back when nothing changed, but a page listing fifty users then makes fifty conditional requests. Prefer the version in the path.
+
+**A public catalogue in front of a CDN.** Put the lifetime on `sharedMaxAge` rather than `maxAge` and only the CDN holds it. That is the difference between a mistake you can fix and one you cannot: a CDN has a purge API, a million browsers do not.
+
+```ts
+200: {
+    body: z.array(ProductSchema),
+    cache: {
+        scope: 'public',
+        maxAge: 0,
+        sharedMaxAge: 600,
+        staleWhileRevalidate: 60,
+    },
+},
+```
+
+**A report that costs real work to build.** The same `sharedMaxAge`, and `staleIfError` so callers keep getting yesterday's numbers while the warehouse is down rather than a 500.
+
+**Anything behind authentication.** Here the policy is about correctness, not speed. `scope: 'private'` keeps a corporate proxy from storing one caller's data and handing it to the next, and `vary` names the request headers that shaped it:
+
+```ts
+200: {
+    body: z.array(InvoiceSchema),
+    cache: {
+        scope: 'private',
+        noCache: true,
+        vary: ['authorization'],
+    },
+    etag: true,
+},
+```
+
+Declaring `public` on a route behind `security` throws at contract assembly, so the version of this that leaks data cannot ship.
+
+## When it does nothing
+
+A React app on TanStack Query or SWR. Those keep their own cache with their own `staleTime` and do not make conditional requests, so neither `maxAge` nor `etag` reaches them. Your generated Swift and Kotlin clients are the opposite: `URLSession` and OkHttp honour all of this with no code on your side.
+
+## Two policies, and the trap between them
+
+`maxAge` is the one thing here you cannot take back. Once a response goes out with `max-age=86400`, every cache holding it may serve that copy for a day, and no deploy reaches them. That leaves two policies worth writing, and the choice is decided by one question: **does the URL change when the content does?**
+
+If it does, cache it forever. A fingerprinted URL can never serve the wrong thing, because new content is a new URL:
+
+```ts
+200: {
+    body: BinarySchema,
+    contentType: 'image/png',
+    cache: {
+        scope: 'public',
+        maxAge: 31536000,
+        immutable: true,
+    },
+},
+```
+
+If it does not, revalidate every time. `noCache` tells the cache to check before every reuse, and an [`etag`](#revalidating) makes the check cost a few hundred bytes instead of the whole body. It can never serve something stale:
+
+```ts
+200: {
+    body: UserSchema,
+    cache: {
+        scope: 'private',
+        noCache: true,
+    },
+    etag: true,
+},
+```
+
+The trap is the middle: a modest `maxAge` on content that changes at a stable URL. It looks reasonable and passes testing, then serves a stale response to somebody for as long as you set, with no way to recall it.
+
+A response that declares no `cache` sends no cache headers, so nothing is cached until you say so.
+
+## Caching a miss
+
+A lookup that gets hammered with requests for things that do not exist can cache the miss too, so the flood stops at the CDN instead of your database. A thousand requests a second for one missing id become one request per lifetime, so even a minute is worth a great deal:
+
+```ts
+responses: {
+    200: {
+        body: UserSchema,
+        cache: {
+            scope: 'public',
+            maxAge: 300,
+        },
+    },
+    404: {
+        body: ProblemDetailsSchema,
+        cache: {
+            scope: 'public',
+            maxAge: 60,
+        },
+    },
+},
+```
+
+The number trades origin protection against how long a newly created resource keeps answering 404. A minute or two is the usual band, and it is what the CDNs pick when you say nothing: Cloudflare holds a 404 for three minutes, Google Cloud CDN for two. Declaring the policy is how you set that number yourself rather than inheriting theirs.
+
+Reach for this when a hot path is spending real work on misses, not as a habit.
+
+## Directives
+
+| Declaration            | Type                    | Sends                    |
+| ---------------------- | ----------------------- | ------------------------ |
+| `scope`                | `'public' \| 'private'` | `public` / `private`     |
+| `maxAge`               | `number`, seconds       | `max-age`                |
+| `sharedMaxAge`         | `number`, seconds       | `s-maxage`               |
+| `staleWhileRevalidate` | `number`, seconds       | `stale-while-revalidate` |
+| `staleIfError`         | `number`, seconds       | `stale-if-error`         |
+| `noCache`              | `true`                  | `no-cache`               |
+| `mustRevalidate`       | `true`                  | `must-revalidate`        |
+| `immutable`            | `true`                  | `immutable`              |
+| `vary`                 | `string[]`              | the `Vary` header        |
+
+`scope: 'private'` is the caller's own browser, `'public'` is every cache in between, including CDNs and corporate proxies. `k.contract` throws when a route behind `security` declares `'public'`, since that lets a shared cache hand Alice's response to Bob. It also rejects a policy that declares nothing, a number of seconds that is not a whole number of zero or more, and an empty `vary`.
+
+`'no-store'` replaces the object rather than sitting inside it, because it rules out every other directive.
+
+`k.contract` also rejects the combinations that cannot mean anything. `noCache` alongside a `maxAge`, since RFC 9111 lets `no-cache` override the lifetime and it never applies. `immutable` with no lifetime, since RFC 8246 applies it only while a response is fresh. `staleWhileRevalidate` or `staleIfError` with no lifetime, since there is nothing to go stale.
+
+The declaration is the only place a policy comes from. A `cache-control` header returned by a handler does not overrule it, so what the OpenAPI document publishes is what callers receive.
+
+## Revalidating
+
+`maxAge` answers "how long may this be reused". It cannot answer "has this changed", because nothing in HTTP lets you recall a response once it is out. `etag` answers the second question:
+
+```ts
+200: {
+    body: UserSchema,
+    cache: {
+        scope: 'private',
+        noCache: true,
+    },
+    etag: true,
+},
+```
+
+kizuna hashes the response body and sends it as `ETag`. The caller's cache stores that, and `no-cache` tells it to check before every reuse. On the next request it sends `If-None-Match`, and when the body still hashes the same kizuna answers `304 Not Modified` with the headers and no body.
+
+The saving is the body, not the work: your handler still runs, because the tag comes from what it returned. Reach for it when responses are large and change rarely.
+
+`noCache` means the caller waits for that check on every request. If you would rather it did not, give the response a short `maxAge` instead and let the tag serve the requests that come after the lifetime runs out.
+
+`etag` applies to successful responses, since `304` says the representation the caller holds is still current.
+
+`Last-Modified` and `If-Modified-Since` are not here. `etag` is the stronger validator and covers the same ground.

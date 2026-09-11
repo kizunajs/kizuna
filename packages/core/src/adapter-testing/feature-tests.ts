@@ -12,7 +12,9 @@ import {
     createSecuredRouter,
     createSubUserRouter,
     createUserRouter,
+    createCachedRouter,
     csvBody,
+    cachedContract,
     deprecatedContract,
     issueContract,
     methodContract,
@@ -112,6 +114,15 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             {
                 contract: deprecatedContract,
                 router: createDeprecatedRouter(),
+            },
+            use
+        );
+
+    const usingCached = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                contract: cachedContract,
+                router: createCachedRouter(),
             },
             use
         );
@@ -709,6 +720,133 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.status).toBe(404);
                 expect(response.headers.get('deprecation')).toBe('@1772323200');
                 expect(response.headers.get('link')).toBe('<https://example.com/changelog/delete-user>; rel="deprecation"');
+            });
+        },
+        'cache.cacheControlHeader': async () => {
+            await usingCached(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/cached-users',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('cache-control')).toBe('private, max-age=300');
+            });
+        },
+        'cache.varyHeader': async () => {
+            await usingCached(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/cached-users',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('vary')).toBe('authorization');
+            });
+        },
+        'cache.undeclaredStatus': async () => {
+            await usingCached(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/cached-lookup/404',
+                });
+                expect(response.status).toBe(404);
+                expect(response.headers.get('cache-control')).toBeNull();
+            });
+        },
+        'cache.errorResponseCache': async () => {
+            await usingCached(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/cached-users/404',
+                });
+                expect(response.status).toBe(404);
+                expect(response.headers.get('cache-control')).toBe('public, max-age=10');
+            });
+        },
+        'cache.declarationWins': async () => {
+            await usingCached(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/cached-report',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('cache-control')).toBe('private, max-age=300');
+            });
+        },
+        'cache.frameworkRaisedStatus': async () => {
+            await usingCached(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/cached-validated?page=not-a-number',
+                });
+                expect(response.status).toBe(400);
+                expect(response.headers.get('cache-control')).toBe('no-store');
+            });
+            await usingSecured(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/who-am-i',
+                });
+                expect(response.status).toBe(401);
+                expect(response.headers.get('cache-control')).toBe('no-store');
+            });
+        },
+        'cache.etagHeader': async () => {
+            await usingCached(async (mounted) => {
+                const first = await mounted.request({
+                    method: 'GET',
+                    path: '/tagged-users/1',
+                });
+                expect(first.status).toBe(200);
+                expect(first.headers.get('etag')).toMatch(/^"[0-9a-f]{32}"$/);
+
+                const second = await mounted.request({
+                    method: 'GET',
+                    path: '/tagged-users/1',
+                });
+                expect(second.headers.get('etag')).toBe(first.headers.get('etag'));
+
+                const other = await mounted.request({
+                    method: 'GET',
+                    path: '/tagged-users/2',
+                });
+                expect(other.headers.get('etag')).not.toBe(first.headers.get('etag'));
+            });
+        },
+        'cache.etagNotModified': async () => {
+            await usingCached(async (mounted) => {
+                const first = await mounted.request({
+                    method: 'GET',
+                    path: '/tagged-users/1',
+                });
+                const etag = first.headers.get('etag');
+                expect(etag).not.toBeNull();
+
+                const second = await mounted.request({
+                    method: 'GET',
+                    path: '/tagged-users/1',
+                    headers: {
+                        'if-none-match': etag as string,
+                    },
+                });
+                expect(second.status).toBe(304);
+                expect(second.text).toBe('');
+                expect(second.headers.get('etag')).toBe(etag);
+                expect(second.headers.get('cache-control')).toBe('private, no-cache');
+            });
+        },
+        'cache.etagMismatchSendsBody': async () => {
+            await usingCached(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/tagged-users/1',
+                    headers: {
+                        'if-none-match': '"stale-tag-value"',
+                    },
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    id: '1',
+                });
             });
         },
         'plugins.routesServed': async () => {

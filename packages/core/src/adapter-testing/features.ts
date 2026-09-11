@@ -102,6 +102,33 @@ export const ADAPTER_FEATURES = {
     'deprecation.errorResponses': {
         summary: 'Deprecation and sunset headers ride on error responses from the route too.',
     },
+    'cache.cacheControlHeader': {
+        summary: 'A response with a cache policy sends it as `Cache-Control`.',
+    },
+    'cache.varyHeader': {
+        summary: 'The request headers a cache policy declares under `vary` reach the `Vary` header.',
+    },
+    'cache.undeclaredStatus': {
+        summary: 'A response declaring no cache policy carries no `Cache-Control`, even where another status on the route declares one.',
+    },
+    'cache.errorResponseCache': {
+        summary: 'A cache policy declared on an error response reaches that response.',
+    },
+    'cache.declarationWins': {
+        summary: "A response's declared policy wins over a `cache-control` header the handler returned.",
+    },
+    'cache.frameworkRaisedStatus': {
+        summary: 'A policy declared on a status kizuna raises itself, a validation failure or a guard denial, reaches that response.',
+    },
+    'cache.etagHeader': {
+        summary: 'A response declaring `etag` sends an `ETag`, and the same body sends the same one.',
+    },
+    'cache.etagNotModified': {
+        summary: 'A matching `If-None-Match` answers `304` with no body, keeping the `ETag` and the cache headers.',
+    },
+    'cache.etagMismatchSendsBody': {
+        summary: 'A non-matching `If-None-Match` answers `200` with the body.',
+    },
     'plugins.routesServed': {
         summary: 'A plugin route is served by `api.mount`, in the same pipeline as the contract’s own.',
     },

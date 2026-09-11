@@ -349,6 +349,29 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object UsersUserProfile {
+
+        data class Params(val id: String)
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: API.User)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class NotFound(val body: API.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object UsersCreateUser {
 
         data class Body(
@@ -995,7 +1018,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Download a user badge, exercises a binary (BinarySchema) response body */
+    /** Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag */
     @Throws(APIClient.UsersUserBadge.Failure::class)
     suspend fun userBadge(build: APIClient.UsersUserBadge.Scope.() -> APIClient.UsersUserBadge.Args): APIClient.UsersUserBadge.Result {
         val args = APIClient.UsersUserBadge.Scope.build()
@@ -1150,7 +1173,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Get a year of user activity, exercising two typed path params (a string id and a coerced int year) */
+    /** Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response */
     @Throws(APIClient.UsersUserActivity.Failure::class)
     suspend fun userActivity(build: APIClient.UsersUserActivity.Scope.() -> APIClient.UsersUserActivity.Args): APIClient.UsersUserActivity.Result {
         val args = APIClient.UsersUserActivity.Scope.build()
@@ -1183,6 +1206,42 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     throw APIClient.UsersUserActivity.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersUserActivity.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with */
+    @Throws(APIClient.UsersUserProfile.Failure::class)
+    suspend fun userProfile(build: APIClient.UsersUserProfile.Scope.() -> APIClient.UsersUserProfile.Args): APIClient.UsersUserProfile.Result {
+        val args = APIClient.UsersUserProfile.Scope.build()
+        val params = args.params
+        var path = "/users/:id/profile"
+        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<API.User>(data.decodeToString())
+                        return@use APIClient.UsersUserProfile.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                }
+                404 -> {
+                    val payload = try {
+                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersUserProfile.Failure.NotFound(body = payload)
+                }
+                else -> throw APIClient.UsersUserProfile.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

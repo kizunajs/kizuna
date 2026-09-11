@@ -101,10 +101,17 @@ export const usersRoutes = k.routes('users', {
         path: '/users',
         query: PaginationQuery,
         responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-                total: z.number(),
-            }),
+            200: {
+                body: z.object({
+                    users: z.array(UserSchema),
+                    total: z.number(),
+                }),
+                cache: {
+                    scope: 'private',
+                    maxAge: 60,
+                    vary: ['authorization'],
+                },
+            },
         },
         summary: 'List users with pagination',
     },
@@ -126,10 +133,15 @@ export const usersRoutes = k.routes('users', {
             200: {
                 body: BinarySchema,
                 contentType: 'application/octet-stream',
+                cache: {
+                    scope: 'public',
+                    noCache: true,
+                },
+                etag: true,
             },
             404: ProblemDetailsSchema,
         },
-        summary: 'Download a user badge, exercises a binary (BinarySchema) response body',
+        summary: 'Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag',
     },
     lastSessionEvent: {
         method: 'GET',
@@ -181,14 +193,43 @@ export const usersRoutes = k.routes('users', {
             year: z.int().min(2000).max(2100),
         }),
         responses: {
-            200: z.object({
-                userId: z.string(),
-                year: z.int(),
-                events: z.int(),
-            }),
+            200: {
+                body: z.object({
+                    userId: z.string(),
+                    year: z.int(),
+                    events: z.int(),
+                }),
+                cache: {
+                    scope: 'public',
+                    maxAge: 300,
+                },
+            },
+            404: {
+                body: ProblemDetailsSchema,
+                cache: {
+                    scope: 'public',
+                    maxAge: 10,
+                },
+            },
+        },
+        summary:
+            'Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response',
+    },
+    userProfile: {
+        method: 'GET',
+        path: '/users/:id/profile',
+        responses: {
+            200: {
+                body: UserSchema,
+                cache: {
+                    scope: 'private',
+                    noCache: true,
+                },
+                etag: true,
+            },
             404: ProblemDetailsSchema,
         },
-        summary: 'Get a year of user activity, exercising two typed path params (a string id and a coerced int year)',
+        summary: 'Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with',
     },
     createUser: {
         method: 'POST',

@@ -85,6 +85,21 @@ export const users: Router<typeof contract.routes.users> = {
             },
         };
     },
+    userProfile: async ({ params }) => {
+        const user = await db.users.findById(params.id);
+        if (!user) {
+            return {
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            };
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    },
     userActivity: async ({ params }) => {
         const user = await db.users.findById(params.id);
         if (!user) {

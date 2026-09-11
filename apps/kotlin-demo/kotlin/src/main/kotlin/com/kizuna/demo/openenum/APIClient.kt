@@ -396,6 +396,29 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
+    object UsersUserProfile {
+
+        data class Params(val id: String)
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: OpenEnumAPI.User)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object UsersCreateUser {
 
         data class Body(
@@ -1069,7 +1092,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Download a user badge, exercises a binary (BinarySchema) response body */
+    /** Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag */
     @Throws(OpenEnumAPIClient.UsersUserBadge.Failure::class)
     suspend fun userBadge(build: OpenEnumAPIClient.UsersUserBadge.Scope.() -> OpenEnumAPIClient.UsersUserBadge.Args): OpenEnumAPIClient.UsersUserBadge.Result {
         val args = OpenEnumAPIClient.UsersUserBadge.Scope.build()
@@ -1224,7 +1247,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Get a year of user activity, exercising two typed path params (a string id and a coerced int year) */
+    /** Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response */
     @Throws(OpenEnumAPIClient.UsersUserActivity.Failure::class)
     suspend fun userActivity(build: OpenEnumAPIClient.UsersUserActivity.Scope.() -> OpenEnumAPIClient.UsersUserActivity.Args): OpenEnumAPIClient.UsersUserActivity.Result {
         val args = OpenEnumAPIClient.UsersUserActivity.Scope.build()
@@ -1257,6 +1280,42 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     throw OpenEnumAPIClient.UsersUserActivity.Failure.NotFound(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersUserActivity.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with */
+    @Throws(OpenEnumAPIClient.UsersUserProfile.Failure::class)
+    suspend fun userProfile(build: OpenEnumAPIClient.UsersUserProfile.Scope.() -> OpenEnumAPIClient.UsersUserProfile.Args): OpenEnumAPIClient.UsersUserProfile.Result {
+        val args = OpenEnumAPIClient.UsersUserProfile.Scope.build()
+        val params = args.params
+        var path = "/users/:id/profile"
+        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPI.User>(data.decodeToString())
+                        return@use OpenEnumAPIClient.UsersUserProfile.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                }
+                404 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersUserProfile.Failure.NotFound(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.UsersUserProfile.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

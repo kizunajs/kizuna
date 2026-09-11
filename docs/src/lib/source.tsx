@@ -9,6 +9,7 @@ import { Badge } from '@/components/shared/badge';
 const badges: Record<string, string> = {
     '/docs/authentication': 'Beta',
     '/docs/jobs': 'Alpha',
+    '/docs/caching': 'Beta',
     '/docs/mcp': 'Beta',
     '/docs/extend/create-adapter': 'Beta',
     '/docs/extend/create-generator': 'Beta',

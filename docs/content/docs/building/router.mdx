@@ -152,6 +152,8 @@ return {
 };
 ```
 
+A response with a [cache policy](/docs/caching) sends its `Cache-Control` whenever your handler returns that status. The declaration wins, so returning a `cache-control` of your own does not change it.
+
 ## Error responses
 
 Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` in your routes to define error status codes. This is the same shape produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in kizuna errors.

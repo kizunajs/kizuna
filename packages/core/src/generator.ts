@@ -34,11 +34,14 @@ export {
 } from './zod-internals.js';
 
 export { deprecationHeaders } from './deprecation.js';
+export { cacheHeaders } from './cache.js';
 
 export {
     resolveResponseBody,
     resolveResponseHeaders,
     resolveResponseContentType,
+    resolveResponseCache,
+    resolveResponseEtag,
     isJsonMediaType,
     toPascalCase,
     toCamelCase,

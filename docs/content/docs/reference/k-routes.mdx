@@ -66,7 +66,7 @@ export const usersRoutes = k.routes('users', {
 | `deprecated`   | No       | `boolean \| string \| { message?, date?, link? }`, see [Deprecations](/docs/deprecations)      |
 | `sunset`       | No       | `string \| { date, link? }`, see [Deprecations](/docs/deprecations)                            |
 
-Use the `{ body, headers?, contentType? }` form of a response to declare [typed response headers](/docs/building/contract#response-schemas) or a [binary body](/docs/reference/binary-and-file-schemas).
+Use the `{ body, headers?, contentType?, cache?, etag? }` form of a response to declare [typed response headers](/docs/building/contract#response-schemas), a [binary body](/docs/reference/binary-and-file-schemas), or a [cache policy and entity tag](/docs/caching).
 
 A route's `security` comes from the contract's [`auth` map](/docs/reference/k-contract#the-auth-map); writing it here is a type error.
 

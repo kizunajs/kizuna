@@ -148,6 +148,7 @@ export { getHeaderValue } from './adapter.js';
 
 export { METHODS } from './types.js';
 export {
+    type CachePolicy,
     type Method,
     type ResponseContentType,
     type ResponseDefinition,

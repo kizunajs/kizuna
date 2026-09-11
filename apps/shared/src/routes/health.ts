@@ -6,7 +6,10 @@ export const healthRoutes = k.routes('health', {
         method: 'GET',
         path: '/health',
         responses: {
-            200: z.object({ ok: z.boolean() }),
+            200: {
+                body: z.object({ ok: z.boolean() }),
+                cache: 'no-store',
+            },
         },
         summary: 'Health check, exercises nested sub-client routing',
     },
