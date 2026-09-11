@@ -1155,3 +1155,37 @@ describe('MCP server: guards', () => {
         await close();
     });
 });
+
+describe('streamed routes', () => {
+    it('are never tools, since a tool result is one value', () => {
+        const streamRoutes = k.routes('api', {
+            reply: {
+                method: 'POST',
+                path: '/reply',
+                body: z.object({
+                    prompt: z.string(),
+                }),
+                responses: {
+                    200: {
+                        stream: {
+                            delta: z.object({
+                                text: z.string(),
+                            }),
+                        },
+                    },
+                },
+            },
+            ping: {
+                method: 'GET',
+                path: '/ping',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        });
+        const definitions = buildToolDefinitions(streamRoutes);
+        expect(definitions.map((definition) => definition.name)).toEqual(['ping']);
+    });
+});

@@ -22,3 +22,5 @@ export const router = server.router({
 ```
 
 See the [Router guide](/docs/building/router) for handler arguments, identity context, and the `RouteHandler` / `Router` types.
+
+A status declared with `stream` takes an async generator function as `body`. Annotate one written outside its handler with `StreamBody<Route, Status>` so its event names stay literals. See [Streaming](/docs/streaming).

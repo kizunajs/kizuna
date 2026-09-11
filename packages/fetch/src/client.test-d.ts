@@ -1,6 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type ValidationError } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { KizunaClient } from './client.js';
 
 const k = new Kizuna({
@@ -792,4 +793,66 @@ test('a union response built from named models is the exact union, not any', asy
     if (result.status === 200) {
         expectTypeOf(result.body).toEqualTypeOf<{ kind: 'started'; at: string } | { kind: 'done'; ok: boolean }>();
     }
+});
+
+test('a streamed status hands back an async iterable of typed messages', () => {
+    const streamRoutes = k.routes('api', {
+        reply: {
+            method: 'POST',
+            path: '/reply',
+            body: z.object({
+                prompt: z.string(),
+            }),
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                        done: z.object({
+                            count: z.int(),
+                        }),
+                    },
+                },
+                404: ProblemDetailsSchema,
+            },
+        },
+        lines: {
+            method: 'GET',
+            path: '/lines',
+            responses: {
+                200: {
+                    stream: z.string(),
+                    contentType: 'text/plain',
+                },
+            },
+        },
+    });
+    const streamClient = new KizunaClient(
+        k.contract({
+            routes: streamRoutes,
+        }),
+        {
+            baseUrl: '',
+        }
+    );
+
+    void (async () => {
+        const result = await streamClient.reply({
+            body: {
+                prompt: 'hi',
+            },
+        });
+        if (result.status === 200) {
+            for await (const message of result.body) {
+                if (message.event === 'delta') expectTypeOf(message.data).toEqualTypeOf<{ text: string }>();
+                if (message.event === 'done') expectTypeOf(message.data).toEqualTypeOf<{ count: number }>();
+                expectTypeOf(message.id).toEqualTypeOf<string | undefined>();
+            }
+        }
+        if (result.status === 404) expectTypeOf(result.body.detail).toEqualTypeOf<string>();
+
+        const lines = await streamClient.lines();
+        if (lines.status === 200) expectTypeOf(lines.body).toEqualTypeOf<AsyncIterable<string>>();
+    })();
 });

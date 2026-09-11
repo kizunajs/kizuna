@@ -103,6 +103,18 @@ const main = async () => {
             }
         }
     }
+    console.log('--- assistant.reply (streams server-sent events) ---');
+    const reply = await apiClient.assistant.reply({
+        body: {
+            prompt: 'What does streaming look like?',
+        },
+    });
+    if (reply.status === 200) {
+        for await (const message of reply.body) {
+            if (message.event === 'delta') process.stdout.write(message.data.text);
+            if (message.event === 'done') console.log(`\n(${message.data.outputTokens} tokens)`);
+        }
+    }
 };
 
 main().catch((error: unknown) => {

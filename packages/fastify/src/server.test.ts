@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import type { AddressInfo } from 'node:net';
 import { KizunaServer } from './server.js';
-import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -60,8 +61,20 @@ testAdapterFeatures({
             responseValidation,
         });
         await app.ready();
+        let listening = false;
+        const baseUrl = async (): Promise<string> => {
+            if (!listening) {
+                await app.listen({
+                    port: 0,
+                    host: '127.0.0.1',
+                });
+                listening = true;
+            }
+            return `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
+        };
         return {
             close: () => app.close(),
+            stream: async (mountRequest) => fetchStream(await baseUrl(), mountRequest),
             request: async ({ method, path, body, headers }) => {
                 const response = await app.inject({
                     method,

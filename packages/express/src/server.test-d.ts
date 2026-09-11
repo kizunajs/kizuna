@@ -7,6 +7,7 @@ import {
     gateContract,
     inferenceContract,
     inferenceGroupContract,
+    streamInferenceContract,
     inferenceRoutes,
     pluginTypeContract,
     requestContextContract,
@@ -22,6 +23,68 @@ const requestContextServer = new KizunaServer(requestContextContract);
 
 test('conforms to the shared adapter type catalogue', () => {
     checkAdapterTypeFeatures('express', {
+        'streams.bodyGenerator': () => {
+            new KizunaServer(streamInferenceContract).router({
+                reply: async ({ body }) => ({
+                    status: 200,
+                    body: async function* ({ signal }) {
+                        expectTypeOf(signal).toEqualTypeOf<AbortSignal>();
+                        yield {
+                            event: 'delta',
+                            data: {
+                                text: body.prompt,
+                            },
+                        };
+                        yield {
+                            comment: 'keep-alive',
+                        };
+                        yield {
+                            event: 'done',
+                            data: {
+                                count: 1,
+                            },
+                            id: 'evt-1',
+                        };
+                    },
+                }),
+            });
+            new KizunaServer(streamInferenceContract).router({
+                // @ts-expect-error `done` carries a count, not text
+                reply: async () => ({
+                    status: 200,
+                    body: async function* () {
+                        yield {
+                            event: 'done',
+                            data: {
+                                text: 'x',
+                            },
+                        };
+                    },
+                }),
+            });
+        },
+        'streams.bodyRejectsValue': () => {
+            new KizunaServer(streamInferenceContract).router({
+                // @ts-expect-error a streamed status takes a generator, not a value
+                reply: async () => ({
+                    status: 200,
+                    body: {
+                        text: 'x',
+                    },
+                }),
+            });
+            new KizunaServer(streamInferenceContract).router({
+                reply: async ({ throwError }) => {
+                    expectTypeOf(throwError).parameter(0).toHaveProperty('status').toEqualTypeOf<400>();
+                    return throwError({
+                        status: 400,
+                        body: {
+                            detail: 'no',
+                        },
+                    });
+                },
+            });
+        },
         'surface.router': () => {
             expectTypeOf<Router<typeof securedContract>>().toEqualTypeOf<ExpectedRouter<typeof securedContract, ExpressHandlerContext>>();
             expectTypeOf<Router<typeof inferenceRoutes>>().toEqualTypeOf<ExpectedRouter<typeof inferenceRoutes, ExpressHandlerContext>>();

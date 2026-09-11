@@ -138,6 +138,18 @@ export const handleNextRequest = async <T extends Routes>(
         respond: (result) => {
             if (result.kind === 'raw-response') return result.response as NextResponse;
             const rendered = renderJsonResult(result, options?.formatError as ErrorFormatter, request, request.method);
+            if (rendered.stream) {
+                return new NextResponse(
+                    rendered.stream({
+                        signal: request.signal,
+                        validate: options?.responseValidation,
+                    }),
+                    {
+                        status: rendered.status,
+                        headers: rendered.headers,
+                    }
+                );
+            }
             return jsonResponse(rendered.status, rendered.body, rendered.headers, rendered.raw);
         },
         onError: async (error): Promise<AdapterResult | void> => {

@@ -49,24 +49,24 @@ export const usersRoutes = k.routes('users', {
 
 ## Route definition fields
 
-| Field          | Required | Type                                                                                           |
-| -------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `method`       | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                             |
-| `path`         | Yes      | URL path. Use `:name` for path parameters                                                      |
-| `pathParams`   | No       | Zod schema for the path parameters, keyed by placeholder name                                  |
-| `body`         | No       | Zod schema for the request body                                                                |
-| `query`        | No       | Zod schema for the query string                                                                |
-| `headers`      | No       | Zod schema for request headers                                                                 |
-| `responses`    | Yes      | Response schemas keyed by status code. A schema, or `{ body, headers?, contentType? }`         |
-| `contentType`  | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
-| `summary`      | No       | Short description shown in OpenAPI                                                             |
-| `description`  | No       | Longer description shown in OpenAPI                                                            |
-| `externalDocs` | No       | `{ url, description? }`, emitted on the operation                                              |
-| `tags`         | No       | OpenAPI tag keys (from the tag set), resolved to titles in the spec                            |
-| `deprecated`   | No       | `boolean \| string \| { message?, date?, link? }`, see [Deprecations](/docs/deprecations)      |
-| `sunset`       | No       | `string \| { date, link? }`, see [Deprecations](/docs/deprecations)                            |
+| Field          | Required | Type                                                                                                                         |
+| -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `method`       | Yes      | `'GET'` `'POST'` `'PUT'` `'PATCH'` `'DELETE'` `'HEAD'` `'OPTIONS'`                                                           |
+| `path`         | Yes      | URL path. Use `:name` for path parameters                                                                                    |
+| `pathParams`   | No       | Zod schema for the path parameters, keyed by placeholder name                                                                |
+| `body`         | No       | Zod schema for the request body                                                                                              |
+| `query`        | No       | Zod schema for the query string                                                                                              |
+| `headers`      | No       | Zod schema for request headers                                                                                               |
+| `responses`    | Yes      | Response schemas keyed by status code. A schema, `{ body, headers?, contentType? }`, or `{ stream, headers?, contentType? }` |
+| `contentType`  | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'`                               |
+| `summary`      | No       | Short description shown in OpenAPI                                                                                           |
+| `description`  | No       | Longer description shown in OpenAPI                                                                                          |
+| `externalDocs` | No       | `{ url, description? }`, emitted on the operation                                                                            |
+| `tags`         | No       | OpenAPI tag keys (from the tag set), resolved to titles in the spec                                                          |
+| `deprecated`   | No       | `boolean \| string \| { message?, date?, link? }`, see [Deprecations](/docs/deprecations)                                    |
+| `sunset`       | No       | `string \| { date, link? }`, see [Deprecations](/docs/deprecations)                                                          |
 
-Use the `{ body, headers?, contentType?, cache?, etag? }` form of a response to declare [typed response headers](/docs/building/contract#response-schemas), a [binary body](/docs/reference/binary-and-file-schemas), or a [cache policy and entity tag](/docs/caching).
+Use the `{ body, headers?, contentType?, cache?, etag? }` form of a response to declare [typed response headers](/docs/building/contract#response-schemas), a [binary body](/docs/reference/binary-and-file-schemas), or a [cache policy and entity tag](/docs/caching). Use `{ stream, headers?, contentType? }` to send the response piece by piece, see [Streaming](/docs/streaming).
 
 A route's `security` comes from the contract's [`auth` map](/docs/reference/k-contract#the-auth-map); writing it here is a type error.
 
@@ -79,3 +79,6 @@ A route's `security` comes from the contract's [`auth` map](/docs/reference/k-co
 - an empty `z.object({})` as a `body`
 - any `z.coerce` schema, anywhere in the route
 - a structured path parameter (object, array, record, tuple, map, or set)
+- a `stream` on a `4xx` or `5xx` status, beside a `body`, or on a `HEAD` route
+- a `stream` whose schema does not fit its `contentType`: a `text/*` type takes `z.string()`, any other non-JSON type takes `BinarySchema`
+- a `stream` event name that is empty or contains a line break

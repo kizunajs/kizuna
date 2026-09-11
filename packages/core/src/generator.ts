@@ -34,12 +34,26 @@ export {
 } from './zod-internals.js';
 
 export { deprecationHeaders } from './deprecation.js';
+export {
+    streamMode,
+    streamContentType,
+    isNamedStream,
+    streamSchemas,
+    streamStatuses,
+    routeStreams,
+    soleStreamResponse,
+    EVENT_STREAM_MEDIA_TYPE,
+    type StreamMode,
+} from './stream.js';
 export { cacheHeaders } from './cache.js';
 
 export {
     resolveResponseBody,
+    resolveResponseStream,
     resolveResponseHeaders,
     resolveResponseContentType,
+    isStreamResponse,
+    isZodSchema,
     resolveResponseCache,
     resolveResponseEtag,
     isJsonMediaType,

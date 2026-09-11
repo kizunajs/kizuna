@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { parsePath } from '@ts-kizuna/core/adapter';
 import {
     isJsonMediaType,
+    isStreamResponse,
     isSuccessStatus,
     isVoidSchema,
     readObjectShape,
@@ -76,11 +77,11 @@ export const buildToolOutputSchema = (route: RouteDefinition): z.ZodType => {
         const response = route.responses[status];
         if (response === undefined) continue;
         const contentType = resolveResponseContentType(response);
-        if (contentType !== undefined && !isJsonMediaType(contentType)) {
+        if (isStreamResponse(response) || (contentType !== undefined && !isJsonMediaType(contentType))) {
             someSuccessHasNoBody = true;
             continue;
         }
-        const body = resolveResponseBody(response);
+        const body = resolveResponseBody(response)!;
         if (isVoidSchema(body)) {
             someSuccessHasNoBody = true;
             continue;

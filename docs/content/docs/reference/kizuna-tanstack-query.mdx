@@ -54,6 +54,15 @@ An object mirroring the contract's route groups.
 | `key()`                    | The partial key matching the route |
 | `call(args)`               | Calls the route                    |
 
+**Routes whose response [streams](/docs/streaming)**, whatever their method
+
+| Factory                  | Description                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------- |
+| `streamOptions(options)` | For `useQuery`, over `experimental_streamedQuery`. `data` is the messages received so far |
+| `streamKey({ input })`   | The stream query's full key                                                               |
+| `key()`                  | The partial key matching the route                                                        |
+| `call(args)`             | Calls the route, returning the async iterable                                             |
+
 **Groups and the root** carry `key()`. Where a route is named the same as a factory, the route wins.
 
 ## Options
@@ -63,12 +72,12 @@ An object mirroring the contract's route groups.
 | `input` | `ClientArgs \| SkipToken` | The route's `{ params, query, body, headers, fetchOptions }`. Optional when every argument is optional. |
 | …       | TanStack Query options    | Passed through untouched                                                                                |
 
-For `infiniteOptions`, `input` is a function of the page parameter. `skipToken` disables the query.
+For `infiniteOptions`, `input` is a function of the page parameter. `skipToken` disables the query. `streamOptions` also takes `refetchMode`, `'reset'` (default), `'append'`, or `'replace'`.
 
 ## Query keys
 
 ```ts
-type KizunaQueryKey = readonly [readonly string[], { input?: unknown; type: 'query' | 'infinite' }];
+type KizunaQueryKey = readonly [readonly string[], { input?: unknown; type: 'query' | 'infinite' | 'stream' }];
 type KizunaPathKey = readonly [readonly string[]];
 ```
 
@@ -76,7 +85,7 @@ Segments are the route's path through the contract, so `api.users.key()` prefixe
 
 ## Errors
 
-Declared statuses come back as data. Anything else throws [`UndeclaredResponseError`](/docs/reference/is-undeclared-response-error).
+Declared statuses come back as data. Anything else throws [`UndeclaredResponseError`](/docs/reference/is-undeclared-response-error). A streamed route that answers a declared status other than its stream throws `NonStreamResponseError`, narrowed with `isNonStreamResponseError`.
 
 ## Example
 

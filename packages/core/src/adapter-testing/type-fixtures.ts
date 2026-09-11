@@ -2,6 +2,7 @@ import { z } from 'zod';
 // Not `../kizuna.js`: an identity's credential is branded, so a contract built from `src` hands the adapters identities
 // their own `server.guard` cannot resolve.
 import { Kizuna } from '@ts-kizuna/core';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createPlugin } from '@ts-kizuna/core/adapter';
 
 const k = new Kizuna({
@@ -46,6 +47,33 @@ export const inferenceRoutes = k.routes('api', {
 
 export const inferenceContract = k.contract({
     routes: inferenceRoutes,
+});
+
+export const streamInferenceRoutes = k.routes('api', {
+    reply: {
+        method: 'POST',
+        path: '/reply',
+        body: z.object({
+            prompt: z.string(),
+        }),
+        responses: {
+            200: {
+                stream: {
+                    delta: z.object({
+                        text: z.string(),
+                    }),
+                    done: z.object({
+                        count: z.int(),
+                    }),
+                },
+            },
+            400: ProblemDetailsSchema,
+        },
+    },
+});
+
+export const streamInferenceContract = k.contract({
+    routes: streamInferenceRoutes,
 });
 
 export const inferenceGroupContract = k.contract({

@@ -212,6 +212,10 @@ const router: Router<typeof contract> = { ... };
 
 `RouteHandler` carries the route's `auth` and request context, nested groups included.
 
+## Streams
+
+A [stream](/docs/streaming) response hijacks the reply and is piped to `reply.raw` after its headers are flushed. The generator's `signal` fires when the raw response closes before the stream has finished.
+
 ## Reference
 
 - [`new KizunaServer()`](/docs/reference/kizuna-server)

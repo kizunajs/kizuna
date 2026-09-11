@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyPluginAsync } from 'fastify';
 import fastifyPlugin from 'fastify-plugin';
-import { Readable } from 'node:stream';
+import { Readable, pipeline } from 'node:stream';
+import type { ServerResponse } from 'node:http';
 import {
     type AdapterRequest,
     type Method,
@@ -24,6 +25,7 @@ import {
     pluginRouterOf,
     createAdapter,
     renderJsonResult,
+    type RenderedResult,
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
@@ -120,7 +122,21 @@ export interface FastifyOptions {
 interface FastifyResponseContext {
     reply: FastifyReply;
     formatError?: ErrorFormatter<FastifyRequest>;
+    responseValidation?: boolean;
 }
+
+const writeStream = (open: NonNullable<RenderedResult['stream']>, res: ServerResponse, validate: boolean | undefined): void => {
+    const controller = new AbortController();
+    res.on('close', () => {
+        if (!res.writableFinished) controller.abort();
+    });
+    res.flushHeaders();
+    const stream = open({
+        signal: controller.signal,
+        validate,
+    });
+    pipeline(Readable.fromWeb(stream as Parameters<typeof Readable.fromWeb>[0]), res, () => undefined);
+};
 
 /**
  * Write a web `Response` to a Fastify reply. Plugins answer in web terms to stay
@@ -143,7 +159,7 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
         request: adapterRequest.request,
         reply,
     }),
-    respond: (result, { reply, formatError }) => {
+    respond: (result, { reply, formatError, responseValidation }) => {
         if (result.kind === 'handler-error') {
             throw result.error;
         }
@@ -152,6 +168,15 @@ const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, Fasti
             return;
         }
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, reply.request, reply.request.method);
+        if (rendered.stream) {
+            reply.hijack();
+            reply.raw.statusCode = rendered.status;
+            for (const [key, value] of Object.entries(rendered.headers)) {
+                reply.raw.setHeader(key, value);
+            }
+            writeStream(rendered.stream, reply.raw, responseValidation);
+            return;
+        }
         for (const [key, value] of Object.entries(rendered.headers)) {
             reply.header(key, value);
         }
@@ -228,6 +253,7 @@ export const fastifyKizuna = fastifyPlugin(
                         responseContext: {
                             reply,
                             formatError: options?.formatError,
+                            responseValidation: options?.responseValidation,
                         },
                         guards,
                         schemes,

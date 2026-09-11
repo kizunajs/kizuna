@@ -164,6 +164,22 @@ responses: {
 },
 ```
 
+To send a response piece by piece, declare `stream` in place of `body`, with the schema of one message, or a record of event name to schema:
+
+```ts
+responses: {
+    200: {
+        stream: {
+            delta: z.object({
+                text: z.string(),
+            }),
+        },
+    },
+},
+```
+
+The handler then yields messages instead of returning one body, and the fetch client reads them with `for await`. See [Streaming](/docs/streaming).
+
 ## Bundle into a contract
 
 Assemble your route groups with `k.contract` and default-export the result. This is the object `client` and `server.api` consume.
@@ -181,7 +197,7 @@ export const contract = k.contract({
 
 API-wide settings are configured on `new Kizuna()` and carried onto every contract `k.contract` produces, so you set them once. That covers tags and [`validation.issueCodes`](/docs/reference/k-issue) for custom validation codes.
 
-For non-JSON responses, set `contentType` to send the body as-is instead of JSON. Responses default to `application/json`, and errors to `application/problem+json`. Declare a non-JSON body as `z.string()`:
+For non-JSON responses, set `contentType` to send the body as-is instead of JSON. Responses default to `application/json`, errors to `application/problem+json`, and a [stream](/docs/streaming) to `text/event-stream`. Declare a non-JSON body as `z.string()`:
 
 ```ts
 responses: {

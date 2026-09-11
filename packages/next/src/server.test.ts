@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { KizunaServer, NextRequest, NextResponse } from './server.js';
-import { readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -429,6 +429,20 @@ testAdapterFeatures({
             responseValidation,
         });
         return {
+            stream: async ({ method, path, body, headers }) => {
+                const handler = handlers[method];
+                if (!handler) throw new Error(`next: no handler exported for ${method}`);
+                const controller = new AbortController();
+                const response = await handler(
+                    new NextRequest(`http://localhost:3000/api${path}`, {
+                        method,
+                        body,
+                        headers,
+                        signal: controller.signal,
+                    })
+                );
+                return streamedResponse(response, controller);
+            },
             request: async ({ method, path, body, headers }) => {
                 const handler = handlers[method];
                 if (!handler) throw new Error(`next: no handler exported for ${method}`);

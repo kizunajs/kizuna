@@ -5,6 +5,8 @@ import { type TagSet, type TagKeysOf, isTagSet } from './tags.js';
 import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
+import { isStreamResponse, isZodSchema } from './generator-utils.js';
+import { assertValidStreams, streamSchemas } from './stream.js';
 
 const isEmptyObjectSchema = (schema: unknown): boolean => {
     if (!schema || typeof schema !== 'object') return false;
@@ -12,11 +14,10 @@ const isEmptyObjectSchema = (schema: unknown): boolean => {
     return typeof candidate.shape === 'object' && candidate.shape !== null && Object.keys(candidate.shape as object).length === 0;
 };
 
-const isZodSchema = (value: unknown): value is z.core.$ZodType => typeof value === 'object' && value !== null && '_zod' in value;
-
-const responseSchema = (response: ResponseDefinition): z.core.$ZodType | undefined => {
-    if (isZodSchema(response)) return response;
-    return response.body;
+const responseSchemas = (response: ResponseDefinition): z.core.$ZodType[] => {
+    if (isZodSchema(response)) return [response];
+    if (isStreamResponse(response)) return streamSchemas(response.stream);
+    return [response.body];
 };
 
 /**
@@ -31,7 +32,9 @@ const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
         ['headers', route.headers],
     ];
     for (const [status, response] of Object.entries(route.responses)) {
-        targets.push([`responses.${status}`, responseSchema(response)]);
+        for (const schema of responseSchemas(response)) {
+            targets.push([`responses.${status}`, schema]);
+        }
     }
     for (const [field, schema] of targets) {
         if (!schema) continue;
@@ -97,6 +100,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             assertPathParamsMatchPath(value, fullKey);
             assertPathParamsAreScalar(value, fullKey);
             assertNoCoercion(value, fullKey);
+            assertValidStreams(value, fullKey);
             resolveCoercionPlans(value);
         } else if (value && typeof value === 'object') {
             validateRoutes(value as Routes, fullKey);

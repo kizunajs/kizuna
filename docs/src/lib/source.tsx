@@ -11,6 +11,7 @@ const badges: Record<string, string> = {
     '/docs/jobs': 'Alpha',
     '/docs/caching': 'Beta',
     '/docs/mcp': 'Beta',
+    '/docs/streaming': 'Beta',
     '/docs/extend/create-adapter': 'Beta',
     '/docs/extend/create-generator': 'Beta',
     '/docs/extend/create-plugin': 'Alpha',

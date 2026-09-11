@@ -92,3 +92,52 @@ test('groups and routes both expose a partial key', () => {
     expectTypeOf(api.users.key()).toEqualTypeOf<readonly [readonly string[]]>();
     expectTypeOf(api.users.getUser.key()).toEqualTypeOf<readonly [readonly string[]]>();
 });
+
+test('a streamed route offers streamOptions with the messages as data, and no query or mutation factories', () => {
+    const streamRoutes = k.routes('users', {
+        reply: {
+            method: 'POST',
+            path: '/reply',
+            body: z.object({
+                prompt: z.string(),
+            }),
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                        done: z.object({
+                            count: z.int(),
+                        }),
+                    },
+                },
+            },
+        },
+    });
+    const streamContract = k.contract({
+        routes: {
+            assistant: streamRoutes,
+        },
+    });
+    const api = new KizunaTanstackQuery(
+        streamContract,
+        new KizunaClient(streamContract, {
+            baseUrl: '',
+        })
+    );
+    const options = api.assistant.reply.streamOptions({
+        input: {
+            body: {
+                prompt: 'hi',
+            },
+        },
+        refetchMode: 'append',
+    });
+    type Data = Awaited<ReturnType<Exclude<typeof options.queryFn, symbol>>>;
+    expectTypeOf<Data[number]['event']>().toEqualTypeOf<'delta' | 'done'>();
+    expectTypeOf<Data[number]['data']>().toEqualTypeOf<{ text: string } | { count: number }>();
+    expectTypeOf<Data[number]['id']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf(api.assistant.reply).not.toHaveProperty('queryOptions');
+    expectTypeOf(api.assistant.reply).not.toHaveProperty('mutationOptions');
+});

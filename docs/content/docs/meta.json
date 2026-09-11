@@ -8,6 +8,7 @@
         "clients",
         "authentication",
         "request-context",
+        "streaming",
         "caching",
         "jobs",
         "deprecations",

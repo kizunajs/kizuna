@@ -115,7 +115,7 @@ Object literal may only specify known properties, but 'helth' does not
 exist in type ToolMap<...>. Did you mean to write 'health'?
 ```
 
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, because MCP tool input is JSON.
+Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, because MCP tool input is JSON. Routes whose response [streams](/docs/streaming) are never tools either, because a tool result is one value.
 
 ### What to cut first
 

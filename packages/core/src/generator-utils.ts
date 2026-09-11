@@ -1,22 +1,39 @@
 import type { z } from 'zod';
-import type { CachePolicy, ResponseDefinition } from './types.js';
+import type { CachePolicy, ResponseDefinition, StreamDefinition, StreamResponseDefinition } from './types.js';
 
 // Kept out of generator.ts so importing these doesn't pull in its node:fs dependency.
 
-export const resolveResponseBody = (value: ResponseDefinition): z.ZodType =>
-    value && typeof value === 'object' && 'body' in value ? value.body : (value as z.ZodType);
+export const isZodSchema = (value: unknown): value is z.ZodType => typeof value === 'object' && value !== null && '_zod' in value;
+
+/**
+ * Whether a response is sent piece by piece, declared with `stream` in place of `body`.
+ */
+export const isStreamResponse = (value: ResponseDefinition | undefined): value is StreamResponseDefinition =>
+    value !== undefined && typeof value === 'object' && !isZodSchema(value) && 'stream' in value && value.stream !== undefined;
+
+/**
+ * The body schema of a response, or `undefined` for a stream, which has none.
+ */
+export const resolveResponseBody = (value: ResponseDefinition): z.ZodType | undefined => {
+    if (isZodSchema(value)) return value;
+    if (isStreamResponse(value)) return undefined;
+    return value.body;
+};
+
+export const resolveResponseStream = (value: ResponseDefinition): StreamDefinition | undefined =>
+    isStreamResponse(value) ? value.stream : undefined;
 
 export const resolveResponseHeaders = (value: ResponseDefinition): z.ZodType | undefined =>
-    value && typeof value === 'object' && 'body' in value ? value.headers : undefined;
+    isZodSchema(value) ? undefined : value.headers;
 
 export const resolveResponseContentType = (value: ResponseDefinition | undefined): string | undefined =>
-    value && typeof value === 'object' && 'body' in value ? value.contentType : undefined;
+    value === undefined || isZodSchema(value) ? undefined : value.contentType;
 
 export const resolveResponseCache = (value: ResponseDefinition | undefined): CachePolicy | undefined =>
-    value && typeof value === 'object' && 'body' in value ? value.cache : undefined;
+    value === undefined || isZodSchema(value) || isStreamResponse(value) ? undefined : value.cache;
 
 export const resolveResponseEtag = (value: ResponseDefinition | undefined): boolean =>
-    value && typeof value === 'object' && 'body' in value ? value.etag === true : false;
+    value !== undefined && !isZodSchema(value) && !isStreamResponse(value) && value.etag === true;
 
 export const toPascalCase = (input: string): string => {
     if (!input) return input;

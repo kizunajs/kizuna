@@ -32,7 +32,10 @@ import {
     resolveResponseCache,
     resolveResponseEtag,
     isJsonMediaType,
+    isStreamResponse,
+    isSuccessStatus,
 } from './generator-utils.js';
+import { encodeStreamBody, EVENT_STREAM_MEDIA_TYPE, streamContentType, type EncodeStreamOptions } from './stream.js';
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
 import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
 import {
@@ -49,6 +52,8 @@ import type { JobTransport } from './job-transport.js';
 
 export type { ResponseHeaders, RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
+export { encodeStreamBody, type EncodeStreamOptions, type StreamContext } from './stream.js';
+export { isStreamResponse } from './generator-utils.js';
 export {
     createPlugin,
     pluginRouteTree,
@@ -872,14 +877,38 @@ const resolveRoute = (
     };
 };
 
-const isAcceptable = (acceptHeader: string | undefined): boolean => {
-    if (!acceptHeader || acceptHeader.trim() === '') return true;
-    for (const part of acceptHeader.split(',')) {
-        const [mediaType = ''] = part.trim().split(';');
-        const normalized = mediaType.trim().toLowerCase();
-        if (normalized === '*/*' || normalized === 'application/*' || normalized === 'application/json') {
-            return true;
+const mediaTypeEssence = (value: string): string => (value.split(';')[0] ?? '').trim().toLowerCase();
+
+const producibleMediaTypes = (route: RouteDefinition): string[] => {
+    const types = new Set<string>();
+    for (const [statusKey, response] of Object.entries(route.responses)) {
+        if (!isSuccessStatus(Number(statusKey))) continue;
+        const declared = resolveResponseContentType(response);
+        if (declared !== undefined) {
+            types.add(mediaTypeEssence(declared));
+        } else if (isStreamResponse(response)) {
+            types.add(EVENT_STREAM_MEDIA_TYPE);
+        } else {
+            const body = resolveResponseBody(response);
+            types.add(body !== undefined && isBinarySchema(body) ? 'application/octet-stream' : 'application/json');
         }
+    }
+    if (types.size === 0) types.add('application/json');
+    return [...types];
+};
+
+const isAcceptable = (acceptHeader: string | undefined, route: RouteDefinition): boolean => {
+    if (!acceptHeader || acceptHeader.trim() === '') return true;
+    const producible = producibleMediaTypes(route);
+    for (const part of acceptHeader.split(',')) {
+        const normalized = mediaTypeEssence(part);
+        if (normalized === '*/*') return true;
+        if (normalized.endsWith('/*')) {
+            const prefix = normalized.slice(0, -1);
+            if (producible.some((mediaType) => mediaType.startsWith(prefix))) return true;
+            continue;
+        }
+        if (producible.includes(normalized)) return true;
     }
     return false;
 };
@@ -967,7 +996,8 @@ const withCacheHeaders = (result: AdapterResult, route: RouteDefinition): Adapte
  */
 const responseBytes = (body: unknown, response: ResponseDefinition | undefined): string | Uint8Array | undefined => {
     if (typeof body === 'string' || body instanceof Uint8Array) return body;
-    const isBinary = response !== undefined && isBinarySchema(resolveResponseBody(response));
+    const bodySchema = response !== undefined ? resolveResponseBody(response) : undefined;
+    const isBinary = bodySchema !== undefined && isBinarySchema(bodySchema);
     const contentType = resolveResponseContentType(response) ?? (isBinary ? 'application/octet-stream' : 'application/json');
     return isJsonMediaType(contentType) ? JSON.stringify(body) : undefined;
 };
@@ -1073,7 +1103,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     };
 
     const acceptHeader = (raw.headers as Record<string, string | undefined>)['accept'];
-    if (!isAcceptable(acceptHeader)) {
+    if (!isAcceptable(acceptHeader, route)) {
         return {
             kind: 'not-acceptable',
         };
@@ -1199,7 +1229,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         }
         if (responseValidation) {
             const responseSpec = route.responses[handlerResult.status];
-            if (responseSpec !== undefined) {
+            if (responseSpec !== undefined && !isStreamResponse(responseSpec)) {
                 const bodySchema = 'safeParse' in responseSpec ? responseSpec : responseSpec.body;
                 // Error responses (status >= 400) auto-fill the Problem Details envelope
                 // (`type`/`title`/`status`) at render time, so the handler only supplies
@@ -1380,14 +1410,34 @@ const contentByteLength = (body: unknown, raw: boolean | undefined): number => {
  * `Content-Length`, and loses the content (RFC 9110 §9.3.2). Leave it
  * unset where the framework discards HEAD content itself (Express, Fastify, Hono).
  */
+export interface RenderedResult {
+    status: number;
+    headers: ResponseHeaders;
+    body: unknown;
+    raw?: boolean;
+    /**
+     * A streamed response carries this in place of `body`. Check it first.
+     */
+    stream?: (options: EncodeStreamOptions) => ReadableStream<Uint8Array>;
+}
+
 export const renderJsonResult = (
     result: Exclude<AdapterResult, { kind: 'raw-response' }>,
     formatError: ErrorFormatter = defaultErrorFormatter,
     request: unknown = undefined,
     requestMethod?: string
-): { status: number; headers: ResponseHeaders; body: unknown; raw?: boolean } => {
+): RenderedResult => {
     const rendered = renderResult(result, formatError, request);
-    if (requestMethod !== 'HEAD' || rendered.body === undefined) return rendered;
+    if (requestMethod !== 'HEAD') return rendered;
+    // A HEAD of a stream keeps the headers and drops the stream; the length is unknown (RFC 9110 §8.6).
+    if (rendered.stream) {
+        return {
+            status: rendered.status,
+            headers: rendered.headers,
+            body: undefined,
+        };
+    }
+    if (rendered.body === undefined) return rendered;
     return {
         status: rendered.status,
         headers: {
@@ -1402,7 +1452,7 @@ const renderResult = (
     result: Exclude<AdapterResult, { kind: 'raw-response' }>,
     formatError: ErrorFormatter,
     request: unknown
-): { status: number; headers: ResponseHeaders; body: unknown; raw?: boolean } => {
+): RenderedResult => {
     const renderError = (
         status: number,
         detail: string,
@@ -1429,6 +1479,20 @@ const renderResult = (
                 const detail = typeof extensions.detail === 'string' ? extensions.detail : (STATUS_TITLES[result.status] ?? 'Error');
                 return renderError(result.status, detail, extensions, result.headers);
             }
+            const responseSpec = result.route.responses[result.status];
+            if (responseSpec !== undefined && isStreamResponse(responseSpec)) {
+                const streamResult = result;
+                return {
+                    status: result.status,
+                    headers: {
+                        'content-type': streamContentType(responseSpec),
+                        'cache-control': 'no-store',
+                        ...(result.headers ?? {}),
+                    },
+                    body: undefined,
+                    stream: (options) => encodeStreamBody(streamResult, options),
+                };
+            }
             if (result.body === undefined) {
                 return {
                     status: result.status,
@@ -1438,8 +1502,8 @@ const renderResult = (
                     body: result.body,
                 };
             }
-            const responseSpec = result.route.responses[result.status];
-            const isBinary = responseSpec !== undefined && isBinarySchema(resolveResponseBody(responseSpec));
+            const bodySchema = responseSpec !== undefined ? resolveResponseBody(responseSpec) : undefined;
+            const isBinary = bodySchema !== undefined && isBinarySchema(bodySchema);
             const contentType = resolveResponseContentType(responseSpec) ?? (isBinary ? 'application/octet-stream' : 'application/json');
             const raw = isBinary || !isJsonMediaType(contentType);
             if (raw && typeof result.body !== 'string' && !(result.body instanceof Uint8Array)) {

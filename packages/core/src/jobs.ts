@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ProblemDetailsSchema } from './error-response.js';
 import { assertValidSchedule, type JobSchedule } from './schedule.js';
-import type { ResponseDefinition } from './types.js';
+import type { ResponseDefinition, StreamResponseDefinition } from './types.js';
 import type { HandlerReturn } from './handler-pipeline.js';
 import type { JobRunner as JobRunnerOf } from './job-runner.js';
 import type { PathClaim } from './path-claims.js';
@@ -78,7 +78,7 @@ export interface JobDefinition {
      * Extra responses beyond the synthesized `200`/`204`, `422`, `500`, `503`.
      */
     responses?: {
-        [status: number]: ResponseDefinition;
+        [status: number]: Exclude<ResponseDefinition, StreamResponseDefinition>;
     };
 }
 

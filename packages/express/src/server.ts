@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction, Router as ExpressRouter } from 'express';
 import { Router as createExpressRouter } from 'express';
-import { Readable } from 'node:stream';
+import { Readable, pipeline } from 'node:stream';
+import type { ServerResponse } from 'node:http';
 import {
     type AdapterRequest,
     type RouteDefinition,
@@ -23,6 +24,7 @@ import {
     pluginRouterOf,
     createAdapter,
     renderJsonResult,
+    type RenderedResult,
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
@@ -121,7 +123,21 @@ interface ExpressResponseContext {
     res: Response;
     next: NextFunction;
     formatError?: ErrorFormatter<Request>;
+    responseValidation?: boolean;
 }
+
+const writeStream = (open: NonNullable<RenderedResult['stream']>, res: ServerResponse, validate: boolean | undefined): void => {
+    const controller = new AbortController();
+    res.on('close', () => {
+        if (!res.writableFinished) controller.abort();
+    });
+    res.flushHeaders();
+    const stream = open({
+        signal: controller.signal,
+        validate,
+    });
+    pipeline(Readable.fromWeb(stream as Parameters<typeof Readable.fromWeb>[0]), res, () => undefined);
+};
 
 /**
  * Write a web `Response` to a node response. Plugins answer in web terms to stay
@@ -143,7 +159,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
         req: adapterRequest.request,
         res,
     }),
-    respond: (result, { res, next, formatError }) => {
+    respond: (result, { res, next, formatError, responseValidation }) => {
         if (result.kind === 'handler-error') {
             next(result.error);
             return;
@@ -161,6 +177,15 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
         const rendered = renderJsonResult(result, formatError as ErrorFormatter, res.req);
         for (const [key, value] of Object.entries(rendered.headers)) {
             res.setHeader(key, value);
+        }
+        if (rendered.stream) {
+            res.status(rendered.status);
+            if (res.req.method === 'HEAD') {
+                res.end();
+                return;
+            }
+            writeStream(rendered.stream, res, responseValidation);
+            return;
         }
         if (rendered.body === undefined) {
             res.status(rendered.status).end();
@@ -225,6 +250,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                         res,
                         next,
                         formatError: options?.formatError,
+                        responseValidation: options?.responseValidation,
                     },
                     guards,
                     schemes,

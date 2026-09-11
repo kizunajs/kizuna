@@ -205,6 +205,10 @@ app.post('/avatar', upload.single('file'), (req, res, next) => {
 api.mount(app);
 ```
 
+## Streams
+
+A [stream](/docs/streaming) response is piped to `res` after `flushHeaders()`, so the client sees the headers before the first message. The generator's `signal` fires when `res` closes before the stream has finished.
+
 ## Reference
 
 - [`new KizunaServer()`](/docs/reference/kizuna-server)

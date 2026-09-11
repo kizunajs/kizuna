@@ -275,6 +275,26 @@ const result = await api.users.getUser.call({
 });
 ```
 
+## Streams
+
+A route whose response [streams](/docs/streaming) offers `streamOptions` in place of `queryOptions`. It builds on TanStack's `experimental_streamedQuery`, so `data` is the list of messages received so far and grows as they arrive:
+
+```tsx title="assistant.tsx"
+const { data } = useQuery(
+    api.assistant.reply.streamOptions({
+        input: {
+            body: {
+                prompt,
+            },
+        },
+    })
+);
+
+const text = data?.flatMap((message) => (message.event === 'delta' ? [message.data.text] : [])).join('') ?? '';
+```
+
+`refetchMode` decides what a refetch does with the messages already held: `'reset'` clears them first and is the default, `'append'` adds to them, and `'replace'` swaps them in once the stream ends. A status other than the streamed one, the route's `400` say, rejects the query with `NonStreamResponseError`. The key is `streamKey({ input })`, typed `'stream'`, and there is no `queryOptions` or `infiniteOptions`, since a cache entry holding an open connection is wrong.
+
 ## Reference
 
 - [`new KizunaTanstackQuery()`](/docs/reference/kizuna-tanstack-query)

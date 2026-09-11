@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { skipToken } from '@tanstack/query-core';
+import { QueryClient, skipToken } from '@tanstack/query-core';
 import { Kizuna } from '@ts-kizuna/core';
 import { KizunaTanstackQuery } from './proxy.js';
-import { UndeclaredResponseError, isUndeclaredResponseError } from './errors.js';
+import { NonStreamResponseError, UndeclaredResponseError, isNonStreamResponseError, isUndeclaredResponseError } from './errors.js';
 
 const k = new Kizuna({
     tags: Kizuna.tags({
@@ -397,5 +397,84 @@ describe('name collisions', () => {
         const api = new KizunaTanstackQuery(collidingContract, client as any);
 
         expect(api.users.key).toHaveProperty('queryOptions');
+    });
+});
+
+describe('streams', () => {
+    const streamRoutes = k.routes('users', {
+        reply: {
+            method: 'POST',
+            path: '/reply',
+            body: z.object({
+                prompt: z.string(),
+            }),
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                    },
+                },
+                404: z.object({
+                    detail: z.string(),
+                }),
+            },
+        },
+    });
+    const streamContract = k.contract({
+        routes: {
+            assistant: streamRoutes,
+        },
+    });
+    const messages = [
+        { event: 'delta', data: { text: 'a' } },
+        { event: 'delta', data: { text: 'b' } },
+    ];
+    const streamedBody = async function* () {
+        for (const message of messages) yield message;
+    };
+    const buildStreamApi = (result: unknown) =>
+        new KizunaTanstackQuery(streamContract, {
+            assistant: {
+                reply: vi.fn().mockResolvedValue(result),
+            },
+        } as any);
+    const input = {
+        body: {
+            prompt: 'hi',
+        },
+    };
+
+    it('offers streamOptions and keys typed stream, and nothing for the cache to hold', () => {
+        const api = buildStreamApi({ status: 200, body: streamedBody(), headers: {} });
+        expect(api.assistant.reply.streamKey({ input })).toEqual([['assistant', 'reply'], { input, type: 'stream' }]);
+        expect(api.assistant.reply.key()).toEqual([['assistant', 'reply']]);
+        expect('queryOptions' in api.assistant.reply).toBe(false);
+        expect('mutationOptions' in api.assistant.reply).toBe(false);
+    });
+
+    it('accumulates the messages as data through TanStack streamedQuery', async () => {
+        const api = buildStreamApi({ status: 200, body: streamedBody(), headers: {} });
+        const queryClient = new QueryClient();
+        const data = await queryClient.fetchQuery(api.assistant.reply.streamOptions({ input }));
+        expect(data).toEqual(messages);
+    });
+
+    it('rejects with NonStreamResponseError when the route answers a status that does not stream', async () => {
+        const api = buildStreamApi({ status: 404, body: { detail: 'gone' }, headers: {} });
+        const queryClient = new QueryClient();
+        const error = await queryClient
+            .fetchQuery(api.assistant.reply.streamOptions({ input, retry: false }))
+            .catch((caught: unknown) => caught);
+        expect(isNonStreamResponseError(error)).toBe(true);
+        expect((error as NonStreamResponseError).status).toBe(404);
+    });
+
+    it('honours skipToken', () => {
+        const api = buildStreamApi({ status: 200, body: streamedBody(), headers: {} });
+        const options = api.assistant.reply.streamOptions({ input: skipToken });
+        expect(options.queryFn).toBe(skipToken);
+        expect(options.queryKey).toEqual([['assistant', 'reply'], { type: 'stream' }]);
     });
 });
