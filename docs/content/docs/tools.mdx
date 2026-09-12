@@ -3,11 +3,11 @@ title: Tools
 description: Declare the tools an AI assistant can call. Run them on the server, and read each call typed in your client.
 ---
 
-<BetaNotice>
+<AlphaNotice>
 
-Tools are new and still settling. `k.tools`, the `tools` field on a streamed response, and the event names may change before v2, so pin your version if you depend on them.
+Tools are new. How a tool is declared, how it runs, and how a client reads a call will likely change before v2, so pin your version if you depend on it.
 
-</BetaNotice>
+</AlphaNotice>
 
 A tool is usually written three times: a JSON Schema for the model, a typed event for the client, and a function that runs it. Declare it once and all three follow.
 
