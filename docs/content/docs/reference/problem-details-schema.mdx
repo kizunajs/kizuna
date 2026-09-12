@@ -41,13 +41,13 @@ const usersRoutes = k.routes('users', {
         path: '/users/:id',
         responses: {
             200: UserSchema,
-            401: ProblemDetailsSchema,
-            403: ProblemDetailsSchema,
             404: ProblemDetailsSchema,
         },
     },
 });
 ```
+
+A route the [auth map](/docs/authentication) guards gets `401` and `403` as Problem Details. See [the 401 and 403 on every guarded route](/docs/authentication#the-401-and-403-on-every-guarded-route).
 
 ## Usage in handlers
 

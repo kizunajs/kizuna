@@ -1615,6 +1615,8 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.ProblemDetails)
+            case forbidden(API.ProblemDetails)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1660,6 +1662,8 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.ProblemDetails)
+            case forbidden(API.ProblemDetails)
             case conflict(API.ProblemDetails)
             case badRequest(APIClient.ValidationError)
 
@@ -1700,6 +1704,8 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.ProblemDetails)
+            case forbidden(API.ProblemDetails)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1733,6 +1739,8 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.ProblemDetails)
+            case forbidden(API.ProblemDetails)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1786,6 +1794,8 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.ProblemDetails)
+            case forbidden(API.ProblemDetails)
             case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
@@ -1837,6 +1847,8 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.ProblemDetails)
+            case forbidden(API.ProblemDetails)
             case notFound(API.ProblemDetails)
 
             public var isCancelled: Bool {
@@ -1903,6 +1915,8 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.ProblemDetails)
+            case forbidden(API.ProblemDetails)
             case notFound(API.ProblemDetails)
             case badRequest(APIClient.ValidationError)
 
@@ -2902,6 +2916,12 @@ public struct APIMembersClient: Sendable {
         case 200:
             let body = try Kizuna.decode(APIClient.MembersListMembers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersListMembers.Failure.self)
             return APIClient.MembersListMembers.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersListMembers.Failure.self)
+            throw APIClient.MembersListMembers.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersListMembers.Failure.self)
+            throw APIClient.MembersListMembers.Failure.forbidden(payload)
         default:
             throw APIClient.MembersListMembers.Failure.unexpectedStatus(statusCode, data)
         }
@@ -2921,6 +2941,12 @@ public struct APIMembersClient: Sendable {
         case 201:
             let body = try Kizuna.decode(API.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
             return APIClient.MembersInviteMember.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
+            throw APIClient.MembersInviteMember.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
+            throw APIClient.MembersInviteMember.Failure.forbidden(payload)
         case 409:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersInviteMember.Failure.self)
             throw APIClient.MembersInviteMember.Failure.conflict(payload)
@@ -2952,6 +2978,12 @@ public struct APIWorkspaceClient: Sendable {
         case 200:
             let body = try Kizuna.decode(APIClient.WorkspaceGetWorkspace.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
             return APIClient.WorkspaceGetWorkspace.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
+            throw APIClient.WorkspaceGetWorkspace.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceGetWorkspace.Failure.self)
+            throw APIClient.WorkspaceGetWorkspace.Failure.forbidden(payload)
         default:
             throw APIClient.WorkspaceGetWorkspace.Failure.unexpectedStatus(statusCode, data)
         }
@@ -2969,6 +3001,12 @@ public struct APIWorkspaceClient: Sendable {
         case 200:
             let body = try Kizuna.decode(APIClient.WorkspaceDeleteWorkspace.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
             return APIClient.WorkspaceDeleteWorkspace.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
+            throw APIClient.WorkspaceDeleteWorkspace.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
+            throw APIClient.WorkspaceDeleteWorkspace.Failure.forbidden(payload)
         default:
             throw APIClient.WorkspaceDeleteWorkspace.Failure.unexpectedStatus(statusCode, data)
         }
@@ -2988,6 +3026,12 @@ public struct APIWorkspaceClient: Sendable {
         case 200:
             let body = try Kizuna.decode(APIClient.WorkspaceTransfer.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
             return APIClient.WorkspaceTransfer.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
+            throw APIClient.WorkspaceTransfer.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
+            throw APIClient.WorkspaceTransfer.Failure.forbidden(payload)
         case 400:
             let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.WorkspaceTransfer.Failure.self)
             throw APIClient.WorkspaceTransfer.Failure.badRequest(payload)
@@ -3017,6 +3061,12 @@ public struct APIInvitesClient: Sendable {
         case 200:
             let body = try Kizuna.decode(APIClient.InvitesGetInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
             return APIClient.InvitesGetInvite.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
+            throw APIClient.InvitesGetInvite.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
+            throw APIClient.InvitesGetInvite.Failure.forbidden(payload)
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesGetInvite.Failure.self)
             throw APIClient.InvitesGetInvite.Failure.notFound(payload)
@@ -3040,6 +3090,12 @@ public struct APIInvitesClient: Sendable {
         case 201:
             let body = try Kizuna.decode(APIClient.InvitesAcceptInvite.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
             return APIClient.InvitesAcceptInvite.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
+            throw APIClient.InvitesAcceptInvite.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
+            throw APIClient.InvitesAcceptInvite.Failure.forbidden(payload)
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.InvitesAcceptInvite.Failure.self)
             throw APIClient.InvitesAcceptInvite.Failure.notFound(payload)

@@ -1995,3 +1995,58 @@ describe('Kotlin generator: streamed responses', () => {
         warn.mockRestore();
     });
 });
+
+describe('Kotlin generator: the statuses the auth map adds', () => {
+    const guardedK = new Kizuna({
+        identities: {
+            user: Kizuna.identity.bearer({
+                context: z.object({
+                    userId: z.string(),
+                }),
+            }),
+        },
+    });
+
+    const guardedContract = () =>
+        guardedK.contract({
+            routes: {
+                getSecret: {
+                    method: 'GET',
+                    path: '/secret',
+                    responses: {
+                        200: z.object({
+                            value: z.string(),
+                        }),
+                    },
+                },
+                health: {
+                    method: 'GET',
+                    path: '/health',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            },
+            auth: {
+                getSecret: 'user',
+                health: false,
+            },
+        });
+
+    it('gives a guarded route the Unauthorized and Forbidden cases it never declared', () => {
+        const output = generateKotlinClient(guardedContract(), baseConfig);
+
+        expect(output).toContain('data class Unauthorized(val body: TestAPI.ProblemDetails) : Failure()');
+        expect(output).toContain('data class Forbidden(val body: TestAPI.ProblemDetails) : Failure()');
+        expect(output).toContain('throw TestAPIClient.GetSecret.Failure.Unauthorized');
+    });
+
+    it('leaves a public route without either', () => {
+        const output = generateKotlinClient(guardedContract(), baseConfig);
+
+        expect(output).not.toContain('TestAPIClient.Health.Failure.Unauthorized');
+        expect(output).not.toContain('TestAPIClient.Health.Failure.Forbidden');
+    });
+});

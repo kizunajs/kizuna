@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method } from './types.js';
-import type { OpenApiSecuritySchemeObject, SecurityScheme } from './security-scheme.js';
+import type { SecurityScheme } from './security-scheme.js';
+import { authenticationChallenge, resolveSecurityRequirements } from './security-scheme.js';
 import type { Credential, NoCredential } from './identity.js';
 import {
     type RouteHandler,
@@ -20,7 +21,7 @@ import { cacheHeaders } from './cache.js';
 import { computeEtag, etagMatches } from './etag.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, type ProblemDetails } from './problem-details.js';
-import { STATUS_TITLES } from './status-titles.js';
+import { statusTitle } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
@@ -168,24 +169,6 @@ export interface GuardDenial {
  * response; a `www-authenticate` among them replaces the default challenge.
  */
 export type GuardDeny = (status: number, detail: string, headers?: ResponseHeaders) => GuardDenial;
-
-type HttpScheme = Extract<OpenApiSecuritySchemeObject, { type: 'http' }>['scheme'];
-
-const HTTP_CHALLENGES: Partial<Record<HttpScheme, string>> = {
-    bearer: 'Bearer',
-    basic: 'Basic',
-};
-
-/**
- * The authentication scheme a `401` from this identity challenges with. An
- * `apiKey` or `custom` identity names none: neither is HTTP authentication.
- */
-export const authenticationChallenge = (scheme: SecurityScheme | undefined): string | undefined => {
-    const openapi = scheme?.openapi;
-    if (openapi === undefined) return undefined;
-    if (openapi.type === 'http') return HTTP_CHALLENGES[openapi.scheme];
-    return openapi.type === 'oauth2' || openapi.type === 'openIdConnect' ? 'Bearer' : undefined;
-};
 
 /**
  * Make a value safe inside an RFC 9110 quoted string: only printable ASCII
@@ -573,7 +556,8 @@ export type {
 } from './handler-pipeline.js';
 export { buildPath, parsePath, type PathSegment } from './path-params.js';
 export { sortFlattenedRoutes } from './route-matcher.js';
-export { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand } from './types.js';
+export { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, AUTO_RESPONSES_BRAND, type AutoResponsesBrand } from './types.js';
+export { authenticationChallenge, resolveSecurityRequirements } from './security-scheme.js';
 export { tagRoutes } from './routes.js';
 export { isTagSet, type NormalizeTags } from './tags.js';
 export { ResponseError } from './response-error.js';
@@ -733,30 +717,6 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
     basePath?: string;
     responseValidation?: boolean;
 }
-
-/**
- * Expand a route's resolved `security` into the concrete (scheme, scopes) pairs
- * whose guards must run before the handler.
- */
-export const resolveSecurityRequirements = (route: RouteDefinition): Array<{ scheme: string; scopes: string[] }> => {
-    const requirements: Array<{ scheme: string; scopes: string[] }> = [];
-    for (const entry of route.security ?? []) {
-        if (typeof entry === 'string') {
-            requirements.push({
-                scheme: entry,
-                scopes: [],
-            });
-            continue;
-        }
-        for (const [scheme, scopes] of Object.entries(entry)) {
-            requirements.push({
-                scheme,
-                scopes: [...(scopes ?? [])],
-            });
-        }
-    }
-    return requirements;
-};
 
 /**
  * Read a raw header value as a single string: the first entry of an array
@@ -1277,7 +1237,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                     handlerResult.status >= 400 && handlerResult.body !== null && typeof handlerResult.body === 'object'
                         ? {
                               type: 'about:blank',
-                              title: STATUS_TITLES[handlerResult.status] ?? 'Unknown Error',
+                              title: statusTitle(handlerResult.status) ?? 'Unknown Error',
                               status: handlerResult.status,
                               ...(handlerResult.body as Record<string, unknown>),
                           }
@@ -1516,7 +1476,7 @@ const renderResult = (
             if (result.status >= 400) {
                 const body = result.body;
                 const extensions = body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
-                const detail = typeof extensions.detail === 'string' ? extensions.detail : (STATUS_TITLES[result.status] ?? 'Error');
+                const detail = typeof extensions.detail === 'string' ? extensions.detail : (statusTitle(result.status) ?? 'Error');
                 return renderError(result.status, detail, extensions, result.headers);
             }
             const responseSpec = result.route.responses[result.status];

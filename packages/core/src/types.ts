@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { KnownStatus } from './status-titles.js';
 import type { Tools } from './tools.js';
 
 export const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
@@ -360,6 +361,21 @@ export const HANDLER_CONTEXT_BRAND: unique symbol = Symbol('ts-kizuna.route.hand
 export interface HandlerContextBrand<Context> {
     readonly [HANDLER_CONTEXT_BRAND]?: Context;
 }
+
+/**
+ * Type-only key under which `k.contract` brands a guarded route with the
+ * statuses its guard answers for it. Never written at runtime.
+ */
+export const AUTO_RESPONSES_BRAND: unique symbol = Symbol('ts-kizuna.route.autoResponses');
+
+export interface AutoResponsesBrand<Statuses extends number> {
+    readonly [AUTO_RESPONSES_BRAND]?: Statuses;
+}
+
+/**
+ * The statuses the auth map puts on a guarded route.
+ */
+export type GuardStatus = Extract<KnownStatus, 401 | 403>;
 
 export interface Routes<TagKeys extends string = string, SchemeNames extends string = string> {
     [ROUTES_TAG]?: string;

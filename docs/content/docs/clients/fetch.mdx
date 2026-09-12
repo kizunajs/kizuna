@@ -220,6 +220,18 @@ if (result.status === 400) {
 }
 ```
 
+## Refusals
+
+A route the contract's `auth` map guards carries `401` and `403` in its response type, as [Problem Details](/docs/reference/problem-details-schema). A public route carries neither. A route declaring its own `403` keeps that body alongside, the way a declared `400` sits beside the validation error.
+
+```ts title="workspace.ts"
+const result = await apiClient.workspace.deleteWorkspace();
+
+if (result.status === 403) {
+    console.log(result.body.detail);
+}
+```
+
 ## React Native
 
 The client works in Expo and in bare React Native, importing the [same contract](/docs/project-structure) as your website.

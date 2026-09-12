@@ -51,3 +51,7 @@ return deny(403, 'The token is missing a required scope', {
 | `deny`            | `(status, detail, headers?) => GuardDenial`, rejects with a Problem Details response. A `401` also carries a `WWW-Authenticate` challenge built from the identity. |
 | `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                                               |
 | framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                                             |
+
+## Where a denial is documented
+
+`k.contract` puts `401` and `403` on every route the auth map guards. See [the 401 and 403 on every guarded route](/docs/authentication#the-401-and-403-on-every-guarded-route).

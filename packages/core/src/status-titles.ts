@@ -4,7 +4,7 @@
  * The single source of truth for human-readable status phrases across kizuna ,
  * used for Problem Details `title` fields and OpenAPI response descriptions.
  */
-export const STATUS_TITLES: Record<number, string> = {
+export const STATUS_TITLES = {
     200: 'OK',
     201: 'Created',
     202: 'Accepted',
@@ -26,7 +26,13 @@ export const STATUS_TITLES: Record<number, string> = {
     500: 'Internal Server Error',
     502: 'Bad Gateway',
     503: 'Service Unavailable',
-};
+} satisfies Record<number, string>;
+
+export type KnownStatus = keyof typeof STATUS_TITLES;
+
+const titles: Record<number, string> = STATUS_TITLES;
+
+export const statusTitle = (status: number): string | undefined => titles[status];
 
 /**
  * Human-readable text for an HTTP status code.
@@ -35,4 +41,4 @@ export const STATUS_TITLES: Record<number, string> = {
  * callers that require a non-empty string (e.g. OpenAPI response descriptions)
  * always get one.
  */
-export const getStatusText = (status: number): string => STATUS_TITLES[status] ?? `${status} Response`;
+export const getStatusText = (status: number): string => statusTitle(status) ?? `${status} Response`;

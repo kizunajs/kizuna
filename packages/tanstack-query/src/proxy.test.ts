@@ -212,6 +212,43 @@ describe('declared statuses', () => {
         );
     });
 
+    it('treats the 401 the auth map added as declared, on a route that never declared it', async () => {
+        const guardedK = new Kizuna({
+            identities: {
+                user: Kizuna.identity.bearer({
+                    context: z.object({
+                        userId: z.string(),
+                    }),
+                }),
+            },
+        });
+        const guardedContract = guardedK.contract({
+            routes: {
+                users: guardedK.routes({
+                    getUser: {
+                        method: 'GET',
+                        path: '/users/:id',
+                        responses: {
+                            200: UserSchema,
+                        },
+                    },
+                }),
+            },
+            auth: {
+                users: 'user',
+            },
+        });
+        const api = new KizunaTanstackQuery(guardedContract, {
+            users: {
+                getUser: vi.fn().mockResolvedValue({ status: 401, body: { detail: 'Unauthorized' }, headers: {} }),
+            },
+        } as never);
+
+        const result = await runQueryFn(api.users.getUser.queryOptions({ input: { params: { id: '1' } } }));
+
+        expect(result).toMatchObject({ status: 401 });
+    });
+
     it('treats the automatic 400 as declared when the route has a query schema', async () => {
         const api = buildApi(buildClient({ status: 400, body: { errors: [] }, headers: {} }));
 

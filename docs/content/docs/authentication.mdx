@@ -260,6 +260,22 @@ The return is checked against the identity's schemas. `deny(status, detail, head
 
 ## What the declaration drives
 
+### The 401 and 403 on every guarded route
+
+`k.contract` puts `401` and `403` on every route the auth map guards, as [Problem Details](/docs/reference/problem-details-schema), both `no-store`. A public route gets neither.
+
+```ts title="delete-workspace.ts"
+const result = await apiClient.workspace.deleteWorkspace();
+
+if (result.status === 401) {
+    console.log(result.body.detail);
+}
+```
+
+The `401` also declares `WWW-Authenticate`, required when every identity on the route has a challenge and optional when only some do. An API key has none, so a route behind one declares no header. The header reaches the OpenAPI document; the Swift and Kotlin clients turn an error status into an enum case, which carries no headers.
+
+Declaring a `401` on a guarded route is an error, since refusing an unauthenticated caller is the guard's. A `403` you may declare, for a refusal the guard cannot make because it runs before the handler loads the resource. That body then sits beside the guard's, and [`isProblemDetails`](/docs/reference/problem-details-schema#checking-for-a-problem-details-body) tells them apart.
+
 ### OpenAPI security
 
 [`generateOpenApi`](/docs/reference/generate-openapi) emits `securitySchemes` and per-route `security` from the auth map:

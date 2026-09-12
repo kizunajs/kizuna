@@ -1963,3 +1963,63 @@ describe('Swift generator: streamed responses', () => {
         warn.mockRestore();
     });
 });
+
+describe('Swift generator: the statuses the auth map adds', () => {
+    const guardedK = new Kizuna({
+        tags: Kizuna.tags({
+            api: 'API',
+        }),
+        identities: {
+            user: Kizuna.identity.bearer({
+                context: z.object({
+                    userId: z.string(),
+                }),
+            }),
+        },
+    });
+
+    const guardedContract = () => {
+        const routes = guardedK.routes('api', {
+            getSecret: {
+                method: 'GET',
+                path: '/secret',
+                responses: {
+                    200: z.object({
+                        value: z.string(),
+                    }),
+                },
+            },
+            health: {
+                method: 'GET',
+                path: '/health',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        });
+        return guardedK.contract({
+            routes,
+            auth: {
+                getSecret: 'user',
+                health: false,
+            },
+        });
+    };
+
+    it('gives a guarded route the unauthorized and forbidden cases it never declared', () => {
+        const output = generateSwiftClient(guardedContract(), baseConfig);
+
+        expect(output).toContain('case unauthorized(TestAPI.ProblemDetails)');
+        expect(output).toContain('case forbidden(TestAPI.ProblemDetails)');
+        expect(output).toContain('throw TestAPIClient.GetSecret.Failure.unauthorized');
+    });
+
+    it('leaves a public route without either', () => {
+        const output = generateSwiftClient(guardedContract(), baseConfig);
+
+        expect(output).not.toContain('TestAPIClient.Health.Failure.unauthorized');
+        expect(output).not.toContain('TestAPIClient.Health.Failure.forbidden');
+    });
+});
