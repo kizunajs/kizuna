@@ -3,6 +3,8 @@ import {
     ROUTES_TAG,
     HANDLER_CONTEXT_BRAND,
     type HandlerContextBrand,
+    type AutoResponsesBrand,
+    type GuardStatus,
     type ResponseHeaders,
     type RouteDefinition,
     type Routes,
@@ -291,9 +293,12 @@ export type HandlersFromAuth<R extends Routes, HandlerContext, Identities, Auth>
  */
 type RouteContextBrand<Context> = [keyof Context] extends [never] ? unknown : HandlerContextBrand<Context>;
 
+type RouteGuardBrand<Value> = [AuthValueIdentityNames<Value>] extends [never] ? unknown : AutoResponsesBrand<GuardStatus>;
+
 type GroupHandlerContextOverlay<G extends Routes, Identities, GroupAuth, ContractContext> = {
     [Key in keyof G]: G[Key] extends RouteDefinition
-        ? RouteContextBrand<AuthArg<RouteAuthValue<GroupAuth, Key & string>, Identities> & ContractContext>
+        ? RouteContextBrand<AuthArg<RouteAuthValue<GroupAuth, Key & string>, Identities> & ContractContext> &
+              RouteGuardBrand<RouteAuthValue<GroupAuth, Key & string>>
         : G[Key] extends Routes
           ? GroupHandlerContextOverlay<G[Key], Identities, SubgroupAuth<GroupAuth, Key & string>, ContractContext>
           : unknown;
@@ -310,7 +315,8 @@ export type RoutesWithHandlerContext<R extends Routes, Identities, Auth, Request
               AuthArg<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, Identities> &
                   RequestContextValues<RequestContext> &
                   ContractContext
-          >
+          > &
+              RouteGuardBrand<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>>
         : R[Group] extends Routes
           ? GroupHandlerContextOverlay<
                 R[Group],

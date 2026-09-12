@@ -1,4 +1,4 @@
-import { STATUS_TITLES } from './status-titles.js';
+import { statusTitle } from './status-titles.js';
 
 export interface ProblemDetails {
     type: string;
@@ -25,7 +25,7 @@ export const problemDetails = <T extends Record<string, unknown> = Record<string
     extensions?: T
 ): ProblemDetails & T => ({
     type: 'about:blank',
-    title: STATUS_TITLES[status] ?? 'Unknown Error',
+    title: statusTitle(status) ?? 'Unknown Error',
     status,
     detail,
     ...((extensions as T) ?? ({} as T)),

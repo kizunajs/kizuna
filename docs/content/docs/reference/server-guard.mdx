@@ -52,3 +52,7 @@ return deny(403, 'The token is missing a required scope', {
 | `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                                               |
 | `requestContext`  | The [request context](/docs/request-context) resolved for this request, keyed by name. Absent when the contract declares none.                                     |
 | framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                                             |
+
+## Where a denial is documented
+
+`k.contract` puts `401` and `403` on every route the auth map guards. See [the 401 and 403 on every guarded route](/docs/authentication#the-401-and-403-on-every-guarded-route).

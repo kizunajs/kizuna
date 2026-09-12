@@ -227,6 +227,10 @@ Routes marked `false` in the auth map get no `security` entry. A [`custom`](/doc
 
 Routes with a `body` or `query` schema automatically include a `400` validation error response, matching what kizuna returns when request data fails validation. A route that declares its own `400` keeps it; nothing is added.
 
+## Refusals
+
+A route the [auth map](/docs/authentication) guards includes `401` and `403` as [Problem Details](/docs/reference/problem-details-schema). The `401` documents the `WWW-Authenticate` header too, required when every identity on the route has a challenge and optional when only some do. A route behind an API key declares no header.
+
 ## Streams
 
 A response declared with [`stream`](/docs/streaming) is documented under `text/event-stream`, with a schema describing one message as `event`, `data`, `id`, and `retry`, one `oneOf` branch per named event. OpenAPI 3.1 has no field for a sequence of messages, so it sits under `schema`. OpenAPI 3.2 adds `itemSchema` with this shape, and the generator moves to it when it targets 3.2.

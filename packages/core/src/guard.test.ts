@@ -193,6 +193,7 @@ describe('guard pipeline', () => {
             status: 401,
             detail: 'Unauthorized',
             headers: {
+                'cache-control': 'no-store',
                 'www-authenticate': 'Bearer',
             },
         });
@@ -226,6 +227,7 @@ describe('guard pipeline', () => {
             status: 403,
             detail: 'Missing scope',
             headers: {
+                'cache-control': 'no-store',
                 'www-authenticate': 'Bearer error="insufficient_scope", scope="items:read"',
             },
         });

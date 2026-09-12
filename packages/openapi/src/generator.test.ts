@@ -1851,6 +1851,35 @@ describe('security from the contract', () => {
         expect(spec.paths['/users']?.get?.security).toBeUndefined();
     });
 
+    it('documents the 401 and 403 the guard answers with, which no route declared', () => {
+        const secret = spec.paths['/secret']?.get?.responses;
+
+        expect(secret?.['401']?.content?.['application/problem+json']).toBeDefined();
+        expect(secret?.['401']?.headers?.['www-authenticate']).toBeDefined();
+        expect(secret?.['403']?.content?.['application/problem+json']).toBeDefined();
+    });
+
+    it('documents no challenge header behind an api key, which is not HTTP authentication', () => {
+        const workspace = spec.paths['/workspace']?.delete?.responses;
+
+        expect(workspace?.['401']?.content?.['application/problem+json']).toBeDefined();
+        expect(workspace?.['401']?.headers?.['www-authenticate']).toBeUndefined();
+    });
+
+    it('keeps a refusal out of every cache', () => {
+        const secret = spec.paths['/secret']?.get?.responses;
+
+        expect(secret?.['401']?.headers?.['Cache-Control']).toBeDefined();
+        expect(secret?.['403']?.headers?.['Cache-Control']).toBeDefined();
+    });
+
+    it('leaves a public route without either', () => {
+        const users = spec.paths['/users']?.get?.responses;
+
+        expect(users?.['401']).toBeUndefined();
+        expect(users?.['403']).toBeUndefined();
+    });
+
     it('omits securitySchemes when the contract has no identities', () => {
         const plain = k.contract({
             routes: contractRoutes,

@@ -239,10 +239,6 @@ export const securedRoutes = securedK.routes({
             200: z.object({
                 userId: z.string(),
             }),
-            401: {
-                body: ProblemDetailsSchema,
-                cache: 'no-store',
-            },
         },
     },
     ownerOnly: {

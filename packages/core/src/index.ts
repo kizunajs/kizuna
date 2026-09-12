@@ -238,3 +238,4 @@ export {
     type BrandedHandlerContext,
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
+export { type AutoResponsesBrand, AUTO_RESPONSES_BRAND } from './types.js';

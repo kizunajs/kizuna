@@ -240,7 +240,6 @@ const securedRoutes = securedK.routes({
             200: z.object({
                 userId: z.string(),
             }),
-            401: ProblemDetailsSchema,
         },
     },
 });
@@ -314,7 +313,7 @@ describe('end-to-end: typed client → secured Express route', () => {
         }
     });
 
-    it('surfaces the typed 401 without a credential', async () => {
+    it('surfaces the 401 the auth map put on the route, which it never declared', async () => {
         const client = new KizunaClient(securedContract, {
             baseUrl,
         });

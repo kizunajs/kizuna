@@ -1702,6 +1702,8 @@ public final class OpenEnumAPIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(OpenEnumAPI.ProblemDetails)
+            case forbidden(OpenEnumAPI.ProblemDetails)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1747,6 +1749,8 @@ public final class OpenEnumAPIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(OpenEnumAPI.ProblemDetails)
+            case forbidden(OpenEnumAPI.ProblemDetails)
             case conflict(OpenEnumAPI.ProblemDetails)
             case badRequest(OpenEnumAPIClient.ValidationError)
 
@@ -1787,6 +1791,8 @@ public final class OpenEnumAPIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(OpenEnumAPI.ProblemDetails)
+            case forbidden(OpenEnumAPI.ProblemDetails)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1820,6 +1826,8 @@ public final class OpenEnumAPIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(OpenEnumAPI.ProblemDetails)
+            case forbidden(OpenEnumAPI.ProblemDetails)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1873,6 +1881,8 @@ public final class OpenEnumAPIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(OpenEnumAPI.ProblemDetails)
+            case forbidden(OpenEnumAPI.ProblemDetails)
             case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
@@ -1924,6 +1934,8 @@ public final class OpenEnumAPIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(OpenEnumAPI.ProblemDetails)
+            case forbidden(OpenEnumAPI.ProblemDetails)
             case notFound(OpenEnumAPI.ProblemDetails)
 
             public var isCancelled: Bool {
@@ -1990,6 +2002,8 @@ public final class OpenEnumAPIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(OpenEnumAPI.ProblemDetails)
+            case forbidden(OpenEnumAPI.ProblemDetails)
             case notFound(OpenEnumAPI.ProblemDetails)
             case badRequest(OpenEnumAPIClient.ValidationError)
 
@@ -3072,6 +3086,12 @@ public struct OpenEnumAPIMembersClient: Sendable {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.MembersListMembers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersListMembers.Failure.self)
             return OpenEnumAPIClient.MembersListMembers.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersListMembers.Failure.self)
+            throw OpenEnumAPIClient.MembersListMembers.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersListMembers.Failure.self)
+            throw OpenEnumAPIClient.MembersListMembers.Failure.forbidden(payload)
         default:
             throw OpenEnumAPIClient.MembersListMembers.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3091,6 +3111,12 @@ public struct OpenEnumAPIMembersClient: Sendable {
         case 201:
             let body = try Kizuna.decode(OpenEnumAPI.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
             return OpenEnumAPIClient.MembersInviteMember.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
+            throw OpenEnumAPIClient.MembersInviteMember.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
+            throw OpenEnumAPIClient.MembersInviteMember.Failure.forbidden(payload)
         case 409:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.MembersInviteMember.Failure.self)
             throw OpenEnumAPIClient.MembersInviteMember.Failure.conflict(payload)
@@ -3122,6 +3148,12 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceGetWorkspace.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.self)
             return OpenEnumAPIClient.WorkspaceGetWorkspace.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.forbidden(payload)
         default:
             throw OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3139,6 +3171,12 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceDeleteWorkspace.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.self)
             return OpenEnumAPIClient.WorkspaceDeleteWorkspace.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.forbidden(payload)
         default:
             throw OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.unexpectedStatus(statusCode, data)
         }
@@ -3158,6 +3196,12 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceTransfer.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
             return OpenEnumAPIClient.WorkspaceTransfer.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceTransfer.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
+            throw OpenEnumAPIClient.WorkspaceTransfer.Failure.forbidden(payload)
         case 400:
             let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
             throw OpenEnumAPIClient.WorkspaceTransfer.Failure.badRequest(payload)
@@ -3187,6 +3231,12 @@ public struct OpenEnumAPIInvitesClient: Sendable {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.InvitesGetInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesGetInvite.Failure.self)
             return OpenEnumAPIClient.InvitesGetInvite.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesGetInvite.Failure.self)
+            throw OpenEnumAPIClient.InvitesGetInvite.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesGetInvite.Failure.self)
+            throw OpenEnumAPIClient.InvitesGetInvite.Failure.forbidden(payload)
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesGetInvite.Failure.self)
             throw OpenEnumAPIClient.InvitesGetInvite.Failure.notFound(payload)
@@ -3210,6 +3260,12 @@ public struct OpenEnumAPIInvitesClient: Sendable {
         case 201:
             let body = try Kizuna.decode(OpenEnumAPIClient.InvitesAcceptInvite.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
             return OpenEnumAPIClient.InvitesAcceptInvite.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
+            throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
+            throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.forbidden(payload)
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.InvitesAcceptInvite.Failure.self)
             throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.notFound(payload)

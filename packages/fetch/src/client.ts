@@ -1,7 +1,9 @@
 import type { z } from 'zod';
 import {
+    AUTO_RESPONSES_BRAND,
     isStreamResponse,
     streamMode,
+    type ProblemDetails,
     type RouteDefinition,
     type Routes,
     type ValidationError,
@@ -83,12 +85,30 @@ type ValidationErrorResult<Codes extends string> = {
 type HasValidation<R extends RouteDefinition> = R extends { body: z.ZodType } ? true : R extends { query: z.ZodType } ? true : false;
 
 /**
+ * The statuses the contract's auth map put on a guarded route. A declared `403`
+ * sits alongside, as a declared `400` does beside the validation error.
+ */
+type AutoStatuses<R extends RouteDefinition> = Extract<
+    typeof AUTO_RESPONSES_BRAND extends keyof R ? NonNullable<R[typeof AUTO_RESPONSES_BRAND]> : never,
+    number
+>;
+
+type AutoErrorResult<R extends RouteDefinition> = {
+    [Status in AutoStatuses<R>]: {
+        status: Status;
+        body: ProblemDetails;
+        headers: Record<string, string>;
+    };
+}[AutoStatuses<R>];
+
+/**
  * Every response one route can produce, as a union discriminated on `status`.
- * Routes with a `body` or `query` schema also carry the automatic `400`
- * validation error.
+ * Routes with a `body` or `query` schema also carry the automatic `400`, and
+ * guarded routes the `401` and `403`.
  */
 export type ClientResponse<R extends RouteDefinition, Codes extends string = never> =
-    HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResult<Codes> : ResponseUnion<R>;
+    | (HasValidation<R> extends true ? ResponseUnion<R> | ValidationErrorResult<Codes> : ResponseUnion<R>)
+    | AutoErrorResult<R>;
 
 type ClientFn<R extends RouteDefinition, Codes extends string> =
     {} extends ClientArgs<R>

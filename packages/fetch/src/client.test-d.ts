@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type ValidationError } from '@ts-kizuna/core';
+import { Kizuna, type ProblemDetails, type ValidationError } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { KizunaClient } from './client.js';
 
@@ -855,4 +855,91 @@ test('a streamed status hands back an async iterable of typed messages', () => {
         const lines = await streamClient.lines();
         if (lines.status === 200) expectTypeOf(lines.body).toEqualTypeOf<AsyncIterable<string>>();
     })();
+});
+
+const MissingRelationSchema = ProblemDetailsSchema.extend({
+    missingRelation: z.string(),
+});
+
+const guardedK = new Kizuna({
+    identities: {
+        user: Kizuna.identity.bearer({
+            context: z.object({
+                userId: z.string(),
+            }),
+        }),
+    },
+});
+
+const guardedRoutes = guardedK.routes({
+    whoAmI: {
+        method: 'GET',
+        path: '/who-am-i',
+        responses: {
+            200: z.object({
+                userId: z.string(),
+            }),
+        },
+    },
+    declaresIts403: {
+        method: 'GET',
+        path: '/declares-its-403',
+        responses: {
+            200: z.object({
+                userId: z.string(),
+            }),
+            403: MissingRelationSchema,
+        },
+    },
+    health: {
+        method: 'GET',
+        path: '/health',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+const guardedContract = guardedK.contract({
+    routes: {
+        api: guardedRoutes,
+    },
+    auth: {
+        api: {
+            '*': 'user',
+            health: false,
+        },
+    },
+});
+
+const guardedClient = new KizunaClient(guardedContract, {
+    baseUrl: 'http://localhost',
+});
+
+test('a guarded route answers with the 401 and 403 its guard sends, undeclared', async () => {
+    const response = await guardedClient.api.whoAmI();
+
+    expectTypeOf(response.status).toEqualTypeOf<200 | 401 | 403>();
+
+    if (response.status === 401) {
+        expectTypeOf(response.body).toEqualTypeOf<ProblemDetails>();
+    }
+});
+
+test('a route declaring its own 403 carries both bodies for that status', async () => {
+    const response = await guardedClient.api.declaresIts403();
+
+    expectTypeOf(response.status).toEqualTypeOf<200 | 401 | 403>();
+
+    if (response.status === 403) {
+        expectTypeOf(response.body).toEqualTypeOf<z.infer<typeof MissingRelationSchema> | ProblemDetails>();
+    }
+});
+
+test('a public route gains neither', async () => {
+    const response = await guardedClient.api.health();
+
+    expectTypeOf(response.status).toEqualTypeOf<200>();
 });

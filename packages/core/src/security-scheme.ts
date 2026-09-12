@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import type { RouteDefinition } from './types.js';
 
 /**
  * An OAuth 2.0 flow object, as defined by OpenAPI 3.1.0.
@@ -130,4 +131,44 @@ export const declaredScopes = (scheme: SecurityScheme | undefined): string[] | u
         for (const name of Object.keys(flow.scopes)) names.add(name);
     }
     return [...names];
+};
+
+const HTTP_CHALLENGES: Partial<Record<Extract<OpenApiSecuritySchemeObject, { type: 'http' }>['scheme'], string>> = {
+    bearer: 'Bearer',
+    basic: 'Basic',
+};
+
+/**
+ * The authentication scheme a `401` from this identity challenges with. An
+ * `apiKey` or `custom` identity names none: neither is HTTP authentication.
+ */
+export const authenticationChallenge = (scheme: SecurityScheme | undefined): string | undefined => {
+    const openapi = scheme?.openapi;
+    if (openapi === undefined) return undefined;
+    if (openapi.type === 'http') return HTTP_CHALLENGES[openapi.scheme];
+    return openapi.type === 'oauth2' || openapi.type === 'openIdConnect' ? 'Bearer' : undefined;
+};
+
+/**
+ * Expand a route's resolved `security` into the concrete (scheme, scopes) pairs
+ * whose guards must run before the handler.
+ */
+export const resolveSecurityRequirements = (route: RouteDefinition): Array<{ scheme: string; scopes: string[] }> => {
+    const requirements: Array<{ scheme: string; scopes: string[] }> = [];
+    for (const entry of route.security ?? []) {
+        if (typeof entry === 'string') {
+            requirements.push({
+                scheme: entry,
+                scopes: [],
+            });
+            continue;
+        }
+        for (const [scheme, scopes] of Object.entries(entry)) {
+            requirements.push({
+                scheme,
+                scopes: [...(scopes ?? [])],
+            });
+        }
+    }
+    return requirements;
 };
