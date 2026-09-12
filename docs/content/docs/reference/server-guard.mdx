@@ -50,4 +50,5 @@ return deny(403, 'The token is missing a required scope', {
 | `params`          | The matched route's path params, for guards that check access to the resource in the URL.                                                                          |
 | `deny`            | `(status, detail, headers?) => GuardDenial`, rejects with a Problem Details response. A `401` also carries a `WWW-Authenticate` challenge built from the identity. |
 | `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                                               |
+| `requestContext`  | The [request context](/docs/request-context) resolved for this request, keyed by name. Absent when the contract declares none.                                     |
 | framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                                             |

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { assembleApi, type GuardDeny } from '@ts-kizuna/core/adapter';
+import { assembleApi, TOOLS_META, type GuardDeny } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
 import { buildInstructions, buildToolDefinitions, createMcpServer } from './mcp-server.js';
@@ -1222,5 +1222,152 @@ describe('streamed routes', () => {
         });
         const definitions = buildToolDefinitions(streamRoutes, publishAllRoutes);
         expect(definitions.map((definition) => definition.name)).toEqual(['ping']);
+    });
+});
+
+describe('MCP server: request context in guards', () => {
+    const user = Kizuna.identity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+
+    const contextK = new Kizuna({
+        identities: {
+            user,
+        },
+        requestContext: {
+            analytics: Kizuna.requestContext({
+                headers: z.object({
+                    'x-session-id': z.string().optional(),
+                }),
+                context: z.object({
+                    sessionId: z.string().nullable(),
+                }),
+            }),
+        },
+    });
+
+    const contextContract = contextK.contract({
+        routes: {
+            api: contextK.routes({
+                whoAmI: {
+                    method: 'GET',
+                    path: '/who-am-i',
+                    responses: {
+                        200: z.object({
+                            userId: z.string(),
+                        }),
+                    },
+                },
+            }),
+        },
+        tools: contextK.tools('user', {
+            reindex: {
+                description: 'Rebuild the search index',
+            },
+        }),
+        auth: {
+            api: 'user',
+        },
+    });
+
+    const connectWithContext = async () => {
+        const seen: unknown[] = [];
+        const api = Object.assign(
+            assembleApi(contextContract, {
+                router: {
+                    api: {
+                        whoAmI: () => ({
+                            status: 200,
+                            body: {
+                                userId: '1',
+                            },
+                        }),
+                    },
+                },
+                guards: {
+                    user: ({ requestContext }: { requestContext?: Record<string, unknown> }) => {
+                        seen.push(requestContext);
+                        return {
+                            userId: '1',
+                        };
+                    },
+                },
+                requestContext: {
+                    analytics: ({ headers }: { headers: Record<string, string | string[] | undefined> }) => ({
+                        sessionId: (headers['x-session-id'] as string | undefined) ?? null,
+                    }),
+                },
+            }),
+            {
+                [TOOLS_META]: {
+                    tools: contextContract.tools!,
+                    handlers: {
+                        reindex: () => undefined,
+                    } as Record<string, unknown>,
+                },
+            }
+        );
+
+        const server = createMcpServer(api as Parameters<typeof createMcpServer>[0], {
+            ...baseOptions,
+            credentialHeaders: {
+                authorization: 'Bearer tok',
+                'x-session-id': 'session-9',
+            },
+            options: {
+                publishRoutes: {
+                    '*': true,
+                },
+            },
+        });
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        const client = new Client({
+            name: 'test-client',
+            version: '1.0.0',
+        });
+        await server.connect(serverTransport);
+        await client.connect(clientTransport);
+        return {
+            client,
+            seen,
+            close: async () => {
+                await client.close();
+                await server.close();
+            },
+        };
+    };
+
+    it('reaches the guard of a route tool call', async () => {
+        const { client, seen, close } = await connectWithContext();
+
+        await client.callTool({
+            name: 'api_who_am_i',
+            arguments: {},
+        });
+
+        expect(seen[0]).toEqual({
+            analytics: {
+                sessionId: 'session-9',
+            },
+        });
+        await close();
+    });
+
+    it('reaches the guard of a declared tool call', async () => {
+        const { client, seen, close } = await connectWithContext();
+
+        await client.callTool({
+            name: 'reindex',
+            arguments: {},
+        });
+
+        expect(seen[0]).toEqual({
+            analytics: {
+                sessionId: 'session-9',
+            },
+        });
+        await close();
     });
 });

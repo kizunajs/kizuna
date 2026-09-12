@@ -112,9 +112,9 @@ export interface FastifyOptions {
 
 /**
  * A guard per identity, keyed by name. Each receives the handler context, a
- * `deny` helper, and the matched route's required scopes, and returns that
- * identity's {@link GuardSuccess} (its context and access fields) or a `deny(...)`
- * result. Keying by name lets each guard's return be typed against its own
+ * `deny` helper, the matched route's required scopes, and the contract's
+ * request context, and returns that identity's {@link GuardSuccess} (its
+ * context and access fields) or a `deny(...)` result. Keying by name lets each guard's return be typed against its own
  * identity, so access values narrow without an annotation. An
  * authentication-only identity (no context, no access) returns nothing on
  * success, or `deny(...)`.

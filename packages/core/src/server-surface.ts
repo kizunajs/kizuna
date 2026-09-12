@@ -69,14 +69,16 @@ export type ContractGroupRouter<Source, GroupOrRoutes, HandlerContext> = GroupOr
 
 /**
  * A guard per identity, keyed by name. Each receives the handler context, the
- * credential its method extracted, a `deny` helper, and the matched route's
- * required scopes, and returns that identity's {@link GuardSuccess} or a
- * `deny(...)` result. Keying by name lets each guard's return be typed against
- * its own identity, so access values narrow without an annotation.
+ * credential its method extracted, a `deny` helper, the matched route's
+ * required scopes, and the contract's request context, and returns that
+ * identity's {@link GuardSuccess} or a `deny(...)` result. Keying by name lets
+ * each guard's return be typed against its own identity, so access values
+ * narrow without an annotation.
  */
-export type GuardFnsFor<Schemes extends Record<string, SecurityScheme>, Params, HandlerContext> = {
+export type GuardFnsFor<Schemes extends Record<string, SecurityScheme>, Params, HandlerContext, RequestContext = {}> = {
     [Name in keyof Schemes]: (
         args: HandlerContext &
+            RequestContextValues<RequestContext> &
             CredentialOf<Schemes[Name]> & {
                 params: Params;
                 deny: GuardDeny;
@@ -96,7 +98,8 @@ export type GuardsFor<Schemes extends Record<string, SecurityScheme>, HandlerCon
 
 /**
  * The resolver functions for the request context schemas declared on `kizuna`,
- * keyed by name. Each runs on every route and returns its schema's value.
+ * keyed by name. Each runs on every route, before the guards, and returns its
+ * schema's value.
  */
 export type RequestResolverFnsFor<RequestContext extends Record<string, RequestContextSchema>, HandlerContext> = {
     [Name in keyof RequestContext]: (
@@ -120,16 +123,17 @@ export interface Server<C extends Contract, HandlerContext, Api> {
      * Define a guard for one of the contract's identities. It runs before the
      * handlers of every route whose `auth` entry requires the identity, and
      * receives the credential its method extracted (`bearer`, `apiKey`, or
-     * `basic`, `null` when absent). Return the identity's context and access
-     * fields to allow the request, or call `deny(status, detail)`.
+     * `basic`, `null` when absent), along with the request context resolved for
+     * the request. Return the identity's context and access fields to allow the
+     * request, or call `deny(status, detail)`.
      */
     guard<const Name extends Extract<keyof SchemesOf<C>, string>>(
         name: Name,
-        run: GuardFnsFor<SchemesOf<C>, GuardParams<RoutesOf<C>, AuthOf<C>, Name>, HandlerContext>[Name]
+        run: GuardFnsFor<SchemesOf<C>, GuardParams<RoutesOf<C>, AuthOf<C>, Name>, HandlerContext, RequestContextOf<C>>[Name]
     ): GuardRun<HandlerContext>;
     /**
      * Define a request context resolver declared on the contract. It runs on
-     * every route, public ones included, and never denies.
+     * every route, public ones included, before the guards, and never denies.
      */
     requestContext<const Name extends Extract<keyof RequestContextOf<C>, string>>(
         name: Name,

@@ -58,6 +58,9 @@ export const ADAPTER_TYPE_FEATURES = {
     'requestContext.handlerArg': {
         summary: 'Handlers receive typed `requestContext` on every route.',
     },
+    'requestContext.guardArg': {
+        summary: 'Guards receive the same typed `requestContext` handlers do.',
+    },
     'requestContext.resolverReturn': {
         summary: 'A resolver’s return is checked against its schema.',
     },

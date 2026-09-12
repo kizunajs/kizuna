@@ -22,6 +22,7 @@ export type { ToolMap, ToolEntry, ToolSelection } from './tool-selection.js';
 type HandlerArgs = {
     body: unknown;
     headers: Record<string, string | string[] | undefined>;
+    requestContext?: Record<string, unknown>;
     [key: string]: unknown;
 };
 
@@ -145,6 +146,7 @@ export const mcpPluginServer = () =>
                             params: target.params,
                             headers: args.headers,
                             handlerContext: adapterContextOf(args),
+                            requestContext: args.requestContext,
                         });
                         if (!outcome.ok) return denialResponse(outcome.denial);
                         transportAuth = {

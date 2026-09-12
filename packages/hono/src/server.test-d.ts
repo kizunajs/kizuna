@@ -349,6 +349,15 @@ test('conforms to the shared adapter type catalogue', () => {
                 requestContext: { analytics: { sessionId: string | null } };
             }>();
         },
+        'requestContext.guardArg': () => {
+            requestContextServer.guard('user', ({ requestContext, bearer, deny }) => {
+                expectTypeOf(requestContext.analytics).toEqualTypeOf<{ sessionId: string | null }>();
+                if (!bearer) return deny(401, 'Unauthorized');
+                return {
+                    userId: requestContext.analytics.sessionId ?? bearer.token,
+                };
+            });
+        },
         'requestContext.resolverReturn': () => {
             requestContextServer.requestContext(
                 'analytics',
