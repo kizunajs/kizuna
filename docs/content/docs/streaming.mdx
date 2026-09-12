@@ -3,11 +3,11 @@ title: Streaming
 description: Declare a route that answers with a stream of typed events, write the handler as an async generator, and read it back with for await in the fetch client.
 ---
 
-<BetaNotice>
+<AlphaNotice>
 
-Streaming is new and still settling. The `stream` response form, the handler shape, and what the fetch client hands back may change before v2, so pin your version if you depend on them.
+Streaming is new. How a route declares a stream, how a handler writes one, and how a client reads one will likely change before v2, so pin your version if you depend on it.
 
-</BetaNotice>
+</AlphaNotice>
 
 An assistant's reply arrives one token at a time, and a caller who has to wait for the last token before seeing the first stops reading. A long export, a progress report, and a feed of events that has no end share the shape. The route declares what each piece looks like, the handler yields the pieces, and the client reads them as they come.
 
