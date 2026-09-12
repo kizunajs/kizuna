@@ -89,6 +89,16 @@ const k = new Kizuna({
         user,
         member,
     },
+    requestContext: {
+        analytics: Kizuna.requestContext({
+            headers: z.object({
+                'x-session-id': z.string().optional(),
+            }),
+            context: z.object({
+                sessionId: z.string().nullable(),
+            }),
+        }),
+    },
 });
 
 const apiRoutes = k.routes('api', {
@@ -190,10 +200,13 @@ const TOKENS: Record<string, { userId: string; role: string; granted: string[] }
     },
 };
 
-const makeApi = (onGuardRun?: () => void) => {
+const makeApi = (onGuardRun?: (requestContext: { analytics: { sessionId: string | null } }) => void) => {
     const server = new KizunaServer(contract);
-    const requireUser = server.guard('user', ({ oauth2, scopes, deny }) => {
-        onGuardRun?.();
+    const captureAnalytics = server.requestContext('analytics', ({ headers }) => ({
+        sessionId: headers['x-session-id'] ?? null,
+    }));
+    const requireUser = server.guard('user', ({ oauth2, scopes, deny, requestContext }) => {
+        onGuardRun?.(requestContext);
         const session = oauth2 ? TOKENS[oauth2.token] : undefined;
         if (!session) return deny(401, 'Invalid or expired token');
         if (!scopes.every((scope) => session.granted.includes(scope))) return deny(403, 'The token is missing a required scope');
@@ -209,6 +222,9 @@ const makeApi = (onGuardRun?: () => void) => {
         guards: {
             user: requireUser,
             member: requireMember,
+        },
+        requestContext: {
+            analytics: captureAnalytics,
         },
         router: {
             api: {
@@ -259,7 +275,7 @@ describe('mcpPlugin: oauth', () => {
         client = undefined;
     });
 
-    const start = async (onGuardRun?: () => void): Promise<number> => {
+    const start = async (onGuardRun?: (requestContext: { analytics: { sessionId: string | null } }) => void): Promise<number> => {
         const app = express();
         app.use(express.json());
         makeApi(onGuardRun).mount(app);
@@ -271,7 +287,7 @@ describe('mcpPlugin: oauth', () => {
         });
     };
 
-    const connect = async (port: number, token: string) => {
+    const connect = async (port: number, token: string, headers: Record<string, string> = {}) => {
         const connected = new Client({
             name: 'test-client',
             version: '1.0.0',
@@ -281,6 +297,7 @@ describe('mcpPlugin: oauth', () => {
                 requestInit: {
                     headers: {
                         authorization: `Bearer ${token}`,
+                        ...headers,
                     },
                 },
             })
@@ -369,6 +386,32 @@ describe('mcpPlugin: oauth', () => {
         expect(parsed.body).toEqual({
             id: '42',
             viewer: 'u-reader',
+        });
+    });
+
+    it('hands the endpoint request context to the guard that authorizes the transport', async () => {
+        const seen: Array<{ analytics: { sessionId: string | null } }> = [];
+        const port = await start((requestContext) => {
+            seen.push(requestContext);
+        });
+        const connected = await connect(port, 'reader', {
+            'x-session-id': 'session-9',
+        });
+
+        seen.length = 0;
+        await connected.callTool({
+            name: 'api_get_user',
+            arguments: {
+                params: {
+                    id: '42',
+                },
+            },
+        });
+
+        expect(seen[0]).toEqual({
+            analytics: {
+                sessionId: 'session-9',
+            },
         });
     });
 
@@ -485,11 +528,17 @@ describe('mcpPlugin: oauth declaration', () => {
             role: 'employee',
         }));
         const requireMember = server.guard('member', () => undefined);
+        const captureAnalytics = server.requestContext('analytics', () => ({
+            sessionId: null,
+        }));
         expect(() =>
             server.api({
                 guards: {
                     user: requireUser,
                     member: requireMember,
+                },
+                requestContext: {
+                    analytics: captureAnalytics,
                 },
                 router: {
                     api: {

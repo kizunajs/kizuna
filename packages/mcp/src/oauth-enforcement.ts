@@ -27,6 +27,11 @@ export interface EnforceOAuthArgs {
     params: Record<string, string>;
     headers: Record<string, string | string[] | undefined>;
     handlerContext: Record<string, unknown>;
+    /**
+     * The request context the endpoint's own pipeline already resolved, so the
+     * transport guard reads the same values a route guard does.
+     */
+    requestContext: Record<string, unknown> | undefined;
 }
 
 const joined = (scopes: readonly string[]): string | undefined => (scopes.length > 0 ? scopes.join(' ') : undefined);
@@ -51,6 +56,11 @@ export const enforceOAuth = async (
         params: args.params,
         deny: guardDenyFor(args.schemeDefinition),
         scopes: [...args.scopes],
+        ...(args.requestContext && Object.keys(args.requestContext).length > 0
+            ? {
+                  requestContext: args.requestContext,
+              }
+            : {}),
     } as Parameters<GuardRun>[0]);
 
     if (isGuardDenial(guardResult)) {

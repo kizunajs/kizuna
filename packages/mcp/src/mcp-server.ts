@@ -288,6 +288,29 @@ const toolError = (status: number, detail: string): ToolCallResult => ({
 });
 
 /**
+ * Resolve every request context declared on the contract, the way the HTTP
+ * pipeline does, reading the headers of the transport request. Guards and
+ * handlers both read the result.
+ */
+const resolveRequestContext = async (
+    contextResolvers: RequestContextMap | undefined,
+    params: Record<string, string>,
+    credentialHeaders: Record<string, string | string[] | undefined> | undefined,
+    handlerContext: Record<string, unknown> | undefined
+): Promise<Record<string, unknown>> => {
+    const resolved: Record<string, unknown> = {};
+    if (!contextResolvers) return resolved;
+    for (const [name, resolver] of Object.entries(contextResolvers)) {
+        resolved[name] = await resolver({
+            ...(handlerContext ?? {}),
+            params,
+            headers: credentialHeaders ?? {},
+        } as Parameters<typeof resolver>[0]);
+    }
+    return resolved;
+};
+
+/**
  * Run the guards a secured route requires, extracting each identity's
  * credential from the MCP transport request headers, the same pipeline the
  * HTTP adapters run. Returns the scheme-keyed security context for the handler
@@ -302,6 +325,7 @@ const runGuards = async (
     schemes: Record<string, SecurityScheme> | undefined,
     handlerContext: Record<string, unknown> | undefined,
     credentialHeaders: Record<string, string | string[] | undefined> | undefined,
+    requestContext: Record<string, unknown>,
     transportAuth: McpServerOptions['transportAuth']
 ): Promise<{ ok: true; securityContext: Record<string, unknown> } | { ok: false; result: ToolCallResult }> => {
     const securityContext: Record<string, unknown> = {};
@@ -330,6 +354,7 @@ const runGuards = async (
             params,
             deny: guardDenyFor(schemeDefinition),
             scopes,
+            ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
         } as Parameters<typeof guard>[0]);
         if (isGuardDenial(guardResult)) {
             return {
@@ -422,16 +447,7 @@ const executeToolCall = async (
         };
     }
 
-    const requestContext: Record<string, unknown> = {};
-    if (contextResolvers) {
-        for (const [name, resolver] of Object.entries(contextResolvers)) {
-            requestContext[name] = await resolver({
-                ...(handlerContext ?? {}),
-                params,
-                headers: credentialHeaders ?? {},
-            } as Parameters<typeof resolver>[0]);
-        }
-    }
+    const requestContext = await resolveRequestContext(contextResolvers, params, credentialHeaders, handlerContext);
 
     const guardOutcome = await runGuards(
         resolveSecurityRequirements(route),
@@ -442,6 +458,7 @@ const executeToolCall = async (
         schemes,
         handlerContext,
         credentialHeaders,
+        requestContext,
         transportAuth
     );
     if (!guardOutcome.ok) {
@@ -503,6 +520,7 @@ const executeDeclaredToolCall = async (
     guards?: GuardMap,
     schemes?: Record<string, SecurityScheme>,
     credentialHeaders?: Record<string, string | string[] | undefined>,
+    contextResolvers?: RequestContextMap,
     transportAuth?: McpServerOptions['transportAuth']
 ): Promise<ToolCallResult> => {
     if (!runner) {
@@ -511,6 +529,7 @@ const executeDeclaredToolCall = async (
 
     const { identity } = definition;
     if (identity !== undefined) {
+        // A tool declares no path, so its guard runs over empty params.
         const guardOutcome = await runGuards(
             [
                 {
@@ -525,6 +544,7 @@ const executeDeclaredToolCall = async (
             schemes,
             handlerContext,
             credentialHeaders,
+            await resolveRequestContext(contextResolvers, {}, credentialHeaders, handlerContext),
             transportAuth
         );
         if (!guardOutcome.ok) return guardOutcome.result;
@@ -671,6 +691,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     guards,
                     schemes,
                     options?.credentialHeaders,
+                    contextResolvers,
                     options?.transportAuth
                 )
         );

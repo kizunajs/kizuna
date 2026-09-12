@@ -206,7 +206,7 @@ The values are typed from the header schemas, so a required header is required h
 
 ## Where it runs
 
-Resolvers run on every route, public ones included, before the guards. A guard does not receive their values, and neither do the [job](/docs/jobs) handlers, which take only their `input`. [MCP](/docs/mcp) tool calls run them the same way the HTTP pipeline does, reading the headers of the transport request.
+Resolvers run on every route, public ones included, before the guards, so a [guard](/docs/reference/server-guard) reads the resolved values under `requestContext` the way a handler does. The [job](/docs/jobs) handlers take only their `input`, so they see none of it. [MCP](/docs/mcp) tool calls run the resolvers the same way the HTTP pipeline does, reading the headers of the transport request.
 
 ## Request context or a guard
 
@@ -215,6 +215,7 @@ Both run before the handler and both put a typed value in its args. They answer 
 |             | Request context         | Guard                            |
 | ----------- | ----------------------- | -------------------------------- |
 | Runs on     | Every route             | The routes the auth map secures  |
+| Runs        | Before the guards       | After every resolver has run     |
 | Can reject  | No                      | Yes, with `deny(status, detail)` |
 | Handler arg | `requestContext.<name>` | `auth.<identity>`                |
 

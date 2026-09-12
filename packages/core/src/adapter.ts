@@ -242,9 +242,11 @@ export const isGuardDenial = (value: unknown): value is GuardDenial => typeof va
 /**
  * The runtime behavior of a guard. It receives one object: the adapter's handler
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
- * from the request (or `null` if absent), a `deny` helper, and the matched
- * route's required `scopes`. It returns the context the scheme provides (nested
- * under `auth`, keyed by the identity's name in the handler args) or `deny(...)` to reject.
+ * from the request (or `null` if absent), a `deny` helper, the matched route's
+ * required `scopes`, and the request context resolved for this request, absent
+ * when the contract declares none. It returns the context the scheme provides
+ * (nested under `auth`, keyed by the identity's name in the handler args) or
+ * `deny(...)` to reject.
  */
 export type GuardRun<HandlerContext = unknown> = (
     args: HandlerContext &
@@ -252,6 +254,7 @@ export type GuardRun<HandlerContext = unknown> = (
             params: Record<string, string>;
             deny: GuardDeny;
             scopes: string[];
+            requestContext?: Record<string, unknown>;
         }
 ) => Promise<Record<string, unknown> | GuardDenial | void> | Record<string, unknown> | GuardDenial | void;
 
@@ -264,8 +267,8 @@ export type GuardMap<HandlerContext = unknown> = Record<string, GuardRun<Handler
 /**
  * The runtime behavior of a request context resolver. It runs on every route
  * before the guards, receives the handler context plus the matched route's
- * `params`, and returns the value handlers read under the context's name. It
- * never denies a request.
+ * `params`, and returns the value the guards and handlers read under the
+ * context's name. It never denies a request.
  */
 export type RequestContextRun<HandlerContext = unknown> = (
     args: HandlerContext & {
@@ -717,7 +720,7 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
     pluginExports?: Record<string, unknown>;
     /**
      * Request context resolvers keyed by name. Each runs on every route before
-     * the guards; its value lands in the handler args under `requestContext`, keyed by its name.
+     * the guards; its value lands in the guard and handler args under `requestContext`, keyed by its name.
      */
     requestContext?: RequestContextMap<HandlerContext>;
     /**
@@ -1205,6 +1208,8 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             }
         }
 
+        const hasRequestContext = Object.keys(requestContext).length > 0;
+
         const securityContext: Record<string, unknown> = {};
         for (const { scheme, scopes } of resolveSecurityRequirements(route)) {
             const guard = guards?.[scheme];
@@ -1219,6 +1224,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 params,
                 deny: guardDenyFor(schemeDefinition),
                 scopes,
+                ...(hasRequestContext ? { requestContext } : {}),
             } as Parameters<typeof guard>[0]);
             if (isGuardDenial(guardResult)) {
                 return {
@@ -1255,7 +1261,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             ...handlerContext,
             ...(jobRunner ? { jobs: jobRunner } : {}),
             ...(toolRunner ? { tools: toolRunner } : {}),
-            ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
+            ...(hasRequestContext ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
             ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),
         });

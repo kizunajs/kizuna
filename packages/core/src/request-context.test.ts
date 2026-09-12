@@ -114,6 +114,67 @@ describe('request context providers', () => {
         });
     });
 
+    it('reaches the guard of a secured route', async () => {
+        const { adapter, results } = makeAdapter();
+        let received: unknown;
+        await adapter.handle({
+            routes: contract.routes,
+            router: {
+                api: {
+                    publicRoute: okHandler,
+                    whoAmI: okHandler,
+                },
+            },
+            request: makeRequest('/users/7', {
+                authorization: 'Bearer tok',
+            }),
+            responseContext: {},
+            guards: {
+                user: ({ requestContext }) => {
+                    received = (requestContext as Record<string, unknown>).analytics;
+                    return {
+                        userId: '1',
+                    };
+                },
+            } as GuardMap<Record<string, never>>,
+            schemes: contract.securitySchemes,
+            requestContext: analytics,
+        });
+        expect(results[0]?.kind).toBe('success');
+        expect(received).toEqual({
+            sessionId: '7',
+        });
+    });
+
+    it('leaves guards no requestContext when the contract declares none', async () => {
+        const { adapter, results } = makeAdapter();
+        let received: unknown = 'unset';
+        await adapter.handle({
+            routes: contract.routes,
+            router: {
+                api: {
+                    publicRoute: okHandler,
+                    whoAmI: okHandler,
+                },
+            },
+            request: makeRequest('/users/7', {
+                authorization: 'Bearer tok',
+            }),
+            responseContext: {},
+            guards: {
+                user: (args) => {
+                    received = args.requestContext;
+                    return {
+                        userId: '1',
+                    };
+                },
+            } as GuardMap<Record<string, never>>,
+            schemes: contract.securitySchemes,
+        });
+        expect(results[0]?.kind).toBe('success');
+        expect(received).toBeUndefined();
+    });
+
     it('runs alongside guards on secured routes and receives params', async () => {
         const { adapter, results } = makeAdapter();
         let received: unknown;
