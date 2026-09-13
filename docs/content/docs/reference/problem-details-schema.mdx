@@ -182,21 +182,13 @@ The input is always the canonical problem; only the outgoing bytes change, so th
 
 ## What produces it
 
-| Source          | Example |
-| --------------- | ------- |
-| Guards (`deny`) | `deny({ |
-
-status: 403,
-body: { |
-
-    detail: 'Forbidden',
-
-},
-})`    |
-| Route not found        | 404 for unmatched paths      |
-| Method not allowed     | 405 with`Allow`header      |
-| Unsupported media type | 415 for wrong`Content-Type` |
-| Handler errors | 500 for unhandled exceptions |
+| Source                 | Example                                                |
+| ---------------------- | ------------------------------------------------------ |
+| Guards (`deny`)        | `deny({ status: 403, body: { detail: 'Forbidden' } })` |
+| Route not found        | 404 for unmatched paths                                |
+| Method not allowed     | 405 with `Allow` header                                |
+| Unsupported media type | 415 for wrong `Content-Type`                           |
+| Handler errors         | 500 for unhandled exceptions                           |
 
 All built-in error responses use `application/problem+json` as the content type.
 
