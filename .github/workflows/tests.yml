@@ -40,6 +40,11 @@ jobs:
               env:
                   NEXT_TELEMETRY_DISABLED: 1
 
+            - name: Build docs
+              run: pnpm build:docs
+              env:
+                  NEXT_TELEMETRY_DISABLED: 1
+
             - name: Check package exports
               run: pnpm test:exports
 
