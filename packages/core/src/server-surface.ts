@@ -1,5 +1,15 @@
 import type { z } from 'zod';
-import type { Contract, RoutesOf, SchemesOf, AuthOf, RequestContextOf, ContractPluginsOf, JobsOf, ToolsOf } from './contract.js';
+import type {
+    Contract,
+    RoutesOf,
+    SchemesOf,
+    AuthOf,
+    RequestContextOf,
+    ContractPluginsOf,
+    JobsOf,
+    ToolsOf,
+    GuardSchemaOf,
+} from './contract.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { CredentialOf } from './identity.js';
@@ -9,6 +19,7 @@ import type { ToolHandlers } from './tools.js';
 import type { ToolsArg } from './tool-runner.js';
 import type { PluginArgs } from './plugin.js';
 import type { PluginImplementations } from './plugin-server.js';
+import type { GuardBody } from './problem-details.js';
 import type { GuardSuccess, HandlersFromAuth, GuardParams, RequestContextValues, Router as CoreRouter } from './handler-pipeline.js';
 import {
     assembleApi,
@@ -75,13 +86,19 @@ export type ContractGroupRouter<Source, GroupOrRoutes, HandlerContext> = GroupOr
  * each guard's return be typed against its own identity, so access values
  * narrow without an annotation.
  */
-export type GuardFnsFor<Schemes extends Record<string, SecurityScheme>, Params, HandlerContext, RequestContext = {}> = {
+export type GuardFnsFor<
+    Schemes extends Record<string, SecurityScheme>,
+    Params,
+    HandlerContext,
+    RequestContext = {},
+    GuardSchema = never,
+> = {
     [Name in keyof Schemes]: (
         args: HandlerContext &
             RequestContextValues<RequestContext> &
             CredentialOf<Schemes[Name]> & {
                 params: Params;
-                deny: GuardDeny;
+                deny: GuardDeny<GuardBody<GuardSchema>>;
                 scopes: string[];
             }
     ) => [keyof GuardSuccess<Schemes[Name]>] extends [never]
@@ -125,11 +142,17 @@ export interface Server<C extends Contract, HandlerContext, Api> {
      * receives the credential its method extracted (`bearer`, `apiKey`, or
      * `basic`, `null` when absent), along with the request context resolved for
      * the request. Return the identity's context and access fields to allow the
-     * request, or call `deny(status, detail)`.
+     * request, or call `deny({ status, body })`.
      */
     guard<const Name extends Extract<keyof SchemesOf<C>, string>>(
         name: Name,
-        run: GuardFnsFor<SchemesOf<C>, GuardParams<RoutesOf<C>, AuthOf<C>, Name>, HandlerContext, RequestContextOf<C>>[Name]
+        run: GuardFnsFor<
+            SchemesOf<C>,
+            GuardParams<RoutesOf<C>, AuthOf<C>, Name>,
+            HandlerContext,
+            RequestContextOf<C>,
+            GuardSchemaOf<C>
+        >[Name]
     ): GuardRun<HandlerContext>;
     /**
      * Define a request context resolver declared on the contract. It runs on

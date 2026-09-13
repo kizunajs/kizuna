@@ -90,7 +90,12 @@ import { server } from './server';
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
     const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
-        return deny(401, 'Unauthorized');
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
     }
     return {
         userId: session.userId,
@@ -250,13 +255,18 @@ A guard receives the credential extracted and typed, along with the route's path
 export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
     const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
     if (!membership) {
-        return deny(403, 'Forbidden');
+        return deny({
+            status: 403,
+            body: {
+                detail: 'Forbidden',
+            },
+        });
     }
     return membership;
 });
 ```
 
-The return is checked against the identity's schemas. `deny(status, detail, headers?)` responds with RFC 9457 Problem Details. A `401` also carries the `WWW-Authenticate` challenge RFC 9110 requires, named after the identity that denied: `Bearer`, or `Basic` for a basic one. An API key is not HTTP authentication and has no challenge to send, so `403` is the honest refusal for one. Guards also get the adapter's native request objects, oauth2 `scopes`, and whatever [request context](/docs/request-context) the contract declares, resolved before the guard runs. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), declare a request context rather than an identity.
+The return is checked against the identity's schemas. `deny({ status, body, headers })` responds with RFC 9457 Problem Details, the same shape `throwError` takes in a handler. A `401` also carries the `WWW-Authenticate` challenge RFC 9110 requires, named after the identity that denied: `Bearer`, or `Basic` for a basic one. An API key is not HTTP authentication and has no challenge to send, so `403` is the honest refusal for one. Guards also get the adapter's native request objects, oauth2 `scopes`, and whatever [request context](/docs/request-context) the contract declares, resolved before the guard runs. See [`server.guard`](/docs/reference/server-guard). For request-scoped values that gate nothing (analytics ids, loggers), declare a request context rather than an identity.
 
 ## What the declaration drives
 
@@ -275,6 +285,39 @@ if (result.status === 401) {
 The `401` also declares `WWW-Authenticate`, required when every identity on the route has a challenge and optional when only some do. An API key has none, so a route behind one declares no header. The header reaches the OpenAPI document; the Swift and Kotlin clients turn an error status into an enum case, which carries no headers.
 
 Declaring a `401` on a guarded route is an error, since refusing an unauthenticated caller is the guard's. A `403` you may declare, for a refusal the guard cannot make because it runs before the handler loads the resource. That body then sits beside the guard's, and [`isProblemDetails`](/docs/reference/problem-details-schema#checking-for-a-problem-details-body) tells them apart.
+
+### What a refusal says
+
+A refusal carries `detail` alone until `guardSchema` widens it:
+
+```ts title="src/k.ts"
+export const GuardSchema = Kizuna.model({
+    title: 'GuardDenial',
+    schema: ProblemDetailsSchema.extend({
+        code: z.enum(['unauthenticated', 'expired_token', 'forbidden']).default('forbidden'),
+    }),
+});
+
+export const k = new Kizuna({
+    identities: {
+        user,
+        member,
+    },
+    guardSchema: GuardSchema,
+});
+```
+
+```ts title="src/guards.ts"
+return deny({
+    status: 401,
+    body: {
+        detail: 'Unauthorized',
+        code: 'expired_token',
+    },
+});
+```
+
+Every field you add must be optional or carry a `.default()`, since kizuna sends this body itself on an access gate refusal. `new Kizuna()` throws when it cannot.
 
 ### OpenAPI security
 
@@ -374,7 +417,12 @@ const jwks = createRemoteJWKSet(new URL('https://auth.example.com/oauth2/jwks'))
 
 export const requireUser = server.guard('user', async ({ oauth2, scopes, deny }) => {
     if (!oauth2) {
-        return deny(401, 'Unauthorized');
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
     }
 
     let claims;
@@ -384,17 +432,28 @@ export const requireUser = server.guard('user', async ({ oauth2, scopes, deny })
             audience: 'https://api.example.com',
         }));
     } catch {
-        return deny(401, 'Invalid or expired token');
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Invalid or expired token',
+            },
+        });
     }
 
     const granted = typeof claims.scope === 'string' ? claims.scope.split(' ') : [];
     if (!scopes.every((scope) => granted.includes(scope))) {
-        return deny(403, 'The token is missing a required scope', {
-            'www-authenticate': bearerChallenge({
-                error: 'insufficient_scope',
-                scope: scopes.join(' '),
-                resource_metadata: 'https://api.example.com/.well-known/oauth-protected-resource',
-            }),
+        return deny({
+            status: 403,
+            body: {
+                detail: 'The token is missing a required scope',
+            },
+            headers: {
+                'www-authenticate': bearerChallenge({
+                    error: 'insufficient_scope',
+                    scope: scopes.join(' '),
+                    resource_metadata: 'https://api.example.com/.well-known/oauth-protected-resource',
+                }),
+            },
         });
     }
 

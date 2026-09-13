@@ -181,7 +181,14 @@ export {
     assertValidSchedule,
     cron,
 } from './schedule.js';
-export { problemDetails, type ProblemDetails } from './problem-details.js';
+export {
+    problemDetails,
+    problemFromBody,
+    type ProblemDetails,
+    type StripProblemEnvelope,
+    type GuardBody,
+    type GuardOutput,
+} from './problem-details.js';
 export {
     buildProtectedResourceMetadata,
     assertCanonicalResourceUri,
@@ -238,4 +245,4 @@ export {
     type BrandedHandlerContext,
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
-export { type AutoResponsesBrand, AUTO_RESPONSES_BRAND } from './types.js';
+export { type AutoResponsesBrand, AUTO_RESPONSES_BRAND, AUTO_GUARD_BRAND, type GuardStatus } from './types.js';

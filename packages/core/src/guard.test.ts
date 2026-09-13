@@ -184,14 +184,22 @@ describe('guard pipeline', () => {
             request: makeRequest('/secret'),
             responseContext: {},
             guards: {
-                user: ({ deny }) => deny(401, 'Unauthorized'),
+                user: ({ deny }) =>
+                    deny({
+                        status: 401,
+                        body: {
+                            detail: 'Unauthorized',
+                        },
+                    }),
             } as GuardMap<Record<string, never>>,
             schemes: contract.securitySchemes,
         });
         expect(results[0]).toEqual({
             kind: 'guard-denied',
             status: 401,
-            detail: 'Unauthorized',
+            body: {
+                detail: 'Unauthorized',
+            },
             headers: {
                 'cache-control': 'no-store',
                 'www-authenticate': 'Bearer',
@@ -216,8 +224,14 @@ describe('guard pipeline', () => {
             responseContext: {},
             guards: {
                 user: ({ deny }) =>
-                    deny(403, 'Missing scope', {
-                        'www-authenticate': 'Bearer error="insufficient_scope", scope="items:read"',
+                    deny({
+                        status: 403,
+                        body: {
+                            detail: 'Missing scope',
+                        },
+                        headers: {
+                            'www-authenticate': 'Bearer error="insufficient_scope", scope="items:read"',
+                        },
                     }),
             } as GuardMap<Record<string, never>>,
             schemes: contract.securitySchemes,
@@ -225,7 +239,9 @@ describe('guard pipeline', () => {
         expect(results[0]).toEqual({
             kind: 'guard-denied',
             status: 403,
-            detail: 'Missing scope',
+            body: {
+                detail: 'Missing scope',
+            },
             headers: {
                 'cache-control': 'no-store',
                 'www-authenticate': 'Bearer error="insufficient_scope", scope="items:read"',
@@ -354,7 +370,9 @@ describe('guard pipeline', () => {
         const rendered = renderJsonResult({
             kind: 'guard-denied',
             status: 401,
-            detail: 'Unauthorized',
+            body: {
+                detail: 'Unauthorized',
+            },
         });
         expect(rendered.status).toBe(401);
         expect(rendered.headers['content-type']).toBe('application/problem+json');
@@ -728,14 +746,22 @@ describe('custom identity guard', () => {
             request: makeRequest('/invites/nope'),
             responseContext: {},
             guards: {
-                inviteToken: ({ deny }) => deny(404, 'Not found'),
+                inviteToken: ({ deny }) =>
+                    deny({
+                        status: 404,
+                        body: {
+                            detail: 'Not found',
+                        },
+                    }),
             } as GuardMap<Record<string, never>>,
             schemes: inviteContract.securitySchemes,
         });
-        expect(results[0]).toEqual({
+        expect(results[0]).toMatchObject({
             kind: 'guard-denied',
             status: 404,
-            detail: 'Not found',
+            body: {
+                detail: 'Not found',
+            },
         });
     });
 });

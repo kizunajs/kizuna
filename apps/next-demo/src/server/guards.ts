@@ -4,7 +4,12 @@ import { server } from './server';
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
     const session = bearer ? await db.sessions.findByToken(bearer.token) : null;
     if (!session) {
-        return deny(401, 'Unauthorized');
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
     }
     return {
         userId: session.userId,
@@ -14,7 +19,12 @@ export const requireUser = server.guard('user', async ({ bearer, deny }) => {
 export const requireMember = server.guard('member', async ({ apiKey, deny }) => {
     const membership = apiKey ? await db.memberships.findByApiKey(apiKey.value) : null;
     if (!membership) {
-        return deny(403, 'Forbidden');
+        return deny({
+            status: 403,
+            body: {
+                detail: 'Forbidden',
+            },
+        });
     }
     return membership;
 });
@@ -22,7 +32,12 @@ export const requireMember = server.guard('member', async ({ apiKey, deny }) => 
 export const requireInviteToken = server.guard('inviteToken', async ({ params, deny }) => {
     const invite = params.token ? await db.invites.findByToken(params.token) : null;
     if (!invite) {
-        return deny(404, 'Not found');
+        return deny({
+            status: 404,
+            body: {
+                detail: 'Not found',
+            },
+        });
     }
     return {
         inviteId: invite.id,
@@ -36,7 +51,12 @@ export const requireInviteToken = server.guard('inviteToken', async ({ params, d
 export const requireScheduler = server.guard('scheduler', ({ bearer, deny }) => {
     const secret = process.env.CRON_SECRET ?? 'dev-cron-secret';
     if (bearer?.token !== secret) {
-        return deny(401, 'Unauthorized');
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
     }
     return {
         invokedAt: new Date().toISOString(),

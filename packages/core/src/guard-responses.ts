@@ -34,10 +34,10 @@ const challengeHeaders = (schemes: string[], identities: Record<string, Security
 /**
  * RFC 9111: a refusal to an authorized request is never stored.
  */
-const guardResponse = (headers?: z.ZodType): ResponseDefinition =>
+const guardResponse = (body: z.ZodType, headers?: z.ZodType): ResponseDefinition =>
     Object.defineProperty(
         {
-            body: ProblemDetailsSchema,
+            body,
             cache: 'no-store',
             ...(headers ? { headers } : {}),
         },
@@ -47,13 +47,13 @@ const guardResponse = (headers?: z.ZodType): ResponseDefinition =>
         }
     ) as ResponseDefinition;
 
-const widened = (declared: ResponseDefinition): ResponseDefinition => {
+const widened = (declared: ResponseDefinition, guardBody: z.ZodType): ResponseDefinition => {
     const body = resolveResponseBody(declared);
     if (body === undefined) return declared;
     return Object.defineProperty(
         {
             ...(isZodSchema(declared) ? {} : declared),
-            body: z.union([body, ProblemDetailsSchema]),
+            body: z.union([body, guardBody]),
         },
         WIDENED,
         {
@@ -70,7 +70,8 @@ const widened = (declared: ResponseDefinition): ResponseDefinition => {
  * Runs unconditionally, and writes a fresh `responses`, so a routes tree reused
  * across contracts neither keeps a stale injection nor leaks one sideways.
  */
-export const injectGuardResponses = (routes: Routes, identities?: Record<string, SecurityScheme>): void => {
+export const injectGuardResponses = (routes: Routes, identities?: Record<string, SecurityScheme>, guardSchema?: z.ZodType): void => {
+    const guardBody = guardSchema ?? ProblemDetailsSchema;
     for (const { route, routeKey } of flattenRoutes(routes)) {
         const declared = Object.entries(route.responses)
             .filter(([, response]) => !carries(response, INJECTED))
@@ -89,10 +90,10 @@ export const injectGuardResponses = (routes: Routes, identities?: Record<string,
         }
 
         const responses: Record<number, ResponseDefinition> = Object.fromEntries(
-            declared.map(([status, response]) => [status, status === 403 ? widened(response) : response])
+            declared.map(([status, response]) => [status, status === 403 ? widened(response, guardBody) : response])
         );
-        responses[401] = guardResponse(challengeHeaders(schemes, identities));
-        responses[403] ??= guardResponse();
+        responses[401] = guardResponse(guardBody, challengeHeaders(schemes, identities));
+        responses[403] ??= guardResponse(guardBody);
         route.responses = responses;
     }
 };

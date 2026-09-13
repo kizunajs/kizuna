@@ -71,7 +71,14 @@ const contract = k.contract({
 const server = new KizunaServer(contract);
 
 const requireScheduler = server.guard('scheduler', ({ bearer, deny }) =>
-    bearer?.token === 'cron-secret' ? { invokedBy: 'platform' } : deny(401, 'Unauthorized')
+    bearer?.token === 'cron-secret'
+        ? { invokedBy: 'platform' }
+        : deny({
+              status: 401,
+              body: {
+                  detail: 'Unauthorized',
+              },
+          })
 );
 
 const sendDigestsRan = vi.fn();
@@ -357,7 +364,14 @@ describe('onJobError', () => {
             }),
             guards: {
                 scheduler: reporting.guard('scheduler', ({ bearer, deny }) =>
-                    bearer?.token === 'cron-secret' ? { invokedBy: 'platform' } : deny(401, 'Unauthorized')
+                    bearer?.token === 'cron-secret'
+                        ? { invokedBy: 'platform' }
+                        : deny({
+                              status: 401,
+                              body: {
+                                  detail: 'Unauthorized',
+                              },
+                          })
                 ),
             },
             jobs: {

@@ -20,7 +20,7 @@ import { deprecationHeaders } from './deprecation.js';
 import { cacheHeaders } from './cache.js';
 import { computeEtag, etagMatches } from './etag.js';
 import { ResponseError } from './response-error.js';
-import { problemDetails, type ProblemDetails } from './problem-details.js';
+import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
 import { statusTitle } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
@@ -124,6 +124,8 @@ export const API_META: unique symbol = Symbol('ts-kizuna.api.meta');
 export const ROUTER_META: unique symbol = Symbol('ts-kizuna.router');
 export const GUARDS_META: unique symbol = Symbol('ts-kizuna.guards');
 export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
+
+export const GUARD_SCHEMA_META: unique symbol = Symbol('ts-kizuna.guardSchema');
 export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
 const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
 export const JOBS_META: unique symbol = Symbol('ts-kizuna.jobs');
@@ -145,19 +147,19 @@ export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
 };
 
 /**
- * The marker a guard's `deny(status, detail)` returns. Distinguishes a denial
+ * The marker a guard's `deny` returns. Distinguishes a denial
  * from the context object a passing guard returns.
  */
 const GUARD_DENY: unique symbol = Symbol('ts-kizuna.guard.deny');
 
 /**
- * The result of `deny(status, detail)` inside a guard, short-circuits the
+ * The result of `deny` inside a guard, short-circuits the
  * request with an RFC 9457 problem details response of the given status.
  */
 export interface GuardDenial {
     readonly [GUARD_DENY]: true;
     status: number;
-    detail: string;
+    body: GuardDenialBody;
     /**
      * The `WWW-Authenticate` challenge RFC 9110 section 11.6.1 requires on a `401`.
      */
@@ -168,7 +170,13 @@ export interface GuardDenial {
  * Reject the request from inside a guard. Extra `headers` ride on the
  * response; a `www-authenticate` among them replaces the default challenge.
  */
-export type GuardDeny = (status: number, detail: string, headers?: ResponseHeaders) => GuardDenial;
+export type GuardDenialBody = { detail: string } & Record<string, unknown>;
+
+export type GuardDeny<Body = { detail: string }, Status extends number = number> = (denial: {
+    status: Status;
+    body: Body;
+    headers?: ResponseHeaders;
+}) => GuardDenial;
 
 /**
  * Make a value safe inside an RFC 9110 quoted string: only printable ASCII
@@ -196,9 +204,9 @@ export const bearerChallenge = (parameters: Record<string, string | undefined>):
  * The `deny` a guard for this identity receives. The challenge rides along with
  * the denial, so a `401` cannot reach the wire without one.
  */
-export const guardDenyFor = (scheme: SecurityScheme | undefined): GuardDeny => {
+export const guardDenyFor = (scheme: SecurityScheme | undefined): GuardDeny<GuardDenialBody> => {
     const challenge = authenticationChallenge(scheme);
-    return (status, detail, headers) => {
+    return ({ status, body, headers }) => {
         const merged = {
             ...(status === 401 && challenge !== undefined
                 ? {
@@ -210,7 +218,7 @@ export const guardDenyFor = (scheme: SecurityScheme | undefined): GuardDeny => {
         return {
             [GUARD_DENY]: true,
             status,
-            detail,
+            body,
             ...(Object.keys(merged).length > 0
                 ? {
                       headers: merged,
@@ -302,6 +310,7 @@ export const assembleApi = <const R extends Routes>(
     contract: {
         routes: R;
         securitySchemes?: Record<string, SecurityScheme>;
+        guardSchema?: z.ZodType;
         plugins?: ContractPlugins;
     },
     parts: ApiParts
@@ -317,6 +326,7 @@ export const assembleApi = <const R extends Routes>(
         [ROUTER_META]: parts.router,
         [GUARDS_META]: parts.guards,
         [SCHEMES_META]: contract.securitySchemes,
+        [GUARD_SCHEMA_META]: contract.guardSchema,
         [REQUEST_CONTEXT_META]: parts.requestContext,
         [PLUGIN_ROUTES_META_KEY]: pluginRoutes,
         [CONTRACT_META]: contract,
@@ -559,7 +569,14 @@ export type {
 } from './handler-pipeline.js';
 export { buildPath, parsePath, type PathSegment } from './path-params.js';
 export { sortFlattenedRoutes } from './route-matcher.js';
-export { ROUTES_TAG, HANDLER_CONTEXT_BRAND, type HandlerContextBrand, AUTO_RESPONSES_BRAND, type AutoResponsesBrand } from './types.js';
+export {
+    ROUTES_TAG,
+    HANDLER_CONTEXT_BRAND,
+    type HandlerContextBrand,
+    AUTO_RESPONSES_BRAND,
+    AUTO_GUARD_BRAND,
+    type AutoResponsesBrand,
+} from './types.js';
 export { authenticationChallenge, resolveSecurityRequirements } from './security-scheme.js';
 export { tagRoutes } from './routes.js';
 export { isTagSet, type NormalizeTags } from './tags.js';
@@ -641,7 +658,7 @@ export type AdapterResult =
     | {
           kind: 'guard-denied';
           status: number;
-          detail: string;
+          body: GuardDenialBody;
           /**
            * The `WWW-Authenticate` challenge RFC 9110 requires on a `401`.
            */
@@ -742,6 +759,30 @@ const parseCookies = (cookieHeader: string | undefined): Record<string, string> 
         if (name) cookies[name] = decodeURIComponent(part.slice(separator + 1).trim());
     }
     return cookies;
+};
+
+/**
+ * An error body is checked as the wire shape, envelope and all, because the
+ * author only ever supplies `detail` and extensions.
+ */
+const assertDeclaredBody = (route: RouteDefinition, routeKey: string, status: number, body: unknown): void => {
+    const responseSpec = route.responses[status];
+    if (responseSpec === undefined || isStreamResponse(responseSpec)) return;
+    const bodySchema = 'safeParse' in responseSpec ? responseSpec : responseSpec.body;
+    const wire = status >= 400 && body !== null && typeof body === 'object' ? problemFromBody(status, body) : body;
+    const parsed = bodySchema.safeParse(wire);
+    if (!parsed.success) throw new ResponseValidationError(routeKey, status, parsed.error.issues);
+};
+
+/**
+ * No author code runs on a gate refusal, so the declared schema fills its own
+ * defaults.
+ */
+const gateDenialBody = (route: RouteDefinition, detail: string): GuardDenialBody => {
+    const declared = route.responses[403];
+    const schema = declared === undefined || isStreamResponse(declared) ? undefined : 'safeParse' in declared ? declared : declared.body;
+    const filled = schema?.safeParse(problemDetails(403, detail));
+    return filled?.success ? (filled.data as GuardDenialBody) : { detail };
 };
 
 /**
@@ -1187,10 +1228,11 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 ...(hasRequestContext ? { requestContext } : {}),
             } as Parameters<typeof guard>[0]);
             if (isGuardDenial(guardResult)) {
+                if (responseValidation) assertDeclaredBody(route, routeKey, guardResult.status, guardResult.body);
                 return {
                     kind: 'guard-denied',
                     status: guardResult.status,
-                    detail: guardResult.detail,
+                    body: guardResult.body,
                     headers: guardResult.headers,
                 };
             }
@@ -1199,7 +1241,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 return {
                     kind: 'guard-denied',
                     status: 403,
-                    detail: `Forbidden: ${scheme}.${field} is not permitted on this route.`,
+                    body: gateDenialBody(route, `Forbidden: ${scheme}.${field} is not permitted on this route.`),
                 };
             }
             if (guardResult && typeof guardResult === 'object') {
@@ -1231,29 +1273,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 response: handlerResult.response,
             };
         }
-        if (responseValidation) {
-            const responseSpec = route.responses[handlerResult.status];
-            if (responseSpec !== undefined && !isStreamResponse(responseSpec)) {
-                const bodySchema = 'safeParse' in responseSpec ? responseSpec : responseSpec.body;
-                // Error responses (status >= 400) auto-fill the Problem Details envelope
-                // (`type`/`title`/`status`) at render time, so the handler only supplies
-                // `detail` plus extensions. Validate the final wire shape, not the partial
-                // body, otherwise every valid error handler would fail validation.
-                const bodyToValidate =
-                    handlerResult.status >= 400 && handlerResult.body !== null && typeof handlerResult.body === 'object'
-                        ? {
-                              type: 'about:blank',
-                              title: statusTitle(handlerResult.status) ?? 'Unknown Error',
-                              status: handlerResult.status,
-                              ...(handlerResult.body as Record<string, unknown>),
-                          }
-                        : handlerResult.body;
-                const parseResult = bodySchema.safeParse(bodyToValidate);
-                if (!parseResult.success) {
-                    throw new ResponseValidationError(routeKey, handlerResult.status, parseResult.error.issues);
-                }
-            }
-        }
+        if (responseValidation) assertDeclaredBody(route, routeKey, handlerResult.status, handlerResult.body);
         const successHeaders =
             route.method === 'OPTIONS'
                 ? {
@@ -1481,9 +1501,8 @@ const renderResult = (
         case 'success': {
             if (result.status >= 400) {
                 const body = result.body;
-                const extensions = body !== null && typeof body === 'object' ? (body as Record<string, unknown>) : {};
-                const detail = typeof extensions.detail === 'string' ? extensions.detail : (statusTitle(result.status) ?? 'Error');
-                return renderError(result.status, detail, extensions, result.headers);
+                const problem = problemFromBody(result.status, body);
+                return renderError(result.status, problem.detail, problem, result.headers);
             }
             const responseSpec = result.route.responses[result.status];
             if (responseSpec !== undefined && isStreamResponse(responseSpec)) {
@@ -1558,7 +1577,7 @@ const renderResult = (
         case 'no-handler':
             return renderError(500, `Handler not implemented: ${result.routeKey}`, undefined, result.headers);
         case 'guard-denied':
-            return renderError(result.status, result.detail, undefined, result.headers);
+            return renderError(result.status, result.body.detail, result.body, result.headers);
         case 'unsupported-media-type':
             return renderError(
                 415,

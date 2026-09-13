@@ -315,7 +315,7 @@ plugins: {
 With `oauth` configured, denials from that identity move to the HTTP level, where the specification puts them:
 
 - No token, or a bad one, answers `401` with `WWW-Authenticate: Bearer resource_metadata="..."`.
-- A `deny(403)` from the guard on a tool call answers `403` with `error="insufficient_scope"` and the scopes the route declares in the auth map.
+- A `403` denial from the guard on a tool call answers `403` with `error="insufficient_scope"` and the scopes the route declares in the auth map.
 - An access-gate failure answers a plain `403`.
 
 The guard runs once per request, its context reaches handlers under `auth.<scheme>` as always, and every other identity keeps the in-band tool errors above.

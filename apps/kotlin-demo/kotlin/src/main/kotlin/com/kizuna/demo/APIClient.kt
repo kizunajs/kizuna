@@ -120,6 +120,24 @@ object API {
         val occurredAt: Instant,
         val userId: String
     )
+
+    @Serializable
+    data class GuardDenial(
+        val type: String,
+        val title: String,
+        val status: Int,
+        val detail: String,
+        val code: Code? = null
+    ) {
+
+        @Serializable
+        enum class Code(override val wireValue: String) : KizunaQueryValue {
+            @SerialName("unauthenticated") UNAUTHENTICATED("unauthenticated"),
+            @SerialName("expired_token") EXPIRED_TOKEN("expired_token"),
+            @SerialName("forbidden") FORBIDDEN("forbidden"),
+            @SerialName("not_found") NOT_FOUND("not_found")
+        }
+    }
 }
 
 class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
@@ -776,8 +794,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.ProblemDetails) : Failure()
-            data class Forbidden(val body: API.ProblemDetails) : Failure()
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -803,8 +821,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: API.User)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.ProblemDetails) : Failure()
-            data class Forbidden(val body: API.ProblemDetails) : Failure()
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
             data class Conflict(val body: API.ProblemDetails) : Failure()
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -823,8 +841,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.ProblemDetails) : Failure()
-            data class Forbidden(val body: API.ProblemDetails) : Failure()
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -838,8 +856,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.ProblemDetails) : Failure()
-            data class Forbidden(val body: API.ProblemDetails) : Failure()
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -868,8 +886,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.ProblemDetails) : Failure()
-            data class Forbidden(val body: API.ProblemDetails) : Failure()
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
@@ -899,8 +917,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.ProblemDetails) : Failure()
-            data class Forbidden(val body: API.ProblemDetails) : Failure()
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
             data class NotFound(val body: API.ProblemDetails) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
@@ -937,8 +955,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: Response201)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.ProblemDetails) : Failure()
-            data class Forbidden(val body: API.ProblemDetails) : Failure()
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
             data class NotFound(val body: API.ProblemDetails) : Failure()
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -2062,13 +2080,13 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.MembersListMembers.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.MembersListMembers.Failure.Forbidden(body = payload)
                 }
@@ -2106,13 +2124,13 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.MembersInviteMember.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.MembersInviteMember.Failure.Forbidden(body = payload)
                 }
@@ -2160,13 +2178,13 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceGetWorkspace.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceGetWorkspace.Failure.Forbidden(body = payload)
                 }
@@ -2199,13 +2217,13 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceDeleteWorkspace.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceDeleteWorkspace.Failure.Forbidden(body = payload)
                 }
@@ -2243,13 +2261,13 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceTransfer.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceTransfer.Failure.Forbidden(body = payload)
                 }
@@ -2294,13 +2312,13 @@ class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: St
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.InvitesGetInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.InvitesGetInvite.Failure.Forbidden(body = payload)
                 }
@@ -2346,13 +2364,13 @@ class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: St
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.InvitesAcceptInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw APIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.InvitesAcceptInvite.Failure.Forbidden(body = payload)
                 }

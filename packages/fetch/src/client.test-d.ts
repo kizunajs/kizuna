@@ -943,3 +943,47 @@ test('a public route gains neither', async () => {
 
     expectTypeOf(response.status).toEqualTypeOf<200>();
 });
+
+const codedK = new Kizuna({
+    identities: {
+        user: Kizuna.identity.bearer({
+            context: z.object({
+                userId: z.string(),
+            }),
+        }),
+    },
+    guardSchema: ProblemDetailsSchema.extend({
+        code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
+    }),
+});
+
+const codedContract = codedK.contract({
+    routes: {
+        api: codedK.routes({
+            whoAmI: {
+                method: 'GET',
+                path: '/who-am-i',
+                responses: {
+                    200: z.object({
+                        userId: z.string(),
+                    }),
+                },
+            },
+        }),
+    },
+    auth: {
+        api: 'user',
+    },
+});
+
+const codedClient = new KizunaClient(codedContract, {
+    baseUrl: 'http://localhost',
+});
+
+test('a refusal carries the body the contract declared under guardSchema', async () => {
+    const response = await codedClient.api.whoAmI();
+
+    if (response.status === 401) {
+        expectTypeOf(response.body.code).toEqualTypeOf<'expired_token' | 'forbidden'>();
+    }
+});

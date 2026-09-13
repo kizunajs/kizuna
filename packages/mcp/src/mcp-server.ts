@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { problemDetails } from '@ts-kizuna/core';
 import { McpServer } from '@modelcontextprotocol/server';
 import { flattenRoutes, validateRequest } from '@ts-kizuna/core/adapter';
 import {
@@ -10,9 +11,11 @@ import {
     ROUTER_META,
     GUARDS_META,
     SCHEMES_META,
+    GUARD_SCHEMA_META,
     REQUEST_CONTEXT_META,
     extractCredential,
     gatePermits,
+    type GuardDenialBody,
     resolveSecurityRequirements,
     guardDenyFor,
     isGuardDenial,
@@ -268,16 +271,15 @@ const toolEnvelope = (status: number, body: unknown): ToolCallResult => {
     };
 };
 
-const toolError = (status: number, detail: string): ToolCallResult => ({
+// A tool result is `{ status, body }`, not an HTTP response, so no envelope.
+const toolError = (status: number, body: GuardDenialBody): ToolCallResult => ({
     content: [
         {
             type: 'text' as const,
             text: JSON.stringify(
                 {
                     status,
-                    body: {
-                        detail,
-                    },
+                    body,
                 },
                 null,
                 2
@@ -310,6 +312,11 @@ const resolveRequestContext = async (
     return resolved;
 };
 
+const gateBody = (guardSchema: z.ZodType | undefined, detail: string): GuardDenialBody => {
+    const filled = guardSchema?.safeParse(problemDetails(403, detail));
+    return filled?.success ? (filled.data as GuardDenialBody) : { detail };
+};
+
 /**
  * Run the guards a secured route requires, extracting each identity's
  * credential from the MCP transport request headers, the same pipeline the
@@ -326,7 +333,8 @@ const runGuards = async (
     handlerContext: Record<string, unknown> | undefined,
     credentialHeaders: Record<string, string | string[] | undefined> | undefined,
     requestContext: Record<string, unknown>,
-    transportAuth: McpServerOptions['transportAuth']
+    transportAuth: McpServerOptions['transportAuth'],
+    guardSchema: z.ZodType | undefined
 ): Promise<{ ok: true; securityContext: Record<string, unknown> } | { ok: false; result: ToolCallResult }> => {
     const securityContext: Record<string, unknown> = {};
     const credentialRequest = {
@@ -343,7 +351,9 @@ const runGuards = async (
         if (!guard) {
             return {
                 ok: false,
-                result: toolError(500, `No guard registered for security scheme "${scheme}" required by ${label}.`),
+                result: toolError(500, {
+                    detail: `No guard registered for security scheme "${scheme}" required by ${label}.`,
+                }),
             };
         }
         const schemeDefinition = schemes?.[scheme];
@@ -359,14 +369,14 @@ const runGuards = async (
         if (isGuardDenial(guardResult)) {
             return {
                 ok: false,
-                result: toolError(guardResult.status, guardResult.detail),
+                result: toolError(guardResult.status, guardResult.body),
             };
         }
         for (const [field, allowed] of Object.entries(accessGate?.[scheme] ?? {})) {
             if (gatePermits((guardResult ?? {})[field as never], allowed)) continue;
             return {
                 ok: false,
-                result: toolError(403, `Forbidden: ${scheme}.${field} is not permitted on this route.`),
+                result: toolError(403, gateBody(guardSchema, `Forbidden: ${scheme}.${field} is not permitted on this route.`)),
             };
         }
         if (guardResult && typeof guardResult === 'object') {
@@ -390,7 +400,8 @@ const executeToolCall = async (
     schemes?: Record<string, SecurityScheme>,
     credentialHeaders?: Record<string, string | string[] | undefined>,
     contextResolvers?: RequestContextMap,
-    transportAuth?: McpServerOptions['transportAuth']
+    transportAuth?: McpServerOptions['transportAuth'],
+    guardSchema?: z.ZodType
 ): Promise<ToolCallResult> => {
     const params = (args.params ?? {}) as Record<string, string>;
     const query = (args.query ?? {}) as Record<string, unknown>;
@@ -459,7 +470,8 @@ const executeToolCall = async (
         handlerContext,
         credentialHeaders,
         requestContext,
-        transportAuth
+        transportAuth,
+        guardSchema
     );
     if (!guardOutcome.ok) {
         return guardOutcome.result;
@@ -521,10 +533,13 @@ const executeDeclaredToolCall = async (
     schemes?: Record<string, SecurityScheme>,
     credentialHeaders?: Record<string, string | string[] | undefined>,
     contextResolvers?: RequestContextMap,
-    transportAuth?: McpServerOptions['transportAuth']
+    transportAuth?: McpServerOptions['transportAuth'],
+    guardSchema?: z.ZodType
 ): Promise<ToolCallResult> => {
     if (!runner) {
-        return toolError(500, `No handler was bound for tool "${definition.toolKey}".`);
+        return toolError(500, {
+            detail: `No handler was bound for tool "${definition.toolKey}".`,
+        });
     }
 
     const { identity } = definition;
@@ -545,7 +560,8 @@ const executeDeclaredToolCall = async (
             handlerContext,
             credentialHeaders,
             await resolveRequestContext(contextResolvers, {}, credentialHeaders, handlerContext),
-            transportAuth
+            transportAuth,
+            guardSchema
         );
         if (!guardOutcome.ok) return guardOutcome.result;
     }
@@ -585,9 +601,13 @@ const executeDeclaredToolCall = async (
             };
         }
         if (error instanceof ToolInputError || error instanceof ToolOutputError) {
-            return toolError(400, error.message);
+            return toolError(400, {
+                detail: error.message,
+            });
         }
-        return toolError(500, error instanceof Error ? error.message : 'Internal Server Error');
+        return toolError(500, {
+            detail: error instanceof Error ? error.message : 'Internal Server Error',
+        });
     }
 };
 
@@ -608,6 +628,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     const router = api[ROUTER_META];
     const guards = (api as unknown as Record<typeof GUARDS_META, GuardMap | undefined>)[GUARDS_META];
     const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
+    const guardSchema = (api as unknown as Record<typeof GUARD_SCHEMA_META, z.ZodType | undefined>)[GUARD_SCHEMA_META];
     const contextResolvers = (api as unknown as Record<typeof REQUEST_CONTEXT_META, RequestContextMap | undefined>)[REQUEST_CONTEXT_META];
 
     const contract = contractOf<Contract | undefined>(api);
@@ -663,7 +684,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     schemes,
                     options?.credentialHeaders,
                     contextResolvers,
-                    options?.transportAuth
+                    options?.transportAuth,
+                    guardSchema
                 )
         );
     }
@@ -692,7 +714,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     schemes,
                     options?.credentialHeaders,
                     contextResolvers,
-                    options?.transportAuth
+                    options?.transportAuth,
+                    guardSchema
                 )
         );
     }

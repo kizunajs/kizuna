@@ -287,7 +287,13 @@ export const securedContract = securedK.contract({
  * The guard body every adapter shares. `server.guard` is an identity function in all four, so only the wiring differs.
  */
 export const requireUserGuard = ({ bearer, deny }: { bearer?: { token: string }; deny: GuardDeny }) => {
-    if (bearer?.token !== sessionToken) return deny(401, 'Unauthorized');
+    if (bearer?.token !== sessionToken)
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
     return {
         userId: '1',
     };
@@ -300,7 +306,13 @@ const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | '
 
 export const requireMemberGuard = ({ apiKey, deny }: { apiKey?: { value: string } | null; deny: GuardDeny }) => {
     const membership = apiKey ? memberships.get(apiKey.value) : undefined;
-    if (!membership) return deny(403, 'Forbidden');
+    if (!membership)
+        return deny({
+            status: 403,
+            body: {
+                detail: 'Forbidden',
+            },
+        });
     return membership;
 };
 

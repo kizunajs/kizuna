@@ -109,9 +109,16 @@ test('conforms to the shared adapter type catalogue', () => {
             >();
         },
         'surface.guardRun': () => {
-            expectTypeOf(securedServer.guard('user', ({ deny }) => deny(401, 'Unauthorized'))).toEqualTypeOf<
-                GuardRun<NextHandlerContext>
-            >();
+            expectTypeOf(
+                securedServer.guard('user', ({ deny }) =>
+                    deny({
+                        status: 401,
+                        body: {
+                            detail: 'Unauthorized',
+                        },
+                    })
+                )
+            ).toEqualTypeOf<GuardRun<NextHandlerContext>>();
         },
         'surface.requestContextRun': () => {
             expectTypeOf(
@@ -222,7 +229,13 @@ test('conforms to the shared adapter type catalogue', () => {
             securedServer.guard('user', ({ bearer, deny, scopes }) => {
                 expectTypeOf(bearer).toEqualTypeOf<{ token: string } | null>();
                 expectTypeOf(scopes).toEqualTypeOf<string[]>();
-                if (!bearer) return deny(401, 'Unauthorized');
+                if (!bearer)
+                    return deny({
+                        status: 401,
+                        body: {
+                            detail: 'Unauthorized',
+                        },
+                    });
                 return {
                     userId: bearer.token,
                 };
@@ -230,7 +243,13 @@ test('conforms to the shared adapter type catalogue', () => {
 
             securedServer.guard('member', ({ apiKey, deny }) => {
                 expectTypeOf(apiKey).toEqualTypeOf<{ in: 'header'; name: 'x-workspace-token'; value: string } | null>();
-                if (!apiKey) return deny(403, 'Forbidden');
+                if (!apiKey)
+                    return deny({
+                        status: 403,
+                        body: {
+                            detail: 'Forbidden',
+                        },
+                    });
                 return {
                     workspaceUserId: apiKey.value,
                     role: 'owner' as const,
@@ -251,7 +270,13 @@ test('conforms to the shared adapter type catalogue', () => {
         },
         'guards.gateOnlyVoid': () => {
             gateServer.guard('apiConsumer', ({ apiKey, deny }) => {
-                if (!apiKey) return deny(401, 'Unauthorized');
+                if (!apiKey)
+                    return deny({
+                        status: 401,
+                        body: {
+                            detail: 'Unauthorized',
+                        },
+                    });
             });
 
             gateServer.guard(
@@ -267,7 +292,14 @@ test('conforms to the shared adapter type catalogue', () => {
             securedServer.guard('admin', () => ({}));
         },
         'guards.completeMap': () => {
-            const requireUser = securedServer.guard('user', ({ deny }) => deny(401, 'Unauthorized'));
+            const requireUser = securedServer.guard('user', ({ deny }) =>
+                deny({
+                    status: 401,
+                    body: {
+                        detail: 'Unauthorized',
+                    },
+                })
+            );
 
             new KizunaServer(securedContract).api({
                 router: {
@@ -345,7 +377,13 @@ test('conforms to the shared adapter type catalogue', () => {
         'requestContext.guardArg': () => {
             requestContextServer.guard('user', ({ requestContext, bearer, deny }) => {
                 expectTypeOf(requestContext.analytics).toEqualTypeOf<{ sessionId: string | null }>();
-                if (!bearer) return deny(401, 'Unauthorized');
+                if (!bearer)
+                    return deny({
+                        status: 401,
+                        body: {
+                            detail: 'Unauthorized',
+                        },
+                    });
                 return {
                     userId: requestContext.analytics.sessionId ?? bearer.token,
                 };
