@@ -36,10 +36,19 @@ jobs:
             - name: Package
               run: pnpm package:vscode
 
+            # vsce gives the Marketplace three minutes and does not retry.
             - name: Publish to the VS Code Marketplace
               env:
                   VSCE_PAT: ${{ secrets.VSCE_PAT }}
-              run: pnpm exec vsce publish --packagePath build/vscode/*.vsix --skip-duplicate
+              run: |
+                  for attempt in 1 2 3 4 5; do
+                      if pnpm exec vsce publish --packagePath build/vscode/*.vsix --skip-duplicate; then
+                          exit 0
+                      fi
+                      echo "Attempt $attempt failed. Retrying in a minute."
+                      sleep 60
+                  done
+                  exit 1
 
             - name: Publish to Open VSX
               env:
