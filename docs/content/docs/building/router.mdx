@@ -73,25 +73,25 @@ You can also type a single group inline by passing its key as the first argument
 
 Each handler receives an object with the validated inputs for that route:
 
-| Property           | Available when                                                      |
-| ------------------ | ------------------------------------------------------------------- |
-| `params`           | Route path has `:param` placeholders                                |
-| `query`            | Route has a `query` schema                                          |
-| `body`             | Route has a `body` schema                                           |
-| `headers`          | Route has a `headers` schema                                        |
-| `throwError`       | Always                                                              |
-| `auth`             | Route is secured by the contract's [auth map](/docs/authentication) |
-| `requestContext`   | Contract declares [request context](/docs/request-context)          |
-| `plugins`          | Contract declares [plugins](/docs/plugins)                          |
-| `jobs`             | Contract declares [jobs](/docs/jobs)                                |
-| `req`, `res`       | Express adapter                                                     |
-| `c`                | Hono adapter                                                        |
-| `request`, `reply` | Fastify adapter                                                     |
-| `request`          | Next.js adapter                                                     |
+| Property           | Available when                                                                |
+| ------------------ | ----------------------------------------------------------------------------- |
+| `params`           | Route path has `:param` placeholders                                          |
+| `query`            | Route has a `query` schema                                                    |
+| `body`             | Route has a `body` schema                                                     |
+| `headers`          | Route has a `headers` schema                                                  |
+| `throwError`       | Always                                                                        |
+| `auth`             | Route is secured by the contract's [access control map](/docs/access-control) |
+| `requestContext`   | Contract declares [request context](/docs/request-context)                    |
+| `plugins`          | Contract declares [plugins](/docs/plugins)                                    |
+| `jobs`             | Contract declares [jobs](/docs/jobs)                                          |
+| `req`, `res`       | Express adapter                                                               |
+| `c`                | Hono adapter                                                                  |
+| `request`, `reply` | Fastify adapter                                                               |
+| `request`          | Next.js adapter                                                               |
 
 ## Identity context
 
-When the contract's [auth map](/docs/authentication) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned, typed by the identity's `context` schema. Values declared as [request context](/docs/request-context) arrive the same way, under `requestContext` on every route.
+When the contract's [access control map](/docs/access-control) secures a route, the handler receives the identity's context under `auth`, keyed by the identity's name. That context is whatever the guard returned, typed by the identity's `context` schema, with `role` beside it when the identity declares roles, and `permissions` when those roles come from a catalog. A row check goes here too, with `auth` in hand. See [Access Control](/docs/access-control#one-row). Values declared as [request context](/docs/request-context) arrive the same way, under `requestContext` on every route.
 
 ```ts title="members.ts"
 listMembers: ({ auth }) => ({
@@ -110,15 +110,22 @@ transfer: ({ body, auth }) => {
 },
 ```
 
-On routes with an [access gate](/docs/authentication#access-gates), the constrained fields narrow to what the gate allows. If the auth map says `deleteWorkspace` requires `member` with `role: 'owner'`, then inside that handler `auth.member.role` is typed `'owner'`:
+A route with `roles` or `requires` in the access control map is checked before the handler runs, so the handler never asks whether the caller may be there. It reads the role when it needs it for something else, such as an audit line:
 
 ```ts title="workspace.ts"
-deleteWorkspace: ({ auth }) => ({
-    status: 200,
-    body: {
-        ok: auth.member.role === 'owner',
-    },
-}),
+deleteWorkspace: async ({ auth }) => {
+    await audit('workspace.deleted', {
+        by: auth.member.workspaceUserId,
+        as: auth.member.role,
+    });
+
+    return {
+        status: 200,
+        body: {
+            ok: true,
+        },
+    };
+},
 ```
 
 ## Return type

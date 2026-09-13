@@ -72,14 +72,13 @@ const contractFor = (routes: DemoRoutes, listUsers: 'user' | false = 'user') =>
         routes: {
             api: routes,
         },
-        auth: {
+        accessControl: {
             api: {
                 '*': false,
                 listUsers,
                 health: false,
                 both: {
-                    user: true,
-                    member: true,
+                    auth: ['user', 'member'],
                 },
                 byKey: 'member',
                 declaresIts403: 'user',
@@ -130,7 +129,7 @@ describe('injectGuardResponses', () => {
                         },
                     }),
                 },
-                auth: {
+                accessControl: {
                     api: 'user',
                 },
             });
@@ -199,25 +198,6 @@ describe('injectGuardResponses', () => {
         expect(Object.keys(route.responses)).toEqual(['200']);
     });
 
-    it('injects nothing for an auth entry that names no identity', () => {
-        const contract = k.contract({
-            routes: {
-                api: k.routes({
-                    nothing: {
-                        method: 'GET',
-                        path: '/nothing',
-                        responses: okResponse(),
-                    },
-                }),
-            },
-            auth: {
-                api: {},
-            },
-        });
-
-        expect(Object.keys((contract.routes.api as Record<string, RouteDefinition>).nothing!.responses)).toEqual(['200']);
-    });
-
     it('does not let routes sharing one responses object inherit each other', () => {
         const shared = okResponse();
         const contract = k.contract({
@@ -235,7 +215,7 @@ describe('injectGuardResponses', () => {
                     },
                 }),
             },
-            auth: {
+            accessControl: {
                 api: {
                     '*': false,
                     guarded: 'user',
@@ -277,7 +257,7 @@ describe('a contract that declares a guardSchema', () => {
                     },
                 }),
             },
-            auth: {
+            accessControl: {
                 api: 'user',
             },
         });

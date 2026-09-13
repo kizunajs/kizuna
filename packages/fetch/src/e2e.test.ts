@@ -251,7 +251,7 @@ const securedContract = securedK.contract({
     routes: {
         api: securedRoutes,
     },
-    auth: {
+    accessControl: {
         api: 'user',
     },
 });

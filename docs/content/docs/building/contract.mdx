@@ -223,7 +223,7 @@ responses: {
 
 ## Authentication
 
-Authentication is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `new Kizuna()`, and give `k.contract` an `auth` map saying which routes require which identity. That one declaration drives runtime enforcement, typed handler context, and the OpenAPI spec's security. The [Authentication guide](/docs/authentication) walks the whole pipeline.
+Authentication is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `new Kizuna()`, and build an access control map with [`k.accessControl`](/docs/reference/k-access-control) saying which identity, roles, or permissions each route requires. That one declaration drives runtime enforcement, typed handler context, and the OpenAPI spec's security. The [Authentication](/docs/authentication) and [Access Control](/docs/access-control) guides walk the whole pipeline.
 
 ## Jobs
 
@@ -238,7 +238,7 @@ export const contract = k.contract({
 });
 ```
 
-A job carries its own identity, so it takes no entry in the `auth` map, and it stays out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. The [Jobs guide](/docs/jobs) covers declaring, handling, and triggering them.
+A job carries its own identity, so it takes no entry in the access control map, and it stays out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. The [Jobs guide](/docs/jobs) covers declaring, handling, and triggering them.
 
 ## Going further
 

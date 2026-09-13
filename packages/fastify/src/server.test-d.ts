@@ -209,9 +209,9 @@ test('conforms to the shared adapter type catalogue', () => {
             expectTypeOf<Router<typeof securedContract>['api']['whoAmI']>()
                 .parameter(0)
                 .toMatchTypeOf<{ auth: { user: { userId: string } } }>();
-            expectTypeOf<Router<typeof securedContract>['api']['ownerOnly']>()
-                .parameter(0)
-                .toMatchTypeOf<{ auth: { member: { role: 'owner' } } }>();
+            expectTypeOf<Router<typeof securedContract>['api']['ownerOnly']>().parameter(0).toMatchTypeOf<{
+                auth: { member: { workspaceUserId: string; role: 'owner' | 'admin' | readonly ('owner' | 'admin')[] } };
+            }>();
             expectTypeOf<Router<typeof securedContract>['api']['both']>().parameter(0).toMatchTypeOf<{
                 auth: { user: { userId: string }; member: { workspaceUserId: string } };
             }>();
@@ -226,9 +226,8 @@ test('conforms to the shared adapter type catalogue', () => {
                 .toMatchTypeOf<{ auth: { user: { userId: string } } }>();
         },
         'guards.credentialByKind': () => {
-            securedServer.guard('user', ({ bearer, deny, scopes }) => {
+            securedServer.guard('user', ({ bearer, deny }) => {
                 expectTypeOf(bearer).toEqualTypeOf<{ token: string } | null>();
-                expectTypeOf(scopes).toEqualTypeOf<string[]>();
                 if (!bearer)
                     return deny({
                         status: 401,
@@ -322,6 +321,12 @@ test('conforms to the shared adapter type catalogue', () => {
                                 ok: true,
                             },
                         }),
+                        adminOnly: () => ({
+                            status: 200,
+                            body: {
+                                ok: true,
+                            },
+                        }),
                         both: ({ auth }) => ({
                             status: 200,
                             body: {
@@ -353,6 +358,12 @@ test('conforms to the shared adapter type catalogue', () => {
                             },
                         }),
                         ownerOnly: () => ({
+                            status: 200,
+                            body: {
+                                ok: true,
+                            },
+                        }),
+                        adminOnly: () => ({
                             status: 200,
                             body: {
                                 ok: true,
@@ -437,6 +448,12 @@ test('conforms to the shared adapter type catalogue', () => {
                 }),
                 whoAmI,
                 ownerOnly: () => ({
+                    status: 200,
+                    body: {
+                        ok: true,
+                    },
+                }),
+                adminOnly: () => ({
                     status: 200,
                     body: {
                         ok: true,

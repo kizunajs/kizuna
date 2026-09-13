@@ -1703,6 +1703,54 @@ public final class APIClient: Sendable {
         }
     }
 
+    public enum MembersCancelInvite {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let cancelled: Bool
+
+            public init(cancelled: Bool) {
+                self.cancelled = cancelled
+            }
+        }
+
+        public struct Params: Sendable {
+            public let inviteId: String
+
+            public init(inviteId: String) {
+                self.inviteId = inviteId
+            }
+
+            public static func params(inviteId: String) -> Self {
+                .init(inviteId: inviteId)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.GuardDenial)
+            case forbidden(API.GuardDenial)
+            case notFound(API.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
     public enum WorkspaceGetWorkspace {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -2986,6 +3034,33 @@ public struct APIMembersClient: Sendable {
             throw APIClient.MembersInviteMember.Failure.unexpectedStatus(statusCode, data)
         }
     }
+
+    /// Cancel an invite, an admin only their own
+    public func cancelInvite(_ params: APIClient.MembersCancelInvite.Params) async throws(APIClient.MembersCancelInvite.Failure) -> APIClient.MembersCancelInvite.Result {
+        var path = "/workspace/invites/:inviteId"
+        path = path.replacingOccurrences(of: ":inviteId", with: Kizuna.encodePathSegment(params.inviteId))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.MembersCancelInvite.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "DELETE"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.MembersCancelInvite.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.MembersCancelInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersCancelInvite.Failure.self)
+            return APIClient.MembersCancelInvite.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.GuardDenial.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersCancelInvite.Failure.self)
+            throw APIClient.MembersCancelInvite.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.GuardDenial.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersCancelInvite.Failure.self)
+            throw APIClient.MembersCancelInvite.Failure.forbidden(payload)
+        case 404:
+            let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.MembersCancelInvite.Failure.self)
+            throw APIClient.MembersCancelInvite.Failure.notFound(payload)
+        default:
+            throw APIClient.MembersCancelInvite.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
 }
 
 public struct APIWorkspaceClient: Sendable {
@@ -3018,7 +3093,7 @@ public struct APIWorkspaceClient: Sendable {
         }
     }
 
-    /// Delete the workspace, owner-only via the auth map
+    /// Delete the workspace, owner only
     public func deleteWorkspace() async throws(APIClient.WorkspaceDeleteWorkspace.Failure) -> APIClient.WorkspaceDeleteWorkspace.Result {
         let path = "/workspace"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceDeleteWorkspace.Failure.self)
@@ -3041,7 +3116,7 @@ public struct APIWorkspaceClient: Sendable {
         }
     }
 
-    /// Transfer ownership, owner-only via the auth map
+    /// Transfer ownership, owner only
     public func transfer(_ body: APIClient.WorkspaceTransfer.Body) async throws(APIClient.WorkspaceTransfer.Failure) -> APIClient.WorkspaceTransfer.Result {
         let path = "/workspace/transfer"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceTransfer.Failure.self)

@@ -34,7 +34,7 @@ export const jobs = k.jobs('scheduler', {
 });
 ```
 
-Jobs nest to any depth. Because a job carries its own identity, it never appears in the contract's `auth` map.
+Jobs nest to any depth. Because a job carries its own identity, it never appears in the contract's access control map.
 
 Omitting the identity argument declares the jobs public, which leaves anyone who can reach `/jobs/run` able to trigger them. Pass an identity unless the endpoints are unreachable from outside your network.
 

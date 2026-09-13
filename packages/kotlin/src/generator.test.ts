@@ -2029,7 +2029,7 @@ describe('Kotlin generator: the statuses the auth map adds', () => {
                     },
                 },
             },
-            auth: {
+            accessControl: {
                 getSecret: 'user',
                 health: false,
             },

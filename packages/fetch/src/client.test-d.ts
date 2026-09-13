@@ -906,7 +906,7 @@ const guardedContract = guardedK.contract({
     routes: {
         api: guardedRoutes,
     },
-    auth: {
+    accessControl: {
         api: {
             '*': 'user',
             health: false,
@@ -971,7 +971,7 @@ const codedContract = codedK.contract({
             },
         }),
     },
-    auth: {
+    accessControl: {
         api: 'user',
     },
 });

@@ -33,4 +33,30 @@ export const members: Router<typeof contract.routes.members> = {
             body: invited,
         };
     },
+    cancelInvite: async ({ params, auth }) => {
+        const invite = await db.invites.findById(params.inviteId);
+        if (!invite) {
+            return {
+                status: 404,
+                body: {
+                    detail: `No invite ${params.inviteId}`,
+                },
+            };
+        }
+        if (invite.sentBy !== auth.member.workspaceUserId) {
+            return {
+                status: 403,
+                body: {
+                    detail: 'Only the member who sent an invite cancels it',
+                },
+            };
+        }
+        await db.invites.cancel(invite.id);
+        return {
+            status: 200,
+            body: {
+                cancelled: true,
+            },
+        };
+    },
 };

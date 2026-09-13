@@ -70,7 +70,7 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, Fastif
 
 /**
  * The handler tree for a contract or route group, typed against it. Routes
- * secured by the contract's `auth` map additionally receive each required
+ * secured by the contract's access control map additionally receive each required
  * identity's context in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C> = ContractRouter<C, FastifyHandlerContext>;
@@ -109,25 +109,6 @@ export interface FastifyOptions {
      */
     formatError?: ErrorFormatter<FastifyRequest>;
 }
-
-/**
- * A guard per identity, keyed by name. Each receives the handler context, a
- * `deny` helper, the matched route's required scopes, and the contract's
- * request context, and returns that identity's {@link GuardSuccess} (its
- * context and access fields) or a `deny(...)` result. Keying by name lets each guard's return be typed against its own
- * identity, so access values narrow without an annotation. An
- * authentication-only identity (no context, no access) returns nothing on
- * success, or `deny(...)`.
- */
-
-/**
- * One guard per identity declared on the contract.
- */
-
-/**
- * The resolver functions for the request context schemas declared on `kizuna`,
- * keyed by name. Each runs on every route and returns its schema's value.
- */
 
 interface FastifyResponseContext {
     reply: FastifyReply;

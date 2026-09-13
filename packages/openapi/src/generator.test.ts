@@ -1725,15 +1725,36 @@ describe('security from the contract', () => {
         bearerFormat: 'JWT',
     });
 
+    const permissions = Kizuna.permissions({
+        workspace: ['read', 'delete'],
+    });
+
+    const roles = Kizuna.roles(permissions, {
+        admin: {
+            workspace: ['read'],
+        },
+        owner: 'all',
+    });
+
     const member = Kizuna.identity.apiKey({
         name: 'x-workspace-token',
         in: 'header',
         context: z.object({
             workspaceUserId: z.string(),
         }),
-        access: z.object({
-            role: z.enum(['owner', 'admin']),
-        }),
+        roles,
+    });
+
+    const partner = Kizuna.identity.oauth2({
+        flows: {
+            clientCredentials: {
+                tokenUrl: 'https://auth.example.com/token',
+                scopes: {
+                    'workspace:read': 'Read the workspace',
+                },
+            },
+        },
+        roles,
     });
 
     const makeSecuredContract = () => {
@@ -1741,6 +1762,7 @@ describe('security from the contract', () => {
             identities: {
                 user,
                 member,
+                partner,
             },
         });
         const routes = securedK.routes({
@@ -1785,17 +1807,22 @@ describe('security from the contract', () => {
             routes: {
                 api: routes,
             },
-            auth: {
+            accessControl: {
                 api: {
                     '*': false,
                     getSecret: 'user',
                     deleteWorkspace: {
-                        member: {
-                            role: 'owner',
+                        auth: 'member',
+                        roles: 'owner',
+                        requires: {
+                            workspace: ['delete'],
                         },
                     },
                     scoped: {
-                        user: ['read:secrets'],
+                        auth: 'partner',
+                        requires: {
+                            workspace: ['read'],
+                        },
                     },
                 },
             },
@@ -1820,6 +1847,17 @@ describe('security from the contract', () => {
                 name: 'x-workspace-token',
                 in: 'header',
             },
+            partner: {
+                type: 'oauth2',
+                flows: {
+                    clientCredentials: {
+                        tokenUrl: 'https://auth.example.com/token',
+                        scopes: {
+                            'workspace:read': 'Read the workspace',
+                        },
+                    },
+                },
+            },
         });
     });
 
@@ -1831,18 +1869,30 @@ describe('security from the contract', () => {
         ]);
     });
 
-    it('emits operation.security for a gated route without leaking the gate', () => {
+    it('emits operation.security and x-kizuna-requires for a route with requires', () => {
         expect(spec.paths['/workspace']?.delete?.security).toEqual([
             {
                 member: [],
             },
         ]);
+        expect(spec.paths['/workspace']?.delete?.['x-kizuna-requires']).toEqual({
+            workspace: ['delete'],
+        });
     });
 
-    it('emits the required scopes on a scoped route', () => {
+    it('emits x-kizuna-roles for a route with roles', () => {
+        expect(spec.paths['/workspace']?.delete?.['x-kizuna-roles']).toEqual(['owner']);
+    });
+
+    it('leaves x-kizuna-requires and x-kizuna-roles off a route with neither', () => {
+        expect(spec.paths['/secret']?.get?.['x-kizuna-requires']).toBeUndefined();
+        expect(spec.paths['/secret']?.get?.['x-kizuna-roles']).toBeUndefined();
+    });
+
+    it('emits what an OAuth route requires as its scopes', () => {
         expect(spec.paths['/scoped']?.get?.security).toEqual([
             {
-                user: ['read:secrets'],
+                partner: ['workspace:read'],
             },
         ]);
     });
@@ -1931,7 +1981,7 @@ describe('security from the contract', () => {
             routes: {
                 members,
             },
-            auth: {
+            accessControl: {
                 members: {
                     '*': 'user',
                     session: {
@@ -2000,7 +2050,7 @@ describe('shared scheme names', () => {
             routes: {
                 api: routes,
             },
-            auth: {
+            accessControl: {
                 api: {
                     '*': 'viewer',
                     updateSettings: 'admin',
@@ -2080,13 +2130,12 @@ describe('custom identities (no OpenAPI scheme)', () => {
             routes: {
                 api: routes,
             },
-            auth: {
+            accessControl: {
                 api: {
                     '*': false,
                     getInvite: 'inviteToken',
                     mixed: {
-                        user: true,
-                        inviteToken: true,
+                        auth: ['user', 'inviteToken'],
                     },
                 },
             },

@@ -54,7 +54,7 @@ Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is 
 export const contract = k.contract({
     routes,
     tools,
-    auth,
+    accessControl,
     plugins: ({ routes, tools }) => ({
         mcp: mcpPlugin({
             routes,
@@ -81,11 +81,11 @@ A route is an HTTP endpoint rather than a tool, so none are published until `pub
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { k } from './k';
 import { routes } from './routes';
-import { auth } from './auth';
+import { accessControl } from './access-control';
 
 export const contract = k.contract({
     routes,
-    auth,
+    accessControl,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',

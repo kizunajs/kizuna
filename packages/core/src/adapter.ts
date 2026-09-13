@@ -1,8 +1,10 @@
 import { z } from 'zod';
-import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method } from './types.js';
+import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method, RequiredPermissions } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import { authenticationChallenge, resolveSecurityRequirements } from './security-scheme.js';
 import type { Credential, NoCredential } from './identity.js';
+import { insufficientScope, requiresDenial, withPermissions } from './access-check.js';
+export { insufficientScope, requiresDenial, withPermissions, type AccessCheckInput } from './access-check.js';
 import {
     type RouteHandler,
     type Router,
@@ -14,14 +16,12 @@ import {
     validateRequest,
 } from './handler-pipeline.js';
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
-import { parsePath } from './path-params.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { deprecationHeaders } from './deprecation.js';
 import { cacheHeaders } from './cache.js';
 import { computeEtag, etagMatches } from './etag.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
-import { statusTitle } from './status-titles.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
@@ -233,8 +233,8 @@ export const isGuardDenial = (value: unknown): value is GuardDenial => typeof va
 /**
  * The runtime behavior of a guard. It receives one object: the adapter's handler
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
- * from the request (or `null` if absent), a `deny` helper, the matched route's
- * required `scopes`, and the request context resolved for this request, absent
+ * from the request (or `null` if absent), a `deny` helper, and the request
+ * context resolved for this request, absent
  * when the contract declares none. It returns the context the scheme provides
  * (nested under `auth`, keyed by the identity's name in the handler args) or
  * `deny(...)` to reject.
@@ -244,7 +244,6 @@ export type GuardRun<HandlerContext = unknown> = (
         Credential & {
             params: Record<string, string>;
             deny: GuardDeny;
-            scopes: string[];
             requestContext?: Record<string, unknown>;
         }
 ) => Promise<Record<string, unknown> | GuardDenial | void> | Record<string, unknown> | GuardDenial | void;
@@ -558,14 +557,14 @@ export const boundJobKeys = (meta: JobsMeta | undefined): Set<string> => {
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
 export type {
-    HandlersFromAuth,
+    HandlersFromAccessControl,
     GuardParams,
     GuardedParamNames,
     RequestContextValues,
     RoutesWithHandlerContext,
     BrandedHandlerContext,
-    RouteAuthValue,
-    ContextFromAuthValue,
+    RouteAccessControlValue,
+    ContextFromAccessControlValue,
 } from './handler-pipeline.js';
 export { buildPath, parsePath, type PathSegment } from './path-params.js';
 export { sortFlattenedRoutes } from './route-matcher.js';
@@ -660,7 +659,8 @@ export type AdapterResult =
           status: number;
           body: GuardDenialBody;
           /**
-           * The `WWW-Authenticate` challenge RFC 9110 requires on a `401`.
+           * The `WWW-Authenticate` challenge RFC 9110 requires on a `401`, or
+           * the `insufficient_scope` one RFC 6750 sends on a `403`.
            */
           headers?: ResponseHeaders;
       }
@@ -775,25 +775,14 @@ const assertDeclaredBody = (route: RouteDefinition, routeKey: string, status: nu
 };
 
 /**
- * No author code runs on a gate refusal, so the declared schema fills its own
- * defaults.
+ * No author code runs when `requires` refuses a caller, so the declared schema
+ * fills its own defaults.
  */
-const gateDenialBody = (route: RouteDefinition, detail: string): GuardDenialBody => {
+const requiresDenialBody = (route: RouteDefinition, detail: string): GuardDenialBody => {
     const declared = route.responses[403];
     const schema = declared === undefined || isStreamResponse(declared) ? undefined : 'safeParse' in declared ? declared : declared.body;
     const filled = schema?.safeParse(problemDetails(403, detail));
     return filled?.success ? (filled.data as GuardDenialBody) : { detail };
-};
-
-/**
- * Whether a guard's returned field satisfies a gate value. Array fields pass
- * when they contain an allowed value; scalar fields when they equal one.
- */
-export const gatePermits = (value: unknown, allowed: unknown): boolean => {
-    if (Array.isArray(value)) {
-        return Array.isArray(allowed) ? allowed.some((entry) => value.includes(entry)) : value.includes(allowed);
-    }
-    return Array.isArray(allowed) ? allowed.includes(value) : value === allowed;
 };
 
 /**
@@ -1212,7 +1201,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         const hasRequestContext = Object.keys(requestContext).length > 0;
 
         const securityContext: Record<string, unknown> = {};
-        for (const { scheme, scopes } of resolveSecurityRequirements(route)) {
+        for (const { scheme } of resolveSecurityRequirements(route)) {
             const guard = guards?.[scheme];
             if (!guard) {
                 throw new Error(`No guard registered for security scheme "${scheme}" required by route "${routeKey}".`);
@@ -1224,7 +1213,6 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 ...credential,
                 params,
                 deny: guardDenyFor(schemeDefinition),
-                scopes,
                 ...(hasRequestContext ? { requestContext } : {}),
             } as Parameters<typeof guard>[0]);
             if (isGuardDenial(guardResult)) {
@@ -1236,17 +1224,39 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                     headers: guardResult.headers,
                 };
             }
-            for (const [field, allowed] of Object.entries(route.accessGate?.[scheme] ?? {})) {
-                if (gatePermits((guardResult ?? {})[field as never], allowed)) continue;
-                return {
-                    kind: 'guard-denied',
-                    status: 403,
-                    body: gateDenialBody(route, `Forbidden: ${scheme}.${field} is not permitted on this route.`),
-                };
-            }
             if (guardResult && typeof guardResult === 'object') {
-                securityContext[scheme] = guardResult;
+                securityContext[scheme] = withPermissions(scheme, schemeDefinition, guardResult);
             }
+        }
+        const accessCheck = {
+            roles: route.roles,
+            requires: route.requires,
+            requiredSchemes: resolveSecurityRequirements(route).map((requirement) => requirement.scheme),
+            schemes,
+            securityContext,
+        };
+        const forbidden = requiresDenial(accessCheck);
+        if (forbidden !== undefined) {
+            const missingScope = insufficientScope(accessCheck);
+            const resourceMetadata = accessCheck.requiredSchemes
+                .map((scheme) => schemes?.[scheme]?.resourceMetadata)
+                .find((url) => url !== undefined);
+            return {
+                kind: 'guard-denied',
+                status: 403,
+                body: requiresDenialBody(route, forbidden),
+                ...(missingScope.length > 0
+                    ? {
+                          headers: {
+                              'www-authenticate': bearerChallenge({
+                                  error: 'insufficient_scope',
+                                  scope: missingScope.join(' '),
+                                  resource_metadata: resourceMetadata,
+                              }),
+                          },
+                      }
+                    : {}),
+            };
         }
 
         const throwError = (response: { status: number; body: unknown; headers?: ResponseHeaders }): never => {

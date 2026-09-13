@@ -3,22 +3,22 @@ title: k.contract
 description: Assemble route groups into the Contract your server, clients, and generators all read.
 ---
 
-`k.contract({ routes, jobs, auth, plugins })` bundles your route groups into the `Contract`, the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/server-api), and generators. It carries the routes, the auth resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
+`k.contract({ routes, jobs, accessControl, plugins })` bundles your route groups into the `Contract`, the one object you hand to the [client](/docs/reference/kizuna-client), [server](/docs/reference/server-api), and generators. It carries the routes, the access control resolved onto them, plus the tags, identities, and `issueCodes` you configured on `new Kizuna()`.
 
 Every client imports it, so the contract and everything it imports travel with them. It holds route shapes, and server config stays in the API app. See [the contract guide](/docs/building/contract).
 
 ```ts title="contract/index.ts"
 import { k } from './k';
 import { routes } from './routes';
-import { auth } from './auth';
+import { accessControl } from './access-control';
 
 export const contract = k.contract({
     routes,
-    auth,
+    accessControl,
 });
 ```
 
-`auth` is the map built with [`k.auth`](/docs/reference/k-auth) beside the routes. `k.contract` also accepts it written inline.
+`accessControl` is the map built with [`k.accessControl`](/docs/reference/k-access-control) beside the routes. `k.contract` also accepts it written inline.
 
 The declared `issueCodes` widen `errors[].code` on `400` responses to `ValidationIssueCode | <your codes>`, so the client suggests them in autocomplete. Emit them at runtime with [`k.issue`](/docs/reference/k-issue). The factory is per API, so codes and tags stay scoped to it.
 
@@ -30,11 +30,11 @@ Jobs declared with [`k.jobs`](/docs/reference/k-jobs) go under `jobs`, beside `r
 export const contract = k.contract({
     routes,
     jobs,
-    auth,
+    accessControl,
 });
 ```
 
-A job carries its own identity, so it takes no entry in the `auth` map, and it stays out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. See [Jobs](/docs/jobs).
+A job carries its own identity, so it takes no entry in the access control map, and it stays out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. See [Jobs](/docs/jobs).
 
 ## Plugins
 
@@ -43,7 +43,7 @@ Plugins go under `plugins`, keyed by the name your handlers read them under:
 ```ts title="contract.ts"
 export const contract = k.contract({
     routes,
-    auth,
+    accessControl,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',
@@ -57,7 +57,7 @@ Write it as a function to get the routes, which is what types props keyed by rou
 ```ts title="contract.ts"
 export const contract = k.contract({
     routes,
-    auth,
+    accessControl,
     plugins: ({ routes }) => ({
         audit: auditPlugin(routes, {
             skip: {
@@ -70,72 +70,25 @@ export const contract = k.contract({
 
 Their routes are served by `api.mount` and stay out of `contract.routes`, so the client and the generators do not see them. Each plugin's server half goes on [`server.api`](/docs/reference/server-api) under the same key. See [Plugins](/docs/plugins).
 
-## The auth map
+## The access control map
 
-The `auth` map assigns each route group its auth policy, keyed by the identity names registered on `new Kizuna()`. It is **exhaustive over groups**: every key in `routes` must appear, and public takes an explicit `false`. See the [Authentication guide](/docs/authentication) for the full walkthrough.
+The access control map assigns each route group what it needs: the identity, and the roles it accepts or the permissions the caller has to hold. It is **exhaustive over groups**: every key in `routes` must appear, and public takes an explicit `false`. Build it with [`k.accessControl`](/docs/reference/k-access-control), which lists every form an entry can take. See [Access Control](/docs/access-control) for the walkthrough.
 
-```ts title="auth.ts"
-export const auth = k.auth(routes, {
+```ts title="access-control.ts"
+export const accessControl = k.accessControl(routes, {
     users: false,
     health: false,
-    members: {
-        '*': 'user',
-        inviteMember: {
-            member: {
-                role: ['owner', 'admin'],
-            },
-        },
-    },
+    members: 'user',
     workspace: {
         '*': 'member',
         deleteWorkspace: {
-            member: {
-                role: 'owner',
+            auth: 'member',
+            requires: {
+                workspace: ['delete'],
             },
         },
     },
 });
 ```
 
-### Value forms
-
-| Form                           | Example                                     | Meaning                                                                                                                          |
-| ------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `false`                        | `health: false`                             | Public, no guard runs.                                                                                                           |
-| Identity name                  | `members: 'user'`                           | Require the identity. Its guard runs; handlers receive its context.                                                              |
-| Constraint object              | `{ member: { role: 'owner' } }`             | Require the identity **and** gate its `access` fields. Out-of-range values get a 403, in-range values narrow the handler's type. |
-| Constraint with allowed values | `{ member: { role: ['owner', 'admin'] } }`  | Gate a field to a set of values.                                                                                                 |
-| Scope array (`oauth2`)         | `{ user: ['users:write'] }`                 | Require the identity with these OAuth scopes.                                                                                    |
-| Multiple identities            | `{ user: true, member: { role: 'owner' } }` | Require every listed identity (AND). Handlers receive each context.                                                              |
-
-### Cascades
-
-A group's value can be a cascade, where `'*'` sets the group default and a route entry refines it: the route inherits the default's identities and states only its delta. `false` opts a route out.
-
-```ts title="auth.ts"
-workspace: {
-    '*': 'member',
-    deleteWorkspace: {
-        member: {
-            role: 'owner',
-        },
-    },
-},
-```
-
-Inside `deleteWorkspace`, `auth.member.role` is typed `'owner'`.
-
-Cascade keys name the group's own routes and subgroups. A subgroup key takes a value for its whole subtree, or its own nested cascade; a key that matches nothing in the group is an error.
-
-```ts title="auth.ts"
-members: {
-    '*': 'user',
-    session: {
-        '*': 'user',
-        login: false,
-    },
-    invites: false,
-},
-```
-
-`k.contract` resolves the map onto every route's `security` (and `accessGate` where fields are constrained), which the [guards](/docs/reference/server-guard), [router](/docs/reference/server-router) types, and [OpenAPI spec](/docs/reference/generate-openapi) all read.
+`k.contract` resolves the map onto every route's `security`, `roles` and `requires`, which the [guards](/docs/reference/server-guard), [router](/docs/reference/server-router) types, and [OpenAPI spec](/docs/reference/generate-openapi) all read.

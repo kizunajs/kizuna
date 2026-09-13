@@ -21,11 +21,11 @@ description: Generate an OpenAPI 3.1.0 document from your contract, and serve it
 import { openApiPlugin } from '@ts-kizuna/openapi';
 import { k } from './k';
 import { routes } from './routes';
-import { auth } from './auth';
+import { accessControl } from './access-control';
 
 export const contract = k.contract({
     routes,
-    auth,
+    accessControl,
     plugins: {
         openApi: openApiPlugin({
             info: {
@@ -197,7 +197,7 @@ openApiPlugin({
 
 ## Security
 
-Security comes from the contract. The [identities](/docs/authentication) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's auth map becomes each operation's `security`, with oauth2 scopes included. There are no generator options for it, so the spec cannot disagree with what the server enforces.
+Security comes from the contract. The [identities](/docs/authentication) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's access control map becomes each operation's `security`, with the permissions an OAuth route requires as its scopes, the roles a route accepts under `x-kizuna-roles`, and the permissions it requires under `x-kizuna-requires`. There are no generator options for it, so the spec cannot disagree with what the server enforces.
 
 ```ts title="identities.ts"
 export const user = Kizuna.identity.bearer({
@@ -221,7 +221,7 @@ paths:
                 - user: []
 ```
 
-Routes marked `false` in the auth map get no `security` entry. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security`, since OpenAPI can't describe its credential, but its routes carry an `x-kizuna-guarded` extension so they stay distinguishable from public ones.
+Routes marked `false` in the access control map get no `security` entry. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security`, since OpenAPI can't describe its credential, but its routes carry an `x-kizuna-guarded` extension so they stay distinguishable from public ones.
 
 ## Validation errors
 
@@ -229,7 +229,7 @@ Routes with a `body` or `query` schema automatically include a `400` validation 
 
 ## Refusals
 
-A route the [auth map](/docs/authentication) guards includes `401` and `403` as [Problem Details](/docs/reference/problem-details-schema). The `401` documents the `WWW-Authenticate` header too, required when every identity on the route has a challenge and optional when only some do. A route behind an API key declares no header.
+A route the [access control map](/docs/access-control) guards includes `401` and `403` as [Problem Details](/docs/reference/problem-details-schema). The `401` documents the `WWW-Authenticate` header too, required when every identity on the route has a challenge and optional when only some do. A route behind an API key declares no header.
 
 ## Streams
 

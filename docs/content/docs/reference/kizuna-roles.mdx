@@ -1,0 +1,54 @@
+---
+title: Kizuna.roles
+description: Declare the roles callers hold, as names or built from a permission catalog.
+---
+
+<AlphaNotice>
+
+Access control is new. `Kizuna.roles` will likely change before v2, so pin your version if you depend on it.
+
+</AlphaNotice>
+
+`Kizuna.roles(names)` declares the roles callers hold:
+
+```ts title="roles.ts"
+import { Kizuna } from '@ts-kizuna/core';
+
+export const roles = Kizuna.roles(['member', 'admin', 'owner']);
+```
+
+Put them on the identity whose callers hold them, under `roles`. Its guard returns `role`, one name or an array of them, and a route's `roles` in the [access control map](/docs/reference/k-access-control) is checked against it before the handler runs.
+
+| Property       | Description                                                            |
+| -------------- | ---------------------------------------------------------------------- |
+| `roles.names`  | The role names, in declaration order.                                  |
+| `roles.schema` | A zod enum of the names, for a response that tells a client who it is. |
+
+## From a permission catalog
+
+`Kizuna.roles(permissions, definitions)` builds the roles from a [permission catalog](/docs/reference/kizuna-permissions), so a route can name the permission it requires instead of the role. Every entry is checked against the catalog, and `'all'` means every permission declared:
+
+```ts title="roles.ts"
+export const roles = Kizuna.roles(permissions, {
+    member: {
+        workspace: ['read'],
+        project: ['read', 'update'],
+    },
+    admin: {
+        workspace: ['read', 'update'],
+        project: ['create', 'read', 'update', 'delete', 'share'],
+    },
+    owner: 'all',
+});
+```
+
+A route's `requires` is checked against what the caller's role holds, or the subset the guard returns as `permissions`, and the handler reads the list under `auth.member.permissions`.
+
+| Property                      | Description                                                     |
+| ----------------------------- | --------------------------------------------------------------- |
+| `roles.permissions`           | The catalog the roles are built from.                           |
+| `roles.definitions`           | Each role and what it holds, as declared.                       |
+| `roles.of(role)`              | What one role holds, or the union for several.                  |
+| `roles.holds(role, requires)` | Whether the role holds every permission in `requires` outright. |
+
+See [Access Control](/docs/access-control) for the walkthrough.

@@ -72,14 +72,17 @@ export const ADAPTER_FEATURES = {
     'guards.context': {
         summary: 'A guard’s returned context reaches the handler as `auth`.',
     },
-    'guards.accessGate': {
-        summary: 'An access gate refuses a credential that does not satisfy it.',
+    'guards.requires': {
+        summary: 'A route’s `requires` refuses a role that does not hold it.',
+    },
+    'guards.roles': {
+        summary: 'A route’s `roles` refuses a caller whose role is not among them.',
     },
     'guards.multiIdentity': {
         summary: 'A route requiring two identities merges both contexts, and denies until both are present.',
     },
     'guards.authFailureModes': {
-        summary: 'An unresolved credential is 401 with a challenge; a resolved one failing the gate is 403 without.',
+        summary: 'An unresolved credential is 401 with a challenge; a resolved one missing a permission is 403 without.',
     },
     'responses.declaredContentType': {
         summary: 'A route declaring a non-JSON content type sends its body raw under it.',

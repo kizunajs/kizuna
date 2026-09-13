@@ -931,6 +931,34 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
+    object MembersCancelInvite {
+
+        @Serializable
+        data class Response(val cancelled: Boolean)
+
+        data class Params(val inviteId: String)
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(inviteId: String): AfterParams = AfterParams(params = Params(inviteId = inviteId))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object WorkspaceGetWorkspace {
 
         @Serializable
@@ -2317,6 +2345,54 @@ class OpenEnumAPIMembersClient(private val client: OkHttpClient, private val bas
             }
         }
     }
+
+    /** Cancel an invite, an admin only their own */
+    @Throws(OpenEnumAPIClient.MembersCancelInvite.Failure::class)
+    suspend fun cancelInvite(build: OpenEnumAPIClient.MembersCancelInvite.Scope.() -> OpenEnumAPIClient.MembersCancelInvite.Args): OpenEnumAPIClient.MembersCancelInvite.Result {
+        val args = OpenEnumAPIClient.MembersCancelInvite.Scope.build()
+        val params = args.params
+        var path = "/workspace/invites/:inviteId"
+        path = path.replace(":inviteId", Kizuna.encodePathSegment(params.inviteId))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("DELETE", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.MembersCancelInvite.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.MembersCancelInvite.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.MembersCancelInvite.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.MembersCancelInvite.Failure.Forbidden(body = payload)
+                }
+                404 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.MembersCancelInvite.Failure.NotFound(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.MembersCancelInvite.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
 }
 
 class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -2360,7 +2436,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
         }
     }
 
-    /** Delete the workspace, owner-only via the auth map */
+    /** Delete the workspace, owner only */
     @Throws(OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure::class)
     suspend fun deleteWorkspace(): OpenEnumAPIClient.WorkspaceDeleteWorkspace.Result {
         val path = "/workspace"
@@ -2399,7 +2475,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
         }
     }
 
-    /** Transfer ownership, owner-only via the auth map */
+    /** Transfer ownership, owner only */
     @Throws(OpenEnumAPIClient.WorkspaceTransfer.Failure::class)
     suspend fun transfer(build: OpenEnumAPIClient.WorkspaceTransfer.Scope.() -> OpenEnumAPIClient.WorkspaceTransfer.Args): OpenEnumAPIClient.WorkspaceTransfer.Result {
         val args = OpenEnumAPIClient.WorkspaceTransfer.Scope.build()

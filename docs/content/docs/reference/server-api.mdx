@@ -19,7 +19,7 @@ export const api = server.api({
 });
 ```
 
-`guards` is keyed by identity name and must cover every identity declared on [`new Kizuna()`](/docs/reference/kizuna), whether or not the auth map references it. A contract that declares identities cannot omit it.
+`guards` is keyed by identity name and must cover every identity declared on [`new Kizuna()`](/docs/reference/kizuna), whether or not the access control map references it. A contract that declares identities cannot omit it.
 
 Mount the returned object with the adapter's mount verb:
 

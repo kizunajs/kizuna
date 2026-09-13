@@ -26,6 +26,17 @@ const workspaceMembers = k.routes('members', {
         },
         summary: 'Invite a member to the workspace',
     },
+    cancelInvite: {
+        method: 'DELETE',
+        path: '/workspace/invites/:inviteId',
+        responses: {
+            200: z.object({
+                cancelled: z.boolean(),
+            }),
+            404: ProblemDetailsSchema,
+        },
+        summary: 'Cancel an invite, an admin only their own',
+    },
 });
 
 const workspaceInfo = k.routes('workspace', {
@@ -48,7 +59,7 @@ const workspaceInfo = k.routes('workspace', {
                 ok: z.boolean(),
             }),
         },
-        summary: 'Delete the workspace, owner-only via the auth map',
+        summary: 'Delete the workspace, owner only',
     },
     transfer: {
         method: 'POST',
@@ -61,7 +72,7 @@ const workspaceInfo = k.routes('workspace', {
                 ok: z.boolean(),
             }),
         },
-        summary: 'Transfer ownership, owner-only via the auth map',
+        summary: 'Transfer ownership, owner only',
     },
 });
 

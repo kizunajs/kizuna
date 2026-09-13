@@ -20,7 +20,7 @@ Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typ
 
 - **Contract-first**: define request/response schemas once, share between server and client
 - **Type-safe everywhere**: full inference on both sides, no casting
-- **Typed authentication**: identities and per-route authentication declared on the contract
+- **Typed authentication**: identities, roles, and per-route access control declared on the contract
 - **RPC-like client**: call your API like a function, get fully typed responses back
 - **Streaming**: stream an AI reply as typed events, yielded from the handler and read with `for await` in the client
 - **Tools**: declare the tools an AI assistant can call, run them on the server, and read each call typed in your client

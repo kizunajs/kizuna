@@ -4,6 +4,8 @@ import {
     HANDLER_CONTEXT_BRAND,
     type HandlerContextBrand,
     type AutoResponsesBrand,
+    AUTO_RESPONSES_BRAND,
+    AUTO_GUARD_WRITTEN_BRAND,
     type GuardStatus,
     type ResponseHeaders,
     type RouteDefinition,
@@ -14,7 +16,7 @@ import {
 import type { StreamBodyOf } from './stream.js';
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
-import type { IdentityAccess } from './identity.js';
+import type { GuardHoldings, IdentityRole } from './identity.js';
 import { applyCoercion, coercionPlanFor } from './coercion.js';
 import type { ProblemDetails, StripProblemEnvelope } from './problem-details.js';
 
@@ -78,12 +80,26 @@ export type HandlerArgs<R extends RouteDefinition> = {
      *
      * This function throws internally and never returns.
      */
-    throwError: (response: ThrowableReturn<R>) => never;
+    throwError: (response: ThrowableReturn<R> | GuardAnswer<R>) => never;
 };
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (
     args: HandlerArgs<R> & HandlerContext & BrandedHandlerContext<R>
-) => Promise<HandlerReturn<R>> | HandlerReturn<R>;
+) => Promise<HandlerReturn<R> | GuardAnswer<R>> | HandlerReturn<R> | GuardAnswer<R>;
+
+/**
+ * The `403` a guarded route already declares, which its handler may answer
+ * itself.
+ */
+export type GuardAnswer<R> = typeof AUTO_RESPONSES_BRAND extends keyof R
+    ? 403 extends NonNullable<R[typeof AUTO_RESPONSES_BRAND]>
+        ? {
+              status: 403;
+              body: typeof AUTO_GUARD_WRITTEN_BRAND extends keyof R ? NonNullable<R[typeof AUTO_GUARD_WRITTEN_BRAND]> : { detail: string };
+              headers?: ResponseHeaders;
+          }
+        : never
+    : never;
 
 export type Router<T extends Routes, HandlerContext = unknown> = {
     [Key in keyof T as Key extends symbol ? never : Key]: T[Key] extends RouteDefinition
@@ -94,106 +110,83 @@ export type Router<T extends Routes, HandlerContext = unknown> = {
 };
 
 /**
- * Narrow an identity's access to the constraint a route puts on it. A
- * `{ field: value }` constraint narrows that field to the value (or to the union,
- * for `{ field: [a, b] }`); an oauth2 scope array leaves access unconstrained.
- *
- * @example
- * type Narrowed = NarrowAccess<typeof member, { role: 'owner' }>;
- * // { role: 'owner' }, even though member.access allows 'owner' | 'admin'
- */
-type NarrowAccess<Id, Constraint> = Constraint extends readonly unknown[]
-    ? IdentityAccess<Id>
-    : Constraint extends Record<string, unknown>
-      ? Omit<IdentityAccess<Id>, keyof Constraint> & {
-            [Field in keyof Constraint & keyof IdentityAccess<Id>]: IdentityAccess<Id>[Field] extends readonly unknown[]
-                ? IdentityAccess<Id>[Field]
-                : Constraint[Field] extends readonly (infer Value)[]
-                  ? Value
-                  : Constraint[Field];
-        }
-      : IdentityAccess<Id>;
-
-/**
- * The object a passing guard returns for an identity: its `context` and `access`
- * fields flattened into one type. Read in a handler under the identity's name and
- * checked against the route's access gate. Flattened (rather than left as an
- * intersection) so it works as a contextual type, letting a guard return literal
- * access values like `role: 'owner'` without an annotation.
+ * What a handler reads for an identity: its `context` and, when the identity
+ * declares roles, the caller's `role`, with `permissions` for roles built from
+ * a catalog, flattened into one type.
+ * Read in a handler under the identity's name. Flattened (rather than left as
+ * an intersection) so it works as a contextual type, letting a guard return a
+ * literal `role: 'owner'` without an annotation.
  */
 export type GuardSuccess<S> = {
-    [Field in keyof (ContextOf<S> & IdentityAccess<S>)]: (ContextOf<S> & IdentityAccess<S>)[Field];
+    [Field in keyof (ContextOf<S> & IdentityRole<S>)]: (ContextOf<S> & IdentityRole<S>)[Field];
 };
 
 /**
+ * What a guard returns to allow a request: the identity's context and its
+ * `role`. `permissions` is optional beside the role, since kizuna fills it in
+ * from the role before the handler runs.
+ */
+export type GuardReturn<S> = {
+    [Field in keyof (ContextOf<S> & GuardHoldings<S>)]: (ContextOf<S> & GuardHoldings<S>)[Field];
+};
+
+/**
+ * The identity names an {@link AccessControlValue} requires: a name, the `auth` of a
+ * rule, or none for `false`.
+ */
+type AccessControlValueIdentityNames<Value> = Value extends false
+    ? never
+    : Value extends string
+      ? Value
+      : Value extends { auth: infer Auth }
+        ? Auth extends string
+            ? Auth
+            : Auth extends readonly (infer Name extends string)[]
+              ? Name
+              : never
+        : never;
+
+/**
  * The scheme-keyed security context a single route's handler receives, derived
- * from the auth value the route resolves to: `false` (public) contributes
- * nothing; a scheme name yields that identity's context and full access; a
- * constraint object keys each named identity to its context and narrowed access.
+ * from the access value the route resolves to: `false` (public) contributes
+ * nothing; each identity the value names yields its context, its role, and
+ * for roles built from a catalog, its permissions.
  *
  * @example
- * type Context = ContextFromAuthValue<{ member: { role: 'owner' } }, { member: typeof member }>;
- * // { member: { workspaceUserId: string; role: 'owner' } }
+ * type Context = ContextFromAccessControlValue<{ auth: 'member' }, { member: typeof member }>;
+ * // { member: { workspaceUserId: string; role: 'owner' | 'admin' | readonly ('owner' | 'admin')[]; permissions: readonly ('workspace:read' | 'workspace:delete')[] } }
  */
-export type ContextFromAuthValue<Value, Identities> = Value extends false
-    ? {}
-    : Value extends string
-      ? Value extends keyof Identities
-          ? [keyof (ContextOf<Identities[Value]> & IdentityAccess<Identities[Value]>)] extends [never]
-              ? {}
-              : { [Name in Value]: ContextOf<Identities[Name]> & IdentityAccess<Identities[Name]> }
-          : {}
-      : Value extends Record<string, unknown>
-        ? {
-              [Name in Extract<keyof Value, string> & keyof Identities as [
-                  keyof (ContextOf<Identities[Name]> & NarrowAccess<Identities[Name], Value[Name]>),
-              ] extends [never]
-                  ? never
-                  : Name]: ContextOf<Identities[Name]> & NarrowAccess<Identities[Name], Value[Name]>;
-          }
-        : {};
+export type ContextFromAccessControlValue<Value, Identities> = {
+    [Name in AccessControlValueIdentityNames<Value> & keyof Identities as [keyof GuardSuccess<Identities[Name]>] extends [never]
+        ? never
+        : Name]: GuardSuccess<Identities[Name]>;
+};
 
 /**
  * The `auth` argument a secured route's handler receives.
  */
 type AuthArg<Value, Identities> =
-    ContextFromAuthValue<Value, Identities> extends infer Ctx ? ([keyof Ctx] extends [never] ? {} : { auth: Ctx }) : never;
+    ContextFromAccessControlValue<Value, Identities> extends infer Ctx ? ([keyof Ctx] extends [never] ? {} : { auth: Ctx }) : never;
 
 /**
- * An auth value normalized to its identity-map form: `false` contributes
- * nothing, a scheme name becomes `{ name: true }`, an object stays as is.
+ * The access value that applies to one route directly within a group's entry: a
+ * named override replaces the `'*'` default.
  */
-type NormalizeAuthValue<Value> = Value extends false ? {} : Value extends string ? { [Name in Value]: true } : Value;
-
-/**
- * An override merged into the `'*'` default: inherits its identities, refines or
- * adds per identity; `false` opts out.
- */
-type MergeAuthValues<Default, Override> = Override extends false
-    ? false
-    : Omit<NormalizeAuthValue<Default>, keyof NormalizeAuthValue<Override>> & NormalizeAuthValue<Override>;
-
-/**
- * The auth value that applies to one route directly within a group's auth entry.
- */
-export type RouteAuthValue<GroupAuth, RouteKey extends string> = GroupAuth extends { '*': infer Default }
-    ? RouteKey extends keyof GroupAuth
-        ? MergeAuthValues<Default, GroupAuth[RouteKey]>
+export type RouteAccessControlValue<GroupAccessControl, RouteKey extends string> = GroupAccessControl extends { '*': infer Default }
+    ? RouteKey extends keyof GroupAccessControl
+        ? GroupAccessControl[RouteKey]
         : Default
-    : GroupAuth;
+    : GroupAccessControl;
 
 /**
- * The group auth a subgroup resolves to within its parent's cascade: a nested
- * cascade with the parent's `'*'` merged in, a merged AuthValue, or the parent's
- * default when unnamed.
+ * The group access a subgroup resolves to within its parent's cascade: its own
+ * entry when named, or the parent's default.
  */
-type SubgroupAuth<GroupAuth, GroupKey extends string> = GroupAuth extends { '*': infer Default }
-    ? GroupKey extends keyof GroupAuth
-        ? GroupAuth[GroupKey] extends { '*': infer NestedDefault }
-            ? Omit<GroupAuth[GroupKey], '*'> & { '*': MergeAuthValues<Default, NestedDefault> }
-            : MergeAuthValues<Default, GroupAuth[GroupKey]>
+type SubgroupAccessControl<GroupAccessControl, GroupKey extends string> = GroupAccessControl extends { '*': infer Default }
+    ? GroupKey extends keyof GroupAccessControl
+        ? GroupAccessControl[GroupKey]
         : Default
-    : GroupAuth;
+    : GroupAccessControl;
 
 /**
  * The `requestContext` argument a handler receives.
@@ -210,33 +203,29 @@ export type RequestContextValues<RequestContext> = string extends keyof RequestC
             };
         };
 
-/**
- * The identity names an {@link AuthValue} requires: a name, the keys of a
- * constraint object, or none for `false`.
- */
-type AuthValueIdentityNames<Value> = Value extends false ? never : Value extends string ? Value : Extract<keyof Value, string>;
-
-type GroupGuardedParamNames<G extends Routes, GroupAuthValue, Name extends string> = {
+type GroupGuardedParamNames<G extends Routes, GroupAccessControlValue, Name extends string> = {
     [Key in keyof G & string]: G[Key] extends RouteDefinition
-        ? Name extends AuthValueIdentityNames<RouteAuthValue<GroupAuthValue, Key>>
+        ? Name extends AccessControlValueIdentityNames<RouteAccessControlValue<GroupAccessControlValue, Key>>
             ? keyof ExtractPathParams<G[Key]['path']> & string
             : never
         : G[Key] extends Routes
-          ? GroupGuardedParamNames<G[Key], SubgroupAuth<GroupAuthValue, Key>, Name>
+          ? GroupGuardedParamNames<G[Key], SubgroupAccessControl<GroupAccessControlValue, Key>, Name>
           : never;
 }[keyof G & string];
 
 /**
  * The path param names of every route the identity `Name` secures, per the
- * contract's auth map.
+ * contract's access control map.
  */
-export type GuardedParamNames<R extends Routes, Auth, Name extends string> = {
+export type GuardedParamNames<R extends Routes, AccessControl, Name extends string> = {
     [Group in keyof R & string]: R[Group] extends RouteDefinition
-        ? Name extends AuthValueIdentityNames<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group>>
+        ? Name extends AccessControlValueIdentityNames<
+              RouteAccessControlValue<Group extends keyof AccessControl ? AccessControl[Group] : false, Group>
+          >
             ? keyof ExtractPathParams<R[Group]['path']> & string
             : never
         : R[Group] extends Routes
-          ? GroupGuardedParamNames<R[Group], Group extends keyof Auth ? Auth[Group] : false, Name>
+          ? GroupGuardedParamNames<R[Group], Group extends keyof AccessControl ? AccessControl[Group] : false, Name>
           : never;
 }[keyof R & string];
 
@@ -245,37 +234,38 @@ export type GuardedParamNames<R extends Routes, Auth, Name extends string> = {
  * routes it secures, each optional since the guard runs across all of them.
  * Falls back to `Record<string, string>` when no params are derivable.
  */
-export type GuardParams<R extends Routes, Auth, Name extends string> = [GuardedParamNames<R, Auth, Name>] extends [never]
+export type GuardParams<R extends Routes, AccessControl, Name extends string> = [GuardedParamNames<R, AccessControl, Name>] extends [never]
     ? Record<string, string>
-    : { [Param in GuardedParamNames<R, Auth, Name>]?: string };
+    : { [Param in GuardedParamNames<R, AccessControl, Name>]?: string };
 
-type GroupHandlers<G extends Routes, HandlerContext, Identities, GroupAuth> = {
+type GroupHandlers<G extends Routes, HandlerContext, Identities, GroupAccessControl> = {
     [Key in keyof G as Key extends symbol ? never : Key]: G[Key] extends RouteDefinition
-        ? RouteHandlerFromContext<G[Key], HandlerContext, AuthArg<RouteAuthValue<GroupAuth, Key & string>, Identities>>
+        ? RouteHandlerFromContext<G[Key], HandlerContext, AuthArg<RouteAccessControlValue<GroupAccessControl, Key & string>, Identities>>
         : G[Key] extends Routes
-          ? GroupHandlers<G[Key], HandlerContext, Identities, SubgroupAuth<GroupAuth, Key & string>>
+          ? GroupHandlers<G[Key], HandlerContext, Identities, SubgroupAccessControl<GroupAccessControl, Key & string>>
           : never;
 };
 
 type RouteHandlerFromContext<R extends RouteDefinition, HandlerContext, SecurityContext> = (
     args: HandlerArgs<R> & HandlerContext & SecurityContext
-) => Promise<HandlerReturn<R>> | HandlerReturn<R>;
+) => Promise<HandlerReturn<R> | GuardAnswer<R>> | HandlerReturn<R> | GuardAnswer<R>;
 
 /**
  * The handler tree for a contract: every route group, each route typed with its
  * inputs, the adapter's handler context, and the scheme-keyed security context
- * its entry in the `auth` map resolves to. Identities and access fields a route
- * requires appear in the handler args under `auth`, keyed by each identity's name.
+ * its entry in the access control map resolves to. The identities a route requires
+ * appear in the handler args under `auth`, keyed by each identity's name, each
+ * carrying its context and the caller's role.
  */
-export type HandlersFromAuth<R extends Routes, HandlerContext, Identities, Auth> = {
+export type HandlersFromAccessControl<R extends Routes, HandlerContext, Identities, AccessControl> = {
     [Group in keyof R as Group extends symbol ? never : Group]: R[Group] extends RouteDefinition
         ? RouteHandlerFromContext<
               R[Group],
               HandlerContext,
-              AuthArg<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, Identities>
+              AuthArg<RouteAccessControlValue<Group extends keyof AccessControl ? AccessControl[Group] : false, Group & string>, Identities>
           >
         : R[Group] extends Routes
-          ? GroupHandlers<R[Group], HandlerContext, Identities, Group extends keyof Auth ? Auth[Group] : false>
+          ? GroupHandlers<R[Group], HandlerContext, Identities, Group extends keyof AccessControl ? AccessControl[Group] : false>
           : never;
 };
 
@@ -284,14 +274,23 @@ export type HandlersFromAuth<R extends Routes, HandlerContext, Identities, Auth>
  */
 type RouteContextBrand<Context> = [keyof Context] extends [never] ? unknown : HandlerContextBrand<Context>;
 
-type RouteGuardBrand<Value, Body> = [AuthValueIdentityNames<Value>] extends [never] ? unknown : AutoResponsesBrand<GuardStatus, Body>;
+type RouteGuardBrand<Value, Body, Written> = [AccessControlValueIdentityNames<Value>] extends [never]
+    ? unknown
+    : AutoResponsesBrand<GuardStatus, Body, Written>;
 
-type GroupHandlerContextOverlay<G extends Routes, Identities, GroupAuth, ContractContext, GuardBody_> = {
+type GroupHandlerContextOverlay<G extends Routes, Identities, GroupAccessControl, ContractContext, GuardBody_, GuardWritten_> = {
     [Key in keyof G]: G[Key] extends RouteDefinition
-        ? RouteContextBrand<AuthArg<RouteAuthValue<GroupAuth, Key & string>, Identities> & ContractContext> &
-              RouteGuardBrand<RouteAuthValue<GroupAuth, Key & string>, GuardBody_>
+        ? RouteContextBrand<AuthArg<RouteAccessControlValue<GroupAccessControl, Key & string>, Identities> & ContractContext> &
+              RouteGuardBrand<RouteAccessControlValue<GroupAccessControl, Key & string>, GuardBody_, GuardWritten_>
         : G[Key] extends Routes
-          ? GroupHandlerContextOverlay<G[Key], Identities, SubgroupAuth<GroupAuth, Key & string>, ContractContext, GuardBody_>
+          ? GroupHandlerContextOverlay<
+                G[Key],
+                Identities,
+                SubgroupAccessControl<GroupAccessControl, Key & string>,
+                ContractContext,
+                GuardBody_,
+                GuardWritten_
+            >
           : unknown;
 };
 
@@ -303,25 +302,34 @@ type GroupHandlerContextOverlay<G extends Routes, Identities, GroupAuth, Contrac
 export type RoutesWithHandlerContext<
     R extends Routes,
     Identities,
-    Auth,
+    AccessControl,
     RequestContext,
     ContractContext = unknown,
     GuardBody_ = ProblemDetails,
+    GuardWritten_ = { detail: string },
 > = R & {
     [Group in keyof R]: R[Group] extends RouteDefinition
         ? RouteContextBrand<
-              AuthArg<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, Identities> &
+              AuthArg<
+                  RouteAccessControlValue<Group extends keyof AccessControl ? AccessControl[Group] : false, Group & string>,
+                  Identities
+              > &
                   RequestContextValues<RequestContext> &
                   ContractContext
           > &
-              RouteGuardBrand<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, GuardBody_>
+              RouteGuardBrand<
+                  RouteAccessControlValue<Group extends keyof AccessControl ? AccessControl[Group] : false, Group & string>,
+                  GuardBody_,
+                  GuardWritten_
+              >
         : R[Group] extends Routes
           ? GroupHandlerContextOverlay<
                 R[Group],
                 Identities,
-                Group extends keyof Auth ? Auth[Group] : false,
+                Group extends keyof AccessControl ? AccessControl[Group] : false,
                 RequestContextValues<RequestContext> & ContractContext,
-                GuardBody_
+                GuardBody_,
+                GuardWritten_
             >
           : unknown;
 };

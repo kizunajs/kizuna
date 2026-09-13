@@ -1,0 +1,222 @@
+---
+title: OAuth
+description: Verify tokens from an authorization server. Declare the identity, secure the routes, verify in the guard, and serve the discovery document.
+---
+
+<AlphaNotice>
+
+OAuth support is new. How an identity declares its authorization server, and how the discovery document is served, will likely change before v2, so pin your version if you depend on it.
+
+</AlphaNotice>
+
+When your tokens come from an authorization server such as better-auth, Auth0 or Keycloak, your API verifies them rather than issuing them. OAuth 2.1 calls that a resource server.
+
+Four steps: declare the identity, secure the routes, verify in the guard, and serve the discovery document.
+
+## Declare where tokens come from
+
+A scope is a permission the token carries. Declare the permissions once, and the roles built from them, as on [Access Control](/docs/access-control):
+
+```ts title="contract/permissions.ts"
+export const permissions = Kizuna.permissions({
+    users: ['read', 'write'],
+});
+```
+
+```ts title="contract/roles.ts"
+export const roles = Kizuna.roles(permissions, {
+    member: {
+        users: ['read'],
+    },
+    admin: 'all',
+});
+```
+
+The identity carries everything about the authorization server. `issuer` is the server's identifier ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)), `flows` names its endpoints and the scopes it issues for the OpenAPI spec, and `resourceMetadata` is where your [discovery document](#serve-the-discovery-document) is served:
+
+```ts title="contract/identities.ts"
+import { z } from 'zod';
+import { Kizuna } from '@ts-kizuna/core';
+
+export const user = Kizuna.identity.oauth2({
+    issuer: 'https://auth.example.com',
+    resourceMetadata: 'https://api.example.com/.well-known/oauth-protected-resource',
+    flows: {
+        authorizationCode: {
+            authorizationUrl: 'https://auth.example.com/oauth2/authorize',
+            tokenUrl: 'https://auth.example.com/oauth2/token',
+            scopes: {
+                'users:read': 'Read users',
+                'users:write': 'Create and update users',
+            },
+        },
+    },
+    context: z.object({
+        userId: z.string(),
+    }),
+    roles,
+});
+```
+
+Give the authorization server the same list, so a token can only carry permissions the code declares. With Better Auth:
+
+```ts title="auth.ts"
+oauthProvider({
+    scopes: ['openid', 'profile', 'email', 'offline_access', ...permissions.names],
+});
+```
+
+For an OpenID Connect server, `Kizuna.identity.openIdConnect({ openIdConnectUrl, resourceMetadata, roles })` is the whole declaration; the issuer derives from the discovery URL.
+
+## Secure the routes
+
+The [access control map](/docs/access-control) names what a route requires, as for any identity:
+
+```ts title="contract/access-control.ts"
+export const accessControl = k.accessControl(routes, {
+    users: {
+        '*': 'user',
+        createUser: {
+            auth: 'user',
+            requires: {
+                users: ['write'],
+            },
+        },
+    },
+});
+```
+
+`k.contract` writes `users:write` into the route's security requirement, so the OpenAPI document lists it as the scope `createUser` needs.
+
+## Verify in the guard
+
+The guard receives the token as `oauth2`. Check the signature against the authorization server's JWKS, the issuer, and the audience, then return the user's role and the token's scopes as `permissions`:
+
+```ts title="server/guards.ts"
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { permissions } from '../contract/permissions';
+import { server } from './server';
+
+const jwks = createRemoteJWKSet(new URL('https://auth.example.com/oauth2/jwks'));
+
+export const requireUser = server.guard('user', async ({ oauth2, deny }) => {
+    if (!oauth2) {
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
+    }
+
+    let claims;
+    try {
+        ({ payload: claims } = await jwtVerify(oauth2.token, jwks, {
+            issuer: 'https://auth.example.com',
+            audience: 'https://api.example.com',
+        }));
+    } catch {
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Invalid or expired token',
+            },
+        });
+    }
+
+    const tokenScopes = typeof claims.scope === 'string' ? claims.scope.split(' ') : [];
+
+    return {
+        userId: String(claims.sub),
+        role: claims.role === 'admin' ? 'admin' : 'member',
+        permissions: permissions.names.filter((name) => tokenScopes.includes(name)),
+    };
+});
+```
+
+The caller holds what both the role and the token allow. When a route requires a permission the role holds but the token lacks, kizuna answers `403` with the `insufficient_scope` challenge ([RFC 6750](https://www.rfc-editor.org/rfc/rfc6750)), so the client knows a new token would pass. When the role lacks it, the `403` has no challenge, since no token could help.
+
+Both challenges point at the discovery document, and so does every `401` from `deny`:
+
+```http
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"
+
+HTTP/1.1 403 Forbidden
+WWW-Authenticate: Bearer error="insufficient_scope", scope="users:write", resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"
+```
+
+## Serve the discovery document
+
+Clients that do not know your authorization server find it through [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) Protected Resource Metadata at `/.well-known/oauth-protected-resource`. Serve it on the framework, next to `api.mount`:
+
+```ts title="src/metadata.ts"
+import { buildProtectedResourceMetadata } from '@ts-kizuna/core';
+import { user } from './identities';
+
+export const metadata = buildProtectedResourceMetadata({
+    resource: 'https://api.example.com',
+    scheme: user,
+});
+```
+
+<Tabs groupId="adapter" items={['Express', 'Fastify', 'Hono', 'Next.js']}>
+
+<Tab value="Express">
+
+```ts title="src/index.ts"
+app.get('/.well-known/oauth-protected-resource', (_req, res) => {
+    res.json(metadata);
+});
+
+api.mount(app);
+```
+
+</Tab>
+
+<Tab value="Fastify">
+
+```ts title="src/index.ts"
+app.get('/.well-known/oauth-protected-resource', async () => metadata);
+
+await api.mount(app);
+```
+
+</Tab>
+
+<Tab value="Hono">
+
+```ts title="src/index.ts"
+app.get('/.well-known/oauth-protected-resource', (c) => c.json(metadata));
+
+api.mount(app);
+```
+
+</Tab>
+
+<Tab value="Next.js">
+
+```ts title="app/.well-known/oauth-protected-resource/route.ts"
+import { metadata } from '@/server/metadata';
+
+export function GET() {
+    return Response.json(metadata);
+}
+```
+
+</Tab>
+
+</Tabs>
+
+The document builds from the identity, so it says what the contract says. `resource` is the canonical URI of your API, the same value your guard checks as the token audience.
+
+Serve it when OAuth clients discover your API rather than being configured for it. A first-party app with a hardcoded authorization server never looks at it.
+
+See [`ProtectedResourceMetadataSchema`](/docs/reference/protected-resource-metadata-schema) for the document's fields and builders.
+
+## Reference
+
+- [Authentication](/docs/authentication) for identities and guards
+- [Access Control](/docs/access-control) for the access control map
+- [`Kizuna.identity`](/docs/reference/kizuna-identity)
+- [`ProtectedResourceMetadataSchema`](/docs/reference/protected-resource-metadata-schema)

@@ -56,6 +56,11 @@ describe('assertCanonicalResource', () => {
     });
 });
 
+const catalog = Kizuna.permissions({
+    users: ['read', 'write'],
+    report: ['read'],
+});
+
 const user = Kizuna.identity.oauth2({
     issuer: 'https://auth.example.com',
     flows: {
@@ -65,14 +70,18 @@ const user = Kizuna.identity.oauth2({
             scopes: {
                 'users:read': 'Read users',
                 'users:write': 'Create and update users',
+                'report:read': 'Read reports',
             },
         },
     },
     context: z.object({
         userId: z.string(),
     }),
-    access: z.object({
-        role: z.string(),
+    roles: Kizuna.roles(catalog, {
+        employee: {
+            users: ['read', 'write'],
+        },
+        admin: 'all',
     }),
 });
 
@@ -152,15 +161,19 @@ const contract = k.contract({
     routes: {
         api: apiRoutes,
     },
-    auth: {
+    accessControl: {
         api: {
             '*': 'user',
             createUser: {
-                user: ['users:write'],
+                auth: 'user',
+                requires: {
+                    users: ['write'],
+                },
             },
             adminReport: {
-                user: {
-                    role: 'admin',
+                auth: 'user',
+                requires: {
+                    report: ['read'],
                 },
             },
             memberFacts: 'member',
@@ -182,21 +195,21 @@ const contract = k.contract({
     },
 });
 
-const TOKENS: Record<string, { userId: string; role: string; granted: string[] }> = {
+const TOKENS: Record<string, { userId: string; role: 'employee' | 'admin'; scope: string }> = {
     reader: {
         userId: 'u-reader',
         role: 'employee',
-        granted: ['users:read'],
+        scope: 'openid users:read',
     },
     writer: {
         userId: 'u-writer',
         role: 'employee',
-        granted: ['users:read', 'users:write'],
+        scope: 'openid users:read users:write',
     },
     admin: {
         userId: 'u-admin',
         role: 'admin',
-        granted: ['users:read', 'users:write'],
+        scope: 'openid users:read users:write report:read',
     },
 };
 
@@ -205,7 +218,7 @@ const makeApi = (onGuardRun?: (requestContext: { analytics: { sessionId: string 
     const captureAnalytics = server.requestContext('analytics', ({ headers }) => ({
         sessionId: headers['x-session-id'] ?? null,
     }));
-    const requireUser = server.guard('user', ({ oauth2, scopes, deny, requestContext }) => {
+    const requireUser = server.guard('user', ({ oauth2, deny, requestContext }) => {
         onGuardRun?.(requestContext);
         const session = oauth2 ? TOKENS[oauth2.token] : undefined;
         if (!session)
@@ -215,16 +228,11 @@ const makeApi = (onGuardRun?: (requestContext: { analytics: { sessionId: string 
                     detail: 'Invalid or expired token',
                 },
             });
-        if (!scopes.every((scope) => session.granted.includes(scope)))
-            return deny({
-                status: 403,
-                body: {
-                    detail: 'The token is missing a required scope',
-                },
-            });
+        const tokenScopes = session.scope.split(' ');
         return {
             userId: session.userId,
             role: session.role,
+            permissions: catalog.names.filter((name) => tokenScopes.includes(name)),
         };
     });
     const requireMember = server.guard('member', ({ apiKey, deny }) => {
@@ -356,7 +364,7 @@ describe('mcpPlugin: oauth', () => {
         expect(await response.json()).toEqual({
             resource: 'https://api.example.com/mcp',
             authorization_servers: ['https://auth.example.com'],
-            scopes_supported: ['users:read', 'users:write'],
+            scopes_supported: ['users:read', 'users:write', 'report:read'],
             bearer_methods_supported: ['header'],
         });
     });
@@ -367,7 +375,7 @@ describe('mcpPlugin: oauth', () => {
         expect(response.status).toBe(401);
         const challenge = response.headers.get('www-authenticate')!;
         expect(challenge).toContain('resource_metadata="https://api.example.com/.well-known/oauth-protected-resource/mcp"');
-        expect(challenge).toContain('scope="users:read users:write"');
+        expect(challenge).toContain('scope="users:read users:write report:read"');
         expect(challenge).not.toContain('error=');
         expect(response.headers.get('content-type')).toContain('application/problem+json');
         expect(((await response.json()) as { status: number }).status).toBe(401);
@@ -466,14 +474,14 @@ describe('mcpPlugin: oauth', () => {
         expect(parsed.status).toBe(201);
     });
 
-    it('answers an access-gate failure with a plain 403', async () => {
+    it('answers a role that lacks the required permission with a plain 403', async () => {
         const port = await start();
         const response = await jsonRpc(port, 'writer', toolCall('api_admin_report', {}));
         expect(response.status).toBe(403);
         expect(response.headers.get('www-authenticate')).toBeNull();
     });
 
-    it('passes an access gate the token satisfies', async () => {
+    it('passes requires when the token’s role holds the permission', async () => {
         const port = await start();
         const connected = await connect(port, 'admin');
         const result = await connected.callTool({
@@ -528,7 +536,7 @@ describe('mcpPlugin: oauth declaration', () => {
             routes: {
                 api: apiRoutes,
             },
-            auth: {
+            accessControl: {
                 api: 'user',
             },
             plugins: {

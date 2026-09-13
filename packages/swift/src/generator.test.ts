@@ -2001,7 +2001,7 @@ describe('Swift generator: the statuses the auth map adds', () => {
         });
         return guardedK.contract({
             routes,
-            auth: {
+            accessControl: {
                 getSecret: 'user',
                 health: false,
             },

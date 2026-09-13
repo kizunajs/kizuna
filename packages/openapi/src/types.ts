@@ -60,6 +60,14 @@ export interface OpenApiOperation {
      * requirement, so this marks the operation as protected, not public.
      */
     'x-kizuna-guarded'?: string[];
+    /**
+     * The roles the route accepts, from the access control map's `roles`.
+     */
+    'x-kizuna-roles'?: string[];
+    /**
+     * The permissions the caller has to hold, from the access control map's `requires`.
+     */
+    'x-kizuna-requires'?: Record<string, string[]>;
     externalDocs?: OpenApiExternalDocs;
     parameters?: OpenApiParameter[];
     requestBody?: {
