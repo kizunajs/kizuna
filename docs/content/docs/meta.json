@@ -12,7 +12,7 @@
         "caching",
         "jobs",
         "deprecations",
-        "---Authentication---",
+        "---Security---",
         "authentication",
         "access-control",
         "oauth",
