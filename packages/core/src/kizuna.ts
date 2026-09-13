@@ -12,103 +12,138 @@ import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, 
 import { buildTools, type AuthoredTools, type CompiledTools, type Tools } from './tools.js';
 import type { ToolsArg } from './tool-runner.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
-import { createIdentity } from './identity.js';
+import { createIdentity, type RolesOf } from './identity.js';
+import { createPermissions, createRoles, permissionNames, type CatalogOf, type PermissionSet, type RoleNamesOf } from './permissions.js';
 import { createRequestContext } from './request-context.js';
 import { createModel } from './model.js';
-import { problemDetails, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
+import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
-import type { Routes, RouteDefinition, SecurityRequirement, AccessGate, AuthoredRoutes } from './types.js';
+import type { Routes, RouteDefinition, SecurityRequirement, RequiredPermissions, AuthoredRoutes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { PathParamsCheck } from './path-params.js';
 
 /**
- * A constraint on an identity's `access` fields: each key is a field, each value
- * the allowed value or values, e.g. `{ role: 'owner' }` or
- * `{ role: ['owner', 'admin'] }`.
+ * One entry in the access control map: `false` for public, an identity name,
+ * or `{ auth, roles?, requires? }`.
  */
-export type AccessConstraint = Record<string, unknown>;
+export type AccessControlValue<Id extends string = string, Identities = Record<string, unknown>> =
+    | Id
+    | false
+    | AccessControlRule<Id, Identities>;
 
 /**
- * The auth a route or group resolves to:
- *
- * - a scheme name: require that identity, no field constraint;
- * - `false`: public;
- * - `{ scheme: true }`: require that identity inside a multi-identity value
- *   (multiple scheme keys are combined with AND);
- * - `{ scheme: { field: value | values } }`: constrain `access` fields;
- * - `{ scheme: [...scopes] }`: oauth2 scopes.
+ * The `requires` an identity accepts: a subset of the catalog behind its roles,
+ * or `never` when the identity declares no roles.
  */
-export type AuthValue<Id extends string = string> = Id | false | { [Name in Id]?: true | AccessConstraint | readonly string[] };
+type RequiresOf<Identities, Name extends string> = Name extends keyof Identities
+    ? [CatalogOf<RolesOf<Identities[Name]>>] extends [never]
+        ? never
+        : PermissionSet<CatalogOf<RolesOf<Identities[Name]>>>
+    : never;
 
 /**
- * A group's entry in the `auth` map: one {@link AuthValue} for the whole group,
- * or a cascade `{ '*': default, key: override }` whose named keys are the
- * group's own routes and subgroups, an {@link AuthValue}, or a nested cascade
- * (an object with its own `'*'`) for a subgroup.
+ * The `roles` an identity accepts: one of its declared role names or several,
+ * or `never` when the identity declares no roles.
  */
-export type GroupAuth<Id extends string = string, Group = Routes> = Group extends RouteDefinition
-    ? AuthValue<Id>
-    : AuthValue<Id> | GroupAuthCascade<Id, Group>;
+type AcceptedRolesOf<Identities, Name extends string> = Name extends keyof Identities
+    ? [RoleNamesOf<RolesOf<Identities[Name]>>] extends [never]
+        ? never
+        : RoleNamesOf<RolesOf<Identities[Name]>> | readonly RoleNamesOf<RolesOf<Identities[Name]>>[]
+    : never;
 
 /**
- * The cascade form of {@link GroupAuth} when the group's shape isn't statically
- * known.
+ * The object form of an {@link AccessControlValue}.
  */
-interface LooseGroupAuthCascade<Id extends string = string> {
-    '*': AuthValue<Id>;
-    [key: string]: AuthValue<Id> | LooseGroupAuthCascade<Id>;
-}
-
-/**
- * The cascade form of {@link GroupAuth}.
- */
-export type GroupAuthCascade<Id extends string = string, Group = Routes> = string extends keyof Group
-    ? LooseGroupAuthCascade<Id>
-    : {
-          '*': AuthValue<Id>;
-      } & {
-          [Key in keyof Group & string]?: GroupAuth<Id, Group[Key]>;
+export type AccessControlRule<Id extends string = string, Identities = Record<string, unknown>> =
+    | {
+          [Name in Id]: {
+              auth: Name;
+              roles?: AcceptedRolesOf<Identities, Name>;
+              requires?: RequiresOf<Identities, Name>;
+          };
+      }[Id]
+    | {
+          auth: readonly Id[];
+          roles?: AcceptedRolesOf<Identities, Id>;
+          requires?: RequiresOf<Identities, Id>;
       };
 
 /**
- * The `auth` map passed to `k.contract`: keyed by route group (every group must
- * appear), with values checked against the contract's identity names. The second
- * parameter takes the routes type, or a union of group names for the unshaped form.
+ * A group's entry in the access control map: one {@link AccessControlValue} for the whole
+ * group, or a cascade `{ '*': default, key: override }` whose named keys are the
+ * group's own routes and subgroups, an {@link AccessControlValue}, or a nested cascade
+ * (an object with its own `'*'`) for a subgroup.
  */
-export type AuthMap<Id extends string = string, GroupsOrRoutes = Record<string, Routes>> = [GroupsOrRoutes] extends [string]
-    ? { [Group in GroupsOrRoutes]: GroupAuth<Id> }
-    : { [Group in keyof GroupsOrRoutes & string]: GroupAuth<Id, GroupsOrRoutes[Group]> };
+export type GroupAccessControl<
+    Id extends string = string,
+    Group = Routes,
+    Identities = Record<string, unknown>,
+> = Group extends RouteDefinition
+    ? AccessControlValue<Id, Identities>
+    : AccessControlValue<Id, Identities> | GroupAccessControlCascade<Id, Group, Identities>;
 
 /**
- * Rechecks an inferred `auth` map against the routes, erroring on keys that
+ * The cascade form of {@link GroupAccessControl} when the group's shape isn't statically
+ * known.
+ */
+interface LooseGroupAccessControlCascade<Id extends string = string, Identities = Record<string, unknown>> {
+    '*': AccessControlValue<Id, Identities>;
+    [key: string]: AccessControlValue<Id, Identities> | LooseGroupAccessControlCascade<Id, Identities>;
+}
+
+/**
+ * The cascade form of {@link GroupAccessControl}.
+ */
+export type GroupAccessControlCascade<
+    Id extends string = string,
+    Group = Routes,
+    Identities = Record<string, unknown>,
+> = string extends keyof Group
+    ? LooseGroupAccessControlCascade<Id, Identities>
+    : {
+          '*': AccessControlValue<Id, Identities>;
+      } & {
+          [Key in keyof Group & string]?: GroupAccessControl<Id, Group[Key], Identities>;
+      };
+
+/**
+ * The access control map passed to `k.contract`: keyed by route group (every group must
+ * appear), with values checked against the contract's identity names and the
+ * permissions their roles declare. The second parameter takes the routes type,
+ * or a union of group names for the unshaped form.
+ */
+export type AccessControlMap<Id extends string = string, GroupsOrRoutes = Record<string, Routes>, Identities = Record<string, unknown>> = [
+    GroupsOrRoutes,
+] extends [string]
+    ? { [Group in GroupsOrRoutes]: GroupAccessControl<Id, Routes, Identities> }
+    : { [Group in keyof GroupsOrRoutes & string]: GroupAccessControl<Id, GroupsOrRoutes[Group], Identities> };
+
+/**
+ * Rechecks an inferred access control map against the routes, erroring on keys that
  * plain assignability would let through as excess properties.
  */
-export type ValidAuthMap<A, R, Id extends string> = {
-    [Group in keyof A]: Group extends keyof R ? ValidGroupAuth<A[Group], R[Group], Id> : never;
+export type ValidAccessControlMap<A, R, Id extends string, Identities = Record<string, unknown>> = {
+    [Group in keyof A]: Group extends keyof R ? ValidGroupAccessControl<A[Group], R[Group], Id, Identities> : never;
 };
 
-type ValidGroupAuth<Entry, Group, Id extends string> = Group extends RouteDefinition
+type ValidGroupAccessControl<Entry, Group, Id extends string, Identities> = Group extends RouteDefinition
     ? Entry extends { '*': unknown }
         ? never
-        : AuthValue<Id>
+        : AccessControlValue<Id, Identities>
     : Entry extends { '*': unknown }
       ? {
             [Key in keyof Entry]: Key extends '*'
-                ? AuthValue<Id>
+                ? AccessControlValue<Id, Identities>
                 : Key extends keyof Group
-                  ? ValidGroupAuth<Entry[Key], Group[Key], Id>
+                  ? ValidGroupAccessControl<Entry[Key], Group[Key], Id, Identities>
                   : never;
         }
-      : AuthValue<Id>;
+      : AccessControlValue<Id, Identities>;
 
 /**
- * Apply one {@link AuthValue} to a single route, setting its `security` and,
- * when fields are constrained, its `accessGate`.
- */
-/**
- * Kizuna sends the guard body itself when an access gate turns a caller away,
- * so every field beyond the envelope has to be one it can fill.
+ * Kizuna sends the guard body itself when a route's `requires` turns a caller
+ * away, so every field beyond the envelope has to be one it can fill.
  */
 const ENVELOPE_FIELDS = ['type', 'title', 'status', 'detail'];
 
@@ -122,11 +157,22 @@ const assertFillableGuardSchema = (schema: z.ZodType): void => {
     if (schema.safeParse(problemDetails(403, 'Forbidden')).success) return;
     throw new Error(
         'The `guardSchema` cannot be built from a status and a detail alone. ' +
-            'Kizuna sends it when an access gate refuses a caller, so give every field you added `.optional()` or a `.default()`.'
+            "Kizuna sends it when a route's `requires` refuses a caller, so give every field you added `.optional()` or a `.default()`."
     );
 };
 
-const resolveAuthValue = (route: RouteDefinition, value: AuthValue): void => {
+/**
+ * Apply one {@link AccessControlValue} to a single route, setting its `security` and,
+ * when narrowed, its `roles` and `requires`.
+ */
+const resolveAccessControlValue = (
+    route: RouteDefinition,
+    value: AccessControlValue,
+    identities: Record<string, SecurityScheme> | undefined,
+    routePath: string
+): void => {
+    delete route.roles;
+    delete route.requires;
     if (value === false) {
         route.security = [];
         return;
@@ -135,83 +181,113 @@ const resolveAuthValue = (route: RouteDefinition, value: AuthValue): void => {
         route.security = [value];
         return;
     }
-    const requirement: Record<string, readonly string[]> = {};
-    const gate: AccessGate = {};
-    for (const [scheme, constraint] of Object.entries(value)) {
-        if (constraint === true) {
-            requirement[scheme] = [];
-        } else if (Array.isArray(constraint)) {
-            requirement[scheme] = constraint as readonly string[];
-        } else {
-            requirement[scheme] = [];
-            const fields = constraint as AccessConstraint;
-            if (Object.keys(fields).length > 0) gate[scheme] = fields;
+    const names = typeof value.auth === 'string' ? [value.auth] : [...value.auth];
+    if (names.length === 0) {
+        throw new Error(`Access control entry for '${routePath}' names no identity under \`auth\`.`);
+    }
+    route.security = [requirementFor(names, undefined, identities) as SecurityRequirement];
+
+    const accepted = value.roles === undefined ? [] : typeof value.roles === 'string' ? [value.roles] : [...value.roles];
+    if (accepted.length > 0) {
+        const declared = names.map((name) => identities?.[name]?.roles).filter((roles) => roles !== undefined);
+        if (declared.length === 0) {
+            throw new Error(`Access control entry for '${routePath}' has \`roles\`, but none of its identities declares roles.`);
+        }
+        for (const role of accepted) {
+            if (!declared.some((roles) => roles.names.includes(role))) {
+                throw new Error(
+                    `Access control entry for '${routePath}' accepts the role '${role}', which no identity on the route declares.`
+                );
+            }
+        }
+        route.roles = accepted;
+    }
+
+    const requires = value.requires as RequiredPermissions | undefined;
+    if (requires === undefined || Object.keys(requires).length === 0) return;
+    const catalogs = names.map((name) => identities?.[name]?.roles?.permissions?.catalog).filter((catalog) => catalog !== undefined);
+    if (catalogs.length === 0) {
+        throw new Error(`Access control entry for '${routePath}' has \`requires\`, but none of its identities declares permissions.`);
+    }
+    for (const [resource, verbs] of Object.entries(requires)) {
+        for (const verb of verbs) {
+            if (!catalogs.some((catalog) => catalog[resource]?.includes(verb))) {
+                throw new Error(
+                    `Access control entry for '${routePath}' requires '${resource}:${verb}', which no identity on the route declares.`
+                );
+            }
         }
     }
-    route.security = [requirement as SecurityRequirement];
-    if (Object.keys(gate).length > 0) route.accessGate = gate;
+    route.requires = requires;
+    route.security = [requirementFor(names, requires, identities) as SecurityRequirement];
 };
 
-const hasCascade = (value: unknown): value is { '*': AuthValue } & Record<string, AuthValue | GroupAuth> =>
+/**
+ * The security requirement for the identities an entry names. An OAuth token
+ * carries its permissions as scopes, so an `oauth2` or `openIdConnect`
+ * identity lists what the route requires from its catalog.
+ */
+const requirementFor = (
+    names: readonly string[],
+    requires: RequiredPermissions | undefined,
+    identities: Record<string, SecurityScheme> | undefined
+): Record<string, readonly string[]> => {
+    const requirement: Record<string, readonly string[]> = {};
+    for (const name of names) {
+        const identity = identities?.[name];
+        const type = identity?.openapi?.type;
+        const catalog = identity?.roles?.permissions?.catalog;
+        requirement[name] =
+            requires !== undefined && catalog !== undefined && (type === 'oauth2' || type === 'openIdConnect')
+                ? permissionNames(requires).filter((permission) => {
+                      const [resource, verb] = permission.split(':');
+                      return catalog[resource ?? '']?.includes(verb ?? '') ?? false;
+                  })
+                : [];
+    }
+    return requirement;
+};
+
+const hasCascade = (value: unknown): value is { '*': AccessControlValue } & Record<string, AccessControlValue | GroupAccessControl> =>
     typeof value === 'object' && value !== null && !Array.isArray(value) && '*' in value;
 
-const toIdentityMap = (value: AuthValue): Record<string, true | AccessConstraint | readonly string[]> => {
-    if (value === false) return {};
-    if (typeof value === 'string') return { [value]: true };
-    return value as Record<string, true | AccessConstraint | readonly string[]>;
-};
-
 /**
- * Merge a route's auth entry into the group's `'*'` default. The route inherits
- * the default's identities and refines or adds per identity; `false` opts the
- * route out entirely.
+ * Resolve a group's {@link GroupAccessControl} across its subtree. Cascade keys address
+ * the group's own routes and subgroups, and a named key replaces the `'*'`
+ * default for what it names; a key matching none would be a silent no-op, so it
+ * throws instead.
  */
-const mergeAuthValue = (groupDefault: AuthValue, override: AuthValue): AuthValue => {
-    if (override === false) return false;
-    return { ...toIdentityMap(groupDefault), ...toIdentityMap(override) } as AuthValue;
-};
-
-/**
- * Resolve a group's {@link GroupAuth} across its subtree. Cascade keys address
- * the group's own routes and subgroups; a key matching none would be a silent
- * no-op, so it throws instead.
- */
-const applyGroupAuth = (group: Routes, groupAuth: GroupAuth, path: string): void => {
-    const cascade = hasCascade(groupAuth);
-    const groupDefault = (cascade ? groupAuth['*'] : groupAuth) as AuthValue;
+const applyGroupAccessControl = (
+    group: Routes,
+    groupAccess: GroupAccessControl,
+    path: string,
+    identities: Record<string, SecurityScheme> | undefined
+): void => {
+    const cascade = hasCascade(groupAccess);
+    const groupDefault = (cascade ? groupAccess['*'] : groupAccess) as AccessControlValue;
     if (cascade) {
-        for (const overrideKey of Object.keys(groupAuth)) {
+        for (const overrideKey of Object.keys(groupAccess)) {
             if (overrideKey !== '*' && !(overrideKey in group)) {
-                throw new Error(`Auth cascade key '${overrideKey}' does not match a route or group directly under '${path}'.`);
+                throw new Error(`Access control map key '${overrideKey}' does not match a route or group directly under '${path}'.`);
             }
         }
     }
     for (const [key, value] of Object.entries(group)) {
-        const entry = cascade ? (groupAuth as Record<string, GroupAuth | undefined>)[key] : undefined;
+        const entry = cascade ? (groupAccess as Record<string, GroupAccessControl | undefined>)[key] : undefined;
+        const subPath = `${path}.${key}`;
         if (!isRouteDefinition(value)) {
-            const subgroup = value as Routes;
-            const subPath = `${path}.${key}`;
-            if (entry === undefined) {
-                applyGroupAuth(subgroup, groupDefault, subPath);
-            } else if (hasCascade(entry)) {
-                applyGroupAuth(
-                    subgroup,
-                    {
-                        ...entry,
-                        '*': mergeAuthValue(groupDefault, entry['*']),
-                    },
-                    subPath
-                );
-            } else {
-                applyGroupAuth(subgroup, mergeAuthValue(groupDefault, entry as AuthValue), subPath);
-            }
+            applyGroupAccessControl(value as Routes, entry === undefined ? groupDefault : entry, subPath, identities);
             continue;
         }
         if (hasCascade(entry)) {
-            throw new Error(`Auth cascade key '${key}' under '${path}' targets a route; a nested cascade only applies to a group.`);
+            throw new Error(`Access control map key '${key}' under '${path}' targets a route; a nested cascade only applies to a group.`);
         }
-        const routeAuth = entry === undefined ? groupDefault : mergeAuthValue(groupDefault, entry as AuthValue);
-        resolveAuthValue(value as RouteDefinition, routeAuth);
+        resolveAccessControlValue(
+            value as RouteDefinition,
+            (entry === undefined ? groupDefault : entry) as AccessControlValue,
+            identities,
+            subPath
+        );
     }
 };
 
@@ -247,18 +323,31 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
     routes<const T extends AuthoredRoutes<TagNamesOf<Spec>>>(tag: TagNamesOf<Spec>, defs: T & PathParamsCheck<T>): T;
     routes<const T extends AuthoredRoutes>(defs: T & PathParamsCheck<T>): T;
     /**
-     * The `auth` map, typed against the routes and identities. Define it wherever
-     * you like, then pass it to `k.contract` under `auth`.
+     * The access control map, typed against the routes, the identities and the
+     * permissions their roles declare. Define it beside the routes, then pass
+     * it to `k.contract` under `accessControl`.
      *
      * @example
-     * export const auth = k.auth(routes, {
-     *     users: false,
-     *     members: 'user',
+     * export const accessControl = k.accessControl(routes, {
+     *     health: false,
+     *     users: 'user',
+     *     workspace: {
+     *         '*': 'member',
+     *         deleteWorkspace: {
+     *             auth: 'member',
+     *             requires: {
+     *                 workspace: ['delete'],
+     *             },
+     *         },
+     *     },
      * });
      */
-    auth<const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>, const A extends AuthMap<IdentityNamesOf<Spec>, R>>(
+    accessControl<
+        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
+        const A extends AccessControlMap<IdentityNamesOf<Spec>, R, Spec['identities']>,
+    >(
         routes: R,
-        map: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>
+        map: A & ValidAccessControlMap<A, R, IdentityNamesOf<Spec>, Spec['identities']>
     ): A;
     /**
      * Declare scheduled jobs. Pass the identity every job requires, the one
@@ -313,17 +402,18 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
     tools<const T extends AuthoredTools, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: T): CompiledTools<T, Name>;
     tools<const T extends AuthoredTools>(definitions: T): CompiledTools<T, undefined>;
     /**
-     * Assemble route groups into a contract. The `auth` map assigns each group
-     * (and optionally each route, via a `'*'` cascade) the identity it requires;
-     * `k.contract` resolves it onto every route's `security` and `accessGate`.
+     * Assemble route groups into a contract. The access control map assigns each group
+     * (and optionally each route, via a `'*'` cascade) the identity it requires,
+     * and the roles it accepts or the permissions the caller has to hold;
+     * `k.contract` resolves it onto every route's `security`, `roles` and `requires`.
      *
      * Jobs declared with `k.jobs` go under `jobs`, alongside `routes` rather than
      * inside it. They carry their own identity, so they never appear in the
-     * `auth` map.
+     * access control map.
      */
     contract<
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
-        const A extends AuthMap<IdentityNamesOf<Spec>, R>,
+        const A extends AccessControlMap<IdentityNamesOf<Spec>, R, Spec['identities']>,
         const J extends Jobs = Record<string, never>,
         const T extends Tools = Record<string, never>,
         const P extends ContractPlugins = Record<string, never>,
@@ -332,7 +422,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         jobs?: J;
         tools?: T;
         plugins?: ContractPluginsArg<R, P, T>;
-        auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
+        accessControl: A & ValidAccessControlMap<A, R, IdentityNamesOf<Spec>, Spec['identities']>;
     }): Contract<
         RoutesWithHandlerContext<
             R,
@@ -340,7 +430,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
             A,
             Spec['requestContext'],
             PluginArgs<P> & JobsArg<J> & ToolsArg<T>,
-            GuardOutput<Spec['guardSchema']>
+            GuardOutput<Spec['guardSchema']>,
+            GuardBody<Spec['guardSchema']>
         >,
         Spec['tags'],
         Spec['codes'],
@@ -369,7 +460,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
             unknown,
             Spec['requestContext'],
             PluginArgs<P> & JobsArg<J> & ToolsArg<T>,
-            GuardOutput<Spec['guardSchema']>
+            GuardOutput<Spec['guardSchema']>,
+            GuardBody<Spec['guardSchema']>
         >,
         Spec['tags'],
         Spec['codes'],
@@ -417,7 +509,7 @@ type SpecOf<
 
 /**
  * The tags, identities, request contexts and custom validation issue codes one
- * API surface is bound to. Routes, auth, jobs and plugins go on `k.contract`.
+ * API surface is bound to. Routes, access, jobs and plugins go on `k.contract`.
  */
 export interface KizunaConfig<
     Tags extends Record<string, TagOptions> = Record<string, never>,
@@ -432,7 +524,7 @@ export interface KizunaConfig<
      * The body every guard's `deny()` produces, and the body each guarded
      * route's `401` and `403` carry. Extend `ProblemDetailsSchema`. Every field
      * you add must be optional or carry a `.default()`, because kizuna sends
-     * this itself when an access gate turns a caller away.
+     * this itself when a route's `requires` turns a caller away.
      *
      * @example
      * guardSchema: ProblemDetailsSchema.extend({
@@ -486,9 +578,9 @@ const createSurface = <
         jobs?: Jobs;
         tools?: Tools;
         plugins?: ContractPluginsArg<Routes, ContractPlugins>;
-        auth?: Record<string, GroupAuth>;
+        accessControl?: Record<string, GroupAccessControl>;
     }) => {
-        const { routes: contractRoutes, jobs: contractJobs, tools: contractTools, auth } = definition;
+        const { routes: contractRoutes, jobs: contractJobs, tools: contractTools, accessControl } = definition;
         const plugins =
             typeof definition.plugins === 'function'
                 ? definition.plugins({
@@ -503,23 +595,28 @@ const createSurface = <
         ]);
         assertValidDeprecationDates(contractRoutes);
         assertValidDeprecationDates(pluginRouteTree(plugins));
-        if (auth) {
-            for (const groupKey of Object.keys(auth)) {
+        if (accessControl) {
+            for (const groupKey of Object.keys(accessControl)) {
                 if (!(groupKey in contractRoutes)) {
-                    throw new Error(`Auth map key '${groupKey}' does not match a route group in the contract.`);
+                    throw new Error(`Access control map key '${groupKey}' does not match a route group in the contract.`);
                 }
             }
             for (const [groupKey, group] of Object.entries(contractRoutes)) {
-                const groupAuth = auth[groupKey];
-                if (groupAuth === undefined || !group || typeof group !== 'object') continue;
+                const groupAccess = accessControl[groupKey];
+                if (groupAccess === undefined || !group || typeof group !== 'object') continue;
                 if (isRouteDefinition(group)) {
-                    resolveAuthValue(group, (hasCascade(groupAuth) ? groupAuth['*'] : groupAuth) as AuthValue);
+                    resolveAccessControlValue(
+                        group,
+                        (hasCascade(groupAccess) ? groupAccess['*'] : groupAccess) as AccessControlValue,
+                        config?.identities,
+                        groupKey
+                    );
                 } else {
-                    applyGroupAuth(group as Routes, groupAuth, groupKey);
+                    applyGroupAccessControl(group as Routes, groupAccess, groupKey, config?.identities);
                 }
             }
         }
-        // After the auth map resolves, so both of these can read `security`.
+        // After the access control map resolves, so both of these can read `security`.
         injectGuardResponses(contractRoutes, config?.identities, config?.guardSchema);
         assertValidCache(contractRoutes);
         assertValidCache(pluginRouteTree(plugins));
@@ -527,7 +624,7 @@ const createSurface = <
             routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
             jobs: contractJobs,
             tools: contractTools,
-            auth,
+            accessControl,
             tags: config?.tags,
             securitySchemes: config?.identities,
             guardSchema: config?.guardSchema,
@@ -542,7 +639,7 @@ const createSurface = <
         routes,
         jobs,
         tools,
-        auth: (_routes, map) => map,
+        accessControl: (_routes, map) => map,
         contract: contract as K<Spec>['contract'],
         issue: addCodedIssue,
     };
@@ -553,10 +650,12 @@ const createSurface = <
 /**
  * Declare one API surface: its tags, identities, request contexts and custom
  * validation issue codes. Keep the instance and use `k.routes` to define route
- * groups, `k.auth` to type the auth map, and `k.contract` to assemble them.
+ * groups, `k.accessControl` to type the access control map, and `k.contract` to assemble
+ * them.
  *
  * The authoring helpers that need no instance stay static: `Kizuna.tags`,
- * `Kizuna.identity`, `Kizuna.requestContext` and `Kizuna.model`.
+ * `Kizuna.identity`, `Kizuna.roles`, `Kizuna.permissions`,
+ * `Kizuna.requestContext` and `Kizuna.model`.
  *
  * @example
  * export const k = new Kizuna({
@@ -578,11 +677,16 @@ export class Kizuna<
 > implements K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>> {
     static readonly tags = createTags;
     static readonly identity = createIdentity;
+    static readonly permissions = createPermissions;
+    /**
+     * Declare the roles callers hold, as names or from a permission catalog.
+     */
+    static readonly roles = createRoles;
     static readonly requestContext = createRequestContext;
     static readonly model = createModel;
 
     declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['routes'];
-    declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['auth'];
+    declare readonly accessControl: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['accessControl'];
     declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['jobs'];
     declare readonly tools: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['tools'];
     declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['contract'];

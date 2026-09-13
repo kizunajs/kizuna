@@ -214,7 +214,7 @@ Both run before the handler and both put a typed value in its args. They answer 
 
 |             | Request context         | Guard                              |
 | ----------- | ----------------------- | ---------------------------------- |
-| Runs on     | Every route             | The routes the auth map secures    |
+| Runs on     | Every route             | The routes access control secures  |
 | Runs        | Before the guards       | After every resolver has run       |
 | Can reject  | No                      | Yes, with `deny({ status, body })` |
 | Handler arg | `requestContext.<name>` | `auth.<identity>`                  |

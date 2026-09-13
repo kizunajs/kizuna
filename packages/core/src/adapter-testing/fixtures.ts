@@ -201,15 +201,24 @@ export const userIdentity = Kizuna.identity.bearer({
     }),
 });
 
+export const workspacePermissions = Kizuna.permissions({
+    workspace: ['read', 'delete'],
+});
+
+export const workspaceRoles = Kizuna.roles(workspacePermissions, {
+    admin: {
+        workspace: ['read'],
+    },
+    owner: 'all',
+});
+
 export const memberIdentity = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
         workspaceUserId: z.string(),
     }),
-    access: z.object({
-        role: z.enum(['owner', 'admin']),
-    }),
+    roles: workspaceRoles,
 });
 
 export const ownerToken = 'wst_owner';
@@ -250,6 +259,15 @@ export const securedRoutes = securedK.routes({
             }),
         },
     },
+    adminOnly: {
+        method: 'GET',
+        path: '/admin-only',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
     both: {
         method: 'GET',
         path: '/both',
@@ -266,18 +284,22 @@ export const securedContract = securedK.contract({
     routes: {
         api: securedRoutes,
     },
-    auth: {
+    accessControl: {
         api: {
             '*': false,
             whoAmI: 'user',
             ownerOnly: {
-                member: {
-                    role: 'owner',
+                auth: 'member',
+                requires: {
+                    workspace: ['delete'],
                 },
             },
+            adminOnly: {
+                auth: 'member',
+                roles: 'admin',
+            },
             both: {
-                user: true,
-                member: true,
+                auth: ['user', 'member'],
             },
         },
     },
@@ -325,7 +347,7 @@ export const securedGuards = {
 };
 
 /**
- * Typed through `HandlersFromAuth` rather than `Router`, so `auth` comes from the contract's resolved `security` and the
+ * Typed through `HandlersFromAccessControl` rather than `Router`, so `auth` comes from the contract's resolved `security` and the
  * handlers below need no casts.
  */
 export type SecuredRouter<Context> = Router<typeof securedContract.routes, Context>;
@@ -345,6 +367,12 @@ export const createSecuredRouter = <Context>(): SecuredRouter<Context> => ({
             },
         }),
         ownerOnly: () => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        }),
+        adminOnly: () => ({
             status: 200,
             body: {
                 ok: true,

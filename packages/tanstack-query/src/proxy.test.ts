@@ -234,7 +234,7 @@ describe('declared statuses', () => {
                     },
                 }),
             },
-            auth: {
+            accessControl: {
                 users: 'user',
             },
         });

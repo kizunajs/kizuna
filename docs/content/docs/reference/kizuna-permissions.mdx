@@ -1,0 +1,30 @@
+---
+title: Kizuna.permissions
+description: Declare every permission an API has, for roles to hold and routes to require.
+---
+
+<AlphaNotice>
+
+Access control is new. `Kizuna.permissions` will likely change before v2, so pin your version if you depend on it.
+
+</AlphaNotice>
+
+`Kizuna.permissions(catalog)` declares every permission that exists, grouped by what it acts on. [Roles](/docs/reference/kizuna-roles) are built from it, routes name what they require from it, and nothing outside it can be required or held.
+
+```ts title="permissions.ts"
+import { Kizuna } from '@ts-kizuna/core';
+
+export const permissions = Kizuna.permissions({
+    workspace: ['read', 'update', 'delete'],
+    project: ['create', 'read', 'update', 'delete', 'share'],
+    invite: ['send', 'cancel', 'accept'],
+});
+```
+
+| Property              | Description                                                |
+| --------------------- | ---------------------------------------------------------- |
+| `permissions.catalog` | The catalog as declared.                                   |
+| `permissions.names`   | Every permission as `resource:verb`.                       |
+| `permissions.schema`  | A zod enum of `names`, for a body that sends a permission. |
+
+Pass it to [`Kizuna.roles`](/docs/reference/kizuna-roles) to build roles that hold permissions. See [Access Control](/docs/access-control).

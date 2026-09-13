@@ -8,6 +8,8 @@ import { Badge } from '@/components/shared/badge';
  */
 const badges: Record<string, string> = {
     '/docs/authentication': 'Beta',
+    '/docs/access-control': 'Alpha',
+    '/docs/oauth': 'Alpha',
     '/docs/jobs': 'Alpha',
     '/docs/caching': 'Beta',
     '/docs/mcp': 'Beta',
@@ -22,7 +24,9 @@ const badges: Record<string, string> = {
     '/docs/clients/tanstack-query': 'Beta',
     '/docs/vscode': 'Beta',
     '/docs/reference/kizuna-identity': 'Beta',
-    '/docs/reference/k-auth': 'Beta',
+    '/docs/reference/k-access-control': 'Alpha',
+    '/docs/reference/kizuna-roles': 'Alpha',
+    '/docs/reference/kizuna-permissions': 'Alpha',
     '/docs/reference/k-jobs': 'Alpha',
     '/docs/reference/k-issue': 'Beta',
     '/docs/reference/server-guard': 'Beta',

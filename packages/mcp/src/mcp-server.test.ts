@@ -976,13 +976,23 @@ describe('MCP server e2e', () => {
 });
 
 describe('MCP server: guards', () => {
+    const permissions = Kizuna.permissions({
+        profile: ['read'],
+        report: ['read'],
+    });
+
+    const roles = Kizuna.roles(permissions, {
+        member: {
+            profile: ['read'],
+        },
+        admin: 'all',
+    });
+
     const user = Kizuna.identity.bearer({
         context: z.object({
             userId: z.string(),
         }),
-        access: z.object({
-            role: z.enum(['owner', 'admin', 'member']),
-        }),
+        roles,
     });
 
     const securedK = new Kizuna({
@@ -1025,13 +1035,15 @@ describe('MCP server: guards', () => {
         routes: {
             api: securedRoutes,
         },
-        auth: {
+        accessControl: {
             api: {
                 '*': false,
                 whoAmI: 'user',
                 ownerOnly: {
-                    user: {
-                        role: ['owner', 'admin'],
+                    auth: 'user',
+                    roles: 'admin',
+                    requires: {
+                        report: ['read'],
                     },
                 },
             },
@@ -1054,6 +1066,12 @@ describe('MCP server: guards', () => {
                             userId: (args.auth as { user: { userId: string } }).user.userId,
                         },
                     }),
+                    ownerOnly: () => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    }),
                 },
             },
             guards: {
@@ -1067,6 +1085,7 @@ describe('MCP server: guards', () => {
                         });
                     return {
                         userId: '1',
+                        role: 'member',
                     };
                 },
             },
@@ -1091,7 +1110,9 @@ describe('MCP server: guards', () => {
         const publicRoute = tools.find((tool) => tool.name === 'api_public_route')!;
 
         expect(whoAmI.description).toContain('Requires: user');
-        expect(gated.description).toContain('Requires: user (role: owner, admin)');
+        expect(gated.description).toContain('Requires: user');
+        expect(gated.description).toContain('Roles: admin');
+        expect(gated.description).toContain('Permissions: report:read');
         expect(publicRoute.description).not.toContain('Requires:');
 
         await close();
@@ -1136,6 +1157,7 @@ describe('MCP server: guards', () => {
                 scheme: 'user',
                 context: {
                     userId: '7',
+                    role: 'member',
                 },
             },
         });
@@ -1149,6 +1171,26 @@ describe('MCP server: guards', () => {
         expect(parsed.body).toEqual({
             userId: '7',
         });
+        await close();
+    });
+
+    it('expands the transport-verified role into permissions, so requires passes', async () => {
+        const { client, close } = await connectMcpClient(makeSecuredApi(), {
+            transportAuth: {
+                scheme: 'user',
+                context: {
+                    userId: '7',
+                    role: 'admin',
+                },
+            },
+        });
+        const result = await client.callTool({
+            name: 'api_owner_only',
+            arguments: {},
+        });
+        const content = result.content as Array<{ type: string; text: string }>;
+        const parsed = JSON.parse(content[0]!.text);
+        expect(parsed.status).toBe(200);
         await close();
     });
 
@@ -1273,7 +1315,7 @@ describe('MCP server: request context in guards', () => {
                 description: 'Rebuild the search index',
             },
         }),
-        auth: {
+        accessControl: {
             api: 'user',
         },
     });

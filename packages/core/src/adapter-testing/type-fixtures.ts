@@ -118,15 +118,24 @@ export const userIdentity = Kizuna.identity.bearer({
     }),
 });
 
+export const workspacePermissions = Kizuna.permissions({
+    workspace: ['read', 'delete'],
+});
+
+export const workspaceRoles = Kizuna.roles(workspacePermissions, {
+    admin: {
+        workspace: ['read'],
+    },
+    owner: 'all',
+});
+
 export const memberIdentity = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
         workspaceUserId: z.string(),
     }),
-    access: z.object({
-        role: z.enum(['owner', 'admin']),
-    }),
+    roles: workspaceRoles,
 });
 
 const securedK = new Kizuna({
@@ -164,6 +173,15 @@ export const securedRoutes = securedK.routes({
             }),
         },
     },
+    adminOnly: {
+        method: 'GET',
+        path: '/admin-only',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
     both: {
         method: 'GET',
         path: '/both',
@@ -180,18 +198,22 @@ export const securedContract = securedK.contract({
     routes: {
         api: securedRoutes,
     },
-    auth: {
+    accessControl: {
         api: {
             '*': false,
             whoAmI: 'user',
             ownerOnly: {
-                member: {
-                    role: 'owner',
+                auth: 'member',
+                requires: {
+                    workspace: ['delete'],
                 },
             },
+            adminOnly: {
+                auth: 'member',
+                roles: 'admin',
+            },
             both: {
-                user: true,
-                member: true,
+                auth: ['user', 'member'],
             },
         },
     },
@@ -243,7 +265,7 @@ export const gateContract = gateK.contract({
     routes: {
         api: gateRoutes,
     },
-    auth: {
+    accessControl: {
         api: {
             '*': false,
             apiOnly: 'apiConsumer',
@@ -283,7 +305,7 @@ export const requestContextContract = requestContextK.contract({
     routes: {
         api: requestContextRoutes,
     },
-    auth: {
+    accessControl: {
         api: false,
     },
 });

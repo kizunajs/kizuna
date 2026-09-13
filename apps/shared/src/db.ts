@@ -21,17 +21,20 @@ const lastSessionEvents = new Map<string, SessionEvent>([
     ['2', { kind: 'logout', at: '2026-08-03T18:42:11.000Z', reason: 'session_expired' }],
 ]);
 
-const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
-    ['wst_owner', { workspaceUserId: '1', role: 'owner' }],
-    ['wst_admin', { workspaceUserId: '2', role: 'admin' }],
+const workspaces = new Map<string, { id: string; name: string }>([['ws_1', { id: 'ws_1', name: 'ts-kizuna demo workspace' }]]);
+
+const memberships = new Map<string, { workspaceUserId: string; workspaceId: string; role: 'owner' | 'admin' }>([
+    ['wst_owner', { workspaceUserId: '1', workspaceId: 'ws_1', role: 'owner' }],
+    ['wst_admin', { workspaceUserId: '2', workspaceId: 'ws_1', role: 'admin' }],
 ]);
 
-interface Invite {
+export interface Invite {
     id: string;
     email: string;
+    sentBy: string;
 }
 
-const invites = new Map<string, Invite>([['inv_9x2k7q', { id: 'invite_1', email: 'grace@example.com' }]]);
+const invites = new Map<string, Invite>([['inv_9x2k7q', { id: 'invite_1', email: 'grace@example.com', sentBy: '2' }]]);
 
 /**
  * In-memory stand-in for a real data layer, async to mimic a database.
@@ -72,10 +75,20 @@ export const db = {
         findLastEventByUserId: async (userId: string): Promise<SessionEvent | null> => lastSessionEvents.get(userId) ?? null,
     },
     memberships: {
-        findByApiKey: async (apiKey: string): Promise<{ workspaceUserId: string; role: 'owner' | 'admin' } | null> =>
+        findByApiKey: async (apiKey: string): Promise<{ workspaceUserId: string; workspaceId: string; role: 'owner' | 'admin' } | null> =>
             memberships.get(apiKey) ?? null,
+    },
+    workspaces: {
+        findById: async (id: string): Promise<{ id: string; name: string } | null> => workspaces.get(id) ?? null,
+        delete: async (id: string): Promise<boolean> => workspaces.delete(id),
     },
     invites: {
         findByToken: async (token: string): Promise<Invite | null> => invites.get(token) ?? null,
+        findById: async (id: string): Promise<Invite | null> => Array.from(invites.values()).find((invite) => invite.id === id) ?? null,
+        cancel: async (id: string): Promise<void> => {
+            for (const [token, invite] of invites) {
+                if (invite.id === id) invites.delete(token);
+            }
+        },
     },
 };

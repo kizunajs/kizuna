@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { roles } from './roles';
 
 /**
  * A signed-in user, authenticated by a bearer session token. Guards resolve the
@@ -12,19 +13,18 @@ export const user = Kizuna.identity.bearer({
 });
 
 /**
- * A workspace membership, authenticated by the `x-workspace-token` header. The
- * `access` schema declares the fields the contract's auth map may constrain per
- * route (e.g. owner-only routes).
+ * A workspace membership, authenticated by the `x-workspace-token` header. Its
+ * callers hold one of the workspace `roles`, which the guard returns and the
+ * access control map's `requires` is checked against.
  */
 export const member = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
         workspaceUserId: z.string(),
+        workspaceId: z.string(),
     }),
-    access: z.object({
-        role: z.enum(['owner', 'admin']),
-    }),
+    roles,
 });
 
 /**

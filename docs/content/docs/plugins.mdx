@@ -13,11 +13,11 @@ A plugin ships as two modules. The declaration goes on `k.contract`:
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { k } from './k';
 import { routes } from './routes';
-import { auth } from './auth';
+import { accessControl } from './access-control';
 
 export const contract = k.contract({
     routes,
-    auth,
+    accessControl,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',
@@ -71,7 +71,7 @@ A contract with no plugins gets no `plugins` argument at all.
 
 ## Plugin routes
 
-A plugin's routes run through the same pipeline as yours, with the same validation, guards, access gates and problem details. They never join `contract.routes`, so they stay out of everything generated from it.
+A plugin's routes run through the same pipeline as yours, with the same validation, guards, access control and problem details. They never join `contract.routes`, so they stay out of everything generated from it.
 
 |                           | your routes | a plugin's routes |
 | ------------------------- | ----------- | ----------------- |
@@ -90,7 +90,7 @@ Some plugins take config keyed by route: which routes to expose, which to rate-l
 ```ts title="contract.ts"
 export const contract = k.contract({
     routes,
-    auth,
+    accessControl,
     plugins: ({ routes }) => ({
         audit: auditPlugin(routes, {
             skip: {

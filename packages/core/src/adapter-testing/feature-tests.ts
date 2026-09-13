@@ -599,7 +599,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
-        'guards.accessGate': async () => {
+        'guards.requires': async () => {
             await usingSecured(async (secured) => {
                 const rejected = await secured.request({
                     method: 'GET',
@@ -615,6 +615,28 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     path: '/owner-only',
                     headers: {
                         'x-workspace-token': ownerToken,
+                    },
+                });
+                expect(allowed.status).toBe(200);
+            });
+        },
+
+        'guards.roles': async () => {
+            await usingSecured(async (secured) => {
+                const rejected = await secured.request({
+                    method: 'GET',
+                    path: '/admin-only',
+                    headers: {
+                        'x-workspace-token': ownerToken,
+                    },
+                });
+                expect(rejected.status).toBe(403);
+
+                const allowed = await secured.request({
+                    method: 'GET',
+                    path: '/admin-only',
+                    headers: {
+                        'x-workspace-token': adminToken,
                     },
                 });
                 expect(allowed.status).toBe(200);

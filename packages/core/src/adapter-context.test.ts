@@ -41,7 +41,7 @@ const contract = k.contract({
             },
         },
     }),
-    auth: {
+    accessControl: {
         everything: 'user',
     },
 });

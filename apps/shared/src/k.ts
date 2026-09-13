@@ -7,7 +7,7 @@ import { analytics } from './request-context';
 
 /**
  * What every guard refuses with. `code` carries a default, because kizuna sends
- * this body itself when an access gate turns a caller away.
+ * this body itself when a route's `requires` turns a caller away.
  */
 export const GuardSchema = Kizuna.model({
     title: 'GuardDenial',

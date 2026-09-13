@@ -85,7 +85,7 @@ export const injectGuardResponses = (routes: Routes, identities?: Record<string,
 
         if (declared.some(([status]) => status === 401)) {
             throw new Error(
-                `Route '${routeKey}' declares a 401, which the auth map already gives it. A guard is what refuses an unauthenticated caller, so remove the declaration.`
+                `Route '${routeKey}' declares a 401, which the access control map already gives it. A guard is what refuses an unauthenticated caller, so remove the declaration.`
             );
         }
 

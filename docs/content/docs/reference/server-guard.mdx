@@ -9,7 +9,7 @@ Authentication is still settling. `server.guard` may change before v2, so pin yo
 
 </BetaNotice>
 
-`server.guard(identity, run)` implements one [identity](/docs/reference/kizuna-identity): it turns the extracted credential into the typed context handlers receive, or denies the request. The [auth map](/docs/reference/k-contract#the-auth-map) decides which routes it protects.
+`server.guard(identity, run)` implements one [identity](/docs/reference/kizuna-identity): it turns the extracted credential into the typed context handlers receive, or denies the request. The [access control map](/docs/reference/k-access-control) decides which routes it protects.
 
 ```ts title="guards.ts"
 import { server } from './server';
@@ -30,24 +30,24 @@ export const requireUser = server.guard('user', ({ bearer, deny }) => {
 });
 ```
 
-Return the identity's `context` and `access` fields to allow the request; they reach handlers under `auth`, keyed by the identity's name. An [authentication-only identity](/docs/reference/kizuna-identity#authentication-only-identities) returns nothing on success.
+Return the identity's `context`, and its `role` when the identity declares roles, to allow the request; they reach handlers under `auth`, keyed by the identity's name. When the roles come from a catalog, handlers also get `permissions`, everything the role holds, or the subset of it the guard returns beside the role. An [authentication-only identity](/docs/reference/kizuna-identity#authentication-only-identities) returns nothing on success.
 
 ## Denying with extra headers
 
-`deny` takes optional response headers as a third argument. A `www-authenticate` among them replaces the default challenge, which is how a guard sends the RFC 6750 `insufficient_scope` challenge [OAuth resource servers](/docs/authentication#oauth-resource-servers) answer scope shortfalls with:
+`deny` takes optional response `headers` beside `status` and `body`. A `www-authenticate` among them replaces the default challenge:
 
 ```ts title="guards.ts"
 import { bearerChallenge } from '@ts-kizuna/core/adapter';
 
 return deny({
-    status: 403,
+    status: 401,
     body: {
-        detail: 'The token is missing a required scope',
+        detail: 'The token has expired',
     },
     headers: {
         'www-authenticate': bearerChallenge({
-            error: 'insufficient_scope',
-            scope: scopes.join(' '),
+            error: 'invalid_token',
+            error_description: 'The token has expired',
         }),
     },
 });
@@ -60,10 +60,9 @@ return deny({
 | credential        | The extracted credential, keyed by the identity's method (`bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`). `null` when absent.                                                                                                                                                 |
 | `params`          | The matched route's path params, for guards that check access to the resource in the URL.                                                                                                                                                                                              |
 | `deny`            | `({ status, body, headers? }) => GuardDenial`, rejects with a Problem Details response. The body is `detail` plus whatever the contract's [`guardSchema`](/docs/authentication#what-a-refusal-says) adds. A `401` also carries a `WWW-Authenticate` challenge built from the identity. |
-| `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                                                                                                                                                                   |
 | `requestContext`  | The [request context](/docs/request-context) resolved for this request, keyed by name. Absent when the contract declares none.                                                                                                                                                         |
 | framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                                                                                                                                                                 |
 
 ## Where a denial is documented
 
-`k.contract` puts `401` and `403` on every route the auth map guards. See [the 401 and 403 on every guarded route](/docs/authentication#the-401-and-403-on-every-guarded-route).
+`k.contract` puts `401` and `403` on every route the access control map guards. See [what it drives](/docs/authentication#what-it-drives).

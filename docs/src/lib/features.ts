@@ -53,7 +53,7 @@ export const features: Feature[] = [
         icons: [KeyRound],
         title: 'Typed authentication',
         href: '/docs/authentication',
-        description: 'Identities and per-route authentication declared on the contract.',
+        description: 'Identities, roles, and per-route access control declared on the contract.',
     },
     {
         icons: [Radio],

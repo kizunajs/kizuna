@@ -3,7 +3,7 @@ import type {
     Contract,
     RoutesOf,
     SchemesOf,
-    AuthOf,
+    AccessControlOf,
     RequestContextOf,
     ContractPluginsOf,
     JobsOf,
@@ -20,7 +20,14 @@ import type { ToolsArg } from './tool-runner.js';
 import type { PluginArgs } from './plugin.js';
 import type { PluginImplementations } from './plugin-server.js';
 import type { GuardBody } from './problem-details.js';
-import type { GuardSuccess, HandlersFromAuth, GuardParams, RequestContextValues, Router as CoreRouter } from './handler-pipeline.js';
+import type {
+    GuardReturn,
+    GuardSuccess,
+    HandlersFromAccessControl,
+    GuardParams,
+    RequestContextValues,
+    Router as CoreRouter,
+} from './handler-pipeline.js';
 import {
     assembleApi,
     warnUnsupportedJobOptions,
@@ -37,12 +44,12 @@ import {
 
 /**
  * The handler tree for a contract or route group, typed against it. Routes
- * secured by the contract's `auth` map additionally receive each required
+ * secured by the contract's access control map additionally receive each required
  * identity's context in their handler args, under `auth`, keyed by the
  * identity's name.
  */
 export type ContractRouter<C, HandlerContext> = C extends Contract
-    ? HandlersFromAuth<
+    ? HandlersFromAccessControl<
           RoutesOf<C>,
           HandlerContext &
               RequestContextValues<RequestContextOf<C>> &
@@ -50,7 +57,7 @@ export type ContractRouter<C, HandlerContext> = C extends Contract
               JobsArg<JobsOf<C>> &
               ToolsArg<ToolsOf<C>>,
           SchemesOf<C>,
-          AuthOf<C>
+          AccessControlOf<C>
       >
     : C extends Routes
       ? CoreRouter<C, HandlerContext>
@@ -80,11 +87,11 @@ export type ContractGroupRouter<Source, GroupOrRoutes, HandlerContext> = GroupOr
 
 /**
  * A guard per identity, keyed by name. Each receives the handler context, the
- * credential its method extracted, a `deny` helper, the matched route's
- * required scopes, and the contract's request context, and returns that
- * identity's {@link GuardSuccess} or a `deny(...)` result. Keying by name lets
- * each guard's return be typed against its own identity, so access values
- * narrow without an annotation.
+ * credential its method extracted, a `deny` helper, and the contract's
+ * request context, and returns that
+ * identity's {@link GuardReturn} or a `deny(...)` result. Keying by name lets
+ * each guard's return be typed against its own identity, so a literal role
+ * needs no annotation.
  */
 export type GuardFnsFor<
     Schemes extends Record<string, SecurityScheme>,
@@ -99,11 +106,10 @@ export type GuardFnsFor<
             CredentialOf<Schemes[Name]> & {
                 params: Params;
                 deny: GuardDeny<GuardBody<GuardSchema>>;
-                scopes: string[];
             }
     ) => [keyof GuardSuccess<Schemes[Name]>] extends [never]
         ? void | GuardDenial | Promise<void | GuardDenial>
-        : GuardSuccess<Schemes[Name]> | GuardDenial | Promise<GuardSuccess<Schemes[Name]> | GuardDenial>;
+        : GuardReturn<Schemes[Name]> | GuardDenial | Promise<GuardReturn<Schemes[Name]> | GuardDenial>;
 };
 
 /**
@@ -138,17 +144,18 @@ export type RequestResolverFnsFor<RequestContext extends Record<string, RequestC
 export interface Server<C extends Contract, HandlerContext, Api> {
     /**
      * Define a guard for one of the contract's identities. It runs before the
-     * handlers of every route whose `auth` entry requires the identity, and
+     * handlers of every route whose access entry requires the identity, and
      * receives the credential its method extracted (`bearer`, `apiKey`, or
      * `basic`, `null` when absent), along with the request context resolved for
-     * the request. Return the identity's context and access fields to allow the
-     * request, or call `deny({ status, body })`.
+     * the request. Return the identity's context, and its `role` when the
+     * identity declares roles, to allow the request, or call
+     * `deny({ status, body })`.
      */
     guard<const Name extends Extract<keyof SchemesOf<C>, string>>(
         name: Name,
         run: GuardFnsFor<
             SchemesOf<C>,
-            GuardParams<RoutesOf<C>, AuthOf<C>, Name>,
+            GuardParams<RoutesOf<C>, AccessControlOf<C>, Name>,
             HandlerContext,
             RequestContextOf<C>,
             GuardSchemaOf<C>

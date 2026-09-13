@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authorizationServerIssuer, declaredScopes } from './security-scheme.js';
+import { authenticationChallenge, authorizationServerIssuer, declaredScopes } from './security-scheme.js';
 import { createIdentity } from './identity.js';
 
 describe('authorizationServerIssuer', () => {
@@ -87,6 +87,54 @@ describe('oauth2 issuer validation', () => {
             createIdentity.oauth2({
                 issuer: 'https://auth.example.com#main',
                 flows,
+            })
+        ).toThrow('query or fragment');
+    });
+});
+
+describe('resourceMetadata', () => {
+    const flows = {
+        clientCredentials: {
+            tokenUrl: 'https://auth.example.com/oauth2/token',
+            scopes: {},
+        },
+    };
+
+    it('puts the metadata URL in the Bearer challenge', () => {
+        const oauth = createIdentity.oauth2({
+            flows,
+            resourceMetadata: 'https://api.example.com/.well-known/oauth-protected-resource',
+        });
+        const openIdConnect = createIdentity.openIdConnect({
+            openIdConnectUrl: 'https://auth.example.com/.well-known/openid-configuration',
+            resourceMetadata: 'https://api.example.com/.well-known/oauth-protected-resource',
+        });
+        expect(authenticationChallenge(oauth)).toBe(
+            'Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"'
+        );
+        expect(authenticationChallenge(openIdConnect)).toBe(
+            'Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"'
+        );
+        expect(
+            authenticationChallenge(
+                createIdentity.oauth2({
+                    flows,
+                })
+            )
+        ).toBe('Bearer');
+    });
+
+    it('rejects a URL that is not https, or carries a fragment', () => {
+        expect(() =>
+            createIdentity.oauth2({
+                flows,
+                resourceMetadata: 'http://api.example.com/.well-known/oauth-protected-resource',
+            })
+        ).toThrow('must be https');
+        expect(() =>
+            createIdentity.openIdConnect({
+                openIdConnectUrl: 'https://auth.example.com/.well-known/openid-configuration',
+                resourceMetadata: 'https://api.example.com/metadata#top',
             })
         ).toThrow('query or fragment');
     });

@@ -187,14 +187,9 @@ export type ResponseDefinition =
     | StreamResponseDefinition;
 
 /**
- * A single security requirement on a route: either a scheme name (sugar for the
- * scheme with no scopes) or a map of scheme name → required scopes. Mirrors an
- * entry of OpenAPI's `operation.security` array.
- *
- * ```ts
- * security: ['user']                  // just authenticated
- * security: [{ user: ['admin'] }]     // authenticated AND has the admin scope
- * ```
+ * A single security requirement on a route, as `k.contract` writes it from the
+ * access control map: a scheme name, or a map of scheme name to the scopes it
+ * requires. Mirrors an entry of OpenAPI's `operation.security` array.
  */
 export type SecurityRequirement<SchemeNames extends string = string> = SchemeNames | { [Name in SchemeNames]?: readonly string[] };
 
@@ -204,13 +199,11 @@ export type SecurityRequirement<SchemeNames extends string = string> = SchemeNam
 export type SchemeNameOf<Entry> = Entry extends string ? Entry : Extract<keyof Entry, string>;
 
 /**
- * A route's resolved access gate, produced by `k.contract` from the `auth` map.
- * Keyed by identity name, then by access field, mapping to the allowed value or
- * values. Adapters deny requests whose field value is not allowed and narrow the
- * field in the handler args. An empty object requires authentication with no
- * field constraint.
+ * The permissions a route requires, set by `k.contract` from the access control map's
+ * `requires`. Keyed by what is acted on, listing the verbs, e.g.
+ * `{ workspace: ['delete'] }`. The caller has to hold every one of them.
  */
-export type AccessGate = Record<string, Record<string, unknown>>;
+export type RequiredPermissions = Record<string, readonly string[]>;
 
 /**
  * A path starting with `/`.
@@ -298,14 +291,19 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
     /**
      * The security schemes this route requires, referencing identities registered
      * on the `kizuna` factory. Each entry is a scheme name or a `{ scheme: scopes }`
-     * map. Set by `k.contract` from the `auth` map; `[]` marks the route public.
+     * map. Set by `k.contract` from the access control map; `[]` marks the route public.
      */
     security?: readonly SecurityRequirement<SchemeNames>[];
     /**
-     * The route's resolved access gate, set by `k.contract` from the `auth` map's
-     * `{ scheme: { field: value } }` constraints. See {@link AccessGate}.
+     * The roles the route accepts, set by `k.contract` from the access control
+     * map's `roles`. The caller holds at least one of them.
      */
-    accessGate?: AccessGate;
+    roles?: readonly string[];
+    /**
+     * The permissions the caller has to hold, set by `k.contract` from the
+     * access control map's `requires`. See {@link RequiredPermissions}.
+     */
+    requires?: RequiredPermissions;
     externalDocs?: {
         url: string;
         description?: string;
@@ -370,14 +368,19 @@ export interface HandlerContextBrand<Context> {
 export const AUTO_RESPONSES_BRAND: unique symbol = Symbol('ts-kizuna.route.autoResponses');
 
 export const AUTO_GUARD_BRAND: unique symbol = Symbol('ts-kizuna.route.guardBody');
+export const AUTO_GUARD_WRITTEN_BRAND: unique symbol = Symbol('ts-kizuna.route.guardBodyWritten');
 
-export interface AutoResponsesBrand<Statuses extends number, Body = ProblemDetails> {
+export interface AutoResponsesBrand<Statuses extends number, Body = ProblemDetails, Written = { detail: string }> {
     readonly [AUTO_RESPONSES_BRAND]?: Statuses;
     readonly [AUTO_GUARD_BRAND]?: Body;
+    /**
+     * The body a handler writes when it answers the `403` itself.
+     */
+    readonly [AUTO_GUARD_WRITTEN_BRAND]?: Written;
 }
 
 /**
- * The statuses the auth map puts on a guarded route.
+ * The statuses the access control map puts on a guarded route.
  */
 export type GuardStatus = Extract<KnownStatus, 401 | 403>;
 
@@ -387,13 +390,14 @@ export interface Routes<TagKeys extends string = string, SchemeNames extends str
 }
 
 /**
- * A route as authored in `k.routes`: the route shape minus `security` and
- * `accessGate`, which the `auth` map owns and `k.contract` resolves. Writing
- * either on a route is a type error.
+ * A route as authored in `k.routes`: the route shape minus `security`, `roles`
+ * and `requires`, which the access control map owns and `k.contract` resolves.
+ * Writing any of them on a route is a type error.
  */
-export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<RouteDefinition<TagKeys>, 'security' | 'accessGate'> & {
+export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<RouteDefinition<TagKeys>, 'security' | 'roles' | 'requires'> & {
     security?: never;
-    accessGate?: never;
+    roles?: never;
+    requires?: never;
 };
 
 /**

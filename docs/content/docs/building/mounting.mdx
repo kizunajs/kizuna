@@ -23,7 +23,7 @@ export const api = server.api({
 
 ## Guards
 
-If the contract declares identities, pass one guard per identity under `guards`. A guard verifies the extracted credential and returns the identity's context or a denial. The contract's auth map decides which routes it protects. See the [Authentication guide](/docs/authentication).
+If the contract declares identities, pass one guard per identity under `guards`. A guard verifies the extracted credential and returns the identity's context or a denial. The contract's access control map decides which routes it protects. See the [Authentication guide](/docs/authentication).
 
 ## Request context
 

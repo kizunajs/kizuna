@@ -25,7 +25,7 @@ import {
     cacheHeaders,
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
-import type { Contract, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
+import type { Contract, RequiredPermissions, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
 import { OPENAPI_PLUGIN_NAME } from './plugin.js';
 import type { StreamResponseDefinition } from '@ts-kizuna/core';
 import type {
@@ -262,6 +262,8 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                 if (emittedSecurity.length > 0) operation.security = emittedSecurity;
                 const customGuards = customGuardsFor(route.security, contract);
                 if (customGuards.length > 0) operation['x-kizuna-guarded'] = customGuards;
+                if (route.roles !== undefined) operation['x-kizuna-roles'] = [...route.roles];
+                if (route.requires !== undefined) operation['x-kizuna-requires'] = requiresExtension(route.requires);
             }
             if (route.externalDocs) operation.externalDocs = route.externalDocs;
 
@@ -520,6 +522,13 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
         },
     };
 });
+
+/**
+ * The permissions a route requires, as `x-kizuna-requires`: what is acted on,
+ * mapped to the verbs the caller has to hold.
+ */
+const requiresExtension = (requires: RequiredPermissions): Record<string, string[]> =>
+    Object.fromEntries(Object.entries(requires).map(([resource, verbs]) => [resource, [...verbs]]));
 
 /**
  * Whether a scheme is a `custom` identity: registered, but with no OpenAPI scheme

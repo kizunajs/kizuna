@@ -21,7 +21,7 @@ describe('identity builders', () => {
             description: 'Session token',
         });
         expect(user.context).toBe(context);
-        expect(user.access).toBeUndefined();
+        expect(user.roles).toBeUndefined();
     });
 
     it('apiKey produces an apiKey scheme object with name and location', () => {
@@ -93,15 +93,20 @@ describe('identity builders', () => {
         expect(isSecurityScheme(inviteToken)).toBe(true);
     });
 
-    it('carries the access schema when declared', () => {
-        const access = z.object({
-            role: z.enum(['owner', 'admin']),
-        });
+    it('carries the roles when declared', () => {
+        const roles = Kizuna.roles(
+            Kizuna.permissions({
+                workspace: ['read'],
+            }),
+            {
+                owner: 'all',
+            }
+        );
         const member = Kizuna.identity.bearer({
             context,
-            access,
+            roles,
         });
-        expect(member.access).toBe(access);
+        expect(member.roles).toBe(roles);
     });
 
     it('builds an authentication-only identity with no context', () => {
@@ -116,7 +121,7 @@ describe('identity builders', () => {
             description: undefined,
         });
         expect(apiConsumer.context).toBeUndefined();
-        expect(apiConsumer.access).toBeUndefined();
+        expect(apiConsumer.roles).toBeUndefined();
         // A context-less identity contributes nothing (`{}`) to the handler args.
         expectTypeOf<ContextOf<typeof apiConsumer>>().toEqualTypeOf<{}>();
     });

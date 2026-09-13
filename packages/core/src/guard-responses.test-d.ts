@@ -40,7 +40,7 @@ const contract = k.contract({
     routes: {
         api: routes,
     },
-    auth: {
+    accessControl: {
         api: {
             '*': false,
             listUsers: 'user',
@@ -58,10 +58,13 @@ test('the auth map brands the routes it guards, and only those', () => {
     expectTypeOf<StatusesOn<Public>>().toEqualTypeOf<never>();
 });
 
-test('the guarded route still refuses a status its handler never declared', () => {
+test('the guarded route lets its handler answer the 403 it already declares, and nothing else it never declared', () => {
     type Throwable = Parameters<HandlerArgs<Guarded>['throwError']>[0];
 
-    expectTypeOf<Throwable['status']>().toEqualTypeOf<200>();
+    expectTypeOf<Throwable['status']>().toEqualTypeOf<200 | 403>();
+    expectTypeOf<Extract<Throwable, { status: 403 }>['body']>().toEqualTypeOf<{ detail: string }>();
+    type PublicThrowable = Parameters<HandlerArgs<Public>['throwError']>[0];
+    expectTypeOf<PublicThrowable['status']>().toEqualTypeOf<200>();
 });
 
 const scopedK = new Kizuna({
@@ -93,7 +96,7 @@ const scopedContract = scopedK.contract({
     routes: {
         api: scopedRoutes,
     },
-    auth: {
+    accessControl: {
         api: 'user',
     },
 });

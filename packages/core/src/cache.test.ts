@@ -275,7 +275,7 @@ describe('assertValidCache', () => {
                 routes: {
                     users: routes,
                 },
-                auth: {
+                accessControl: {
                     users: 'user',
                 },
             })

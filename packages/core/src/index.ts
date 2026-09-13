@@ -7,16 +7,16 @@ export {
     type KizunaSpec,
     type TagNamesOf,
     type IdentityNamesOf,
-    type AuthMap,
-    type GroupAuth,
-    type AuthValue,
-    type AccessConstraint,
+    type AccessControlMap,
+    type GroupAccessControl,
+    type AccessControlValue,
+    type AccessControlRule,
 } from './kizuna.js';
 export {
     type Contract,
     type RoutesOf,
     type SchemesOf,
-    type AuthOf,
+    type AccessControlOf,
     type RequestContextOf,
     type ContractPluginsOf,
     type JobsOf,
@@ -40,12 +40,28 @@ export {
     type Credential,
     type NoCredential,
     type CredentialOf,
-    type AccessOf,
-    type IdentityAccess,
+    type RolesOf,
+    type RoleOf,
+    type GrantsOf,
+    type GuardHoldings,
+    type IdentityRole,
     type BearerCredential,
     type BasicCredential,
     type ApiKeyCredential,
 } from './identity.js';
+export {
+    isPermissions,
+    isRoles,
+    type Permissions,
+    type PermissionCatalog,
+    type PermissionName,
+    type PermissionSet,
+    type RoleDefinition,
+    type Roles,
+    type RoleNamesOf,
+    type CatalogOf,
+    type GrantNamesOf,
+} from './permissions.js';
 export { type RequestContextSchema, type RequestContextHeaderInputs, type RequestContextHeaderValues } from './request-context.js';
 export {
     isSecurityScheme,
@@ -228,7 +244,7 @@ export {
     type StreamResponseDefinition,
     type SecurityRequirement,
     type SchemeNameOf,
-    type AccessGate,
+    type RequiredPermissions,
     type RouteDefinition,
     type RoutePath,
     type Routes,
@@ -241,8 +257,10 @@ export {
     type HandlerReturn,
     type ThrowableReturn,
     type GuardSuccess,
+    type GuardReturn,
     type RoutesWithHandlerContext,
     type BrandedHandlerContext,
+    type GuardAnswer,
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
-export { type AutoResponsesBrand, AUTO_RESPONSES_BRAND, AUTO_GUARD_BRAND, type GuardStatus } from './types.js';
+export { type AutoResponsesBrand, AUTO_RESPONSES_BRAND, AUTO_GUARD_BRAND, AUTO_GUARD_WRITTEN_BRAND, type GuardStatus } from './types.js';

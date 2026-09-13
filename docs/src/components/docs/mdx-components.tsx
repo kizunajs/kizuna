@@ -5,6 +5,7 @@ import { Step, Steps } from 'fumadocs-ui/components/steps';
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 import { AdapterTabs } from './adapter-tabs';
+import { AccessStyle, AccessStyleSwitch } from './access-style';
 import { ContractExplorer } from '@/components/code/contract-explorer';
 import { HandlerExplorer } from '@/components/code/handler-explorer';
 import { AlphaNotice } from './alpha-notice';
@@ -30,6 +31,8 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         Tab,
         Tabs,
         AdapterTabs,
+        AccessStyle,
+        AccessStyleSwitch,
         ContractExplorer: () => <ContractExplorer className={blockStyles.block} />,
         HandlerExplorer: () => <HandlerExplorer className={blockStyles.block} />,
         AlphaNotice,

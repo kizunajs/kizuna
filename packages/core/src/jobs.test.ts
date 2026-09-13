@@ -271,7 +271,7 @@ describe('k.contract with jobs', () => {
         const contract = k.contract({
             routes,
             jobs,
-            auth: {
+            accessControl: {
                 listUsers: false,
             },
         });
@@ -282,7 +282,7 @@ describe('k.contract with jobs', () => {
     it('leaves jobs undefined when none are declared', () => {
         const contract = k.contract({
             routes,
-            auth: {
+            accessControl: {
                 listUsers: false,
             },
         });
@@ -299,7 +299,7 @@ describe('k.contract with jobs', () => {
             k.contract({
                 routes,
                 jobs,
-                auth: {
+                accessControl: {
                     listUsers: false,
                 },
             })
@@ -330,7 +330,7 @@ describe('a job endpoint colliding with a route', () => {
             k.contract({
                 routes: routesAt(path),
                 jobs: scheduled,
-                auth: {
+                accessControl: {
                     listJobs: false,
                 },
             })
@@ -342,7 +342,7 @@ describe('a job endpoint colliding with a route', () => {
             k.contract({
                 routes: routesAt('/jobs'),
                 jobs: scheduled,
-                auth: {
+                accessControl: {
                     listJobs: false,
                 },
             })
@@ -374,7 +374,7 @@ describe('a job endpoint colliding with a route', () => {
                         schedule: '0 5 * * *',
                     },
                 }),
-                auth: {
+                accessControl: {
                     listJobs: false,
                 },
             })

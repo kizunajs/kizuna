@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { SecurityScheme, OpenApiSecuritySchemeObject, OAuthFlows } from './security-scheme.js';
+import type { Roles, RoleNamesOf, GrantNamesOf, CatalogOf } from './permissions.js';
 
 /**
  * The token a `bearer`, `oauth2`, or `openIdConnect` method extracts from the
@@ -55,21 +56,18 @@ declare const CREDENTIAL: unique symbol;
 
 /**
  * An authenticated caller, defined with the `Kizuna.identity` builders. Extends
- * {@link SecurityScheme} with an optional `access` schema describing the fields
- * the `auth` map may constrain, and carries the credential its authentication
- * method extracts from the request.
+ * {@link SecurityScheme} with what its callers hold and the credential its
+ * authentication method extracts from the request.
  */
 export interface Identity<
     ContextSchema extends z.ZodType | undefined = z.ZodType | undefined,
-    AccessSchema extends z.ZodType | undefined = z.ZodType | undefined,
+    RolesType extends Roles | undefined = Roles | undefined,
     CredentialType extends Credential | NoCredential = Credential,
 > extends SecurityScheme<ContextSchema> {
     /**
-     * Schema for the fields the `auth` map may constrain
-     * (`{ scheme: { field: value } }`) and that a handler reads under the
-     * identity's name. `undefined` when the identity declares no access fields.
+     * The roles this identity's callers hold. The guard returns `role`.
      */
-    readonly access: AccessSchema;
+    readonly roles: RolesType;
     /**
      * Phantom marker carrying the {@link Credential} the method extracts. Never
      * present at runtime.
@@ -82,65 +80,87 @@ export interface Identity<
  * to its guard, a single discriminated member, e.g. `{ apiKey: { in; name;
  * value } | null }` for an `apiKey` identity.
  */
-export type CredentialOf<Id> = Id extends Identity<z.ZodType | undefined, z.ZodType | undefined, infer Extracted> ? Extracted : Credential;
+export type CredentialOf<Id> = Id extends Identity<z.ZodType | undefined, Roles | undefined, infer Extracted> ? Extracted : Credential;
 
 /**
- * The access type an identity exposes: the `z.output` of its `access` schema,
- * or `never` when it declares none.
+ * The {@link Roles} an identity declares, or `never` when it declares none.
  */
-export type AccessOf<Id> =
-    Id extends Identity<z.ZodType | undefined, infer AccessSchema>
-        ? AccessSchema extends z.ZodType
-            ? z.output<AccessSchema>
-            : never
-        : never;
+export type RolesOf<Id> =
+    Id extends Identity<z.ZodType | undefined, infer RolesType> ? (RolesType extends Roles ? RolesType : never) : never;
 
 /**
- * An identity's access type, or `{}` when it declares none, used where access is
- * intersected with context (in a guard's return and the handler's scheme-keyed
- * args) so a missing access schema never collapses the result to `never`.
+ * The role a guard returns and a handler reads: one declared name, or several.
  */
-export type IdentityAccess<Id> = [AccessOf<Id>] extends [never] ? {} : AccessOf<Id>;
+export type RoleOf<Id> = RoleNamesOf<RolesOf<Id>> | readonly RoleNamesOf<RolesOf<Id>>[];
+
+/**
+ * What a caller holds, as permission names, when the identity's roles come from a catalog.
+ */
+export type GrantsOf<Id> = readonly GrantNamesOf<RolesOf<Id>>[];
+
+/**
+ * What roles add to a guard's return: `role` when the identity declares them,
+ * with optional `permissions` when they come from a catalog, the subset of the
+ * role's this caller was given, `{}` otherwise.
+ */
+export type GuardHoldings<Id> = [RolesOf<Id>] extends [never]
+    ? {}
+    : [CatalogOf<RolesOf<Id>>] extends [never]
+      ? { role: RoleOf<Id> }
+      : { role: RoleOf<Id>; permissions?: GrantsOf<Id> };
+
+/**
+ * What roles add to a handler's `auth`: `role` when the identity declares them,
+ * and `permissions`, what the caller holds, when they come from a catalog: the
+ * role's, or the subset the guard returned.
+ */
+export type IdentityRole<Id> = [RolesOf<Id>] extends [never]
+    ? {}
+    : [CatalogOf<RolesOf<Id>>] extends [never]
+      ? { role: RoleOf<Id> }
+      : { role: RoleOf<Id>; permissions: GrantsOf<Id> };
 
 const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
-const assertValidIssuer = (issuer: string): void => {
+const assertHttpsUrl = (label: string, value: string): void => {
     let parsed: URL;
     try {
-        parsed = new URL(issuer);
+        parsed = new URL(value);
     } catch {
-        throw new Error(`The issuer "${issuer}" is not an absolute URL.`);
+        throw new Error(`The ${label} "${value}" is not an absolute URL.`);
     }
     if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && LOOPBACK_HOSTNAMES.has(parsed.hostname))) {
-        throw new Error(`The issuer "${issuer}" must be https. http is only allowed on localhost.`);
+        throw new Error(`The ${label} "${value}" must be https. http is only allowed on localhost.`);
     }
     if (parsed.search !== '' || parsed.hash !== '') {
-        throw new Error(`The issuer "${issuer}" has a query or fragment.`);
+        throw new Error(`The ${label} "${value}" has a query or fragment.`);
     }
 };
 
 const make = <
     ContextSchema extends z.ZodType | undefined,
-    AccessSchema extends z.ZodType | undefined,
+    RolesType extends Roles | undefined,
     CredentialType extends Credential | NoCredential = { bearer: BearerCredential | null },
 >(
     openapi: OpenApiSecuritySchemeObject | undefined,
     context: ContextSchema,
-    access: AccessSchema,
+    roles: RolesType,
     scheme: string | undefined,
-    issuer?: string
-): Identity<ContextSchema, AccessSchema, CredentialType> => ({
+    issuer?: string,
+    resourceMetadata?: string
+): Identity<ContextSchema, RolesType, CredentialType> => ({
     __brand: 'SecurityScheme',
     openapi,
     context,
-    access,
+    roles,
     scheme,
     issuer,
+    resourceMetadata,
 });
 
-export interface BearerConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface BearerConfig<ContextSchema extends z.ZodType | undefined, RolesType extends Roles | undefined> {
     context?: ContextSchema;
-    access?: AccessSchema;
+    roles?: RolesType;
     bearerFormat?: string;
     description?: string;
     scheme?: string;
@@ -148,26 +168,26 @@ export interface BearerConfig<ContextSchema extends z.ZodType | undefined, Acces
 
 export interface ApiKeyConfig<
     ContextSchema extends z.ZodType | undefined,
-    AccessSchema extends z.ZodType | undefined,
+    RolesType extends Roles | undefined,
     Name extends string,
     In extends 'header' | 'query' | 'cookie',
 > {
     name: Name;
     in: In;
     context?: ContextSchema;
-    access?: AccessSchema;
+    roles?: RolesType;
     description?: string;
     scheme?: string;
 }
 
-export interface BasicConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface BasicConfig<ContextSchema extends z.ZodType | undefined, RolesType extends Roles | undefined> {
     context?: ContextSchema;
-    access?: AccessSchema;
+    roles?: RolesType;
     description?: string;
     scheme?: string;
 }
 
-export interface OAuth2Config<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface OAuth2Config<ContextSchema extends z.ZodType | undefined, RolesType extends Roles | undefined> {
     flows: OAuthFlows;
     /**
      * Issuer identifier of the authorization server (RFC 8414), for consumers
@@ -175,23 +195,33 @@ export interface OAuth2Config<ContextSchema extends z.ZodType | undefined, Acces
      * in for it: an issuer may carry a path the endpoint URLs do not reveal.
      */
     issuer?: string;
+    /**
+     * URL of this API's RFC 9728 metadata document, sent as `resource_metadata`
+     * in every `Bearer` challenge so a client can find the authorization server.
+     */
+    resourceMetadata?: string;
     context?: ContextSchema;
-    access?: AccessSchema;
+    roles?: RolesType;
     description?: string;
     scheme?: string;
 }
 
-export interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined, RolesType extends Roles | undefined> {
     openIdConnectUrl: string;
+    /**
+     * URL of this API's RFC 9728 metadata document, sent as `resource_metadata`
+     * in every `Bearer` challenge so a client can find the authorization server.
+     */
+    resourceMetadata?: string;
     context?: ContextSchema;
-    access?: AccessSchema;
+    roles?: RolesType;
     description?: string;
     scheme?: string;
 }
 
-export interface CustomConfig<ContextSchema extends z.ZodType | undefined, AccessSchema extends z.ZodType | undefined> {
+export interface CustomConfig<ContextSchema extends z.ZodType | undefined, RolesType extends Roles | undefined> {
     context?: ContextSchema;
-    access?: AccessSchema;
+    roles?: RolesType;
     description?: string;
     scheme?: string;
 }
@@ -200,19 +230,19 @@ export interface CustomConfig<ContextSchema extends z.ZodType | undefined, Acces
  * Builders that define an identity by its authentication mechanism: `bearer`,
  * `apiKey`, `basic`, `oauth2`, `openIdConnect`, and `custom` (a credential no
  * OpenAPI security scheme can express, such as a capability-URL path token).
- * Each takes, optionally, the `context` a passing guard returns and the `access`
- * fields the `auth` map may constrain. Omit `context` for an authentication-only
+ * Each takes, optionally, the `context` a passing guard returns and what its
+ * callers hold, `roles` declared with `Kizuna.roles`. Omit `context` for an authentication-only
  * identity, a pure gate whose guard returns nothing on success and contributes
  * no handler args.
  *
  * @example
- * const user = Kizuna.identity.bearer({
+ * const member = Kizuna.identity.apiKey({
+ *     name: 'x-workspace-token',
+ *     in: 'header',
  *     context: z.object({
- *         id: z.string().uuid(),
+ *         workspaceUserId: z.string(),
  *     }),
- *     access: z.object({
- *         role: z.enum(['owner', 'admin']),
- *     }),
+ *     roles,
  * });
  *
  * @example
@@ -223,59 +253,65 @@ export interface CustomConfig<ContextSchema extends z.ZodType | undefined, Acces
  * });
  */
 export const createIdentity = {
-    bearer: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
-        config: BearerConfig<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, { bearer: BearerCredential | null }> =>
-        make<ContextSchema, AccessSchema, { bearer: BearerCredential | null }>(
+    bearer: <ContextSchema extends z.ZodType | undefined = undefined, RolesType extends Roles | undefined = undefined>(
+        config: BearerConfig<ContextSchema, RolesType>
+    ): Identity<ContextSchema, RolesType, { bearer: BearerCredential | null }> =>
+        make<ContextSchema, RolesType, { bearer: BearerCredential | null }>(
             { type: 'http', scheme: 'bearer', bearerFormat: config.bearerFormat, description: config.description },
             config.context as ContextSchema,
-            config.access as AccessSchema,
+            config.roles as RolesType,
             config.scheme
         ),
     apiKey: <
         ContextSchema extends z.ZodType | undefined = undefined,
-        AccessSchema extends z.ZodType | undefined = undefined,
+        RolesType extends Roles | undefined = undefined,
         const Name extends string = string,
         const In extends 'header' | 'query' | 'cookie' = 'header' | 'query' | 'cookie',
     >(
-        config: ApiKeyConfig<ContextSchema, AccessSchema, Name, In>
-    ): Identity<ContextSchema, AccessSchema, { apiKey: ApiKeyCredential<In, Name> | null }> =>
-        make<ContextSchema, AccessSchema, { apiKey: ApiKeyCredential<In, Name> | null }>(
+        config: ApiKeyConfig<ContextSchema, RolesType, Name, In>
+    ): Identity<ContextSchema, RolesType, { apiKey: ApiKeyCredential<In, Name> | null }> =>
+        make<ContextSchema, RolesType, { apiKey: ApiKeyCredential<In, Name> | null }>(
             { type: 'apiKey', name: config.name, in: config.in, description: config.description },
             config.context as ContextSchema,
-            config.access as AccessSchema,
+            config.roles as RolesType,
             config.scheme
         ),
-    basic: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
-        config: BasicConfig<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, { basic: BasicCredential | null }> =>
-        make<ContextSchema, AccessSchema, { basic: BasicCredential | null }>(
+    basic: <ContextSchema extends z.ZodType | undefined = undefined, RolesType extends Roles | undefined = undefined>(
+        config: BasicConfig<ContextSchema, RolesType>
+    ): Identity<ContextSchema, RolesType, { basic: BasicCredential | null }> =>
+        make<ContextSchema, RolesType, { basic: BasicCredential | null }>(
             { type: 'http', scheme: 'basic', description: config.description },
             config.context as ContextSchema,
-            config.access as AccessSchema,
+            config.roles as RolesType,
             config.scheme
         ),
-    oauth2: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
-        config: OAuth2Config<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }> => {
-        if (config.issuer !== undefined) assertValidIssuer(config.issuer);
-        return make<ContextSchema, AccessSchema, { oauth2: BearerCredential | null }>(
+    oauth2: <ContextSchema extends z.ZodType | undefined = undefined, RolesType extends Roles | undefined = undefined>(
+        config: OAuth2Config<ContextSchema, RolesType>
+    ): Identity<ContextSchema, RolesType, { oauth2: BearerCredential | null }> => {
+        if (config.issuer !== undefined) assertHttpsUrl('issuer', config.issuer);
+        if (config.resourceMetadata !== undefined) assertHttpsUrl('resourceMetadata', config.resourceMetadata);
+        return make<ContextSchema, RolesType, { oauth2: BearerCredential | null }>(
             { type: 'oauth2', flows: config.flows, description: config.description },
             config.context as ContextSchema,
-            config.access as AccessSchema,
+            config.roles as RolesType,
             config.scheme,
-            config.issuer
+            config.issuer,
+            config.resourceMetadata
         );
     },
-    openIdConnect: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
-        config: OpenIdConnectConfig<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, { openIdConnect: BearerCredential | null }> =>
-        make<ContextSchema, AccessSchema, { openIdConnect: BearerCredential | null }>(
+    openIdConnect: <ContextSchema extends z.ZodType | undefined = undefined, RolesType extends Roles | undefined = undefined>(
+        config: OpenIdConnectConfig<ContextSchema, RolesType>
+    ): Identity<ContextSchema, RolesType, { openIdConnect: BearerCredential | null }> => {
+        if (config.resourceMetadata !== undefined) assertHttpsUrl('resourceMetadata', config.resourceMetadata);
+        return make<ContextSchema, RolesType, { openIdConnect: BearerCredential | null }>(
             { type: 'openIdConnect', openIdConnectUrl: config.openIdConnectUrl, description: config.description },
             config.context as ContextSchema,
-            config.access as AccessSchema,
-            config.scheme
-        ),
+            config.roles as RolesType,
+            config.scheme,
+            undefined,
+            config.resourceMetadata
+        );
+    },
     /**
      * An identity whose credential no OpenAPI scheme can express, such as a
      * capability-URL token in a path segment. The guard reads the credential
@@ -290,13 +326,8 @@ export const createIdentity = {
      *     }),
      * });
      */
-    custom: <ContextSchema extends z.ZodType | undefined = undefined, AccessSchema extends z.ZodType | undefined = undefined>(
-        config: CustomConfig<ContextSchema, AccessSchema>
-    ): Identity<ContextSchema, AccessSchema, NoCredential> =>
-        make<ContextSchema, AccessSchema, NoCredential>(
-            undefined,
-            config.context as ContextSchema,
-            config.access as AccessSchema,
-            config.scheme
-        ),
+    custom: <ContextSchema extends z.ZodType | undefined = undefined, RolesType extends Roles | undefined = undefined>(
+        config: CustomConfig<ContextSchema, RolesType>
+    ): Identity<ContextSchema, RolesType, NoCredential> =>
+        make<ContextSchema, RolesType, NoCredential>(undefined, config.context as ContextSchema, config.roles as RolesType, config.scheme),
 };

@@ -38,7 +38,7 @@ Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin), and `
 | `operationMapper` | `(operation, route, id) => operation` | none      | Callback to transform each operation before it is added to the spec                     |
 | `derivedHead`     | `boolean`                             | `false`   | Document the derived `head` operation on every `GET` path without a declared one        |
 
-There are no security or tag options. Security is emitted from the [`auth` map](#security-emission) and the document's tag list from [`Kizuna.tags`](/docs/reference/kizuna-tags), so neither can disagree with the contract.
+There are no security or tag options. Security is emitted from the [access control map](#security-emission) and the document's tag list from [`Kizuna.tags`](/docs/reference/kizuna-tags), so neither can disagree with the contract.
 
 ## Returns
 
@@ -88,9 +88,9 @@ app.get('/openapi.json', (_req, res) => {
 
 ## Security emission
 
-Security is generated from the contract, not configured on the generator. Every [identity](/docs/reference/kizuna-identity) registered on [`new Kizuna()`](/docs/reference/kizuna) is emitted under `components.securitySchemes`, and every route the [`auth` map](/docs/reference/k-contract#the-auth-map) secures references those names in its `security`, with OAuth scopes where the map declares them. Public routes (`false`) get none.
+Security is generated from the contract, not configured on the generator. Every [identity](/docs/reference/kizuna-identity) registered on [`new Kizuna()`](/docs/reference/kizuna) is emitted under `components.securitySchemes`, and every route the [access control map](/docs/reference/k-access-control) secures references those names in its `security`, with the permissions an OAuth route requires as its scopes. Public routes (`false`) get none.
 
-With the `user` (bearer) and `member` (API key) identities and `workspace: 'member'` in the auth map, the document contains:
+With the `user` (bearer) and `member` (API key) identities and `workspace: 'member'` in the access control map, the document contains:
 
 ```yaml title="openapi.yaml"
 components:
@@ -111,6 +111,8 @@ paths:
 
 A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity is the exception: OpenAPI can't describe its credential, so it emits no `securityScheme` and no `security`. Its routes instead carry an `x-kizuna-guarded` extension, keeping a protected-out-of-band route distinct from a public one.
 
-The spec and the runtime [guards](/docs/reference/server-guard) both derive from the auth map, so documented security is enforced security.
+A route with `roles` carries them under `x-kizuna-roles`, `['owner']`, and one with `requires` carries the permissions under `x-kizuna-requires`, `{ workspace: ['delete'] }`, so a reader of the document sees who the caller has to be.
+
+The spec and the runtime [guards](/docs/reference/server-guard) both derive from the access control map, so documented security is enforced security.
 
 See the [OpenAPI guide](/docs/openapi) for Scalar integration, writing specs to disk, and breaking change detection.

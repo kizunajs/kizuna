@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { RouteDefinition } from './types.js';
+import type { Roles } from './permissions.js';
 
 /**
  * An OAuth 2.0 flow object, as defined by OpenAPI 3.1.0.
@@ -58,7 +59,7 @@ export type OpenApiSecuritySchemeObject =
  * - a `context` schema describing what a passing guard provides to the handler.
  *
  * Register schemes on the `kizuna` factory under `identities`; the contract's
- * `auth` map then references them by name, and handlers of secured routes
+ * access control map then references them by name, and handlers of secured routes
  * receive the scheme's context (`z.output` of `context`) in their args.
  */
 export interface SecurityScheme<ContextSchema extends z.ZodType | undefined = z.ZodType | undefined> {
@@ -84,12 +85,22 @@ export interface SecurityScheme<ContextSchema extends z.ZodType | undefined = z.
      */
     readonly context: ContextSchema;
     /**
+     * The roles this identity's callers hold.
+     */
+    readonly roles?: Roles;
+    /**
      * Issuer identifier of the authorization server that mints this scheme's
      * tokens (RFC 8414). Consumers that advertise the authorization server,
      * such as RFC 9728 metadata, read it via `authorizationServerIssuer`,
      * which derives it from `openIdConnectUrl` for `openIdConnect` identities.
      */
     readonly issuer?: string;
+    /**
+     * URL of this API's RFC 9728 Protected Resource Metadata document. Sent as
+     * `resource_metadata` in the `Bearer` challenge of every `401` and
+     * `insufficient_scope` `403`, so a client can find the authorization server.
+     */
+    readonly resourceMetadata?: string;
 }
 
 /**
@@ -146,7 +157,10 @@ export const authenticationChallenge = (scheme: SecurityScheme | undefined): str
     const openapi = scheme?.openapi;
     if (openapi === undefined) return undefined;
     if (openapi.type === 'http') return HTTP_CHALLENGES[openapi.scheme];
-    return openapi.type === 'oauth2' || openapi.type === 'openIdConnect' ? 'Bearer' : undefined;
+    if (openapi.type !== 'oauth2' && openapi.type !== 'openIdConnect') return undefined;
+    return scheme?.resourceMetadata === undefined
+        ? 'Bearer'
+        : `Bearer resource_metadata="${scheme.resourceMetadata.replace(/[\\"]/g, '\\$&')}"`;
 };
 
 /**

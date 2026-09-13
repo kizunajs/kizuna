@@ -25,11 +25,11 @@ MCP is a [plugin](/docs/plugins), declared on `k.contract` and served by `api.mo
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { k } from './k';
 import { routes } from './routes';
-import { auth } from './auth';
+import { accessControl } from './access-control';
 
 export const contract = k.contract({
     routes,
-    auth,
+    accessControl,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',
@@ -72,7 +72,7 @@ Pass the routes to `mcpPlugin` and name the ones to leave out. Write `plugins` a
 ```ts title="contract.ts"
 export const contract = k.contract({
     routes,
-    auth,
+    accessControl,
     plugins: ({ routes }) => ({
         mcp: mcpPlugin({
             name: 'My API',
@@ -263,15 +263,16 @@ Use it for what belongs to no single route: the order operations happen in, the 
 
 ## Authentication
 
-Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/authentication) registered on `server.api`, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, access gates apply, and the handler receives its typed identity context.
+Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/authentication) registered on `server.api`, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, the route's [`roles` or `requires`](/docs/access-control) is checked, and the handler receives its typed identity context.
 
-A route's identities appear in its tool description, along with the scopes and access constraints that go with them, so an assistant can tell it will be refused without spending a call to find out:
+A route's identities appear in its tool description, along with the roles and permissions that go with them, so an assistant can tell it will be refused without spending a call to find out:
 
 ```text
 Delete the workspace
 
 HTTP: DELETE /workspace
-Requires: member (role: owner)
+Requires: member
+Roles: owner
 ```
 
 Configure the MCP client to send the credential as a header on the connection. For example, with Claude Code:
@@ -282,7 +283,7 @@ claude mcp add --transport http my-api http://localhost:3000/mcp --header "Autho
 
 For an `apiKey` identity, send the header the identity names (e.g. `x-workspace-token`) instead.
 
-When a guard denies the call, or an access gate fails, the tool call returns an error result (`isError: true`) carrying the status and detail, so the assistant sees exactly why it was refused:
+When a guard denies the call, or the caller's role is not one the route accepts, the tool call returns an error result (`isError: true`) carrying the status and detail, so the assistant sees exactly why it was refused:
 
 ```json
 {
@@ -293,7 +294,7 @@ When a guard denies the call, or an access gate fails, the tool call returns an 
 }
 ```
 
-Public routes (`false` in the auth map) run without guards, credentials or not.
+Public routes (`false` in the access control map) run without guards, credentials or not.
 
 ## OAuth
 
@@ -315,8 +316,8 @@ plugins: {
 With `oauth` configured, denials from that identity move to the HTTP level, where the specification puts them:
 
 - No token, or a bad one, answers `401` with `WWW-Authenticate: Bearer resource_metadata="..."`.
-- A `403` denial from the guard on a tool call answers `403` with `error="insufficient_scope"` and the scopes the route declares in the auth map.
-- An access-gate failure answers a plain `403`.
+- A token that lacks a permission its role holds answers `403` with `error="insufficient_scope"` and the permissions it is missing.
+- A role that lacks a permission the route requires answers a plain `403`.
 
 The guard runs once per request, its context reaches handlers under `auth.<scheme>` as always, and every other identity keeps the in-band tool errors above.
 

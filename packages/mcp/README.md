@@ -1,6 +1,6 @@
 # @ts-kizuna/mcp
 
-`@ts-kizuna/mcp` adds an MCP (Model Context Protocol) endpoint to your API. Each route becomes a tool that AI assistants can discover and call.
+`@ts-kizuna/mcp` adds an MCP (Model Context Protocol) endpoint to your API. The tools you declare, and the routes you choose to publish, become tools that AI assistants can discover and call.
 
 ## Installation
 

@@ -10,16 +10,32 @@ const user = Kizuna.identity.bearer({
     }),
 });
 
+const permissions = Kizuna.permissions({
+    workspace: ['read', 'delete'],
+});
+
+const roles = Kizuna.roles(permissions, {
+    admin: {
+        workspace: ['read'],
+    },
+    owner: 'all',
+});
+
 const member = Kizuna.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
         workspaceUserId: z.string(),
     }),
-    access: z.object({
-        role: z.enum(['owner', 'admin']),
-    }),
+    roles,
 });
+
+const deleteRule = {
+    auth: 'member',
+    requires: {
+        workspace: ['delete'],
+    },
+} as const;
 
 const routeDefinition = (path: `/${string}`) => ({
     method: 'GET' as const,
@@ -83,15 +99,15 @@ const makeNestedRoutes = () => {
 const nestedRouteOf = (routes: Routes, groupKey: string, routeKey: string): RouteDefinition =>
     routeOf(routes[groupKey] as Routes, routeKey);
 
-describe('k.contract auth resolution', () => {
-    it('marks a group public with security: [] when auth is false', () => {
+describe('k.contract access resolution', () => {
+    it('marks a group public with security: [] when the entry is false', () => {
         const { k, users, workspace } = makeRoutes();
         k.contract({
             routes: {
                 users,
                 workspace,
             },
-            auth: {
+            accessControl: {
                 users: false,
                 workspace: false,
             },
@@ -107,27 +123,244 @@ describe('k.contract auth resolution', () => {
                 users,
                 workspace,
             },
-            auth: {
+            accessControl: {
                 users: 'user',
                 workspace: false,
             },
         });
         expect(routeOf(users, 'listUsers').security).toEqual(['user']);
-        expect(routeOf(users, 'listUsers').accessGate).toBeUndefined();
+        expect(routeOf(users, 'listUsers').requires).toBeUndefined();
     });
 
-    it('resolves a field constraint into security plus an access gate', () => {
+    it('resolves requires onto the route beside security', () => {
         const { k, users, workspace } = makeRoutes();
         k.contract({
             routes: {
                 users,
                 workspace,
             },
-            auth: {
+            accessControl: {
+                users: false,
+                workspace: deleteRule,
+            },
+        });
+        expect(routeOf(workspace, 'getWorkspace').security).toEqual([
+            {
+                member: [],
+            },
+        ]);
+        expect(routeOf(workspace, 'getWorkspace').requires).toEqual({
+            workspace: ['delete'],
+        });
+    });
+
+    it('rejects requires naming a permission no identity on the route declares', () => {
+        const { k, users, workspace } = makeRoutes();
+        expect(() =>
+            // @ts-expect-error archive is not a workspace permission
+            k.contract({
+                routes: {
+                    users,
+                    workspace,
+                },
+                accessControl: {
+                    users: false,
+                    workspace: {
+                        auth: 'member',
+                        requires: {
+                            workspace: ['archive'],
+                        },
+                    },
+                },
+            })
+        ).toThrow(/workspace:archive/);
+    });
+
+    it('rejects requires on an identity that declares no permissions', () => {
+        const { k, users, workspace } = makeRoutes();
+        expect(() =>
+            // @ts-expect-error user declares no roles
+            k.contract({
+                routes: {
+                    users,
+                    workspace,
+                },
+                accessControl: {
+                    users: false,
+                    workspace: {
+                        auth: 'user',
+                        requires: {
+                            workspace: ['read'],
+                        },
+                    },
+                },
+            })
+        ).toThrow(/declares permissions/);
+    });
+
+    it('resolves roles onto the route beside security', () => {
+        const { k, users, workspace } = makeRoutes();
+        k.contract({
+            routes: {
+                users,
+                workspace,
+            },
+            accessControl: {
                 users: false,
                 workspace: {
-                    member: {
-                        role: 'owner',
+                    '*': {
+                        auth: 'member',
+                        roles: 'owner',
+                    },
+                    getWorkspace: {
+                        auth: 'member',
+                        roles: ['admin', 'owner'],
+                    },
+                },
+            },
+        });
+        expect(routeOf(workspace, 'deleteWorkspace').roles).toEqual(['owner']);
+        expect(routeOf(workspace, 'getWorkspace').roles).toEqual(['admin', 'owner']);
+        expect(routeOf(workspace, 'getWorkspace').requires).toBeUndefined();
+    });
+
+    it('rejects roles naming a role no identity on the route declares', () => {
+        const { k, users, workspace } = makeRoutes();
+        expect(() =>
+            // @ts-expect-error viewer is not a member role
+            k.contract({
+                routes: {
+                    users,
+                    workspace,
+                },
+                accessControl: {
+                    users: false,
+                    workspace: {
+                        auth: 'member',
+                        roles: 'viewer',
+                    },
+                },
+            })
+        ).toThrow(/'viewer'/);
+    });
+
+    it('rejects roles on an identity that declares none', () => {
+        const { k, users, workspace } = makeRoutes();
+        expect(() =>
+            // @ts-expect-error user declares no roles
+            k.contract({
+                routes: {
+                    users,
+                    workspace,
+                },
+                accessControl: {
+                    users: false,
+                    workspace: {
+                        auth: 'user',
+                        roles: 'owner',
+                    },
+                },
+            })
+        ).toThrow(/declares roles/);
+    });
+
+    it('rejects requires on roles declared without a catalog', () => {
+        const viewer = Kizuna.identity.bearer({
+            context: z.object({
+                userId: z.string(),
+            }),
+            roles: Kizuna.roles(['viewer', 'editor']),
+        });
+        const k = new Kizuna({
+            identities: {
+                viewer,
+            },
+        });
+        const docs = k.routes({
+            listDocs: routeDefinition('/docs'),
+        });
+        k.contract({
+            routes: {
+                docs,
+            },
+            accessControl: {
+                docs: {
+                    auth: 'viewer',
+                    roles: 'editor',
+                },
+            },
+        });
+        expect(routeOf(docs, 'listDocs').roles).toEqual(['editor']);
+        expect(() =>
+            // @ts-expect-error roles from names carry no permissions to require
+            k.contract({
+                routes: {
+                    docs,
+                },
+                accessControl: {
+                    docs: {
+                        auth: 'viewer',
+                        requires: {
+                            workspace: ['read'],
+                        },
+                    },
+                },
+            })
+        ).toThrow(/declares permissions/);
+    });
+
+    it('writes what an OAuth route requires as its scopes', () => {
+        const partner = Kizuna.identity.oauth2({
+            flows: {
+                clientCredentials: {
+                    tokenUrl: 'https://auth.example.com/token',
+                    scopes: {
+                        'workspace:read': 'Read the workspace',
+                    },
+                },
+            },
+            roles: Kizuna.roles(permissions, {
+                integration: {
+                    workspace: ['read'],
+                },
+            }),
+        });
+        const k = new Kizuna({
+            identities: {
+                partner,
+                member,
+            },
+        });
+        const workspace = k.routes({
+            getWorkspace: routeDefinition('/workspace'),
+        });
+        k.contract({
+            routes: {
+                workspace,
+            },
+            accessControl: {
+                workspace: {
+                    auth: 'partner',
+                    requires: {
+                        workspace: ['read'],
+                    },
+                },
+            },
+        });
+        expect(routeOf(workspace, 'getWorkspace').security).toEqual([
+            {
+                partner: ['workspace:read'],
+            },
+        ]);
+        k.contract({
+            routes: {
+                workspace,
+            },
+            accessControl: {
+                workspace: {
+                    auth: 'member',
+                    requires: {
+                        workspace: ['read'],
                     },
                 },
             },
@@ -137,33 +370,6 @@ describe('k.contract auth resolution', () => {
                 member: [],
             },
         ]);
-        expect(routeOf(workspace, 'getWorkspace').accessGate).toEqual({
-            member: {
-                role: 'owner',
-            },
-        });
-    });
-
-    it('resolves an oauth2 scope array into the requirement without a gate', () => {
-        const { k, users, workspace } = makeRoutes();
-        k.contract({
-            routes: {
-                users,
-                workspace,
-            },
-            auth: {
-                users: false,
-                workspace: {
-                    user: ['read:workspace'],
-                },
-            },
-        });
-        expect(routeOf(workspace, 'getWorkspace').security).toEqual([
-            {
-                user: ['read:workspace'],
-            },
-        ]);
-        expect(routeOf(workspace, 'getWorkspace').accessGate).toBeUndefined();
     });
 
     it('cascades a * default with per-route overrides', () => {
@@ -173,15 +379,11 @@ describe('k.contract auth resolution', () => {
                 users,
                 workspace,
             },
-            auth: {
+            accessControl: {
                 users: false,
                 workspace: {
                     '*': 'member',
-                    deleteWorkspace: {
-                        member: {
-                            role: 'owner',
-                        },
-                    },
+                    deleteWorkspace: deleteRule,
                 },
             },
         });
@@ -191,10 +393,8 @@ describe('k.contract auth resolution', () => {
                 member: [],
             },
         ]);
-        expect(routeOf(workspace, 'deleteWorkspace').accessGate).toEqual({
-            member: {
-                role: 'owner',
-            },
+        expect(routeOf(workspace, 'deleteWorkspace').requires).toEqual({
+            workspace: ['delete'],
         });
     });
 
@@ -209,21 +409,21 @@ describe('k.contract auth resolution', () => {
             routes: {
                 nested,
             },
-            auth: {
+            accessControl: {
                 nested: 'user',
             },
         });
         expect(routeOf(nested.inner as Routes, 'getThing').security).toEqual(['user']);
     });
 
-    it('carries the identities and auth map on the contract', () => {
+    it('carries the identities and access control map on the contract', () => {
         const { k, users, workspace } = makeRoutes();
         const contract = k.contract({
             routes: {
                 users,
                 workspace,
             },
-            auth: {
+            accessControl: {
                 users: false,
                 workspace: 'member',
             },
@@ -232,13 +432,13 @@ describe('k.contract auth resolution', () => {
             user,
             member,
         });
-        expect(contract.auth).toEqual({
+        expect(contract.accessControl).toEqual({
             users: false,
             workspace: 'member',
         });
     });
 
-    it('leaves routes untouched when no auth map is passed', () => {
+    it('leaves routes untouched when no access control map is passed', () => {
         const k = new Kizuna();
         const routes = k.routes({
             listItems: routeDefinition('/items'),
@@ -253,20 +453,20 @@ describe('k.contract auth resolution', () => {
     });
 });
 
-describe('multi-identity auth values', () => {
-    it('resolves { scheme: true } to a bare requirement without a gate', () => {
+describe('multi-identity access values', () => {
+    it('resolves an auth array to one requirement over every identity', () => {
         const { k, users, workspace } = makeRoutes();
         k.contract({
             routes: {
                 users,
                 workspace,
             },
-            auth: {
+            accessControl: {
                 users: false,
                 workspace: {
-                    user: true,
-                    member: {
-                        role: 'owner',
+                    auth: ['user', 'member'],
+                    requires: {
+                        workspace: ['delete'],
                     },
                 },
             },
@@ -277,69 +477,55 @@ describe('multi-identity auth values', () => {
                 member: [],
             },
         ]);
-        expect(routeOf(workspace, 'getWorkspace').accessGate).toEqual({
-            member: {
-                role: 'owner',
-            },
+        expect(routeOf(workspace, 'getWorkspace').requires).toEqual({
+            workspace: ['delete'],
         });
     });
 });
 
-describe('cascade merging', () => {
-    it('merges a route entry into the * default, inheriting its identities', () => {
+describe('cascade overrides', () => {
+    it('replaces the * default with the named entry', () => {
         const { k, users, workspace } = makeRoutes();
         k.contract({
             routes: {
                 users,
                 workspace,
             },
-            auth: {
+            accessControl: {
                 users: false,
                 workspace: {
                     '*': 'member',
-                    deleteWorkspace: {
-                        user: true,
-                    },
+                    deleteWorkspace: 'user',
                 },
             },
         });
-        expect(routeOf(workspace, 'deleteWorkspace').security).toEqual([
-            {
-                member: [],
-                user: [],
-            },
-        ]);
+        expect(routeOf(workspace, 'getWorkspace').security).toEqual(['member']);
+        expect(routeOf(workspace, 'deleteWorkspace').security).toEqual(['user']);
     });
 
-    it('lets a route entry refine the default identity without restating it', () => {
+    it('clears a stale requires when a routes tree is reused under a looser map', () => {
         const { k, users, workspace } = makeRoutes();
         k.contract({
             routes: {
                 users,
                 workspace,
             },
-            auth: {
+            accessControl: {
                 users: false,
-                workspace: {
-                    '*': 'member',
-                    deleteWorkspace: {
-                        member: {
-                            role: 'owner',
-                        },
-                    },
-                },
+                workspace: deleteRule,
             },
         });
-        expect(routeOf(workspace, 'deleteWorkspace').security).toEqual([
-            {
-                member: [],
+        k.contract({
+            routes: {
+                users,
+                workspace,
             },
-        ]);
-        expect(routeOf(workspace, 'deleteWorkspace').accessGate).toEqual({
-            member: {
-                role: 'owner',
+            accessControl: {
+                users: false,
+                workspace: 'member',
             },
         });
+        expect(routeOf(workspace, 'deleteWorkspace').requires).toBeUndefined();
     });
 
     it('rejects a cascade key that matches no route or subgroup in the group', () => {
@@ -351,7 +537,7 @@ describe('cascade merging', () => {
                     users,
                     workspace,
                 },
-                auth: {
+                accessControl: {
                     users: false,
                     workspace: {
                         '*': 'member',
@@ -369,7 +555,7 @@ describe('cascade merging', () => {
                 users,
                 workspace,
             },
-            auth: {
+            accessControl: {
                 users: false,
                 workspace: {
                     '*': 'member',
@@ -382,14 +568,14 @@ describe('cascade merging', () => {
     });
 });
 
-describe('nested group auth', () => {
-    it('applies an AuthValue on a subgroup key to that whole subtree', () => {
+describe('nested group access', () => {
+    it('applies an access value on a subgroup key to that whole subtree', () => {
         const { k, members } = makeNestedRoutes();
         k.contract({
             routes: {
                 members,
             },
-            auth: {
+            accessControl: {
                 members: {
                     '*': 'user',
                     invites: false,
@@ -408,7 +594,7 @@ describe('nested group auth', () => {
             routes: {
                 members,
             },
-            auth: {
+            accessControl: {
                 members: {
                     '*': 'user',
                     session: {
@@ -421,29 +607,21 @@ describe('nested group auth', () => {
         });
         expect(nestedRouteOf(members, 'session', 'login').security).toEqual([]);
         expect(nestedRouteOf(members, 'session', 'refresh').security).toEqual([]);
-        expect(nestedRouteOf(members, 'session', 'me').security).toEqual([
-            {
-                user: [],
-            },
-        ]);
+        expect(nestedRouteOf(members, 'session', 'me').security).toEqual(['user']);
         expect(nestedRouteOf(members, 'events', 'list').security).toEqual(['user']);
     });
 
-    it("merges a nested cascade's * into the parent group default", () => {
+    it("replaces the parent default with a nested cascade's *", () => {
         const { k, members } = makeNestedRoutes();
         k.contract({
             routes: {
                 members,
             },
-            auth: {
+            accessControl: {
                 members: {
                     '*': 'user',
                     events: {
-                        '*': {
-                            member: {
-                                role: 'owner',
-                            },
-                        },
+                        '*': deleteRule,
                         list: false,
                     },
                 },
@@ -451,45 +629,35 @@ describe('nested group auth', () => {
         });
         expect(nestedRouteOf(members, 'events', 'get').security).toEqual([
             {
-                user: [],
                 member: [],
             },
         ]);
-        expect(nestedRouteOf(members, 'events', 'get').accessGate).toEqual({
-            member: {
-                role: 'owner',
-            },
+        expect(nestedRouteOf(members, 'events', 'get').requires).toEqual({
+            workspace: ['delete'],
         });
         expect(nestedRouteOf(members, 'events', 'list').security).toEqual([]);
     });
 
-    it('merges an AuthValue on a subgroup key into the parent group default', () => {
+    it('applies an access value on a subgroup key across its subtree in place of the parent default', () => {
         const { k, members } = makeNestedRoutes();
         k.contract({
             routes: {
                 members,
             },
-            auth: {
+            accessControl: {
                 members: {
                     '*': 'user',
-                    events: {
-                        member: {
-                            role: 'owner',
-                        },
-                    },
+                    events: deleteRule,
                 },
             },
         });
         expect(nestedRouteOf(members, 'events', 'list').security).toEqual([
             {
-                user: [],
                 member: [],
             },
         ]);
-        expect(nestedRouteOf(members, 'events', 'list').accessGate).toEqual({
-            member: {
-                role: 'owner',
-            },
+        expect(nestedRouteOf(members, 'events', 'list').requires).toEqual({
+            workspace: ['delete'],
         });
     });
 
@@ -501,7 +669,7 @@ describe('nested group auth', () => {
                 routes: {
                     members,
                 },
-                auth: {
+                accessControl: {
                     members: {
                         '*': 'user',
                         list: false,
@@ -521,7 +689,7 @@ describe('nested group auth', () => {
                 routes: {
                     members,
                 },
-                auth: {
+                accessControl: {
                     members: {
                         '*': 'user',
                         session: {

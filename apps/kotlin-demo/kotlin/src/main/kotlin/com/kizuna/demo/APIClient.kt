@@ -830,6 +830,34 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object MembersCancelInvite {
+
+        @Serializable
+        data class Response(val cancelled: Boolean)
+
+        data class Params(val inviteId: String)
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(inviteId: String): AfterParams = AfterParams(params = Params(inviteId = inviteId))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
+            data class NotFound(val body: API.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object WorkspaceGetWorkspace {
 
         @Serializable
@@ -2150,6 +2178,54 @@ class APIMembersClient(private val client: OkHttpClient, private val baseUrl: St
             }
         }
     }
+
+    /** Cancel an invite, an admin only their own */
+    @Throws(APIClient.MembersCancelInvite.Failure::class)
+    suspend fun cancelInvite(build: APIClient.MembersCancelInvite.Scope.() -> APIClient.MembersCancelInvite.Args): APIClient.MembersCancelInvite.Result {
+        val args = APIClient.MembersCancelInvite.Scope.build()
+        val params = args.params
+        var path = "/workspace/invites/:inviteId"
+        path = path.replace(":inviteId", Kizuna.encodePathSegment(params.inviteId))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("DELETE", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.MembersCancelInvite.Response>(data.decodeToString())
+                        return@use APIClient.MembersCancelInvite.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.MembersCancelInvite.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.MembersCancelInvite.Failure.Forbidden(body = payload)
+                }
+                404 -> {
+                    val payload = try {
+                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.MembersCancelInvite.Failure.NotFound(body = payload)
+                }
+                else -> throw APIClient.MembersCancelInvite.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
 }
 
 class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -2193,7 +2269,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
         }
     }
 
-    /** Delete the workspace, owner-only via the auth map */
+    /** Delete the workspace, owner only */
     @Throws(APIClient.WorkspaceDeleteWorkspace.Failure::class)
     suspend fun deleteWorkspace(): APIClient.WorkspaceDeleteWorkspace.Result {
         val path = "/workspace"
@@ -2232,7 +2308,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
         }
     }
 
-    /** Transfer ownership, owner-only via the auth map */
+    /** Transfer ownership, owner only */
     @Throws(APIClient.WorkspaceTransfer.Failure::class)
     suspend fun transfer(build: APIClient.WorkspaceTransfer.Scope.() -> APIClient.WorkspaceTransfer.Args): APIClient.WorkspaceTransfer.Result {
         val args = APIClient.WorkspaceTransfer.Scope.build()

@@ -3,17 +3,20 @@ import type { Router } from '@ts-kizuna/fastify';
 import type { contract } from '@ts-kizuna-demo/shared';
 
 export const workspace: Router<typeof contract.routes.workspace> = {
-    getWorkspace: ({ auth }) => ({
+    getWorkspace: async ({ auth }) => {
+        const workspace = await db.workspaces.findById(auth.member.workspaceId);
+        return {
+            status: 200,
+            body: {
+                id: auth.member.workspaceId,
+                name: workspace?.name ?? '',
+            },
+        };
+    },
+    deleteWorkspace: async ({ auth }) => ({
         status: 200,
         body: {
-            id: auth.member.workspaceUserId,
-            name: 'Demo Workspace',
-        },
-    }),
-    deleteWorkspace: ({ auth }) => ({
-        status: 200,
-        body: {
-            ok: auth.member.role === 'owner',
+            ok: await db.workspaces.delete(auth.member.workspaceId),
         },
     }),
     transfer: async ({ body, auth }) => {

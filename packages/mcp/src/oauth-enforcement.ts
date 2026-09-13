@@ -1,10 +1,12 @@
 import type { z } from 'zod';
-import { problemDetails, problemFromBody, type AccessGate, type SecurityScheme } from '@ts-kizuna/core';
+import { problemDetails, problemFromBody, type RequiredPermissions, type SecurityScheme } from '@ts-kizuna/core';
 import {
     bearerChallenge,
     extractCredential,
-    gatePermits,
     guardDenyFor,
+    insufficientScope,
+    requiresDenial,
+    withPermissions,
     isGuardDenial,
     rawResponse,
     type AdapterRequest,
@@ -12,16 +14,16 @@ import {
     type GuardRun,
 } from '@ts-kizuna/core/adapter';
 
+const forbiddenBody = (guardSchema: z.ZodType | undefined, detail: string): GuardDenialBody => {
+    const filled = guardSchema?.safeParse(problemDetails(403, detail));
+    return filled?.success ? (filled.data as GuardDenialBody) : { detail };
+};
+
 export interface OAuthDenial {
     status: number;
     body: GuardDenialBody;
     challenge?: string;
 }
-
-const gateBody = (guardSchema: z.ZodType | undefined, detail: string): GuardDenialBody => {
-    const filled = guardSchema?.safeParse(problemDetails(403, detail));
-    return filled?.success ? (filled.data as GuardDenialBody) : { detail };
-};
 
 export interface EnforceOAuthArgs {
     scheme: string;
@@ -31,7 +33,12 @@ export interface EnforceOAuthArgs {
     metadataUrl: string;
     scopesSupported: readonly string[] | undefined;
     scopes: readonly string[];
-    accessGate: AccessGate | undefined;
+    /**
+     * The route's `roles` and `requires`, when the oauth identity's roles alone
+     * decide them.
+     */
+    roles: readonly string[] | undefined;
+    requires: RequiredPermissions | undefined;
     params: Record<string, string>;
     headers: Record<string, string | string[] | undefined>;
     handlerContext: Record<string, unknown>;
@@ -63,7 +70,6 @@ export const enforceOAuth = async (
         ...credential,
         params: args.params,
         deny: guardDenyFor(args.schemeDefinition),
-        scopes: [...args.scopes],
         ...(args.requestContext && Object.keys(args.requestContext).length > 0
             ? {
                   requestContext: args.requestContext,
@@ -84,13 +90,7 @@ export const enforceOAuth = async (
                       resource_metadata: args.metadataUrl,
                       scope: joined(args.scopes) ?? joined(args.scopesSupported ?? []),
                   })
-                : guardResult.status === 403
-                  ? bearerChallenge({
-                        error: 'insufficient_scope',
-                        scope: joined(args.scopes),
-                        resource_metadata: args.metadataUrl,
-                    })
-                  : undefined;
+                : undefined;
         return {
             ok: false,
             denial: {
@@ -101,20 +101,43 @@ export const enforceOAuth = async (
         };
     }
 
-    for (const [field, allowed] of Object.entries(args.accessGate?.[args.scheme] ?? {})) {
-        if (gatePermits(((guardResult ?? {}) as Record<string, unknown>)[field], allowed)) continue;
+    const context =
+        guardResult && typeof guardResult === 'object' ? withPermissions(args.scheme, args.schemeDefinition, guardResult) : undefined;
+    const accessCheck = {
+        roles: args.roles,
+        requires: args.requires,
+        requiredSchemes: [args.scheme],
+        schemes: {
+            [args.scheme]: args.schemeDefinition,
+        },
+        securityContext: {
+            [args.scheme]: context ?? {},
+        },
+    };
+    const forbidden = requiresDenial(accessCheck);
+    if (forbidden !== undefined) {
+        const missingScope = insufficientScope(accessCheck);
         return {
             ok: false,
             denial: {
                 status: 403,
-                body: gateBody(args.guardSchema, `Forbidden: ${args.scheme}.${field} is not permitted on this route.`),
+                body: forbiddenBody(args.guardSchema, forbidden),
+                ...(missingScope.length > 0
+                    ? {
+                          challenge: bearerChallenge({
+                              error: 'insufficient_scope',
+                              scope: missingScope.join(' '),
+                              resource_metadata: args.metadataUrl,
+                          }),
+                      }
+                    : {}),
             },
         };
     }
 
     return {
         ok: true,
-        context: guardResult && typeof guardResult === 'object' ? guardResult : undefined,
+        context: context as Record<string, unknown> | undefined,
     };
 };
 
