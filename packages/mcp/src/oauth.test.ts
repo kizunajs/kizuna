@@ -166,15 +166,11 @@ const contract = k.contract({
             '*': 'user',
             createUser: {
                 auth: 'user',
-                requires: {
-                    users: ['write'],
-                },
+                scopes: ['users:write'],
             },
             adminReport: {
                 auth: 'user',
-                requires: {
-                    report: ['read'],
-                },
+                scopes: ['report:read'],
             },
             memberFacts: 'member',
         },
@@ -218,7 +214,7 @@ const makeApi = (onGuardRun?: (requestContext: { analytics: { sessionId: string 
     const captureAnalytics = server.requestContext('analytics', ({ headers }) => ({
         sessionId: headers['x-session-id'] ?? null,
     }));
-    const requireUser = server.guard('user', ({ oauth2, deny, requestContext }) => {
+    const requireUser = server.guard('user', ({ oauth2, scopes, deny, requestContext }) => {
         onGuardRun?.(requestContext);
         const session = oauth2 ? TOKENS[oauth2.token] : undefined;
         if (!session)
@@ -229,6 +225,13 @@ const makeApi = (onGuardRun?: (requestContext: { analytics: { sessionId: string 
                 },
             });
         const tokenScopes = session.scope.split(' ');
+        if (!scopes.every((scope) => tokenScopes.includes(scope)))
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'The token is missing a required scope',
+                },
+            });
         return {
             userId: session.userId,
             role: session.role,
@@ -474,14 +477,7 @@ describe('mcpPlugin: oauth', () => {
         expect(parsed.status).toBe(201);
     });
 
-    it('answers a role that lacks the required permission with a plain 403', async () => {
-        const port = await start();
-        const response = await jsonRpc(port, 'writer', toolCall('api_admin_report', {}));
-        expect(response.status).toBe(403);
-        expect(response.headers.get('www-authenticate')).toBeNull();
-    });
-
-    it('passes requires when the token’s role holds the permission', async () => {
+    it('runs a tool whose scope the token carries', async () => {
         const port = await start();
         const connected = await connect(port, 'admin');
         const result = await connected.callTool({

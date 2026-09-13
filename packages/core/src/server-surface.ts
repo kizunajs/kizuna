@@ -87,8 +87,8 @@ export type ContractGroupRouter<Source, GroupOrRoutes, HandlerContext> = GroupOr
 
 /**
  * A guard per identity, keyed by name. Each receives the handler context, the
- * credential its method extracted, a `deny` helper, and the contract's
- * request context, and returns that
+ * credential its method extracted, a `deny` helper, the matched route's
+ * required scopes, and the contract's request context, and returns that
  * identity's {@link GuardReturn} or a `deny(...)` result. Keying by name lets
  * each guard's return be typed against its own identity, so a literal role
  * needs no annotation.
@@ -106,6 +106,7 @@ export type GuardFnsFor<
             CredentialOf<Schemes[Name]> & {
                 params: Params;
                 deny: GuardDeny<GuardBody<GuardSchema>>;
+                scopes: string[];
             }
     ) => [keyof GuardSuccess<Schemes[Name]>] extends [never]
         ? void | GuardDenial | Promise<void | GuardDenial>

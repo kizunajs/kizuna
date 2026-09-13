@@ -30,11 +30,9 @@ const member = Kizuna.identity.apiKey({
     roles,
 });
 
-const deleteRule = {
+const scopedRule = {
     auth: 'member',
-    requires: {
-        workspace: ['delete'],
-    },
+    scopes: ['workspace:delete'],
 } as const;
 
 const routeDefinition = (path: `/${string}`) => ({
@@ -129,76 +127,9 @@ describe('k.contract access resolution', () => {
             },
         });
         expect(routeOf(users, 'listUsers').security).toEqual(['user']);
-        expect(routeOf(users, 'listUsers').requires).toBeUndefined();
     });
 
-    it('resolves requires onto the route beside security', () => {
-        const { k, users, workspace } = makeRoutes();
-        k.contract({
-            routes: {
-                users,
-                workspace,
-            },
-            accessControl: {
-                users: false,
-                workspace: deleteRule,
-            },
-        });
-        expect(routeOf(workspace, 'getWorkspace').security).toEqual([
-            {
-                member: [],
-            },
-        ]);
-        expect(routeOf(workspace, 'getWorkspace').requires).toEqual({
-            workspace: ['delete'],
-        });
-    });
-
-    it('rejects requires naming a permission no identity on the route declares', () => {
-        const { k, users, workspace } = makeRoutes();
-        expect(() =>
-            // @ts-expect-error archive is not a workspace permission
-            k.contract({
-                routes: {
-                    users,
-                    workspace,
-                },
-                accessControl: {
-                    users: false,
-                    workspace: {
-                        auth: 'member',
-                        requires: {
-                            workspace: ['archive'],
-                        },
-                    },
-                },
-            })
-        ).toThrow(/workspace:archive/);
-    });
-
-    it('rejects requires on an identity that declares no permissions', () => {
-        const { k, users, workspace } = makeRoutes();
-        expect(() =>
-            // @ts-expect-error user declares no roles
-            k.contract({
-                routes: {
-                    users,
-                    workspace,
-                },
-                accessControl: {
-                    users: false,
-                    workspace: {
-                        auth: 'user',
-                        requires: {
-                            workspace: ['read'],
-                        },
-                    },
-                },
-            })
-        ).toThrow(/declares permissions/);
-    });
-
-    it('resolves roles onto the route beside security', () => {
+    it('resolves scopes into the requirement', () => {
         const { k, users, workspace } = makeRoutes();
         k.contract({
             routes: {
@@ -208,166 +139,14 @@ describe('k.contract access resolution', () => {
             accessControl: {
                 users: false,
                 workspace: {
-                    '*': {
-                        auth: 'member',
-                        roles: 'owner',
-                    },
-                    getWorkspace: {
-                        auth: 'member',
-                        roles: ['admin', 'owner'],
-                    },
-                },
-            },
-        });
-        expect(routeOf(workspace, 'deleteWorkspace').roles).toEqual(['owner']);
-        expect(routeOf(workspace, 'getWorkspace').roles).toEqual(['admin', 'owner']);
-        expect(routeOf(workspace, 'getWorkspace').requires).toBeUndefined();
-    });
-
-    it('rejects roles naming a role no identity on the route declares', () => {
-        const { k, users, workspace } = makeRoutes();
-        expect(() =>
-            // @ts-expect-error viewer is not a member role
-            k.contract({
-                routes: {
-                    users,
-                    workspace,
-                },
-                accessControl: {
-                    users: false,
-                    workspace: {
-                        auth: 'member',
-                        roles: 'viewer',
-                    },
-                },
-            })
-        ).toThrow(/'viewer'/);
-    });
-
-    it('rejects roles on an identity that declares none', () => {
-        const { k, users, workspace } = makeRoutes();
-        expect(() =>
-            // @ts-expect-error user declares no roles
-            k.contract({
-                routes: {
-                    users,
-                    workspace,
-                },
-                accessControl: {
-                    users: false,
-                    workspace: {
-                        auth: 'user',
-                        roles: 'owner',
-                    },
-                },
-            })
-        ).toThrow(/declares roles/);
-    });
-
-    it('rejects requires on roles declared without a catalog', () => {
-        const viewer = Kizuna.identity.bearer({
-            context: z.object({
-                userId: z.string(),
-            }),
-            roles: Kizuna.roles(['viewer', 'editor']),
-        });
-        const k = new Kizuna({
-            identities: {
-                viewer,
-            },
-        });
-        const docs = k.routes({
-            listDocs: routeDefinition('/docs'),
-        });
-        k.contract({
-            routes: {
-                docs,
-            },
-            accessControl: {
-                docs: {
-                    auth: 'viewer',
-                    roles: 'editor',
-                },
-            },
-        });
-        expect(routeOf(docs, 'listDocs').roles).toEqual(['editor']);
-        expect(() =>
-            // @ts-expect-error roles from names carry no permissions to require
-            k.contract({
-                routes: {
-                    docs,
-                },
-                accessControl: {
-                    docs: {
-                        auth: 'viewer',
-                        requires: {
-                            workspace: ['read'],
-                        },
-                    },
-                },
-            })
-        ).toThrow(/declares permissions/);
-    });
-
-    it('writes what an OAuth route requires as its scopes', () => {
-        const partner = Kizuna.identity.oauth2({
-            flows: {
-                clientCredentials: {
-                    tokenUrl: 'https://auth.example.com/token',
-                    scopes: {
-                        'workspace:read': 'Read the workspace',
-                    },
-                },
-            },
-            roles: Kizuna.roles(permissions, {
-                integration: {
-                    workspace: ['read'],
-                },
-            }),
-        });
-        const k = new Kizuna({
-            identities: {
-                partner,
-                member,
-            },
-        });
-        const workspace = k.routes({
-            getWorkspace: routeDefinition('/workspace'),
-        });
-        k.contract({
-            routes: {
-                workspace,
-            },
-            accessControl: {
-                workspace: {
-                    auth: 'partner',
-                    requires: {
-                        workspace: ['read'],
-                    },
+                    auth: 'user',
+                    scopes: ['read:workspace'],
                 },
             },
         });
         expect(routeOf(workspace, 'getWorkspace').security).toEqual([
             {
-                partner: ['workspace:read'],
-            },
-        ]);
-        k.contract({
-            routes: {
-                workspace,
-            },
-            accessControl: {
-                workspace: {
-                    auth: 'member',
-                    requires: {
-                        workspace: ['read'],
-                    },
-                },
-            },
-        });
-        expect(routeOf(workspace, 'getWorkspace').security).toEqual([
-            {
-                member: [],
+                user: ['read:workspace'],
             },
         ]);
     });
@@ -383,19 +162,16 @@ describe('k.contract access resolution', () => {
                 users: false,
                 workspace: {
                     '*': 'member',
-                    deleteWorkspace: deleteRule,
+                    deleteWorkspace: scopedRule,
                 },
             },
         });
         expect(routeOf(workspace, 'getWorkspace').security).toEqual(['member']);
         expect(routeOf(workspace, 'deleteWorkspace').security).toEqual([
             {
-                member: [],
+                member: ['workspace:delete'],
             },
         ]);
-        expect(routeOf(workspace, 'deleteWorkspace').requires).toEqual({
-            workspace: ['delete'],
-        });
     });
 
     it('applies group auth to routes in nested groups', () => {
@@ -465,21 +241,16 @@ describe('multi-identity access values', () => {
                 users: false,
                 workspace: {
                     auth: ['user', 'member'],
-                    requires: {
-                        workspace: ['delete'],
-                    },
+                    scopes: ['workspace:delete'],
                 },
             },
         });
         expect(routeOf(workspace, 'getWorkspace').security).toEqual([
             {
-                user: [],
-                member: [],
+                user: ['workspace:delete'],
+                member: ['workspace:delete'],
             },
         ]);
-        expect(routeOf(workspace, 'getWorkspace').requires).toEqual({
-            workspace: ['delete'],
-        });
     });
 });
 
@@ -503,7 +274,7 @@ describe('cascade overrides', () => {
         expect(routeOf(workspace, 'deleteWorkspace').security).toEqual(['user']);
     });
 
-    it('clears a stale requires when a routes tree is reused under a looser map', () => {
+    it('clears stale scopes when a routes tree is reused under a looser map', () => {
         const { k, users, workspace } = makeRoutes();
         k.contract({
             routes: {
@@ -512,7 +283,7 @@ describe('cascade overrides', () => {
             },
             accessControl: {
                 users: false,
-                workspace: deleteRule,
+                workspace: scopedRule,
             },
         });
         k.contract({
@@ -525,7 +296,7 @@ describe('cascade overrides', () => {
                 workspace: 'member',
             },
         });
-        expect(routeOf(workspace, 'deleteWorkspace').requires).toBeUndefined();
+        expect(routeOf(workspace, 'deleteWorkspace').security).toEqual(['member']);
     });
 
     it('rejects a cascade key that matches no route or subgroup in the group', () => {
@@ -621,7 +392,7 @@ describe('nested group access', () => {
                 members: {
                     '*': 'user',
                     events: {
-                        '*': deleteRule,
+                        '*': scopedRule,
                         list: false,
                     },
                 },
@@ -629,12 +400,9 @@ describe('nested group access', () => {
         });
         expect(nestedRouteOf(members, 'events', 'get').security).toEqual([
             {
-                member: [],
+                member: ['workspace:delete'],
             },
         ]);
-        expect(nestedRouteOf(members, 'events', 'get').requires).toEqual({
-            workspace: ['delete'],
-        });
         expect(nestedRouteOf(members, 'events', 'list').security).toEqual([]);
     });
 
@@ -647,18 +415,15 @@ describe('nested group access', () => {
             accessControl: {
                 members: {
                     '*': 'user',
-                    events: deleteRule,
+                    events: scopedRule,
                 },
             },
         });
         expect(nestedRouteOf(members, 'events', 'list').security).toEqual([
             {
-                member: [],
+                member: ['workspace:delete'],
             },
         ]);
-        expect(nestedRouteOf(members, 'events', 'list').requires).toEqual({
-            workspace: ['delete'],
-        });
     });
 
     it('does not match a cascade key against leaf routes in subgroups', () => {

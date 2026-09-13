@@ -199,13 +199,6 @@ export type SecurityRequirement<SchemeNames extends string = string> = SchemeNam
 export type SchemeNameOf<Entry> = Entry extends string ? Entry : Extract<keyof Entry, string>;
 
 /**
- * The permissions a route requires, set by `k.contract` from the access control map's
- * `requires`. Keyed by what is acted on, listing the verbs, e.g.
- * `{ workspace: ['delete'] }`. The caller has to hold every one of them.
- */
-export type RequiredPermissions = Record<string, readonly string[]>;
-
-/**
  * A path starting with `/`.
  */
 export type RoutePath = `/${string}`;
@@ -294,16 +287,6 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
      * map. Set by `k.contract` from the access control map; `[]` marks the route public.
      */
     security?: readonly SecurityRequirement<SchemeNames>[];
-    /**
-     * The roles the route accepts, set by `k.contract` from the access control
-     * map's `roles`. The caller holds at least one of them.
-     */
-    roles?: readonly string[];
-    /**
-     * The permissions the caller has to hold, set by `k.contract` from the
-     * access control map's `requires`. See {@link RequiredPermissions}.
-     */
-    requires?: RequiredPermissions;
     externalDocs?: {
         url: string;
         description?: string;
@@ -390,14 +373,12 @@ export interface Routes<TagKeys extends string = string, SchemeNames extends str
 }
 
 /**
- * A route as authored in `k.routes`: the route shape minus `security`, `roles`
- * and `requires`, which the access control map owns and `k.contract` resolves.
- * Writing any of them on a route is a type error.
+ * A route as authored in `k.routes`: the route shape minus `security`, which
+ * the access control map owns and `k.contract` resolves. Writing it on a route
+ * is a type error.
  */
-export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<RouteDefinition<TagKeys>, 'security' | 'roles' | 'requires'> & {
+export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<RouteDefinition<TagKeys>, 'security'> & {
     security?: never;
-    roles?: never;
-    requires?: never;
 };
 
 /**

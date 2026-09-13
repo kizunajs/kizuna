@@ -14,7 +14,6 @@ import {
     GUARD_SCHEMA_META,
     REQUEST_CONTEXT_META,
     extractCredential,
-    requiresDenial,
     withPermissions,
     type GuardDenialBody,
     resolveSecurityRequirements,
@@ -112,15 +111,8 @@ const buildToolAnnotations = (route: RouteDefinition): Annotations => ({
     ...(route.method === 'DELETE' ? { destructiveHint: true } : {}),
 });
 
-const describeRoles = (route: RouteDefinition): string | undefined =>
-    route.roles !== undefined && route.roles.length > 0 ? `Roles: ${route.roles.join(', ')}` : undefined;
-
-const describeRequires = (route: RouteDefinition): string | undefined => {
-    const requires = route.requires;
-    if (requires === undefined) return undefined;
-    const names = Object.entries(requires).flatMap(([resource, verbs]) => verbs.map((verb) => `${resource}:${verb}`));
-    return names.length > 0 ? `Permissions: ${names.join(', ')}` : undefined;
-};
+const describeRequirement = (scheme: string, scopes: readonly string[]): string =>
+    scopes.length > 0 ? `${scheme} (scopes: ${scopes.join(', ')})` : scheme;
 
 const buildToolDescription = (route: RouteDefinition): string => {
     const parts: string[] = [];
@@ -131,12 +123,8 @@ const buildToolDescription = (route: RouteDefinition): string => {
 
     const requirements = resolveSecurityRequirements(route);
     if (requirements.length > 0) {
-        parts.push(`Requires: ${requirements.map(({ scheme }) => scheme).join(', ')}`);
+        parts.push(`Requires: ${requirements.map(({ scheme, scopes }) => describeRequirement(scheme, scopes)).join(', ')}`);
     }
-    const roles = describeRoles(route);
-    if (roles !== undefined) parts.push(roles);
-    const permissions = describeRequires(route);
-    if (permissions !== undefined) parts.push(permissions);
 
     return parts.join('\n');
 };
@@ -316,22 +304,14 @@ const resolveRequestContext = async (
     return resolved;
 };
 
-const gateBody = (guardSchema: z.ZodType | undefined, detail: string): GuardDenialBody => {
-    const filled = guardSchema?.safeParse(problemDetails(403, detail));
-    return filled?.success ? (filled.data as GuardDenialBody) : { detail };
-};
-
 /**
  * Run the guards a secured route requires, extracting each identity's
  * credential from the MCP transport request headers, the same pipeline the
  * HTTP adapters run. Returns the scheme-keyed security context for the handler
- * args, or a {@link ToolCallResult} error when a guard denies or the caller's
- * role is not one the route accepts or does not hold what it requires.
+ * args, or a {@link ToolCallResult} error when a guard denies.
  */
 const runGuards = async (
     requirements: ReturnType<typeof resolveSecurityRequirements>,
-    roles: RouteDefinition['roles'],
-    requires: RouteDefinition['requires'],
     label: string,
     params: Record<string, string>,
     guards: GuardMap | undefined,
@@ -348,7 +328,7 @@ const runGuards = async (
         query: {},
     } as unknown as AdapterRequest<unknown>;
 
-    for (const { scheme } of requirements) {
+    for (const { scheme, scopes } of requirements) {
         if (scheme === transportAuth?.scheme) {
             if (transportAuth.context !== undefined) {
                 securityContext[scheme] = withPermissions(scheme, schemes?.[scheme], transportAuth.context);
@@ -371,6 +351,7 @@ const runGuards = async (
             ...credential,
             params,
             deny: guardDenyFor(schemeDefinition),
+            scopes,
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
         } as Parameters<typeof guard>[0]);
         if (isGuardDenial(guardResult)) {
@@ -383,20 +364,6 @@ const runGuards = async (
             securityContext[scheme] = withPermissions(scheme, schemeDefinition, guardResult);
         }
     }
-    const forbidden = requiresDenial({
-        roles,
-        requires,
-        requiredSchemes: requirements.map((requirement) => requirement.scheme),
-        schemes,
-        securityContext,
-    });
-    if (forbidden !== undefined) {
-        return {
-            ok: false,
-            result: toolError(403, gateBody(guardSchema, forbidden)),
-        };
-    }
-
     return {
         ok: true,
         securityContext,
@@ -475,8 +442,6 @@ const executeToolCall = async (
 
     const guardOutcome = await runGuards(
         resolveSecurityRequirements(route),
-        route.roles,
-        route.requires,
         `route "${routeKey}"`,
         params,
         guards,
@@ -566,8 +531,6 @@ const executeDeclaredToolCall = async (
                     scopes: [],
                 },
             ],
-            undefined,
-            undefined,
             `tool "${definition.toolKey}"`,
             {},
             guards,

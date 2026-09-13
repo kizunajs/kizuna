@@ -1811,18 +1811,10 @@ describe('security from the contract', () => {
                 api: {
                     '*': false,
                     getSecret: 'user',
-                    deleteWorkspace: {
-                        auth: 'member',
-                        roles: 'owner',
-                        requires: {
-                            workspace: ['delete'],
-                        },
-                    },
+                    deleteWorkspace: 'member',
                     scoped: {
                         auth: 'partner',
-                        requires: {
-                            workspace: ['read'],
-                        },
+                        scopes: ['workspace:read'],
                     },
                 },
             },
@@ -1869,27 +1861,15 @@ describe('security from the contract', () => {
         ]);
     });
 
-    it('emits operation.security and x-kizuna-requires for a route with requires', () => {
+    it('emits operation.security for an apiKey-secured route', () => {
         expect(spec.paths['/workspace']?.delete?.security).toEqual([
             {
                 member: [],
             },
         ]);
-        expect(spec.paths['/workspace']?.delete?.['x-kizuna-requires']).toEqual({
-            workspace: ['delete'],
-        });
     });
 
-    it('emits x-kizuna-roles for a route with roles', () => {
-        expect(spec.paths['/workspace']?.delete?.['x-kizuna-roles']).toEqual(['owner']);
-    });
-
-    it('leaves x-kizuna-requires and x-kizuna-roles off a route with neither', () => {
-        expect(spec.paths['/secret']?.get?.['x-kizuna-requires']).toBeUndefined();
-        expect(spec.paths['/secret']?.get?.['x-kizuna-roles']).toBeUndefined();
-    });
-
-    it('emits what an OAuth route requires as its scopes', () => {
+    it('emits the scopes a route declares', () => {
         expect(spec.paths['/scoped']?.get?.security).toEqual([
             {
                 partner: ['workspace:read'],

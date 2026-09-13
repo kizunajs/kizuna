@@ -288,16 +288,8 @@ export const securedContract = securedK.contract({
         api: {
             '*': false,
             whoAmI: 'user',
-            ownerOnly: {
-                auth: 'member',
-                requires: {
-                    workspace: ['delete'],
-                },
-            },
-            adminOnly: {
-                auth: 'member',
-                roles: 'admin',
-            },
+            ownerOnly: 'member',
+            adminOnly: 'member',
             both: {
                 auth: ['user', 'member'],
             },

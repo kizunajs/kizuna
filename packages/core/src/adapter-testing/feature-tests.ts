@@ -599,50 +599,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
-        'guards.requires': async () => {
-            await usingSecured(async (secured) => {
-                const rejected = await secured.request({
-                    method: 'GET',
-                    path: '/owner-only',
-                    headers: {
-                        'x-workspace-token': adminToken,
-                    },
-                });
-                expect(rejected.status).toBe(403);
-
-                const allowed = await secured.request({
-                    method: 'GET',
-                    path: '/owner-only',
-                    headers: {
-                        'x-workspace-token': ownerToken,
-                    },
-                });
-                expect(allowed.status).toBe(200);
-            });
-        },
-
-        'guards.roles': async () => {
-            await usingSecured(async (secured) => {
-                const rejected = await secured.request({
-                    method: 'GET',
-                    path: '/admin-only',
-                    headers: {
-                        'x-workspace-token': ownerToken,
-                    },
-                });
-                expect(rejected.status).toBe(403);
-
-                const allowed = await secured.request({
-                    method: 'GET',
-                    path: '/admin-only',
-                    headers: {
-                        'x-workspace-token': adminToken,
-                    },
-                });
-                expect(allowed.status).toBe(200);
-            });
-        },
-
         'guards.multiIdentity': async () => {
             await usingSecured(async (secured) => {
                 const partial = await secured.request({
@@ -680,16 +636,16 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 // RFC 9110 section 11.6.1: a 401 names the scheme the client should use.
                 expect(unresolved.headers.get('www-authenticate')).toBe('Bearer');
 
-                const gated = await secured.request({
+                const refused = await secured.request({
                     method: 'GET',
                     path: '/owner-only',
                     headers: {
-                        'x-workspace-token': adminToken,
+                        'x-workspace-token': 'wst_unknown',
                     },
                 });
-                expect(gated.status).toBe(403);
-                // A resolved identity needs no challenge; the credential was fine.
-                expect(gated.headers.get('www-authenticate')).toBeNull();
+                expect(refused.status).toBe(403);
+                // An API key is not HTTP authentication, so there is no challenge to send.
+                expect(refused.headers.get('www-authenticate')).toBeNull();
             });
         },
 

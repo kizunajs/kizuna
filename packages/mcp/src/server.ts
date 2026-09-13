@@ -3,7 +3,6 @@ import {
     buildProtectedResourceMetadata,
     declaredScopes,
     type ProtectedResourceMetadata,
-    type RequiredPermissions,
     type SecurityScheme,
 } from '@ts-kizuna/core';
 import {
@@ -87,40 +86,28 @@ const prepareOAuth = (
 /**
  * The oauth scheme's requirement for the tool a `tools/call` body names, so
  * the challenge speaks about the operation the client is attempting. The
- * route's `roles` and `requires` ride along when the oauth identity is the only one on
- * the route whose roles can satisfy it; otherwise the tool call checks it,
- * with every guard's role in hand.
+ * challenge names the scopes the route declares.
  */
 const toolCallTarget = (
     body: unknown,
     enforcement: OAuthEnforcement
-): {
-    scopes: readonly string[];
-    roles: readonly string[] | undefined;
-    requires: RequiredPermissions | undefined;
-    params: Record<string, string>;
-} => {
+): { scopes: readonly string[]; params: Record<string, string> } => {
     if (body !== null && typeof body === 'object' && (body as { method?: unknown }).method === 'tools/call') {
         const callParams = (body as { params?: { name?: unknown; arguments?: { params?: unknown } } }).params;
         const definition = typeof callParams?.name === 'string' ? enforcement.tools.get(callParams.name) : undefined;
         if (definition !== undefined) {
-            const requirements = resolveSecurityRequirements(definition.route);
-            const requirement = requirements.find((candidate) => candidate.scheme === enforcement.oauth.scheme);
-            const roleBearing = requirements.filter((candidate) => enforcement.schemes?.[candidate.scheme]?.roles !== undefined);
-            const oauthDecidesRequires = roleBearing.every((candidate) => candidate.scheme === enforcement.oauth.scheme);
+            const requirement = resolveSecurityRequirements(definition.route).find(
+                (candidate) => candidate.scheme === enforcement.oauth.scheme
+            );
             const routeParams = callParams?.arguments?.params;
             return {
                 scopes: requirement?.scopes ?? [],
-                roles: requirement !== undefined && oauthDecidesRequires ? definition.route.roles : undefined,
-                requires: requirement !== undefined && oauthDecidesRequires ? definition.route.requires : undefined,
                 params: routeParams !== null && typeof routeParams === 'object' ? (routeParams as Record<string, string>) : {},
             };
         }
     }
     return {
         scopes: [],
-        roles: undefined,
-        requires: undefined,
         params: {},
     };
 };
@@ -161,8 +148,6 @@ export const mcpPluginServer = () =>
                             metadataUrl: enforcement.metadataUrl,
                             scopesSupported: enforcement.scopesSupported,
                             scopes: target.scopes,
-                            roles: target.roles,
-                            requires: target.requires,
                             params: target.params,
                             headers: args.headers,
                             handlerContext: adapterContextOf(args),

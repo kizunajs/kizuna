@@ -70,16 +70,8 @@ const makeContract = () => {
             items: {
                 '*': false,
                 getSecret: 'user',
-                ownerOnly: {
-                    auth: 'member',
-                    requires: {
-                        workspace: ['delete'],
-                    },
-                },
-                adminOnly: {
-                    auth: 'member',
-                    roles: 'admin',
-                },
+                ownerOnly: 'member',
+                adminOnly: 'member',
             },
         },
     });
@@ -257,188 +249,6 @@ describe('guard pipeline', () => {
                 'cache-control': 'no-store',
                 'www-authenticate': 'Bearer error="insufficient_scope", scope="items:read"',
             },
-        });
-    });
-
-    it('rejects with 403 when the returned role does not hold what the route requires', async () => {
-        const contract = makeContract();
-        const { adapter, results } = makeAdapter();
-        await adapter.handle({
-            routes: contract.routes,
-            router: {
-                items: {
-                    listItems: okHandler,
-                    getSecret: okHandler,
-                    ownerOnly: okHandler,
-                    adminOnly: okHandler,
-                },
-            },
-            request: makeRequest('/owner-only', {
-                'x-workspace-token': 'wst_admin',
-            }),
-            responseContext: {},
-            guards: {
-                member: () => ({
-                    workspaceUserId: '2',
-                    role: 'admin',
-                }),
-            } as GuardMap<Record<string, never>>,
-            schemes: contract.securitySchemes,
-        });
-        expect(results[0]?.kind).toBe('guard-denied');
-        expect((results[0] as { status: number; body: { detail: string } }).status).toBe(403);
-        expect((results[0] as { body: { detail: string } }).body.detail).toBe('Forbidden: this route requires workspace:delete.');
-    });
-
-    it('passes requires when the returned role holds it and hands the handler the role and its permissions', async () => {
-        const contract = makeContract();
-        const { adapter, results } = makeAdapter();
-        let received: unknown;
-        await adapter.handle({
-            routes: contract.routes,
-            router: {
-                items: {
-                    listItems: okHandler,
-                    getSecret: okHandler,
-                    ownerOnly: (args: Record<string, unknown>) => {
-                        received = (args.auth as Record<string, unknown>).member;
-                        return okHandler();
-                    },
-                    adminOnly: okHandler,
-                },
-            },
-            request: makeRequest('/owner-only', {
-                'x-workspace-token': 'wst_owner',
-            }),
-            responseContext: {},
-            guards: {
-                member: ({ apiKey }) => ({
-                    workspaceUserId: (apiKey as { value: string }).value,
-                    role: 'owner',
-                }),
-            } as GuardMap<Record<string, never>>,
-            schemes: contract.securitySchemes,
-        });
-        expect(results[0]?.kind).toBe('success');
-        expect(received).toEqual({
-            workspaceUserId: 'wst_owner',
-            role: 'owner',
-            permissions: ['workspace:read', 'workspace:delete'],
-        });
-    });
-
-    it('rejects with 403 when the returned role is not one the route accepts', async () => {
-        const contract = makeContract();
-        const { adapter, results } = makeAdapter();
-        await adapter.handle({
-            routes: contract.routes,
-            router: {
-                items: {
-                    listItems: okHandler,
-                    getSecret: okHandler,
-                    ownerOnly: okHandler,
-                    adminOnly: okHandler,
-                },
-            },
-            request: makeRequest('/admin-only', {
-                'x-workspace-token': 'wst_owner',
-            }),
-            responseContext: {},
-            guards: {
-                member: () => ({
-                    workspaceUserId: '1',
-                    role: 'owner',
-                }),
-            } as GuardMap<Record<string, never>>,
-            schemes: contract.securitySchemes,
-        });
-        expect(results[0]?.kind).toBe('guard-denied');
-        expect((results[0] as { status: number }).status).toBe(403);
-        expect((results[0] as { body: { detail: string } }).body.detail).toBe('Forbidden: this route requires the admin role.');
-    });
-
-    it('passes roles when one of the returned roles is accepted', async () => {
-        const contract = makeContract();
-        const { adapter, results } = makeAdapter();
-        await adapter.handle({
-            routes: contract.routes,
-            router: {
-                items: {
-                    listItems: okHandler,
-                    getSecret: okHandler,
-                    ownerOnly: okHandler,
-                    adminOnly: okHandler,
-                },
-            },
-            request: makeRequest('/admin-only', {
-                'x-workspace-token': 'wst_both',
-            }),
-            responseContext: {},
-            guards: {
-                member: () => ({
-                    workspaceUserId: '3',
-                    role: ['owner', 'admin'],
-                }),
-            } as GuardMap<Record<string, never>>,
-            schemes: contract.securitySchemes,
-        });
-        expect(results[0]?.kind).toBe('success');
-    });
-
-    it('hands a handler behind roles from names the role alone', async () => {
-        const viewer = Kizuna.identity.bearer({
-            context: z.object({
-                userId: z.string(),
-            }),
-            roles: Kizuna.roles(['viewer', 'editor']),
-        });
-        const plain = new Kizuna({
-            identities: {
-                viewer,
-            },
-        });
-        const docs = plain.routes({
-            listDocs: routeDefinition('/docs'),
-        });
-        const contract = plain.contract({
-            routes: {
-                docs,
-            },
-            accessControl: {
-                docs: {
-                    auth: 'viewer',
-                    roles: 'editor',
-                },
-            },
-        });
-        const { adapter, results } = makeAdapter();
-        let received: unknown;
-        await adapter.handle({
-            routes: contract.routes,
-            router: {
-                docs: {
-                    listDocs: (args: Record<string, unknown>) => {
-                        received = (args.auth as Record<string, unknown>).viewer;
-                        return okHandler();
-                    },
-                },
-            },
-            request: makeRequest('/docs', {
-                authorization: 'Bearer tok',
-            }),
-            responseContext: {},
-            guards: {
-                viewer: () => ({
-                    userId: '1',
-                    role: 'editor',
-                }),
-            } as GuardMap<Record<string, never>>,
-            schemes: contract.securitySchemes,
-        });
-        expect(results[0]?.kind).toBe('success');
-        expect(received).toEqual({
-            userId: '1',
-            role: 'editor',
         });
     });
 
@@ -717,12 +527,7 @@ describe('guard params and several roles', () => {
             }),
         },
         accessControl: {
-            users: {
-                auth: 'member',
-                requires: {
-                    user: ['export'],
-                },
-            },
+            users: 'member',
         },
     });
 
@@ -752,11 +557,19 @@ describe('guard params and several roles', () => {
         expect(results[0]?.kind).toBe('success');
     });
 
-    it('rejects when none of the returned roles holds the permission', async () => {
+    it('hands the handler only what the returned role holds', async () => {
         const { adapter, results } = makeAdapter();
+        let received: unknown;
         await adapter.handle({
             routes: teamContract.routes,
-            router: teamRouter,
+            router: {
+                users: {
+                    exportUsers: (args: Record<string, unknown>) => {
+                        received = (args.auth as Record<string, unknown>).member;
+                        return okHandler();
+                    },
+                },
+            },
             request: makeRequest('/users/export', {
                 'x-workspace-token': 'tok',
             }),
@@ -769,8 +582,12 @@ describe('guard params and several roles', () => {
             } as GuardMap<Record<string, never>>,
             schemes: teamContract.securitySchemes,
         });
-        expect(results[0]?.kind).toBe('guard-denied');
-        expect((results[0] as { status: number }).status).toBe(403);
+        expect(results[0]?.kind).toBe('success');
+        expect(received).toEqual({
+            workspaceUserId: '1',
+            role: ['inviter'],
+            permissions: ['invite:send'],
+        });
     });
 });
 
@@ -838,7 +655,7 @@ describe('custom identity guard', () => {
         });
         expect(results[0]?.kind).toBe('success');
         // The guard receives exactly the framework args, with no credential key.
-        expect(receivedKeys?.sort()).toEqual(['deny', 'params']);
+        expect(receivedKeys?.sort()).toEqual(['deny', 'params', 'scopes']);
         expect(received).toEqual({
             inviteId: 'invite-for-inv_1',
         });
@@ -912,12 +729,7 @@ describe('permissions within a role', () => {
             reports,
         },
         accessControl: {
-            reports: {
-                auth: 'analyst',
-                requires: {
-                    report: ['export'],
-                },
-            },
+            reports: 'analyst',
         },
     });
 
@@ -947,13 +759,16 @@ describe('permissions within a role', () => {
     };
 
     it('treats what the guard returns as what the caller holds', async () => {
-        const denied = await run({
+        const narrowed = await run({
             userId: '1',
             role: 'analyst',
             permissions: ['report:read'],
         });
-        expect(denied.result?.kind).toBe('guard-denied');
-        expect((denied.result as { status: number }).status).toBe(403);
+        expect(narrowed.received).toEqual({
+            userId: '1',
+            role: 'analyst',
+            permissions: ['report:read'],
+        });
 
         const allowed = await run({
             userId: '1',
@@ -987,153 +802,10 @@ describe('permissions within a role', () => {
             role: 'viewer',
             permissions: ['report:read', 'report:export'],
         });
-        expect(beyond.result?.kind).toBe('guard-denied');
-        expect(beyond.received).toBeUndefined();
-    });
-});
-
-describe('OAuth tokens', () => {
-    const catalog = Kizuna.permissions({
-        users: ['read', 'write'],
-        report: ['read'],
-    });
-
-    const partner = Kizuna.identity.oauth2({
-        flows: {
-            clientCredentials: {
-                tokenUrl: 'https://auth.example.com/token',
-                scopes: {
-                    'users:read': 'Read users',
-                    'users:write': 'Write users',
-                    'report:read': 'Read reports',
-                },
-            },
-        },
-        resourceMetadata: 'https://api.example.com/.well-known/oauth-protected-resource',
-        context: z.object({
-            clientId: z.string(),
-        }),
-        roles: Kizuna.roles(catalog, {
-            integration: {
-                users: ['read', 'write'],
-            },
-        }),
-    });
-
-    const oauth = new Kizuna({
-        identities: {
-            partner,
-        },
-    });
-
-    const users = oauth.routes({
-        createUser: routeDefinition('/users'),
-        readReport: routeDefinition('/report'),
-    });
-
-    const contract = oauth.contract({
-        routes: {
-            users,
-        },
-        accessControl: {
-            users: {
-                '*': {
-                    auth: 'partner',
-                    requires: {
-                        users: ['write'],
-                    },
-                },
-                readReport: {
-                    auth: 'partner',
-                    requires: {
-                        report: ['read'],
-                    },
-                },
-            },
-        },
-    });
-
-    const run = async (path: `/${string}`, tokenScopes: string[]) => {
-        const { adapter, results } = makeAdapter();
-        await adapter.handle({
-            routes: contract.routes,
-            router: {
-                users: {
-                    createUser: okHandler,
-                    readReport: okHandler,
-                },
-            },
-            request: makeRequest(path, {
-                authorization: 'Bearer tok',
-            }),
-            responseContext: {},
-            guards: {
-                partner: () => ({
-                    clientId: 'c1',
-                    role: 'integration',
-                    permissions: tokenScopes,
-                }),
-            } as GuardMap<Record<string, never>>,
-            schemes: contract.securitySchemes,
+        expect(beyond.received).toEqual({
+            userId: '1',
+            role: 'viewer',
+            permissions: ['report:read'],
         });
-        return results[0] as { kind: string; status?: number; headers?: Record<string, string> };
-    };
-
-    it('writes what the route requires as the scopes of the security requirement', () => {
-        expect(resolveSecurityRequirements(contract.routes.users.createUser as RouteDefinition)).toEqual([
-            {
-                scheme: 'partner',
-                scopes: ['users:write'],
-            },
-        ]);
-    });
-
-    it('passes a token that carries the permission', async () => {
-        const result = await run('/users', ['users:read', 'users:write']);
-        expect(result.kind).toBe('success');
-    });
-
-    it('answers insufficient_scope when the role holds the permission and the token does not', async () => {
-        const result = await run('/users', ['users:read']);
-        expect(result.status).toBe(403);
-        expect(result.headers?.['www-authenticate']).toBe(
-            'Bearer error="insufficient_scope", scope="users:write", resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"'
-        );
-    });
-
-    it('points a missing token at the metadata document', async () => {
-        const { adapter, results } = makeAdapter();
-        await adapter.handle({
-            routes: contract.routes,
-            router: {
-                users: {
-                    createUser: okHandler,
-                    readReport: okHandler,
-                },
-            },
-            request: makeRequest('/users'),
-            responseContext: {},
-            guards: {
-                partner: ({ deny }) =>
-                    deny({
-                        status: 401,
-                        body: {
-                            detail: 'Unauthorized',
-                        },
-                    }),
-            } as GuardMap<Record<string, never>>,
-            schemes: contract.securitySchemes,
-        });
-        const result = results[0] as { status: number; headers?: Record<string, string> };
-        expect(result.status).toBe(401);
-        expect(result.headers?.['www-authenticate']).toBe(
-            'Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"'
-        );
-    });
-
-    it('answers a plain 403 when no token could help, since the role lacks the permission', async () => {
-        const result = await run('/report', ['report:read']);
-        expect(result.status).toBe(403);
-        expect(result.headers?.['www-authenticate']).toBeUndefined();
     });
 });

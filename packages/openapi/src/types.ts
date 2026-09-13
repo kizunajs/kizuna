@@ -60,6 +60,21 @@ export interface OpenApiOperation {
      * requirement, so this marks the operation as protected, not public.
      */
     'x-kizuna-guarded'?: string[];
+    externalDocs?: OpenApiExternalDocs;
+}
+
+export interface OpenApiOperation {
+    operationId?: string;
+    summary?: string;
+    description?: string;
+    deprecated?: boolean;
+    tags?: string[];
+    security?: Array<Record<string, string[]>>;
+    /**
+     * The `custom` schemes guarding this operation. They emit no `security`
+     * requirement, so this marks the operation as protected, not public.
+     */
+    'x-kizuna-guarded'?: string[];
     /**
      * The roles the route accepts, from the access control map's `roles`.
      */

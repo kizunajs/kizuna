@@ -244,7 +244,6 @@ export {
     type StreamResponseDefinition,
     type SecurityRequirement,
     type SchemeNameOf,
-    type RequiredPermissions,
     type RouteDefinition,
     type RoutePath,
     type Routes,

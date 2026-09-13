@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method, RequiredPermissions } from './types.js';
+import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import { authenticationChallenge, resolveSecurityRequirements } from './security-scheme.js';
 import type { Credential, NoCredential } from './identity.js';
-import { insufficientScope, requiresDenial, withPermissions } from './access-check.js';
-export { insufficientScope, requiresDenial, withPermissions, type AccessCheckInput } from './access-check.js';
+import { withPermissions } from './access-check.js';
+export { withPermissions } from './access-check.js';
 import {
     type RouteHandler,
     type Router,
@@ -233,8 +233,8 @@ export const isGuardDenial = (value: unknown): value is GuardDenial => typeof va
 /**
  * The runtime behavior of a guard. It receives one object: the adapter's handler
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
- * from the request (or `null` if absent), a `deny` helper, and the request
- * context resolved for this request, absent
+ * from the request (or `null` if absent), a `deny` helper, the matched route's
+ * required `scopes`, and the request context resolved for this request, absent
  * when the contract declares none. It returns the context the scheme provides
  * (nested under `auth`, keyed by the identity's name in the handler args) or
  * `deny(...)` to reject.
@@ -244,6 +244,7 @@ export type GuardRun<HandlerContext = unknown> = (
         Credential & {
             params: Record<string, string>;
             deny: GuardDeny;
+            scopes: string[];
             requestContext?: Record<string, unknown>;
         }
 ) => Promise<Record<string, unknown> | GuardDenial | void> | Record<string, unknown> | GuardDenial | void;
@@ -775,17 +776,6 @@ const assertDeclaredBody = (route: RouteDefinition, routeKey: string, status: nu
 };
 
 /**
- * No author code runs when `requires` refuses a caller, so the declared schema
- * fills its own defaults.
- */
-const requiresDenialBody = (route: RouteDefinition, detail: string): GuardDenialBody => {
-    const declared = route.responses[403];
-    const schema = declared === undefined || isStreamResponse(declared) ? undefined : 'safeParse' in declared ? declared : declared.body;
-    const filled = schema?.safeParse(problemDetails(403, detail));
-    return filled?.success ? (filled.data as GuardDenialBody) : { detail };
-};
-
-/**
  * Extract the credential an identity's authentication method expects from the
  * request, labelled with its scheme kind: the value of the named
  * header/query/cookie for `apiKey`, the decoded `username`/`password` for HTTP
@@ -1201,7 +1191,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         const hasRequestContext = Object.keys(requestContext).length > 0;
 
         const securityContext: Record<string, unknown> = {};
-        for (const { scheme } of resolveSecurityRequirements(route)) {
+        for (const { scheme, scopes } of resolveSecurityRequirements(route)) {
             const guard = guards?.[scheme];
             if (!guard) {
                 throw new Error(`No guard registered for security scheme "${scheme}" required by route "${routeKey}".`);
@@ -1213,6 +1203,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 ...credential,
                 params,
                 deny: guardDenyFor(schemeDefinition),
+                scopes,
                 ...(hasRequestContext ? { requestContext } : {}),
             } as Parameters<typeof guard>[0]);
             if (isGuardDenial(guardResult)) {
@@ -1228,37 +1219,6 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 securityContext[scheme] = withPermissions(scheme, schemeDefinition, guardResult);
             }
         }
-        const accessCheck = {
-            roles: route.roles,
-            requires: route.requires,
-            requiredSchemes: resolveSecurityRequirements(route).map((requirement) => requirement.scheme),
-            schemes,
-            securityContext,
-        };
-        const forbidden = requiresDenial(accessCheck);
-        if (forbidden !== undefined) {
-            const missingScope = insufficientScope(accessCheck);
-            const resourceMetadata = accessCheck.requiredSchemes
-                .map((scheme) => schemes?.[scheme]?.resourceMetadata)
-                .find((url) => url !== undefined);
-            return {
-                kind: 'guard-denied',
-                status: 403,
-                body: requiresDenialBody(route, forbidden),
-                ...(missingScope.length > 0
-                    ? {
-                          headers: {
-                              'www-authenticate': bearerChallenge({
-                                  error: 'insufficient_scope',
-                                  scope: missingScope.join(' '),
-                                  resource_metadata: resourceMetadata,
-                              }),
-                          },
-                      }
-                    : {}),
-            };
-        }
-
         const throwError = (response: { status: number; body: unknown; headers?: ResponseHeaders }): never => {
             throw new ResponseError(response);
         };

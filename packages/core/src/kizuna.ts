@@ -12,45 +12,25 @@ import { jobClaims, buildJobs, type AuthoredJobs, type CompiledJobs, type Jobs, 
 import { buildTools, type AuthoredTools, type CompiledTools, type Tools } from './tools.js';
 import type { ToolsArg } from './tool-runner.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
-import { createIdentity, type RolesOf } from './identity.js';
-import { createPermissions, createRoles, permissionNames, type CatalogOf, type PermissionSet, type RoleNamesOf } from './permissions.js';
+import { createIdentity } from './identity.js';
+import { createPermissions, createRoles } from './permissions.js';
 import { createRequestContext } from './request-context.js';
 import { createModel } from './model.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
-import type { Routes, RouteDefinition, SecurityRequirement, RequiredPermissions, AuthoredRoutes } from './types.js';
+import type { Routes, RouteDefinition, SecurityRequirement, AuthoredRoutes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { PathParamsCheck } from './path-params.js';
 
 /**
  * One entry in the access control map: `false` for public, an identity name,
- * or `{ auth, roles?, requires? }`.
+ * or `{ auth, scopes? }`.
  */
 export type AccessControlValue<Id extends string = string, Identities = Record<string, unknown>> =
     | Id
     | false
     | AccessControlRule<Id, Identities>;
-
-/**
- * The `requires` an identity accepts: a subset of the catalog behind its roles,
- * or `never` when the identity declares no roles.
- */
-type RequiresOf<Identities, Name extends string> = Name extends keyof Identities
-    ? [CatalogOf<RolesOf<Identities[Name]>>] extends [never]
-        ? never
-        : PermissionSet<CatalogOf<RolesOf<Identities[Name]>>>
-    : never;
-
-/**
- * The `roles` an identity accepts: one of its declared role names or several,
- * or `never` when the identity declares no roles.
- */
-type AcceptedRolesOf<Identities, Name extends string> = Name extends keyof Identities
-    ? [RoleNamesOf<RolesOf<Identities[Name]>>] extends [never]
-        ? never
-        : RoleNamesOf<RolesOf<Identities[Name]>> | readonly RoleNamesOf<RolesOf<Identities[Name]>>[]
-    : never;
 
 /**
  * The object form of an {@link AccessControlValue}.
@@ -59,14 +39,12 @@ export type AccessControlRule<Id extends string = string, Identities = Record<st
     | {
           [Name in Id]: {
               auth: Name;
-              roles?: AcceptedRolesOf<Identities, Name>;
-              requires?: RequiresOf<Identities, Name>;
+              scopes?: readonly string[];
           };
       }[Id]
     | {
           auth: readonly Id[];
-          roles?: AcceptedRolesOf<Identities, Id>;
-          requires?: RequiresOf<Identities, Id>;
+          scopes?: readonly string[];
       };
 
 /**
@@ -162,17 +140,9 @@ const assertFillableGuardSchema = (schema: z.ZodType): void => {
 };
 
 /**
- * Apply one {@link AccessControlValue} to a single route, setting its `security` and,
- * when narrowed, its `roles` and `requires`.
+ * Apply one {@link AccessControlValue} to a single route, setting its `security`.
  */
-const resolveAccessControlValue = (
-    route: RouteDefinition,
-    value: AccessControlValue,
-    identities: Record<string, SecurityScheme> | undefined,
-    routePath: string
-): void => {
-    delete route.roles;
-    delete route.requires;
+const resolveAccessControlValue = (route: RouteDefinition, value: AccessControlValue, routePath: string): void => {
     if (value === false) {
         route.security = [];
         return;
@@ -185,67 +155,12 @@ const resolveAccessControlValue = (
     if (names.length === 0) {
         throw new Error(`Access control entry for '${routePath}' names no identity under \`auth\`.`);
     }
-    route.security = [requirementFor(names, undefined, identities) as SecurityRequirement];
-
-    const accepted = value.roles === undefined ? [] : typeof value.roles === 'string' ? [value.roles] : [...value.roles];
-    if (accepted.length > 0) {
-        const declared = names.map((name) => identities?.[name]?.roles).filter((roles) => roles !== undefined);
-        if (declared.length === 0) {
-            throw new Error(`Access control entry for '${routePath}' has \`roles\`, but none of its identities declares roles.`);
-        }
-        for (const role of accepted) {
-            if (!declared.some((roles) => roles.names.includes(role))) {
-                throw new Error(
-                    `Access control entry for '${routePath}' accepts the role '${role}', which no identity on the route declares.`
-                );
-            }
-        }
-        route.roles = accepted;
-    }
-
-    const requires = value.requires as RequiredPermissions | undefined;
-    if (requires === undefined || Object.keys(requires).length === 0) return;
-    const catalogs = names.map((name) => identities?.[name]?.roles?.permissions?.catalog).filter((catalog) => catalog !== undefined);
-    if (catalogs.length === 0) {
-        throw new Error(`Access control entry for '${routePath}' has \`requires\`, but none of its identities declares permissions.`);
-    }
-    for (const [resource, verbs] of Object.entries(requires)) {
-        for (const verb of verbs) {
-            if (!catalogs.some((catalog) => catalog[resource]?.includes(verb))) {
-                throw new Error(
-                    `Access control entry for '${routePath}' requires '${resource}:${verb}', which no identity on the route declares.`
-                );
-            }
-        }
-    }
-    route.requires = requires;
-    route.security = [requirementFor(names, requires, identities) as SecurityRequirement];
-};
-
-/**
- * The security requirement for the identities an entry names. An OAuth token
- * carries its permissions as scopes, so an `oauth2` or `openIdConnect`
- * identity lists what the route requires from its catalog.
- */
-const requirementFor = (
-    names: readonly string[],
-    requires: RequiredPermissions | undefined,
-    identities: Record<string, SecurityScheme> | undefined
-): Record<string, readonly string[]> => {
+    const scopes = value.scopes ?? [];
     const requirement: Record<string, readonly string[]> = {};
     for (const name of names) {
-        const identity = identities?.[name];
-        const type = identity?.openapi?.type;
-        const catalog = identity?.roles?.permissions?.catalog;
-        requirement[name] =
-            requires !== undefined && catalog !== undefined && (type === 'oauth2' || type === 'openIdConnect')
-                ? permissionNames(requires).filter((permission) => {
-                      const [resource, verb] = permission.split(':');
-                      return catalog[resource ?? '']?.includes(verb ?? '') ?? false;
-                  })
-                : [];
+        requirement[name] = scopes;
     }
-    return requirement;
+    route.security = [requirement as SecurityRequirement];
 };
 
 const hasCascade = (value: unknown): value is { '*': AccessControlValue } & Record<string, AccessControlValue | GroupAccessControl> =>
@@ -257,12 +172,7 @@ const hasCascade = (value: unknown): value is { '*': AccessControlValue } & Reco
  * default for what it names; a key matching none would be a silent no-op, so it
  * throws instead.
  */
-const applyGroupAccessControl = (
-    group: Routes,
-    groupAccess: GroupAccessControl,
-    path: string,
-    identities: Record<string, SecurityScheme> | undefined
-): void => {
+const applyGroupAccessControl = (group: Routes, groupAccess: GroupAccessControl, path: string): void => {
     const cascade = hasCascade(groupAccess);
     const groupDefault = (cascade ? groupAccess['*'] : groupAccess) as AccessControlValue;
     if (cascade) {
@@ -276,18 +186,13 @@ const applyGroupAccessControl = (
         const entry = cascade ? (groupAccess as Record<string, GroupAccessControl | undefined>)[key] : undefined;
         const subPath = `${path}.${key}`;
         if (!isRouteDefinition(value)) {
-            applyGroupAccessControl(value as Routes, entry === undefined ? groupDefault : entry, subPath, identities);
+            applyGroupAccessControl(value as Routes, entry === undefined ? groupDefault : entry, subPath);
             continue;
         }
         if (hasCascade(entry)) {
             throw new Error(`Access control map key '${key}' under '${path}' targets a route; a nested cascade only applies to a group.`);
         }
-        resolveAccessControlValue(
-            value as RouteDefinition,
-            (entry === undefined ? groupDefault : entry) as AccessControlValue,
-            identities,
-            subPath
-        );
+        resolveAccessControlValue(value as RouteDefinition, (entry === undefined ? groupDefault : entry) as AccessControlValue, subPath);
     }
 };
 
@@ -608,11 +513,10 @@ const createSurface = <
                     resolveAccessControlValue(
                         group,
                         (hasCascade(groupAccess) ? groupAccess['*'] : groupAccess) as AccessControlValue,
-                        config?.identities,
                         groupKey
                     );
                 } else {
-                    applyGroupAccessControl(group as Routes, groupAccess, groupKey, config?.identities);
+                    applyGroupAccessControl(group as Routes, groupAccess, groupKey);
                 }
             }
         }

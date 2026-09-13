@@ -1039,13 +1039,7 @@ describe('MCP server: guards', () => {
             api: {
                 '*': false,
                 whoAmI: 'user',
-                ownerOnly: {
-                    auth: 'user',
-                    roles: 'admin',
-                    requires: {
-                        report: ['read'],
-                    },
-                },
+                ownerOnly: 'user',
             },
         },
     });
@@ -1111,8 +1105,6 @@ describe('MCP server: guards', () => {
 
         expect(whoAmI.description).toContain('Requires: user');
         expect(gated.description).toContain('Requires: user');
-        expect(gated.description).toContain('Roles: admin');
-        expect(gated.description).toContain('Permissions: report:read');
         expect(publicRoute.description).not.toContain('Requires:');
 
         await close();
@@ -1174,7 +1166,7 @@ describe('MCP server: guards', () => {
         await close();
     });
 
-    it('expands the transport-verified role into permissions, so requires passes', async () => {
+    it('hands a transport-verified context to the handler', async () => {
         const { client, close } = await connectMcpClient(makeSecuredApi(), {
             transportAuth: {
                 scheme: 'user',
