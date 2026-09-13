@@ -1058,7 +1058,13 @@ describe('MCP server: guards', () => {
             },
             guards: {
                 user: ({ bearer, deny }: { bearer: { token: string } | null; deny: GuardDeny }) => {
-                    if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+                    if (bearer?.token !== 'tok_ada')
+                        return deny({
+                            status: 401,
+                            body: {
+                                detail: 'Unauthorized',
+                            },
+                        });
                     return {
                         userId: '1',
                     };

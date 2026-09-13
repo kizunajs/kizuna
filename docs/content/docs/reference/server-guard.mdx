@@ -17,7 +17,12 @@ import { server } from './server';
 export const requireUser = server.guard('user', ({ bearer, deny }) => {
     const session = bearer ? sessions.get(bearer.token) : undefined;
     if (!session) {
-        return deny(401, 'Unauthorized');
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
     }
     return {
         userId: session.userId,
@@ -34,24 +39,30 @@ Return the identity's `context` and `access` fields to allow the request; they r
 ```ts title="guards.ts"
 import { bearerChallenge } from '@ts-kizuna/core/adapter';
 
-return deny(403, 'The token is missing a required scope', {
-    'www-authenticate': bearerChallenge({
-        error: 'insufficient_scope',
-        scope: scopes.join(' '),
-    }),
+return deny({
+    status: 403,
+    body: {
+        detail: 'The token is missing a required scope',
+    },
+    headers: {
+        'www-authenticate': bearerChallenge({
+            error: 'insufficient_scope',
+            scope: scopes.join(' '),
+        }),
+    },
 });
 ```
 
 ## Guard arguments
 
-| Property          | Description                                                                                                                                                        |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| credential        | The extracted credential, keyed by the identity's method (`bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`). `null` when absent.                             |
-| `params`          | The matched route's path params, for guards that check access to the resource in the URL.                                                                          |
-| `deny`            | `(status, detail, headers?) => GuardDenial`, rejects with a Problem Details response. A `401` also carries a `WWW-Authenticate` challenge built from the identity. |
-| `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                                               |
-| `requestContext`  | The [request context](/docs/request-context) resolved for this request, keyed by name. Absent when the contract declares none.                                     |
-| framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                                             |
+| Property          | Description                                                                                                                                                                                                                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| credential        | The extracted credential, keyed by the identity's method (`bearer`, `apiKey`, `basic`, `oauth2`, `openIdConnect`). `null` when absent.                                                                                                                                                 |
+| `params`          | The matched route's path params, for guards that check access to the resource in the URL.                                                                                                                                                                                              |
+| `deny`            | `({ status, body, headers? }) => GuardDenial`, rejects with a Problem Details response. The body is `detail` plus whatever the contract's [`guardSchema`](/docs/authentication#what-a-refusal-says) adds. A `401` also carries a `WWW-Authenticate` challenge built from the identity. |
+| `scopes`          | The matched route's required OAuth scopes (`string[]`, empty for non-scoped routes).                                                                                                                                                                                                   |
+| `requestContext`  | The [request context](/docs/request-context) resolved for this request, keyed by name. Absent when the contract declares none.                                                                                                                                                         |
+| framework context | The adapter's native request objects (`req`/`res`, `c`, `request`/`reply`, `request`).                                                                                                                                                                                                 |
 
 ## Where a denial is documented
 

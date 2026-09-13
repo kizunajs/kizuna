@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import {
+    AUTO_GUARD_BRAND,
     AUTO_RESPONSES_BRAND,
     isStreamResponse,
     streamMode,
@@ -93,10 +94,17 @@ type AutoStatuses<R extends RouteDefinition> = Extract<
     number
 >;
 
+/**
+ * The contract's `guardSchema`, or plain Problem Details when it declares none.
+ */
+type AutoBody<R extends RouteDefinition> = typeof AUTO_GUARD_BRAND extends keyof R
+    ? NonNullable<R[typeof AUTO_GUARD_BRAND]>
+    : ProblemDetails;
+
 type AutoErrorResult<R extends RouteDefinition> = {
     [Status in AutoStatuses<R>]: {
         status: Status;
-        body: ProblemDetails;
+        body: AutoBody<R>;
         headers: Record<string, string>;
     };
 }[AutoStatuses<R>];

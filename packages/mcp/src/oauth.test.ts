@@ -208,15 +208,33 @@ const makeApi = (onGuardRun?: (requestContext: { analytics: { sessionId: string 
     const requireUser = server.guard('user', ({ oauth2, scopes, deny, requestContext }) => {
         onGuardRun?.(requestContext);
         const session = oauth2 ? TOKENS[oauth2.token] : undefined;
-        if (!session) return deny(401, 'Invalid or expired token');
-        if (!scopes.every((scope) => session.granted.includes(scope))) return deny(403, 'The token is missing a required scope');
+        if (!session)
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Invalid or expired token',
+                },
+            });
+        if (!scopes.every((scope) => session.granted.includes(scope)))
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'The token is missing a required scope',
+                },
+            });
         return {
             userId: session.userId,
             role: session.role,
         };
     });
     const requireMember = server.guard('member', ({ apiKey, deny }) => {
-        if (apiKey?.value !== 'workspace-secret') return deny(403, 'Forbidden');
+        if (apiKey?.value !== 'workspace-secret')
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'Forbidden',
+                },
+            });
     });
     return server.api({
         guards: {

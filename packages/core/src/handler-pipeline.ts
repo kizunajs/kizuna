@@ -16,16 +16,7 @@ import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { IdentityAccess } from './identity.js';
 import { applyCoercion, coercionPlanFor } from './coercion.js';
-
-type ProblemDetailsEnvelope = { type: string; title: string; status: number; detail: string };
-
-/**
- * Strips the RFC 9457 envelope fields the adapter auto-fills (`type`/`title`/`status`),
- * leaving the author to supply `detail` plus any extension members. `type` stays optional
- * (authors may point it at their own problem-type URI); `title`/`status` are forbidden.
- */
-type StripProblemEnvelope<T extends ProblemDetailsEnvelope> = Omit<T, 'type' | 'title' | 'status'> &
-    Partial<Pick<T, 'type'>> & { title?: never; status?: never };
+import type { ProblemDetails, StripProblemEnvelope } from './problem-details.js';
 
 /**
  * True when a literal status key is in the 4xx/5xx range. Widened `number` keys (no
@@ -40,7 +31,7 @@ type IsErrorStatus<Status> = `${Status & number}` extends `4${string}` | `5${str
  * return / `throwError()` site. Success responses pass through unchanged.
  */
 type ApplyErrorEnvelope<Input, Status> =
-    IsErrorStatus<Status> extends true ? (Input extends ProblemDetailsEnvelope ? StripProblemEnvelope<Input> : never) : Input;
+    IsErrorStatus<Status> extends true ? (Input extends ProblemDetails ? StripProblemEnvelope<Input> : never) : Input;
 
 type HandlerBody<S, Status> = S extends z.ZodType
     ? ApplyErrorEnvelope<z.input<S>, Status>
@@ -293,14 +284,14 @@ export type HandlersFromAuth<R extends Routes, HandlerContext, Identities, Auth>
  */
 type RouteContextBrand<Context> = [keyof Context] extends [never] ? unknown : HandlerContextBrand<Context>;
 
-type RouteGuardBrand<Value> = [AuthValueIdentityNames<Value>] extends [never] ? unknown : AutoResponsesBrand<GuardStatus>;
+type RouteGuardBrand<Value, Body> = [AuthValueIdentityNames<Value>] extends [never] ? unknown : AutoResponsesBrand<GuardStatus, Body>;
 
-type GroupHandlerContextOverlay<G extends Routes, Identities, GroupAuth, ContractContext> = {
+type GroupHandlerContextOverlay<G extends Routes, Identities, GroupAuth, ContractContext, GuardBody_> = {
     [Key in keyof G]: G[Key] extends RouteDefinition
         ? RouteContextBrand<AuthArg<RouteAuthValue<GroupAuth, Key & string>, Identities> & ContractContext> &
-              RouteGuardBrand<RouteAuthValue<GroupAuth, Key & string>>
+              RouteGuardBrand<RouteAuthValue<GroupAuth, Key & string>, GuardBody_>
         : G[Key] extends Routes
-          ? GroupHandlerContextOverlay<G[Key], Identities, SubgroupAuth<GroupAuth, Key & string>, ContractContext>
+          ? GroupHandlerContextOverlay<G[Key], Identities, SubgroupAuth<GroupAuth, Key & string>, ContractContext, GuardBody_>
           : unknown;
 };
 
@@ -309,20 +300,28 @@ type GroupHandlerContextOverlay<G extends Routes, Identities, GroupAuth, Contrac
  * args: `auth`, `requestContext`, plugins, and jobs. Read back by
  * {@link RouteHandler}.
  */
-export type RoutesWithHandlerContext<R extends Routes, Identities, Auth, RequestContext, ContractContext = unknown> = R & {
+export type RoutesWithHandlerContext<
+    R extends Routes,
+    Identities,
+    Auth,
+    RequestContext,
+    ContractContext = unknown,
+    GuardBody_ = ProblemDetails,
+> = R & {
     [Group in keyof R]: R[Group] extends RouteDefinition
         ? RouteContextBrand<
               AuthArg<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, Identities> &
                   RequestContextValues<RequestContext> &
                   ContractContext
           > &
-              RouteGuardBrand<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>>
+              RouteGuardBrand<RouteAuthValue<Group extends keyof Auth ? Auth[Group] : false, Group & string>, GuardBody_>
         : R[Group] extends Routes
           ? GroupHandlerContextOverlay<
                 R[Group],
                 Identities,
                 Group extends keyof Auth ? Auth[Group] : false,
-                RequestContextValues<RequestContext> & ContractContext
+                RequestContextValues<RequestContext> & ContractContext,
+                GuardBody_
             >
           : unknown;
 };

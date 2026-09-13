@@ -230,6 +230,9 @@ const securedK = new Kizuna({
     identities: {
         user: userIdentity,
     },
+    guardSchema: ProblemDetailsSchema.extend({
+        code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
+    }),
 });
 
 const securedRoutes = securedK.routes({
@@ -264,7 +267,14 @@ describe('end-to-end: typed client → secured Express route', () => {
         const securedServer = new KizunaServer(securedContract);
 
         const requireUser = securedServer.guard('user', ({ bearer, deny }) => {
-            if (bearer?.token !== 'tok_ada') return deny(401, 'Unauthorized');
+            if (bearer?.token !== 'tok_ada')
+                return deny({
+                    status: 401,
+                    body: {
+                        detail: 'Unauthorized',
+                        code: 'expired_token',
+                    },
+                });
             return {
                 userId: '1',
             };
@@ -321,6 +331,7 @@ describe('end-to-end: typed client → secured Express route', () => {
         expect(response.status).toBe(401);
         if (response.status === 401) {
             expect(response.body.detail).toBe('Unauthorized');
+            expect(response.body.code).toBe('expired_token');
         }
     });
 });

@@ -15,6 +15,8 @@ import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity } from './identity.js';
 import { createRequestContext } from './request-context.js';
 import { createModel } from './model.js';
+import { problemDetails, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
+import { readObjectShape } from './zod-internals.js';
 import type { Routes, RouteDefinition, SecurityRequirement, AccessGate, AuthoredRoutes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
@@ -104,6 +106,26 @@ type ValidGroupAuth<Entry, Group, Id extends string> = Group extends RouteDefini
  * Apply one {@link AuthValue} to a single route, setting its `security` and,
  * when fields are constrained, its `accessGate`.
  */
+/**
+ * Kizuna sends the guard body itself when an access gate turns a caller away,
+ * so every field beyond the envelope has to be one it can fill.
+ */
+const ENVELOPE_FIELDS = ['type', 'title', 'status', 'detail'];
+
+const assertFillableGuardSchema = (schema: z.ZodType): void => {
+    const shape = readObjectShape(schema);
+    if (shape === undefined || !ENVELOPE_FIELDS.every((field) => field in shape)) {
+        throw new Error(
+            'The `guardSchema` must extend `ProblemDetailsSchema`. Every response at 400 or above is RFC 9457 Problem Details.'
+        );
+    }
+    if (schema.safeParse(problemDetails(403, 'Forbidden')).success) return;
+    throw new Error(
+        'The `guardSchema` cannot be built from a status and a detail alone. ' +
+            'Kizuna sends it when an access gate refuses a caller, so give every field you added `.optional()` or a `.default()`.'
+    );
+};
+
 const resolveAuthValue = (route: RouteDefinition, value: AuthValue): void => {
     if (value === false) {
         route.security = [];
@@ -201,6 +223,7 @@ export interface KizunaSpec {
     codes: string;
     identities: Record<string, SecurityScheme>;
     requestContext: Record<string, RequestContextSchema>;
+    guardSchema: z.ZodType | undefined;
 }
 
 /**
@@ -311,7 +334,14 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         plugins?: ContractPluginsArg<R, P, T>;
         auth: A & ValidAuthMap<A, R, IdentityNamesOf<Spec>>;
     }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], A, Spec['requestContext'], PluginArgs<P> & JobsArg<J> & ToolsArg<T>>,
+        RoutesWithHandlerContext<
+            R,
+            Spec['identities'],
+            A,
+            Spec['requestContext'],
+            PluginArgs<P> & JobsArg<J> & ToolsArg<T>,
+            GuardOutput<Spec['guardSchema']>
+        >,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
@@ -319,7 +349,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         Spec['requestContext'],
         P,
         J,
-        T
+        T,
+        Spec['guardSchema']
     >;
     contract<
         const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
@@ -332,7 +363,14 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         tools?: T;
         plugins?: ContractPluginsArg<R, P, T>;
     }): Contract<
-        RoutesWithHandlerContext<R, Spec['identities'], unknown, Spec['requestContext'], PluginArgs<P> & JobsArg<J> & ToolsArg<T>>,
+        RoutesWithHandlerContext<
+            R,
+            Spec['identities'],
+            unknown,
+            Spec['requestContext'],
+            PluginArgs<P> & JobsArg<J> & ToolsArg<T>,
+            GuardOutput<Spec['guardSchema']>
+        >,
         Spec['tags'],
         Spec['codes'],
         Spec['identities'],
@@ -340,7 +378,8 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         Spec['requestContext'],
         P,
         J,
-        T
+        T,
+        Spec['guardSchema']
     >;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
@@ -367,11 +406,13 @@ type SpecOf<
     Codes extends string,
     Identities extends Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema>,
+    GuardSchema extends z.ZodType | undefined,
 > = {
     tags: Tags;
     codes: Codes;
     identities: Identities;
     requestContext: RequestContext;
+    guardSchema: GuardSchema;
 };
 
 /**
@@ -383,9 +424,22 @@ export interface KizunaConfig<
     Codes extends string = never,
     Identities extends Record<string, SecurityScheme> = Record<string, never>,
     RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+    GuardSchema extends z.ZodType | undefined = undefined,
 > {
     identities?: Identities;
     requestContext?: RequestContext;
+    /**
+     * The body every guard's `deny()` produces, and the body each guarded
+     * route's `401` and `403` carry. Extend `ProblemDetailsSchema`. Every field
+     * you add must be optional or carry a `.default()`, because kizuna sends
+     * this itself when an access gate turns a caller away.
+     *
+     * @example
+     * guardSchema: ProblemDetailsSchema.extend({
+     *     code: z.enum(['unauthenticated', 'expired_token', 'forbidden']).default('forbidden'),
+     * }),
+     */
+    guardSchema?: GuardSchema & GuardSchemaCheck<GuardSchema>;
     tags?: TagSet<Tags>;
     validation?: {
         issueCodes?: readonly Codes[];
@@ -401,10 +455,12 @@ const createSurface = <
     Codes extends string,
     Identities extends Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema>,
+    GuardSchema extends z.ZodType | undefined,
 >(
-    config?: KizunaConfig<Tags, Codes, Identities, RequestContext>
-): K<SpecOf<Tags, Codes, Identities, RequestContext>> => {
-    type Spec = SpecOf<Tags, Codes, Identities, RequestContext>;
+    config?: KizunaConfig<Tags, Codes, Identities, RequestContext, GuardSchema>
+): K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>> => {
+    type Spec = SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>;
+    if (config?.guardSchema) assertFillableGuardSchema(config.guardSchema);
 
     const tagSet: TagSet<Tags> = config?.tags ?? { __brand: 'TagSet', tags: {} as Tags };
 
@@ -464,7 +520,7 @@ const createSurface = <
             }
         }
         // After the auth map resolves, so both of these can read `security`.
-        injectGuardResponses(contractRoutes, config?.identities);
+        injectGuardResponses(contractRoutes, config?.identities, config?.guardSchema);
         assertValidCache(contractRoutes);
         assertValidCache(pluginRouteTree(plugins));
         return assembleContract({
@@ -474,6 +530,7 @@ const createSurface = <
             auth,
             tags: config?.tags,
             securitySchemes: config?.identities,
+            guardSchema: config?.guardSchema,
             requestContext: config?.requestContext,
             validation: config?.validation,
             plugins,
@@ -517,20 +574,21 @@ export class Kizuna<
     const Codes extends string = never,
     const Identities extends Record<string, SecurityScheme> = Record<string, never>,
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
-> implements K<SpecOf<Tags, Codes, Identities, RequestContext>> {
+    GuardSchema extends z.ZodType | undefined = undefined,
+> implements K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>> {
     static readonly tags = createTags;
     static readonly identity = createIdentity;
     static readonly requestContext = createRequestContext;
     static readonly model = createModel;
 
-    declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext>>['routes'];
-    declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext>>['auth'];
-    declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext>>['jobs'];
-    declare readonly tools: K<SpecOf<Tags, Codes, Identities, RequestContext>>['tools'];
-    declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext>>['contract'];
-    declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext>>['issue'];
+    declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['routes'];
+    declare readonly auth: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['auth'];
+    declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['jobs'];
+    declare readonly tools: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['tools'];
+    declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['contract'];
+    declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['issue'];
 
-    constructor(config?: KizunaConfig<Tags, Codes, Identities, RequestContext>) {
-        Object.assign(this, createSurface<Tags, Codes, Identities, RequestContext>(config));
+    constructor(config?: KizunaConfig<Tags, Codes, Identities, RequestContext, GuardSchema>) {
+        Object.assign(this, createSurface<Tags, Codes, Identities, RequestContext, GuardSchema>(config));
     }
 }

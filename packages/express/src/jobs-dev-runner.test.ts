@@ -60,7 +60,13 @@ const startServer = async (): Promise<{ httpServer: Server; baseUrl: string }> =
         }),
         guards: {
             scheduler: server.guard('scheduler', ({ bearer, deny }) => {
-                if (bearer?.token !== 'cron-secret') return deny(401, 'Unauthorized');
+                if (bearer?.token !== 'cron-secret')
+                    return deny({
+                        status: 401,
+                        body: {
+                            detail: 'Unauthorized',
+                        },
+                    });
             }),
         },
         jobs: server.jobs({

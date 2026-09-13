@@ -1,6 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { ProblemDetailsSchema } from './error-response.js';
 import type { AutoResponsesBrand } from './types.js';
 import type { HandlerArgs } from './handler-pipeline.js';
 
@@ -61,4 +62,44 @@ test('the guarded route still refuses a status its handler never declared', () =
     type Throwable = Parameters<HandlerArgs<Guarded>['throwError']>[0];
 
     expectTypeOf<Throwable['status']>().toEqualTypeOf<200>();
+});
+
+const scopedK = new Kizuna({
+    identities: {
+        user: Kizuna.identity.bearer({
+            context: z.object({
+                userId: z.string(),
+            }),
+        }),
+    },
+    guardSchema: ProblemDetailsSchema.extend({
+        code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
+    }),
+});
+
+const scopedRoutes = scopedK.routes({
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
+});
+
+const scopedContract = scopedK.contract({
+    routes: {
+        api: scopedRoutes,
+    },
+    auth: {
+        api: 'user',
+    },
+});
+
+type BodyOn<R> = R extends AutoResponsesBrand<number, infer Body> ? Body : never;
+
+test('the brand carries the declared guard body', () => {
+    expectTypeOf<BodyOn<(typeof scopedContract.routes.api)['listUsers']>['code']>().toEqualTypeOf<'expired_token' | 'forbidden'>();
 });

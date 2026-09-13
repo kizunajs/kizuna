@@ -10,7 +10,22 @@ import kizuna from '@ts-kizuna/eslint-plugin';
 export default [
     ...tseslint.config(
         {
-            ignores: ['node_modules', '**/dist', '**/build', '**/.turbo', '**/.source', '**/__fixtures__/**'],
+            ignores: [
+                'node_modules',
+                '**/dist',
+                '**/build',
+                '**/.turbo',
+                '**/.source',
+                '**/.next',
+                '**/.vercel',
+                '**/.build',
+                '**/.swiftpm',
+                '**/DerivedData',
+                '**/.kizuna',
+                '**/coverage',
+                '**/next-env.d.ts',
+                '**/__fixtures__/**',
+            ],
         },
         eslint.configs.recommended,
         ...tseslint.configs.recommended,

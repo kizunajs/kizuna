@@ -313,7 +313,15 @@ export interface Server<C extends Contract> extends CoreServer<C, ExpressHandler
  *
  * const requireUser = server.guard('user', ({ bearer, deny }) => {
  *     const session = bearer && sessions.get(bearer.token);
- *     return session ? { userId: session.userId } : deny(401, 'Unauthorized');
+ *     if (!session) {
+ *         return deny({
+ *             status: 401,
+ *             body: {
+ *                 detail: 'Unauthorized',
+ *             },
+ *         });
+ *     }
+ *     return { userId: session.userId };
  * });
  *
  * export const api = server.api({

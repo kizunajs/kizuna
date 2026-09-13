@@ -83,7 +83,13 @@ Its [guard](/docs/reference/server-guard) returns nothing on success, or `deny(.
 
 ```ts title="guards.ts"
 export const requireApiKey = server.guard('apiConsumer', async ({ apiKey, deny }) => {
-    if (!apiKey || !(await isKnownKey(apiKey.value))) return deny(401, 'Unauthorized');
+    if (!apiKey || !(await isKnownKey(apiKey.value)))
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
 });
 ```
 
@@ -106,7 +112,13 @@ export const inviteToken = Kizuna.identity.custom({
 ```ts title="guards.ts"
 export const requireInviteToken = server.guard('inviteToken', async ({ params, deny }) => {
     const inviteId = await resolveInvite(params.token);
-    if (!inviteId) return deny(404, 'Not found');
+    if (!inviteId)
+        return deny({
+            status: 404,
+            body: {
+                detail: 'Not found',
+            },
+        });
     return {
         inviteId,
     };

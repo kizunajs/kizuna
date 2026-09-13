@@ -249,3 +249,67 @@ describe('injectGuardResponses', () => {
         expect(Object.keys(routes.open!.responses)).toEqual(['200']);
     });
 });
+
+describe('a contract that declares a guardSchema', () => {
+    const GuardSchema = ProblemDetailsSchema.extend({
+        code: z.enum(['expired_token', 'forbidden', 'not_found']).default('forbidden'),
+    });
+
+    const scoped = new Kizuna({
+        identities: {
+            user: Kizuna.identity.bearer({
+                context: z.object({
+                    userId: z.string(),
+                }),
+            }),
+        },
+        guardSchema: GuardSchema,
+    });
+
+    const build = () =>
+        scoped.contract({
+            routes: {
+                api: scoped.routes({
+                    listUsers: {
+                        method: 'GET',
+                        path: '/users',
+                        responses: okResponse(),
+                    },
+                }),
+            },
+            auth: {
+                api: 'user',
+            },
+        });
+
+    const routeOfScoped = (name: string): RouteDefinition => (build().routes.api as Record<string, RouteDefinition>)[name]!;
+
+    it('puts the declared body on the 401 and 403 in place of bare Problem Details', () => {
+        const route = routeOfScoped('listUsers');
+
+        expect((route.responses[401] as { body: unknown }).body).toBe(GuardSchema);
+        expect((route.responses[403] as { body: unknown }).body).toBe(GuardSchema);
+    });
+
+    it('refuses a schema that is not Problem Details at all', () => {
+        expect(
+            () =>
+                new Kizuna({
+                    guardSchema: z.object({
+                        reason: z.string(),
+                    }) as never,
+                })
+        ).toThrow(/must extend `ProblemDetailsSchema`/);
+    });
+
+    it('refuses a schema kizuna cannot build from a status and a detail alone', () => {
+        expect(
+            () =>
+                new Kizuna({
+                    guardSchema: ProblemDetailsSchema.extend({
+                        code: z.string(),
+                    }),
+                })
+        ).toThrow(/`.optional\(\)` or a `.default\(\)`/);
+    });
+});

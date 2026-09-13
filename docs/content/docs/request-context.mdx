@@ -212,12 +212,12 @@ Resolvers run on every route, public ones included, before the guards, so a [gua
 
 Both run before the handler and both put a typed value in its args. They answer different questions:
 
-|             | Request context         | Guard                            |
-| ----------- | ----------------------- | -------------------------------- |
-| Runs on     | Every route             | The routes the auth map secures  |
-| Runs        | Before the guards       | After every resolver has run     |
-| Can reject  | No                      | Yes, with `deny(status, detail)` |
-| Handler arg | `requestContext.<name>` | `auth.<identity>`                |
+|             | Request context         | Guard                              |
+| ----------- | ----------------------- | ---------------------------------- |
+| Runs on     | Every route             | The routes the auth map secures    |
+| Runs        | Before the guards       | After every resolver has run       |
+| Can reject  | No                      | Yes, with `deny({ status, body })` |
+| Handler arg | `requestContext.<name>` | `auth.<identity>`                  |
 
 If the answer decides whether the request may proceed, it belongs in a [guard](/docs/authentication). If it is something the handler wants to have on hand, it belongs here.
 

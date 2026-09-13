@@ -167,6 +167,51 @@ object OpenEnumAPI {
         val occurredAt: Instant,
         val userId: String
     )
+
+    @Serializable
+    data class GuardDenial(
+        val type: String,
+        val title: String,
+        val status: Int,
+        val detail: String,
+        val code: Code? = null
+    ) {
+
+        @Serializable(with = Code.Serializer::class)
+        sealed interface Code : KizunaQueryValue {
+            data object UNAUTHENTICATED : Code {
+                override val wireValue: String = "unauthenticated"
+            }
+            data object EXPIRED_TOKEN : Code {
+                override val wireValue: String = "expired_token"
+            }
+            data object FORBIDDEN : Code {
+                override val wireValue: String = "forbidden"
+            }
+            data object NOT_FOUND : Code {
+                override val wireValue: String = "not_found"
+            }
+            data class Unknown(override val wireValue: String) : Code
+
+            companion object {
+                fun fromWireValue(wireValue: String): Code = when (wireValue) {
+                    "unauthenticated" -> UNAUTHENTICATED
+                    "expired_token" -> EXPIRED_TOKEN
+                    "forbidden" -> FORBIDDEN
+                    "not_found" -> NOT_FOUND
+                    else -> Unknown(wireValue)
+                }
+            }
+
+            object Serializer : KSerializer<Code> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Code", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): Code = Code.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: Code) {
+                    encoder.encodeString(value.wireValue)
+                }
+            }
+        }
+    }
 }
 
 class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
@@ -850,8 +895,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.ProblemDetails) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -877,8 +922,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Result(val body: OpenEnumAPI.User)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.ProblemDetails) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
             data class Conflict(val body: OpenEnumAPI.ProblemDetails) : Failure()
             data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -897,8 +942,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.ProblemDetails) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -912,8 +957,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.ProblemDetails) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -942,8 +987,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.ProblemDetails) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
             data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
@@ -973,8 +1018,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.ProblemDetails) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
@@ -1011,8 +1056,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Result(val body: Response201)
 
         sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.ProblemDetails) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
             data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
@@ -2202,13 +2247,13 @@ class OpenEnumAPIMembersClient(private val client: OkHttpClient, private val bas
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.MembersListMembers.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.MembersListMembers.Failure.Forbidden(body = payload)
                 }
@@ -2246,13 +2291,13 @@ class OpenEnumAPIMembersClient(private val client: OkHttpClient, private val bas
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.MembersInviteMember.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.MembersInviteMember.Failure.Forbidden(body = payload)
                 }
@@ -2300,13 +2345,13 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.Forbidden(body = payload)
                 }
@@ -2339,13 +2384,13 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.Forbidden(body = payload)
                 }
@@ -2383,13 +2428,13 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.WorkspaceTransfer.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.WorkspaceTransfer.Failure.Forbidden(body = payload)
                 }
@@ -2434,13 +2479,13 @@ class OpenEnumAPIInvitesClient(private val client: OkHttpClient, private val bas
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.InvitesGetInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.InvitesGetInvite.Failure.Forbidden(body = payload)
                 }
@@ -2486,13 +2531,13 @@ class OpenEnumAPIInvitesClient(private val client: OkHttpClient, private val bas
                 }
                 401 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
                     } catch (error: Exception) { throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                     throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Forbidden(body = payload)
                 }

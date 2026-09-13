@@ -208,7 +208,14 @@ QStash calls the run endpoint, so the jobs' identity guards it. Forwarding the s
 
 ```ts title="guards.ts"
 export const requireScheduler = server.guard('scheduler', ({ bearer, deny }) =>
-    bearer?.token === process.env.CRON_SECRET ? {} : deny(401, 'Unauthorized')
+    bearer?.token === process.env.CRON_SECRET
+        ? {}
+        : deny({
+              status: 401,
+              body: {
+                  detail: 'Unauthorized',
+              },
+          })
 );
 ```
 

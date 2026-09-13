@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import type { Routes } from './types.js';
 import type { TagSet, TagOptions } from './tags.js';
 import type { SecurityScheme } from './security-scheme.js';
@@ -21,11 +22,18 @@ export interface Contract<
     Plugins extends ContractPlugins = ContractPlugins,
     Jobs_ extends Jobs = Jobs,
     Tools_ extends Tools = Tools,
+    GuardSchema extends z.ZodType | undefined = z.ZodType | undefined,
 > {
     /**
      * The API's route groups.
      */
     routes: Routes_;
+    /**
+     * The body every guard's `deny()` produces, passed to `new Kizuna()` under
+     * `guardSchema`. Each guarded route's `401` and `403` carry it in place of
+     * bare Problem Details.
+     */
+    guardSchema?: GuardSchema;
     /**
      * The plugins installed on `k.contract`. Their routes are served by
      * `api.mount` but stay outside `routes`, so the client and the generators
@@ -97,8 +105,10 @@ export function assembleContract<
     const Plugins extends ContractPlugins = Record<string, never>,
     const Jobs_ extends Jobs = Record<string, never>,
     const Tools_ extends Tools = Record<string, never>,
+    GuardSchema extends z.ZodType | undefined = undefined,
 >(config: {
     routes: R;
+    guardSchema?: GuardSchema;
     jobs?: Jobs_;
     jobsConfig?: JobsConfig;
     tools?: Tools_;
@@ -110,9 +120,10 @@ export function assembleContract<
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_, Tools_> {
+}): Contract<R, Tags, Codes, Schemes, Auth, RequestContext, Plugins, Jobs_, Tools_, GuardSchema> {
     return {
         routes: config.routes,
+        guardSchema: config.guardSchema,
         plugins: config.plugins,
         jobs: config.jobs,
         jobsConfig: config.jobsConfig,
@@ -154,6 +165,8 @@ export type ContractPluginsOf<C extends Contract> = Exclude<C['plugins'], undefi
  * A contract's jobs, or an empty map when it declares none.
  */
 export type JobsOf<C extends Contract> = Exclude<C['jobs'], undefined>;
+
+export type GuardSchemaOf<C extends Contract> = Extract<C['guardSchema'], z.ZodType>;
 
 /**
  * A contract's tools, or an empty map when it declares none.

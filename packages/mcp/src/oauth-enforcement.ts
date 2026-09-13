@@ -1,4 +1,5 @@
-import { problemDetails, type AccessGate, type SecurityScheme } from '@ts-kizuna/core';
+import type { z } from 'zod';
+import { problemDetails, problemFromBody, type AccessGate, type SecurityScheme } from '@ts-kizuna/core';
 import {
     bearerChallenge,
     extractCredential,
@@ -7,17 +8,24 @@ import {
     isGuardDenial,
     rawResponse,
     type AdapterRequest,
+    type GuardDenialBody,
     type GuardRun,
 } from '@ts-kizuna/core/adapter';
 
 export interface OAuthDenial {
     status: number;
-    detail: string;
+    body: GuardDenialBody;
     challenge?: string;
 }
 
+const gateBody = (guardSchema: z.ZodType | undefined, detail: string): GuardDenialBody => {
+    const filled = guardSchema?.safeParse(problemDetails(403, detail));
+    return filled?.success ? (filled.data as GuardDenialBody) : { detail };
+};
+
 export interface EnforceOAuthArgs {
     scheme: string;
+    guardSchema?: z.ZodType;
     guard: GuardRun;
     schemeDefinition: SecurityScheme;
     metadataUrl: string;
@@ -70,7 +78,7 @@ export const enforceOAuth = async (
                       ...(presented
                           ? {
                                 error: 'invalid_token',
-                                error_description: guardResult.detail,
+                                error_description: guardResult.body.detail,
                             }
                           : {}),
                       resource_metadata: args.metadataUrl,
@@ -87,7 +95,7 @@ export const enforceOAuth = async (
             ok: false,
             denial: {
                 status: guardResult.status,
-                detail: guardResult.detail,
+                body: guardResult.body,
                 challenge,
             },
         };
@@ -99,7 +107,7 @@ export const enforceOAuth = async (
             ok: false,
             denial: {
                 status: 403,
-                detail: `Forbidden: ${args.scheme}.${field} is not permitted on this route.`,
+                body: gateBody(args.guardSchema, `Forbidden: ${args.scheme}.${field} is not permitted on this route.`),
             },
         };
     }
@@ -112,7 +120,7 @@ export const enforceOAuth = async (
 
 export const denialResponse = (denial: OAuthDenial): ReturnType<typeof rawResponse> =>
     rawResponse(
-        new Response(JSON.stringify(problemDetails(denial.status, denial.detail)), {
+        new Response(JSON.stringify(problemFromBody(denial.status, denial.body)), {
             status: denial.status,
             headers: {
                 'content-type': 'application/problem+json',

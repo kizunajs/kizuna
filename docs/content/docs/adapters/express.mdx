@@ -135,7 +135,12 @@ import { server } from './server';
 export const requireUser = server.guard('user', async ({ bearer, deny }) => {
     const session = bearer ? await verifySession(bearer.token) : undefined;
     if (!session) {
-        return deny(401, 'Unauthorized');
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
     }
     return {
         userId: session.userId,

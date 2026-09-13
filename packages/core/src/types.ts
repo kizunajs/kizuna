@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { KnownStatus } from './status-titles.js';
+import type { ProblemDetails } from './problem-details.js';
 import type { Tools } from './tools.js';
 
 export const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
@@ -368,8 +369,11 @@ export interface HandlerContextBrand<Context> {
  */
 export const AUTO_RESPONSES_BRAND: unique symbol = Symbol('ts-kizuna.route.autoResponses');
 
-export interface AutoResponsesBrand<Statuses extends number> {
+export const AUTO_GUARD_BRAND: unique symbol = Symbol('ts-kizuna.route.guardBody');
+
+export interface AutoResponsesBrand<Statuses extends number, Body = ProblemDetails> {
     readonly [AUTO_RESPONSES_BRAND]?: Statuses;
+    readonly [AUTO_GUARD_BRAND]?: Body;
 }
 
 /**
