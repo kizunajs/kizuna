@@ -3,7 +3,7 @@ import './zod-meta.js';
 export {
     Kizuna,
     type K,
-    type KizunaConfig,
+    type KizunaOptions,
     type KizunaSpec,
     type TagNamesOf,
     type IdentityNamesOf,
@@ -264,3 +264,14 @@ export {
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
 export { type AutoResponsesBrand, AUTO_RESPONSES_BRAND, AUTO_GUARD_BRAND, AUTO_GUARD_WRITTEN_BRAND, type GuardStatus } from './types.js';
+export {
+    defineConfig,
+    apiEntries,
+    type KizunaConfig,
+    type KizunaConfigInput,
+    type ConfigOf,
+    type ApiEntry,
+    type ClientTarget,
+    type RegisteredRoutes,
+    type RegisteredApiNames,
+} from './config.js';

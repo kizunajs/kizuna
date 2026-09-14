@@ -21,6 +21,7 @@
         "openapi",
         "mcp",
         "---Tooling---",
+        "configuration",
         "eslint",
         "vscode",
         "breaking-changes",

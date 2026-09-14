@@ -1,0 +1,101 @@
+---
+title: Configuration
+description: Name your APIs once in kizuna.config.ts, so the tooling knows what your repository contains.
+---
+
+`kizuna.config.ts` says what your repository contains: its APIs, their contracts, and where their generated clients go.
+
+You do not need it to define routes, serve them, or call them from a typed client. Reach for it to generate clients with one command, or when a repository holds more than one API.
+
+## The file
+
+```ts title="kizuna.config.ts"
+import { defineConfig, type ConfigOf } from '@ts-kizuna/core';
+import { swiftClient } from '@ts-kizuna/swift';
+import { contract } from './src/contract';
+
+export const config = defineConfig({
+    contract,
+    clients: [
+        swiftClient({
+            output: './ios/MyApp/Generated/APIClient.swift',
+            namespace: 'API',
+        }),
+    ],
+});
+
+declare module '@ts-kizuna/core' {
+    interface KizunaConfig extends ConfigOf<typeof config> {}
+}
+```
+
+`defineConfig` is data the tooling reads. The `declare module` block hands the type system your routes, and is the same in every project.
+
+Each client comes from the package that generates it, so its options are typed there and a generator you have not installed cannot be configured by accident.
+
+| Client            | Import from                 |
+| ----------------- | --------------------------- |
+| `swiftClient`     | `@ts-kizuna/swift`          |
+| `kotlinClient`    | `@ts-kizuna/kotlin`         |
+| `openApiDocument` | `@ts-kizuna/openapi/server` |
+
+## Several APIs
+
+```ts title="kizuna.config.ts"
+export const config = defineConfig({
+    apis: {
+        app: {
+            contract: appContract,
+            clients: [
+                swiftClient({
+                    output: './ios/MyApp/Generated/APIClient.swift',
+                    namespace: 'API',
+                }),
+            ],
+        },
+        workspace: {
+            contract: workspaceContract,
+        },
+    },
+});
+```
+
+Each API keeps its own contract and its own generated clients, and never sees another's routes.
+
+## Two clients of one language
+
+Add two entries.
+
+```ts title="kizuna.config.ts"
+clients: [
+    swiftClient({
+        output: './ios/MyApp/Generated/APIClient.swift',
+        namespace: 'API',
+    }),
+    swiftClient({
+        output: './ios/MyApp/Generated/OpenEnumAPIClient.swift',
+        namespace: 'OpenEnumAPI',
+        unknownEnumCase: true,
+    }),
+],
+```
+
+## Client options
+
+| Option                | Applies to    | Description                                                               |
+| --------------------- | ------------- | ------------------------------------------------------------------------- |
+| `output`              | all           | Path the generated file is written to                                     |
+| `namespace`           | Swift, Kotlin | Name of the generated namespace, `API` by default                         |
+| `package`             | Kotlin        | Package the generated file declares                                       |
+| `camelCaseProperties` | Swift, Kotlin | Convert wire field names to camelCase, mapping the wire name back         |
+| `unknownEnumCase`     | Swift, Kotlin | Give every enum an `unknown` case, so an unrecognised value still decodes |
+
+`openApiDocument` takes the same overrides `generateOpenApi` does, and picks its format from the output extension: `.json` renders JSON, anything else renders YAML.
+
+The file goes at the root, beside `package.json`, and has to be in the TypeScript program that compiles the code reading it.
+
+## Reference
+
+- [`k.contract`](/docs/reference/k-contract)
+- [Swift client](/docs/clients/swift)
+- [Kotlin client](/docs/clients/kotlin)

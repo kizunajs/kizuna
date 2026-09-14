@@ -511,7 +511,7 @@ type SpecOf<
  * The tags, identities, request contexts and custom validation issue codes one
  * API surface is bound to. Routes, access, jobs and plugins go on `k.contract`.
  */
-export interface KizunaConfig<
+export interface KizunaOptions<
     Tags extends Record<string, TagOptions> = Record<string, never>,
     Codes extends string = never,
     Identities extends Record<string, SecurityScheme> = Record<string, never>,
@@ -549,7 +549,7 @@ const createSurface = <
     RequestContext extends Record<string, RequestContextSchema>,
     GuardSchema extends z.ZodType | undefined,
 >(
-    config?: KizunaConfig<Tags, Codes, Identities, RequestContext, GuardSchema>
+    config?: KizunaOptions<Tags, Codes, Identities, RequestContext, GuardSchema>
 ): K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>> => {
     type Spec = SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>;
     if (config?.guardSchema) assertFillableGuardSchema(config.guardSchema);
@@ -692,7 +692,7 @@ export class Kizuna<
     declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['contract'];
     declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['issue'];
 
-    constructor(config?: KizunaConfig<Tags, Codes, Identities, RequestContext, GuardSchema>) {
+    constructor(config?: KizunaOptions<Tags, Codes, Identities, RequestContext, GuardSchema>) {
         Object.assign(this, createSurface<Tags, Codes, Identities, RequestContext, GuardSchema>(config));
     }
 }

@@ -5,6 +5,7 @@ import { renderOpenApi } from './generator.js';
 import { renderDocsHtml } from './docs-html.js';
 
 export { generateOpenApi, renderOpenApi } from './generator.js';
+export { openApiDocument, type OpenApiDocumentOptions } from './document-target.js';
 export { renderDocsHtml, type DocsProvider, type DocsHtmlOptions } from './docs-html.js';
 const HTML = 'text/html; charset=utf-8';
 const JSON_TYPE = 'application/json';

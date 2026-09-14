@@ -26,3 +26,6 @@ apps/*/openapi.yaml
 
 # vscode extension packaging
 build/
+
+# planning notes
+plans/
