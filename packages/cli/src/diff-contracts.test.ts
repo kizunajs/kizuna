@@ -112,7 +112,7 @@ describe('the shape of a route', () => {
     });
 });
 
-describe('schemas, the change oasdiff was there for', () => {
+describe('schemas, compared field by field', () => {
     const withBody = contractOf({
         createUser: {
             method: 'POST',

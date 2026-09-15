@@ -21,6 +21,9 @@ export interface LoadContractOptions {
     reread?: readonly string[];
 }
 
+const isContract = (value: unknown): value is Contract =>
+    typeof value === 'object' && value !== null && typeof (value as Contract).routes === 'object';
+
 const cacheOf = (jiti: unknown): Record<string, unknown> => (jiti as { cache?: Record<string, unknown> }).cache ?? {};
 
 /**
@@ -53,11 +56,15 @@ export const loadContract = async (
     // The cache is shared across instances and outlives this call, so only what
     // this load put there counts as the contract's own graph.
     const before = new Set(Object.keys(cache));
-    const loaded = (await jiti.import(contractPath)) as Record<string, Contract | undefined>;
+    const loaded = (await jiti.import(contractPath)) as Record<string, Contract | undefined> | undefined;
 
     if (files) {
         files.push(...Object.keys(cache).filter((file) => !file.includes('node_modules') && (!before.has(file) || evicted.has(file))));
     }
 
-    return loaded[exportName] ?? loaded.default;
+    const candidate = loaded?.[exportName] ?? loaded?.default;
+
+    // `interopDefault` hands back the namespace when a module has no default,
+    // so a module without a contract would otherwise look like one.
+    return isContract(candidate) ? candidate : undefined;
 };
