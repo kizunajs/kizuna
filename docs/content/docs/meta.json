@@ -22,6 +22,7 @@
         "mcp",
         "---Tooling---",
         "configuration",
+        "watching",
         "eslint",
         "vscode",
         "breaking-changes",
