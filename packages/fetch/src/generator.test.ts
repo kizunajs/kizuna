@@ -67,7 +67,7 @@ const contract = k.contract({
     },
 });
 
-const source = generateFetchClient(contract);
+const source = generateFetchClient(contract, { source: '../src/contract.ts' });
 
 describe('generateFetchClient', () => {
     it('names a model once and references it by name', () => {
@@ -100,6 +100,11 @@ describe('generateFetchClient', () => {
     it('types each response as a member of a discriminated union', () => {
         expect(source).toContain('{ status: 200; body: User; headers: Record<string, string> }');
         expect(source).toContain('{ status: 404; body: {');
+    });
+
+    it('names the contract it came from', () => {
+        expect(source).toContain(' * Source: ../src/contract.ts');
+        expect(source).toContain(' * Regenerate: kizuna generate');
     });
 
     it('ships no schema library and no handlers', () => {
