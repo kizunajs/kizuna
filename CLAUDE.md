@@ -185,6 +185,7 @@ When changing any exported function, type, or option in `packages/*/src/`, check
 - `pnpm test` runs Vitest + Swift end-to-end. Always use this.
 - `pnpm test:types` runs type-level tests only (`*.test-d.ts`).
 - `pnpm -r typecheck` runs `tsc --noEmit` across all packages. Always pair with `pnpm test` before declaring something done.
+- `pnpm typecheck:tests` typechecks every package's `src`, test files included. Each package's own tsconfig excludes them, so this is the only check that sees a type error in a test.
 - `pnpm build` rebuilds all packages. Required before typechecking after changing cross-package exports.
 - `pnpm --filter @ts-kizuna-demo/kotlin test` runs Kotlin end-to-end (starts express-demo, compiles the generated client, runs `./gradlew test`). Not part of `pnpm test`.
 

@@ -8,6 +8,7 @@
     "build:demos": "pnpm -r --filter \"./apps/*\" --filter \"!@ts-kizuna-demo/swift\" --filter \"!@ts-kizuna-demo/kotlin\" build",
     "build:docs": "pnpm --filter docs build",
     "typecheck": "pnpm -r typecheck",
+    "typecheck:tests": "tsc -p tsconfig.tests.json",
     "test": "vitest run && pnpm test:swift",
     "test:ts": "vitest run",
     "test:watch": "vitest",
