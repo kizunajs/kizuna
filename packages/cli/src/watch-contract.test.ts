@@ -1,8 +1,7 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { loadContract } from './load-contract.js';
 import { watchContract, type ContractChange } from './watch-contract.js';
 import type { Contract, RouteDefinition, Routes } from '@ts-kizuna/core';
 
@@ -26,7 +25,7 @@ afterEach(() => {
  * rather than just the entry.
  */
 const project = (routePath: string) => {
-    const directory = mkdtempSync(join(tmpdir(), 'kizuna-watch-'));
+    const directory = realpathSync(mkdtempSync(join(tmpdir(), 'kizuna-watch-')));
     cleanups.push(() => rmSync(directory, { recursive: true, force: true }));
 
     writeFileSync(
@@ -60,7 +59,19 @@ export const contract = k.contract({ routes: { users: routes } });
     return directory;
 };
 
-const settle = (ms = 400) => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Waits for a debounced reload to land, rather than guessing at a duration that
+ * holds when the whole suite is running.
+ */
+const waitFor = async (condition: () => boolean, timeout = 15_000): Promise<void> => {
+    const deadline = Date.now() + timeout;
+    while (!condition()) {
+        if (Date.now() > deadline) throw new Error('Timed out waiting for the watcher');
+        await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+};
+
+const settle = (ms = 200) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe('watchContract', () => {
     it('reports the contract once before anything changes', async () => {
@@ -79,16 +90,19 @@ describe('watchContract', () => {
 
     it('watches every file the contract was built from, not just the entry', async () => {
         const directory = project('/users/:id');
+        const changes: ContractChange[] = [];
 
-        const stop = await watchContract(join(directory, 'contract.ts'), () => {});
+        const stop = await watchContract(join(directory, 'contract.ts'), (change) => {
+            changes.push(change);
+        });
         cleanups.push(stop);
 
-        const files: string[] = [];
-        await loadContract(join(directory, 'contract.ts'), { files });
+        const files = changes[0]?.files ?? [];
 
         expect(files.some((file) => file.endsWith('contract.ts'))).toBe(true);
         expect(files.some((file) => file.endsWith('routes.ts'))).toBe(true);
         expect(files.every((file) => !file.includes('node_modules'))).toBe(true);
+        expect(files.every((file) => file.includes(basename(directory)))).toBe(true);
     });
 
     it('reloads when an imported file changes', async () => {
@@ -117,12 +131,12 @@ export const routes = k.routes('users', {
 `
         );
 
-        await settle();
+        await waitFor(() => changes.length > 1);
 
         expect(changes.length).toBeGreaterThan(1);
         expect(routePath(changes.at(-1)?.contract, 'users', 'getUser')).toBe('/people/:id');
         expect(changes.at(-1)?.changed).toContain('routes.ts');
-    });
+    }, 20_000);
 
     it('keeps the last good contract when an edit does not parse', async () => {
         const directory = project('/users/:id');
@@ -141,12 +155,12 @@ export const routes = k.routes('users', {
         cleanups.push(stop);
 
         writeFileSync(join(directory, 'routes.ts'), 'export const routes = {');
-        await settle();
+        await waitFor(() => errors.length > 0);
 
         expect(errors).toHaveLength(1);
         expect(changes).toHaveLength(1);
         expect(routePath(changes[0]?.contract, 'users', 'getUser')).toBe('/users/:id');
-    });
+    }, 20_000);
 
     it('reports a broken edit to stderr when nothing else is listening', async () => {
         const directory = project('/users/:id');
@@ -161,11 +175,11 @@ export const routes = k.routes('users', {
         cleanups.push(stop);
 
         writeFileSync(join(directory, 'routes.ts'), 'export const routes = {');
-        await settle();
+        await waitFor(() => reported.length > 0);
 
         expect(reported.join('\n')).toContain('Could not load the contract after');
         expect(reported.join('\n')).toContain('routes.ts');
-    });
+    }, 20_000);
 
     it('fails loudly when the contract is broken at startup', async () => {
         const directory = project('/users/:id');

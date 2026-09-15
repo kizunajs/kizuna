@@ -2,6 +2,7 @@ import { watch, type FSWatcher } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Contract } from '@ts-kizuna/core';
 import { loadContract } from './load-contract.js';
+import { contractNotices, type Notice } from './contract-notices.js';
 
 /**
  * What a watcher reports each time it reloads.
@@ -16,6 +17,10 @@ export interface ContractChange {
      * Every file the contract was built from, the set being watched.
      */
     files: string[];
+    /**
+     * Routes that announce their own retirement, soonest sunset first.
+     */
+    notices: Notice[];
 }
 
 export interface WatchContractOptions {
@@ -77,7 +82,7 @@ export const watchContract = async (
 
         known = files;
         watchDirectories(files);
-        await onChange({ contract, changed, files });
+        await onChange({ contract, changed, files, notices: contractNotices(contract, {}) });
     };
 
     const watchDirectories = (files: string[]): void => {
