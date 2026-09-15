@@ -1,6 +1,9 @@
 import type { Contract, RouteDefinition } from '@ts-kizuna/core';
 import { createGenerator, flattenJobs, toToolName } from '@ts-kizuna/core/generator';
 import { flattenTools } from '@ts-kizuna/core/adapter';
+import { resolveResponseBody } from '@ts-kizuna/core/generator';
+import { diffSchemas, type Direction } from './diff-schemas.js';
+import type { z } from 'zod';
 
 /**
  * How much a change asks of the people already calling an API.
@@ -26,6 +29,10 @@ interface RouteFacts {
     statuses: number[];
     deprecated: boolean;
     sunset?: string;
+    body?: z.core.$ZodType;
+    query?: z.core.$ZodType;
+    headers?: z.core.$ZodType;
+    responses: Map<number, z.core.$ZodType | undefined>;
 }
 
 const routeFacts = createGenerator<Record<string, never>, Map<string, RouteFacts>>(() => {
@@ -38,6 +45,12 @@ const routeFacts = createGenerator<Record<string, never>, Map<string, RouteFacts
                 statuses: Object.keys(route.responses).map(Number).sort(),
                 deprecated,
                 ...(sunsetOf(route) === undefined ? {} : { sunset: sunsetOf(route) }),
+                ...(route.body ? { body: route.body } : {}),
+                ...(route.query ? { query: route.query } : {}),
+                ...(route.headers ? { headers: route.headers } : {}),
+                responses: new Map(
+                    Object.entries(route.responses).map(([status, response]) => [Number(status), resolveResponseBody(response)])
+                ),
             });
         },
         finalize: () => facts,
@@ -157,6 +170,34 @@ export const diffContracts = (before: Contract, after: Contract): Change[] => {
                 key,
                 summary: `${key} can now answer ${newStatuses.join(', ')}`,
             });
+        }
+
+        const inputs: Array<[Direction, string, z.core.$ZodType | undefined, z.core.$ZodType | undefined]> = [
+            ['request', 'body', gone.body, arrived.body],
+            ['request', 'query', gone.query, arrived.query],
+            ['request', 'headers', gone.headers, arrived.headers],
+        ];
+
+        for (const [direction, label, was, now] of inputs) {
+            for (const change of diffSchemas(was, now, direction, label)) {
+                changes.push({
+                    level: change.breaking ? 'breaking' : 'changed',
+                    key,
+                    summary: `${key} ${change.summary}`,
+                });
+            }
+        }
+
+        for (const [status, was] of gone.responses) {
+            const now = arrived.responses.get(status);
+            if (!arrived.responses.has(status)) continue;
+            for (const change of diffSchemas(was, now, 'response', `${status}`)) {
+                changes.push({
+                    level: change.breaking ? 'breaking' : 'changed',
+                    key,
+                    summary: `${key} ${change.summary}`,
+                });
+            }
         }
 
         if (!gone.deprecated && arrived.deprecated) {

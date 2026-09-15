@@ -112,6 +112,73 @@ describe('the shape of a route', () => {
     });
 });
 
+describe('schemas, the change oasdiff was there for', () => {
+    const withBody = contractOf({
+        createUser: {
+            method: 'POST',
+            path: '/users',
+            body: z.object({ name: z.string() }),
+            responses: { 201: z.object({ id: z.string(), nickname: z.string() }) },
+        },
+    });
+
+    it('reports a newly required request field as breaking', () => {
+        const after = contractOf({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({ name: z.string(), organisationId: z.string() }),
+                responses: { 201: z.object({ id: z.string(), nickname: z.string() }) },
+            },
+        });
+
+        expect(summaries(diffContracts(withBody, after))).toContain('users.createUser body.organisationId is now required');
+        expect(hasBreakingChange(diffContracts(withBody, after))).toBe(true);
+    });
+
+    it('does not report an optional request field', () => {
+        const after = contractOf({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({ name: z.string(), nickname: z.string().optional() }),
+                responses: { 201: z.object({ id: z.string(), nickname: z.string() }) },
+            },
+        });
+
+        expect(diffContracts(withBody, after)).toEqual([]);
+    });
+
+    it('reports a removed response field as breaking', () => {
+        const after = contractOf({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({ name: z.string() }),
+                responses: { 201: z.object({ id: z.string() }) },
+            },
+        });
+
+        expect(summaries(diffContracts(withBody, after))).toContain('users.createUser 201.nickname is gone');
+    });
+
+    it('reports a narrowed query param as breaking', () => {
+        const before = contractOf({
+            listUsers: { method: 'GET', path: '/users', query: z.object({ sort: z.string() }), responses: ok },
+        });
+        const after = contractOf({
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                query: z.object({ sort: z.enum(['name', 'createdAt']) }),
+                responses: ok,
+            },
+        });
+
+        expect(summaries(diffContracts(before, after))).toContain('users.listUsers query.sort is enum instead of string');
+    });
+});
+
 describe('what a document cannot carry', () => {
     const withJob = k.contract({
         routes: { users: k.routes('users', { listUsers: { method: 'GET', path: '/users', responses: ok } }) },
