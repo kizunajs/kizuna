@@ -246,12 +246,14 @@ export {
     type SchemeNameOf,
     type RequiredPermissions,
     type RouteDefinition,
+    type RouteHandlerFunction,
     type RoutePath,
     type Routes,
     type AuthoredRouteDefinition,
     type AuthoredRoutes,
 } from './types.js';
 export { type ExtractPathParams, type PathParamName, type HasPathParams } from './path-params.js';
+export { type RouteBuilder, type RouteWithHandler } from './route.js';
 export {
     type HandlerArgs,
     type HandlerReturn,

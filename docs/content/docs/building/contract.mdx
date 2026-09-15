@@ -180,6 +180,52 @@ responses: {
 
 The handler then yields messages instead of returning one body, and the fetch client reads them with `for await`. See [Streaming](/docs/streaming).
 
+## Put the handler on the route
+
+`k.route` takes the route and hands back its handler. `body`, `params`, `query` and `headers` are typed from what the route declares, and the return is checked against its `responses`.
+
+```ts title="users/create-user.ts"
+import { z } from 'zod';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from '../k';
+import { UserSchema } from './schemas';
+
+export const createUser = k
+    .route({
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+        }),
+        responses: {
+            201: UserSchema,
+            400: ProblemDetailsSchema,
+        },
+    })
+    .handler(async ({ body }) => ({
+        status: 201,
+        body: await db.users.create(body),
+    }));
+```
+
+A route lives in its own file, and `k.routes` groups them:
+
+```ts title="users/index.ts"
+import { k } from '../k';
+import { createUser } from './create-user';
+import { getUser } from './get-user';
+
+export const usersRoutes = k.routes('users', {
+    createUser,
+    getUser,
+});
+```
+
+### Nothing runs at import
+
+`kizuna generate` imports your route files to read the contract, so whatever a module does at the top level, it does on every generate. Importing a database client is fine. Opening a connection, reading a file, or throwing on a missing environment variable is not, so keep that inside the handler.
+
 ## Bundle into a contract
 
 Assemble your route groups with `k.contract` and default-export the result. This is the object `client` and `server.api` consume.

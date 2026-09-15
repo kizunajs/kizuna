@@ -18,10 +18,18 @@ import { createRequestContext } from './request-context.js';
 import { createModel } from './model.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
-import type { Routes, RouteDefinition, SecurityRequirement, RequiredPermissions, AuthoredRoutes } from './types.js';
+import type {
+    Routes,
+    RouteDefinition,
+    SecurityRequirement,
+    RequiredPermissions,
+    AuthoredRoutes,
+    AuthoredRouteDefinition,
+} from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
-import type { PathParamsCheck } from './path-params.js';
+import type { PathParamsCheck, RoutePathParamsCheck } from './path-params.js';
+import { createRoute, type RouteBuilder } from './route.js';
 
 /**
  * One entry in the access control map: `false` for public, an identity name,
@@ -316,6 +324,33 @@ export type IdentityNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['ident
  * The authoring surface a {@link Kizuna} instance exposes.
  */
 export interface K<Spec extends KizunaSpec = KizunaSpec> {
+    /**
+     * Declare one route and the handler that answers it. `body`, `params`,
+     * `query` and `headers` are typed from the route, and the return is checked
+     * against its `responses`.
+     *
+     * Group routes with `k.routes`, which takes the routes this returns.
+     *
+     * @example
+     * export const createUser = k
+     *     .route({
+     *         method: 'POST',
+     *         path: '/users',
+     *         body: z.object({
+     *             name: z.string().min(1),
+     *         }),
+     *         responses: {
+     *             201: UserSchema,
+     *         },
+     *     })
+     *     .handler(async ({ body }) => ({
+     *         status: 201,
+     *         body: await db.users.create(body.name),
+     *     }));
+     */
+    route<const Definition extends AuthoredRouteDefinition<TagNamesOf<Spec>>>(
+        definition: Definition & RoutePathParamsCheck<Definition>
+    ): RouteBuilder<Definition>;
     /**
      * Define a group of routes. Pass a tag (one of the keys from `Kizuna.tags`)
      * to group them in the OpenAPI document, or omit it for an untagged group.
@@ -636,6 +671,7 @@ const createSurface = <
     };
 
     const k: K<Spec> = {
+        route: createRoute as K<Spec>['route'],
         routes,
         jobs,
         tools,
@@ -685,6 +721,7 @@ export class Kizuna<
     static readonly requestContext = createRequestContext;
     static readonly model = createModel;
 
+    declare readonly route: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['route'];
     declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['routes'];
     declare readonly accessControl: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['accessControl'];
     declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema>>['jobs'];

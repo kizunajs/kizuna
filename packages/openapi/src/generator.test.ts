@@ -2291,3 +2291,35 @@ describe('streams', () => {
         await expect(spec).toBeAValidOpenAPIDefinition();
     });
 });
+
+describe('routes carrying handlers', () => {
+    it('documents the route without its handler', () => {
+        const contract = k.contract({
+            routes: k.routes({
+                users: {
+                    getUser: k
+                        .route({
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: z.object({
+                                    id: z.string(),
+                                }),
+                            },
+                        })
+                        .handler(({ params }) => ({
+                            status: 200,
+                            body: {
+                                id: params.id,
+                            },
+                        })),
+                },
+            }),
+        });
+
+        const spec = generateJson(contract, baseConfig);
+
+        expect(spec.paths['/users/{id}']!.get).toHaveProperty('responses');
+        expect(JSON.stringify(spec)).not.toContain('handler');
+    });
+});

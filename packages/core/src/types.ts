@@ -215,6 +215,12 @@ export type RoutePath = `/${string}`;
  */
 export type ResponseHeaders = Record<string, string>;
 
+/**
+ * A handler as the route type carries it. Each route narrows its own arguments
+ * and return through `k.route(...).handler(...)`.
+ */
+export type RouteHandlerFunction = (args: never) => unknown;
+
 export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {
     method: Method;
     /**
@@ -342,6 +348,12 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
     responses: {
         [status: number]: ResponseDefinition;
     };
+    /**
+     * The handler that answers this route. Attach it with
+     * `k.route(...).handler(...)`, which types `body`, `params`, `query` and
+     * `headers` from this route and checks the return against `responses`.
+     */
+    handler?: RouteHandlerFunction;
 }
 
 /**

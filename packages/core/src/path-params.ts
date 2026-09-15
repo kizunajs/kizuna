@@ -128,6 +128,22 @@ type MismatchShape<Node> = {
  */
 export type PathParamsCheck<RouteTree> = [TreeMismatch<RouteTree>] extends [never] ? unknown : MismatchShape<RouteTree>;
 
+/**
+ * The {@link PathParamsCheck} of one route, for `k.route`. Intersect it with the
+ * inferred definition: a route whose `pathParams` keys match its path gives
+ * `unknown`, and a mismatch resolves `pathParams` to an error message.
+ */
+export type RoutePathParamsCheck<Definition> = Definition extends {
+    path: infer Path extends string;
+    pathParams: infer Schema;
+}
+    ? [PathParamsMismatch<Path, Schema>] extends [never]
+        ? unknown
+        : {
+              pathParams: PathParamsMismatch<Path, Schema>;
+          }
+    : unknown;
+
 export interface PathSegment {
     kind: 'literal' | 'param';
     value: string;
