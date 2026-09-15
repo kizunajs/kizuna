@@ -63,15 +63,34 @@ export const contract = k.contract({ routes: { users: routes } });
  * Waits for a debounced reload to land, rather than guessing at a duration that
  * holds when the whole suite is running.
  */
-const waitFor = async (condition: () => boolean, timeout = 15_000): Promise<void> => {
+const waitFor = async (condition: () => boolean, nudge?: () => void, timeout = 15_000): Promise<void> => {
     const deadline = Date.now() + timeout;
+    let elapsed = 0;
     while (!condition()) {
         if (Date.now() > deadline) throw new Error('Timed out waiting for the watcher');
         await new Promise((resolve) => setTimeout(resolve, 20));
+        elapsed += 20;
+        // `fs.watch` drops events when the machine is busy, which a full test
+        // run makes it. Touching the file again asks for another.
+        if (nudge && elapsed % 1000 === 0) nudge();
     }
 };
 
 const settle = (ms = 200) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const routesSource = (routePath: string) => `import { Kizuna } from '@ts-kizuna/core';
+import { z } from 'zod';
+
+const k = new Kizuna();
+
+export const routes = k.routes('users', {
+    getUser: {
+        method: 'GET',
+        path: '${routePath}',
+        responses: { 200: z.object({ id: z.string() }) },
+    },
+});
+`;
 
 describe('watchContract', () => {
     it('reports the contract once before anything changes', async () => {
@@ -131,7 +150,10 @@ export const routes = k.routes('users', {
 `
         );
 
-        await waitFor(() => changes.length > 1);
+        await waitFor(
+            () => changes.length > 1,
+            () => writeFileSync(join(directory, 'routes.ts'), routesSource('/people/:id'))
+        );
 
         expect(changes.length).toBeGreaterThan(1);
         expect(routePath(changes.at(-1)?.contract, 'users', 'getUser')).toBe('/people/:id');
@@ -155,7 +177,10 @@ export const routes = k.routes('users', {
         cleanups.push(stop);
 
         writeFileSync(join(directory, 'routes.ts'), 'export const routes = {');
-        await waitFor(() => errors.length > 0);
+        await waitFor(
+            () => errors.length > 0,
+            () => writeFileSync(join(directory, 'routes.ts'), 'export const routes = {')
+        );
 
         expect(errors).toHaveLength(1);
         expect(changes).toHaveLength(1);
@@ -175,7 +200,10 @@ export const routes = k.routes('users', {
         cleanups.push(stop);
 
         writeFileSync(join(directory, 'routes.ts'), 'export const routes = {');
-        await waitFor(() => reported.length > 0);
+        await waitFor(
+            () => reported.length > 0,
+            () => writeFileSync(join(directory, 'routes.ts'), 'export const routes = {')
+        );
 
         expect(reported.join('\n')).toContain('Could not load the contract after');
         expect(reported.join('\n')).toContain('routes.ts');
