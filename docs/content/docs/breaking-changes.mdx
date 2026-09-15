@@ -1,34 +1,31 @@
 ---
 title: Breaking Changes
-description: Catch a change that breaks callers before it ships, in the contract and in the OpenAPI document.
+description: Catch a change that breaks callers before it ships.
 ---
 
-Two things can break the people calling your API, and they need different tools.
+`kizuna diff` compares two contracts and reports what each change costs the people already calling your API.
 
-**The HTTP surface**: a path that moved, a status that disappeared, a field that became required. [oasdiff](https://github.com/oasdiff/oasdiff) compares two OpenAPI documents and reports these.
-
-**Everything a document cannot carry**: a route key renamed, an MCP tool that vanished, a job key that changed. `diffContracts` compares the declarations, so it sees these.
-
-A rename is the clearest example. Renaming `users.patchUser` to `users.updateUser` leaves the method, the path and every schema alone, so the documents are identical. It still changes the client method, the MCP tool name, and the method names in the generated Swift and Kotlin clients.
+It reads the declarations, so route keys, MCP tool names and job keys are all in view, and every Zod schema is compared field by field.
 
 ## Comparing contracts
 
 ```ts title="scripts/diff.ts"
-import { diffContracts, formatChange, hasBreakingChange, loadContract } from '@ts-kizuna/cli';
+import { diffAgainst, formatChange, hasBreakingChange } from '@ts-kizuna/cli';
 
-const before = await loadContract('./base/src/contract.ts');
-const after = await loadContract('./src/contract.ts');
-
-const changes = diffContracts(before!, after!);
+const changes = await diffAgainst(process.argv[2] ?? 'main', './src/contract.ts');
 
 for (const change of changes) console.log(formatChange(change));
 
 if (hasBreakingChange(changes)) process.exit(1);
 ```
 
+`diffAgainst` checks the ref out into a git worktree inside the repository, loads the contract from there, and removes it afterwards. **Nothing is installed for the base tree**: it sits inside your repository, so Node resolves dependencies by walking up to the `node_modules` you already have.
+
 ```
 BREAKING users.patchUser renamed to users.updateUser
          client method and generated client names change, HTTP surface unaffected
+
+BREAKING users.createUser body.organisationId is now required
 
 BREAKING the job reconcileInvoices is gone
          whatever calls POST /jobs/run with that key stops working
@@ -37,7 +34,7 @@ CHANGED  users.getUser can now answer 410
 ADDED    users.archiveUser
 ```
 
-### What it reports
+## The route surface
 
 | Change                               | Level    |
 | ------------------------------------ | -------- |
@@ -51,7 +48,32 @@ ADDED    users.archiveUser
 | A new deprecation or sunset          | changed  |
 | A route added                        | added    |
 
-A rename is spotted by matching a departed key against an arrived one on the same method and path, so it reads as one breaking change rather than a removal and an addition.
+A rename is spotted by matching a departed key against an arrived one on the same method and path, so it reads as one breaking change rather than a removal and an addition. Renaming `users.patchUser` to `users.updateUser` leaves the method, the path and every schema alone, and still changes the client method, the MCP tool name, and the method names in the generated Swift and Kotlin clients.
+
+## Schemas, where direction decides everything
+
+A caller sends requests and reads responses, so tightening an input and dropping an output are the two that hurt.
+
+| Change                     | Request      | Response     |
+| -------------------------- | ------------ | ------------ |
+| A required field added     | **breaking** | changed      |
+| An optional field added    | quiet        | changed      |
+| A field removed            | changed      | **breaking** |
+| An optional field required | **breaking** | changed      |
+| A type changed             | **breaking** | **breaking** |
+| An enum value removed      | **breaking** | **breaking** |
+| An enum value added        | changed      | **breaking** |
+
+That last row catches people out. Adding a value to a response enum breaks any client that generated a closed enum for it, which is what [`unknownEnumCase`](/docs/clients/swift) exists for in the Swift and Kotlin clients.
+
+Bodies, query parameters, headers and every response body are compared, reported by path and followed into arrays:
+
+```
+BREAKING users.createUser body.address.postcode is now required
+BREAKING users.listUsers 200.items[].id is number instead of string
+```
+
+**What it cannot see** is a rule inside `.refine()` or `.superRefine()`, because those are functions rather than declarations. A tightened refinement passes quietly.
 
 ## Keeping generated clients current
 
@@ -77,43 +99,15 @@ A generated client is out of date:
 Run `kizuna generate` and commit the result.
 ```
 
-Editors get the same signal sooner. The [VS Code extension](/docs/vscode) reports a generated client that is older than the contract it came from, pointing at the file rather than at a missing property three files away. It reads the `Source:` line in the generated header and compares against every file the contract imports.
+Editors get the same signal sooner. The [VS Code extension](/docs/vscode) reports a generated client older than the contract it came from, pointing at the file rather than at a missing property three files away. It reads the `Source:` line in the generated header and compares against every file the contract imports.
 
-That works when the contract and the client are in one TypeScript program. When the client is published from its own package, the editor cannot see the contract, and the check above is what catches it.
-
-## The OpenAPI surface
-
-oasdiff remains the right tool for the HTTP surface, and it covers what a document expresses: paths, methods, status codes, request and response schemas, required fields, and security requirements, since ts-kizuna writes `security` onto routes from the auth rules.
-
-## Print your spec to stdout
-
-This is the interface oasdiff and CI workflows consume.
-
-```ts title="print-openapi.ts"
-import { generateOpenApi } from '@ts-kizuna/openapi';
-import { contract } from '../src/contract';
-
-const spec = generateOpenApi(contract);
-
-console.log(spec('yaml'));
-```
-
-Add a script to your `package.json`:
-
-```json title="package.json"
-{
-    "scripts": {
-        "print:openapi": "tsx scripts/print-openapi.ts"
-    }
-}
-```
+That works when the contract and the client sit in one TypeScript program. When the client is published from its own package, the editor cannot see the contract, and the check above is what catches it.
 
 ## GitHub Actions
 
-Generate the spec from both the base branch and the PR branch, then compare them.
+One checkout, one install, no build. `fetch-depth: 0` matters: the default shallow clone has no base commit to compare against.
 
 ```yaml title=".github/workflows/breaking-changes.yml"
-# .github/workflows/breaking-changes.yml
 name: Breaking Changes
 
 on:
@@ -124,51 +118,24 @@ jobs:
     breaking-changes:
         runs-on: ubuntu-latest
         steps:
-            - name: Checkout PR branch
-              uses: actions/checkout@v4
+            - uses: actions/checkout@v6
               with:
-                  ref: ${{ github.head_ref }}
+                  fetch-depth: 0
 
-            - name: Setup
-              uses: pnpm/action-setup@v4
-            - uses: actions/setup-node@v4
+            - uses: pnpm/action-setup@v6
+            - uses: actions/setup-node@v6
               with:
-                  node-version: 22
+                  node-version: 24
                   cache: pnpm
 
-            - name: Install and build (PR)
-              run: |
-                  pnpm install --frozen-lockfile
-                  pnpm build
-            - name: Generate PR spec
-              run: pnpm print:openapi > pr-api.yaml
+            - run: pnpm install --frozen-lockfile
 
-            - name: Checkout base branch
-              uses: actions/checkout@v4
-              with:
-                  ref: ${{ github.base_ref }}
-                  clean: false
-                  path: base
+            - name: Compare contracts
+              id: diff
+              run: pnpm tsx scripts/diff.ts ${{ github.event.pull_request.base.sha }}
 
-            - name: Install and build (base)
-              working-directory: base
-              run: |
-                  pnpm install --frozen-lockfile
-                  pnpm build
-            - name: Generate base spec
-              working-directory: base
-              run: pnpm print:openapi > ../base-api.yaml
-
-            - name: Check for breaking changes
-              id: oasdiff
-              uses: oasdiff/oasdiff-action/breaking@main
-              with:
-                  base: base-api.yaml
-                  revision: pr-api.yaml
-                  fail-on: ERR
-
-            - name: Require label for breaking changes
-              if: steps.oasdiff.outcome == 'failure'
+            - name: Require a label for breaking changes
+              if: steps.diff.outcome == 'failure'
               run: |
                   if [[ "${{ contains(github.event.pull_request.labels.*.name, 'breaking changes') }}" == "true" ]]; then
                       echo "Breaking changes acknowledged via label."
@@ -178,4 +145,10 @@ jobs:
                   fi
 ```
 
-A detected breaking change blocks the PR until someone adds the `breaking changes` label.
+A breaking change blocks the pull request until someone adds the `breaking changes` label.
+
+## Reference
+
+- [Deprecations](/docs/deprecations), for retiring a route rather than removing it
+- [Watching](/docs/watching), which reloads the contract as you edit
+- [Configuration](/docs/configuration)
