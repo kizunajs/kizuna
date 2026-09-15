@@ -16,6 +16,8 @@ import {
     type SecurityScheme,
     type StreamMessageOf,
     type StreamResponseDefinition,
+    type Method,
+    type RoutePath,
 } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
 import { buildPath, isRouteDefinition } from '@ts-kizuna/core/adapter';
@@ -343,3 +345,34 @@ export interface KizunaClientConstructor {
 }
 
 export const KizunaClient = buildClient as unknown as KizunaClientConstructor;
+
+/**
+ * What a generated client knows about one response: nothing for a body it
+ * parses as JSON, the media type for one it streams.
+ */
+export type GeneratedResponse = Record<string, never> | { stream: { contentType?: string } };
+
+/**
+ * One route in a generated client's table: how to reach it, and enough about
+ * each response to read the body.
+ */
+export interface GeneratedRoute {
+    method: Method;
+    path: RoutePath;
+    contentType?: string;
+    responses: Record<number, GeneratedResponse>;
+}
+
+/**
+ * The route table a generated client carries, nested the way the client is.
+ */
+export interface GeneratedRoutes {
+    [key: string]: GeneratedRoutes | GeneratedRoute;
+}
+
+/**
+ * Builds the client tree a generated client exposes. The generated file owns the
+ * types; this owns the requests.
+ */
+export const createGeneratedClient = (routes: GeneratedRoutes, config: ClientConfig): Record<string, unknown> =>
+    buildClientTree(routes as unknown as Routes, config);
