@@ -1,9 +1,89 @@
 ---
 title: Breaking Changes
-description: Detect breaking API changes between versions using oasdiff.
+description: Catch a change that breaks callers before it ships, in the contract and in the OpenAPI document.
 ---
 
-We recommend [oasdiff](https://github.com/oasdiff/oasdiff). It compares two OpenAPI specs and reports breaking changes, changelogs, and diffs, so pointing it at the spec ts-kizuna generates from your routes catches them before they ship.
+Two things can break the people calling your API, and they need different tools.
+
+**The HTTP surface**: a path that moved, a status that disappeared, a field that became required. [oasdiff](https://github.com/oasdiff/oasdiff) compares two OpenAPI documents and reports these.
+
+**Everything a document cannot carry**: a route key renamed, an MCP tool that vanished, a job key that changed. `diffContracts` compares the declarations, so it sees these.
+
+A rename is the clearest example. Renaming `users.patchUser` to `users.updateUser` leaves the method, the path and every schema alone, so the documents are identical. It still changes the client method, the MCP tool name, and the method names in the generated Swift and Kotlin clients.
+
+## Comparing contracts
+
+```ts title="scripts/diff.ts"
+import { diffContracts, formatChange, hasBreakingChange, loadContract } from '@ts-kizuna/cli';
+
+const before = await loadContract('./base/src/contract.ts');
+const after = await loadContract('./src/contract.ts');
+
+const changes = diffContracts(before!, after!);
+
+for (const change of changes) console.log(formatChange(change));
+
+if (hasBreakingChange(changes)) process.exit(1);
+```
+
+```
+BREAKING users.patchUser renamed to users.updateUser
+         client method and generated client names change, HTTP surface unaffected
+
+BREAKING the job reconcileInvoices is gone
+         whatever calls POST /jobs/run with that key stops working
+
+CHANGED  users.getUser can now answer 410
+ADDED    users.archiveUser
+```
+
+### What it reports
+
+| Change                               | Level    |
+| ------------------------------------ | -------- |
+| A route removed                      | breaking |
+| A route renamed                      | breaking |
+| A method or path changed             | breaking |
+| A declared status no longer answered | breaking |
+| A job key removed                    | breaking |
+| An MCP tool removed or renamed       | breaking |
+| A new status                         | changed  |
+| A new deprecation or sunset          | changed  |
+| A route added                        | added    |
+
+A rename is spotted by matching a departed key against an arrived one on the same method and path, so it reads as one breaking change rather than a removal and an addition.
+
+## Keeping generated clients current
+
+A generated client that has fallen behind is a compile error waiting to happen in whatever imports it. Check it in the same pipeline:
+
+```ts title="scripts/check-clients.ts"
+import { checkClients, formatStale, loadContract } from '@ts-kizuna/cli';
+import { config } from '../kizuna.config';
+
+const contract = await loadContract('./src/contract.ts');
+const stale = checkClients(contract!, config.clients ?? []);
+
+if (stale.length > 0) {
+    console.error(formatStale(stale));
+    process.exit(1);
+}
+```
+
+```
+A generated client is out of date:
+  src/api-client.ts is behind the contract
+
+Run `kizuna generate` and commit the result.
+```
+
+Editors get the same signal sooner. The [VS Code extension](/docs/vscode) reports a generated client that is older than the contract it came from, pointing at the file rather than at a missing property three files away. It reads the `Source:` line in the generated header and compares against every file the contract imports.
+
+That works when the contract and the client are in one TypeScript program. When the client is published from its own package, the editor cannot see the contract, and the check above is what catches it.
+
+## The OpenAPI surface
+
+oasdiff remains the right tool for the HTTP surface, and it covers what a document expresses: paths, methods, status codes, request and response schemas, required fields, and security requirements, since ts-kizuna writes `security` onto routes from the auth rules.
 
 ## Print your spec to stdout
 
