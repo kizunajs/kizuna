@@ -25,11 +25,9 @@ MCP is a [plugin](/docs/plugins), declared on `k.contract` and served by `api.mo
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { k } from './k';
 import { routes } from './routes';
-import { accessControl } from './access-control';
 
 export const contract = k.contract({
     routes,
-    accessControl,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',
@@ -72,7 +70,6 @@ Pass the routes to `mcpPlugin` and name the ones to leave out. Write `plugins` a
 ```ts title="contract.ts"
 export const contract = k.contract({
     routes,
-    accessControl,
     plugins: ({ routes }) => ({
         mcp: mcpPlugin({
             name: 'My API',

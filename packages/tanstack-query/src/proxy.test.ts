@@ -29,6 +29,7 @@ const routes = k.routes('users', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
+        auth: 'user',
         responses: {
             200: UserSchema,
             404: z.object({
@@ -228,14 +229,12 @@ describe('declared statuses', () => {
                     getUser: {
                         method: 'GET',
                         path: '/users/:id',
+                        auth: 'user',
                         responses: {
                             200: UserSchema,
                         },
                     },
                 }),
-            },
-            accessControl: {
-                users: 'user',
             },
         });
         const api = new KizunaTanstackQuery(guardedContract, {

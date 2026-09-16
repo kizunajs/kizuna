@@ -58,6 +58,7 @@ const contractRoutes = k.routes('api', {
     listUsers: {
         method: 'GET',
         path: '/users',
+        auth: false,
         query: z.object({
             page: z.number().optional(),
             limit: z.number().optional(),
@@ -949,6 +950,7 @@ describe('contract-level tag grouping', () => {
             listUsers: {
                 method: 'GET',
                 path: '/users',
+                auth: false,
                 responses: {
                     200: z.object({ users: z.array(z.string()) }),
                 },
@@ -1013,6 +1015,7 @@ describe('contract-level tag grouping', () => {
             listUsers: {
                 method: 'GET',
                 path: '/users',
+                auth: false,
                 responses: {
                     200: z.object({ ok: z.boolean() }),
                 },
@@ -1043,6 +1046,7 @@ describe('contract-level tag grouping', () => {
                 listUsers: {
                     method: 'GET',
                     path: '/users',
+                    auth: false,
                     responses: {
                         200: z.object({ users: z.array(z.string()) }),
                     },
@@ -1306,6 +1310,7 @@ describe('examples from metadata', () => {
         listEvents: {
             method: 'GET',
             path: '/events',
+            auth: 'user',
             responses: {
                 200: EventSchema,
             },
@@ -1442,6 +1447,7 @@ describe('cache headers', () => {
             listUsers: {
                 method: 'GET',
                 path: '/users',
+                auth: false,
                 responses: {
                     200: {
                         body: z.object({
@@ -1769,6 +1775,7 @@ describe('security from the contract', () => {
             listUsers: {
                 method: 'GET',
                 path: '/users',
+                auth: false,
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -1778,6 +1785,7 @@ describe('security from the contract', () => {
             getSecret: {
                 method: 'GET',
                 path: '/secret',
+                auth: 'user',
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -1787,6 +1795,13 @@ describe('security from the contract', () => {
             deleteWorkspace: {
                 method: 'DELETE',
                 path: '/workspace',
+                auth: {
+                    identity: 'member',
+                    roles: 'owner',
+                    requires: {
+                        workspace: ['delete'],
+                    },
+                },
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -1796,6 +1811,12 @@ describe('security from the contract', () => {
             scoped: {
                 method: 'GET',
                 path: '/scoped',
+                auth: {
+                    identity: 'partner',
+                    requires: {
+                        workspace: ['read'],
+                    },
+                },
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -1806,25 +1827,6 @@ describe('security from the contract', () => {
         return securedK.contract({
             routes: {
                 api: routes,
-            },
-            accessControl: {
-                api: {
-                    '*': false,
-                    getSecret: 'user',
-                    deleteWorkspace: {
-                        auth: 'member',
-                        roles: 'owner',
-                        requires: {
-                            workspace: ['delete'],
-                        },
-                    },
-                    scoped: {
-                        auth: 'partner',
-                        requires: {
-                            workspace: ['read'],
-                        },
-                    },
-                },
             },
         });
     };
@@ -1949,6 +1951,7 @@ describe('security from the contract', () => {
                 login: {
                     method: 'POST',
                     path: '/auth/login',
+                    auth: false,
                     responses: {
                         200: z.object({
                             ok: z.boolean(),
@@ -1958,6 +1961,7 @@ describe('security from the contract', () => {
                 me: {
                     method: 'GET',
                     path: '/auth/me',
+                    auth: 'user',
                     responses: {
                         200: z.object({
                             ok: z.boolean(),
@@ -1969,6 +1973,7 @@ describe('security from the contract', () => {
                 listEvents: {
                     method: 'GET',
                     path: '/events',
+                    auth: 'user',
                     responses: {
                         200: z.object({
                             ok: z.boolean(),
@@ -1980,15 +1985,6 @@ describe('security from the contract', () => {
         const nestedContract = nestedK.contract({
             routes: {
                 members,
-            },
-            accessControl: {
-                members: {
-                    '*': 'user',
-                    session: {
-                        '*': 'user',
-                        login: false,
-                    },
-                },
             },
         });
         const nestedSpec = generateJson(nestedContract, baseConfig);
@@ -2030,6 +2026,7 @@ describe('shared scheme names', () => {
             updateSettings: {
                 method: 'GET',
                 path: '/settings/update',
+                auth: 'admin',
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -2039,6 +2036,7 @@ describe('shared scheme names', () => {
             getSettings: {
                 method: 'GET',
                 path: '/settings',
+                auth: 'viewer',
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -2049,12 +2047,6 @@ describe('shared scheme names', () => {
         const sharedContract = sharedK.contract({
             routes: {
                 api: routes,
-            },
-            accessControl: {
-                api: {
-                    '*': 'viewer',
-                    updateSettings: 'admin',
-                },
             },
         });
         const spec = generateJson(sharedContract, baseConfig);
@@ -2101,6 +2093,7 @@ describe('custom identities (no OpenAPI scheme)', () => {
             getInvite: {
                 method: 'GET',
                 path: '/invites/:token',
+                auth: 'inviteToken',
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -2110,6 +2103,7 @@ describe('custom identities (no OpenAPI scheme)', () => {
             mixed: {
                 method: 'GET',
                 path: '/mixed/:token',
+                auth: ['user', 'inviteToken'],
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -2119,6 +2113,7 @@ describe('custom identities (no OpenAPI scheme)', () => {
             open: {
                 method: 'GET',
                 path: '/open',
+                auth: false,
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -2129,15 +2124,6 @@ describe('custom identities (no OpenAPI scheme)', () => {
         return customK.contract({
             routes: {
                 api: routes,
-            },
-            accessControl: {
-                api: {
-                    '*': false,
-                    getInvite: 'inviteToken',
-                    mixed: {
-                        auth: ['user', 'inviteToken'],
-                    },
-                },
             },
         });
     };

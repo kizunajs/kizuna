@@ -3,7 +3,6 @@ export { contract } from './contract';
 export { user, member, inviteToken, scheduler } from './identities';
 export { type User } from './types';
 export { db, type Invite } from './db';
-export { accessControl } from './access-control';
 export { permissions } from './permissions';
 export { roles } from './roles';
 export { jobs } from './jobs';

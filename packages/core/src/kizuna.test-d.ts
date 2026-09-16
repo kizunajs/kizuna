@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import type {
-    HandlersFromAccessControl,
+    HandlersFromRoutes,
     HandlerReturn,
     GuardReturn,
     GuardSuccess,
@@ -61,6 +61,7 @@ const users = k.routes({
     listUsers: {
         method: 'GET',
         path: '/users',
+        auth: false,
         ...okResponse,
     },
 });
@@ -69,11 +70,18 @@ const workspace = k.routes({
     getWorkspace: {
         method: 'GET',
         path: '/workspace',
+        auth: 'user',
         ...okResponse,
     },
     deleteWorkspace: {
         method: 'DELETE',
         path: '/workspace',
+        auth: {
+            identity: ['user', 'member'],
+            requires: {
+                workspace: ['delete'],
+            },
+        },
         ...okResponse,
     },
 });
@@ -83,29 +91,17 @@ const contract = k.contract({
         users,
         workspace,
     },
-    accessControl: {
-        users: false,
-        workspace: {
-            '*': 'user',
-            deleteWorkspace: {
-                auth: ['user', 'member'],
-                requires: {
-                    workspace: ['delete'],
-                },
-            },
-        },
-    },
 });
 
 type Identities = NonNullable<typeof contract.securitySchemes>;
-type Handlers = HandlersFromAccessControl<typeof contract.routes, {}, Identities, NonNullable<typeof contract.accessControl>>;
+type Handlers = HandlersFromRoutes<typeof contract.routes, {}, Identities>;
 
 test('a public route receives no auth context', () => {
     type Args = Parameters<Handlers['users']['listUsers']>[0];
     expectTypeOf<Args>().not.toHaveProperty('auth');
 });
 
-test('a group-secured route receives the identity context under auth by name', () => {
+test('a secured route receives the identity context under auth by name', () => {
     type Args = Parameters<Handlers['workspace']['getWorkspace']>[0];
     expectTypeOf<Args['auth']['user']>().toEqualTypeOf<{ userId: string }>();
 });
@@ -115,6 +111,11 @@ test('a secured handler reads the role and what it holds', () => {
     expectTypeOf<Args['auth']['member']['role']>().toEqualTypeOf<MemberRole>();
     expectTypeOf<Args['auth']['member']['permissions']>().toEqualTypeOf<readonly MemberPermission[]>();
     expectTypeOf<Args['auth']['member']['workspaceUserId']>().toEqualTypeOf<string>();
+});
+
+test('an identity array hands the handler every identity it names', () => {
+    type Args = Parameters<Handlers['workspace']['deleteWorkspace']>[0];
+    expectTypeOf<Args['auth']['user']>().toEqualTypeOf<{ userId: string }>();
 });
 
 test('roles from names give the handler a role and no permissions', () => {
@@ -133,6 +134,10 @@ test('roles from names give the handler a role and no permissions', () => {
         listDocs: {
             method: 'GET',
             path: '/docs',
+            auth: {
+                identity: 'viewer',
+                roles: ['editor'],
+            },
             ...okResponse,
         },
     });
@@ -140,115 +145,102 @@ test('roles from names give the handler a role and no permissions', () => {
         routes: {
             docs,
         },
-        accessControl: {
-            docs: {
-                auth: 'viewer',
-                roles: ['editor'],
-            },
-        },
     });
     type Args = Parameters<
-        HandlersFromAccessControl<
-            typeof plainContract.routes,
-            {},
-            NonNullable<typeof plainContract.securitySchemes>,
-            NonNullable<typeof plainContract.accessControl>
-        >['docs']['listDocs']
+        HandlersFromRoutes<typeof plainContract.routes, {}, NonNullable<typeof plainContract.securitySchemes>>['docs']['listDocs']
     >[0];
     expectTypeOf<Args['auth']['viewer']['role']>().toEqualTypeOf<'viewer' | 'editor' | readonly ('viewer' | 'editor')[]>();
     expectTypeOf<Args['auth']['viewer']>().not.toHaveProperty('permissions');
     expectTypeOf<GuardReturn<typeof viewer>>().not.toHaveProperty('permissions');
-    // @ts-expect-error roles from names carry no permissions to require
-    plain.contract({
-        routes: {
-            docs,
-        },
-        accessControl: {
-            docs: {
-                auth: 'viewer',
+    plain.routes({
+        listDocs: {
+            method: 'GET',
+            path: '/docs',
+            // @ts-expect-error roles from names carry no permissions to require
+            auth: {
+                identity: 'viewer',
                 requires: {
                     workspace: ['read'],
                 },
             },
+            ...okResponse,
         },
     });
 });
 
-test('roles on an entry are checked against the identity', () => {
-    // @ts-expect-error viewer is not a member role
-    k.contract({
-        routes: {
-            users,
-            workspace,
-        },
-        accessControl: {
-            users: false,
-            workspace: {
-                auth: 'member',
+test('roles on a route are checked against its identity', () => {
+    k.routes({
+        deleteWorkspace: {
+            method: 'DELETE',
+            path: '/workspace',
+            // @ts-expect-error viewer is not a member role
+            auth: {
+                identity: 'member',
                 roles: 'viewer',
             },
+            ...okResponse,
         },
     });
-    // @ts-expect-error user declares no roles
-    k.contract({
-        routes: {
-            users,
-            workspace,
-        },
-        accessControl: {
-            users: false,
-            workspace: {
-                auth: 'user',
+    k.routes({
+        deleteWorkspace: {
+            method: 'DELETE',
+            path: '/workspace',
+            // @ts-expect-error user declares no roles
+            auth: {
+                identity: 'user',
                 roles: 'owner',
             },
+            ...okResponse,
         },
     });
-});
-
-test('an auth array hands the handler every identity it names', () => {
-    type Args = Parameters<Handlers['workspace']['deleteWorkspace']>[0];
-    expectTypeOf<Args['auth']['user']>().toEqualTypeOf<{ userId: string }>();
 });
 
 test('requires rejects a permission the identity does not declare', () => {
-    // @ts-expect-error archive is not a workspace permission
-    k.contract({
-        routes: {
-            users,
-            workspace,
-        },
-        accessControl: {
-            users: false,
-            workspace: {
-                auth: 'member',
+    k.routes({
+        deleteWorkspace: {
+            method: 'DELETE',
+            path: '/workspace',
+            // @ts-expect-error archive is not a workspace permission
+            auth: {
+                identity: 'member',
                 requires: {
                     workspace: ['archive'],
                 },
             },
+            ...okResponse,
         },
     });
 });
 
 test('requires rejects an identity that declares no roles', () => {
-    // @ts-expect-error user declares no roles
-    k.contract({
-        routes: {
-            users,
-            workspace,
-        },
-        accessControl: {
-            users: false,
-            workspace: {
-                auth: 'user',
+    k.routes({
+        deleteWorkspace: {
+            method: 'DELETE',
+            path: '/workspace',
+            // @ts-expect-error user declares no roles
+            auth: {
+                identity: 'user',
                 requires: {
                     workspace: ['read'],
                 },
             },
+            ...okResponse,
         },
     });
 });
 
-test('an auth-less contract degrades to plain handlers', () => {
+test('a route cannot leave out its auth once an identity exists', () => {
+    k.routes({
+        // @ts-expect-error every route states its rule
+        listThings: {
+            method: 'GET',
+            path: '/things',
+            ...okResponse,
+        },
+    });
+});
+
+test('an identity-less contract degrades to plain handlers', () => {
     const plainK = new Kizuna();
     const items = plainK.routes({
         listItems: {
@@ -262,12 +254,7 @@ test('an auth-less contract degrades to plain handlers', () => {
             items,
         },
     });
-    type PlainHandlers = HandlersFromAccessControl<
-        typeof plainContract.routes,
-        {},
-        Record<string, never>,
-        NonNullable<typeof plainContract.accessControl>
-    >;
+    type PlainHandlers = HandlersFromRoutes<typeof plainContract.routes, {}, Record<string, never>>;
     type Args = Parameters<PlainHandlers['items']['listItems']>[0];
     expectTypeOf<Args>().toHaveProperty('query');
     expectTypeOf<Args>().not.toHaveProperty('auth');
@@ -276,29 +263,14 @@ test('an auth-less contract degrades to plain handlers', () => {
     >();
 });
 
-test('the access control map must cover every route group', () => {
-    k.contract({
-        routes: {
-            users,
-            workspace,
-        },
-        // @ts-expect-error workspace is missing from the access control map
-        accessControl: {
-            users: false,
-        },
-    });
-});
-
-test('the access control map rejects unknown identity names', () => {
-    // @ts-expect-error 'admin' is not a declared identity
-    k.contract({
-        routes: {
-            users,
-            workspace,
-        },
-        accessControl: {
-            users: false,
-            workspace: 'admin',
+test('a route rejects an identity the instance does not declare', () => {
+    k.routes({
+        listThings: {
+            method: 'GET',
+            path: '/things',
+            // @ts-expect-error 'admin' is not a declared identity
+            auth: 'admin',
+            ...okResponse,
         },
     });
 });
@@ -308,7 +280,8 @@ test('k.routes rejects inline security on a route', () => {
         listThings: {
             method: 'GET',
             path: '/things',
-            // @ts-expect-error security is owned by the access control map
+            auth: false,
+            // @ts-expect-error security is resolved from auth
             security: ['user'],
             ...okResponse,
         },
@@ -350,11 +323,13 @@ const members = k.routes({
         login: {
             method: 'POST',
             path: '/auth/login',
+            auth: false,
             ...okResponse,
         },
         me: {
             method: 'GET',
             path: '/auth/me',
+            auth: 'user',
             ...okResponse,
         },
     },
@@ -362,11 +337,23 @@ const members = k.routes({
         list: {
             method: 'GET',
             path: '/events',
+            auth: {
+                identity: ['user', 'member'],
+                requires: {
+                    workspace: ['delete'],
+                },
+            },
             ...okResponse,
         },
         get: {
             method: 'GET',
             path: '/events/:eventId',
+            auth: {
+                identity: ['user', 'member'],
+                requires: {
+                    workspace: ['delete'],
+                },
+            },
             ...okResponse,
         },
     },
@@ -374,11 +361,13 @@ const members = k.routes({
         list: {
             method: 'GET',
             path: '/invites',
+            auth: false,
             ...okResponse,
         },
         get: {
             method: 'GET',
             path: '/invites/:inviteId',
+            auth: false,
             ...okResponse,
         },
     },
@@ -388,102 +377,48 @@ const nestedContract = k.contract({
     routes: {
         members,
     },
-    accessControl: {
-        members: {
-            '*': 'user',
-            session: {
-                '*': 'user',
-                login: false,
-            },
-            events: {
-                auth: ['user', 'member'],
-                requires: {
-                    workspace: ['delete'],
-                },
-            },
-            invites: false,
-        },
-    },
 });
 
-type NestedHandlers = HandlersFromAccessControl<
-    typeof nestedContract.routes,
-    {},
-    NonNullable<typeof nestedContract.securitySchemes>,
-    NonNullable<typeof nestedContract.accessControl>
->;
+type NestedHandlers = HandlersFromRoutes<typeof nestedContract.routes, {}, NonNullable<typeof nestedContract.securitySchemes>>;
 
-test('a route opted out in a nested cascade receives no auth context', () => {
+test('a public route in a nested group receives no auth context', () => {
     type Args = Parameters<NestedHandlers['members']['session']['login']>[0];
     expectTypeOf<Args>().not.toHaveProperty('auth');
 });
 
-test('a route not named in a nested cascade inherits its * default', () => {
+test('a secured route in a nested group receives its identity', () => {
     type Args = Parameters<NestedHandlers['members']['session']['me']>[0];
     expectTypeOf<Args['auth']['user']>().toEqualTypeOf<{ userId: string }>();
 });
 
-test('an access value on a subgroup key applies across its subtree', () => {
+test('a route naming two identities receives both', () => {
     type Args = Parameters<NestedHandlers['members']['events']['list']>[0];
     expectTypeOf<Args['auth']['user']>().toEqualTypeOf<{ userId: string }>();
     expectTypeOf<Args['auth']['member']['role']>().toEqualTypeOf<MemberRole>();
 });
 
-test('a subgroup opted out with false is public despite sibling overrides for the same route keys', () => {
+test('sibling groups keep their own auth for the same route key', () => {
     type Args = Parameters<NestedHandlers['members']['invites']['list']>[0];
     expectTypeOf<Args>().not.toHaveProperty('auth');
 });
 
-test('the access control map rejects a cascade key that does not name a route or subgroup in the group', () => {
-    // @ts-expect-error list is a leaf route key, not directly in members
-    k.contract({
-        routes: {
-            members,
-        },
-        accessControl: {
-            members: {
-                '*': 'user',
-                list: false,
-            },
-        },
-    });
-});
-
-test('the access control map rejects a nested cascade on a route key', () => {
-    // @ts-expect-error login is a route, not a group
-    k.contract({
-        routes: {
-            members,
-        },
-        accessControl: {
-            members: {
-                '*': 'user',
-                session: {
-                    '*': 'user',
-                    login: {
-                        '*': false,
-                    },
-                },
-            },
-        },
-    });
-});
-
-test('GuardParams only derives params from the subgroups an identity secures', () => {
-    type MemberParams = GuardParams<typeof nestedContract.routes, NonNullable<typeof nestedContract.accessControl>, 'member'>;
+test('GuardParams only derives params from the routes an identity secures', () => {
+    type MemberParams = GuardParams<typeof nestedContract.routes, 'member'>;
     expectTypeOf<MemberParams>().toEqualTypeOf<{ eventId?: string }>();
 });
 
-test('GuardParams derives param names from the routes an identity secures', () => {
+test('GuardParams derives param names from every route an identity secures', () => {
     const paramRoutes = k.routes({
         getWorkspaceUser: {
             method: 'GET',
             path: '/workspaces/:workspaceId/users/:id',
+            auth: 'member',
             ...okResponse,
         },
         listWorkspaces: {
             method: 'GET',
             path: '/workspaces',
+            auth: 'member',
             ...okResponse,
         },
     });
@@ -491,27 +426,24 @@ test('GuardParams derives param names from the routes an identity secures', () =
         routes: {
             api: paramRoutes,
         },
-        accessControl: {
-            api: 'member',
-        },
     });
-    type Params = GuardParams<typeof paramContract.routes, NonNullable<typeof paramContract.accessControl>, 'member'>;
+    type Params = GuardParams<typeof paramContract.routes, 'member'>;
     expectTypeOf<Params>().toEqualTypeOf<{ workspaceId?: string; id?: string }>();
-    type NoParams = GuardParams<typeof paramContract.routes, NonNullable<typeof paramContract.accessControl>, 'user'>;
+    type NoParams = GuardParams<typeof paramContract.routes, 'user'>;
     expectTypeOf<NoParams>().toEqualTypeOf<Record<string, string>>();
 });
 
-test('a contract brands each route with the auth its access entry resolves to', () => {
+test('a contract brands each route with the auth it declares', () => {
     expectTypeOf<BrandedHandlerContext<typeof nestedContract.routes.members.session.me>>().toEqualTypeOf<{
         auth: { user: { userId: string } };
     }>();
 });
 
-test('a route opted out in a nested cascade carries no branded auth', () => {
+test('a public route carries no branded auth', () => {
     expectTypeOf<BrandedHandlerContext<typeof nestedContract.routes.members.session.login>>().toEqualTypeOf<{}>();
 });
 
-test('a branded route carries every identity a subgroup access value names', () => {
+test('a branded route carries every identity its auth names', () => {
     type Context = BrandedHandlerContext<typeof nestedContract.routes.members.events.list>;
     expectTypeOf<Context['auth']['user']>().toEqualTypeOf<{ userId: string }>();
     expectTypeOf<Context['auth']['member']['role']>().toEqualTypeOf<MemberRole>();
@@ -546,21 +478,14 @@ const inviteContract = inviteK.contract({
             getInvite: {
                 method: 'GET',
                 path: '/invites/:token',
+                auth: 'inviteToken',
                 ...okResponse,
             },
         }),
     },
-    accessControl: {
-        invites: 'inviteToken',
-    },
 });
 
-type InviteHandlers = HandlersFromAccessControl<
-    typeof inviteContract.routes,
-    {},
-    NonNullable<typeof inviteContract.securitySchemes>,
-    NonNullable<typeof inviteContract.accessControl>
->;
+type InviteHandlers = HandlersFromRoutes<typeof inviteContract.routes, {}, NonNullable<typeof inviteContract.securitySchemes>>;
 
 test('a custom identity carries no credential key to its guard', () => {
     expectTypeOf<CredentialOf<typeof inviteToken>>().toEqualTypeOf<{}>();
@@ -572,6 +497,6 @@ test('a custom-guarded route hands its context to the handler by name', () => {
 });
 
 test('a custom identity derives its guard params from the routes it secures', () => {
-    type Params = GuardParams<typeof inviteContract.routes, NonNullable<typeof inviteContract.accessControl>, 'inviteToken'>;
+    type Params = GuardParams<typeof inviteContract.routes, 'inviteToken'>;
     expectTypeOf<Params>().toEqualTypeOf<{ token?: string }>();
 });

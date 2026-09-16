@@ -19,6 +19,7 @@ const routes = k.routes({
     listUsers: {
         method: 'GET',
         path: '/users',
+        auth: 'user',
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -28,6 +29,7 @@ const routes = k.routes({
     health: {
         method: 'GET',
         path: '/health',
+        auth: false,
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -39,12 +41,6 @@ const routes = k.routes({
 const contract = k.contract({
     routes: {
         api: routes,
-    },
-    accessControl: {
-        api: {
-            '*': false,
-            listUsers: 'user',
-        },
     },
 });
 
@@ -84,6 +80,7 @@ const scopedRoutes = scopedK.routes({
     listUsers: {
         method: 'GET',
         path: '/users',
+        auth: 'user',
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -95,9 +92,6 @@ const scopedRoutes = scopedK.routes({
 const scopedContract = scopedK.contract({
     routes: {
         api: scopedRoutes,
-    },
-    accessControl: {
-        api: 'user',
     },
 });
 

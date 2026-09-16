@@ -257,6 +257,7 @@ describe('assertValidCache', () => {
             listUsers: {
                 method: 'GET',
                 path: '/users',
+                auth: 'user',
                 responses: {
                     200: {
                         body: z.object({
@@ -274,9 +275,6 @@ describe('assertValidCache', () => {
             secured.contract({
                 routes: {
                     users: routes,
-                },
-                accessControl: {
-                    users: 'user',
                 },
             })
         ).toThrow(/declares cache\.scope 'public' on its 200 response, but the route is behind authentication/);

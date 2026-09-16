@@ -269,7 +269,7 @@ responses: {
 
 ## Authentication
 
-Authentication is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `new Kizuna()`, and build an access control map with [`k.accessControl`](/docs/reference/k-access-control) saying which identity, roles, or permissions each route requires. That one declaration drives runtime enforcement, typed handler context, and the OpenAPI spec's security. The [Authentication](/docs/authentication) and [Access Control](/docs/access-control) guides walk the whole pipeline.
+Authentication is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `new Kizuna()`, and give each route an [`auth`](/docs/reference/k-route) saying which identity, roles, or permissions it requires. That one declaration drives runtime enforcement, typed handler context, and the OpenAPI spec's security. The [Authentication](/docs/authentication) and [Access Control](/docs/access-control) guides walk the whole pipeline.
 
 ## Jobs
 

@@ -32,15 +32,13 @@ const contract = k.contract({
         listUsers: {
             method: 'GET',
             path: '/users',
+            auth: false,
             responses: {
                 200: z.array(z.string()),
             },
         },
     }),
     jobs,
-    accessControl: {
-        listUsers: false,
-    },
 }) as unknown as Contract;
 
 const at = (iso: string): Date => new Date(iso);

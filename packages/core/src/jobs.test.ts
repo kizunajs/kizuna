@@ -256,6 +256,7 @@ describe('k.contract with jobs', () => {
         listUsers: {
             method: 'GET',
             path: '/users',
+            auth: false,
             responses: {
                 200: z.array(z.string()),
             },
@@ -271,9 +272,6 @@ describe('k.contract with jobs', () => {
         const contract = k.contract({
             routes,
             jobs,
-            accessControl: {
-                listUsers: false,
-            },
         });
         expect(Object.keys(contract.jobs ?? {})).toEqual(['sendDigests']);
         expect(Object.keys(contract.routes)).toEqual(['listUsers']);
@@ -282,9 +280,6 @@ describe('k.contract with jobs', () => {
     it('leaves jobs undefined when none are declared', () => {
         const contract = k.contract({
             routes,
-            accessControl: {
-                listUsers: false,
-            },
         });
         expect(contract.jobs).toBeUndefined();
     });
@@ -299,9 +294,6 @@ describe('k.contract with jobs', () => {
             k.contract({
                 routes,
                 jobs,
-                accessControl: {
-                    listUsers: false,
-                },
             })
         ).not.toThrow();
     });
@@ -312,6 +304,7 @@ describe('a job endpoint colliding with a route', () => {
         k.routes({
             listJobs: {
                 method: 'POST',
+                auth: false,
                 path,
                 responses: {
                     200: z.array(z.string()),
@@ -330,9 +323,6 @@ describe('a job endpoint colliding with a route', () => {
             k.contract({
                 routes: routesAt(path),
                 jobs: scheduled,
-                accessControl: {
-                    listJobs: false,
-                },
             })
         ).toThrow('which already serves it');
     });
@@ -342,9 +332,6 @@ describe('a job endpoint colliding with a route', () => {
             k.contract({
                 routes: routesAt('/jobs'),
                 jobs: scheduled,
-                accessControl: {
-                    listJobs: false,
-                },
             })
         ).not.toThrow();
     });
@@ -364,6 +351,7 @@ describe('a job endpoint colliding with a route', () => {
                     listJobs: {
                         method: 'POST',
                         path: '/jobs/dispatch',
+                        auth: false,
                         responses: {
                             200: z.array(z.string()),
                         },
@@ -374,9 +362,6 @@ describe('a job endpoint colliding with a route', () => {
                         schedule: '0 5 * * *',
                     },
                 }),
-                accessControl: {
-                    listJobs: false,
-                },
             })
         ).not.toThrow();
     });

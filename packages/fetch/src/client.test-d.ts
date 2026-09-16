@@ -875,6 +875,7 @@ const guardedRoutes = guardedK.routes({
     whoAmI: {
         method: 'GET',
         path: '/who-am-i',
+        auth: 'user',
         responses: {
             200: z.object({
                 userId: z.string(),
@@ -884,6 +885,7 @@ const guardedRoutes = guardedK.routes({
     declaresIts403: {
         method: 'GET',
         path: '/declares-its-403',
+        auth: 'user',
         responses: {
             200: z.object({
                 userId: z.string(),
@@ -894,6 +896,7 @@ const guardedRoutes = guardedK.routes({
     health: {
         method: 'GET',
         path: '/health',
+        auth: false,
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -905,12 +908,6 @@ const guardedRoutes = guardedK.routes({
 const guardedContract = guardedK.contract({
     routes: {
         api: guardedRoutes,
-    },
-    accessControl: {
-        api: {
-            '*': 'user',
-            health: false,
-        },
     },
 });
 
@@ -963,6 +960,7 @@ const codedContract = codedK.contract({
             whoAmI: {
                 method: 'GET',
                 path: '/who-am-i',
+                auth: 'user',
                 responses: {
                     200: z.object({
                         userId: z.string(),
@@ -970,9 +968,6 @@ const codedContract = codedK.contract({
                 },
             },
         }),
-    },
-    accessControl: {
-        api: 'user',
     },
 });
 

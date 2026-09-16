@@ -6,6 +6,7 @@ export const inviteRoutes = k.routes('invites', {
     getInvite: {
         method: 'GET',
         path: '/invites/:token',
+        auth: 'inviteToken',
         responses: {
             200: z.object({
                 inviteId: z.string(),
@@ -18,6 +19,7 @@ export const inviteRoutes = k.routes('invites', {
     acceptInvite: {
         method: 'POST',
         path: '/invites/:token/accept',
+        auth: 'inviteToken',
         body: z.object({
             name: z.string(),
         }),

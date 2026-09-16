@@ -45,9 +45,10 @@ const k = new Kizuna({
     },
 });
 
-const routeDefinition = (path: `/${string}`) => ({
+const routeDefinition = <const Auth>(path: `/${string}`, auth: Auth) => ({
     method: 'GET' as const,
     path,
+    auth,
     responses: {
         200: z.object({
             ok: z.boolean(),
@@ -58,30 +59,22 @@ const routeDefinition = (path: `/${string}`) => ({
 const makeContract = () => {
     const routes = {
         items: k.routes({
-            listItems: routeDefinition('/items'),
-            getSecret: routeDefinition('/secret'),
-            ownerOnly: routeDefinition('/owner-only'),
-            adminOnly: routeDefinition('/admin-only'),
+            listItems: routeDefinition('/items', false),
+            getSecret: routeDefinition('/secret', 'user'),
+            ownerOnly: routeDefinition('/owner-only', {
+                identity: 'member',
+                requires: {
+                    workspace: ['delete'],
+                },
+            }),
+            adminOnly: routeDefinition('/admin-only', {
+                identity: 'member',
+                roles: 'admin',
+            }),
         }),
     };
     return k.contract({
         routes,
-        accessControl: {
-            items: {
-                '*': false,
-                getSecret: 'user',
-                ownerOnly: {
-                    auth: 'member',
-                    requires: {
-                        workspace: ['delete'],
-                    },
-                },
-                adminOnly: {
-                    auth: 'member',
-                    roles: 'admin',
-                },
-            },
-        },
     });
 };
 
@@ -398,17 +391,14 @@ describe('guard pipeline', () => {
             },
         });
         const docs = plain.routes({
-            listDocs: routeDefinition('/docs'),
+            listDocs: routeDefinition('/docs', {
+                identity: 'viewer',
+                roles: 'editor',
+            }),
         });
         const contract = plain.contract({
             routes: {
                 docs,
-            },
-            accessControl: {
-                docs: {
-                    auth: 'viewer',
-                    roles: 'editor',
-                },
             },
         });
         const { adapter, results } = makeAdapter();
@@ -483,7 +473,7 @@ describe('guard pipeline', () => {
 describe('resolveSecurityRequirements', () => {
     it('expands names and scoped entries', () => {
         const route = {
-            ...routeDefinition('/x'),
+            ...routeDefinition('/x', false),
             security: [
                 'user',
                 {
@@ -504,10 +494,10 @@ describe('resolveSecurityRequirements', () => {
     });
 
     it('returns nothing for a public or unsecured route', () => {
-        expect(resolveSecurityRequirements(routeDefinition('/x'))).toEqual([]);
+        expect(resolveSecurityRequirements(routeDefinition('/x', false))).toEqual([]);
         expect(
             resolveSecurityRequirements({
-                ...routeDefinition('/x'),
+                ...routeDefinition('/x', false),
                 security: [],
             } as RouteDefinition)
         ).toEqual([]);
@@ -629,6 +619,7 @@ describe('guard params and several roles', () => {
                 getWorkspaceUser: {
                     method: 'GET',
                     path: '/workspaces/:workspaceId/users/:id',
+                    auth: 'user',
                     responses: {
                         200: z.object({
                             ok: z.boolean(),
@@ -636,9 +627,6 @@ describe('guard params and several roles', () => {
                     },
                 },
             }),
-        },
-        accessControl: {
-            items: 'user',
         },
     });
 
@@ -708,6 +696,12 @@ describe('guard params and several roles', () => {
                 exportUsers: {
                     method: 'GET',
                     path: '/users/export',
+                    auth: {
+                        identity: 'member',
+                        requires: {
+                            user: ['export'],
+                        },
+                    },
                     responses: {
                         200: z.object({
                             ok: z.boolean(),
@@ -715,14 +709,6 @@ describe('guard params and several roles', () => {
                     },
                 },
             }),
-        },
-        accessControl: {
-            users: {
-                auth: 'member',
-                requires: {
-                    user: ['export'],
-                },
-            },
         },
     });
 
@@ -793,6 +779,7 @@ describe('custom identity guard', () => {
                 getInvite: {
                     method: 'GET',
                     path: '/invites/:token',
+                    auth: 'inviteToken',
                     responses: {
                         200: z.object({
                             ok: z.boolean(),
@@ -800,9 +787,6 @@ describe('custom identity guard', () => {
                     },
                 },
             }),
-        },
-        accessControl: {
-            invites: 'inviteToken',
         },
     });
 
@@ -904,20 +888,17 @@ describe('permissions within a role', () => {
     });
 
     const reports = granted.routes({
-        exportReport: routeDefinition('/reports/export'),
+        exportReport: routeDefinition('/reports/export', {
+            identity: 'analyst',
+            requires: {
+                report: ['export'],
+            },
+        }),
     });
 
     const contract = granted.contract({
         routes: {
             reports,
-        },
-        accessControl: {
-            reports: {
-                auth: 'analyst',
-                requires: {
-                    report: ['export'],
-                },
-            },
         },
     });
 
@@ -1027,29 +1008,23 @@ describe('OAuth tokens', () => {
     });
 
     const users = oauth.routes({
-        createUser: routeDefinition('/users'),
-        readReport: routeDefinition('/report'),
+        createUser: routeDefinition('/users', {
+            identity: 'partner',
+            requires: {
+                users: ['write'],
+            },
+        }),
+        readReport: routeDefinition('/report', {
+            identity: 'partner',
+            requires: {
+                report: ['read'],
+            },
+        }),
     });
 
     const contract = oauth.contract({
         routes: {
             users,
-        },
-        accessControl: {
-            users: {
-                '*': {
-                    auth: 'partner',
-                    requires: {
-                        users: ['write'],
-                    },
-                },
-                readReport: {
-                    auth: 'partner',
-                    requires: {
-                        report: ['read'],
-                    },
-                },
-            },
         },
     });
 

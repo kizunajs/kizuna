@@ -9,7 +9,7 @@ Authentication is still settling. `Kizuna.identity` may change before v2, so pin
 
 </BetaNotice>
 
-An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and optionally the `roles` its callers hold, which a route's entry in the [access control map](/docs/reference/k-access-control) is checked against. See [Authentication](/docs/authentication) and [Access Control](/docs/access-control) for the walkthroughs.
+An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing [guard](/docs/reference/server-guard) provides to handlers), and optionally the `roles` its callers hold, which a route's [`auth`](/docs/reference/k-route) is checked against. See [Authentication](/docs/authentication) and [Access Control](/docs/access-control) for the walkthroughs.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
@@ -149,26 +149,35 @@ export const k = new Kizuna({
 
 ## Securing routes
 
-Routes never mention identities directly. The contract's access control map assigns them per group (or per route via a `'*'` cascade), keyed by the names above:
+A route's `auth` names the identity it requires, keyed by the names above:
 
-```ts title="access-control.ts"
-export const accessControl = k.accessControl(routes, {
-    users: false,
-    health: false,
-    members: 'user',
-    workspace: {
-        '*': 'member',
-        deleteWorkspace: {
-            auth: 'member',
+```ts title="contract/routes/workspace.ts"
+export const workspaceRoutes = k.routes('workspace', {
+    getWorkspace: {
+        method: 'GET',
+        path: '/workspace',
+        auth: 'member',
+        responses: {
+            200: WorkspaceSchema,
+        },
+    },
+    deleteWorkspace: {
+        method: 'DELETE',
+        path: '/workspace',
+        auth: {
+            identity: 'member',
             requires: {
                 workspace: ['delete'],
             },
+        },
+        responses: {
+            204: z.void(),
         },
     },
 });
 ```
 
-See [`k.accessControl`](/docs/reference/k-access-control) for every value form. From there, each identity needs exactly one [guard](/docs/reference/server-guard), registered on [`server.api`](/docs/reference/server-api).
+See [`k.route`](/docs/reference/k-route) for every value form. From there, each identity needs exactly one [guard](/docs/reference/server-guard), registered on [`server.api`](/docs/reference/server-api).
 
 ## OpenAPI emission
 

@@ -211,6 +211,32 @@ export type RequiredPermissions = Record<string, readonly string[]>;
 export type RoutePath = `/${string}`;
 
 /**
+ * What a route requires of its caller: an identity name, several of them for
+ * either, `false` for a public route, or the object form narrowing to the roles
+ * it accepts or the permissions the caller has to hold.
+ *
+ * @example
+ * auth: 'member'
+ *
+ * @example
+ * auth: {
+ *     identity: 'member',
+ *     requires: {
+ *         workspace: ['delete'],
+ *     },
+ * }
+ */
+export type RouteAuth<Names extends string = string> =
+    | false
+    | Names
+    | readonly Names[]
+    | {
+          identity: Names | readonly Names[];
+          roles?: string | readonly string[];
+          requires?: RequiredPermissions;
+      };
+
+/**
  * Response headers keyed by name.
  */
 export type ResponseHeaders = Record<string, string>;
@@ -223,6 +249,10 @@ export type RouteHandlerFunction = (args: never) => unknown;
 
 export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {
     method: Method;
+    /**
+     * What this route requires of its caller. See {@link RouteAuth}.
+     */
+    auth?: RouteAuth<SchemeNames>;
     /**
      * Use `:paramName` for path parameters.
      *
@@ -402,20 +432,27 @@ export interface Routes<TagKeys extends string = string, SchemeNames extends str
 }
 
 /**
- * A route as authored in `k.routes`: the route shape minus `security`, `roles`
- * and `requires`, which the access control map owns and `k.contract` resolves.
- * Writing any of them on a route is a type error.
+ * A route as authored in `k.route` and `k.routes`: the route shape minus
+ * `security`, `roles` and `requires`, which `k.contract` resolves from its
+ * `auth`. Writing any of them on a route is a type error.
  */
-export type AuthoredRouteDefinition<TagKeys extends string = string> = Omit<RouteDefinition<TagKeys>, 'security' | 'roles' | 'requires'> & {
+export type AuthoredRouteDefinition<TagKeys extends string = string, Names extends string = string> = Omit<
+    RouteDefinition<TagKeys>,
+    'security' | 'roles' | 'requires' | 'auth'
+> & {
     security?: never;
     roles?: never;
     requires?: never;
+    /**
+     * What this route requires of its caller. See {@link RouteAuth}.
+     */
+    auth?: RouteAuth<Names>;
 };
 
 /**
  * A tree of {@link AuthoredRouteDefinition}s, the shape `k.routes` accepts.
  */
-export interface AuthoredRoutes<TagKeys extends string = string> {
+export interface AuthoredRoutes<TagKeys extends string = string, Names extends string = string> {
     [ROUTES_TAG]?: string;
-    [key: string]: AuthoredRouteDefinition<TagKeys> | AuthoredRoutes<TagKeys>;
+    [key: string]: AuthoredRouteDefinition<TagKeys, Names> | AuthoredRoutes<TagKeys, Names>;
 }

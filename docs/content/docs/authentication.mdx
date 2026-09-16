@@ -199,23 +199,28 @@ export const api = server.api({
 
 ## Say which routes need it
 
-Every group must appear in the map, so public is an explicit `false` and a forgotten route is a type error:
+Every route states its rule, so public is an explicit `false` and a forgotten route is a type error:
 
-```ts title="access-control.ts"
-export const accessControl = k.accessControl(routes, {
-    health: false,
-    users: 'user',
+```ts title="contract/routes/users.ts"
+export const usersRoutes = k.routes('users', {
+    listUsers: {
+        method: 'GET',
+        path: '/users',
+        auth: 'user',
+        responses: {
+            200: z.array(UserSchema),
+        },
+    },
 });
 ```
 
 ```ts title="contract/index.ts"
 export const contract = k.contract({
     routes,
-    accessControl,
 });
 ```
 
-The rest of what an entry can say is on [Access Control](/docs/access-control).
+The rest of what an `auth` can say is on [Access Control](/docs/access-control).
 
 </Step>
 

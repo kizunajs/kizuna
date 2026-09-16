@@ -239,6 +239,7 @@ const securedRoutes = securedK.routes({
     whoAmI: {
         method: 'GET',
         path: '/who-am-i',
+        auth: 'user',
         responses: {
             200: z.object({
                 userId: z.string(),
@@ -250,9 +251,6 @@ const securedRoutes = securedK.routes({
 const securedContract = securedK.contract({
     routes: {
         api: securedRoutes,
-    },
-    accessControl: {
-        api: 'user',
     },
 });
 

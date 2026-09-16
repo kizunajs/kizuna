@@ -9,7 +9,7 @@ Authentication is still settling. `server.guard` may change before v2, so pin yo
 
 </BetaNotice>
 
-`server.guard(identity, run)` implements one [identity](/docs/reference/kizuna-identity): it turns the extracted credential into the typed context handlers receive, or denies the request. The [access control map](/docs/reference/k-access-control) decides which routes it protects.
+`server.guard(identity, run)` implements one [identity](/docs/reference/kizuna-identity): it turns the extracted credential into the typed context handlers receive, or denies the request. Each route's [`auth`](/docs/reference/k-route) decides which routes it protects.
 
 ```ts title="guards.ts"
 import { server } from './server';

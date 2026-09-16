@@ -1,15 +1,5 @@
 import type { z } from 'zod';
-import type {
-    Contract,
-    RoutesOf,
-    SchemesOf,
-    AccessControlOf,
-    RequestContextOf,
-    ContractPluginsOf,
-    JobsOf,
-    ToolsOf,
-    GuardSchemaOf,
-} from './contract.js';
+import type { Contract, RoutesOf, SchemesOf, RequestContextOf, ContractPluginsOf, JobsOf, ToolsOf, GuardSchemaOf } from './contract.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { CredentialOf } from './identity.js';
@@ -23,7 +13,7 @@ import type { GuardBody } from './problem-details.js';
 import type {
     GuardReturn,
     GuardSuccess,
-    HandlersFromAccessControl,
+    HandlersFromRoutes,
     GuardParams,
     RequestContextValues,
     Router as CoreRouter,
@@ -49,15 +39,14 @@ import {
  * identity's name.
  */
 export type ContractRouter<C, HandlerContext> = C extends Contract
-    ? HandlersFromAccessControl<
+    ? HandlersFromRoutes<
           RoutesOf<C>,
           HandlerContext &
               RequestContextValues<RequestContextOf<C>> &
               PluginArgs<ContractPluginsOf<C>> &
               JobsArg<JobsOf<C>> &
               ToolsArg<ToolsOf<C>>,
-          SchemesOf<C>,
-          AccessControlOf<C>
+          SchemesOf<C>
       >
     : C extends Routes
       ? CoreRouter<C, HandlerContext>
@@ -153,13 +142,7 @@ export interface Server<C extends Contract, HandlerContext, Api> {
      */
     guard<const Name extends Extract<keyof SchemesOf<C>, string>>(
         name: Name,
-        run: GuardFnsFor<
-            SchemesOf<C>,
-            GuardParams<RoutesOf<C>, AccessControlOf<C>, Name>,
-            HandlerContext,
-            RequestContextOf<C>,
-            GuardSchemaOf<C>
-        >[Name]
+        run: GuardFnsFor<SchemesOf<C>, GuardParams<RoutesOf<C>, Name>, HandlerContext, RequestContextOf<C>, GuardSchemaOf<C>>[Name]
     ): GuardRun<HandlerContext>;
     /**
      * Define a request context resolver declared on the contract. It runs on

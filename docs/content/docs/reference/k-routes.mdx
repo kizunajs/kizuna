@@ -68,7 +68,7 @@ export const usersRoutes = k.routes('users', {
 
 Use the `{ body, headers?, contentType?, cache?, etag? }` form of a response to declare [typed response headers](/docs/building/contract#response-schemas), a [binary body](/docs/reference/binary-and-file-schemas), or a [cache policy and entity tag](/docs/caching). Use `{ stream, headers?, contentType? }` to send the response piece by piece, see [Streaming](/docs/streaming).
 
-A route's `security` comes from the contract's [access control map](/docs/reference/k-access-control); writing it here is a type error.
+A route's `security` is resolved from its [`auth`](/docs/reference/k-route); writing it here is a type error.
 
 ## Validation
 

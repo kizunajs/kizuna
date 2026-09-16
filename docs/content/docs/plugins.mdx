@@ -13,11 +13,9 @@ A plugin ships as two modules. The declaration goes on `k.contract`:
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { k } from './k';
 import { routes } from './routes';
-import { accessControl } from './access-control';
 
 export const contract = k.contract({
     routes,
-    accessControl,
     plugins: {
         mcp: mcpPlugin({
             name: 'My API',
@@ -90,7 +88,6 @@ Some plugins take config keyed by route: which routes to expose, which to rate-l
 ```ts title="contract.ts"
 export const contract = k.contract({
     routes,
-    accessControl,
     plugins: ({ routes }) => ({
         audit: auditPlugin(routes, {
             skip: {

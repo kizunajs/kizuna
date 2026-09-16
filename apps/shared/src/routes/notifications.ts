@@ -62,6 +62,7 @@ export const notificationsRoutes = k.routes('notifications', {
     sendNotification: {
         method: 'POST',
         path: '/notifications',
+        auth: false,
         tags: ['notifications', 'health'],
         body: NotificationEvent,
         responses: {
@@ -74,6 +75,7 @@ export const notificationsRoutes = k.routes('notifications', {
     listEvents: {
         method: 'GET',
         path: '/events',
+        auth: false,
         query: z.object({
             since: z.date().optional().meta({
                 description: 'Lower bound for occurredAt, wire format is ISO-8601',
@@ -114,6 +116,7 @@ export const notificationsRoutes = k.routes('notifications', {
     validateConfig: {
         method: 'POST',
         path: '/contract/validate',
+        auth: false,
         body: z.object({
             default: z.string(),
             interval: z.int(),
@@ -134,6 +137,7 @@ export const notificationsRoutes = k.routes('notifications', {
     webhook: {
         method: 'POST',
         path: '/webhook',
+        auth: false,
         body: z.any(),
         responses: {
             200: z.object({

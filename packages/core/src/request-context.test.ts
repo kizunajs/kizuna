@@ -28,6 +28,7 @@ const contract = k.contract({
             publicRoute: {
                 method: 'GET',
                 path: '/public',
+                auth: false,
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -37,6 +38,7 @@ const contract = k.contract({
             whoAmI: {
                 method: 'GET',
                 path: '/users/:id',
+                auth: 'user',
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -44,12 +46,6 @@ const contract = k.contract({
                 },
             },
         }),
-    },
-    accessControl: {
-        api: {
-            '*': false,
-            whoAmI: 'user',
-        },
     },
 });
 

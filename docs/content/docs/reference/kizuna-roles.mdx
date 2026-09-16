@@ -17,7 +17,7 @@ import { Kizuna } from '@ts-kizuna/core';
 export const roles = Kizuna.roles(['member', 'admin', 'owner']);
 ```
 
-Put them on the identity whose callers hold them, under `roles`. Its guard returns `role`, one name or an array of them, and a route's `roles` in the [access control map](/docs/reference/k-access-control) is checked against it before the handler runs.
+Put them on the identity whose callers hold them, under `roles`. Its guard returns `role`, one name or an array of them, and a route's `roles` in its [`auth`](/docs/reference/k-route) is checked against it before the handler runs.
 
 | Property       | Description                                                            |
 | -------------- | ---------------------------------------------------------------------- |

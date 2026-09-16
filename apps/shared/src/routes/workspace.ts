@@ -7,6 +7,7 @@ const workspaceMembers = k.routes('members', {
     listMembers: {
         method: 'GET',
         path: '/workspace/members',
+        auth: 'user',
         responses: {
             200: z.object({
                 members: z.array(UserSchema),
@@ -17,6 +18,12 @@ const workspaceMembers = k.routes('members', {
     inviteMember: {
         method: 'POST',
         path: '/workspace/members',
+        auth: {
+            identity: ['user', 'member'],
+            requires: {
+                invite: ['send'],
+            },
+        },
         body: z.object({
             email: z.email(),
         }),
@@ -29,6 +36,12 @@ const workspaceMembers = k.routes('members', {
     cancelInvite: {
         method: 'DELETE',
         path: '/workspace/invites/:inviteId',
+        auth: {
+            identity: ['user', 'member'],
+            requires: {
+                invite: ['cancel'],
+            },
+        },
         responses: {
             200: z.object({
                 cancelled: z.boolean(),
@@ -43,6 +56,12 @@ const workspaceInfo = k.routes('workspace', {
     getWorkspace: {
         method: 'GET',
         path: '/workspace',
+        auth: {
+            identity: 'member',
+            requires: {
+                workspace: ['read'],
+            },
+        },
         responses: {
             200: z.object({
                 id: z.string(),
@@ -54,6 +73,12 @@ const workspaceInfo = k.routes('workspace', {
     deleteWorkspace: {
         method: 'DELETE',
         path: '/workspace',
+        auth: {
+            identity: 'member',
+            requires: {
+                workspace: ['delete'],
+            },
+        },
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -64,6 +89,12 @@ const workspaceInfo = k.routes('workspace', {
     transfer: {
         method: 'POST',
         path: '/workspace/transfer',
+        auth: {
+            identity: 'member',
+            requires: {
+                workspace: ['transfer'],
+            },
+        },
         body: z.object({
             toUserId: z.string(),
         }),

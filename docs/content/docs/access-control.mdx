@@ -5,7 +5,7 @@ description: Declare the roles callers hold and say who may call each route. kiz
 
 <AlphaNotice>
 
-The least settled part of kizuna. `Kizuna.roles`, `Kizuna.permissions` and `k.accessControl` may change shape, move out of the contract, or be removed before v2. Pin your version, and expect to rewrite what you build on them.
+The least settled part of kizuna. `Kizuna.roles` and `Kizuna.permissions` may change shape or be removed before v2. Pin your version, and expect to rewrite what you build on them.
 
 </AlphaNotice>
 
@@ -13,9 +13,9 @@ The least settled part of kizuna. `Kizuna.roles`, `Kizuna.permissions` and `k.ac
 
 There are three levels, and each one adds to the one before it:
 
-| Level                  | The map says                        | Enough when                                        |
+| Level                  | The route says                      | Enough when                                        |
 | ---------------------- | ----------------------------------- | -------------------------------------------------- |
-| Identity only          | `'member'`                          | Logged in is the whole question.                   |
+| Identity only          | `auth: 'member'`                    | Logged in is the whole question.                   |
 | Roles                  | `roles: 'owner'`                    | Some routes are for some kinds of member.          |
 | Roles with permissions | `requires: { project: ['delete'] }` | What a role may do changes, or differs per member. |
 
@@ -129,17 +129,30 @@ That adds `role` to what the guard returns and what handlers receive, typed as `
 
 ## Say who may call each route
 
-Every group must appear in the map, so public is an explicit `false`.
+Every route carries its own `auth`, so a route cannot be added without stating its rule, and public is an explicit `false`.
 
 <AccessStyle value="identity">
 
 A route names the identity it accepts:
 
-```ts title="contract/access-control.ts"
-export const accessControl = k.accessControl(routes, {
-    health: false,
-    projects: 'member',
-    invites: 'member',
+```ts title="contract/routes/projects.ts"
+export const projectRoutes = k.routes('projects', {
+    listProjects: {
+        method: 'GET',
+        path: '/projects',
+        auth: 'member',
+        responses: {
+            200: z.array(ProjectSchema),
+        },
+    },
+    deleteProject: {
+        method: 'DELETE',
+        path: '/projects/:id',
+        auth: 'member',
+        responses: {
+            204: z.void(),
+        },
+    },
 });
 ```
 
@@ -149,24 +162,25 @@ export const accessControl = k.accessControl(routes, {
 
 A route names the identity, and the roles it accepts:
 
-```ts title="contract/access-control.ts"
-export const accessControl = k.accessControl(routes, {
-    health: false,
-    projects: {
-        '*': 'member',
-        createProject: {
-            auth: 'member',
-            roles: ['admin', 'owner'],
-        },
-        deleteProject: {
-            auth: 'member',
-            roles: 'owner',
+```ts title="contract/routes/projects.ts"
+export const projectRoutes = k.routes('projects', {
+    listProjects: {
+        method: 'GET',
+        path: '/projects',
+        auth: 'member',
+        responses: {
+            200: z.array(ProjectSchema),
         },
     },
-    invites: {
-        cancelInvite: {
-            auth: 'member',
-            roles: ['admin', 'owner'],
+    deleteProject: {
+        method: 'DELETE',
+        path: '/projects/:id',
+        auth: {
+            identity: 'member',
+            roles: 'owner',
+        },
+        responses: {
+            204: z.void(),
         },
     },
 });
@@ -178,35 +192,32 @@ export const accessControl = k.accessControl(routes, {
 
 A route names the identity, and the permission it requires. Who may call it follows from what each role holds:
 
-```ts title="contract/access-control.ts"
-export const accessControl = k.accessControl(routes, {
-    health: false,
-    projects: {
-        '*': {
-            auth: 'member',
+```ts title="contract/routes/projects.ts"
+export const projectRoutes = k.routes('projects', {
+    listProjects: {
+        method: 'GET',
+        path: '/projects',
+        auth: {
+            identity: 'member',
             requires: {
                 project: ['read'],
             },
         },
-        createProject: {
-            auth: 'member',
-            requires: {
-                project: ['create'],
-            },
+        responses: {
+            200: z.array(ProjectSchema),
         },
-        deleteProject: {
-            auth: 'member',
+    },
+    deleteProject: {
+        method: 'DELETE',
+        path: '/projects/:id',
+        auth: {
+            identity: 'member',
             requires: {
                 project: ['delete'],
             },
         },
-    },
-    invites: {
-        cancelInvite: {
-            auth: 'member',
-            requires: {
-                invite: ['cancel'],
-            },
+        responses: {
+            204: z.void(),
         },
     },
 });
@@ -216,10 +227,20 @@ Members read, admins create projects and cancel invites, and only the owner dele
 
 </AccessStyle>
 
-```ts title="contract/index.ts"
-export const contract = k.contract({
-    routes,
-    accessControl,
+A public route says so:
+
+```ts title="contract/routes/health.ts"
+export const healthRoutes = k.routes('health', {
+    getHealth: {
+        method: 'GET',
+        path: '/health',
+        auth: false,
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    },
 });
 ```
 
@@ -325,16 +346,16 @@ A caller with several roles returns them as an array, and holds all of them.
 
 </Steps>
 
-## What an entry can say
+## What an auth can say
 
-| Entry                         | Meaning                                            |
-| ----------------------------- | -------------------------------------------------- |
-| `false`                       | Public                                             |
-| `'member'`                    | Requires the `member` identity, any role           |
-| `{ auth, roles?, requires? }` | The same, narrowed                                 |
-| `{ '*': ..., login: false }`  | `'*'` is the group default, named keys override it |
+| Value                             | Meaning                                  |
+| --------------------------------- | ---------------------------------------- |
+| `false`                           | Public                                   |
+| `'member'`                        | Requires the `member` identity, any role |
+| `['user', 'member']`              | Either identity                          |
+| `{ identity, roles?, requires? }` | The same, narrowed                       |
 
-`'member'` is shorthand for `{ auth: 'member' }`. `roles` checks who the caller is and `requires` checks what they hold, so a route with only `roles` does not look at permissions. A subgroup key covers its whole subtree, and can nest its own `'*'`. A key matching nothing in the group is an error.
+`'member'` is shorthand for `{ identity: 'member' }`. `roles` checks who the caller is and `requires` checks what they hold, so a route with only `roles` does not look at permissions.
 
 ## Permissions
 
@@ -519,6 +540,6 @@ paths:
 
 - [`Kizuna.roles`](/docs/reference/kizuna-roles)
 - [`Kizuna.permissions`](/docs/reference/kizuna-permissions)
-- [`k.accessControl`](/docs/reference/k-access-control)
+- [`k.route`](/docs/reference/k-route)
 - [`server.api`](/docs/reference/server-api)
 - [Authentication](/docs/authentication)

@@ -21,6 +21,7 @@ const routes = k.routes({
     listUsers: {
         method: 'GET',
         path: '/users',
+        auth: false,
         responses: {
             200: z.array(z.string()),
         },
@@ -28,6 +29,7 @@ const routes = k.routes({
     createUser: {
         method: 'POST',
         path: '/users',
+        auth: false,
         body: z.object({
             name: z.string(),
         }),
@@ -62,10 +64,6 @@ const jobs = k.jobs('scheduler', {
 const contract = k.contract({
     routes,
     jobs,
-    accessControl: {
-        listUsers: false,
-        createUser: false,
-    },
 });
 
 const server = new KizunaServer(contract);

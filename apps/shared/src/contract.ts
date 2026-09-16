@@ -4,13 +4,11 @@ import { k } from './k';
 import { routes } from './routes/index';
 import { jobs } from './jobs';
 import { tools } from './tools';
-import { accessControl } from './access-control';
 
 export const contract = k.contract({
     routes,
     jobs,
     tools,
-    accessControl,
     plugins: ({ routes, tools }) => ({
         mcp: mcpPlugin({
             name: 'ts-kizuna demo',

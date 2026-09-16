@@ -439,6 +439,7 @@ describe('Kotlin generator: nested sub-client routing', () => {
                     check: {
                         method: 'GET',
                         path: '/health',
+                        auth: false,
                         responses: {
                             200: z.object({ ok: z.boolean() }),
                         },
@@ -2013,6 +2014,7 @@ describe('Kotlin generator: the statuses the auth map adds', () => {
                 getSecret: {
                     method: 'GET',
                     path: '/secret',
+                    auth: 'user',
                     responses: {
                         200: z.object({
                             value: z.string(),
@@ -2022,16 +2024,13 @@ describe('Kotlin generator: the statuses the auth map adds', () => {
                 health: {
                     method: 'GET',
                     path: '/health',
+                    auth: false,
                     responses: {
                         200: z.object({
                             ok: z.boolean(),
                         }),
                     },
                 },
-            },
-            accessControl: {
-                getSecret: 'user',
-                health: false,
             },
         });
 

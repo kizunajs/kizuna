@@ -557,14 +557,13 @@ export const boundJobKeys = (meta: JobsMeta | undefined): Set<string> => {
 export type { FlattenedRoute, RouteHandler, Router, RawInputs, ValidationFailure, ValidationStage } from './handler-pipeline.js';
 export { allowedMethodsForPath, flattenRoutes, formatValidationError, isRouteDefinition, validateRequest } from './handler-pipeline.js';
 export type {
-    HandlersFromAccessControl,
+    HandlersFromRoutes,
     GuardParams,
     GuardedParamNames,
     RequestContextValues,
     RoutesWithHandlerContext,
     BrandedHandlerContext,
-    RouteAccessControlValue,
-    ContextFromAccessControlValue,
+    ContextFromAuth,
 } from './handler-pipeline.js';
 export { buildPath, parsePath, type PathSegment } from './path-params.js';
 export { sortFlattenedRoutes } from './route-matcher.js';

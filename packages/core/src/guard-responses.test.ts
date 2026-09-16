@@ -31,31 +31,36 @@ const okResponse = () => ({
     }),
 });
 
-const makeRoutes = () =>
+const makeRoutes = (listUsers: 'user' | false = 'user') =>
     k.routes({
         listUsers: {
             method: 'GET',
             path: '/users',
+            auth: listUsers,
             responses: okResponse(),
         },
         health: {
             method: 'GET',
             path: '/health',
+            auth: false,
             responses: okResponse(),
         },
         both: {
             method: 'GET',
             path: '/both',
+            auth: ['user', 'member'],
             responses: okResponse(),
         },
         byKey: {
             method: 'GET',
             path: '/by-key',
+            auth: 'member',
             responses: okResponse(),
         },
         declaresIts403: {
             method: 'GET',
             path: '/declares-its-403',
+            auth: 'user',
             responses: {
                 ...okResponse(),
                 403: ProblemDetailsSchema.extend({
@@ -67,22 +72,10 @@ const makeRoutes = () =>
 
 type DemoRoutes = ReturnType<typeof makeRoutes>;
 
-const contractFor = (routes: DemoRoutes, listUsers: 'user' | false = 'user') =>
+const contractFor = (routes: DemoRoutes) =>
     k.contract({
         routes: {
             api: routes,
-        },
-        accessControl: {
-            api: {
-                '*': false,
-                listUsers,
-                health: false,
-                both: {
-                    auth: ['user', 'member'],
-                },
-                byKey: 'member',
-                declaresIts403: 'user',
-            },
         },
     });
 
@@ -122,15 +115,13 @@ describe('injectGuardResponses', () => {
                         listUsers: {
                             method: 'GET',
                             path: '/users',
+                            auth: 'user',
                             responses: {
                                 ...okResponse(),
                                 401: ProblemDetailsSchema,
                             },
                         },
                     }),
-                },
-                accessControl: {
-                    api: 'user',
                 },
             });
 
@@ -193,7 +184,8 @@ describe('injectGuardResponses', () => {
     it('takes its own injection back when the same routes go public in a second contract', () => {
         const routes = makeRoutes();
         contractFor(routes);
-        const route = routeOf(contractFor(routes, false), 'listUsers');
+        (routes.listUsers as { auth: unknown }).auth = false;
+        const route = routeOf(contractFor(routes), 'listUsers');
 
         expect(Object.keys(route.responses)).toEqual(['200']);
     });
@@ -206,21 +198,16 @@ describe('injectGuardResponses', () => {
                     guarded: {
                         method: 'GET',
                         path: '/guarded',
+                        auth: 'user',
                         responses: shared,
                     },
                     open: {
                         method: 'GET',
                         path: '/open',
+                        auth: false,
                         responses: shared,
                     },
                 }),
-            },
-            accessControl: {
-                api: {
-                    '*': false,
-                    guarded: 'user',
-                    open: false,
-                },
             },
         });
         const routes = contract.routes.api as Record<string, RouteDefinition>;
@@ -253,12 +240,10 @@ describe('a contract that declares a guardSchema', () => {
                     listUsers: {
                         method: 'GET',
                         path: '/users',
+                        auth: 'user',
                         responses: okResponse(),
                     },
                 }),
-            },
-            accessControl: {
-                api: 'user',
             },
         });
 

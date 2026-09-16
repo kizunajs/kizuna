@@ -70,17 +70,22 @@ For an OpenID Connect server, `Kizuna.identity.openIdConnect({ openIdConnectUrl,
 
 ## Secure the routes
 
-The [access control map](/docs/access-control) names what a route requires, as for any identity:
+A route names what it requires, as for any identity:
 
-```ts title="contract/access-control.ts"
-export const accessControl = k.accessControl(routes, {
-    users: {
-        '*': 'user',
-        createUser: {
-            auth: 'user',
+```ts title="contract/routes/users.ts"
+export const usersRoutes = k.routes('users', {
+    createUser: {
+        method: 'POST',
+        path: '/users',
+        auth: {
+            identity: 'user',
             requires: {
                 users: ['write'],
             },
+        },
+        body: CreateUserSchema,
+        responses: {
+            201: UserSchema,
         },
     },
 });

@@ -99,6 +99,7 @@ export const usersRoutes = k.routes('users', {
     listUsers: {
         method: 'GET',
         path: '/users',
+        auth: false,
         query: PaginationQuery,
         responses: {
             200: {
@@ -118,6 +119,7 @@ export const usersRoutes = k.routes('users', {
     exportUsers: {
         method: 'GET',
         path: '/users/export',
+        auth: false,
         responses: {
             200: {
                 body: z.string(),
@@ -129,6 +131,7 @@ export const usersRoutes = k.routes('users', {
     userBadge: {
         method: 'GET',
         path: '/users/:id/badge',
+        auth: false,
         responses: {
             200: {
                 body: BinarySchema,
@@ -146,6 +149,7 @@ export const usersRoutes = k.routes('users', {
     lastSessionEvent: {
         method: 'GET',
         path: '/users/:id/last-session-event',
+        auth: false,
         responses: {
             200: UserSessionEvent,
             404: ProblemDetailsSchema,
@@ -155,6 +159,7 @@ export const usersRoutes = k.routes('users', {
     searchUsers: {
         method: 'GET',
         path: '/users/search',
+        auth: false,
         query: z.object({
             q: z.string(),
             limit: z.number().int().min(1).max(100),
@@ -171,6 +176,7 @@ export const usersRoutes = k.routes('users', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
+        auth: false,
         headers: z.object({
             'x-request-id': z.string(),
         }),
@@ -188,6 +194,7 @@ export const usersRoutes = k.routes('users', {
     userActivity: {
         method: 'GET',
         path: '/users/:id/activity/:year',
+        auth: false,
         pathParams: z.object({
             id: z.string(),
             year: z.int().min(2000).max(2100),
@@ -218,6 +225,7 @@ export const usersRoutes = k.routes('users', {
     userProfile: {
         method: 'GET',
         path: '/users/:id/profile',
+        auth: false,
         responses: {
             200: {
                 body: UserSchema,
@@ -234,6 +242,7 @@ export const usersRoutes = k.routes('users', {
     createUser: {
         method: 'POST',
         path: '/users',
+        auth: false,
         body: CreateUserSchema,
         responses: {
             201: UserSchema,
@@ -244,6 +253,7 @@ export const usersRoutes = k.routes('users', {
     deleteUser: {
         method: 'DELETE',
         path: '/users/:id',
+        auth: false,
         deprecated: {
             message: 'use `archiveUser` instead',
             date: '2026-03-01',
@@ -261,6 +271,7 @@ export const usersRoutes = k.routes('users', {
     archiveUser: {
         method: 'POST',
         path: '/users/:id/archive',
+        auth: false,
         responses: {
             200: z.object({
                 alreadyArchived: z.literal(true),
@@ -276,6 +287,7 @@ export const usersRoutes = k.routes('users', {
     uploadAvatar: {
         method: 'POST',
         path: '/avatar',
+        auth: false,
         contentType: 'multipart/form-data',
         body: z.object({
             file: z.instanceof(File),
@@ -292,6 +304,7 @@ export const usersRoutes = k.routes('users', {
     pingUser: {
         method: 'POST',
         path: '/users/:id/ping',
+        auth: false,
         body: z.void(),
         responses: {
             204: z.void(),
@@ -301,6 +314,7 @@ export const usersRoutes = k.routes('users', {
     getMyWork: {
         method: 'GET',
         path: '/work',
+        auth: false,
         responses: {
             200: z.object({
                 items: z.array(z.string()),
@@ -314,6 +328,7 @@ export const usersRoutes = k.routes('users', {
     checkUser: {
         method: 'HEAD',
         path: '/users/:id/check',
+        auth: false,
         responses: {
             200: z.object({
                 exists: z.boolean(),
@@ -325,6 +340,7 @@ export const usersRoutes = k.routes('users', {
     describeUsers: {
         method: 'OPTIONS',
         path: '/users/describe',
+        auth: false,
         responses: {
             200: z.object({
                 allow: z.string(),

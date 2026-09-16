@@ -7,6 +7,7 @@ export const assistantRoutes = k.routes('assistant', {
     reply: {
         method: 'POST',
         path: '/assistant/reply',
+        auth: false,
         body: z.object({
             prompt: z.string().min(1),
         }),

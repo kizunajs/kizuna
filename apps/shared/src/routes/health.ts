@@ -5,6 +5,7 @@ export const healthRoutes = k.routes('health', {
     check: {
         method: 'GET',
         path: '/health',
+        auth: false,
         responses: {
             200: {
                 body: z.object({ ok: z.boolean() }),
@@ -16,6 +17,7 @@ export const healthRoutes = k.routes('health', {
     version: {
         method: 'GET',
         path: '/health/version',
+        auth: false,
         responses: {
             200: z.object({ version: z.string() }),
         },
@@ -24,6 +26,7 @@ export const healthRoutes = k.routes('health', {
     history: {
         method: 'GET',
         path: '/health/history',
+        auth: false,
         responses: {
             200: z.array(z.object({ ok: z.boolean(), checkedAt: z.iso.datetime() })),
         },

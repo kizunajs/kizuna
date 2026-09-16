@@ -17,7 +17,6 @@ export interface Contract<
     Tags extends Record<string, TagOptions> = Record<string, TagOptions>,
     Codes extends string = string,
     Schemes extends Record<string, SecurityScheme> = Record<string, SecurityScheme>,
-    AccessControl = unknown,
     RequestContext extends Record<string, RequestContextSchema> = Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins = ContractPlugins,
     Jobs_ extends Jobs = Jobs,
@@ -54,19 +53,13 @@ export interface Contract<
      */
     tools?: Tools_;
     /**
-     * The access control map passed to `k.contract`, keyed by route group. Carried on
-     * the contract so the adapters can resolve each route's required identities
-     * and permissions into the handler's scheme-keyed context.
-     */
-    accessControl?: AccessControl;
-    /**
      * The tag set declared with `Kizuna.tags`. Routes reference its keys; the
      * OpenAPI generator resolves each key to its title and description.
      */
     tags?: TagSet<Tags>;
     /**
-     * The identities passed to `new Kizuna()`. The access control map references
-     * them by name, `k.contract` writes each route's `security` from it, and the
+     * The identities passed to `new Kizuna()`. A route's `auth` names them,
+     * `k.contract` writes each route's `security` from it, and the
      * OpenAPI generator emits them under `components.securitySchemes`.
      */
     securitySchemes?: Schemes;
@@ -100,7 +93,6 @@ export function assembleContract<
         Extract<keyof Tags, string>,
         Extract<keyof Schemes, string>
     >,
-    const AccessControl = unknown,
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
     const Plugins extends ContractPlugins = Record<string, never>,
     const Jobs_ extends Jobs = Record<string, never>,
@@ -112,7 +104,6 @@ export function assembleContract<
     jobs?: Jobs_;
     jobsConfig?: JobsConfig;
     tools?: Tools_;
-    accessControl?: AccessControl;
     tags?: TagSet<Tags>;
     securitySchemes?: Schemes;
     requestContext?: RequestContext;
@@ -120,7 +111,7 @@ export function assembleContract<
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): Contract<R, Tags, Codes, Schemes, AccessControl, RequestContext, Plugins, Jobs_, Tools_, GuardSchema> {
+}): Contract<R, Tags, Codes, Schemes, RequestContext, Plugins, Jobs_, Tools_, GuardSchema> {
     return {
         routes: config.routes,
         guardSchema: config.guardSchema,
@@ -128,7 +119,6 @@ export function assembleContract<
         jobs: config.jobs,
         jobsConfig: config.jobsConfig,
         tools: config.tools,
-        accessControl: config.accessControl,
         tags: config.tags,
         securitySchemes: config.securitySchemes,
         requestContext: config.requestContext,
@@ -145,11 +135,6 @@ export type RoutesOf<C extends Contract> = C['routes'];
  * A contract's identities, or an empty map when it declares none.
  */
 export type SchemesOf<C extends Contract> = Exclude<C['securitySchemes'], undefined>;
-
-/**
- * The access control map a contract was built with.
- */
-export type AccessControlOf<C extends Contract> = Exclude<C['accessControl'], undefined>;
 
 /**
  * A contract's request context schemas, or an empty map when it declares none.

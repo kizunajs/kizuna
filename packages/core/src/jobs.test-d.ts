@@ -91,15 +91,13 @@ const contract = k.contract({
         listUsers: {
             method: 'GET',
             path: '/users',
+            auth: false,
             responses: {
                 200: z.array(z.string()),
             },
         },
     }),
     jobs,
-    accessControl: {
-        listUsers: false,
-    },
 });
 
 type ContractJobs = NonNullable<(typeof contract)['jobs']>;

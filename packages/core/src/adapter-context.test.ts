@@ -28,6 +28,7 @@ const contract = k.contract({
         everything: {
             method: 'POST',
             path: '/everything/:id',
+            auth: 'user',
             query: z.object({
                 page: z.number(),
             }),
@@ -41,9 +42,6 @@ const contract = k.contract({
             },
         },
     }),
-    accessControl: {
-        everything: 'user',
-    },
 });
 
 /**

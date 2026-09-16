@@ -7,20 +7,10 @@ export {
     type KizunaSpec,
     type TagNamesOf,
     type IdentityNamesOf,
-    type AccessControlMap,
-    type GroupAccessControl,
-    type AccessControlValue,
-    type AccessControlRule,
+    type RouteAuthValue,
+    type RouteAuthRule,
 } from './kizuna.js';
-export {
-    type Contract,
-    type RoutesOf,
-    type SchemesOf,
-    type AccessControlOf,
-    type RequestContextOf,
-    type ContractPluginsOf,
-    type JobsOf,
-} from './contract.js';
+export { type Contract, type RoutesOf, type SchemesOf, type RequestContextOf, type ContractPluginsOf, type JobsOf } from './contract.js';
 export {
     createPlugin,
     type PluginDeclaration,
@@ -245,6 +235,7 @@ export {
     type SecurityRequirement,
     type SchemeNameOf,
     type RequiredPermissions,
+    type RouteAuth,
     type RouteDefinition,
     type RouteHandlerFunction,
     type RoutePath,
@@ -253,6 +244,7 @@ export {
     type AuthoredRoutes,
 } from './types.js';
 export { type ExtractPathParams, type PathParamName, type HasPathParams } from './path-params.js';
+export { type AuthCheck, type RouteAuthCheck } from './auth-check.js';
 export { type RouteBuilder, type RouteWithHandler } from './route.js';
 export {
     type HandlerArgs,

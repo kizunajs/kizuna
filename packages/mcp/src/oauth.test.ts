@@ -114,6 +114,7 @@ const apiRoutes = k.routes('api', {
     getUser: {
         method: 'GET',
         path: '/users/:id',
+        auth: 'user',
         summary: 'Get a user by id',
         responses: {
             200: z.object({
@@ -124,6 +125,12 @@ const apiRoutes = k.routes('api', {
     },
     createUser: {
         method: 'POST',
+        auth: {
+            identity: 'user',
+            requires: {
+                users: ['write'],
+            },
+        },
         path: '/users',
         summary: 'Create a user',
         body: z.object({
@@ -137,6 +144,12 @@ const apiRoutes = k.routes('api', {
     },
     adminReport: {
         method: 'GET',
+        auth: {
+            identity: 'user',
+            requires: {
+                report: ['read'],
+            },
+        },
         path: '/report',
         summary: 'Admin report',
         responses: {
@@ -148,6 +161,7 @@ const apiRoutes = k.routes('api', {
     memberFacts: {
         method: 'GET',
         path: '/member-facts',
+        auth: 'member',
         summary: 'Facts for the workspace service',
         responses: {
             200: z.object({
@@ -160,24 +174,6 @@ const apiRoutes = k.routes('api', {
 const contract = k.contract({
     routes: {
         api: apiRoutes,
-    },
-    accessControl: {
-        api: {
-            '*': 'user',
-            createUser: {
-                auth: 'user',
-                requires: {
-                    users: ['write'],
-                },
-            },
-            adminReport: {
-                auth: 'user',
-                requires: {
-                    report: ['read'],
-                },
-            },
-            memberFacts: 'member',
-        },
     },
     plugins: {
         mcp: mcpPlugin({
@@ -535,9 +531,6 @@ describe('mcpPlugin: oauth declaration', () => {
         const brokenContract = k.contract({
             routes: {
                 api: apiRoutes,
-            },
-            accessControl: {
-                api: 'user',
             },
             plugins: {
                 mcp: mcpPlugin({

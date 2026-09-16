@@ -235,6 +235,7 @@ export const securedRoutes = securedK.routes({
     publicRoute: {
         method: 'GET',
         path: '/public',
+        auth: false,
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -244,6 +245,7 @@ export const securedRoutes = securedK.routes({
     whoAmI: {
         method: 'GET',
         path: '/who-am-i',
+        auth: 'user',
         responses: {
             200: z.object({
                 userId: z.string(),
@@ -253,6 +255,12 @@ export const securedRoutes = securedK.routes({
     ownerOnly: {
         method: 'GET',
         path: '/owner-only',
+        auth: {
+            identity: 'member',
+            requires: {
+                workspace: ['delete'],
+            },
+        },
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -262,6 +270,10 @@ export const securedRoutes = securedK.routes({
     adminOnly: {
         method: 'GET',
         path: '/admin-only',
+        auth: {
+            identity: 'member',
+            roles: 'admin',
+        },
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -271,6 +283,7 @@ export const securedRoutes = securedK.routes({
     both: {
         method: 'GET',
         path: '/both',
+        auth: ['user', 'member'],
         responses: {
             200: z.object({
                 userId: z.string(),
@@ -283,25 +296,6 @@ export const securedRoutes = securedK.routes({
 export const securedContract = securedK.contract({
     routes: {
         api: securedRoutes,
-    },
-    accessControl: {
-        api: {
-            '*': false,
-            whoAmI: 'user',
-            ownerOnly: {
-                auth: 'member',
-                requires: {
-                    workspace: ['delete'],
-                },
-            },
-            adminOnly: {
-                auth: 'member',
-                roles: 'admin',
-            },
-            both: {
-                auth: ['user', 'member'],
-            },
-        },
     },
 });
 
@@ -347,8 +341,7 @@ export const securedGuards = {
 };
 
 /**
- * Typed through `HandlersFromAccessControl` rather than `Router`, so `auth` comes from the contract's resolved `security` and the
- * handlers below need no casts.
+ * Typed from the contract, so `auth` follows each route's own rule and the handlers below need no casts.
  */
 export type SecuredRouter<Context> = Router<typeof securedContract.routes, Context>;
 

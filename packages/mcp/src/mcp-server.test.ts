@@ -1005,6 +1005,7 @@ describe('MCP server: guards', () => {
         publicRoute: {
             method: 'GET',
             path: '/public',
+            auth: false,
             responses: {
                 200: z.object({
                     ok: z.boolean(),
@@ -1014,6 +1015,7 @@ describe('MCP server: guards', () => {
         whoAmI: {
             method: 'GET',
             path: '/who-am-i',
+            auth: 'user',
             responses: {
                 200: z.object({
                     userId: z.string(),
@@ -1022,6 +1024,13 @@ describe('MCP server: guards', () => {
         },
         ownerOnly: {
             method: 'GET',
+            auth: {
+                identity: 'user',
+                roles: 'admin',
+                requires: {
+                    report: ['read'],
+                },
+            },
             path: '/owner-only',
             responses: {
                 200: z.object({
@@ -1034,19 +1043,6 @@ describe('MCP server: guards', () => {
     const securedContract = securedK.contract({
         routes: {
             api: securedRoutes,
-        },
-        accessControl: {
-            api: {
-                '*': false,
-                whoAmI: 'user',
-                ownerOnly: {
-                    auth: 'user',
-                    roles: 'admin',
-                    requires: {
-                        report: ['read'],
-                    },
-                },
-            },
         },
     });
 
@@ -1245,6 +1241,13 @@ describe('streamed routes', () => {
             reply: {
                 method: 'POST',
                 path: '/reply',
+                auth: {
+                    identity: 'user',
+                    roles: 'admin',
+                    requires: {
+                        report: ['read'],
+                    },
+                },
                 body: z.object({
                     prompt: z.string(),
                 }),
@@ -1302,6 +1305,7 @@ describe('MCP server: request context in guards', () => {
                 whoAmI: {
                     method: 'GET',
                     path: '/who-am-i',
+                    auth: 'user',
                     responses: {
                         200: z.object({
                             userId: z.string(),
@@ -1315,9 +1319,6 @@ describe('MCP server: request context in guards', () => {
                 description: 'Rebuild the search index',
             },
         }),
-        accessControl: {
-            api: 'user',
-        },
     });
 
     const connectWithContext = async () => {

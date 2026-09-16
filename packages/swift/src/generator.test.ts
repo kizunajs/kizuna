@@ -585,6 +585,7 @@ describe('Swift generator: nested sub-client routing', () => {
                 check: {
                     method: 'GET',
                     path: '/health',
+                    auth: false,
                     responses: {
                         200: z.object({ ok: z.boolean() }),
                     },
@@ -623,6 +624,7 @@ describe('Swift generator: nested sub-client routing', () => {
                 check: {
                     method: 'GET',
                     path: '/health',
+                    auth: false,
                     responses: {
                         200: z.object({ ok: z.boolean() }),
                     },
@@ -1983,6 +1985,7 @@ describe('Swift generator: the statuses the auth map adds', () => {
             getSecret: {
                 method: 'GET',
                 path: '/secret',
+                auth: 'user',
                 responses: {
                     200: z.object({
                         value: z.string(),
@@ -1992,6 +1995,7 @@ describe('Swift generator: the statuses the auth map adds', () => {
             health: {
                 method: 'GET',
                 path: '/health',
+                auth: false,
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -2001,10 +2005,6 @@ describe('Swift generator: the statuses the auth map adds', () => {
         });
         return guardedK.contract({
             routes,
-            accessControl: {
-                getSecret: 'user',
-                health: false,
-            },
         });
     };
 

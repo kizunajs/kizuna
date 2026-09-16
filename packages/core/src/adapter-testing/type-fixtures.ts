@@ -149,6 +149,7 @@ export const securedRoutes = securedK.routes({
     publicRoute: {
         method: 'GET',
         path: '/public',
+        auth: false,
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -158,6 +159,7 @@ export const securedRoutes = securedK.routes({
     whoAmI: {
         method: 'GET',
         path: '/who-am-i',
+        auth: 'user',
         responses: {
             200: z.object({
                 userId: z.string(),
@@ -167,6 +169,12 @@ export const securedRoutes = securedK.routes({
     ownerOnly: {
         method: 'GET',
         path: '/owner-only',
+        auth: {
+            identity: 'member',
+            requires: {
+                workspace: ['delete'],
+            },
+        },
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -176,6 +184,10 @@ export const securedRoutes = securedK.routes({
     adminOnly: {
         method: 'GET',
         path: '/admin-only',
+        auth: {
+            identity: 'member',
+            roles: 'admin',
+        },
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -185,6 +197,7 @@ export const securedRoutes = securedK.routes({
     both: {
         method: 'GET',
         path: '/both',
+        auth: ['user', 'member'],
         responses: {
             200: z.object({
                 userId: z.string(),
@@ -197,25 +210,6 @@ export const securedRoutes = securedK.routes({
 export const securedContract = securedK.contract({
     routes: {
         api: securedRoutes,
-    },
-    accessControl: {
-        api: {
-            '*': false,
-            whoAmI: 'user',
-            ownerOnly: {
-                auth: 'member',
-                requires: {
-                    workspace: ['delete'],
-                },
-            },
-            adminOnly: {
-                auth: 'member',
-                roles: 'admin',
-            },
-            both: {
-                auth: ['user', 'member'],
-            },
-        },
     },
 });
 
@@ -235,6 +229,7 @@ export const gateRoutes = gateK.routes({
     publicRoute: {
         method: 'GET',
         path: '/public',
+        auth: false,
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -244,6 +239,7 @@ export const gateRoutes = gateK.routes({
     apiOnly: {
         method: 'GET',
         path: '/api-only',
+        auth: 'apiConsumer',
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -253,6 +249,7 @@ export const gateRoutes = gateK.routes({
     whoAmI: {
         method: 'GET',
         path: '/who-am-i',
+        auth: 'user',
         responses: {
             200: z.object({
                 userId: z.string(),
@@ -264,13 +261,6 @@ export const gateRoutes = gateK.routes({
 export const gateContract = gateK.contract({
     routes: {
         api: gateRoutes,
-    },
-    accessControl: {
-        api: {
-            '*': false,
-            apiOnly: 'apiConsumer',
-            whoAmI: 'user',
-        },
     },
 });
 
@@ -293,6 +283,7 @@ export const requestContextRoutes = requestContextK.routes({
     publicRoute: {
         method: 'GET',
         path: '/public',
+        auth: false,
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -304,9 +295,6 @@ export const requestContextRoutes = requestContextK.routes({
 export const requestContextContract = requestContextK.contract({
     routes: {
         api: requestContextRoutes,
-    },
-    accessControl: {
-        api: false,
     },
 });
 
