@@ -3,6 +3,15 @@ import { fastifyAdapter } from '@ts-kizuna/fastify';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { openApiPlugin } from '@ts-kizuna/openapi';
 import { GuardSchema, analytics, jobs, routes, tags, tools, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
+import { diagnostics } from './src/routes/diagnostics';
+
+/**
+ * The shared routes every demo serves, plus the ones only this demo can answer.
+ */
+const served = {
+    ...routes,
+    diagnostics,
+};
 
 export const { api } = defineConfig({
     adapter: fastifyAdapter,
@@ -18,13 +27,13 @@ export const { api } = defineConfig({
     },
     guardSchema: GuardSchema,
     issueCodes: ['invalid_phone_number'],
-    routes,
+    routes: served,
     jobs,
     tools,
     plugins: [
         mcpPlugin({
             name: 'ts-kizuna demo',
-            routes,
+            routes: served,
             tools,
             options: {
                 publishRoutes: {
