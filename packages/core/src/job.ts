@@ -1,4 +1,5 @@
 import type { AuthoredJobDefinition, JobHandlerArgs, JobHandlerReturn, JobVoidReturn } from './jobs.js';
+import { DECLARATION } from './types.js';
 
 /**
  * A job's handler, typed against the job it answers.
@@ -29,5 +30,6 @@ export const createJob = <const Definition extends AuthoredJobDefinition>(defini
     handler: (fn) => ({
         ...definition,
         handler: fn,
+        [DECLARATION]: 'job' as const,
     }),
 });

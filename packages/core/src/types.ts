@@ -242,6 +242,15 @@ export type RouteAuth<Names extends string = string> =
 export type ResponseHeaders = Record<string, string>;
 
 /**
+ * Key under which every declaration says what it is, so `kizuna generate` can
+ * tell a route from a job from any other export. A symbol, so nothing that
+ * walks a declaration's own entries sees it.
+ */
+export const DECLARATION: unique symbol = Symbol('ts-kizuna.declaration');
+
+export type DeclarationKind = 'route' | 'job' | 'tool' | 'identity' | 'requestContext';
+
+/**
  * A handler as the route type carries it. Each route narrows its own arguments
  * and return through `k.route(...).handler(...)`.
  */

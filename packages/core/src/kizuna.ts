@@ -11,7 +11,7 @@ import {
     type ToolsOf,
     type GuardSchemaOf,
 } from './contract.js';
-import { pluginRouteTree, type ContractPlugins, type ContractPluginsArg, type PluginArgs } from './plugin.js';
+
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { assertValidDeprecationDates } from './deprecation.js';
 import { assertValidCache } from './cache.js';
@@ -34,9 +34,11 @@ import type { JobErrorHandler } from './job-runner.js';
 import { buildTools, type AuthoredTools, type CompiledTools, type ToolDefinition, type ToolHandlers, type Tools } from './tools.js';
 import type { ToolsArg } from './tool-runner.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
-import { createIdentity, type IdentityParamsOf, type RolesOf } from './identity.js';
+import type { IdentityParamsOf, RolesOf } from './identity.js';
 import { createPermissions, createRoles, permissionNames, type CatalogOf, type PermissionSet, type RoleNamesOf } from './permissions.js';
-import { createRequestContext } from './request-context.js';
+import { createRequestContext, type RequestContextConfig } from './request-context.js';
+import { createRequestContextBuilder, type RequestContextBuilder } from './request-context-builder.js';
+import { identityFactories, type IdentityFactories } from './identity-builder.js';
 import { createModel } from './model.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
@@ -61,6 +63,19 @@ import { buildApi, type Api } from './api.js';
 import type { GuardFnsFor, GuardsFor, RequestResolverFnsFor } from './server-surface.js';
 import type { GuardRun, RequestContextRun } from './adapter.js';
 import type { AuthContextOf, GuardParams, RequestContextValues, RouteGuardBrandOf } from './handler-pipeline.js';
+import type {
+    ConfiguredAdapterContext,
+    ConfiguredAdapterValue,
+    ConfiguredCodes,
+    ConfiguredGuardSchema,
+    ConfiguredIdentities,
+    ConfiguredJobs,
+    ConfiguredRequestContext,
+    ConfiguredRequestContextSchemas,
+    ConfiguredTags,
+    ConfiguredTools,
+    KizunaConfigShape,
+} from './configured.js';
 import type { PluginImplementations } from './plugin-server.js';
 
 /**
@@ -113,115 +128,6 @@ export type RouteAuthRule<Id extends string = string, Identities = Record<string
       };
 
 /**
- * Kizuna sends the guard body itself when a route's `requires` turns a caller
- * away, so every field beyond the envelope has to be one it can fill.
- */
-const ENVELOPE_FIELDS = ['type', 'title', 'status', 'detail'];
-
-const assertFillableGuardSchema = (schema: z.ZodType): void => {
-    const shape = readObjectShape(schema);
-    if (shape === undefined || !ENVELOPE_FIELDS.every((field) => field in shape)) {
-        throw new Error(
-            'The `guardSchema` must extend `ProblemDetailsSchema`. Every response at 400 or above is RFC 9457 Problem Details.'
-        );
-    }
-    if (schema.safeParse(problemDetails(403, 'Forbidden')).success) return;
-    throw new Error(
-        'The `guardSchema` cannot be built from a status and a detail alone. ' +
-            "Kizuna sends it when a route's `requires` refuses a caller, so give every field you added `.optional()` or a `.default()`."
-    );
-};
-
-/**
- * Apply a route's {@link RouteAuth} to it, setting its `security` and, when
- * narrowed, its `roles` and `requires`.
- */
-const resolveRouteAuth = (
-    route: RouteDefinition,
-    value: RouteAuth,
-    identities: Record<string, SecurityScheme> | undefined,
-    routePath: string
-): void => {
-    delete route.roles;
-    delete route.requires;
-    if (value === false) {
-        route.security = [];
-        return;
-    }
-    if (typeof value === 'string') {
-        route.security = [value];
-        return;
-    }
-    if (Array.isArray(value)) {
-        if (value.length === 0) throw new Error(`Route '${routePath}' names no identity under \`auth\`.`);
-        route.security = [requirementFor(value as readonly string[], undefined, identities) as SecurityRequirement];
-        return;
-    }
-    const rule = value as Exclude<RouteAuth, false | string | readonly string[]>;
-    const names = typeof rule.identity === 'string' ? [rule.identity] : [...rule.identity];
-    if (names.length === 0) {
-        throw new Error(`Route '${routePath}' names no identity under \`auth\`.`);
-    }
-    route.security = [requirementFor(names, undefined, identities) as SecurityRequirement];
-
-    const accepted = rule.roles === undefined ? [] : typeof rule.roles === 'string' ? [rule.roles] : [...rule.roles];
-    if (accepted.length > 0) {
-        const declared = names.map((name) => identities?.[name]?.roles).filter((roles) => roles !== undefined);
-        if (declared.length === 0) {
-            throw new Error(`Route '${routePath}' has \`roles\`, but none of its identities declares roles.`);
-        }
-        for (const role of accepted) {
-            if (!declared.some((roles) => roles.names.includes(role))) {
-                throw new Error(`Route '${routePath}' accepts the role '${role}', which no identity on the route declares.`);
-            }
-        }
-        route.roles = accepted;
-    }
-
-    const requires = rule.requires as RequiredPermissions | undefined;
-    if (requires === undefined || Object.keys(requires).length === 0) return;
-    const catalogs = names.map((name) => identities?.[name]?.roles?.permissions?.catalog).filter((catalog) => catalog !== undefined);
-    if (catalogs.length === 0) {
-        throw new Error(`Route '${routePath}' has \`requires\`, but none of its identities declares permissions.`);
-    }
-    for (const [resource, verbs] of Object.entries(requires)) {
-        for (const verb of verbs) {
-            if (!catalogs.some((catalog) => catalog[resource]?.includes(verb))) {
-                throw new Error(`Route '${routePath}' requires '${resource}:${verb}', which no identity on the route declares.`);
-            }
-        }
-    }
-    route.requires = requires;
-    route.security = [requirementFor(names, requires, identities) as SecurityRequirement];
-};
-
-/**
- * The security requirement for the identities an entry names. An OAuth token
- * carries its permissions as scopes, so an `oauth2` or `openIdConnect`
- * identity lists what the route requires from its catalog.
- */
-const requirementFor = (
-    names: readonly string[],
-    requires: RequiredPermissions | undefined,
-    identities: Record<string, SecurityScheme> | undefined
-): Record<string, readonly string[]> => {
-    const requirement: Record<string, readonly string[]> = {};
-    for (const name of names) {
-        const identity = identities?.[name];
-        const type = identity?.openapi?.type;
-        const catalog = identity?.roles?.permissions?.catalog;
-        requirement[name] =
-            requires !== undefined && catalog !== undefined && (type === 'oauth2' || type === 'openIdConnect')
-                ? permissionNames(requires).filter((permission) => {
-                      const [resource, verb] = permission.split(':');
-                      return catalog[resource ?? '']?.includes(verb ?? '') ?? false;
-                  })
-                : [];
-    }
-    return requirement;
-};
-
-/**
  * What a {@link Kizuna} instance declares.
  */
 export interface KizunaSpec {
@@ -231,6 +137,7 @@ export interface KizunaSpec {
     requestContext: Record<string, RequestContextSchema>;
     guardSchema: z.ZodType | undefined;
     adapter: AnyAdapter | undefined;
+    config: unknown;
 }
 
 /**
@@ -381,102 +288,61 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
     tools<const T extends AuthoredTools, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: T): CompiledTools<T, Name>;
     tools<const T extends AuthoredTools>(definitions: T): CompiledTools<T, undefined>;
     /**
-     * Assemble route groups into a contract. Every route's `auth` resolves onto
-     * its `security`, `roles` and `requires`.
+     * Declare an identity and the guard that authenticates it. The builder you
+     * pick is the authentication mechanism, and `guard` receives the credential
+     * it extracts.
      *
-     * Jobs declared with `k.jobs` go under `jobs`, alongside `routes` rather than
-     * inside it, and carry their own identity.
+     * @example
+     * export const user = k.identity
+     *     .bearer({
+     *         context: z.object({
+     *             userId: z.string(),
+     *         }),
+     *     })
+     *     .guard(async ({ bearer, deny }) => {
+     *         const session = bearer ? await db.sessions.findByToken(bearer.token) : null;
+     *         if (!session) {
+     *             return deny({
+     *                 status: 401,
+     *                 body: {
+     *                     detail: 'Unauthorized',
+     *                 },
+     *             });
+     *         }
+     *         return {
+     *             userId: session.userId,
+     *         };
+     *     });
      */
-    contract<
-        const R extends Routes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>,
-        const J extends Jobs = Record<string, never>,
-        const T extends Tools = Record<string, never>,
-        const P extends ContractPlugins = Record<string, never>,
-    >(definition: {
-        routes: R;
-        jobs?: J;
-        tools?: T;
-        plugins?: ContractPluginsArg<R, P, T>;
-    }): Contract<
-        RoutesWithHandlerContext<
-            R,
-            Spec['identities'],
-            Spec['requestContext'],
-            PluginArgs<P> & JobsArg<J> & ToolsArg<T>,
-            GuardOutput<Spec['guardSchema']>,
-            GuardBody<Spec['guardSchema']>
-        >,
-        Spec['tags'],
-        Spec['codes'],
-        Spec['identities'],
-        Spec['requestContext'],
-        P,
-        J,
-        T,
-        Spec['guardSchema']
+    identity: IdentityFactories<
+        ConfiguredAdapterContext<Spec['config']>,
+        ConfiguredRequestContext<Spec['config']>,
+        ConfiguredGuardSchema<Spec['config']>
     >;
     /**
-     * Implement one of the instance's identities. It runs before the handler of
-     * every route whose `auth` names the identity, receives the credential its
-     * method extracted along with the path params the identity declares, and
-     * returns the identity's context or calls `deny({ status, body })`.
+     * Declare a request-scoped value and the resolver that fills it. It runs on
+     * every route, public ones included, before the guards, and never denies.
      *
      * @example
-     * export const requireUser = k.guard('user', async ({ bearer, deny }) => {
-     *     const session = bearer ? await db.sessions.findByToken(bearer.token) : null;
-     *     if (!session) {
-     *         return deny({
-     *             status: 401,
-     *             body: {
-     *                 detail: 'Unauthorized',
-     *             },
-     *         });
-     *     }
-     *     return {
-     *         userId: session.userId,
-     *     };
-     * });
+     * export const analytics = k
+     *     .requestContext({
+     *         headers: z.object({
+     *             'x-posthog-session-id': z.string().optional(),
+     *         }),
+     *         context: z.object({
+     *             sessionId: z.string().nullable(),
+     *         }),
+     *     })
+     *     .handler(({ headers }) => ({
+     *         sessionId: headers['x-posthog-session-id'] ?? null,
+     *     }));
      */
-    guard<const Name extends IdentityNamesOf<Spec>>(
-        name: Name,
-        run: GuardFnsFor<
-            Spec['identities'],
-            IdentityParamsOf<Spec['identities'][Name]>,
-            HandlerContextOf<Spec['adapter']>,
-            Spec['requestContext'],
-            Spec['guardSchema']
-        >[Name]
-    ): GuardRun<HandlerContextOf<Spec['adapter']>>;
-    /**
-     * Resolve one of the instance's request contexts. It runs on every route,
-     * public ones included, before the guards, and never denies.
-     *
-     * @example
-     * export const captureAnalytics = k.requestContext('analytics', ({ headers }) => ({
-     *     sessionId: headers['x-posthog-session-id'] ?? null,
-     * }));
-     */
-    requestContext<const Name extends Extract<keyof Spec['requestContext'], string>>(
-        name: Name,
-        run: RequestResolverFnsFor<Spec['requestContext'], HandlerContextOf<Spec['adapter']>>[Name]
-    ): RequestContextRun<HandlerContextOf<Spec['adapter']>>;
-    /**
-     * Assemble a contract and everything that serves it into the object a
-     * framework mounts. Route handlers come from the routes themselves; what is
-     * left is one guard per identity, one resolver per request context, the
-     * handlers for jobs and tools, and each plugin's server half.
-     *
-     * @example
-     * export const api = k.api({
-     *     contract,
-     *     guards: {
-     *         user: requireUser,
-     *     },
-     * });
-     *
-     * api.mount(app);
-     */
-    api<const C extends Contract>(definition: ApiOptions<C, Spec>): Api<C, Spec['adapter']>;
+    requestContext<const ContextSchema extends z.ZodType, const HeadersSchema extends z.ZodType | undefined = undefined>(
+        config: RequestContextConfig<ContextSchema, HeadersSchema>
+    ): RequestContextBuilder<RequestContextSchema<ContextSchema, HeadersSchema>, ConfiguredAdapterContext<Spec['config']>>;
+    requestContext<const ContextSchema extends z.ZodType>(
+        context: ContextSchema
+    ): RequestContextBuilder<RequestContextSchema<ContextSchema, undefined>, ConfiguredAdapterContext<Spec['config']>>;
     /**
      * Emit a validation issue with a machine-readable `code`, checked against the
      * codes declared under `validation.issueCodes`.
@@ -535,44 +401,17 @@ export type RequestResolver<
 > = RequestResolverFnsFor<RequestContextOf<C>, HandlerContext>[Name];
 
 /**
- * What `k.api` takes: the contract, and everything that serves it. Each part is
- * required exactly when the contract declares something for it. The adapter is
- * required only when the instance declares none, which is how one contract is
- * served on more than one framework.
+ * The spec a config assembles into, which is what every authoring call on `k`
+ * is checked against.
  */
-export type ApiOptions<C extends Contract, Spec extends KizunaSpec> = {
-    contract: C;
-} & (string extends keyof SchemesOf<C>
-    ? { guards?: undefined }
-    : { guards: NoInfer<GuardsFor<SchemesOf<C>, HandlerContextOf<Spec['adapter']>>> }) &
-    (string extends keyof RequestContextOf<C>
-        ? { requestContext?: undefined }
-        : { requestContext: NoInfer<{ [Name in keyof RequestContextOf<C>]: RequestContextRun<HandlerContextOf<Spec['adapter']>> }> }) &
-    (string extends keyof JobsOf<C>
-        ? { jobTransport?: undefined; onJobError?: undefined }
-        : { jobTransport?: JobTransport; onJobError?: JobErrorHandler }) &
-    (string extends keyof ContractPluginsOf<C>
-        ? { plugins?: undefined }
-        : { plugins: NoInfer<PluginImplementations<ContractPluginsOf<C>, HandlerContextOf<Spec['adapter']>>> }) &
-    ([Spec['adapter']] extends [undefined] ? { adapter: AnyAdapter } : { adapter?: AnyAdapter });
-
-/**
- * The spec a {@link Kizuna} instance's type parameters assemble into.
- */
-type SpecOf<
-    Tags extends Record<string, TagOptions>,
-    Codes extends string,
-    Identities extends Record<string, SecurityScheme>,
-    RequestContext extends Record<string, RequestContextSchema>,
-    GuardSchema extends z.ZodType | undefined,
-    AdapterValue extends AnyAdapter | undefined,
-> = {
-    tags: Tags;
-    codes: Codes;
-    identities: Identities;
-    requestContext: RequestContext;
-    guardSchema: GuardSchema;
-    adapter: AdapterValue;
+type SpecOf<Config> = {
+    tags: ConfiguredTags<Config>;
+    codes: ConfiguredCodes<Config>;
+    identities: ConfiguredIdentities<Config>;
+    requestContext: ConfiguredRequestContextSchemas<Config>;
+    guardSchema: ConfiguredGuardSchema<Config>;
+    adapter: ConfiguredAdapterValue<Config>;
+    config: Config;
 };
 
 /**
@@ -581,79 +420,16 @@ type SpecOf<
  * handler.
  */
 export type HandlerContextFor<Spec extends KizunaSpec, Definition> = AuthContextOf<Definition, Spec['identities']> &
-    RequestContextValues<Spec['requestContext']> &
-    HandlerContextOf<Spec['adapter']>;
+    ConfiguredRequestContext<Spec['config']> &
+    ConfiguredJobs<Spec['config']> &
+    ConfiguredTools<Spec['config']> &
+    ConfiguredAdapterContext<Spec['config']>;
 
-/**
- * The tags, identities, request contexts and custom validation issue codes one
- * API surface is bound to. Routes, access, jobs and plugins go on `k.contract`.
- */
-export interface KizunaOptions<
-    Tags extends Record<string, TagOptions> = Record<string, never>,
-    Codes extends string = never,
-    Identities extends Record<string, SecurityScheme> = Record<string, never>,
-    RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
-    GuardSchema extends z.ZodType | undefined = undefined,
-    AdapterValue extends AnyAdapter | undefined = undefined,
-> {
-    /**
-     * The framework this API is served on, as a value. Its handler context
-     * reaches every handler, and the api it produces mounts onto that
-     * framework's app.
-     *
-     * @example
-     * import { expressAdapter } from '@ts-kizuna/express';
-     *
-     * export const k = new Kizuna({
-     *     adapter: expressAdapter,
-     * });
-     */
-    adapter?: AdapterValue;
-    identities?: Identities;
-    requestContext?: RequestContext;
-    /**
-     * The body every guard's `deny()` produces, and the body each guarded
-     * route's `401` and `403` carry. Extend `ProblemDetailsSchema`. Every field
-     * you add must be optional or carry a `.default()`, because kizuna sends
-     * this itself when a route's `requires` turns a caller away.
-     *
-     * @example
-     * guardSchema: ProblemDetailsSchema.extend({
-     *     code: z.enum(['unauthenticated', 'expired_token', 'forbidden']).default('forbidden'),
-     * }),
-     */
-    guardSchema?: GuardSchema & GuardSchemaCheck<GuardSchema>;
-    tags?: TagSet<Tags>;
-    validation?: {
-        issueCodes?: readonly Codes[];
-    };
-    /**
-     * Settings shared by every job. The jobs themselves are declared with `k.jobs`.
-     */
-    jobs?: JobsConfig;
-}
+const createSurface = <Config>(): K<SpecOf<Config>> => {
+    type Spec = SpecOf<Config>;
 
-const createSurface = <
-    Tags extends Record<string, TagOptions>,
-    Codes extends string,
-    Identities extends Record<string, SecurityScheme>,
-    RequestContext extends Record<string, RequestContextSchema>,
-    GuardSchema extends z.ZodType | undefined,
-    AdapterValue extends AnyAdapter | undefined,
->(
-    config?: KizunaOptions<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>
-): K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>> => {
-    type Spec = SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
-    if (config?.guardSchema) assertFillableGuardSchema(config.guardSchema);
-
-    const tagSet: TagSet<Tags> = config?.tags ?? { __brand: 'TagSet', tags: {} as Tags };
-
-    const routes = ((tagOrDefs: string | Routes, defs?: Routes) => {
-        if (defs === undefined) {
-            return tagRoutes(tagOrDefs as Routes);
-        }
-        return tagRoutes(tagSet, tagOrDefs as Extract<keyof Tags, string>, defs as Routes<Extract<keyof Tags, string>>);
-    }) as K<Spec>['routes'];
+    const routes = ((tagOrDefs: string | Routes, defs?: Routes) =>
+        defs === undefined ? tagRoutes(tagOrDefs as Routes) : tagRoutes(tagOrDefs as string, defs as Routes)) as K<Spec>['routes'];
 
     const jobs = ((identityOrDefinitions: string | AuthoredJobs, definitions?: AuthoredJobs) =>
         definitions === undefined
@@ -665,154 +441,56 @@ const createSurface = <
             ? buildTools(undefined, identityOrDefinitions as AuthoredTools)
             : buildTools(identityOrDefinitions as string, definitions)) as K<Spec>['tools'];
 
-    const contract = (definition: {
-        routes: Routes;
-        jobs?: Jobs;
-        tools?: Tools;
-        plugins?: ContractPluginsArg<Routes, ContractPlugins>;
-    }) => {
-        const { routes: contractRoutes, jobs: contractJobs, tools: contractTools } = definition;
-        const plugins =
-            typeof definition.plugins === 'function'
-                ? definition.plugins({
-                      routes: contractRoutes,
-                      tools: contractTools ?? {},
-                  })
-                : definition.plugins;
-        assertNoPathCollisions([
-            ...routeClaims(contractRoutes),
-            ...routeClaims(pluginRouteTree(plugins), 'Plugin route'),
-            ...jobClaims(contractJobs, config?.jobs),
-        ]);
-        assertValidDeprecationDates(contractRoutes);
-        assertValidDeprecationDates(pluginRouteTree(plugins));
-        const declaresIdentities = Object.keys(config?.identities ?? {}).length > 0;
-        for (const { route, routeKey } of flattenRoutes(contractRoutes)) {
-            if (route.auth === undefined) {
-                if (declaresIdentities) {
-                    throw new Error(
-                        `Route '${routeKey}' declares no \`auth\`. Name the identity it requires, or \`false\` for a public route.`
-                    );
-                }
-                route.security = [];
-                continue;
-            }
-            resolveRouteAuth(route, route.auth, config?.identities, routeKey);
-        }
-        // After every route's `auth` resolves, so both of these can read `security`.
-        injectGuardResponses(contractRoutes, config?.identities, config?.guardSchema);
-        assertValidCache(contractRoutes);
-        assertValidCache(pluginRouteTree(plugins));
-        return assembleContract({
-            routes: contractRoutes as Routes<Extract<keyof Tags, string>, Extract<keyof Identities, string>>,
-            jobs: contractJobs,
-            tools: contractTools,
-            tags: config?.tags,
-            securitySchemes: config?.identities,
-            guardSchema: config?.guardSchema,
-            requestContext: config?.requestContext,
-            validation: config?.validation,
-            plugins,
-            jobsConfig: config?.jobs,
-        });
-    };
-
-    const api = ((definition: Record<string, unknown>) => {
-        const {
-            contract: apiContract,
-            adapter: apiAdapter,
-            guards,
-            requestContext,
-            plugins,
-            jobs: jobHandlers,
-            tools: toolHandlers,
-            jobTransport,
-            onJobError,
-        } = definition;
-        return buildApi(
-            apiContract as Contract,
-            {
-                guards: guards as Record<string, unknown> | undefined,
-                requestContext: requestContext as Record<string, unknown> | undefined,
-                plugins: plugins as Record<string, unknown> | undefined,
-                jobs: jobHandlers as Record<string, unknown> | undefined,
-                tools: toolHandlers as Record<string, unknown> | undefined,
-                jobTransport: jobTransport as JobTransport | undefined,
-                onJobError: onJobError as JobErrorHandler | undefined,
-            },
-            (apiAdapter as AnyAdapter | undefined) ?? config?.adapter
-        );
-    }) as K<Spec>['api'];
-
-    const k: K<Spec> = {
-        api,
-        job: createJob as K<Spec>['job'],
-        tool: createTool as K<Spec>['tool'],
-        guard: ((_name: string, run: unknown) => run) as K<Spec>['guard'],
-        requestContext: ((_name: string, run: unknown) => run) as K<Spec>['requestContext'],
+    return {
         route: createRoute as K<Spec>['route'],
         routes,
+        job: createJob as K<Spec>['job'],
+        tool: createTool as K<Spec>['tool'],
         jobs,
         tools,
-        contract: contract as K<Spec>['contract'],
+        identity: identityFactories as unknown as K<Spec>['identity'],
+        requestContext: ((config: never) => createRequestContextBuilder(createRequestContext(config))) as K<Spec>['requestContext'],
         issue: addCodedIssue,
     };
-
-    return k;
 };
 
 /**
- * Declare one API surface: its tags, identities, request contexts and custom
- * validation issue codes. Keep the instance and use `k.route` to define a route
- * with its handler, `k.routes` to group them, and `k.contract` to assemble
- * them.
+ * The authoring surface for one API. Its type parameter is the `Config` that
+ * `kizuna generate` writes, which is what every name on `k` is checked against
+ * and what types everything a handler receives.
  *
- * The authoring helpers that need no instance stay static: `Kizuna.tags`,
- * `Kizuna.identity`, `Kizuna.roles`, `Kizuna.permissions`,
- * `Kizuna.requestContext` and `Kizuna.model`.
+ * `k.route` declares a route with its handler, `k.routes` groups them, and
+ * `k.job`, `k.tool`, `k.jobs` and `k.tools` do the same for jobs and tools.
+ * `defineApi` assembles them.
+ *
+ * The authoring helpers that need no config stay static: `Kizuna.tags`,
+ * `Kizuna.roles`, `Kizuna.permissions` and `Kizuna.model`.
  *
  * @example
- * export const k = new Kizuna({
- *     identities: {
- *         user,
- *     },
- *     tags,
- *     validation: {
- *         issueCodes: ['invalid_phone_number'],
- *     },
- * });
+ * import type { Config } from './kizuna.types';
+ *
+ * export const k = new Kizuna<Config>();
  */
-export class Kizuna<
-    const Tags extends Record<string, TagOptions> = Record<string, never>,
-    const Codes extends string = never,
-    const Identities extends Record<string, SecurityScheme> = Record<string, never>,
-    const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
-    GuardSchema extends z.ZodType | undefined = undefined,
-    const AdapterValue extends AnyAdapter | undefined = undefined,
-> implements K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>> {
+export class Kizuna<Config extends KizunaConfigShape = Record<string, never>> implements K<SpecOf<Config>> {
     static readonly tags = createTags;
-    static readonly identity = createIdentity;
     static readonly permissions = createPermissions;
     /**
      * Declare the roles callers hold, as names or from a permission catalog.
      */
     static readonly roles = createRoles;
-    static readonly requestContext = createRequestContext;
     static readonly model = createModel;
 
-    declare readonly route: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['route'];
-    declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['routes'];
-    declare readonly job: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['job'];
-    declare readonly tool: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['tool'];
-    declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['jobs'];
-    declare readonly tools: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['tools'];
-    declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['contract'];
-    declare readonly api: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['api'];
-    declare readonly guard: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['guard'];
-    declare readonly requestContext: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['requestContext'];
-    declare readonly issue: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['issue'];
+    declare readonly route: K<SpecOf<Config>>['route'];
+    declare readonly routes: K<SpecOf<Config>>['routes'];
+    declare readonly job: K<SpecOf<Config>>['job'];
+    declare readonly tool: K<SpecOf<Config>>['tool'];
+    declare readonly jobs: K<SpecOf<Config>>['jobs'];
+    declare readonly tools: K<SpecOf<Config>>['tools'];
+    declare readonly identity: K<SpecOf<Config>>['identity'];
+    declare readonly requestContext: K<SpecOf<Config>>['requestContext'];
+    declare readonly issue: K<SpecOf<Config>>['issue'];
 
-    constructor(config?: KizunaOptions<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>) {
-        Object.assign(this, createSurface<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>(config));
+    constructor() {
+        Object.assign(this, createSurface<Config>());
     }
 }

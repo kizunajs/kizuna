@@ -1,6 +1,9 @@
 export { k } from './k';
 export * from './routes/index';
-export { contract } from './contract';
+export { GuardSchema } from './guard-schema';
+export { analytics } from './request-context';
+export { tags } from './tags';
+export type { Config } from './kizuna.types';
 export { user, member, inviteToken, scheduler } from './identities';
 export { type User } from './types';
 export { db, type Invite } from './db';

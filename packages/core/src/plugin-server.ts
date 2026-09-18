@@ -145,26 +145,17 @@ export const pluginExportsOf = (api: unknown): Record<string, unknown> => {
  */
 export const resolvePluginServers = (
     plugins: ContractPlugins | undefined,
-    implementations: Record<string, PluginImplementation> | undefined,
     api: unknown
 ): Record<string, { router: Record<string, unknown>; exports?: unknown }> => {
     const resolved: Record<string, { router: Record<string, unknown>; exports?: unknown }> = {};
     for (const [pluginKey, declaration] of Object.entries(plugins ?? {})) {
-        const implementation = implementations?.[pluginKey];
-        if (!implementation) {
-            throw new Error(
-                `Plugin '${pluginKey}' is declared on the contract but has no server. Import its server half from '${declaration.serverModule}' and pass it to server.api under plugins.${pluginKey}.`
-            );
-        }
-        const served = implementation.serve(declaration.props as never, api) as {
+        const served = declaration.serve(declaration.props as never, api) as {
             router: Record<string, unknown>;
             exports?: unknown;
         };
         for (const routeKey of Object.keys(declaration.routes)) {
             if (routeKey in served.router) continue;
-            throw new Error(
-                `Plugin '${pluginKey}' declares the route '${routeKey}' but the server half from '${declaration.serverModule}' does not handle it.`
-            );
+            throw new Error(`Plugin '${pluginKey}' declares the route '${routeKey}' but its \`serve\` does not handle it.`);
         }
         resolved[pluginKey] = served;
     }

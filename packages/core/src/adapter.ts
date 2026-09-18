@@ -333,7 +333,7 @@ export const assembleApi = <const R extends Routes>(
     } as Record<string | symbol, unknown>;
 
     // Resolved after the api exists, because a plugin's server half receives it.
-    api[PLUGIN_SERVERS_META_KEY] = resolvePluginServers(contract.plugins, parts.plugins, api);
+    api[PLUGIN_SERVERS_META_KEY] = resolvePluginServers(contract.plugins, api);
 
     return api as unknown as ApiWithRouter<R>;
 };
@@ -439,7 +439,7 @@ export const warnUnsupportedJobOptions = (
     if (!transport) {
         logger.warn(
             `[ts-kizuna] ${named} declare \`retry\`, but no transport is configured, so a failed run is not retried. ` +
-                'Pass one as `jobTransport` to `new KizunaServer()` to make retrying real.'
+                'Pass one as `jobTransport` in `kizuna.config.ts` to make retrying real.'
         );
         return;
     }

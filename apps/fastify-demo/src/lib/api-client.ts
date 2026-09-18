@@ -1,7 +1,7 @@
 import { KizunaClient } from '@ts-kizuna/fetch';
-import { contract } from '@ts-kizuna-demo/shared';
+import { api } from '../../kizuna.config';
 
-export const apiClient = new KizunaClient(contract, {
+export const apiClient = new KizunaClient(api, {
     baseUrl: process.env.BASE_URL ?? 'http://localhost:8002',
     requestContext: {
         'x-posthog-session-id': process.env.POSTHOG_SESSION_ID,

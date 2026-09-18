@@ -4,6 +4,7 @@ import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
 import type { Routes, Tools } from '@ts-kizuna/core';
 import type { ToolSelection } from './tool-selection.js';
 import { protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
+import { mcpServe } from './server.js';
 
 export interface McpPluginProps<R extends Routes = Routes, T extends Tools = Tools> {
     /**
@@ -62,7 +63,6 @@ const declare = (props: McpPluginProps) => {
     const endpointPath = props.path ?? '/mcp';
     return createPlugin({
         name: 'mcp',
-        serverModule: '@ts-kizuna/mcp/server',
         routes: {
             endpoint: {
                 method: 'POST',
@@ -87,6 +87,7 @@ const declare = (props: McpPluginProps) => {
                   }),
         },
         props,
+        serve: (pluginProps, api) => mcpServe(pluginProps, api),
     });
 };
 

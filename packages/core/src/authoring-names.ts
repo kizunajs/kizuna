@@ -1,3 +1,4 @@
+import type { defineConfig } from './define-config.js';
 import type { Kizuna, K } from './kizuna.js';
 
 /**
@@ -8,16 +9,16 @@ import type { Kizuna, K } from './kizuna.js';
 export const AUTHORING_NAMES = {
     model: 'model',
     routes: 'routes',
-    contract: 'contract',
+    defineConfig: 'defineConfig',
     router: 'router',
 } as const satisfies {
     model: keyof typeof Kizuna;
     routes: keyof K;
-    contract: keyof K;
+    defineConfig: typeof defineConfig extends unknown ? 'defineConfig' : never;
     router: string;
 };
 
 /**
  * Export names the deprecation parser treats as a contract entry point.
  */
-export const CONTRACT_EXPORT_NAMES = ['contract', 'api'] as const;
+export const CONTRACT_EXPORT_NAMES = ['api'] as const;

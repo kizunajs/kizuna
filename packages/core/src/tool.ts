@@ -1,4 +1,5 @@
 import type { ToolDefinition, ToolHandlerFor } from './tools.js';
+import { DECLARATION } from './types.js';
 
 /**
  * A tool and the handler that answers it.
@@ -22,5 +23,6 @@ export const createTool = <const Definition extends ToolDefinition>(definition: 
     handler: (fn) => ({
         ...definition,
         handler: fn,
+        [DECLARATION]: 'tool' as const,
     }),
 });

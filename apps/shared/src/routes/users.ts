@@ -376,12 +376,17 @@ export const usersRoutes = k.routes('users', {
             },
             summary: 'Create a user',
         })
-        .handler(async ({ body }) => {
+        .handler(async ({ body, jobs }) => {
             const user = await db.users.create({
                 id: randomUUID(),
                 name: body.name,
                 email: body.email,
                 last_name: body.last_name,
+            });
+            await jobs.users.indexUser.queue({
+                input: {
+                    userId: user.id,
+                },
             });
             return {
                 status: 201,

@@ -25,7 +25,7 @@ export interface RequestContextSchema<
     readonly headers?: HeadersSchema;
 }
 
-interface RequestContextConfig<ContextSchema extends z.ZodType, HeadersSchema extends z.ZodType | undefined> {
+export interface RequestContextConfig<ContextSchema extends z.ZodType, HeadersSchema extends z.ZodType | undefined> {
     context: ContextSchema;
     headers?: HeadersSchema;
 }

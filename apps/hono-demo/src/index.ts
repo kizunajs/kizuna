@@ -1,7 +1,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 
-import { api } from './server/api';
+import { api } from '../kizuna.config';
 
 const app = new Hono();
 

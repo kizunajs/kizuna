@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 
-import { api } from './server/api';
+import { api } from '../kizuna.config';
 
 const app = Fastify();
 

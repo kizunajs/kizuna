@@ -3,13 +3,11 @@ import './zod-meta.js';
 export {
     Kizuna,
     type K,
-    type KizunaOptions,
     type KizunaSpec,
     type TagNamesOf,
     type IdentityNamesOf,
     type RouteAuthValue,
     type RouteAuthRule,
-    type ApiOptions,
 } from './kizuna.js';
 export {
     type Contract,
@@ -256,6 +254,9 @@ export {
 } from './types.js';
 export { buildPath, parsePath, type ExtractPathParams, type PathParamName, type HasPathParams } from './path-params.js';
 export { type AuthCheck, type RouteAuthCheck } from './auth-check.js';
+export { type JobFnOf, type JobsOfTree, type ToolsOfTree, type KizunaConfigShape } from './configured.js';
+export { defineConfig, type KizunaConfigInput, type ConfiguredApi } from './define-config.js';
+export { DECLARATION, type DeclarationKind } from './types.js';
 export { isRouteDefinition } from './handler-pipeline.js';
 export { type Api, type ApiImplementations } from './api.js';
 export { type RouteBuilder, type RouteWithHandler } from './route.js';
@@ -275,14 +276,5 @@ export {
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
 export { type AutoResponsesBrand, AUTO_RESPONSES_BRAND, AUTO_GUARD_BRAND, AUTO_GUARD_WRITTEN_BRAND, type GuardStatus } from './types.js';
-export {
-    defineConfig,
-    apiEntries,
-    type KizunaConfig,
-    type KizunaConfigInput,
-    type ConfigOf,
-    type ApiEntry,
-    type ClientTarget,
-    type RegisteredRoutes,
-    type RegisteredApiNames,
-} from './config.js';
+export { apiEntries, type ApiEntry, type ClientTarget } from './config.js';
+export { type AnyPlugin, type PluginList, type PluginsByName } from './plugin.js';

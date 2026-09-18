@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
+import { openApiServe } from './server.js';
 import type { DocsProvider } from './docs-html.js';
 import type { GenerateOpenApiOptions } from './types.js';
 
@@ -81,7 +82,6 @@ export interface OpenApiPluginProps extends GenerateOpenApiOptions {
 export const openApiPlugin = (props: OpenApiPluginProps) =>
     createPlugin({
         name: OPENAPI_PLUGIN_NAME,
-        serverModule: '@ts-kizuna/openapi/server',
         routes: {
             ...(props.docsPath === undefined
                 ? {}
@@ -121,4 +121,5 @@ export const openApiPlugin = (props: OpenApiPluginProps) =>
                   }),
         },
         props,
+        serve: (pluginProps, api) => openApiServe(pluginProps, api),
     });

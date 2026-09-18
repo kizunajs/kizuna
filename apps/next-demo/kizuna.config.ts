@@ -1,16 +1,28 @@
+import { defineConfig } from '@ts-kizuna/core';
+import { nextAdapter } from '@ts-kizuna/next';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { openApiPlugin } from '@ts-kizuna/openapi';
-import { k } from './k';
-import { routes } from './routes/index';
-import { jobs } from './jobs';
-import { tools } from './tools';
+import { GuardSchema, analytics, jobs, routes, tags, tools, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
 
-export const contract = k.contract({
+export const { api } = defineConfig({
+    adapter: nextAdapter,
+    tags,
+    identities: {
+        user,
+        member,
+        inviteToken,
+        scheduler,
+    },
+    requestContext: {
+        analytics,
+    },
+    guardSchema: GuardSchema,
+    issueCodes: ['invalid_phone_number'],
     routes,
     jobs,
     tools,
-    plugins: ({ routes, tools }) => ({
-        mcp: mcpPlugin({
+    plugins: [
+        mcpPlugin({
             name: 'ts-kizuna demo',
             routes,
             tools,
@@ -26,7 +38,7 @@ export const contract = k.contract({
                 hideTools: ['countWords'],
             },
         }),
-        openApi: openApiPlugin({
+        openApiPlugin({
             info: {
                 title: 'ts-kizuna demo',
                 version: '1.0.0',
@@ -36,5 +48,5 @@ export const contract = k.contract({
             docsPath: '/docs',
             jsonPath: '/openapi.json',
         }),
-    }),
+    ],
 });

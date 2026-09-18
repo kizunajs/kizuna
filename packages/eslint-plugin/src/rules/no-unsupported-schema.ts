@@ -106,7 +106,7 @@ const schemaNodesOf = (call: TSESTree.CallExpression): TSESTree.Node[] => {
         return schema ? [schema.value] : [];
     }
 
-    if (name !== AUTHORING_NAMES.routes && name !== AUTHORING_NAMES.contract) return [];
+    if (name !== AUTHORING_NAMES.routes && name !== AUTHORING_NAMES.defineConfig) return [];
 
     const nodes: TSESTree.Node[] = [];
     const visit = (node: TSESTree.Node): void => {

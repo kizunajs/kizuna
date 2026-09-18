@@ -1,11 +1,16 @@
 import type { RouteHandler } from './handler-pipeline.js';
-import type { AuthoredRouteDefinition } from './types.js';
+import { DECLARATION } from './types.js';
+import type { AuthoredRouteDefinition, RouteHandlerFunction } from './types.js';
 
 /**
  * A route and the handler that answers it.
  */
 export type RouteWithHandler<Definition extends AuthoredRouteDefinition, HandlerContext = unknown> = Definition & {
-    handler: RouteHandler<Definition, HandlerContext>;
+    /**
+     * Stored without its argument types, so a config that lists routes never
+     * depends on what a handler reads back off that config.
+     */
+    handler: RouteHandlerFunction;
 };
 
 /**
@@ -24,5 +29,6 @@ export const createRoute = <Definition extends AuthoredRouteDefinition>(definiti
     handler: (fn) => ({
         ...definition,
         handler: fn,
+        [DECLARATION]: 'route' as const,
     }),
 });

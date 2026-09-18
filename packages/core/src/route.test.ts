@@ -34,8 +34,10 @@ describe('k.route', () => {
     });
 
     it('carries the handler', () => {
+        const handler = getUser.handler as (args: unknown) => unknown;
+
         expect(
-            getUser.handler({
+            handler({
                 params: {
                     id: '1',
                 },

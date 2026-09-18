@@ -1,6 +1,6 @@
 import type { Contract } from '@ts-kizuna/core';
-import { contractOf, implementPlugin, rawResponse } from '@ts-kizuna/core/adapter';
-import { openApiPlugin } from './plugin.js';
+import { contractOf, rawResponse } from '@ts-kizuna/core/adapter';
+import type { OpenApiPluginProps } from './plugin.js';
 import { renderOpenApi } from './generator.js';
 import { renderDocsHtml } from './docs-html.js';
 
@@ -33,28 +33,27 @@ const sent = (body: string, contentType: string): Response =>
  * });
  * ```
  */
-export const openApiPluginServer = () =>
-    implementPlugin(openApiPlugin, ({ props, api }) => {
-        const spec = renderOpenApi(contractOf<Contract>(api), props);
+export const openApiServe = (props: OpenApiPluginProps, api: unknown) => {
+    const spec = renderOpenApi(contractOf<Contract>(api), props);
 
-        return {
-            router: {
-                page: () =>
-                    rawResponse(
-                        sent(
-                            renderDocsHtml({
-                                specUrl: props.jsonPath,
-                                specContent: props.jsonPath === undefined ? spec('json') : undefined,
-                                provider: props.provider,
-                                pageTitle: props.pageTitle ?? spec('json').info.title,
-                                cdnUrl: props.cdnUrl,
-                                configuration: props.configuration,
-                            }),
-                            HTML
-                        )
-                    ),
-                json: () => rawResponse(sent(JSON.stringify(spec('json')), JSON_TYPE)),
-                yaml: () => rawResponse(sent(spec('yaml'), YAML)),
-            },
-        };
-    });
+    return {
+        router: {
+            page: () =>
+                rawResponse(
+                    sent(
+                        renderDocsHtml({
+                            specUrl: props.jsonPath,
+                            specContent: props.jsonPath === undefined ? spec('json') : undefined,
+                            provider: props.provider,
+                            pageTitle: props.pageTitle ?? spec('json').info.title,
+                            cdnUrl: props.cdnUrl,
+                            configuration: props.configuration,
+                        }),
+                        HTML
+                    )
+                ),
+            json: () => rawResponse(sent(JSON.stringify(spec('json')), JSON_TYPE)),
+            yaml: () => rawResponse(sent(spec('yaml'), YAML)),
+        },
+    };
+};
