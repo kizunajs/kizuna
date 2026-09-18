@@ -2,12 +2,19 @@ import express from 'express';
 import request from 'supertest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { KizunaServer } from './server.js';
+import { Kizuna } from '@ts-kizuna/core';
+import { expressAdapter, type ExpressApi } from './server.js';
 import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 testAdapterFeatures({
     name: 'express',
-    initServerApi: (contract, options) => new KizunaServer(contract).api(options),
+    initServerApi: (contract, options) =>
+        new Kizuna({
+            adapter: expressAdapter,
+        }).api({
+            contract,
+            ...(options as object),
+        }) as unknown as ExpressApi,
     mount: (api, { responseValidation }) => {
         const app = express();
         app.use(express.json());

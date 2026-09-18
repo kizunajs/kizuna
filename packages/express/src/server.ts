@@ -36,6 +36,7 @@ import {
     type ContractRouter,
     type ContractJobsRouter,
     type ContractToolsRouter,
+    type Adapter,
 } from '@ts-kizuna/core/adapter';
 import type { Contract, RoutesOf, SecurityScheme, GuardSuccess } from '@ts-kizuna/core';
 
@@ -281,6 +282,21 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
 
     return expressRouter;
 }
+
+/**
+ * The Express adapter, as a value. Pass it to `new Kizuna({ adapter })`.
+ *
+ * @example
+ * import { expressAdapter } from '@ts-kizuna/express';
+ *
+ * export const k = new Kizuna({
+ *     adapter: expressAdapter,
+ * });
+ */
+export const expressAdapter: Adapter<ExpressHandlerContext, [app: AppLike, options?: ExpressOptions], ExpressRouter> = {
+    name: 'express',
+    mount: (api, app, options) => mountExpress(api as ExpressApi, app, options),
+};
 
 export interface Server<C extends Contract> extends CoreServer<C, ExpressHandlerContext, ExpressApi<RoutesOf<C>>> {}
 

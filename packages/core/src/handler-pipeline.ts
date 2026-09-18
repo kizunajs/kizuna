@@ -170,6 +170,11 @@ export type ContextFromAuth<Value, Identities> = {
 };
 
 /**
+ * The `auth` argument one route's handler receives, from the route's own rule.
+ */
+export type AuthContextOf<Route, Identities> = AuthArg<AuthOf<Route>, Identities>;
+
+/**
  * The `auth` argument a secured route's handler receives.
  */
 type AuthArg<Value, Identities> =
@@ -239,6 +244,12 @@ type RouteContextBrand<Context> = [keyof Context] extends [never] ? unknown : Ha
 type RouteGuardBrand<Value, Body, Written> = [AuthIdentityNames<Value>] extends [never]
     ? unknown
     : AutoResponsesBrand<GuardStatus, Body, Written>;
+
+/**
+ * The `401` and `403` a route's own `auth` gives it, so a handler written at the
+ * route may answer the `403` itself.
+ */
+export type RouteGuardBrandOf<Route, Body, Written> = RouteGuardBrand<AuthOf<Route>, Body, Written>;
 
 type HandlerContextOverlay<R extends Routes, Identities, Context, GuardBody_, GuardWritten_> = {
     [Key in keyof R]: R[Key] extends RouteDefinition

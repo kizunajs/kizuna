@@ -15,6 +15,7 @@ import { Kizuna } from '@ts-kizuna/core';
 
 ```ts
 new Kizuna(config?: {
+    adapter?: Adapter;
     identities?: Record<string, SecurityScheme>;
     requestContext?: Record<string, RequestContext>;
     tags?: TagSet;
@@ -23,13 +24,14 @@ new Kizuna(config?: {
 }): K
 ```
 
-| Field                   | Type                             | Description                                                                                                                                                           |
-| ----------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `identities`            | `Record<string, SecurityScheme>` | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names a route's `auth` and the guards use. |
-| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                      |
-| `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                        |
-| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                      |
-| `jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                       |
+| Field                   | Type                             | Description                                                                                                                                                               |
+| ----------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adapter`               | `Adapter`                        | Optional. The framework this API is served on, as a value: `expressAdapter`, `fastifyAdapter`, `honoAdapter` or `nextAdapter`. Its handler context reaches every handler. |
+| `identities`            | `Record<string, SecurityScheme>` | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names a route's `auth` and the guards use.     |
+| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                          |
+| `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                            |
+| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                          |
+| `jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                           |
 
 ### `JobsConfig`
 

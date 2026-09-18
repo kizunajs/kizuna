@@ -1,7 +1,8 @@
+import type { ToolHandlers, ToolsOf } from '@ts-kizuna/core';
+import { contract } from '@ts-kizuna-demo/shared';
 import { countWords, forecastFor, signupsOverDays } from '@ts-kizuna-demo/shared';
-import { server } from './server';
 
-export const toolHandlers = server.tools({
+export const toolHandlers: ToolHandlers<ToolsOf<typeof contract>> = {
     weather: {
         getForecast: ({ input, throwError }) => {
             if (input.city.trim() === '') {
@@ -20,4 +21,4 @@ export const toolHandlers = server.tools({
     countWords: ({ input }) => ({
         words: countWords(input.text),
     }),
-});
+};

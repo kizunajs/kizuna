@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { db } from '../db';
+import { toCsv } from '../csv';
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/core/schemas';
 import { z } from 'zod';
@@ -96,256 +99,479 @@ export const CreateUserSchema = Kizuna.model({
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 
 export const usersRoutes = k.routes('users', {
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        auth: false,
-        query: PaginationQuery,
-        responses: {
-            200: {
-                body: z.object({
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            auth: false,
+            query: PaginationQuery,
+            responses: {
+                200: {
+                    body: z.object({
+                        users: z.array(UserSchema),
+                        total: z.number(),
+                    }),
+                    cache: {
+                        scope: 'private',
+                        maxAge: 60,
+                        vary: ['authorization'],
+                    },
+                },
+            },
+            summary: 'List users with pagination',
+        })
+        .handler(async ({ query }) => {
+            const skip = (query.page - 1) * query.limit;
+            const [users, total] = await Promise.all([db.users.findMany({ skip, take: query.limit }), db.users.count()]);
+            return {
+                status: 200,
+                body: {
+                    users,
+                    total,
+                },
+            };
+        }),
+    exportUsers: k
+        .route({
+            method: 'GET',
+            path: '/users/export',
+            auth: false,
+            responses: {
+                200: {
+                    body: z.string(),
+                    contentType: 'text/csv',
+                },
+            },
+            summary: 'Export users as CSV, exercises a non-JSON (text/csv) raw response body',
+        })
+        .handler(async () => {
+            const users = await db.users.findMany();
+            const rows = users.map((user) => [user.id, user.name, user.email]);
+            return {
+                status: 200,
+                body: toCsv(['id', 'name', 'email'], rows),
+            };
+        }),
+    userBadge: k
+        .route({
+            method: 'GET',
+            path: '/users/:id/badge',
+            auth: false,
+            responses: {
+                200: {
+                    body: BinarySchema,
+                    contentType: 'application/octet-stream',
+                    cache: {
+                        scope: 'public',
+                        noCache: true,
+                    },
+                    etag: true,
+                },
+                404: ProblemDetailsSchema,
+            },
+            summary: 'Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag',
+        })
+        .handler(async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: Buffer.from(`BADGE:${user.id}:${user.name}`, 'utf-8'),
+            };
+        }),
+    lastSessionEvent: k
+        .route({
+            method: 'GET',
+            path: '/users/:id/last-session-event',
+            auth: false,
+            responses: {
+                200: UserSessionEvent,
+                404: ProblemDetailsSchema,
+            },
+            summary: "A user's most recent login or logout, inline union variants nest under the User model in native clients",
+        })
+        .handler(async ({ params }) => {
+            const event = await db.sessions.findLastEventByUserId(params.id);
+            if (!event) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'No session events for this user',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: event,
+            };
+        }),
+    searchUsers: k
+        .route({
+            method: 'GET',
+            path: '/users/search',
+            auth: false,
+            query: z.object({
+                q: z.string(),
+                limit: z.number().int().min(1).max(100),
+                cursor: z.number().int().min(0),
+            }),
+            responses: {
+                200: z.object({
                     users: z.array(UserSchema),
-                    total: z.number(),
+                    nextCursor: z.number().nullable(),
                 }),
-                cache: {
-                    scope: 'private',
-                    maxAge: 60,
-                    vary: ['authorization'],
+            },
+            summary: 'Search users, required coerced limit and cursor',
+        })
+        .handler(async ({ query }) => {
+            const { users, nextCursor } = await db.users.search(query.q, {
+                cursor: query.cursor,
+                limit: query.limit,
+            });
+            return {
+                status: 200,
+                body: {
+                    users,
+                    nextCursor,
                 },
-            },
-        },
-        summary: 'List users with pagination',
-    },
-    exportUsers: {
-        method: 'GET',
-        path: '/users/export',
-        auth: false,
-        responses: {
-            200: {
-                body: z.string(),
-                contentType: 'text/csv',
-            },
-        },
-        summary: 'Export users as CSV, exercises a non-JSON (text/csv) raw response body',
-    },
-    userBadge: {
-        method: 'GET',
-        path: '/users/:id/badge',
-        auth: false,
-        responses: {
-            200: {
-                body: BinarySchema,
-                contentType: 'application/octet-stream',
-                cache: {
-                    scope: 'public',
-                    noCache: true,
-                },
-                etag: true,
-            },
-            404: ProblemDetailsSchema,
-        },
-        summary: 'Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag',
-    },
-    lastSessionEvent: {
-        method: 'GET',
-        path: '/users/:id/last-session-event',
-        auth: false,
-        responses: {
-            200: UserSessionEvent,
-            404: ProblemDetailsSchema,
-        },
-        summary: "A user's most recent login or logout, inline union variants nest under the User model in native clients",
-    },
-    searchUsers: {
-        method: 'GET',
-        path: '/users/search',
-        auth: false,
-        query: z.object({
-            q: z.string(),
-            limit: z.number().int().min(1).max(100),
-            cursor: z.number().int().min(0),
+            };
         }),
-        responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-                nextCursor: z.number().nullable(),
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            auth: false,
+            headers: z.object({
+                'x-request-id': z.string(),
             }),
-        },
-        summary: 'Search users, required coerced limit and cursor',
-    },
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        auth: false,
-        headers: z.object({
-            'x-request-id': z.string(),
-        }),
-        responses: {
-            200: {
-                body: UserSchema,
-                headers: z.object({
-                    'x-request-id': z.string().optional(),
-                }),
+            responses: {
+                200: {
+                    body: UserSchema,
+                    headers: z.object({
+                        'x-request-id': z.string().optional(),
+                    }),
+                },
+                404: ProblemDetailsSchema,
             },
-            404: ProblemDetailsSchema,
-        },
-        summary: 'Get a user by id',
-    },
-    userActivity: {
-        method: 'GET',
-        path: '/users/:id/activity/:year',
-        auth: false,
-        pathParams: z.object({
-            id: z.string(),
-            year: z.int().min(2000).max(2100),
+            summary: 'Get a user by id',
+        })
+        .handler(async ({ params, headers }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: user,
+                headers: {
+                    'x-request-id': headers['x-request-id'],
+                },
+            };
         }),
-        responses: {
-            200: {
-                body: z.object({
+    userActivity: k
+        .route({
+            method: 'GET',
+            path: '/users/:id/activity/:year',
+            auth: false,
+            pathParams: z.object({
+                id: z.string(),
+                year: z.int().min(2000).max(2100),
+            }),
+            responses: {
+                200: {
+                    body: z.object({
+                        userId: z.string(),
+                        year: z.int(),
+                        events: z.int(),
+                    }),
+                    cache: {
+                        scope: 'public',
+                        maxAge: 300,
+                    },
+                },
+                404: {
+                    body: ProblemDetailsSchema,
+                    cache: {
+                        scope: 'public',
+                        maxAge: 10,
+                    },
+                },
+            },
+            summary:
+                'Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response',
+        })
+        .handler(async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: {
+                    userId: user.id,
+                    year: params.year,
+                    events: params.year - 2000,
+                },
+            };
+        }),
+    userProfile: k
+        .route({
+            method: 'GET',
+            path: '/users/:id/profile',
+            auth: false,
+            responses: {
+                200: {
+                    body: UserSchema,
+                    cache: {
+                        scope: 'private',
+                        noCache: true,
+                    },
+                    etag: true,
+                },
+                404: ProblemDetailsSchema,
+            },
+            summary: 'Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with',
+        })
+        .handler(async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: user,
+            };
+        }),
+    createUser: k
+        .route({
+            method: 'POST',
+            path: '/users',
+            auth: false,
+            body: CreateUserSchema,
+            responses: {
+                201: UserSchema,
+                400: ProblemDetailsSchema,
+            },
+            summary: 'Create a user',
+        })
+        .handler(async ({ body }) => {
+            const user = await db.users.create({
+                id: randomUUID(),
+                name: body.name,
+                email: body.email,
+                last_name: body.last_name,
+            });
+            return {
+                status: 201,
+                body: user,
+            };
+        }),
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/users/:id',
+            auth: false,
+            deprecated: {
+                message: 'use `archiveUser` instead',
+                date: '2026-03-01',
+                link: 'https://example.com/changelog/delete-user',
+            },
+            sunset: '2027-01-01',
+            responses: {
+                200: z.object({
+                    success: z.boolean(),
+                }),
+                404: ProblemDetailsSchema,
+            },
+            summary: 'Delete a user',
+        })
+        .handler(async ({ params }) => {
+            const existed = await db.users.delete(params.id);
+            if (!existed) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: {
+                    success: true,
+                },
+            };
+        }),
+    archiveUser: k
+        .route({
+            method: 'POST',
+            path: '/users/:id/archive',
+            auth: false,
+            responses: {
+                200: z.object({
+                    alreadyArchived: z.literal(true),
                     userId: z.string(),
-                    year: z.int(),
-                    events: z.int(),
                 }),
-                cache: {
-                    scope: 'public',
-                    maxAge: 300,
-                },
+                201: z.object({
+                    archivedAt: z.iso.datetime(),
+                    userId: z.string(),
+                }),
             },
-            404: {
-                body: ProblemDetailsSchema,
-                cache: {
-                    scope: 'public',
-                    maxAge: 10,
+            summary: 'Archive a user, first call returns 201, subsequent calls 200',
+        })
+        .handler(async ({ params }) => {
+            const { alreadyArchived } = await db.users.archive(params.id);
+            if (alreadyArchived) {
+                return {
+                    status: 200,
+                    body: {
+                        alreadyArchived: true,
+                        userId: params.id,
+                    },
+                };
+            }
+            return {
+                status: 201,
+                body: {
+                    archivedAt: new Date().toISOString(),
+                    userId: params.id,
                 },
-            },
-        },
-        summary:
-            'Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response',
-    },
-    userProfile: {
-        method: 'GET',
-        path: '/users/:id/profile',
-        auth: false,
-        responses: {
-            200: {
-                body: UserSchema,
-                cache: {
-                    scope: 'private',
-                    noCache: true,
-                },
-                etag: true,
-            },
-            404: ProblemDetailsSchema,
-        },
-        summary: 'Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with',
-    },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        auth: false,
-        body: CreateUserSchema,
-        responses: {
-            201: UserSchema,
-            400: ProblemDetailsSchema,
-        },
-        summary: 'Create a user',
-    },
-    deleteUser: {
-        method: 'DELETE',
-        path: '/users/:id',
-        auth: false,
-        deprecated: {
-            message: 'use `archiveUser` instead',
-            date: '2026-03-01',
-            link: 'https://example.com/changelog/delete-user',
-        },
-        sunset: '2027-01-01',
-        responses: {
-            200: z.object({
-                success: z.boolean(),
-            }),
-            404: ProblemDetailsSchema,
-        },
-        summary: 'Delete a user',
-    },
-    archiveUser: {
-        method: 'POST',
-        path: '/users/:id/archive',
-        auth: false,
-        responses: {
-            200: z.object({
-                alreadyArchived: z.literal(true),
-                userId: z.string(),
-            }),
-            201: z.object({
-                archivedAt: z.iso.datetime(),
-                userId: z.string(),
-            }),
-        },
-        summary: 'Archive a user, first call returns 201, subsequent calls 200',
-    },
-    uploadAvatar: {
-        method: 'POST',
-        path: '/avatar',
-        auth: false,
-        contentType: 'multipart/form-data',
-        body: z.object({
-            file: z.instanceof(File),
-            userId: z.string(),
+            };
         }),
-        responses: {
-            200: z.object({
-                size: z.number(),
+    uploadAvatar: k
+        .route({
+            method: 'POST',
+            path: '/avatar',
+            auth: false,
+            contentType: 'multipart/form-data',
+            body: z.object({
+                file: z.instanceof(File),
                 userId: z.string(),
             }),
-        },
-        summary: 'Upload an avatar image',
-    },
-    pingUser: {
-        method: 'POST',
-        path: '/users/:id/ping',
-        auth: false,
-        body: z.void(),
-        responses: {
-            204: z.void(),
-        },
-        summary: 'Ping a user, exercises z.void() body and response',
-    },
-    getMyWork: {
-        method: 'GET',
-        path: '/work',
-        auth: false,
-        responses: {
-            200: z.object({
-                items: z.array(z.string()),
-                contentType: z.enum(['image/jpeg', 'text-plain', 'video.mp4', '3d-model']),
-            }),
-            204: z.void(),
-        },
-        summary:
-            'List work items, exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers',
-    },
-    checkUser: {
-        method: 'HEAD',
-        path: '/users/:id/check',
-        auth: false,
-        responses: {
-            200: z.object({
-                exists: z.boolean(),
-            }),
-            404: ProblemDetailsSchema,
-        },
-        summary: 'Check user existence, exercises HEAD body stripping',
-    },
-    describeUsers: {
-        method: 'OPTIONS',
-        path: '/users/describe',
-        auth: false,
-        responses: {
-            200: z.object({
-                allow: z.string(),
-            }),
-        },
-        summary: 'Describe allowed operations, exercises OPTIONS routing',
-    },
+            responses: {
+                200: z.object({
+                    size: z.number(),
+                    userId: z.string(),
+                }),
+            },
+            summary: 'Upload an avatar image',
+        })
+        .handler(() => {
+            // Multipart is out of scope for the Express adapter today (see CLAUDE.md).
+            // Real consumers wire multer (or similar) before this handler runs.
+            return {
+                status: 200,
+                body: {
+                    size: 0,
+                    userId: 'unsupported',
+                },
+            };
+        }),
+    pingUser: k
+        .route({
+            method: 'POST',
+            path: '/users/:id/ping',
+            auth: false,
+            body: z.void(),
+            responses: {
+                204: z.void(),
+            },
+            summary: 'Ping a user, exercises z.void() body and response',
+        })
+        .handler(() => ({
+            status: 204,
+            body: undefined,
+        })),
+    getMyWork: k
+        .route({
+            method: 'GET',
+            path: '/work',
+            auth: false,
+            responses: {
+                200: z.object({
+                    items: z.array(z.string()),
+                    contentType: z.enum(['image/jpeg', 'text-plain', 'video.mp4', '3d-model']),
+                }),
+                204: z.void(),
+            },
+            summary:
+                'List work items, exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers',
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                items: ['draft report', 'review pull request'],
+                contentType: 'image/jpeg',
+            },
+        })),
+    checkUser: k
+        .route({
+            method: 'HEAD',
+            path: '/users/:id/check',
+            auth: false,
+            responses: {
+                200: z.object({
+                    exists: z.boolean(),
+                }),
+                404: ProblemDetailsSchema,
+            },
+            summary: 'Check user existence, exercises HEAD body stripping',
+        })
+        .handler(async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: {
+                    exists: true,
+                },
+            };
+        }),
+    describeUsers: k
+        .route({
+            method: 'OPTIONS',
+            path: '/users/describe',
+            auth: false,
+            responses: {
+                200: z.object({
+                    allow: z.string(),
+                }),
+            },
+            summary: 'Describe allowed operations, exercises OPTIONS routing',
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                allow: 'GET, HEAD, POST, OPTIONS',
+            },
+        })),
 });

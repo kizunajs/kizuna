@@ -1,4 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
+import { Kizuna } from '@ts-kizuna/core';
+import type { HandlerContextOf } from '@ts-kizuna/core/adapter';
 import type { Env } from 'hono';
 import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
 import {
@@ -15,7 +17,7 @@ import {
     type ExpectedRouteHandler,
     type ExpectedRouter,
 } from '../../core/src/adapter-testing/type-testing.js';
-import { KizunaServer, type HonoHandlerContext, type RouteHandler, type Router } from './server.js';
+import { KizunaServer, honoAdapter, type HonoHandlerContext, type RouteHandler, type Router } from './server.js';
 
 interface SessionEnv extends Env {
     Variables: {
@@ -527,4 +529,12 @@ test('the Env generic threads through the handler context', () => {
     expectTypeOf<RouteHandler<typeof inferenceRoutes.getUser, SessionEnv>>().toEqualTypeOf<
         ExpectedRouteHandler<typeof inferenceRoutes.getUser, HonoHandlerContext<SessionEnv>>
     >();
+});
+
+test('the Hono adapter is a value carrying its handler context', () => {
+    expectTypeOf<HandlerContextOf<typeof honoAdapter>>().toEqualTypeOf<HonoHandlerContext<Env>>();
+
+    new Kizuna({
+        adapter: honoAdapter,
+    });
 });

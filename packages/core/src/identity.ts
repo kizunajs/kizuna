@@ -63,7 +63,13 @@ export interface Identity<
     ContextSchema extends z.ZodType | undefined = z.ZodType | undefined,
     RolesType extends Roles | undefined = Roles | undefined,
     CredentialType extends Credential | NoCredential = Credential,
+    ParamsSchema extends z.ZodType | undefined = z.ZodType | undefined,
 > extends SecurityScheme<ContextSchema> {
+    /**
+     * The path parameters this identity's guard reads. A route whose `auth`
+     * names the identity has to carry them, and the guard receives them typed.
+     */
+    readonly params: ParamsSchema;
     /**
      * The roles this identity's callers hold. The guard returns `role`.
      */
@@ -81,6 +87,16 @@ export interface Identity<
  * value } | null }` for an `apiKey` identity.
  */
 export type CredentialOf<Id> = Id extends Identity<z.ZodType | undefined, Roles | undefined, infer Extracted> ? Extracted : Credential;
+
+/**
+ * The path params an identity's guard receives: what its `params` schema
+ * declares, or the adapter's raw record when it declares none.
+ */
+export type IdentityParamsOf<Id> = Id extends { params: infer ParamsSchema }
+    ? ParamsSchema extends z.ZodType
+        ? z.output<ParamsSchema>
+        : Record<string, string>
+    : Record<string, string>;
 
 /**
  * The {@link Roles} an identity declares, or `never` when it declares none.
@@ -141,14 +157,16 @@ const make = <
     ContextSchema extends z.ZodType | undefined,
     RolesType extends Roles | undefined,
     CredentialType extends Credential | NoCredential = { bearer: BearerCredential | null },
+    ParamsSchema extends z.ZodType | undefined = undefined,
 >(
     openapi: OpenApiSecuritySchemeObject | undefined,
     context: ContextSchema,
     roles: RolesType,
     scheme: string | undefined,
     issuer?: string,
-    resourceMetadata?: string
-): Identity<ContextSchema, RolesType, CredentialType> => ({
+    resourceMetadata?: string,
+    params?: ParamsSchema
+): Identity<ContextSchema, RolesType, CredentialType, ParamsSchema> => ({
     __brand: 'SecurityScheme',
     openapi,
     context,
@@ -156,6 +174,7 @@ const make = <
     scheme,
     issuer,
     resourceMetadata,
+    params: params as ParamsSchema,
 });
 
 export interface BearerConfig<ContextSchema extends z.ZodType | undefined, RolesType extends Roles | undefined> {
@@ -219,11 +238,26 @@ export interface OpenIdConnectConfig<ContextSchema extends z.ZodType | undefined
     scheme?: string;
 }
 
-export interface CustomConfig<ContextSchema extends z.ZodType | undefined, RolesType extends Roles | undefined> {
+export interface CustomConfig<
+    ContextSchema extends z.ZodType | undefined,
+    RolesType extends Roles | undefined,
+    ParamsSchema extends z.ZodType | undefined = undefined,
+> {
     context?: ContextSchema;
     roles?: RolesType;
     description?: string;
     scheme?: string;
+    /**
+     * The path parameters this identity's guard reads, for a credential that
+     * travels in the path. A route whose `auth` names the identity has to carry
+     * them.
+     *
+     * @example
+     * params: z.object({
+     *     token: z.string(),
+     * }),
+     */
+    params?: ParamsSchema;
 }
 
 /**
@@ -326,8 +360,20 @@ export const createIdentity = {
      *     }),
      * });
      */
-    custom: <ContextSchema extends z.ZodType | undefined = undefined, RolesType extends Roles | undefined = undefined>(
-        config: CustomConfig<ContextSchema, RolesType>
-    ): Identity<ContextSchema, RolesType, NoCredential> =>
-        make<ContextSchema, RolesType, NoCredential>(undefined, config.context as ContextSchema, config.roles as RolesType, config.scheme),
+    custom: <
+        ContextSchema extends z.ZodType | undefined = undefined,
+        RolesType extends Roles | undefined = undefined,
+        ParamsSchema extends z.ZodType | undefined = undefined,
+    >(
+        config: CustomConfig<ContextSchema, RolesType, ParamsSchema>
+    ): Identity<ContextSchema, RolesType, NoCredential, ParamsSchema> =>
+        make<ContextSchema, RolesType, NoCredential, ParamsSchema>(
+            undefined,
+            config.context as ContextSchema,
+            config.roles as RolesType,
+            config.scheme,
+            undefined,
+            undefined,
+            config.params as ParamsSchema
+        ),
 };

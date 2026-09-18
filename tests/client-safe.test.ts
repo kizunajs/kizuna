@@ -1,7 +1,9 @@
-import { beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { build, type Plugin } from 'esbuild';
+import { generateFetchClient } from '../packages/fetch/src/generator.js';
+import { contract } from '../apps/shared/src/contract.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
@@ -181,33 +183,57 @@ describe('the client-safe boundary', () => {
     }
 });
 
+/**
+ * What a browser imports is the generated client, so that is what has to bundle.
+ * The contract carries the handlers and stays on the server.
+ */
 const DEMO_CONTRACT = path.join(ROOT, 'apps/shared/src/contract.ts');
 
-describe('a contract stays client-safe end to end', () => {
-    test('apps/shared contract bundles for the browser, plugins and all', async () => {
+/**
+ * Written inside the repository, so `@ts-kizuna/fetch` resolves the way it
+ * would in a consumer rather than from a temp directory.
+ */
+const generatedClient = (): string => {
+    const file = path.join(ROOT, `tests/.generated-client-${process.pid}.ts`);
+    fs.writeFileSync(file, generateFetchClient(contract as never));
+    return file;
+};
+
+describe('a generated client stays client-safe end to end', () => {
+    let clientFile: string;
+
+    beforeAll(() => {
+        clientFile = generatedClient();
+    });
+
+    afterAll(() => {
+        fs.rmSync(clientFile, { force: true });
+    });
+
+    test('the generated client bundles for the browser', async () => {
         const failures = await bundleFailures(
             {
-                file: DEMO_CONTRACT,
+                file: clientFile,
                 external: ['zod'],
             },
             'browser'
         );
-        expect(failures, `the demo contract reaches a Node built-in:\n${failures.join('\n')}`).toEqual([]);
+        expect(failures, `the generated client reaches a Node built-in:\n${failures.join('\n')}`).toEqual([]);
     }, 60_000);
 
     /**
      * Derived rather than declared, so labelling a client entry `server` to
      * quiet a failure is caught by the graph itself.
      */
-    test('every entry the demo contract reaches is classified client', async () => {
+    test('every entry the generated client reaches is classified client', async () => {
         const byFile = new Map(entries.map((entry) => [fs.realpathSync(entry.file), entry.specifier]));
-        const reached = (await bundleInputs(DEMO_CONTRACT, ['zod']))
+        const reached = (await bundleInputs(clientFile, ['zod']))
             .map((input) => byFile.get(input))
             .filter((specifier): specifier is string => specifier !== undefined);
 
         const reachOf = new Map(entries.map((entry) => [entry.specifier, entry.reach]));
         const mislabelled = [...new Set(reached)].filter((specifier) => reachOf.get(specifier) !== 'client');
-        expect(mislabelled, 'a contract reaches these, so they cannot be server-only').toEqual([]);
+        expect(mislabelled, 'a generated client reaches these, so they cannot be server-only').toEqual([]);
     }, 60_000);
 });
 

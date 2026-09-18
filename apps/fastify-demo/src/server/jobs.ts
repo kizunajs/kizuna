@@ -1,7 +1,8 @@
+import type { JobHandlers, JobsOf } from '@ts-kizuna/core';
+import { contract } from '@ts-kizuna-demo/shared';
 import { db } from '@ts-kizuna-demo/shared';
-import { server } from './server';
 
-export const jobHandlers = server.jobs({
+export const jobHandlers: JobHandlers<JobsOf<typeof contract>> = {
     users: {
         sendDigests: async () => ({
             status: 200,
@@ -42,4 +43,4 @@ export const jobHandlers = server.jobs({
             body: undefined,
         }),
     },
-});
+};

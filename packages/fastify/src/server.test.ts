@@ -3,7 +3,7 @@ import Fastify from 'fastify';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import type { AddressInfo } from 'node:net';
-import { KizunaServer } from './server.js';
+import { KizunaServer, fastifyAdapter, type FastifyApi } from './server.js';
 import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const k = new Kizuna({
@@ -54,7 +54,13 @@ describe('Fastify: handler context', () => {
 
 testAdapterFeatures({
     name: 'fastify',
-    initServerApi: (contract, options) => new KizunaServer(contract).api(options),
+    initServerApi: (contract, options) =>
+        new Kizuna({
+            adapter: fastifyAdapter,
+        }).api({
+            contract,
+            ...(options as object),
+        }) as unknown as FastifyApi,
     mount: async (api, { responseValidation }) => {
         const app = Fastify();
         await api.mount(app, {

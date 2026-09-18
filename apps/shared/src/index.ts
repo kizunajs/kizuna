@@ -1,3 +1,4 @@
+export { k } from './k';
 export * from './routes/index';
 export { contract } from './contract';
 export { user, member, inviteToken, scheduler } from './identities';

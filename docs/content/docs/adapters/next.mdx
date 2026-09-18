@@ -9,6 +9,19 @@ description: Mount a ts-kizuna API on a Next.js App Router catch-all route.
 
 <InstallTabs packageName="@ts-kizuna/next" />
 
+## The adapter
+
+`nextAdapter` is the Next adapter as a value. Pass it to `new Kizuna()`, and every handler on this API receives Next's request objects:
+
+```ts title="contract/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { nextAdapter } from '@ts-kizuna/next';
+
+export const k = new Kizuna({
+    adapter: nextAdapter,
+});
+```
+
 <Steps>
 
 <Step>

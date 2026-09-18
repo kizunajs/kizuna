@@ -16,6 +16,9 @@
       "default": "./src/csv.ts"
     }
   },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  },
   "dependencies": {
     "@ts-kizuna/core": "workspace:*",
     "@ts-kizuna/mcp": "workspace:*",

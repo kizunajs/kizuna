@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { KizunaServer } from './server.js';
+import { KizunaServer, honoAdapter, type HonoApi } from './server.js';
 import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const k = new Kizuna({
@@ -49,7 +49,13 @@ describe('Hono: handler context', () => {
 
 testAdapterFeatures({
     name: 'hono',
-    initServerApi: (contract, options) => new KizunaServer(contract).api(options),
+    initServerApi: (contract, options) =>
+        new Kizuna({
+            adapter: honoAdapter,
+        }).api({
+            contract,
+            ...(options as object),
+        }) as unknown as HonoApi,
     mount: (api, { responseValidation }) => {
         const app = new Hono();
         api.mount(app, {

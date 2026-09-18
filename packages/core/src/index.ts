@@ -9,8 +9,18 @@ export {
     type IdentityNamesOf,
     type RouteAuthValue,
     type RouteAuthRule,
+    type ApiOptions,
 } from './kizuna.js';
-export { type Contract, type RoutesOf, type SchemesOf, type RequestContextOf, type ContractPluginsOf, type JobsOf } from './contract.js';
+export {
+    type Contract,
+    type RoutesOf,
+    type SchemesOf,
+    type RequestContextOf,
+    type ContractPluginsOf,
+    type JobsOf,
+    type ToolsOf,
+    type GuardSchemaOf,
+} from './contract.js';
 export {
     createPlugin,
     type PluginDeclaration,
@@ -31,6 +41,7 @@ export {
     type NoCredential,
     type CredentialOf,
     type RolesOf,
+    type IdentityParamsOf,
     type RoleOf,
     type GrantsOf,
     type GuardHoldings,
@@ -243,10 +254,14 @@ export {
     type AuthoredRouteDefinition,
     type AuthoredRoutes,
 } from './types.js';
-export { type ExtractPathParams, type PathParamName, type HasPathParams } from './path-params.js';
+export { buildPath, parsePath, type ExtractPathParams, type PathParamName, type HasPathParams } from './path-params.js';
 export { type AuthCheck, type RouteAuthCheck } from './auth-check.js';
+export { isRouteDefinition } from './handler-pipeline.js';
+export { type Api, type ApiImplementations } from './api.js';
 export { type RouteBuilder, type RouteWithHandler } from './route.js';
 export {
+    type AuthContextOf,
+    type ContextFromAuth,
     type HandlerArgs,
     type HandlerReturn,
     type ThrowableReturn,

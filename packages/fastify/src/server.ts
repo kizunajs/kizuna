@@ -34,6 +34,7 @@ import {
     toolRunnerFrom,
     createServerSurface,
     type Server as CoreServer,
+    type Adapter,
     type ContractRouter,
     type ContractJobsRouter,
     type ContractToolsRouter,
@@ -293,6 +294,26 @@ export const fastifyKizuna = fastifyPlugin(
         name: '@ts-kizuna/fastify',
     }
 );
+
+/**
+ * The Fastify adapter, as a value. Pass it to `new Kizuna({ adapter })`.
+ *
+ * @example
+ * import { fastifyAdapter } from '@ts-kizuna/fastify';
+ *
+ * export const k = new Kizuna({
+ *     adapter: fastifyAdapter,
+ * });
+ */
+export const fastifyAdapter: Adapter<FastifyHandlerContext, [app: FastifyInstance, options?: FastifyOptions], Promise<void>> = {
+    name: 'fastify',
+    mount: async (api, app, options) => {
+        await app.register(fastifyKizuna, {
+            ...(options ?? {}),
+            api: api as FastifyApi,
+        });
+    },
+};
 
 export interface Server<C extends Contract> extends CoreServer<C, FastifyHandlerContext, FastifyApi<RoutesOf<C>>> {}
 

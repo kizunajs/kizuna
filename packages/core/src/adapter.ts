@@ -13,6 +13,7 @@ import {
     allowedMethodsForPath,
     flattenRoutes,
     formatValidationError,
+    isRouteDefinition,
     validateRequest,
 } from './handler-pipeline.js';
 import { type MatchResult, matchRoute as defaultMatchRoute, sortFlattenedRoutes } from './route-matcher.js';
@@ -359,6 +360,59 @@ export const jobRouter = <HandlerContext>(meta: JobsMeta): Router<Routes, Handle
  * The job runner an adapter hands to every handler, built from what
  * `server.jobs` stamped on the api.
  */
+/**
+ * Type-only key under which an {@link Adapter} carries the handler context its
+ * framework hands to every handler. Never present at runtime.
+ */
+export declare const ADAPTER_CONTEXT: unique symbol;
+
+/**
+ * One framework's adapter, as a value. Pass it to `new Kizuna({ adapter })`,
+ * and the api it produces mounts onto that framework's app.
+ *
+ * @example
+ * import { expressAdapter } from '@ts-kizuna/express';
+ *
+ * export const k = new Kizuna({
+ *     adapter: expressAdapter,
+ * });
+ */
+export interface Adapter<HandlerContext = unknown, MountArgs extends readonly unknown[] = readonly unknown[], Mounted = unknown> {
+    /**
+     * The framework this serves, for error messages.
+     */
+    readonly name: string;
+    /**
+     * Register every route of an api on the framework. What it takes after the
+     * api, and what it hands back, is the framework's own.
+     */
+    readonly mount: (api: ApiWithRouter, ...args: MountArgs) => Mounted;
+    readonly [ADAPTER_CONTEXT]?: HandlerContext;
+}
+
+/**
+ * Any adapter, whatever its framework takes. A `mount` reads its own arguments,
+ * so a concrete adapter is not assignable to a widened one; this stands in
+ * wherever an adapter is a constraint rather than a value.
+ */
+export type AnyAdapter = Adapter<any, any, any>;
+
+/**
+ * The handler context an adapter hands to every handler, `{}` when none is
+ * declared.
+ */
+export type HandlerContextOf<A> = A extends Adapter<infer HandlerContext, any, any> ? HandlerContext : {};
+
+/**
+ * What an adapter's `mount` takes after the api.
+ */
+export type MountArgsOf<A> = A extends Adapter<any, infer MountArgs, any> ? MountArgs : readonly unknown[];
+
+/**
+ * What an adapter's `mount` hands back.
+ */
+export type MountedOf<A> = A extends Adapter<any, any, infer Mounted> ? Mounted : never;
+
 export interface ServerOptions {
     /**
      * Carries a queued job to whatever runs it. Without one, `queue` runs the job
@@ -831,7 +885,12 @@ export const extractCredential = (scheme: SecurityScheme, request: AdapterReques
     return { bearer: token };
 };
 
-export interface Adapter<NativeRequest, NativeResponse, HandlerContext, ResponseContext> {
+/**
+ * The request pipeline `createAdapter` builds: what matches a request to a
+ * route, runs the guards and the handler, and hands the result back to the
+ * framework.
+ */
+export interface RequestPipeline<NativeRequest, NativeResponse, HandlerContext, ResponseContext> {
     handle: <T extends Routes>(args: HandleArgs<NativeRequest, HandlerContext, ResponseContext, T>) => Promise<NativeResponse>;
     eachRoute: <T extends Routes>(
         routes: T,
@@ -842,6 +901,22 @@ export interface Adapter<NativeRequest, NativeResponse, HandlerContext, Response
         handler: RouteHandler<RouteDefinition, HandlerContext>;
     }>;
 }
+
+/**
+ * The handler tree a routes tree already carries, mirroring its shape so
+ * everything that walks a router by dotted key finds the route's own handler.
+ */
+export const routerFromRoutes = (routes: Routes): Record<string, unknown> => {
+    const router: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(routes)) {
+        if (isRouteDefinition(value)) {
+            if (value.handler) router[key] = value.handler;
+            continue;
+        }
+        if (value && typeof value === 'object') router[key] = routerFromRoutes(value as Routes);
+    }
+    return router;
+};
 
 const resolveHandler = (handlers: unknown, routeKey: string): unknown => {
     const segments = routeKey.split('.');
@@ -1328,7 +1403,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
 
 export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, ResponseContext = Record<string, never>>(
     definition: AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, ResponseContext>
-): Adapter<NativeRequest, NativeResponse, HandlerContext, ResponseContext> => ({
+): RequestPipeline<NativeRequest, NativeResponse, HandlerContext, ResponseContext> => ({
     handle: async ({
         routes,
         router,

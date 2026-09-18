@@ -23,78 +23,31 @@ export interface User {
  * Module level rather than a factory so `k.routes` infers `method` and `path` as literals; a factory returning an object
  * literal widens both to `string` and weakens `PathParamsCheck`.
  */
-export const userRoutes = k.routes('api', {
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: z.object({
-                id: z.string(),
-                name: z.string(),
-            }),
-            404: ProblemDetailsSchema,
-        },
-    },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string().min(1),
-            email: z.email(),
-        }),
-        responses: {
-            201: z.object({
-                id: z.string(),
-                name: z.string(),
-                email: z.string(),
-            }),
-        },
-    },
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        query: z.object({
-            page: z.number().int().min(1).default(1),
-            limit: z.number().int().min(1).default(10),
-        }),
-        responses: {
-            200: z.object({
-                users: z.array(
-                    z.object({
-                        id: z.string(),
-                        name: z.string(),
-                    })
-                ),
-                total: z.number(),
-            }),
-        },
-    },
-    deleteUser: {
-        method: 'DELETE',
-        path: '/users/:id',
-        responses: {
-            200: z.object({
-                success: z.boolean(),
-            }),
-            404: ProblemDetailsSchema,
-        },
-    },
-});
-
-export type UserRoutes = typeof userRoutes;
-
-export const userContract = k.contract({
-    routes: userRoutes,
-});
+const users = new Map<string, User>();
+let nextUserId = 1;
 
 /**
- * Generic in the handler context so each adapter gets a typed `Router<UserRoutes, Context>` with no cast.
+ * Empties the user store, so each test starts from nothing.
  */
-export const createUserRouter = <Context>(): Router<UserRoutes, Context> => {
-    const users = new Map<string, User>();
-    let nextId = 1;
-    return {
-        getUser: ({ params }) => {
+export const resetUsers = (): void => {
+    users.clear();
+    nextUserId = 1;
+};
+
+export const userRoutes = k.routes('api', {
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                    name: z.string(),
+                }),
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(({ params }) => {
             const user = users.get(params.id);
             if (!user) {
                 return {
@@ -111,9 +64,25 @@ export const createUserRouter = <Context>(): Router<UserRoutes, Context> => {
                     name: user.name,
                 },
             };
-        },
-        createUser: ({ body }) => {
-            const id = String(nextId++);
+        }),
+    createUser: k
+        .route({
+            method: 'POST',
+            path: '/users',
+            body: z.object({
+                name: z.string().min(1),
+                email: z.email(),
+            }),
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                    name: z.string(),
+                    email: z.string(),
+                }),
+            },
+        })
+        .handler(({ body }) => {
+            const id = String(nextUserId++);
             const user: User = {
                 id,
                 name: body.name,
@@ -124,8 +93,28 @@ export const createUserRouter = <Context>(): Router<UserRoutes, Context> => {
                 status: 201,
                 body: user,
             };
-        },
-        listUsers: ({ query }) => {
+        }),
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            query: z.object({
+                page: z.number().int().min(1).default(1),
+                limit: z.number().int().min(1).default(10),
+            }),
+            responses: {
+                200: z.object({
+                    users: z.array(
+                        z.object({
+                            id: z.string(),
+                            name: z.string(),
+                        })
+                    ),
+                    total: z.number(),
+                }),
+            },
+        })
+        .handler(({ query }) => {
             const all = Array.from(users.values());
             const start = (query.page - 1) * query.limit;
             return {
@@ -138,8 +127,19 @@ export const createUserRouter = <Context>(): Router<UserRoutes, Context> => {
                     total: all.length,
                 },
             };
-        },
-        deleteUser: ({ params }) => {
+        }),
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/users/:id',
+            responses: {
+                200: z.object({
+                    success: z.boolean(),
+                }),
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(({ params }) => {
             if (!users.has(params.id)) {
                 return {
                     status: 404,
@@ -155,36 +155,39 @@ export const createUserRouter = <Context>(): Router<UserRoutes, Context> => {
                     success: true,
                 },
             };
-        },
-    };
-};
+        }),
+});
+
+export type UserRoutes = typeof userRoutes;
+
+export const userContract = k.contract({
+    routes: userRoutes,
+});
 
 /**
  * A route whose handler returns a body the contract does not allow, for `responses.validation`.
  */
 export const brokenRoutes = k.routes('api', {
-    getBroken: {
-        method: 'GET',
-        path: '/broken',
-        responses: {
-            200: z.object({
-                id: z.string(),
-            }),
-        },
-    },
+    getBroken: k
+        .route({
+            method: 'GET',
+            path: '/broken',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                id: 42 as unknown as string,
+            },
+        })),
 });
 
 export const brokenContract = k.contract({
     routes: brokenRoutes,
-});
-
-export const createBrokenRouter = <Context>(): Router<typeof brokenRoutes, Context> => ({
-    getBroken: () => ({
-        status: 200,
-        body: {
-            id: 42 as unknown as string,
-        },
-    }),
 });
 
 export const sessionToken = 'tok_ada';
@@ -232,65 +235,101 @@ const securedK = new Kizuna({
 });
 
 export const securedRoutes = securedK.routes({
-    publicRoute: {
-        method: 'GET',
-        path: '/public',
-        auth: false,
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
-    whoAmI: {
-        method: 'GET',
-        path: '/who-am-i',
-        auth: 'user',
-        responses: {
-            200: z.object({
-                userId: z.string(),
-            }),
-        },
-    },
-    ownerOnly: {
-        method: 'GET',
-        path: '/owner-only',
-        auth: {
-            identity: 'member',
-            requires: {
-                workspace: ['delete'],
+    publicRoute: securedK
+        .route({
+            method: 'GET',
+            path: '/public',
+            auth: false,
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
             },
-        },
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
-    adminOnly: {
-        method: 'GET',
-        path: '/admin-only',
-        auth: {
-            identity: 'member',
-            roles: 'admin',
-        },
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
-    both: {
-        method: 'GET',
-        path: '/both',
-        auth: ['user', 'member'],
-        responses: {
-            200: z.object({
-                userId: z.string(),
-                workspaceUserId: z.string(),
-            }),
-        },
-    },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        })),
+    whoAmI: securedK
+        .route({
+            method: 'GET',
+            path: '/who-am-i',
+            auth: 'user',
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                }),
+            },
+        })
+        .handler(({ auth }) => ({
+            status: 200,
+            body: {
+                userId: auth.user.userId,
+            },
+        })),
+    ownerOnly: securedK
+        .route({
+            method: 'GET',
+            path: '/owner-only',
+            auth: {
+                identity: 'member',
+                requires: {
+                    workspace: ['delete'],
+                },
+            },
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        })),
+    adminOnly: securedK
+        .route({
+            method: 'GET',
+            path: '/admin-only',
+            auth: {
+                identity: 'member',
+                roles: 'admin',
+            },
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        })),
+    both: securedK
+        .route({
+            method: 'GET',
+            path: '/both',
+            auth: ['user', 'member'],
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                    workspaceUserId: z.string(),
+                }),
+            },
+        })
+        .handler(({ auth }) => ({
+            status: 200,
+            body: {
+                userId: auth.user.userId,
+                workspaceUserId: auth.member.workspaceUserId,
+            },
+        })),
 });
 
 export const securedContract = securedK.contract({
@@ -341,59 +380,25 @@ export const securedGuards = {
 };
 
 /**
- * Typed from the contract, so `auth` follows each route's own rule and the handlers below need no casts.
- */
-export type SecuredRouter<Context> = Router<typeof securedContract.routes, Context>;
-
-export const createSecuredRouter = <Context>(): SecuredRouter<Context> => ({
-    api: {
-        publicRoute: () => ({
-            status: 200,
-            body: {
-                ok: true,
-            },
-        }),
-        whoAmI: ({ auth }) => ({
-            status: 200,
-            body: {
-                userId: auth.user.userId,
-            },
-        }),
-        ownerOnly: () => ({
-            status: 200,
-            body: {
-                ok: true,
-            },
-        }),
-        adminOnly: () => ({
-            status: 200,
-            body: {
-                ok: true,
-            },
-        }),
-        both: ({ auth }) => ({
-            status: 200,
-            body: {
-                userId: auth.user.userId,
-                workspaceUserId: auth.member.workspaceUserId,
-            },
-        }),
-    },
-});
-
-/**
  * A one-route group at a distinct path, for the sub-router composition tests each adapter repeated.
  */
 export const subUserRoutes = k.routes('api', {
-    getUser: {
-        method: 'GET',
-        path: '/sub-users/:id',
-        responses: {
-            200: z.object({
-                id: z.string(),
-            }),
-        },
-    },
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/sub-users/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        })
+        .handler(({ params }) => ({
+            status: 200,
+            body: {
+                id: params.id,
+            },
+        })),
 });
 
 export const subUserContract = k.contract({
@@ -402,508 +407,505 @@ export const subUserContract = k.contract({
     },
 });
 
-export const createSubUserRouter = <Context>(): Router<typeof subUserContract.routes, Context> => ({
-    users: {
-        getUser: ({ params }) => ({
-            status: 200,
-            body: {
-                id: params.id,
-            },
-        }),
-    },
-});
-
 /**
  * Constraints covering each Zod issue code the kernel serializes, so every adapter proves it surfaces them.
  */
 export const issueRoutes = k.routes('api', {
-    createProfile: {
-        method: 'POST',
-        path: '/profiles',
-        body: z
-            .object({
-                name: z.string().min(1),
-                age: z.number().max(120),
-                tags: z.array(z.string()).max(2),
-                slug: z.string().refine((value) => !value.includes(' '), 'no spaces'),
-                nickname: z.string().optional(),
-            })
-            .refine((value) => value.name !== value.slug, 'name and slug must differ'),
-        responses: {
-            201: z.object({
-                id: z.string(),
-            }),
-        },
-    },
+    createProfile: k
+        .route({
+            method: 'POST',
+            path: '/profiles',
+            body: z
+                .object({
+                    name: z.string().min(1),
+                    age: z.number().max(120),
+                    tags: z.array(z.string()).max(2),
+                    slug: z.string().refine((value) => !value.includes(' '), 'no spaces'),
+                    nickname: z.string().optional(),
+                })
+                .refine((value) => value.name !== value.slug, 'name and slug must differ'),
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 201,
+            body: {
+                id: '1',
+            },
+        })),
 });
 
 export const issueContract = k.contract({
     routes: issueRoutes,
 });
 
-export const createIssueRouter = <Context>(): Router<typeof issueRoutes, Context> => ({
-    createProfile: () => ({
-        status: 201,
-        body: {
-            id: '1',
-        },
-    }),
-});
-
 /**
  * Routes declaring non-JSON and empty response bodies.
  */
+export const csvBody = 'id,name\n1,Ada';
+export const badgeBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
+
 export const responseShapeRoutes = k.routes('api', {
-    exportCsv: {
-        method: 'GET',
-        path: '/items.csv',
-        responses: {
-            200: {
-                body: z.string(),
-                contentType: 'text/csv',
+    exportCsv: k
+        .route({
+            method: 'GET',
+            path: '/items.csv',
+            responses: {
+                200: {
+                    body: z.string(),
+                    contentType: 'text/csv',
+                },
             },
-        },
-    },
-    downloadBadge: {
-        method: 'GET',
-        path: '/badge',
-        responses: {
-            200: {
-                body: z.instanceof(Uint8Array),
-                contentType: 'application/octet-stream',
+        })
+        .handler(() => ({
+            status: 200,
+            body: csvBody,
+        })),
+    downloadBadge: k
+        .route({
+            method: 'GET',
+            path: '/badge',
+            responses: {
+                200: {
+                    body: z.instanceof(Uint8Array),
+                    contentType: 'application/octet-stream',
+                },
             },
-        },
-    },
-    deleteItem: {
-        method: 'DELETE',
-        path: '/items/:id',
-        responses: {
-            204: z.void(),
-        },
-    },
-    createValidated: {
-        method: 'POST',
-        path: '/validated',
-        body: z.object({
-            name: z.string().min(1),
-        }),
-        responses: {
-            201: z.object({
-                id: z.string(),
+        })
+        .handler(() => ({
+            status: 200,
+            body: badgeBytes,
+        })),
+    deleteItem: k
+        .route({
+            method: 'DELETE',
+            path: '/items/:id',
+            responses: {
+                204: z.void(),
+            },
+        })
+        .handler(() => ({
+            status: 204,
+            body: undefined,
+        })),
+    createValidated: k
+        .route({
+            method: 'POST',
+            path: '/validated',
+            body: z.object({
+                name: z.string().min(1),
             }),
-        },
-    },
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 201,
+            body: {
+                id: '1',
+            },
+        })),
 });
 
 export const responseShapeContract = k.contract({
     routes: responseShapeRoutes,
 });
 
-export const csvBody = 'id,name\n1,Ada';
-export const badgeBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
-
-export const createResponseShapeRouter = <Context>(): Router<typeof responseShapeRoutes, Context> => ({
-    exportCsv: () => ({
-        status: 200,
-        body: csvBody,
-    }),
-    downloadBadge: () => ({
-        status: 200,
-        body: badgeBytes,
-    }),
-    deleteItem: () => ({
-        status: 204,
-        body: undefined,
-    }),
-    createValidated: () => ({
-        status: 201,
-        body: {
-            id: '1',
-        },
-    }),
-});
-
 export const deprecatedRoutes = k.routes('api', {
-    deleteUser: {
-        method: 'DELETE',
-        path: '/deprecated-users/:id',
-        deprecated: {
-            message: 'use `archiveUser` instead',
-            date: '2026-03-01T00:00:00Z',
-            link: 'https://example.com/changelog/delete-user',
-        },
-        responses: {
-            200: z.object({
-                success: z.boolean(),
-            }),
-            404: ProblemDetailsSchema,
-        },
-    },
-    exportReport: {
-        method: 'GET',
-        path: '/report',
-        sunset: {
-            date: '2027-01-01',
-            link: 'https://example.com/retirement-policy',
-        },
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/deprecated-users/:id',
+            deprecated: {
+                message: 'use `archiveUser` instead',
+                date: '2026-03-01T00:00:00Z',
+                link: 'https://example.com/changelog/delete-user',
+            },
+            responses: {
+                200: z.object({
+                    success: z.boolean(),
+                }),
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(({ params }) => {
+            if (params.id !== '1') {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'Not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: {
+                    success: true,
+                },
+            };
+        }),
+    exportReport: k
+        .route({
+            method: 'GET',
+            path: '/report',
+            sunset: {
+                date: '2027-01-01',
+                link: 'https://example.com/retirement-policy',
+            },
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        })),
 });
 
 export const deprecatedContract = k.contract({
     routes: deprecatedRoutes,
 });
 
-export const createDeprecatedRouter = <Context>(): Router<typeof deprecatedRoutes, Context> => ({
-    deleteUser: ({ params }) => {
-        if (params.id !== '1') {
-            return {
-                status: 404,
-                body: {
-                    detail: 'Not found',
+export const cachedRoutes = k.routes('api', {
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/cached-users',
+            responses: {
+                200: {
+                    body: z.object({
+                        users: z.array(z.string()),
+                    }),
+                    cache: {
+                        scope: 'private',
+                        maxAge: 300,
+                        vary: ['authorization'],
+                    },
                 },
-            };
-        }
-        return {
+            },
+        })
+        .handler(() => ({
             status: 200,
             body: {
-                success: true,
+                users: ['alice'],
             },
-        };
-    },
-    exportReport: () => ({
-        status: 200,
-        body: {
-            ok: true,
-        },
-    }),
-});
-
-export const cachedRoutes = k.routes('api', {
-    listUsers: {
-        method: 'GET',
-        path: '/cached-users',
-        responses: {
-            200: {
-                body: z.object({
-                    users: z.array(z.string()),
-                }),
-                cache: {
-                    scope: 'private',
-                    maxAge: 300,
-                    vary: ['authorization'],
+        })),
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/cached-users/:id',
+            responses: {
+                200: {
+                    body: z.object({
+                        id: z.string(),
+                    }),
+                    cache: {
+                        scope: 'private',
+                        maxAge: 300,
+                    },
+                },
+                404: {
+                    body: ProblemDetailsSchema,
+                    cache: {
+                        scope: 'public',
+                        maxAge: 10,
+                    },
                 },
             },
-        },
-    },
-    getUser: {
-        method: 'GET',
-        path: '/cached-users/:id',
-        responses: {
-            200: {
-                body: z.object({
-                    id: z.string(),
-                }),
-                cache: {
-                    scope: 'private',
-                    maxAge: 300,
+        })
+        .handler(({ params }) => {
+            if (params.id !== '1') {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'Not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: {
+                    id: params.id,
+                },
+            };
+        }),
+    findUser: k
+        .route({
+            method: 'GET',
+            path: '/cached-lookup/:id',
+            responses: {
+                200: {
+                    body: z.object({
+                        id: z.string(),
+                    }),
+                    cache: {
+                        scope: 'private',
+                        maxAge: 300,
+                    },
+                },
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(({ params }) => {
+            if (params.id !== '1') {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'Not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: {
+                    id: params.id,
+                },
+            };
+        }),
+    health: k
+        .route({
+            method: 'GET',
+            path: '/cached-health',
+            responses: {
+                200: {
+                    body: z.object({
+                        ok: z.boolean(),
+                    }),
+                    cache: 'no-store',
                 },
             },
-            404: {
-                body: ProblemDetailsSchema,
-                cache: {
-                    scope: 'public',
-                    maxAge: 10,
-                },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                ok: true,
             },
-        },
-    },
-    findUser: {
-        method: 'GET',
-        path: '/cached-lookup/:id',
-        responses: {
-            200: {
-                body: z.object({
-                    id: z.string(),
-                }),
-                cache: {
-                    scope: 'private',
-                    maxAge: 300,
-                },
-            },
-            404: ProblemDetailsSchema,
-        },
-    },
-    health: {
-        method: 'GET',
-        path: '/cached-health',
-        responses: {
-            200: {
-                body: z.object({
-                    ok: z.boolean(),
-                }),
-                cache: 'no-store',
-            },
-        },
-    },
+        })),
     /**
      * Its handler returns a `cache-control` of its own, which the declared
      * policy overrules.
      */
-    freshReport: {
-        method: 'GET',
-        path: '/cached-report',
-        responses: {
-            200: {
-                body: z.object({
+    freshReport: k
+        .route({
+            method: 'GET',
+            path: '/cached-report',
+            responses: {
+                200: {
+                    body: z.object({
+                        ok: z.boolean(),
+                    }),
+                    cache: {
+                        scope: 'private',
+                        maxAge: 300,
+                    },
+                },
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+            headers: {
+                'cache-control': 'no-store',
+            },
+        })),
+    guardedReport: k
+        .route({
+            method: 'GET',
+            path: '/cached-guarded',
+            responses: {
+                200: z.object({
                     ok: z.boolean(),
                 }),
-                cache: {
-                    scope: 'private',
-                    maxAge: 300,
+                403: {
+                    body: ProblemDetailsSchema,
+                    cache: 'no-store',
                 },
             },
-        },
-    },
-    guardedReport: {
-        method: 'GET',
-        path: '/cached-guarded',
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-            403: {
-                body: ProblemDetailsSchema,
-                cache: 'no-store',
+        })
+        .handler(() => ({
+            status: 403,
+            body: {
+                detail: 'Forbidden',
             },
-        },
-    },
-    validatedReport: {
-        method: 'GET',
-        path: '/cached-validated',
-        query: z.object({
-            page: z.number().int(),
-        }),
-        responses: {
-            200: z.object({
-                page: z.number(),
+        })),
+    validatedReport: k
+        .route({
+            method: 'GET',
+            path: '/cached-validated',
+            query: z.object({
+                page: z.number().int(),
             }),
-            400: {
-                body: ProblemDetailsSchema,
-                cache: 'no-store',
-            },
-        },
-    },
-    taggedUser: {
-        method: 'GET',
-        path: '/tagged-users/:id',
-        responses: {
-            200: {
-                body: z.object({
-                    id: z.string(),
+            responses: {
+                200: z.object({
+                    page: z.number(),
                 }),
-                cache: {
-                    scope: 'private',
-                    noCache: true,
+                400: {
+                    body: ProblemDetailsSchema,
+                    cache: 'no-store',
                 },
-                etag: true,
             },
-        },
-    },
+        })
+        .handler(({ query }) => ({
+            status: 200,
+            body: {
+                page: query.page,
+            },
+        })),
+    taggedUser: k
+        .route({
+            method: 'GET',
+            path: '/tagged-users/:id',
+            responses: {
+                200: {
+                    body: z.object({
+                        id: z.string(),
+                    }),
+                    cache: {
+                        scope: 'private',
+                        noCache: true,
+                    },
+                    etag: true,
+                },
+            },
+        })
+        .handler(({ params }) => ({
+            status: 200,
+            body: {
+                id: params.id,
+            },
+        })),
 });
 
 export const cachedContract = k.contract({
     routes: cachedRoutes,
 });
 
-export const createCachedRouter = <Context>(): Router<typeof cachedRoutes, Context> => ({
-    listUsers: () => ({
-        status: 200,
-        body: {
-            users: ['alice'],
-        },
-    }),
-    getUser: ({ params }) => {
-        if (params.id !== '1') {
-            return {
-                status: 404,
-                body: {
-                    detail: 'Not found',
-                },
-            };
-        }
-        return {
-            status: 200,
-            body: {
-                id: params.id,
-            },
-        };
+const echoMethod = (method: string) => () => ({
+    status: 200 as const,
+    body: {
+        method,
     },
-    findUser: ({ params }) => {
-        if (params.id !== '1') {
-            return {
-                status: 404,
-                body: {
-                    detail: 'Not found',
-                },
-            };
-        }
-        return {
-            status: 200,
-            body: {
-                id: params.id,
-            },
-        };
-    },
-    health: () => ({
-        status: 200,
-        body: {
-            ok: true,
-        },
-    }),
-    freshReport: () => ({
-        status: 200,
-        body: {
-            ok: true,
-        },
-        headers: {
-            'cache-control': 'no-store',
-        },
-    }),
-    guardedReport: () => ({
-        status: 403,
-        body: {
-            detail: 'Forbidden',
-        },
-    }),
-    validatedReport: ({ query }) => ({
-        status: 200,
-        body: {
-            page: query.page,
-        },
-    }),
-    taggedUser: ({ params }) => ({
-        status: 200,
-        body: {
-            id: params.id,
-        },
-    }),
 });
 
 /**
  * One route per HTTP method, so every adapter proves it registers and dispatches all of them.
  */
 export const methodRoutes = k.routes('api', {
-    getItem: {
-        method: 'GET',
-        path: '/items/:id',
-        responses: {
-            200: z.object({
-                method: z.string(),
-            }),
-        },
-    },
-    createItem: {
-        method: 'POST',
-        path: '/items',
-        responses: {
-            200: z.object({
-                method: z.string(),
-            }),
-        },
-    },
-    listItems: {
-        method: 'GET',
-        path: '/items',
-        responses: {
-            200: z.object({
-                method: z.string(),
-            }),
-        },
-    },
-    optionsItems: {
-        method: 'OPTIONS',
-        path: '/items',
-        responses: {
-            200: z.object({
-                method: z.string(),
-            }),
-        },
-    },
-    replaceItem: {
-        method: 'PUT',
-        path: '/items/:id',
-        responses: {
-            200: z.object({
-                method: z.string(),
-            }),
-        },
-    },
-    patchItem: {
-        method: 'PATCH',
-        path: '/items/:id',
-        responses: {
-            200: z.object({
-                method: z.string(),
-            }),
-        },
-    },
-    deleteItem: {
-        method: 'DELETE',
-        path: '/items/:id',
-        responses: {
-            200: z.object({
-                method: z.string(),
-            }),
-        },
-    },
-    optionsItem: {
-        method: 'OPTIONS',
-        path: '/items/:id',
-        responses: {
-            200: z.object({
-                method: z.string(),
-            }),
-        },
-    },
-    headItem: {
-        method: 'HEAD',
-        path: '/items/:id',
-        responses: {
-            200: z.object({
-                method: z.string(),
-            }),
-        },
-    },
+    getItem: k
+        .route({
+            method: 'GET',
+            path: '/items/:id',
+            responses: {
+                200: z.object({
+                    method: z.string(),
+                }),
+            },
+        })
+        .handler(echoMethod('GET')),
+    createItem: k
+        .route({
+            method: 'POST',
+            path: '/items',
+            responses: {
+                200: z.object({
+                    method: z.string(),
+                }),
+            },
+        })
+        .handler(echoMethod('POST')),
+    listItems: k
+        .route({
+            method: 'GET',
+            path: '/items',
+            responses: {
+                200: z.object({
+                    method: z.string(),
+                }),
+            },
+        })
+        .handler(echoMethod('GET')),
+    optionsItems: k
+        .route({
+            method: 'OPTIONS',
+            path: '/items',
+            responses: {
+                200: z.object({
+                    method: z.string(),
+                }),
+            },
+        })
+        .handler(echoMethod('OPTIONS')),
+    replaceItem: k
+        .route({
+            method: 'PUT',
+            path: '/items/:id',
+            responses: {
+                200: z.object({
+                    method: z.string(),
+                }),
+            },
+        })
+        .handler(echoMethod('PUT')),
+    patchItem: k
+        .route({
+            method: 'PATCH',
+            path: '/items/:id',
+            responses: {
+                200: z.object({
+                    method: z.string(),
+                }),
+            },
+        })
+        .handler(echoMethod('PATCH')),
+    deleteItem: k
+        .route({
+            method: 'DELETE',
+            path: '/items/:id',
+            responses: {
+                200: z.object({
+                    method: z.string(),
+                }),
+            },
+        })
+        .handler(echoMethod('DELETE')),
+    optionsItem: k
+        .route({
+            method: 'OPTIONS',
+            path: '/items/:id',
+            responses: {
+                200: z.object({
+                    method: z.string(),
+                }),
+            },
+        })
+        .handler(echoMethod('OPTIONS')),
+    headItem: k
+        .route({
+            method: 'HEAD',
+            path: '/items/:id',
+            responses: {
+                200: z.object({
+                    method: z.string(),
+                }),
+            },
+        })
+        .handler(echoMethod('HEAD')),
 });
 
 export const methodContract = k.contract({
     routes: methodRoutes,
 });
-
-export const createMethodRouter = <Context>(): Router<typeof methodRoutes, Context> => {
-    const echo = (method: string) => () => ({
-        status: 200 as const,
-        body: {
-            method,
-        },
-    });
-    return {
-        getItem: echo('GET'),
-        createItem: echo('POST'),
-        listItems: echo('GET'),
-        optionsItems: echo('OPTIONS'),
-        replaceItem: echo('PUT'),
-        patchItem: echo('PATCH'),
-        deleteItem: echo('DELETE'),
-        optionsItem: echo('OPTIONS'),
-        headItem: echo('HEAD'),
-    };
-};
 
 const probePlugin = createPlugin<{ label: () => string }>()({
     name: 'probe',
@@ -976,24 +978,38 @@ const pluginK = new Kizuna({
 });
 
 export const pluginRoutes = pluginK.routes('api', {
-    whichLabel: {
-        method: 'GET',
-        path: '/which-label',
-        responses: {
-            200: z.object({
-                label: z.string(),
-            }),
-        },
-    },
-    overlapping: {
-        method: 'GET',
-        path: '/which-label/me',
-        responses: {
-            200: z.object({
-                from: z.string(),
-            }),
-        },
-    },
+    whichLabel: pluginK
+        .route({
+            method: 'GET',
+            path: '/which-label',
+            responses: {
+                200: z.object({
+                    label: z.string(),
+                }),
+            },
+        })
+        .handler((({ plugins }: { plugins: { probe: { label: () => string } } }) => ({
+            status: 200,
+            body: {
+                label: plugins.probe.label(),
+            },
+        })) as never),
+    overlapping: pluginK
+        .route({
+            method: 'GET',
+            path: '/which-label/me',
+            responses: {
+                200: z.object({
+                    from: z.string(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                from: 'contract',
+            },
+        })),
 });
 
 export const pluginContract = pluginK.contract({
@@ -1008,22 +1024,6 @@ export const pluginImplementations = {
         label: 'probed',
     }),
 };
-
-export const createPluginRouter = <Context>(): Router<typeof pluginRoutes, Context> =>
-    ({
-        whichLabel: ({ plugins }: { plugins: { probe: { label: () => string } } }) => ({
-            status: 200,
-            body: {
-                label: plugins.probe.label(),
-            },
-        }),
-        overlapping: () => ({
-            status: 200,
-            body: {
-                from: 'contract',
-            },
-        }),
-    }) as unknown as Router<typeof pluginRoutes, Context>;
 
 // Holds the generator before its last event. Open by default; `hold()` arms it for one test.
 const createStreamGate = () => {
@@ -1064,49 +1064,119 @@ const createStreamGate = () => {
 export const streamGate = createStreamGate();
 
 export const streamRoutes = k.routes('api', {
-    watchEvents: {
-        method: 'GET',
-        path: '/events',
-        query: z.object({
-            fail: z.string().optional(),
-            boom: z.string().optional(),
-            invalid: z.string().optional(),
+    watchEvents: k
+        .route({
+            method: 'GET',
+            path: '/events',
+            query: z.object({
+                fail: z.string().optional(),
+                boom: z.string().optional(),
+                invalid: z.string().optional(),
+            }),
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                        done: z.object({
+                            count: z.int(),
+                        }),
+                    },
+                },
+                400: ProblemDetailsSchema,
+            },
+        })
+        .handler(({ query, throwError }) => {
+            if (query.fail === '1') {
+                return throwError({
+                    status: 400,
+                    body: {
+                        detail: 'asked to fail',
+                    },
+                });
+            }
+            return {
+                status: 200,
+                body: async function* ({ signal }) {
+                    signal.addEventListener('abort', () => streamGate.markAborted(), {
+                        once: true,
+                    });
+                    yield {
+                        event: 'delta',
+                        data: {
+                            text: 'a',
+                        },
+                    };
+                    yield {
+                        comment: 'keep-alive',
+                    };
+                    if (query.boom === '1') throw new Error('boom');
+                    if (query.invalid === '1') {
+                        yield {
+                            event: 'delta',
+                            data: {
+                                text: 42 as unknown as string,
+                            },
+                        };
+                    }
+                    await streamGate.wait();
+                    yield {
+                        event: 'done',
+                        data: {
+                            count: 1,
+                        },
+                        id: 'evt-1',
+                        retry: 5000,
+                    };
+                },
+            };
         }),
-        responses: {
-            200: {
-                stream: {
-                    delta: z.object({
-                        text: z.string(),
-                    }),
-                    done: z.object({
-                        count: z.int(),
+    watchTicks: k
+        .route({
+            method: 'GET',
+            path: '/ticks',
+            responses: {
+                200: {
+                    stream: z.object({
+                        tick: z.int(),
                     }),
                 },
             },
-            400: ProblemDetailsSchema,
-        },
-    },
-    watchTicks: {
-        method: 'GET',
-        path: '/ticks',
-        responses: {
-            200: {
-                stream: z.object({
-                    tick: z.int(),
-                }),
+        })
+        .handler(() => ({
+            status: 200,
+            body: async function* () {
+                yield {
+                    data: {
+                        tick: 1,
+                    },
+                };
+                yield {
+                    data: {
+                        tick: 2,
+                    },
+                };
             },
-        },
-    },
-    exportLines: {
-        method: 'GET',
-        path: '/lines.txt',
-        responses: {
-            200: {
-                stream: z.string(),
-                contentType: 'text/plain',
+        })),
+    exportLines: k
+        .route({
+            method: 'GET',
+            path: '/lines.txt',
+            responses: {
+                200: {
+                    stream: z.string(),
+                    contentType: 'text/plain',
+                },
             },
-        },
-    },
+        })
+        .handler(() => ({
+            status: 200,
+            body: async function* () {
+                yield 'one\n';
+                yield 'two\n';
+            },
+        })),
 });
 
 export const streamContract = k.contract({
@@ -1117,73 +1187,3 @@ export const streamedEventsText =
     'event: delta\ndata: {"text":"a"}\n\n: keep-alive\n\nevent: done\ndata: {"count":1}\nid: evt-1\nretry: 5000\n\n';
 export const streamedTicksText = 'data: {"tick":1}\n\ndata: {"tick":2}\n\n';
 export const streamedLinesText = 'one\ntwo\n';
-
-export const createStreamRouter = <Context>(): Router<typeof streamRoutes, Context> => ({
-    watchEvents: ({ query, throwError }) => {
-        if (query.fail === '1') {
-            return throwError({
-                status: 400,
-                body: {
-                    detail: 'asked to fail',
-                },
-            });
-        }
-        return {
-            status: 200,
-            body: async function* ({ signal }) {
-                signal.addEventListener('abort', () => streamGate.markAborted(), {
-                    once: true,
-                });
-                yield {
-                    event: 'delta',
-                    data: {
-                        text: 'a',
-                    },
-                };
-                yield {
-                    comment: 'keep-alive',
-                };
-                if (query.boom === '1') throw new Error('boom');
-                if (query.invalid === '1') {
-                    yield {
-                        event: 'delta',
-                        data: {
-                            text: 42 as unknown as string,
-                        },
-                    };
-                }
-                await streamGate.wait();
-                yield {
-                    event: 'done',
-                    data: {
-                        count: 1,
-                    },
-                    id: 'evt-1',
-                    retry: 5000,
-                };
-            },
-        };
-    },
-    watchTicks: () => ({
-        status: 200,
-        body: async function* () {
-            yield {
-                data: {
-                    tick: 1,
-                },
-            };
-            yield {
-                data: {
-                    tick: 2,
-                },
-            };
-        },
-    }),
-    exportLines: () => ({
-        status: 200,
-        body: async function* () {
-            yield 'one\n';
-            yield 'two\n';
-        },
-    }),
-});

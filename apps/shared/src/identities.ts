@@ -36,6 +36,9 @@ export const inviteToken = Kizuna.identity.custom({
         inviteId: z.string(),
         email: z.email(),
     }),
+    params: z.object({
+        token: z.string(),
+    }),
 });
 
 /**

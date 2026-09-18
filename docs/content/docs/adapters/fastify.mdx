@@ -9,6 +9,19 @@ description: Mount a ts-kizuna API on a Fastify application.
 
 <InstallTabs packageName="@ts-kizuna/fastify fastify" />
 
+## The adapter
+
+`fastifyAdapter` is the Fastify adapter as a value. Pass it to `new Kizuna()`, and every handler on this API receives Fastify's request objects:
+
+```ts title="contract/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { fastifyAdapter } from '@ts-kizuna/fastify';
+
+export const k = new Kizuna({
+    adapter: fastifyAdapter,
+});
+```
+
 <Steps>
 
 <Step>

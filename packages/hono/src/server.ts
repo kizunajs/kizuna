@@ -29,6 +29,7 @@ import {
     toolRunnerFrom,
     createServerSurface,
     type Server as CoreServer,
+    type Adapter,
     type ContractRouter,
     type ContractJobsRouter,
     type ContractToolsRouter,
@@ -94,7 +95,7 @@ export interface HonoOptions {
     formatError?: ErrorFormatter<Request>;
 }
 
-const honoAdapter = createAdapter<
+const pipeline = createAdapter<
     Request,
     Response,
     HonoHandlerContext<Env>,
@@ -170,7 +171,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                 readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
             };
 
-            return honoAdapter.handle({
+            return pipeline.handle({
                 routes: lane,
                 router: resolvedRouter,
                 request: adapterRequest,
@@ -196,7 +197,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
     };
 
     const mountLane = (lane: Routes, resolvedRouter: CoreRouter<Routes, HonoHandlerContext<Env>>): void => {
-        for (const { routeKey, route } of honoAdapter.eachRoute(lane, resolvedRouter)) {
+        for (const { routeKey, route } of pipeline.eachRoute(lane, resolvedRouter)) {
             mountRoute(routeKey, route, lane, resolvedRouter);
         }
     };
@@ -212,6 +213,21 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
         }
     }
 }
+
+/**
+ * The Hono adapter, as a value. Pass it to `new Kizuna({ adapter })`.
+ *
+ * @example
+ * import { honoAdapter } from '@ts-kizuna/hono';
+ *
+ * export const k = new Kizuna({
+ *     adapter: honoAdapter,
+ * });
+ */
+export const honoAdapter: Adapter<HonoHandlerContext<Env>, [app: Hono, options?: HonoOptions], void> = {
+    name: 'hono',
+    mount: (api, app, options) => mountHono(api as HonoApi, app, options),
+};
 
 export interface Server<C extends Contract, E extends Env = Env> extends CoreServer<C, HonoHandlerContext<E>, HonoApi<RoutesOf<C>>> {}
 

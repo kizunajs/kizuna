@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { KizunaServer, NextRequest, NextResponse } from './server.js';
+import { KizunaServer, nextAdapter, NextRequest, NextResponse, type NextApi } from './server.js';
 import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 const k = new Kizuna({
@@ -422,7 +422,13 @@ describe('Next.js handler: requestMiddleware', () => {
 
 testAdapterFeatures({
     name: 'next',
-    initServerApi: (contract, options) => new KizunaServer(contract).api(options),
+    initServerApi: (contract, options) =>
+        new Kizuna({
+            adapter: nextAdapter,
+        }).api({
+            contract,
+            ...(options as object),
+        }) as unknown as NextApi,
     mount: (api, { responseValidation }) => {
         const handlers = api.mount({
             basePath: '/api',

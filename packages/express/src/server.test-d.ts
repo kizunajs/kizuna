@@ -1,4 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
+import { Kizuna } from '@ts-kizuna/core';
+import type { HandlerContextOf } from '@ts-kizuna/core/adapter';
 import type { Request } from 'express';
 import type { RouteDefinition } from '@ts-kizuna/core';
 import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
@@ -16,7 +18,7 @@ import {
     type ExpectedRouteHandler,
     type ExpectedRouter,
 } from '../../core/src/adapter-testing/type-testing.js';
-import { KizunaServer, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
+import { KizunaServer, expressAdapter, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
 
 const securedServer = new KizunaServer(securedContract);
 const gateServer = new KizunaServer(gateContract);
@@ -518,4 +520,12 @@ test('a request context resolver reads the Express request', () => {
     requestContextServer.requestContext('analytics', ({ req }) => ({
         sessionId: req.header('x-posthog-session-id') ?? null,
     }));
+});
+
+test('the Express adapter is a value carrying its handler context', () => {
+    expectTypeOf<HandlerContextOf<typeof expressAdapter>>().toEqualTypeOf<ExpressHandlerContext>();
+
+    new Kizuna({
+        adapter: expressAdapter,
+    });
 });

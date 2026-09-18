@@ -9,6 +9,19 @@ description: Mount a ts-kizuna API on a Hono application.
 
 <InstallTabs packageName="@ts-kizuna/hono hono" />
 
+## The adapter
+
+`honoAdapter` is the Hono adapter as a value. Pass it to `new Kizuna()`, and every handler on this API receives Hono's request objects:
+
+```ts title="contract/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { honoAdapter } from '@ts-kizuna/hono';
+
+export const k = new Kizuna({
+    adapter: honoAdapter,
+});
+```
+
 <Steps>
 
 <Step>

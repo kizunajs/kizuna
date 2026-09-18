@@ -98,6 +98,9 @@ importers:
       '@ts-kizuna/eslint-plugin':
         specifier: workspace:*
         version: link:packages/eslint-plugin
+      '@ts-kizuna/fetch':
+        specifier: workspace:*
+        version: link:packages/fetch
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
@@ -364,6 +367,10 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.3.6
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.2
 
   apps/swift-demo:
     dependencies:

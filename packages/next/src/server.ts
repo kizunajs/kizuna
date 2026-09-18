@@ -33,6 +33,7 @@ import {
     type Tools,
     createServerSurface,
     type Server as CoreServer,
+    type Adapter,
     type ServerApiOptions,
     type ContractRouter,
     type ContractJobsRouter,
@@ -400,6 +401,23 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
         OPTIONS: handler,
     };
 }
+
+/**
+ * The Next adapter, as a value. Pass it to `new Kizuna({ adapter })`. Next
+ * routes by file, so mounting returns the route handlers to re-export rather
+ * than registering them on an app.
+ *
+ * @example
+ * import { nextAdapter } from '@ts-kizuna/next';
+ *
+ * export const k = new Kizuna({
+ *     adapter: nextAdapter,
+ * });
+ */
+export const nextAdapter: Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> = {
+    name: 'next',
+    mount: (api, options) => mountNext(api as NextApiWithRouter, options),
+};
 
 export interface Server<C extends Contract> extends CoreServer<C, NextHandlerContext, NextApi<RoutesOf<C>>> {
     /**

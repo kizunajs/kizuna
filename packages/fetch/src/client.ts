@@ -20,7 +20,7 @@ import {
     type RoutePath,
 } from '@ts-kizuna/core';
 import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
-import { buildPath, isRouteDefinition } from '@ts-kizuna/core/adapter';
+import { buildPath, isRouteDefinition } from '@ts-kizuna/core';
 import { parseServerSentEvents, readByteChunks, readTextChunks } from './sse.js';
 
 type ResponseUnion<R extends RouteDefinition> = {

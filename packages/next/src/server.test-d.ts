@@ -1,4 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
+import { Kizuna } from '@ts-kizuna/core';
+import type { HandlerContextOf } from '@ts-kizuna/core/adapter';
 import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
 import {
     checkAdapterTypeFeatures,
@@ -14,7 +16,14 @@ import {
     type ExpectedRouteHandler,
     type ExpectedRouter,
 } from '../../core/src/adapter-testing/type-testing.js';
-import { KizunaServer, type NextHandlerContext, type NextMiddlewareHandler, type RouteHandler, type Router } from './server.js';
+import {
+    KizunaServer,
+    nextAdapter,
+    type NextHandlerContext,
+    type NextMiddlewareHandler,
+    type RouteHandler,
+    type Router,
+} from './server.js';
 
 const securedServer = new KizunaServer(securedContract);
 const gateServer = new KizunaServer(gateContract);
@@ -516,4 +525,12 @@ test('a request context resolver reads the Next request', () => {
 
 test('NextMiddlewareHandler receives the Next request', () => {
     expectTypeOf<NextMiddlewareHandler>().parameter(0).toMatchTypeOf<NextHandlerContext['request']>();
+});
+
+test('the Next adapter is a value carrying its handler context', () => {
+    expectTypeOf<HandlerContextOf<typeof nextAdapter>>().toEqualTypeOf<NextHandlerContext>();
+
+    new Kizuna({
+        adapter: nextAdapter,
+    });
 });

@@ -4,15 +4,7 @@ import {
     adminToken,
     badgeBytes,
     brokenContract,
-    createBrokenRouter,
-    createIssueRouter,
-    createMethodRouter,
-    createResponseShapeRouter,
-    createDeprecatedRouter,
-    createSecuredRouter,
-    createSubUserRouter,
-    createUserRouter,
-    createCachedRouter,
+    resetUsers,
     csvBody,
     cachedContract,
     deprecatedContract,
@@ -26,10 +18,8 @@ import {
     subUserContract,
     userContract,
     pluginContract,
-    createPluginRouter,
     pluginImplementations,
     streamContract,
-    createStreamRouter,
     streamGate,
     streamedEventsText,
     streamedTicksText,
@@ -61,7 +51,6 @@ export interface AdapterUnderTest<Api> {
 
 interface MountOptions {
     contract: unknown;
-    router: unknown;
     responseValidation?: boolean;
     guards?: Record<string, unknown>;
     plugins?: Record<string, unknown>;
@@ -74,7 +63,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         const api = adapter.initServerApi(
             options.contract as never,
             {
-                router: options.router,
                 guards: options.guards,
                 plugins: options.plugins,
             } as never
@@ -98,7 +86,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 contract: pluginContract,
-                router: createPluginRouter(),
                 plugins: pluginImplementations,
             },
             use
@@ -108,7 +95,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 contract: securedContract,
-                router: createSecuredRouter(),
                 guards: securedGuards,
             },
             use
@@ -118,7 +104,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 contract: methodContract,
-                router: createMethodRouter(),
             },
             use
         );
@@ -127,7 +112,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 contract: deprecatedContract,
-                router: createDeprecatedRouter(),
             },
             use
         );
@@ -137,7 +121,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         return using(
             {
                 contract: streamContract,
-                router: createStreamRouter(),
                 responseValidation,
             },
             use
@@ -156,7 +139,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 contract: cachedContract,
-                router: createCachedRouter(),
             },
             use
         );
@@ -165,7 +147,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 contract: responseShapeContract,
-                router: createResponseShapeRouter(),
             },
             use
         );
@@ -174,7 +155,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 contract: issueContract,
-                router: createIssueRouter(),
             },
             (issues) =>
                 issues.request({
@@ -190,9 +170,9 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     let api: MountedApi;
 
     beforeEach(async () => {
+        resetUsers();
         api = await mount({
             contract: userContract,
-            router: createUserRouter(),
         });
     });
 
@@ -265,7 +245,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             await using(
                 {
                     contract: subUserContract,
-                    router: createSubUserRouter(),
                 },
                 async (composed) => {
                     const response = await composed.request({
@@ -733,7 +712,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             await using(
                 {
                     contract: brokenContract,
-                    router: createBrokenRouter(),
                     responseValidation: true,
                 },
                 async (broken) => {
@@ -952,14 +930,9 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
         'plugins.serverRequired': async () => {
-            expect(() =>
-                adapter.initServerApi(
-                    pluginContract as never,
-                    {
-                        router: createPluginRouter(),
-                    } as never
-                )
-            ).toThrow(/Plugin 'probe' is declared on the contract but has no server/);
+            expect(() => adapter.initServerApi(pluginContract as never, {} as never)).toThrow(
+                /Plugin 'probe' is declared on the contract but has no server/
+            );
         },
         'streams.sseFraming': async () => {
             await usingStreams(async (streams) => {

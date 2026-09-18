@@ -1,7 +1,7 @@
 import { getHeaderValue } from '@ts-kizuna/core';
-import { server } from './server';
+import { k } from '@ts-kizuna-demo/shared';
 
-export const captureAnalytics = server.requestContext('analytics', ({ request }) => ({
-    sessionId: getHeaderValue(request.headers['x-posthog-session-id']) ?? null,
-    distinctId: getHeaderValue(request.headers['x-posthog-distinct-id']) ?? null,
+export const captureAnalytics = k.requestContext('analytics', ({ headers }) => ({
+    sessionId: getHeaderValue(headers['x-posthog-session-id']) ?? null,
+    distinctId: getHeaderValue(headers['x-posthog-distinct-id']) ?? null,
 }));

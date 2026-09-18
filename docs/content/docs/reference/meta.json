@@ -12,6 +12,7 @@
         "k-routes",
         "k-jobs",
         "k-contract",
+        "k-api",
         "k-issue",
         "kizuna-server",
         "server-guard",

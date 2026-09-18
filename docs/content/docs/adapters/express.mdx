@@ -9,6 +9,19 @@ description: Mount a ts-kizuna API on an Express 5 application.
 
 <InstallTabs packageName="@ts-kizuna/express express" />
 
+## The adapter
+
+`expressAdapter` is the Express adapter as a value. Pass it to `new Kizuna()`, and every handler on this API receives Express's request objects:
+
+```ts title="contract/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
+
+export const k = new Kizuna({
+    adapter: expressAdapter,
+});
+```
+
 <Steps>
 
 <Step>
