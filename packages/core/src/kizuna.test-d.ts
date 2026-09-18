@@ -11,9 +11,26 @@ import type {
 } from './handler-pipeline.js';
 import type { RouteDefinition } from './types.js';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { type CredentialOf } from './identity.js';
 
-const user = Kizuna.identity.bearer({
+interface Config {
+    identities: {
+        user: typeof user;
+        member: typeof member;
+    };
+}
+
+interface InviteKConfig {
+    identities: {
+        inviteToken: typeof inviteToken;
+    };
+}
+
+const k = new Kizuna<Config>();
+const inviteK = new Kizuna<InviteKConfig>();
+
+const user = k.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
@@ -30,7 +47,7 @@ const roles = Kizuna.roles(permissions, {
     owner: 'all',
 });
 
-const member = Kizuna.identity.apiKey({
+const member = k.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -42,12 +59,12 @@ const member = Kizuna.identity.apiKey({
 type MemberRole = 'owner' | 'admin' | readonly ('owner' | 'admin')[];
 type MemberPermission = 'workspace:read' | 'workspace:delete';
 
-const k = new Kizuna({
+const config = {
     identities: {
         user,
         member,
     },
-});
+};
 
 const okResponse = {
     responses: {
@@ -58,22 +75,22 @@ const okResponse = {
 } as const;
 
 const users = k.routes({
-    listUsers: {
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         auth: false,
         ...okResponse,
-    },
+    }),
 });
 
 const workspace = k.routes({
-    getWorkspace: {
+    getWorkspace: k.route({
         method: 'GET',
         path: '/workspace',
         auth: 'user',
         ...okResponse,
-    },
-    deleteWorkspace: {
+    }),
+    deleteWorkspace: k.route({
         method: 'DELETE',
         path: '/workspace',
         auth: {
@@ -83,15 +100,16 @@ const workspace = k.routes({
             },
         },
         ...okResponse,
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: {
         users,
         workspace,
     },
-});
+}).api;
 
 type Identities = NonNullable<typeof contract.securitySchemes>;
 type Handlers = HandlersFromRoutes<typeof contract.routes, {}, Identities>;
@@ -119,19 +137,24 @@ test('an identity array hands the handler every identity it names', () => {
 });
 
 test('roles from names give the handler a role and no permissions', () => {
-    const viewer = Kizuna.identity.bearer({
+    const viewer = k.identity.bearer({
         context: z.object({
             userId: z.string(),
         }),
         roles: Kizuna.roles(['viewer', 'editor']),
     });
-    const plain = new Kizuna({
+    const plainConfig = {
         identities: {
             viewer,
         },
-    });
+    };
+    const plain = new Kizuna<{
+        identities: {
+            viewer: typeof viewer;
+        };
+    }>();
     const docs = plain.routes({
-        listDocs: {
+        listDocs: plain.route({
             method: 'GET',
             path: '/docs',
             auth: {
@@ -139,13 +162,14 @@ test('roles from names give the handler a role and no permissions', () => {
                 roles: ['editor'],
             },
             ...okResponse,
-        },
+        }),
     });
-    const plainContract = plain.contract({
+    const plainContract = defineConfig({
+        ...plainConfig,
         routes: {
             docs,
         },
-    });
+    }).api;
     type Args = Parameters<
         HandlersFromRoutes<typeof plainContract.routes, {}, NonNullable<typeof plainContract.securitySchemes>>['docs']['listDocs']
     >[0];
@@ -153,7 +177,8 @@ test('roles from names give the handler a role and no permissions', () => {
     expectTypeOf<Args['auth']['viewer']>().not.toHaveProperty('permissions');
     expectTypeOf<GuardReturn<typeof viewer>>().not.toHaveProperty('permissions');
     plain.routes({
-        listDocs: {
+        // @ts-expect-error roles from names carry no permissions to require
+        listDocs: plain.route({
             method: 'GET',
             path: '/docs',
             // @ts-expect-error roles from names carry no permissions to require
@@ -164,13 +189,14 @@ test('roles from names give the handler a role and no permissions', () => {
                 },
             },
             ...okResponse,
-        },
+        }),
     });
 });
 
 test('roles on a route are checked against its identity', () => {
     k.routes({
-        deleteWorkspace: {
+        // @ts-expect-error viewer is not a member role
+        deleteWorkspace: k.route({
             method: 'DELETE',
             path: '/workspace',
             // @ts-expect-error viewer is not a member role
@@ -179,10 +205,11 @@ test('roles on a route are checked against its identity', () => {
                 roles: 'viewer',
             },
             ...okResponse,
-        },
+        }),
     });
     k.routes({
-        deleteWorkspace: {
+        // @ts-expect-error user declares no roles
+        deleteWorkspace: k.route({
             method: 'DELETE',
             path: '/workspace',
             // @ts-expect-error user declares no roles
@@ -191,13 +218,14 @@ test('roles on a route are checked against its identity', () => {
                 roles: 'owner',
             },
             ...okResponse,
-        },
+        }),
     });
 });
 
 test('requires rejects a permission the identity does not declare', () => {
     k.routes({
-        deleteWorkspace: {
+        // @ts-expect-error archive is not a workspace permission
+        deleteWorkspace: k.route({
             method: 'DELETE',
             path: '/workspace',
             // @ts-expect-error archive is not a workspace permission
@@ -208,13 +236,14 @@ test('requires rejects a permission the identity does not declare', () => {
                 },
             },
             ...okResponse,
-        },
+        }),
     });
 });
 
 test('requires rejects an identity that declares no roles', () => {
     k.routes({
-        deleteWorkspace: {
+        // @ts-expect-error user declares no roles
+        deleteWorkspace: k.route({
             method: 'DELETE',
             path: '/workspace',
             // @ts-expect-error user declares no roles
@@ -225,35 +254,35 @@ test('requires rejects an identity that declares no roles', () => {
                 },
             },
             ...okResponse,
-        },
+        }),
     });
 });
 
 test('a route cannot leave out its auth once an identity exists', () => {
     k.routes({
         // @ts-expect-error every route states its rule
-        listThings: {
+        listThings: k.route({
             method: 'GET',
             path: '/things',
             ...okResponse,
-        },
+        }),
     });
 });
 
 test('an identity-less contract degrades to plain handlers', () => {
     const plainK = new Kizuna();
     const items = plainK.routes({
-        listItems: {
+        listItems: plainK.route({
             method: 'GET',
             path: '/items',
             ...okResponse,
-        },
+        }),
     });
-    const plainContract = plainK.contract({
+    const plainContract = defineConfig({
         routes: {
             items,
         },
-    });
+    }).api;
     type PlainHandlers = HandlersFromRoutes<typeof plainContract.routes, {}, Record<string, never>>;
     type Args = Parameters<PlainHandlers['items']['listItems']>[0];
     expectTypeOf<Args>().toHaveProperty('query');
@@ -265,26 +294,26 @@ test('an identity-less contract degrades to plain handlers', () => {
 
 test('a route rejects an identity the instance does not declare', () => {
     k.routes({
-        listThings: {
+        // @ts-expect-error 'admin' is not a declared identity
+        listThings: k.route({
             method: 'GET',
             path: '/things',
             // @ts-expect-error 'admin' is not a declared identity
             auth: 'admin',
             ...okResponse,
-        },
+        }),
     });
 });
 
-test('k.routes rejects inline security on a route', () => {
-    k.routes({
-        listThings: {
-            method: 'GET',
-            path: '/things',
-            auth: false,
-            // @ts-expect-error security is resolved from auth
-            security: ['user'],
-            ...okResponse,
-        },
+test('k.route rejects inline security on a route', () => {
+    k.route({
+        method: 'GET',
+        path: '/things',
+        // @ts-expect-error security is resolved from auth, so a route carrying one no longer reads as a route
+        auth: false,
+        ...okResponse,
+        // @ts-expect-error security is resolved from auth
+        security: ['user'],
     });
 });
 
@@ -320,21 +349,21 @@ test('resolved security on a route is the typed requirement shape', () => {
 
 const members = k.routes({
     session: {
-        login: {
+        login: k.route({
             method: 'POST',
             path: '/auth/login',
             auth: false,
             ...okResponse,
-        },
-        me: {
+        }),
+        me: k.route({
             method: 'GET',
             path: '/auth/me',
             auth: 'user',
             ...okResponse,
-        },
+        }),
     },
     events: {
-        list: {
+        list: k.route({
             method: 'GET',
             path: '/events',
             auth: {
@@ -344,8 +373,8 @@ const members = k.routes({
                 },
             },
             ...okResponse,
-        },
-        get: {
+        }),
+        get: k.route({
             method: 'GET',
             path: '/events/:eventId',
             auth: {
@@ -355,29 +384,30 @@ const members = k.routes({
                 },
             },
             ...okResponse,
-        },
+        }),
     },
     invites: {
-        list: {
+        list: k.route({
             method: 'GET',
             path: '/invites',
             auth: false,
             ...okResponse,
-        },
-        get: {
+        }),
+        get: k.route({
             method: 'GET',
             path: '/invites/:inviteId',
             auth: false,
             ...okResponse,
-        },
+        }),
     },
 });
 
-const nestedContract = k.contract({
+const nestedContract = defineConfig({
+    ...config,
     routes: {
         members,
     },
-});
+}).api;
 
 type NestedHandlers = HandlersFromRoutes<typeof nestedContract.routes, {}, NonNullable<typeof nestedContract.securitySchemes>>;
 
@@ -409,24 +439,25 @@ test('GuardParams only derives params from the routes an identity secures', () =
 
 test('GuardParams derives param names from every route an identity secures', () => {
     const paramRoutes = k.routes({
-        getWorkspaceUser: {
+        getWorkspaceUser: k.route({
             method: 'GET',
             path: '/workspaces/:workspaceId/users/:id',
             auth: 'member',
             ...okResponse,
-        },
-        listWorkspaces: {
+        }),
+        listWorkspaces: k.route({
             method: 'GET',
             path: '/workspaces',
             auth: 'member',
             ...okResponse,
-        },
+        }),
     });
-    const paramContract = k.contract({
+    const paramContract = defineConfig({
+        ...config,
         routes: {
             api: paramRoutes,
         },
-    });
+    }).api;
     type Params = GuardParams<typeof paramContract.routes, 'member'>;
     expectTypeOf<Params>().toEqualTypeOf<{ workspaceId?: string; id?: string }>();
     type NoParams = GuardParams<typeof paramContract.routes, 'user'>;
@@ -460,30 +491,31 @@ test('the standalone RouteHandler matches the Router tree it drops into', () => 
     >();
 });
 
-const inviteToken = Kizuna.identity.custom({
+const inviteToken = k.identity.custom({
     context: z.object({
         inviteId: z.string(),
     }),
 });
 
-const inviteK = new Kizuna({
+const inviteKConfig = {
     identities: {
         inviteToken,
     },
-});
+};
 
-const inviteContract = inviteK.contract({
+const inviteContract = defineConfig({
+    ...inviteKConfig,
     routes: {
         invites: inviteK.routes({
-            getInvite: {
+            getInvite: inviteK.route({
                 method: 'GET',
                 path: '/invites/:token',
                 auth: 'inviteToken',
                 ...okResponse,
-            },
+            }),
         }),
     },
-});
+}).api;
 
 type InviteHandlers = HandlersFromRoutes<typeof inviteContract.routes, {}, NonNullable<typeof inviteContract.securitySchemes>>;
 

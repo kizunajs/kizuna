@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { tagRoutes } from './routes.js';
 import { Kizuna } from './kizuna.js';
 
+const k = new Kizuna();
+
 const routes = tagRoutes({
     getUser: {
         method: 'GET',
@@ -48,7 +50,7 @@ test('path must start with /', () => {
     tagRoutes({ bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } } });
 });
 
-const tags = Kizuna.tags({
+const tags = k.tags({
     users: {
         title: 'Users',
         description: 'User management endpoints',

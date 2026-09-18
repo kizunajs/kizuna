@@ -19,7 +19,6 @@ import {
     REQUEST_CONTEXT_META,
     JOBS_META,
     TOOLS_META,
-    type ServerOptions,
     type JobsMeta,
     type ToolsMeta,
     pluginRoutesOf,
@@ -32,8 +31,6 @@ import {
     jobRouter,
     jobRunnerFrom,
     toolRunnerFrom,
-    createServerSurface,
-    type Server as CoreServer,
     type Adapter,
     type ContractRouter,
     type ContractJobsRouter,
@@ -314,40 +311,3 @@ export const fastifyAdapter: Adapter<FastifyHandlerContext, [app: FastifyInstanc
         });
     },
 };
-
-export interface Server<C extends Contract> extends CoreServer<C, FastifyHandlerContext, FastifyApi<RoutesOf<C>>> {}
-
-/**
- * Turn a contract into a server handle: the serving counterpart to `Kizuna`.
- * Keep the instance and use `server.guard` to define guards, `server.router`
- * to write typed handlers, and `server.api` to assemble them.
- */
-export class KizunaServer<C extends Contract> implements Server<C> {
-    declare readonly guard: Server<C>['guard'];
-    declare readonly requestContext: Server<C>['requestContext'];
-    declare readonly router: Server<C>['router'];
-    declare readonly jobs: Server<C>['jobs'];
-    declare readonly tools: Server<C>['tools'];
-    declare readonly api: Server<C>['api'];
-
-    constructor(contract: C, options?: ServerOptions) {
-        Object.assign(
-            this,
-            createServerSurface<C, FastifyHandlerContext, FastifyApi<RoutesOf<C>>>(contract, options, (assembled) => {
-                const api = assembled as FastifyApi<RoutesOf<C>>;
-                const plugin = fastifyPlugin(
-                    async (app: FastifyInstance, pluginOptions: FastifyOptions) => {
-                        await fastifyKizuna(app, { ...pluginOptions, api });
-                    },
-                    { name: '@ts-kizuna/fastify' }
-                );
-                return Object.assign(api, {
-                    plugin,
-                    mount: async (app: FastifyInstance, mountOptions?: FastifyOptions) => {
-                        await app.register(plugin, mountOptions ?? {});
-                    },
-                });
-            })
-        );
-    }
-}

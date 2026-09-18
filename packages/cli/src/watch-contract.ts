@@ -59,7 +59,7 @@ export const watchContract = async (
     onChange: (change: ContractChange) => void | Promise<void>,
     options: WatchContractOptions = {}
 ): Promise<() => void> => {
-    const { exportName = 'contract', debounce = 60 } = options;
+    const { exportName = 'api', debounce = 60 } = options;
 
     const report =
         options.onError ??

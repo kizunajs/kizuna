@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { flattenRoutes, isRouteDefinition } from './handler-pipeline.js';
+import { HANDLER } from './types.js';
 
 const k = new Kizuna();
 
@@ -34,7 +36,7 @@ describe('k.route', () => {
     });
 
     it('carries the handler', () => {
-        const handler = getUser.handler as (args: unknown) => unknown;
+        const handler = getUser[HANDLER] as (args: unknown) => unknown;
 
         expect(
             handler({
@@ -69,14 +71,14 @@ describe('k.route', () => {
     });
 
     it('reaches the contract with its handler', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: k.routes({
                 users: {
                     getUser,
                 },
             }),
-        });
+        }).api;
 
-        expect(contract.routes.users.getUser.handler).toBe(getUser.handler);
+        expect(contract.routes.users.getUser[HANDLER]).toBe(getUser[HANDLER]);
     });
 });

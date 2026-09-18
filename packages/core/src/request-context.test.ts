@@ -2,30 +2,44 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createAdapter, type AdapterRequest, type AdapterResult, type RequestContextMap, type GuardMap } from './adapter.js';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 
-const user = Kizuna.identity.bearer({
+interface Config {
+    identities: {
+        user: typeof user;
+    };
+    requestContext: {
+        analytics: typeof kAnalytics;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const user = k.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
 });
 
-const k = new Kizuna({
+const kAnalytics = k.requestContext(
+    z.object({
+        sessionId: z.string().nullable(),
+    })
+);
+const config = {
     identities: {
         user,
     },
     requestContext: {
-        analytics: Kizuna.requestContext(
-            z.object({
-                sessionId: z.string().nullable(),
-            })
-        ),
+        analytics: kAnalytics,
     },
-});
+};
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: {
         api: k.routes({
-            publicRoute: {
+            publicRoute: k.route({
                 method: 'GET',
                 path: '/public',
                 auth: false,
@@ -34,8 +48,8 @@ const contract = k.contract({
                         ok: z.boolean(),
                     }),
                 },
-            },
-            whoAmI: {
+            }),
+            whoAmI: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 auth: 'user',
@@ -44,10 +58,10 @@ const contract = k.contract({
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         }),
     },
-});
+}).api;
 
 const makeRequest = (path: string, headers: Record<string, string> = {}): AdapterRequest<null> => ({
     request: null,

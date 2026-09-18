@@ -144,9 +144,6 @@ export const ADAPTER_FEATURES = {
     'plugins.rawResponse': {
         summary: 'A plugin route answering with `rawResponse` sends its response untouched by validation or rendering.',
     },
-    'plugins.serverRequired': {
-        summary: 'A plugin declared on the contract with no server half passed to `server.api` throws, naming the module to import.',
-    },
     'streams.sseFraming': {
         summary: 'A streamed status writes each yield as a server-sent event under `text/event-stream` with `Cache-Control: no-store`.',
     },

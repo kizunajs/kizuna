@@ -56,7 +56,7 @@
   },
   "kizuna": {
     "entries": {
-      ".": "client",
+      ".": "server",
       "./server": "server"
     }
   },

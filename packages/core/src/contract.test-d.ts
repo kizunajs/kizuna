@@ -1,15 +1,23 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        users: 'Users',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    users: 'Users',
 });
+const config = {
+    tags: kTags,
+};
 
 const routes = k.routes('users', {
-    getUser: {
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
@@ -21,8 +29,8 @@ const routes = k.routes('users', {
                 message: z.string(),
             }),
         },
-    },
-    createUser: {
+    }),
+    createUser: k.route({
         method: 'POST',
         path: '/users',
         body: z.object({
@@ -33,12 +41,13 @@ const routes = k.routes('users', {
                 id: z.string(),
             }),
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes,
-});
+}).api;
 
 test('routes preserve literal method and path strings', () => {
     expectTypeOf(routes.getUser.method).toEqualTypeOf<'GET'>();
@@ -55,7 +64,7 @@ test('createUser has body, getUser does not', () => {
 test('path must start with /', () => {
     k.routes('users', {
         // @ts-expect-error path must start with /
-        bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } },
+        bad: k.route({ method: 'GET', path: 'users/:id', responses: { 200: z.string() } }),
     });
 });
 

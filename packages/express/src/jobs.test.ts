@@ -1,94 +1,77 @@
 import express from 'express';
+import { expressAdapter } from '@ts-kizuna/express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { KizunaServer } from './server.js';
-
-const scheduler = Kizuna.identity.bearer({
-    context: z.object({
-        invokedBy: z.string(),
-    }),
-});
-
-const k = new Kizuna({
-    identities: {
-        scheduler,
-    },
-});
-
-const routes = k.routes({
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        auth: false,
-        responses: {
-            200: z.array(z.string()),
-        },
-    },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        auth: false,
-        body: z.object({
-            name: z.string(),
-        }),
-        responses: {
-            201: z.object({
-                id: z.string(),
-            }),
-        },
-    },
-});
-
-const jobs = k.jobs('scheduler', {
-    sendDigests: {
-        schedule: '* * * * *',
-        result: z.object({
-            sent: z.int(),
-        }),
-    },
-    reconcile: {
-        input: z.object({
-            since: z.string(),
-        }),
-        result: z.object({
-            reconciled: z.int(),
-        }),
-    },
-    cleanup: {
-        schedule: '0 3 * * *',
-    },
-});
-
-const contract = k.contract({
-    routes,
-    jobs,
-});
-
-const server = new KizunaServer(contract);
-
-const requireScheduler = server.guard('scheduler', ({ bearer, deny }) =>
-    bearer?.token === 'cron-secret'
-        ? { invokedBy: 'platform' }
-        : deny({
-              status: 401,
-              body: {
-                  detail: 'Unauthorized',
-              },
-          })
-);
+import { defineConfig } from '@ts-kizuna/core';
 
 const sendDigestsRan = vi.fn();
 const reconcileRan = vi.fn();
+let failing = false;
 
-const buildApp = (options?: { failing?: boolean }) => {
-    const router = server.router({
-        listUsers: () => ({
+interface Config {
+    jobs: typeof jobs;
+    adapter: typeof expressAdapter;
+    identities: {
+        scheduler: typeof scheduler;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const scheduler = k.identity
+    .bearer({
+        context: z.object({
+            invokedBy: z.string(),
+        }),
+    })
+    .guard(({ bearer, deny }) =>
+        bearer?.token === 'cron-secret'
+            ? { invokedBy: 'platform' }
+            : deny({
+                  status: 401,
+                  body: {
+                      detail: 'Unauthorized',
+                  },
+              })
+    );
+
+const config = {
+    identities: {
+        scheduler,
+    },
+};
+
+const routes = k.routes({
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            auth: false,
+            responses: {
+                200: z.array(z.string()),
+            },
+        })
+        .handler(() => ({
             status: 200,
             body: ['ada'],
-        }),
-        createUser: async ({ body, jobs }) => {
+        })),
+    createUser: k
+        .route({
+            method: 'POST',
+            path: '/users',
+            auth: false,
+            body: z.object({
+                name: z.string(),
+            }),
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                }),
+            },
+        })
+        .handler(async ({ body, jobs }) => {
             await jobs.reconcile.queue({
                 input: {
                     since: body.name,
@@ -100,21 +83,37 @@ const buildApp = (options?: { failing?: boolean }) => {
                     id: 'user-1',
                 },
             };
-        },
-    });
+        }),
+});
 
-    const jobHandlers = server.jobs({
-        sendDigests: () => {
+const jobs = k.jobs('scheduler', {
+    sendDigests: k
+        .job({
+            schedule: '* * * * *',
+            result: z.object({
+                sent: z.int(),
+            }),
+        })
+        .handler(() => {
             sendDigestsRan();
-            if (options?.failing) throw new Error('the mailer is down');
+            if (failing) throw new Error('the mailer is down');
             return {
                 status: 200,
                 body: {
                     sent: 3,
                 },
             };
-        },
-        reconcile: ({ input }) => {
+        }),
+    reconcile: k
+        .job({
+            input: z.object({
+                since: z.string(),
+            }),
+            result: z.object({
+                reconciled: z.int(),
+            }),
+        })
+        .handler(({ input }) => {
             reconcileRan(input.since.length);
             return {
                 status: 200,
@@ -122,17 +121,24 @@ const buildApp = (options?: { failing?: boolean }) => {
                     reconciled: input.since.length,
                 },
             };
-        },
-        cleanup: () => {},
-    });
+        }),
+    cleanup: k
+        .job({
+            schedule: '0 3 * * *',
+        })
+        .handler(() => {}),
+});
 
-    const api = server.api({
-        router,
-        guards: {
-            scheduler: requireScheduler,
-        },
-        jobs: jobHandlers,
-    });
+const contract = defineConfig({
+    ...config,
+    adapter: expressAdapter,
+    routes,
+    jobs,
+}).api;
+
+const buildApp = (options?: { failing?: boolean }) => {
+    failing = options?.failing ?? false;
+    const api = contract;
 
     const app = express();
     app.use(express.json());
@@ -282,51 +288,22 @@ describe('a job outside a tick', () => {
     });
 
     it('never appears under the routes tree', () => {
-        const api = server.api({
-            router: server.router({
-                listUsers: () => ({
-                    status: 200,
-                    body: [],
-                }),
-                createUser: () => ({
-                    status: 201,
-                    body: {
-                        id: 'user-1',
-                    },
-                }),
-            }),
-            guards: {
-                scheduler: requireScheduler,
-            },
-            jobs: server.jobs({
-                sendDigests: () => ({ status: 200, body: { sent: 0 } }),
-                reconcile: () => ({ status: 200, body: { reconciled: 0 } }),
-                cleanup: () => {},
-            }),
-        });
-        expect(Object.keys(api.routes)).toEqual(['listUsers', 'createUser']);
+        expect(Object.keys(contract.routes)).toEqual(['listUsers', 'createUser']);
     });
 
     it('reports a job with no handler as failed rather than 500ing the tick', async () => {
-        const api = server.api({
-            router: server.router({
-                listUsers: () => ({
-                    status: 200,
-                    body: [],
-                }),
-                createUser: () => ({
-                    status: 201,
-                    body: {
-                        id: 'user-1',
-                    },
+        const { api } = defineConfig({
+            ...config,
+            adapter: expressAdapter,
+            routes,
+            jobs: k.jobs('scheduler', {
+                sendDigests: k.job({
+                    schedule: '* * * * *',
+                    result: z.object({
+                        sent: z.int(),
+                    }),
                 }),
             }),
-            guards: {
-                scheduler: requireScheduler,
-            },
-            jobs: {
-                reconcile: () => ({ status: 200 as const, body: { reconciled: 0 } }),
-            } as never,
         });
         const app = express();
         app.use(express.json());
@@ -339,46 +316,43 @@ describe('a job outside a tick', () => {
 
 describe('onJobError', () => {
     const buildAppWithout = (onJobError?: (job: string, error: unknown) => void) => {
-        const reporting = new KizunaServer(contract, { onJobError });
-        const api = reporting.api({
-            router: reporting.router({
-                listUsers: () => ({
-                    status: 200,
-                    body: [],
-                }),
-                createUser: async ({ jobs }) => {
-                    await jobs.reconcile.queue({
-                        input: {
-                            since: '2026-08-05',
-                        },
-                    });
-                    return {
-                        status: 201,
+        const { api } = defineConfig({
+            ...config,
+            adapter: expressAdapter,
+            routes,
+            jobs: k.jobs('scheduler', {
+                sendDigests: k
+                    .job({
+                        schedule: '* * * * *',
+                        result: z.object({
+                            sent: z.int(),
+                        }),
+                    })
+                    .handler(() => ({
+                        status: 200,
                         body: {
-                            id: 'user-1',
+                            sent: 0,
                         },
-                    };
-                },
+                    })),
+                reconcile: k
+                    .job({
+                        input: z.object({
+                            since: z.string(),
+                        }),
+                        result: z.object({
+                            reconciled: z.int(),
+                        }),
+                    })
+                    .handler(() => {
+                        throw new Error('the index is offline');
+                    }),
+                cleanup: k
+                    .job({
+                        schedule: '0 3 * * *',
+                    })
+                    .handler(() => {}),
             }),
-            guards: {
-                scheduler: reporting.guard('scheduler', ({ bearer, deny }) =>
-                    bearer?.token === 'cron-secret'
-                        ? { invokedBy: 'platform' }
-                        : deny({
-                              status: 401,
-                              body: {
-                                  detail: 'Unauthorized',
-                              },
-                          })
-                ),
-            },
-            jobs: {
-                sendDigests: () => ({ status: 200 as const, body: { sent: 0 } }),
-                reconcile: () => {
-                    throw new Error('the index is offline');
-                },
-                cleanup: () => {},
-            } as never,
+            onJobError,
         });
         const app = express();
         app.use(express.json());

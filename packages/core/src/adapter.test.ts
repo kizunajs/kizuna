@@ -4,14 +4,21 @@ import { ProblemDetailsSchema } from './schemas.js';
 import { createAdapter, renderJsonResult, ResponseValidationError, type AdapterRequest, type AdapterResult } from './adapter.js';
 import { Kizuna } from './kizuna.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const contract = k.routes('api', {
-    getItem: {
+    getItem: k.route({
         method: 'GET',
         path: '/items/:id',
         responses: {
@@ -21,7 +28,7 @@ const contract = k.routes('api', {
             }),
             404: ProblemDetailsSchema,
         },
-    },
+    }),
 });
 
 const makeRequest = (path: string): AdapterRequest<null> => ({
@@ -297,16 +304,16 @@ describe('renderJsonResult: error formatting', () => {
 describe('eachRoute', () => {
     it('yields static routes before parameterized routes at the same path segment', () => {
         const c = k.routes('api', {
-            getById: {
+            getById: k.route({
                 method: 'GET',
                 path: '/items/:id',
                 responses: { 200: z.object({ id: z.string() }) },
-            },
-            getMine: {
+            }),
+            getMine: k.route({
                 method: 'GET',
                 path: '/items/mine',
                 responses: { 200: z.object({ id: z.string() }) },
-            },
+            }),
         });
 
         const { adapter } = makeAdapter();
@@ -322,7 +329,7 @@ describe('eachRoute', () => {
 
 describe('renderJsonResult: non-JSON and binary bodies', () => {
     const rawContract = k.routes('api', {
-        exportCsv: {
+        exportCsv: k.route({
             method: 'GET',
             path: '/export',
             responses: {
@@ -331,8 +338,8 @@ describe('renderJsonResult: non-JSON and binary bodies', () => {
                     contentType: 'text/csv',
                 },
             },
-        },
-        downloadBadge: {
+        }),
+        downloadBadge: k.route({
             method: 'GET',
             path: '/badge',
             responses: {
@@ -341,7 +348,7 @@ describe('renderJsonResult: non-JSON and binary bodies', () => {
                     contentType: 'application/pdf',
                 },
             },
-        },
+        }),
     });
 
     it('sends a string body raw under the declared content type', () => {

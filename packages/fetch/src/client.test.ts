@@ -1,16 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { KizunaClient } from './client.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const contractRoutes = k.routes('api', {
-    getUser: {
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
@@ -24,8 +32,8 @@ const contractRoutes = k.routes('api', {
                 }),
             },
         },
-    },
-    createUser: {
+    }),
+    createUser: k.route({
         method: 'POST',
         path: '/users',
         body: z.object({
@@ -37,8 +45,8 @@ const contractRoutes = k.routes('api', {
                 name: z.string(),
             }),
         },
-    },
-    listUsers: {
+    }),
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         query: z.object({
@@ -49,8 +57,8 @@ const contractRoutes = k.routes('api', {
                 users: z.array(z.string()),
             }),
         },
-    },
-    uploadAvatar: {
+    }),
+    uploadAvatar: k.route({
         method: 'POST',
         path: '/avatar',
         contentType: 'multipart/form-data',
@@ -63,8 +71,8 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    submitForm: {
+    }),
+    submitForm: k.route({
         method: 'POST',
         path: '/form',
         contentType: 'application/x-www-form-urlencoded',
@@ -76,16 +84,17 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: contractRoutes,
-});
+}).api;
 
 const nestedContractRoutes = k.routes('api', {
     users: {
-        getUser: {
+        getUser: k.route({
             method: 'GET',
             path: '/users/:id',
             responses: {
@@ -94,8 +103,8 @@ const nestedContractRoutes = k.routes('api', {
                     name: z.string(),
                 }),
             },
-        },
-        createUser: {
+        }),
+        createUser: k.route({
             method: 'POST',
             path: '/users',
             body: z.object({
@@ -107,10 +116,10 @@ const nestedContractRoutes = k.routes('api', {
                     name: z.string(),
                 }),
             },
-        },
+        }),
     },
     posts: {
-        listPosts: {
+        listPosts: k.route({
             method: 'GET',
             path: '/posts',
             responses: {
@@ -118,13 +127,14 @@ const nestedContractRoutes = k.routes('api', {
                     posts: z.array(z.string()),
                 }),
             },
-        },
+        }),
     },
 });
 
-const nestedContract = k.contract({
+const nestedContract = defineConfig({
+    ...config,
     routes: nestedContractRoutes,
-});
+}).api;
 
 const stubFetch = (status: number, body: unknown, headers: Record<string, string> = {}) =>
     vi.fn().mockResolvedValue({
@@ -612,7 +622,7 @@ describe('KizunaClient: relative baseUrl', () => {
 });
 
 describe('requestContext on the client initializer', () => {
-    const analytics = Kizuna.requestContext({
+    const analytics = k.requestContext({
         headers: z.object({
             'x-session-id': z.string().optional(),
         }),
@@ -621,16 +631,22 @@ describe('requestContext on the client initializer', () => {
         }),
     });
 
-    const ctxK = new Kizuna({
+    const ctxKConfig = {
         requestContext: {
             analytics,
         },
-    });
+    };
+    const ctxK = new Kizuna<{
+        requestContext: {
+            analytics: typeof analytics;
+        };
+    }>();
 
-    const ctxContract = ctxK.contract({
+    const ctxContract = defineConfig({
+        ...ctxKConfig,
         routes: {
             users: ctxK.routes({
-                listUsers: {
+                listUsers: ctxK.route({
                     method: 'GET',
                     path: '/users',
                     responses: {
@@ -638,10 +654,10 @@ describe('requestContext on the client initializer', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             }),
         },
-    });
+    }).api;
 
     it('sends requestContext values as headers on every request', async () => {
         const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
@@ -673,7 +689,7 @@ describe('requestContext on the client initializer', () => {
 });
 
 const activityRoutes = k.routes('api', {
-    getActivity: {
+    getActivity: k.route({
         method: 'GET',
         path: '/activity',
         responses: {
@@ -697,12 +713,13 @@ const activityRoutes = k.routes('api', {
                 ]),
             }),
         },
-    },
+    }),
 });
 
-const activityContract = k.contract({
+const activityContract = defineConfig({
+    ...config,
     routes: activityRoutes,
-});
+}).api;
 
 describe('discriminated union response built from named models', () => {
     it('switches over the response body and narrows the started branch', async () => {
@@ -788,7 +805,7 @@ describe('discriminated union response built from named models', () => {
 
 describe('streams', () => {
     const streamRoutes = k.routes('api', {
-        reply: {
+        reply: k.route({
             method: 'POST',
             path: '/reply',
             body: z.object({
@@ -812,8 +829,8 @@ describe('streams', () => {
                     detail: z.string(),
                 }),
             },
-        },
-        ticks: {
+        }),
+        ticks: k.route({
             method: 'GET',
             path: '/ticks',
             responses: {
@@ -823,8 +840,8 @@ describe('streams', () => {
                     }),
                 },
             },
-        },
-        lines: {
+        }),
+        lines: k.route({
             method: 'GET',
             path: '/lines',
             responses: {
@@ -833,11 +850,12 @@ describe('streams', () => {
                     contentType: 'text/plain',
                 },
             },
-        },
+        }),
     });
-    const streamContract = k.contract({
+    const streamContract = defineConfig({
+        ...config,
         routes: streamRoutes,
-    });
+    }).api;
 
     const streamOf = (chunks: string[]): ReadableStream<Uint8Array> => {
         const encoder = new TextEncoder();

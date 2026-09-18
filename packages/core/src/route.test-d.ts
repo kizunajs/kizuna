@@ -2,12 +2,20 @@ import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { ProblemDetailsSchema } from './error-response.js';
+import { HANDLER } from './types.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        users: 'Users',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    users: 'Users',
 });
+const config = {
+    tags: kTags,
+};
 
 const UserSchema = z.object({
     id: z.string(),
@@ -79,7 +87,7 @@ test('a route carrying a handler goes into a group', () => {
         getUser,
     });
 
-    expectTypeOf(routes.createUser.handler).toEqualTypeOf<typeof createUser.handler>();
+    expectTypeOf(routes.createUser[HANDLER]).toEqualTypeOf<(typeof createUser)[typeof HANDLER]>();
 });
 
 test('the handler cannot answer a status the route does not declare', () => {

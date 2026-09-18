@@ -3,23 +3,21 @@ import { ADAPTER_BEHAVIOUR, ADAPTER_FEATURES, featureGroups, featuresInGroup, ty
 import {
     adminToken,
     badgeBytes,
-    brokenContract,
+    brokenInput,
     resetUsers,
     csvBody,
-    cachedContract,
-    deprecatedContract,
-    issueContract,
-    methodContract,
+    cachedInput,
+    deprecatedInput,
+    issueInput,
+    methodInput,
     ownerToken,
-    responseShapeContract,
-    securedContract,
-    securedGuards,
+    responseShapeInput,
+    securedInput,
     sessionAuthorization,
-    subUserContract,
-    userContract,
-    pluginContract,
-    pluginImplementations,
-    streamContract,
+    subUserInput,
+    userInput,
+    pluginInput,
+    streamInput,
     streamGate,
     streamedEventsText,
     streamedTicksText,
@@ -42,31 +40,30 @@ import {
 export interface AdapterUnderTest<Api> {
     name: AdapterName;
     /**
+     * Assemble a fixture against this adapter. It runs on the adapter's side so
+     * the api and its `mount` come from the same copy of core.
+     *
      * @example
-     * initServerApi: (contract, options) => new KizunaServer(contract).api(options)
+     * createApi: (input) => defineConfig({ ...input, adapter: expressAdapter }).api
      */
-    initServerApi: (contract: never, options: never) => Api;
+    createApi: (input: never) => Api;
     mount: (api: Api, options: { responseValidation?: boolean }) => Transport | Promise<Transport>;
 }
 
 interface MountOptions {
-    contract: unknown;
+    /**
+     * What a fixture declares, before an adapter is chosen. The catalogue
+     * assembles it against the adapter under test.
+     */
+    input: unknown;
     responseValidation?: boolean;
-    guards?: Record<string, unknown>;
-    plugins?: Record<string, unknown>;
 }
 
 export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void => {
     const behaviour = ADAPTER_BEHAVIOUR[adapter.name];
 
     const mount = async (options: MountOptions): Promise<MountedApi> => {
-        const api = adapter.initServerApi(
-            options.contract as never,
-            {
-                guards: options.guards,
-                plugins: options.plugins,
-            } as never
-        );
+        const api = adapter.createApi(options.input as never);
         const transport = await adapter.mount(api, {
             responseValidation: options.responseValidation,
         });
@@ -85,8 +82,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     const usingPlugins = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
             {
-                contract: pluginContract,
-                plugins: pluginImplementations,
+                input: pluginInput,
             },
             use
         );
@@ -94,8 +90,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     const usingSecured = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
             {
-                contract: securedContract,
-                guards: securedGuards,
+                input: securedInput,
             },
             use
         );
@@ -103,7 +98,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     const usingMethods = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
             {
-                contract: methodContract,
+                input: methodInput,
             },
             use
         );
@@ -111,7 +106,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     const usingDeprecated = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
             {
-                contract: deprecatedContract,
+                input: deprecatedInput,
             },
             use
         );
@@ -120,7 +115,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         streamGate.reset();
         return using(
             {
-                contract: streamContract,
+                input: streamInput,
                 responseValidation,
             },
             use
@@ -138,7 +133,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     const usingCached = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
             {
-                contract: cachedContract,
+                input: cachedInput,
             },
             use
         );
@@ -146,7 +141,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     const usingShapes = <T>(use: (mounted: MountedApi) => Promise<T>) =>
         using(
             {
-                contract: responseShapeContract,
+                input: responseShapeInput,
             },
             use
         );
@@ -154,7 +149,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     const postProfile = (body: unknown) =>
         using(
             {
-                contract: issueContract,
+                input: issueInput,
             },
             (issues) =>
                 issues.request({
@@ -172,7 +167,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
     beforeEach(async () => {
         resetUsers();
         api = await mount({
-            contract: userContract,
+            input: userInput,
         });
     });
 
@@ -244,7 +239,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         'routing.subRouterComposition': async () => {
             await using(
                 {
-                    contract: subUserContract,
+                    input: subUserInput,
                 },
                 async (composed) => {
                     const response = await composed.request({
@@ -711,7 +706,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         'responses.validation': async () => {
             await using(
                 {
-                    contract: brokenContract,
+                    input: brokenInput,
                     responseValidation: true,
                 },
                 async (broken) => {
@@ -928,11 +923,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.status).toBe(200);
                 expect(response.text).toBe('not json at all');
             });
-        },
-        'plugins.serverRequired': async () => {
-            expect(() => adapter.initServerApi(pluginContract as never, {} as never)).toThrow(
-                /Plugin 'probe' is declared on the contract but has no server/
-            );
         },
         'streams.sseFraming': async () => {
             await usingStreams(async (streams) => {

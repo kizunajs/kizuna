@@ -4,14 +4,21 @@ import { assembleApi } from './adapter.js';
 import { matchRoute } from './route-matcher.js';
 import { Kizuna } from './kizuna.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const routes = k.routes('api', {
-    getUser: {
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
@@ -19,8 +26,8 @@ const routes = k.routes('api', {
                 id: z.string(),
             }),
         },
-    },
-    createUser: {
+    }),
+    createUser: k.route({
         method: 'POST',
         path: '/users',
         body: z.object({
@@ -31,8 +38,8 @@ const routes = k.routes('api', {
                 id: z.string(),
             }),
         },
-    },
-    getUserPosts: {
+    }),
+    getUserPosts: k.route({
         method: 'GET',
         path: '/users/:userId/posts/:postId',
         responses: {
@@ -40,8 +47,8 @@ const routes = k.routes('api', {
                 id: z.string(),
             }),
         },
-    },
-    listUsers: {
+    }),
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         responses: {
@@ -49,22 +56,22 @@ const routes = k.routes('api', {
                 users: z.array(z.string()),
             }),
         },
-    },
+    }),
 });
 
 describe('duplicate route detection', () => {
     it('throws on exact duplicate method + path', () => {
         const duplicateRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: { 200: z.string() },
-            },
-            fetchUser: {
+            }),
+            fetchUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: { 200: z.string() },
-            },
+            }),
         });
         expect(() => assembleApi({ routes: duplicateRoutes }, { router: {} })).toThrow(
             /fetchUser.*collides with.*getUser|getUser.*collides with.*fetchUser/
@@ -73,16 +80,16 @@ describe('duplicate route detection', () => {
 
     it('throws on parametric conflict (same structure, different param names)', () => {
         const conflictingRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: { 200: z.string() },
-            },
-            fetchUser: {
+            }),
+            fetchUser: k.route({
                 method: 'GET',
                 path: '/users/:userId',
                 responses: { 200: z.string() },
-            },
+            }),
         });
         expect(() => assembleApi({ routes: conflictingRoutes }, { router: {} })).toThrow(/collides with/);
     });
@@ -90,18 +97,18 @@ describe('duplicate route detection', () => {
     it('throws on duplicate across nested sub-routes with dot-notated keys in message', () => {
         const nestedRoutes = k.routes('api', {
             users: {
-                getUser: {
+                getUser: k.route({
                     method: 'GET',
                     path: '/users/:id',
                     responses: { 200: z.string() },
-                },
+                }),
             },
             legacy: {
-                getUser: {
+                getUser: k.route({
                     method: 'GET',
                     path: '/users/:id',
                     responses: { 200: z.string() },
-                },
+                }),
             },
         });
         expect(() => assembleApi({ routes: nestedRoutes }, { router: {} })).toThrow(/users\.getUser|legacy\.getUser/);
@@ -162,7 +169,7 @@ describe('matchRoute', () => {
 
     it('prefers a declared HEAD route over the GET fallback', () => {
         const withHead = k.routes('api', {
-            getReport: {
+            getReport: k.route({
                 method: 'GET',
                 path: '/report',
                 responses: {
@@ -170,8 +177,8 @@ describe('matchRoute', () => {
                         rows: z.number(),
                     }),
                 },
-            },
-            headReport: {
+            }),
+            headReport: k.route({
                 method: 'HEAD',
                 path: '/report',
                 responses: {
@@ -179,14 +186,14 @@ describe('matchRoute', () => {
                         rows: z.number(),
                     }),
                 },
-            },
+            }),
         });
         expect(matched(matchRoute('HEAD', '/report', withHead)).routeKey).toBe('headReport');
     });
 
     it('does not allow HEAD on a path without GET', () => {
         const postOnly = k.routes('api', {
-            createUser: {
+            createUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({
@@ -197,7 +204,7 @@ describe('matchRoute', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
         const mismatch = matchRoute('HEAD', '/users', postOnly);
         expect(mismatch.kind).toBe('method-mismatch');
@@ -223,16 +230,16 @@ describe('matchRoute', () => {
 
     it('prefers static segments over parameterized ones regardless of declaration order', () => {
         const cartRoutes = k.routes('api', {
-            addItem: {
+            addItem: k.route({
                 method: 'POST',
                 path: '/cart/:itemId',
                 responses: { 200: z.object({ ok: z.boolean() }) },
-            },
-            checkout: {
+            }),
+            checkout: k.route({
                 method: 'POST',
                 path: '/cart/checkout',
                 responses: { 200: z.object({ ok: z.boolean() }) },
-            },
+            }),
         });
         const match = matched(matchRoute('POST', '/cart/checkout', cartRoutes));
         expect(match.routeKey).toBe('checkout');
@@ -240,16 +247,16 @@ describe('matchRoute', () => {
 
     it('prefers static over dynamic at the same segment position with equal param counts', () => {
         const meRoutes = k.routes('api', {
-            getByUserId: {
+            getByUserId: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: { 200: z.object({ id: z.string() }) },
-            },
-            getMe: {
+            }),
+            getMe: k.route({
                 method: 'GET',
                 path: '/users/me',
                 responses: { 200: z.object({ id: z.string() }) },
-            },
+            }),
         });
         const match = matched(matchRoute('GET', '/users/me', meRoutes));
         expect(match.routeKey).toBe('getMe');
@@ -257,16 +264,16 @@ describe('matchRoute', () => {
 
     it('prefers static over dynamic in deeper paths with equal param counts', () => {
         const postRoutes = k.routes('api', {
-            getUserPosts: {
+            getUserPosts: k.route({
                 method: 'GET',
                 path: '/users/:id/posts',
                 responses: { 200: z.object({ id: z.string() }) },
-            },
-            getMyPosts: {
+            }),
+            getMyPosts: k.route({
                 method: 'GET',
                 path: '/users/me/posts',
                 responses: { 200: z.object({ id: z.string() }) },
-            },
+            }),
         });
         const match = matched(matchRoute('GET', '/users/me/posts', postRoutes));
         expect(match.routeKey).toBe('getMyPosts');
@@ -274,16 +281,16 @@ describe('matchRoute', () => {
 
     it('matches distinct routes with identical structure but different static segments', () => {
         const collectionRoutes = k.routes('api', {
-            getUserPosts: {
+            getUserPosts: k.route({
                 method: 'GET',
                 path: '/users/:id/posts',
                 responses: { 200: z.object({ id: z.string() }) },
-            },
-            getUserThings: {
+            }),
+            getUserThings: k.route({
                 method: 'GET',
                 path: '/users/:id/things',
                 responses: { 200: z.object({ id: z.string() }) },
-            },
+            }),
         });
         expect(matched(matchRoute('GET', '/users/42/posts', collectionRoutes)).routeKey).toBe('getUserPosts');
         expect(matched(matchRoute('GET', '/users/42/things', collectionRoutes)).routeKey).toBe('getUserThings');

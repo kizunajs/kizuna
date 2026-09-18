@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
-import { apiEntries, defineConfig } from './config.js';
+import { apiEntries } from './config.js';
+import { defineConfig } from './define-config.js';
 import type { ClientTarget } from './config.js';
 
 const k = new Kizuna();
 
 const routes = k.routes('users', {
-    getUser: {
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
@@ -15,68 +16,81 @@ const routes = k.routes('users', {
                 name: z.string(),
             }),
         },
-    },
+    }),
 });
 
-const contract = k.contract({
-    routes: {
-        users: routes,
-    },
-});
+const swiftClient: ClientTarget = {
+    kind: 'swift',
+    output: './APIClient.swift',
+    generate: () => '',
+};
 
 describe('defineConfig', () => {
-    it('hands the config back untouched', () => {
-        const config = defineConfig({
-            contract,
+    it('hands back the api it assembled', () => {
+        const { api } = defineConfig({
+            routes: {
+                users: routes,
+            },
         });
 
-        expect(config.contract).toBe(contract);
+        expect(Object.keys(api.routes)).toEqual(['users']);
+    });
+
+    it('carries the clients it was given', () => {
+        const { clients } = defineConfig({
+            routes: {
+                users: routes,
+            },
+            clients: [swiftClient],
+        });
+
+        expect(clients).toEqual([swiftClient]);
+    });
+
+    it('has no clients when none are declared', () => {
+        const { clients } = defineConfig({
+            routes: {
+                users: routes,
+            },
+        });
+
+        expect(clients).toEqual([]);
     });
 });
 
 describe('apiEntries', () => {
-    it('reports a single API under `default`', () => {
-        const config = defineConfig({
-            contract,
-        });
-
-        expect(apiEntries(config)).toEqual([['default', config]]);
-    });
-
-    it('reports each named API', () => {
-        const config = defineConfig({
-            apis: {
-                app: {
-                    contract,
-                },
-                workspace: {
-                    contract,
-                },
+    it('reports an api exported as `api` under `default`', () => {
+        const { api } = defineConfig({
+            routes: {
+                users: routes,
             },
         });
 
-        expect(apiEntries(config).map(([name]) => name)).toEqual(['app', 'workspace']);
+        expect(apiEntries({ api }).map(([name]) => name)).toEqual(['default']);
     });
 
-    it('carries each API clients through', () => {
-        const swift: ClientTarget = {
-            kind: 'swift',
-            output: './API.swift',
-            generate: () => '',
-        };
+    it('reports each api a module exports under its own name', () => {
+        const app = defineConfig({
+            routes: {
+                users: routes,
+            },
+        }).api;
+        const workspace = defineConfig({
+            routes: {
+                users: routes,
+            },
+        }).api;
 
-        const config = defineConfig({
-            apis: {
-                app: {
-                    contract,
-                    clients: [swift],
-                },
-                workspace: {
-                    contract,
-                },
+        expect(apiEntries({ app, workspace }).map(([name]) => name)).toEqual(['app', 'workspace']);
+    });
+
+    it('carries the clients a module exports alongside its api', () => {
+        const { api } = defineConfig({
+            routes: {
+                users: routes,
             },
         });
 
-        expect(apiEntries(config)[0]?.[1].clients).toEqual([swift]);
+        expect(apiEntries({ api, clients: [swiftClient] })[0]?.[1].clients).toEqual([swiftClient]);
     });
 });

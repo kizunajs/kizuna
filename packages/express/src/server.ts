@@ -18,7 +18,6 @@ import {
     REQUEST_CONTEXT_META,
     JOBS_META,
     TOOLS_META,
-    type ServerOptions,
     type JobsMeta,
     type ToolsMeta,
     pluginRoutesOf,
@@ -31,8 +30,6 @@ import {
     jobRouter,
     jobRunnerFrom,
     toolRunnerFrom,
-    createServerSurface,
-    type Server as CoreServer,
     type ContractRouter,
     type ContractJobsRouter,
     type ContractToolsRouter,
@@ -297,56 +294,3 @@ export const expressAdapter: Adapter<ExpressHandlerContext, [app: AppLike, optio
     name: 'express',
     mount: (api, app, options) => mountExpress(api as ExpressApi, app, options),
 };
-
-export interface Server<C extends Contract> extends CoreServer<C, ExpressHandlerContext, ExpressApi<RoutesOf<C>>> {}
-
-/**
- * Turn a contract into a server handle: the serving counterpart to `Kizuna`.
- * Keep the instance and use `server.guard` to define guards, `server.router`
- * to write typed handlers, and `server.api` to assemble them.
- *
- * @example
- * const server = new KizunaServer(contract);
- *
- * const requireUser = server.guard('user', ({ bearer, deny }) => {
- *     const session = bearer && sessions.get(bearer.token);
- *     if (!session) {
- *         return deny({
- *             status: 401,
- *             body: {
- *                 detail: 'Unauthorized',
- *             },
- *         });
- *     }
- *     return {
- *         userId: session.userId,
- *     };
- * });
- *
- * export const api = server.api({
- *     router,
- *     guards: {
- *         user: requireUser,
- *     },
- * });
- */
-export class KizunaServer<C extends Contract> implements Server<C> {
-    declare readonly guard: Server<C>['guard'];
-    declare readonly requestContext: Server<C>['requestContext'];
-    declare readonly router: Server<C>['router'];
-    declare readonly jobs: Server<C>['jobs'];
-    declare readonly tools: Server<C>['tools'];
-    declare readonly api: Server<C>['api'];
-
-    constructor(contract: C, options?: ServerOptions) {
-        Object.assign(
-            this,
-            createServerSurface<C, ExpressHandlerContext, ExpressApi<RoutesOf<C>>>(contract, options, (assembled) => {
-                const api = assembled as ExpressApi<RoutesOf<C>>;
-                return Object.assign(api, {
-                    mount: (app: AppLike, mountOptions?: ExpressOptions) => mountExpress(api, app, mountOptions),
-                });
-            })
-        );
-    }
-}

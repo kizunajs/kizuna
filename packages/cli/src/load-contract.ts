@@ -5,7 +5,7 @@ export interface LoadContractOptions {
     /**
      * Named export to read the contract from.
      *
-     * @default 'contract'
+     * @default 'api'
      */
     exportName?: string;
     /**
@@ -40,10 +40,10 @@ const isSource = (file: string): boolean => !file.includes('node_modules') && !f
  */
 export const loadContract = async (
     contractPath: string,
-    exportNameOrOptions: string | LoadContractOptions = 'contract'
+    exportNameOrOptions: string | LoadContractOptions = 'api'
 ): Promise<Contract | undefined> => {
     const options = typeof exportNameOrOptions === 'string' ? { exportName: exportNameOrOptions } : exportNameOrOptions;
-    const { exportName = 'contract', files, reread } = options;
+    const { exportName = 'api', files, reread } = options;
 
     const jiti = createJiti(import.meta.url, {
         interopDefault: true,

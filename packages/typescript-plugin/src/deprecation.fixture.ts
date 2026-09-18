@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { Kizuna } from '../../core/src/index.js';
+import { defineConfig } from '../../core/src/index.js';
 import { KizunaClient } from '../../fetch/src/client.js';
+
+interface Config {
+    tags: typeof tags;
+}
+
+const k = new Kizuna<Config>();
 
 const Paginated = <ItemSchema extends z.ZodType>(itemSchema: ItemSchema) =>
     z.object({
@@ -16,16 +23,18 @@ const UserSchema = z.object({
     email_address: z.string(),
 });
 
-export const tags = Kizuna.tags({
+export const tags = k.tags({
     api: {
         title: 'API',
     },
 });
 
-const k = new Kizuna({ tags });
+const config = {
+    tags,
+};
 
 const routes = k.routes('api', {
-    oldRoute: {
+    oldRoute: k.route({
         method: 'GET',
         path: '/old',
         deprecated: 'use newRoute instead',
@@ -34,8 +43,8 @@ const routes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    newRoute: {
+    }),
+    newRoute: k.route({
         method: 'GET',
         path: '/new',
         responses: {
@@ -43,8 +52,8 @@ const routes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    detailedRoute: {
+    }),
+    detailedRoute: k.route({
         method: 'GET',
         path: '/detailed',
         deprecated: {
@@ -56,8 +65,8 @@ const routes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    datedRoute: {
+    }),
+    datedRoute: k.route({
         method: 'GET',
         path: '/dated',
         deprecated: {
@@ -68,24 +77,27 @@ const routes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    getUser: {
+    }),
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
             200: UserSchema,
         },
-    },
-    listUsersPaginated: {
+    }),
+    listUsersPaginated: k.route({
         method: 'GET',
         path: '/users/paginated',
         responses: {
             200: Paginated(UserSchema),
         },
-    },
+    }),
 });
 
-export const contract = k.contract({ routes });
+export const contract = defineConfig({
+    ...config,
+    routes,
+}).api;
 
 export const client = new KizunaClient(contract, {
     baseUrl: 'http://localhost:3000',

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { generateKotlinClient } from './generator.js';
 
 const k = new Kizuna();
@@ -11,7 +12,7 @@ const baseConfig = {
 
 describe('Kotlin generator: z.void()', () => {
     it('emits no body param and Response return for z.void() body and response', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 ping: {
                     method: 'POST',
@@ -22,7 +23,7 @@ describe('Kotlin generator: z.void()', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun ping(build: TestAPIClient.Ping.Scope.() -> TestAPIClient.Ping.Args)');
         expect(output).not.toContain('class Body');
@@ -34,7 +35,7 @@ describe('Kotlin generator: z.void()', () => {
 
 describe('Kotlin generator: z.union()', () => {
     it('resolves one-or-many union (array | single.transform) to list type', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getByIds: {
                     method: 'GET',
@@ -55,14 +56,14 @@ describe('Kotlin generator: z.union()', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('ids: List<String>');
         expect(output).not.toContain('JsonElement');
     });
 
     it('resolves union where all branches have the same type', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 search: {
                     method: 'GET',
@@ -77,7 +78,7 @@ describe('Kotlin generator: z.union()', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('tag: String');
         expect(output).not.toContain('JsonElement');
@@ -86,7 +87,7 @@ describe('Kotlin generator: z.union()', () => {
 
 describe('Kotlin generator: z.iso.datetime()', () => {
     it('maps z.iso.datetime() to Kotlin Instant, not String', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 listEvents: {
                     method: 'GET',
@@ -98,14 +99,14 @@ describe('Kotlin generator: z.iso.datetime()', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('val occurredAt: Instant');
         expect(output).not.toContain('val occurredAt: String');
     });
 
     it('maps z.string().datetime() to Kotlin Instant (legacy style)', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 listEvents: {
                     method: 'GET',
@@ -117,7 +118,7 @@ describe('Kotlin generator: z.iso.datetime()', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('val occurredAt: Instant');
         expect(output).not.toContain('val occurredAt: String');
@@ -126,7 +127,7 @@ describe('Kotlin generator: z.iso.datetime()', () => {
 
 describe('Kotlin generator: z.pipe() and z.string().transform()', () => {
     it('resolves z.string().pipe(z.coerce.number()) to Double', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 search: {
                     method: 'GET',
@@ -142,14 +143,14 @@ describe('Kotlin generator: z.pipe() and z.string().transform()', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('limit: Double');
         expect(output).not.toContain('JsonElement');
     });
 
     it('resolves z.string().transform() to String (input type)', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 list: {
                     method: 'GET',
@@ -164,7 +165,7 @@ describe('Kotlin generator: z.pipe() and z.string().transform()', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('label: String');
         expect(output).not.toContain('JsonElement');
@@ -173,7 +174,7 @@ describe('Kotlin generator: z.pipe() and z.string().transform()', () => {
 
 describe('Kotlin generator: namespace wrapper', () => {
     it('wraps all types in an object named after config.namespaceName', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -183,7 +184,7 @@ describe('Kotlin generator: namespace wrapper', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('object TestAPI {');
         expect(output).toContain('data class Error(');
@@ -193,7 +194,7 @@ describe('Kotlin generator: namespace wrapper', () => {
 
 describe('Kotlin generator: keyword property @SerialName', () => {
     it('emits @SerialName when a field name is a Kotlin keyword', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 createUser: {
                     method: 'POST',
@@ -207,7 +208,7 @@ describe('Kotlin generator: keyword property @SerialName', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('val `when`: String');
         expect(output).toContain('@SerialName');
@@ -216,7 +217,7 @@ describe('Kotlin generator: keyword property @SerialName', () => {
 
 describe('Kotlin generator: Unit error responses', () => {
     it('emits data object for Unit error status in sealed Failure', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -227,7 +228,7 @@ describe('Kotlin generator: Unit error responses', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data object Unauthorized : Failure()');
         expect(output).toContain('throw TestAPIClient.GetUser.Failure.Unauthorized');
@@ -236,7 +237,7 @@ describe('Kotlin generator: Unit error responses', () => {
 
 describe('Kotlin generator: z.int() maps to Int', () => {
     it('maps z.int() to Kotlin Int, not Double', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getStats: {
                     method: 'GET',
@@ -249,7 +250,7 @@ describe('Kotlin generator: z.int() maps to Int', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('val count: Int');
         expect(output).toContain('val ratio: Double');
@@ -258,7 +259,7 @@ describe('Kotlin generator: z.int() maps to Int', () => {
 
 describe('Kotlin generator: doc comments on auto-named types', () => {
     it('emits a KDoc comment for an auto-named data class with a description', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 healthCheck: {
                     method: 'GET',
@@ -268,7 +269,7 @@ describe('Kotlin generator: doc comments on auto-named types', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('/** Health check response */');
     });
@@ -276,7 +277,7 @@ describe('Kotlin generator: doc comments on auto-named types', () => {
 
 describe('Kotlin generator: array type qualification', () => {
     it('array response type is placed inside Ok body field', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 listItems: {
                     method: 'GET',
@@ -286,14 +287,14 @@ describe('Kotlin generator: array type qualification', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain(': TestAPIClient.ListItems.Result');
         expect(output).toContain('data class Result(val body: List<ResponseItem>)');
     });
 
     it('array response type in sub-client uses Ok body field', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 items: {
                     list: {
@@ -305,14 +306,14 @@ describe('Kotlin generator: array type qualification', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain(': TestAPIClient.ItemsList.Result');
         expect(output).toContain('data class Result(val body: List<ResponseItem>)');
     });
 
     it('qualifies array element types in sub-client method parameters', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 items: {
                     bulkCreate: {
@@ -327,14 +328,14 @@ describe('Kotlin generator: array type qualification', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('tags: List<String>');
         expect(output).not.toContain('TestAPI.List<String>');
     });
 
     it('qualifies array of user-defined types in query params', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 items: {
                     list: {
@@ -349,7 +350,7 @@ describe('Kotlin generator: array type qualification', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         // Within the operation object, the enum element resolves to its local name, a List of the
         // user-defined type, never the built-in List mis-qualified with the client namespace.
@@ -360,7 +361,7 @@ describe('Kotlin generator: array type qualification', () => {
 
 describe('Kotlin generator: nested sub-client routing', () => {
     it('emits a sub-client class for a grouped router key', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 users: {
                     getById: {
@@ -372,14 +373,14 @@ describe('Kotlin generator: nested sub-client routing', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('class TestAPIUsersClient');
         expect(output).toContain('val users = TestAPIUsersClient(');
     });
 
     it('uses the leaf method name for grouped routes, not the full joined name', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 users: {
                     getById: {
@@ -391,14 +392,14 @@ describe('Kotlin generator: nested sub-client routing', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun getById(build: TestAPIClient.UsersGetById.Scope.() -> TestAPIClient.UsersGetById.Args)');
         expect(output).not.toContain('suspend fun usersGetById');
     });
 
     it('uses the full joined name for type naming to avoid collisions across groups', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 users: {
                     getById: {
@@ -419,14 +420,14 @@ describe('Kotlin generator: nested sub-client routing', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('TestAPIClient.UsersGetById.Result');
         expect(output).toContain('TestAPIClient.PostsGetById.Result');
     });
 
     it('keeps flat routes directly on the client when mixed with grouped routes', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 ping: {
                     method: 'GET',
@@ -446,7 +447,7 @@ describe('Kotlin generator: nested sub-client routing', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun ping()');
         expect(output).toContain('class TestAPIHealthClient');
@@ -456,7 +457,7 @@ describe('Kotlin generator: nested sub-client routing', () => {
 
 describe('Kotlin generator: responseHeaders', () => {
     it('emits Ok with body and headers when response headers are declared', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -471,7 +472,7 @@ describe('Kotlin generator: responseHeaders', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class Response(');
         expect(output).toContain('val body:');
@@ -481,7 +482,7 @@ describe('Kotlin generator: responseHeaders', () => {
     });
 
     it('reads the header from response and passes it to Ok constructor', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -496,13 +497,13 @@ describe('Kotlin generator: responseHeaders', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('httpResponse.header("x-request-id")');
     });
 
     it('routes without responseHeaders emit Response with body only', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 ping: {
                     method: 'GET',
@@ -512,7 +513,7 @@ describe('Kotlin generator: responseHeaders', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class Result(val body:');
         expect(output).not.toContain('val headers: Headers');
@@ -521,7 +522,7 @@ describe('Kotlin generator: responseHeaders', () => {
 
 describe('Kotlin generator: owned type nesting', () => {
     it('nests an enum class inside its owning data class and removes it from top level', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getVideo: {
                     method: 'GET',
@@ -537,7 +538,7 @@ describe('Kotlin generator: owned type nesting', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class Video(');
         expect(output).toContain('enum class Status');
@@ -546,7 +547,7 @@ describe('Kotlin generator: owned type nesting', () => {
     });
 
     it('nests an inline object inside its parent data class', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getPage: {
                     method: 'GET',
@@ -565,7 +566,7 @@ describe('Kotlin generator: owned type nesting', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class Page(');
         expect(output).toContain('data class Images(');
@@ -581,7 +582,7 @@ describe('Kotlin generator: owned type nesting', () => {
                 width: z.number().int(),
             }),
         });
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getPage: {
                     method: 'GET',
@@ -597,7 +598,7 @@ describe('Kotlin generator: owned type nesting', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class Page(');
         expect(output).toContain('data class Image(');
@@ -609,7 +610,7 @@ describe('Kotlin generator: owned type nesting', () => {
     });
 
     it('handles deeply nested inline objects', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getPage: {
                     method: 'GET',
@@ -628,7 +629,7 @@ describe('Kotlin generator: owned type nesting', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).not.toContain('data class PageSettings');
         expect(output).not.toContain('data class PageSettingsTheme');
@@ -637,7 +638,7 @@ describe('Kotlin generator: owned type nesting', () => {
     });
 
     it('keeps sibling anonymous objects apart when one field name is a prefix of another (identical shapes)', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getOrderItem: {
                     method: 'GET',
@@ -667,7 +668,7 @@ describe('Kotlin generator: owned type nesting', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         // `ImagesItem` must nest under the parent, not get claimed by `Image` as `sItem`
         expect(output).toContain('data class Image(');
@@ -686,15 +687,15 @@ describe('Kotlin generator: @Deprecated', () => {
         }),
     });
     const deprecationRoutes = k.routes({
-        getUserById: {
+        getUserById: k.route({
             method: 'GET',
             path: '/users/by-id/:id',
             deprecated: true,
             responses: {
                 200: DeprecatedFieldSchema,
             },
-        },
-        oldRoute: {
+        }),
+        oldRoute: k.route({
             method: 'GET',
             path: '/old',
             deprecated: 'use newRoute instead',
@@ -703,8 +704,8 @@ describe('Kotlin generator: @Deprecated', () => {
                     ok: z.boolean(),
                 }),
             },
-        },
-        sunsetRoute: {
+        }),
+        sunsetRoute: k.route({
             method: 'GET',
             path: '/sunset',
             deprecated: {
@@ -718,15 +719,15 @@ describe('Kotlin generator: @Deprecated', () => {
                     ok: z.boolean(),
                 }),
             },
-        },
-        getUser: {
+        }),
+        getUser: k.route({
             method: 'GET',
             path: '/users/:id',
             responses: {
                 200: DeprecatedFieldSchema,
             },
-        },
-        getUserByIdV2: {
+        }),
+        getUserByIdV2: k.route({
             method: 'GET',
             path: '/users/v2/:id',
             responses: {
@@ -737,11 +738,11 @@ describe('Kotlin generator: @Deprecated', () => {
                     }),
                 }),
             },
-        },
+        }),
     });
-    const deprecatedContract = k.contract({
+    const deprecatedContract = defineConfig({
         routes: deprecationRoutes,
-    });
+    }).api;
 
     const generate = (routes: Contract['routes']): string => generateKotlinClient({ routes } as Contract, baseConfig);
 
@@ -783,7 +784,7 @@ describe('Kotlin generator: @Deprecated', () => {
 
 describe('Kotlin generator: HEAD method', () => {
     it('returns Unit on success and throws a void NotFound for HEAD', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 checkUser: {
                     method: 'HEAD',
@@ -797,7 +798,7 @@ describe('Kotlin generator: HEAD method', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun checkUser(build: TestAPIClient.CheckUser.Scope.() -> TestAPIClient.CheckUser.Args)');
         expect(output).not.toContain(': TestAPIClient.CheckUser.Result');
@@ -805,7 +806,7 @@ describe('Kotlin generator: HEAD method', () => {
     });
 
     it('generates OPTIONS method with normal body decoding', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 describeUsers: {
                     method: 'OPTIONS',
@@ -817,7 +818,7 @@ describe('Kotlin generator: HEAD method', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun describeUsers()');
         expect(output).toContain('decodeFromString');
@@ -826,7 +827,7 @@ describe('Kotlin generator: HEAD method', () => {
 
 describe('Kotlin generator: automatic validation error', () => {
     it('adds BadRequest variant in sealed Failure for route with body', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 createUser: {
                     method: 'POST',
@@ -841,7 +842,7 @@ describe('Kotlin generator: automatic validation error', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class BadRequest(val body: TestAPIClient.ValidationError) : Failure()');
         expect(output).toContain('data class ValidationError(');
@@ -849,7 +850,7 @@ describe('Kotlin generator: automatic validation error', () => {
     });
 
     it('does not add validation case for route without body or query', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -861,14 +862,14 @@ describe('Kotlin generator: automatic validation error', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).not.toContain('ValidationError');
         expect(output).not.toContain('ValidationIssue');
     });
 
     it('uses ValidationError variant when route also declares 400', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 createUser: {
                     method: 'POST',
@@ -886,14 +887,14 @@ describe('Kotlin generator: automatic validation error', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class BadRequest(val body: Response400) : Failure()');
         expect(output).toContain('data class ValidationError(val body: TestAPIClient.ValidationError) : Failure()');
     });
 
     it('groups duplicate status codes into a single when branch', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 createUser: {
                     method: 'POST',
@@ -911,7 +912,7 @@ describe('Kotlin generator: automatic validation error', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         const matches = output.match(/400 -> \{/g);
         expect(matches).toHaveLength(1);
@@ -920,7 +921,7 @@ describe('Kotlin generator: automatic validation error', () => {
 
 describe('Kotlin generator: @SerialName for wire names', () => {
     it('emits @SerialName when property name is sanitized from a hyphenated wire name', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -933,7 +934,7 @@ describe('Kotlin generator: @SerialName for wire names', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('@SerialName("first-name")');
         expect(output).toContain('val firstName: String');
@@ -942,7 +943,7 @@ describe('Kotlin generator: @SerialName for wire names', () => {
     });
 
     it('preserves snake_case field names as valid Kotlin identifiers', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -955,7 +956,7 @@ describe('Kotlin generator: @SerialName for wire names', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('val first_name: String');
         expect(output).toContain('val last_name: String');
@@ -968,7 +969,7 @@ describe('Kotlin generator: @SerialName for wire names', () => {
 });
 
 describe('Kotlin generator: camelCaseProperties option', () => {
-    const contract = k.contract({
+    const contract = defineConfig({
         routes: {
             getStats: {
                 method: 'GET',
@@ -981,7 +982,7 @@ describe('Kotlin generator: camelCaseProperties option', () => {
                 },
             },
         },
-    });
+    }).api;
 
     it('keeps wire names verbatim by default', () => {
         const output = generateKotlinClient(contract, baseConfig);
@@ -1008,7 +1009,7 @@ describe('Kotlin generator: camelCaseProperties option', () => {
 
 describe('Kotlin generator: z.bigint() maps to Long', () => {
     it('maps z.bigint() to Kotlin Long', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getStats: {
                     method: 'GET',
@@ -1020,7 +1021,7 @@ describe('Kotlin generator: z.bigint() maps to Long', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('val totalBytes: Long');
     });
@@ -1028,7 +1029,7 @@ describe('Kotlin generator: z.bigint() maps to Long', () => {
 
 describe('Kotlin generator: discriminated union', () => {
     it('emits a sealed interface with @JsonClassDiscriminator for discriminated unions', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 send: {
                     method: 'POST',
@@ -1048,7 +1049,7 @@ describe('Kotlin generator: discriminated union', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('@JsonClassDiscriminator("channel")');
         expect(output).toContain('sealed interface Input');
@@ -1057,7 +1058,7 @@ describe('Kotlin generator: discriminated union', () => {
     });
 
     it('emits a nested enum class for an inline z.enum, matching the field reference', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getVideo: {
                     method: 'GET',
@@ -1073,7 +1074,7 @@ describe('Kotlin generator: discriminated union', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         // The inline enum nests under its owner and the field references the same name.
         expect(output).toContain('val encodingStatus: EncodingStatus');
@@ -1087,7 +1088,7 @@ describe('Kotlin generator: discriminated union', () => {
             title: 'BaseUnit',
             schema: z.enum(['g', 'ml']),
         });
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getFood: {
                     method: 'GET',
@@ -1116,7 +1117,7 @@ describe('Kotlin generator: discriminated union', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output.match(/enum class BaseUnit/g)).toHaveLength(1);
         expect(output).not.toContain('FoodBaseUnit');
@@ -1129,7 +1130,7 @@ describe('Kotlin generator: discriminated union', () => {
             title: 'FoodSource',
             schema: z.enum(['manual', 'barcode']),
         });
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getFood: {
                     method: 'GET',
@@ -1145,7 +1146,7 @@ describe('Kotlin generator: discriminated union', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('enum class FoodSource');
         expect(output).toContain('val source: FoodSource');
@@ -1172,7 +1173,7 @@ describe('Kotlin generator: discriminated union', () => {
             title: 'Attachment',
             schema: z.discriminatedUnion('kind', [ImageAttachment, VideoAttachment]),
         });
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getMessage: {
                     method: 'GET',
@@ -1188,7 +1189,7 @@ describe('Kotlin generator: discriminated union', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         // Members are top-level data classes named after their title, implementing the sealed
         // interface, never nested under the discriminant literal.
@@ -1211,7 +1212,7 @@ describe('Kotlin generator: discriminated union', () => {
 
 describe('Kotlin generator: imports', () => {
     it('includes required imports in the generated file', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 ping: {
                     method: 'GET',
@@ -1221,7 +1222,7 @@ describe('Kotlin generator: imports', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('import kotlinx.serialization.*');
         expect(output).toContain('import kotlinx.serialization.json.*');
@@ -1232,7 +1233,7 @@ describe('Kotlin generator: imports', () => {
 
 describe('Kotlin generator: throw-on-error model', () => {
     it('returns a Response wrapper and a sealed Failure for single-success routes', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -1243,7 +1244,7 @@ describe('Kotlin generator: throw-on-error model', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain(
             'suspend fun getUser(build: TestAPIClient.GetUser.Scope.() -> TestAPIClient.GetUser.Args): TestAPIClient.GetUser.Result'
@@ -1259,7 +1260,7 @@ describe('Kotlin generator: throw-on-error model', () => {
     });
 
     it('wraps multi-status success in a sealed Success carried by Response.body', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 archive: {
                     method: 'POST',
@@ -1270,7 +1271,7 @@ describe('Kotlin generator: throw-on-error model', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('sealed interface Success');
         expect(output).toContain('data class Status200(val body:');
@@ -1279,7 +1280,7 @@ describe('Kotlin generator: throw-on-error model', () => {
     });
 
     it('throws the typed Failure for error statuses and returns Response on success', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -1290,7 +1291,7 @@ describe('Kotlin generator: throw-on-error model', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('throw TestAPIClient.GetUser.Failure.NotFound(body = payload)');
         expect(output).toContain('return@use TestAPIClient.GetUser.Result(body = payload)');
@@ -1300,7 +1301,7 @@ describe('Kotlin generator: throw-on-error model', () => {
 
 describe('Kotlin generator: inline response body name', () => {
     it('names the inline 200 body Response, distinct from the Result wrapper', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 listUsers: {
                     method: 'GET',
@@ -1313,7 +1314,7 @@ describe('Kotlin generator: inline response body name', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class Response(');
         expect(output).toContain('data class Result(val body: Response)');
@@ -1322,7 +1323,7 @@ describe('Kotlin generator: inline response body name', () => {
 
 describe('Kotlin generator: enum query wire value', () => {
     it('carries the @SerialName as wireValue rather than guessing from the constant name', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 listEvents: {
                     method: 'GET',
@@ -1335,7 +1336,7 @@ describe('Kotlin generator: enum query wire value', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('enum class QueryKind(override val wireValue: String) : KizunaQueryValue');
         expect(output).toContain('@SerialName("userCreated") USERCREATED("userCreated")');
@@ -1349,7 +1350,7 @@ describe('Kotlin generator: enum query wire value', () => {
 
 describe('Kotlin generator: package declaration', () => {
     it('emits a package declaration when packageName is set', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 ping: {
                     method: 'GET',
@@ -1359,7 +1360,7 @@ describe('Kotlin generator: package declaration', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, {
             namespaceName: 'TestAPI',
             packageName: 'com.example.api',
@@ -1368,7 +1369,7 @@ describe('Kotlin generator: package declaration', () => {
     });
 
     it('omits the package declaration when packageName is absent', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 ping: {
                     method: 'GET',
@@ -1378,7 +1379,7 @@ describe('Kotlin generator: package declaration', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).not.toContain('package ');
     });
@@ -1386,7 +1387,7 @@ describe('Kotlin generator: package declaration', () => {
 
 describe('Kotlin generator: bodyless POST/PUT/PATCH', () => {
     it('sends an empty body so OkHttp does not reject a null body', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 ping: {
                     method: 'POST',
@@ -1396,14 +1397,14 @@ describe('Kotlin generator: bodyless POST/PUT/PATCH', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('.method("POST", ByteArray(0).toRequestBody(null))');
         expect(output).not.toContain('.method("POST", null)');
     });
 
     it('keeps a null body for bodyless GET', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 check: {
                     method: 'GET',
@@ -1413,7 +1414,7 @@ describe('Kotlin generator: bodyless POST/PUT/PATCH', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('.method("GET", null)');
     });
@@ -1421,7 +1422,7 @@ describe('Kotlin generator: bodyless POST/PUT/PATCH', () => {
 
 describe('Kotlin generator: grouped request components (params/body/query/headers)', () => {
     it('emits each group as a builder class and a builder-lambda method parameter', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -1432,7 +1433,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun getUser(build: TestAPIClient.GetUser.Scope.() -> TestAPIClient.GetUser.Args');
         expect(output).toContain('data class Params(val id: String)');
@@ -1447,7 +1448,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
     });
 
     it('emits a multi-field Query builder with all fields', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 search: {
                     method: 'GET',
@@ -1458,7 +1459,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         // required query (has required fields) → non-defaulted lambda parameter
         expect(output).toContain('suspend fun search(build: TestAPIClient.Search.Scope.() -> TestAPIClient.Search.Args)');
@@ -1468,7 +1469,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
     });
 
     it('defaults an all-optional group to {} so it can be omitted at the call site', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 list: {
                     method: 'GET',
@@ -1479,13 +1480,13 @@ describe('Kotlin generator: grouped request components (params/body/query/header
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('build: TestAPIClient.List.Scope.() -> TestAPIClient.List.Args = { query() }');
     });
 
     it('wraps an object body in a Body builder exposing its fields, built into the payload for encoding', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 createUser: {
                     method: 'POST',
@@ -1499,7 +1500,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun createUser(build: TestAPIClient.CreateUser.Scope.() -> TestAPIClient.CreateUser.Args)');
         expect(output).toContain('data class Body(');
@@ -1510,7 +1511,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
     });
 
     it('wraps a struct body in a Body builder carrying the payload directly', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 send: {
                     method: 'POST',
@@ -1532,7 +1533,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         // >6 fields → the body is kept as a struct payload rather than flattened
         expect(output).toContain('data class Body(val payload: TestAPI.BigInput)');
@@ -1540,7 +1541,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
     });
 
     it('orders required groups before optional ones so optional groups keep trailing defaults', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 list: {
                     method: 'GET',
@@ -1551,7 +1552,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('suspend fun list(build: TestAPIClient.List.Scope.() -> TestAPIClient.List.Args)');
         // the optional query is only reachable after the required params step
@@ -1562,7 +1563,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
     });
 
     it('sanitizes enum values that are not valid Kotlin identifiers (leading digit, dashes)', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 listAssets: {
                     method: 'GET',
@@ -1573,7 +1574,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         // dashes → underscores, leading digit → `_` prefix; the original value is kept as the wireValue
         expect(output).toContain('@SerialName("3d-model") _3D_MODEL("3d-model")');
@@ -1582,7 +1583,7 @@ describe('Kotlin generator: grouped request components (params/body/query/header
 });
 
 describe('Kotlin generator: request context', () => {
-    const analytics = Kizuna.requestContext({
+    const analytics = k.requestContext({
         headers: z.object({
             'x-session-id': z.string().optional(),
             'x-tenant': z.string(),
@@ -1592,16 +1593,22 @@ describe('Kotlin generator: request context', () => {
         }),
     });
 
-    const ctxK = new Kizuna({
+    const ctxKConfig = {
         requestContext: {
             analytics,
         },
-    });
+    };
+    const ctxK = new Kizuna<{
+        requestContext: {
+            analytics: typeof analytics;
+        };
+    }>();
 
-    const ctxContract = ctxK.contract({
+    const ctxContract = defineConfig({
+        ...ctxKConfig,
         routes: {
             users: ctxK.routes({
-                listUsers: {
+                listUsers: ctxK.route({
                     method: 'GET',
                     path: '/users',
                     responses: {
@@ -1609,10 +1616,10 @@ describe('Kotlin generator: request context', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             }),
         },
-    });
+    }).api;
 
     it('emits a RequestContext class and a required constructor parameter', () => {
         const output = generateKotlinClient(ctxContract, baseConfig);
@@ -1625,9 +1632,9 @@ describe('Kotlin generator: request context', () => {
     });
 
     it('emits nothing when the contract declares no request context headers', () => {
-        const plainContract = k.contract({
+        const plainContract = defineConfig({
             routes: k.routes('api', {
-                ping: {
+                ping: k.route({
                     method: 'GET',
                     path: '/ping',
                     responses: {
@@ -1635,9 +1642,9 @@ describe('Kotlin generator: request context', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             }),
-        });
+        }).api;
         const output = generateKotlinClient(plainContract, baseConfig);
         expect(output).not.toContain('RequestContext');
         expect(output).not.toContain('requestContextHeaders');
@@ -1646,7 +1653,7 @@ describe('Kotlin generator: request context', () => {
 
 describe('Kotlin generator: ByteArray structural equality', () => {
     it('emits Failure.Unexpected/Decoding as plain classes, not data classes (no per-op boilerplate)', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -1658,7 +1665,7 @@ describe('Kotlin generator: ByteArray structural equality', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         // Thrown exceptions are never compared by value, so they stay plain classes ,
         // no `data`, no ByteArray equals/hashCode boilerplate, no ArrayInDataClass warning.
@@ -1671,7 +1678,7 @@ describe('Kotlin generator: ByteArray structural equality', () => {
     });
 
     it('overrides equals/hashCode on MultipartFile', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 upload: {
                     method: 'POST',
@@ -1687,7 +1694,7 @@ describe('Kotlin generator: ByteArray structural equality', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class MultipartFile(');
         expect(output).toContain(
@@ -1701,7 +1708,7 @@ describe('Kotlin generator: ByteArray structural equality', () => {
 
 describe('Kotlin generator: emitted-syntax cleanups', () => {
     it('inlines the status code into the when expression', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -1713,14 +1720,14 @@ describe('Kotlin generator: emitted-syntax cleanups', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('when (val statusCode = httpResponse.code) {');
         expect(output).not.toContain('val statusCode = httpResponse.code\n');
     });
 
     it('declares path as val when the route has no path params, var when it does', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 listUsers: {
                     method: 'GET',
@@ -1741,14 +1748,14 @@ describe('Kotlin generator: emitted-syntax cleanups', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('val path = "/users"');
         expect(output).toContain('var path = "/users/:id"');
     });
 
     it('emits an empty success branch for void-success routes', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 remove: {
                     method: 'DELETE',
@@ -1758,7 +1765,7 @@ describe('Kotlin generator: emitted-syntax cleanups', () => {
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('204 -> {}');
         expect(output).not.toContain('204 -> {\n');
@@ -1772,7 +1779,7 @@ describe('Kotlin generator: unknownEnumCase', () => {
     };
 
     const enumContract = (values: [string, ...string[]]): Contract =>
-        k.contract({
+        defineConfig({
             routes: {
                 getOrder: {
                     method: 'GET',
@@ -1788,7 +1795,7 @@ describe('Kotlin generator: unknownEnumCase', () => {
                     },
                 },
             },
-        });
+        }).api;
 
     it('emits a strict enum class by default', () => {
         const output = generateKotlinClient(enumContract(['encoding', 'encoded', 'failed']), baseConfig);
@@ -1815,7 +1822,7 @@ describe('Kotlin generator: unknownEnumCase', () => {
 
 describe('Kotlin generator: union variants owned by a name-prefix class', () => {
     it('does not duplicate sealed variant payloads as nested classes', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -1849,7 +1856,7 @@ describe('Kotlin generator: union variants owned by a name-prefix class', () => 
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class User(val id: String)');
         expect(output).not.toContain('data class ActivityEventStarted');
@@ -1857,7 +1864,7 @@ describe('Kotlin generator: union variants owned by a name-prefix class', () => 
     });
 
     it('nests a variant-owned enum inside the variant, matching the Swift client', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
             routes: {
                 getUser: {
                     method: 'GET',
@@ -1891,7 +1898,7 @@ describe('Kotlin generator: union variants owned by a name-prefix class', () => 
                     },
                 },
             },
-        });
+        }).api;
         const output = generateKotlinClient(contract, baseConfig);
         // inside the Logout variant the nested enum is already in scope
         expect(output).toContain('val reason: Reason');
@@ -1903,7 +1910,7 @@ describe('Kotlin generator: union variants owned by a name-prefix class', () => 
 
 describe('Kotlin generator: streamed responses', () => {
     const contractRoutes = k.routes({
-        reply: {
+        reply: k.route({
             method: 'POST',
             path: '/reply',
             body: z.object({
@@ -1927,8 +1934,8 @@ describe('Kotlin generator: streamed responses', () => {
                     detail: z.string(),
                 }),
             },
-        },
-        lines: {
+        }),
+        lines: k.route({
             method: 'GET',
             path: '/lines',
             responses: {
@@ -1937,14 +1944,14 @@ describe('Kotlin generator: streamed responses', () => {
                     contentType: 'text/plain',
                 },
             },
-        },
+        }),
     });
 
     it('emits an event type per named event and reads the body as a stream', () => {
         const output = generateKotlinClient(
-            k.contract({
+            defineConfig({
                 routes: contractRoutes,
-            }),
+            }).api,
             baseConfig
         );
         expect(output).toContain('sealed interface Event');
@@ -1960,9 +1967,9 @@ describe('Kotlin generator: streamed responses', () => {
 
     it('reads a text stream line by line', () => {
         const output = generateKotlinClient(
-            k.contract({
+            defineConfig({
                 routes: contractRoutes,
-            }),
+            }).api,
             baseConfig
         );
         expect(output).toContain('Flow<String>');
@@ -1971,7 +1978,7 @@ describe('Kotlin generator: streamed responses', () => {
 
     it('skips a route that mixes a streamed status with another success status', () => {
         const mixed = k.routes({
-            mixed: {
+            mixed: k.route({
                 method: 'GET',
                 path: '/mixed',
                 responses: {
@@ -1982,13 +1989,13 @@ describe('Kotlin generator: streamed responses', () => {
                         queued: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         const output = generateKotlinClient(
-            k.contract({
+            defineConfig({
                 routes: mixed,
-            }),
+            }).api,
             baseConfig
         );
         expect(output).not.toContain('mixed(');
@@ -1998,18 +2005,25 @@ describe('Kotlin generator: streamed responses', () => {
 });
 
 describe('Kotlin generator: the statuses the auth map adds', () => {
-    const guardedK = new Kizuna({
-        identities: {
-            user: Kizuna.identity.bearer({
-                context: z.object({
-                    userId: z.string(),
-                }),
-            }),
-        },
+    const guardedKUser = k.identity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
     });
+    const guardedKConfig = {
+        identities: {
+            user: guardedKUser,
+        },
+    };
+    const guardedK = new Kizuna<{
+        identities: {
+            user: typeof guardedKUser;
+        };
+    }>();
 
     const guardedContract = () =>
-        guardedK.contract({
+        defineConfig({
+            ...guardedKConfig,
             routes: {
                 getSecret: {
                     method: 'GET',
@@ -2032,7 +2046,7 @@ describe('Kotlin generator: the statuses the auth map adds', () => {
                     },
                 },
             },
-        });
+        }).api;
 
     it('gives a guarded route the Unauthorized and Forbidden cases it never declared', () => {
         const output = generateKotlinClient(guardedContract(), baseConfig);

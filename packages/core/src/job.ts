@@ -1,5 +1,5 @@
 import type { AuthoredJobDefinition, JobHandlerArgs, JobHandlerReturn, JobVoidReturn } from './jobs.js';
-import { DECLARATION } from './types.js';
+import { DECLARATION, HANDLER } from './types.js';
 
 /**
  * A job's handler, typed against the job it answers.
@@ -12,13 +12,16 @@ export type JobHandlerFor<Definition extends AuthoredJobDefinition> = (
  * A job and the handler that runs it.
  */
 export type JobWithHandler<Definition extends AuthoredJobDefinition> = Definition & {
-    handler: JobHandlerFor<Definition>;
+    readonly [HANDLER]: (args: never) => unknown;
 };
 
 /**
- * What `k.job` returns: the job, waiting for its handler.
+ * What `k.job` returns: the job itself, and the `handler` that runs it. A job
+ * nothing runs, one a generator reads, needs no handler.
  */
-export interface JobBuilder<Definition extends AuthoredJobDefinition> {
+export type JobBuilder<Definition extends AuthoredJobDefinition> = Definition & JobHandlerStep<Definition>;
+
+interface JobHandlerStep<Definition extends AuthoredJobDefinition> {
     /**
      * The handler that runs this job. `input` is typed from the job's schema,
      * and the return is checked against its `result`.
@@ -26,10 +29,12 @@ export interface JobBuilder<Definition extends AuthoredJobDefinition> {
     handler(fn: JobHandlerFor<Definition>): JobWithHandler<Definition>;
 }
 
-export const createJob = <const Definition extends AuthoredJobDefinition>(definition: Definition): JobBuilder<Definition> => ({
-    handler: (fn) => ({
+export const createJob = <const Definition extends AuthoredJobDefinition>(definition: Definition): JobBuilder<Definition> =>
+    ({
         ...definition,
-        handler: fn,
-        [DECLARATION]: 'job' as const,
-    }),
-});
+        handler: (fn: unknown) => ({
+            ...definition,
+            [HANDLER]: fn,
+            [DECLARATION]: 'job' as const,
+        }),
+    }) as unknown as JobBuilder<Definition>;

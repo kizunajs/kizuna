@@ -1,16 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { ProblemDetailsSchema } from './error-response.js';
 import type { RouteDefinition } from './types.js';
 
-const user = Kizuna.identity.bearer({
+interface Config {
+    identities: {
+        user: typeof user;
+        member: typeof member;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const user = k.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
 });
 
-const member = Kizuna.identity.apiKey({
+const member = k.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -18,12 +28,12 @@ const member = Kizuna.identity.apiKey({
     }),
 });
 
-const k = new Kizuna({
+const config = {
     identities: {
         user,
         member,
     },
-});
+};
 
 const okResponse = () => ({
     200: z.object({
@@ -33,31 +43,31 @@ const okResponse = () => ({
 
 const makeRoutes = (listUsers: 'user' | false = 'user') =>
     k.routes({
-        listUsers: {
+        listUsers: k.route({
             method: 'GET',
             path: '/users',
             auth: listUsers,
             responses: okResponse(),
-        },
-        health: {
+        }),
+        health: k.route({
             method: 'GET',
             path: '/health',
             auth: false,
             responses: okResponse(),
-        },
-        both: {
+        }),
+        both: k.route({
             method: 'GET',
             path: '/both',
             auth: ['user', 'member'],
             responses: okResponse(),
-        },
-        byKey: {
+        }),
+        byKey: k.route({
             method: 'GET',
             path: '/by-key',
             auth: 'member',
             responses: okResponse(),
-        },
-        declaresIts403: {
+        }),
+        declaresIts403: k.route({
             method: 'GET',
             path: '/declares-its-403',
             auth: 'user',
@@ -67,17 +77,18 @@ const makeRoutes = (listUsers: 'user' | false = 'user') =>
                     missingRelation: z.string(),
                 }),
             },
-        },
+        }),
     });
 
 type DemoRoutes = ReturnType<typeof makeRoutes>;
 
 const contractFor = (routes: DemoRoutes) =>
-    k.contract({
+    defineConfig({
+        ...config,
         routes: {
             api: routes,
         },
-    });
+    }).api;
 
 const routeOf = (contract: ReturnType<typeof contractFor>, name: string): RouteDefinition =>
     (contract.routes.api as Record<string, RouteDefinition>)[name]!;
@@ -109,10 +120,11 @@ describe('injectGuardResponses', () => {
 
     it('refuses a 401 the route declares for itself', () => {
         const build = () =>
-            k.contract({
+            defineConfig({
+                ...config,
                 routes: {
                     api: k.routes({
-                        listUsers: {
+                        listUsers: k.route({
                             method: 'GET',
                             path: '/users',
                             auth: 'user',
@@ -120,10 +132,10 @@ describe('injectGuardResponses', () => {
                                 ...okResponse(),
                                 401: ProblemDetailsSchema,
                             },
-                        },
+                        }),
                     }),
                 },
-            });
+            }).api;
 
         expect(build).toThrow(/declares a 401/);
     });
@@ -192,24 +204,25 @@ describe('injectGuardResponses', () => {
 
     it('does not let routes sharing one responses object inherit each other', () => {
         const shared = okResponse();
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: {
                 api: k.routes({
-                    guarded: {
+                    guarded: k.route({
                         method: 'GET',
                         path: '/guarded',
                         auth: 'user',
                         responses: shared,
-                    },
-                    open: {
+                    }),
+                    open: k.route({
                         method: 'GET',
                         path: '/open',
                         auth: false,
                         responses: shared,
-                    },
+                    }),
                 }),
             },
-        });
+        }).api;
         const routes = contract.routes.api as Record<string, RouteDefinition>;
 
         expect(Object.keys(routes.guarded!.responses)).toEqual(['200', '401', '403']);
@@ -222,30 +235,38 @@ describe('a contract that declares a guardSchema', () => {
         code: z.enum(['expired_token', 'forbidden', 'not_found']).default('forbidden'),
     });
 
-    const scoped = new Kizuna({
+    const scopedUser = k.identity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+    const scopedConfig = {
         identities: {
-            user: Kizuna.identity.bearer({
-                context: z.object({
-                    userId: z.string(),
-                }),
-            }),
+            user: scopedUser,
         },
         guardSchema: GuardSchema,
-    });
+    };
+    const scoped = new Kizuna<{
+        identities: {
+            user: typeof scopedUser;
+        };
+        guardSchema: typeof GuardSchema;
+    }>();
 
     const build = () =>
-        scoped.contract({
+        defineConfig({
+            ...scopedConfig,
             routes: {
                 api: scoped.routes({
-                    listUsers: {
+                    listUsers: scoped.route({
                         method: 'GET',
                         path: '/users',
                         auth: 'user',
                         responses: okResponse(),
-                    },
+                    }),
                 }),
             },
-        });
+        }).api;
 
     const routeOfScoped = (name: string): RouteDefinition => (build().routes.api as Record<string, RouteDefinition>)[name]!;
 
@@ -257,24 +278,24 @@ describe('a contract that declares a guardSchema', () => {
     });
 
     it('refuses a schema that is not Problem Details at all', () => {
-        expect(
-            () =>
-                new Kizuna({
-                    guardSchema: z.object({
-                        reason: z.string(),
-                    }) as never,
-                })
+        expect(() =>
+            defineConfig({
+                routes: {},
+                guardSchema: z.object({
+                    reason: z.string(),
+                }) as never,
+            })
         ).toThrow(/must extend `ProblemDetailsSchema`/);
     });
 
     it('refuses a schema kizuna cannot build from a status and a detail alone', () => {
-        expect(
-            () =>
-                new Kizuna({
-                    guardSchema: ProblemDetailsSchema.extend({
-                        code: z.string(),
-                    }),
-                })
+        expect(() =>
+            defineConfig({
+                routes: {},
+                guardSchema: ProblemDetailsSchema.extend({
+                    code: z.string(),
+                }),
+            })
         ).toThrow(/`.optional\(\)` or a `.default\(\)`/);
     });
 });

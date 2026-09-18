@@ -70,6 +70,7 @@ import type {
     ConfiguredGuardSchema,
     ConfiguredIdentities,
     ConfiguredJobs,
+    ConfiguredPlugins,
     ConfiguredRequestContext,
     ConfiguredRequestContextSchemas,
     ConfiguredTags,
@@ -314,6 +315,11 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *         };
      *     });
      */
+    /**
+     * Declare the OpenAPI tags routes are grouped under. `k.routes` takes one of
+     * these names.
+     */
+    tags: typeof createTags;
     identity: IdentityFactories<
         ConfiguredAdapterContext<Spec['config']>,
         ConfiguredRequestContext<Spec['config']>,
@@ -423,6 +429,7 @@ export type HandlerContextFor<Spec extends KizunaSpec, Definition> = AuthContext
     ConfiguredRequestContext<Spec['config']> &
     ConfiguredJobs<Spec['config']> &
     ConfiguredTools<Spec['config']> &
+    ConfiguredPlugins<Spec['config']> &
     ConfiguredAdapterContext<Spec['config']>;
 
 const createSurface = <Config>(): K<SpecOf<Config>> => {
@@ -442,6 +449,7 @@ const createSurface = <Config>(): K<SpecOf<Config>> => {
             : buildTools(identityOrDefinitions as string, definitions)) as K<Spec>['tools'];
 
     return {
+        tags: createTags,
         route: createRoute as K<Spec>['route'],
         routes,
         job: createJob as K<Spec>['job'],
@@ -449,7 +457,8 @@ const createSurface = <Config>(): K<SpecOf<Config>> => {
         jobs,
         tools,
         identity: identityFactories as unknown as K<Spec>['identity'],
-        requestContext: ((config: never) => createRequestContextBuilder(createRequestContext(config))) as K<Spec>['requestContext'],
+        requestContext: ((config: never) =>
+            createRequestContextBuilder(createRequestContext(config))) as unknown as K<Spec>['requestContext'],
         issue: addCodedIssue,
     };
 };
@@ -461,10 +470,7 @@ const createSurface = <Config>(): K<SpecOf<Config>> => {
  *
  * `k.route` declares a route with its handler, `k.routes` groups them, and
  * `k.job`, `k.tool`, `k.jobs` and `k.tools` do the same for jobs and tools.
- * `defineApi` assembles them.
- *
- * The authoring helpers that need no config stay static: `Kizuna.tags`,
- * `Kizuna.roles`, `Kizuna.permissions` and `Kizuna.model`.
+ * `defineConfig` assembles them.
  *
  * @example
  * import type { Config } from './kizuna.types';
@@ -472,14 +478,22 @@ const createSurface = <Config>(): K<SpecOf<Config>> => {
  * export const k = new Kizuna<Config>();
  */
 export class Kizuna<Config extends KizunaConfigShape = Record<string, never>> implements K<SpecOf<Config>> {
-    static readonly tags = createTags;
+    /**
+     * Name a schema, so every generated client and the OpenAPI document reuse
+     * the one type rather than inlining it.
+     */
+    static readonly model = createModel;
+    /**
+     * Declare the permissions callers hold, as a catalog of resources and the
+     * verbs each allows.
+     */
     static readonly permissions = createPermissions;
     /**
      * Declare the roles callers hold, as names or from a permission catalog.
      */
     static readonly roles = createRoles;
-    static readonly model = createModel;
 
+    declare readonly tags: K<SpecOf<Config>>['tags'];
     declare readonly route: K<SpecOf<Config>>['route'];
     declare readonly routes: K<SpecOf<Config>>['routes'];
     declare readonly job: K<SpecOf<Config>>['job'];

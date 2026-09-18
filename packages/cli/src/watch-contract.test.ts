@@ -47,12 +47,10 @@ export const routes = k.routes('users', {
 
     writeFileSync(
         join(directory, 'contract.ts'),
-        `import { Kizuna } from '@ts-kizuna/core';
+        `import { defineConfig } from '@ts-kizuna/core';
 import { routes } from './routes.js';
 
-const k = new Kizuna();
-
-export const contract = k.contract({ routes: { users: routes } });
+export const { api } = defineConfig({ routes: { users: routes } });
 `
     );
 

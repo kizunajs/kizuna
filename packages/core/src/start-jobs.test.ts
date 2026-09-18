@@ -5,13 +5,17 @@ import { createJobTransport, type JobMessage, type ScheduledJob } from './job-tr
 import { JOBS_META } from './adapter.js';
 import { occurrenceKey, startJobs } from './start-jobs.js';
 
-const k = new Kizuna({});
+interface Config {}
+
+const k = new Kizuna<Config>();
+
+const config = {};
 
 const jobs = k.jobs({
-    cleanup: {
+    cleanup: k.job({
         schedule: '0 3 * * *',
-    },
-    reportDaily: {
+    }),
+    reportDaily: k.job({
         schedule: {
             cron: '0 6 * * *',
             timezone: 'Europe/Oslo',
@@ -19,7 +23,7 @@ const jobs = k.jobs({
         result: z.object({
             sent: z.int(),
         }),
-    },
+    }),
     indexUser: {
         input: z.object({
             userId: z.string(),

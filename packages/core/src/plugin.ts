@@ -146,9 +146,11 @@ export type PluginExportValues<Plugins extends ContractPlugins> = {
  */
 export type PluginArgs<Plugins extends ContractPlugins> = string extends keyof Plugins
     ? unknown
-    : {
-          plugins: PluginExportValues<Plugins>;
-      };
+    : [keyof Plugins] extends [never]
+      ? unknown
+      : {
+            plugins: PluginExportValues<Plugins>;
+        };
 
 /**
  * Every plugin's routes as one tree, keyed by install name, for the adapter to

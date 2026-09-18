@@ -2,20 +2,59 @@ import { z } from 'zod';
 // Not `../kizuna.js`: an identity's credential is branded, so a contract built from `src` hands the adapters identities
 // their own `server.guard` cannot resolve.
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { createPlugin } from '@ts-kizuna/core/adapter';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+interface SecuredKConfig {
+    identities: {
+        user: typeof userIdentity;
+        member: typeof memberIdentity;
+    };
+}
+
+interface GateKConfig {
+    identities: {
+        user: typeof userIdentity;
+        apiConsumer: typeof apiConsumerIdentity;
+    };
+}
+
+interface RequestContextKConfig {
+    identities: {
+        user: typeof userIdentity;
+    };
+    requestContext: {
+        analytics: typeof analyticsContext;
+    };
+}
+
+interface PluginTypeKConfig {
+    tags: typeof pluginTypeKTags;
+}
+
+const k = new Kizuna<Config>();
+const securedK = new Kizuna<SecuredKConfig>();
+const gateK = new Kizuna<GateKConfig>();
+const requestContextK = new Kizuna<RequestContextKConfig>();
+const pluginTypeK = new Kizuna<PluginTypeKConfig>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 /**
  * Two routes, not the runtime suite's four: every `router.*` feature writes one handler per route, once per adapter.
  */
 export const inferenceRoutes = k.routes('api', {
-    getUser: {
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
@@ -27,8 +66,8 @@ export const inferenceRoutes = k.routes('api', {
                 message: z.string(),
             }),
         },
-    },
-    createUser: {
+    }),
+    createUser: k.route({
         method: 'POST',
         path: '/users',
         body: z.object({
@@ -42,15 +81,16 @@ export const inferenceRoutes = k.routes('api', {
                 email: z.string(),
             }),
         },
-    },
+    }),
 });
 
-export const inferenceContract = k.contract({
+export const inferenceContract = defineConfig({
+    ...config,
     routes: inferenceRoutes,
-});
+}).api;
 
 export const streamInferenceRoutes = k.routes('api', {
-    reply: {
+    reply: k.route({
         method: 'POST',
         path: '/reply',
         body: z.object({
@@ -69,15 +109,16 @@ export const streamInferenceRoutes = k.routes('api', {
             },
             400: ProblemDetailsSchema,
         },
-    },
+    }),
 });
 
-export const streamInferenceContract = k.contract({
+export const streamInferenceContract = defineConfig({
+    ...config,
     routes: streamInferenceRoutes,
-});
+}).api;
 
 export const toolInferenceTools = k.tools({
-    countWords: {
+    countWords: k.tool({
         description: 'Count the words in a piece of text',
         input: z.object({
             text: z.string(),
@@ -85,12 +126,13 @@ export const toolInferenceTools = k.tools({
         output: z.object({
             words: z.int(),
         }),
-    },
+    }),
 });
 
-export const toolInferenceContract = k.contract({
+export const toolInferenceContract = defineConfig({
+    ...config,
     routes: k.routes('api', {
-        summarize: {
+        summarize: k.route({
             method: 'POST',
             path: '/summarize',
             body: z.object({
@@ -101,18 +143,19 @@ export const toolInferenceContract = k.contract({
                     words: z.int(),
                 }),
             },
-        },
+        }),
     }),
     tools: toolInferenceTools,
-});
+}).api;
 
-export const inferenceGroupContract = k.contract({
+export const inferenceGroupContract = defineConfig({
+    ...config,
     routes: {
         users: inferenceRoutes,
     },
-});
+}).api;
 
-export const userIdentity = Kizuna.identity.bearer({
+export const userIdentity = k.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
@@ -129,7 +172,7 @@ export const workspaceRoles = Kizuna.roles(workspacePermissions, {
     owner: 'all',
 });
 
-export const memberIdentity = Kizuna.identity.apiKey({
+export const memberIdentity = k.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -138,15 +181,15 @@ export const memberIdentity = Kizuna.identity.apiKey({
     roles: workspaceRoles,
 });
 
-const securedK = new Kizuna({
+const securedKConfig = {
     identities: {
         user: userIdentity,
         member: memberIdentity,
     },
-});
+};
 
 export const securedRoutes = securedK.routes({
-    publicRoute: {
+    publicRoute: securedK.route({
         method: 'GET',
         path: '/public',
         auth: false,
@@ -155,8 +198,8 @@ export const securedRoutes = securedK.routes({
                 ok: z.boolean(),
             }),
         },
-    },
-    whoAmI: {
+    }),
+    whoAmI: securedK.route({
         method: 'GET',
         path: '/who-am-i',
         auth: 'user',
@@ -165,8 +208,8 @@ export const securedRoutes = securedK.routes({
                 userId: z.string(),
             }),
         },
-    },
-    ownerOnly: {
+    }),
+    ownerOnly: securedK.route({
         method: 'GET',
         path: '/owner-only',
         auth: {
@@ -180,8 +223,8 @@ export const securedRoutes = securedK.routes({
                 ok: z.boolean(),
             }),
         },
-    },
-    adminOnly: {
+    }),
+    adminOnly: securedK.route({
         method: 'GET',
         path: '/admin-only',
         auth: {
@@ -193,8 +236,8 @@ export const securedRoutes = securedK.routes({
                 ok: z.boolean(),
             }),
         },
-    },
-    both: {
+    }),
+    both: securedK.route({
         method: 'GET',
         path: '/both',
         auth: ['user', 'member'],
@@ -204,29 +247,30 @@ export const securedRoutes = securedK.routes({
                 workspaceUserId: z.string(),
             }),
         },
-    },
+    }),
 });
 
-export const securedContract = securedK.contract({
+export const securedContract = defineConfig({
+    ...securedKConfig,
     routes: {
         api: securedRoutes,
     },
-});
+}).api;
 
-export const apiConsumerIdentity = Kizuna.identity.apiKey({
+export const apiConsumerIdentity = k.identity.apiKey({
     name: 'x-api-key',
     in: 'header',
 });
 
-const gateK = new Kizuna({
+const gateKConfig = {
     identities: {
         user: userIdentity,
         apiConsumer: apiConsumerIdentity,
     },
-});
+};
 
 export const gateRoutes = gateK.routes({
-    publicRoute: {
+    publicRoute: gateK.route({
         method: 'GET',
         path: '/public',
         auth: false,
@@ -235,8 +279,8 @@ export const gateRoutes = gateK.routes({
                 ok: z.boolean(),
             }),
         },
-    },
-    apiOnly: {
+    }),
+    apiOnly: gateK.route({
         method: 'GET',
         path: '/api-only',
         auth: 'apiConsumer',
@@ -245,8 +289,8 @@ export const gateRoutes = gateK.routes({
                 ok: z.boolean(),
             }),
         },
-    },
-    whoAmI: {
+    }),
+    whoAmI: gateK.route({
         method: 'GET',
         path: '/who-am-i',
         auth: 'user',
@@ -255,32 +299,33 @@ export const gateRoutes = gateK.routes({
                 userId: z.string(),
             }),
         },
-    },
+    }),
 });
 
-export const gateContract = gateK.contract({
+export const gateContract = defineConfig({
+    ...gateKConfig,
     routes: {
         api: gateRoutes,
     },
-});
+}).api;
 
-export const analyticsContext = Kizuna.requestContext(
+export const analyticsContext = k.requestContext(
     z.object({
         sessionId: z.string().nullable(),
     })
 );
 
-const requestContextK = new Kizuna({
+const requestContextKConfig = {
     identities: {
         user: userIdentity,
     },
     requestContext: {
         analytics: analyticsContext,
     },
-});
+};
 
 export const requestContextRoutes = requestContextK.routes({
-    publicRoute: {
+    publicRoute: requestContextK.route({
         method: 'GET',
         path: '/public',
         auth: false,
@@ -289,18 +334,18 @@ export const requestContextRoutes = requestContextK.routes({
                 ok: z.boolean(),
             }),
         },
-    },
+    }),
 });
 
-export const requestContextContract = requestContextK.contract({
+export const requestContextContract = defineConfig({
+    ...requestContextKConfig,
     routes: {
         api: requestContextRoutes,
     },
-});
+}).api;
 
-const typedProbePlugin = createPlugin<{ label: () => string }>()({
+const typedProbePlugin = createPlugin({
     name: 'probe',
-    serverModule: '@ts-kizuna/core/adapter-testing',
     routes: {
         ping: {
             method: 'GET',
@@ -312,20 +357,33 @@ const typedProbePlugin = createPlugin<{ label: () => string }>()({
             },
         },
     },
-});
-
-const pluginTypeK = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
+    serve: () => ({
+        router: {
+            ping: () => ({
+                status: 200 as const,
+                body: {
+                    pong: true,
+                },
+            }),
+        },
+        exports: {
+            label: () => 'probe',
+        },
     }),
 });
 
-export const pluginTypeContract = pluginTypeK.contract({
-    plugins: {
-        probe: typedProbePlugin,
-    },
+const pluginTypeKTags = k.tags({
+    api: 'API',
+});
+const pluginTypeKConfig = {
+    tags: pluginTypeKTags,
+};
+
+export const pluginTypeContract = defineConfig({
+    ...pluginTypeKConfig,
+    plugins: [typedProbePlugin],
     routes: pluginTypeK.routes('api', {
-        whichLabel: {
+        whichLabel: pluginTypeK.route({
             method: 'GET',
             path: '/which-label',
             responses: {
@@ -333,14 +391,14 @@ export const pluginTypeContract = pluginTypeK.contract({
                     label: z.string(),
                 }),
             },
-        },
+        }),
     }),
     jobs: pluginTypeK.jobs({
-        reindex: {
+        reindex: pluginTypeK.job({
             summary: 'Re-index one record',
             input: z.object({
                 recordId: z.string(),
             }),
-        },
+        }),
     }),
-});
+}).api;

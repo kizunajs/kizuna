@@ -12,21 +12,27 @@ export type RequestContextHandlerFor<Declaration extends RequestContextSchema, H
     }
 ) => z.output<Declaration['context']> | Promise<z.output<Declaration['context']>>;
 
+// Registry-global: a dual ESM/CJS install would otherwise hold two different symbols.
+export const RESOLVER: unique symbol = Symbol.for('ts-kizuna.resolver') as symbol as typeof RESOLVER;
+
 /**
- * A request context and the resolver that fills it.
+ * A request context and the resolver that fills it. The resolver is stored
+ * without its argument types, so a config that lists request contexts never
+ * depends on what a resolver reads back off that config.
  */
 export type RequestContextWithHandler<Declaration extends RequestContextSchema> = Declaration & {
-    /**
-     * Stored without its argument types, so a config that lists request
-     * contexts never depends on what a resolver reads back off that config.
-     */
-    handler: (args: never) => unknown;
+    readonly [RESOLVER]: (args: never) => unknown;
 };
 
 /**
- * What `k.requestContext` returns: the declaration, waiting for its resolver.
+ * What `k.requestContext` returns: the declaration itself, and the `handler`
+ * that fills it. A request context nothing serves, one a client reads, needs no
+ * resolver.
  */
-export interface RequestContextBuilder<Declaration extends RequestContextSchema, HandlerContext> {
+export type RequestContextBuilder<Declaration extends RequestContextSchema, HandlerContext> = Declaration &
+    RequestContextHandlerStep<Declaration, HandlerContext>;
+
+interface RequestContextHandlerStep<Declaration extends RequestContextSchema, HandlerContext> {
     /**
      * The resolver that fills this request context. It runs on every route,
      * public ones included, before the guards, and never denies.
@@ -36,10 +42,12 @@ export interface RequestContextBuilder<Declaration extends RequestContextSchema,
 
 export const createRequestContextBuilder = <Declaration extends RequestContextSchema>(
     declaration: Declaration
-): RequestContextBuilder<Declaration, unknown> => ({
-    handler: (fn) => ({
+): RequestContextBuilder<Declaration, unknown> =>
+    ({
         ...declaration,
-        handler: fn as (args: never) => unknown,
-        [DECLARATION]: 'requestContext' as const,
-    }),
-});
+        handler: (fn: unknown) => ({
+            ...declaration,
+            [RESOLVER]: fn,
+            [DECLARATION]: 'requestContext' as const,
+        }),
+    }) as unknown as RequestContextBuilder<Declaration, unknown>;

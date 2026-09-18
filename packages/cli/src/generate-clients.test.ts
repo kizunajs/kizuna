@@ -4,21 +4,22 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type ClientTarget } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { checkClients, formatStale, writeClients } from './generate-clients.js';
 
 const k = new Kizuna();
 
-const contract = k.contract({
+const contract = defineConfig({
     routes: {
         users: k.routes({
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: { 200: z.object({ id: z.string() }) },
-            },
+            }),
         }),
     },
-});
+}).api;
 
 const directories: string[] = [];
 

@@ -2,10 +2,17 @@ import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({ users: { title: 'Users' } }),
-    validation: { issueCodes: ['invalid_phone_number'] },
-});
+interface Config {
+    tags: typeof kTags;
+    issueCodes: 'invalid_phone_number';
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({ users: { title: 'Users' } });
+const config = {
+    tags: kTags,
+};
 
 test('issueCodes literal is preserved, not widened to string', () => {
     const schema = z.string().superRefine((value, ctx) => {

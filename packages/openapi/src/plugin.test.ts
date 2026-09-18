@@ -1,57 +1,60 @@
 import { describe, expect, it } from 'vitest';
+import { expressAdapter } from '@ts-kizuna/express';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { KizunaServer } from '@ts-kizuna/express';
+import { defineConfig } from '@ts-kizuna/core';
 import express from 'express';
 import request from 'supertest';
 import { generateOpenApi } from './generator.js';
 import { openApiPlugin } from './plugin.js';
-import { openApiPluginServer } from './server.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
-const contract = k.contract({
-    plugins: {
-        openApi: openApiPlugin({
+const contract = defineConfig({
+    adapter: expressAdapter,
+    ...config,
+    plugins: [
+        openApiPlugin({
             info: {
                 title: 'Demo API',
                 version: '1.0.0',
             },
             docsPath: '/docs',
         }),
-    },
+    ],
     routes: k.routes('api', {
-        getUser: {
-            method: 'GET',
-            path: '/users/:id',
-            responses: {
-                200: z.object({
-                    id: z.string(),
-                }),
-            },
-        },
-    }),
-});
-
-const serve = () => {
-    const server = new KizunaServer(contract);
-    const api = server.api({
-        router: {
-            getUser: ({ params }) => ({
+        getUser: k
+            .route({
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            })
+            .handler(({ params }) => ({
                 status: 200,
                 body: {
                     id: params.id,
                 },
-            }),
-        },
-        plugins: {
-            openApi: openApiPluginServer(),
-        },
-    });
+            })),
+    }),
+}).api;
+
+const serve = () => {
+    const api = contract;
     const app = express();
     api.mount(app);
     return app;
@@ -86,50 +89,49 @@ describe('openApiPlugin', () => {
     });
 
     it('hands its options to generateOpenApi, so a build step cannot drift from what is served', async () => {
-        const servedK = new Kizuna({
-            tags: Kizuna.tags({
-                api: 'API',
-            }),
+        const servedKTags = k.tags({
+            api: 'API',
         });
-        const servedContract = servedK.contract({
-            plugins: {
-                openApi: openApiPlugin({
+        const servedKConfig = {
+            tags: servedKTags,
+        };
+        const servedK = new Kizuna<{
+            tags: typeof servedKTags;
+        }>();
+        const servedContract = defineConfig({
+            adapter: expressAdapter,
+            ...servedKConfig,
+            plugins: [
+                openApiPlugin({
                     info: {
                         title: 'No drift',
                         version: '2.0.0',
                     },
                     jsonPath: '/openapi.json',
                 }),
-            },
+            ],
             routes: servedK.routes('api', {
-                ping: {
-                    method: 'GET',
-                    path: '/ping',
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
-                },
-            }),
-        });
-
-        const app = express();
-        new KizunaServer(servedContract)
-            .api({
-                router: {
-                    ping: () => ({
+                ping: servedK
+                    .route({
+                        method: 'GET',
+                        path: '/ping',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    })
+                    .handler(() => ({
                         status: 200,
                         body: {
                             ok: true,
                         },
-                    }),
-                },
-                plugins: {
-                    openApi: openApiPluginServer(),
-                },
-            })
-            .mount(app);
+                    })),
+            }),
+        }).api;
+
+        const app = express();
+        servedContract.mount(app);
 
         const served = JSON.parse((await request(app).get('/openapi.json')).text);
 
@@ -138,14 +140,19 @@ describe('openApiPlugin', () => {
     });
 
     it('says what to do when there are no options and no plugin', () => {
-        const bareK = new Kizuna({
-            tags: Kizuna.tags({
-                api: 'API',
-            }),
+        const bareKTags = k.tags({
+            api: 'API',
         });
-        const bare = bareK.contract({
+        const bareKConfig = {
+            tags: bareKTags,
+        };
+        const bareK = new Kizuna<{
+            tags: typeof bareKTags;
+        }>();
+        const bare = defineConfig({
+            ...bareKConfig,
             routes: bareK.routes('api', {
-                ping: {
+                ping: bareK.route({
                     method: 'GET',
                     path: '/ping',
                     responses: {
@@ -153,72 +160,77 @@ describe('openApiPlugin', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             }),
-        });
+        }).api;
 
         expect(() => generateOpenApi(bare)).toThrow(/Install `openApiPlugin`/);
     });
 
     it('serves the document with no UI when only a document path is given', async () => {
-        const specOnlyK = new Kizuna({
-            tags: Kizuna.tags({
-                api: 'API',
-            }),
+        const specOnlyKTags = k.tags({
+            api: 'API',
         });
-        const specOnly = specOnlyK.contract({
-            plugins: {
-                openApi: openApiPlugin({
+        const specOnlyKConfig = {
+            tags: specOnlyKTags,
+        };
+        const specOnlyK = new Kizuna<{
+            tags: typeof specOnlyKTags;
+        }>();
+        const specOnly = defineConfig({
+            adapter: expressAdapter,
+            ...specOnlyKConfig,
+            plugins: [
+                openApiPlugin({
                     info: {
                         title: 'Spec only',
                         version: '1.0.0',
                     },
                     jsonPath: '/openapi.json',
                 }),
-            },
+            ],
             routes: specOnlyK.routes('api', {
-                ping: {
-                    method: 'GET',
-                    path: '/ping',
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
-                },
-            }),
-        });
-
-        const app = express();
-        new KizunaServer(specOnly)
-            .api({
-                router: {
-                    ping: () => ({
+                ping: specOnlyK
+                    .route({
+                        method: 'GET',
+                        path: '/ping',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    })
+                    .handler(() => ({
                         status: 200,
                         body: {
                             ok: true,
                         },
-                    }),
-                },
-                plugins: {
-                    openApi: openApiPluginServer(),
-                },
-            })
-            .mount(app);
+                    })),
+            }),
+        }).api;
+
+        const app = express();
+        specOnly.mount(app);
 
         expect((await request(app).get('/openapi.json')).status).toBe(200);
         expect((await request(app).get('/docs')).status).toBe(404);
     });
 
     it('takes a path for each of the three', async () => {
-        const customK = new Kizuna({
-            tags: Kizuna.tags({
-                api: 'API',
-            }),
+        const customKTags = k.tags({
+            api: 'API',
         });
-        const custom = customK.contract({
-            plugins: {
-                openApi: openApiPlugin({
+        const customKConfig = {
+            tags: customKTags,
+        };
+        const customK = new Kizuna<{
+            tags: typeof customKTags;
+        }>();
+        const custom = defineConfig({
+            adapter: expressAdapter,
+            ...customKConfig,
+            plugins: [
+                openApiPlugin({
                     info: {
                         title: 'Custom',
                         version: '1.0.0',
@@ -226,36 +238,29 @@ describe('openApiPlugin', () => {
                     docsPath: '/reference',
                     yamlPath: '/spec.yaml',
                 }),
-            },
+            ],
             routes: customK.routes('api', {
-                ping: {
-                    method: 'GET',
-                    path: '/ping',
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
-                },
-            }),
-        });
-
-        const app = express();
-        new KizunaServer(custom)
-            .api({
-                router: {
-                    ping: () => ({
+                ping: customK
+                    .route({
+                        method: 'GET',
+                        path: '/ping',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    })
+                    .handler(() => ({
                         status: 200,
                         body: {
                             ok: true,
                         },
-                    }),
-                },
-                plugins: {
-                    openApi: openApiPluginServer(),
-                },
-            })
-            .mount(app);
+                    })),
+            }),
+        }).api;
+
+        const app = express();
+        custom.mount(app);
 
         expect((await request(app).get('/reference')).status).toBe(200);
         expect((await request(app).get('/spec.yaml')).status).toBe(200);
@@ -264,14 +269,20 @@ describe('openApiPlugin', () => {
     });
 
     it('serves the document at the paths it is given', async () => {
-        const jsonOnlyK = new Kizuna({
-            tags: Kizuna.tags({
-                api: 'API',
-            }),
+        const jsonOnlyKTags = k.tags({
+            api: 'API',
         });
-        const jsonOnly = jsonOnlyK.contract({
-            plugins: {
-                openApi: openApiPlugin({
+        const jsonOnlyKConfig = {
+            tags: jsonOnlyKTags,
+        };
+        const jsonOnlyK = new Kizuna<{
+            tags: typeof jsonOnlyKTags;
+        }>();
+        const jsonOnly = defineConfig({
+            adapter: expressAdapter,
+            ...jsonOnlyKConfig,
+            plugins: [
+                openApiPlugin({
                     info: {
                         title: 'Both',
                         version: '1.0.0',
@@ -279,37 +290,29 @@ describe('openApiPlugin', () => {
                     jsonPath: '/openapi.json',
                     yamlPath: '/openapi.yaml',
                 }),
-            },
+            ],
             routes: jsonOnlyK.routes('api', {
-                ping: {
-                    method: 'GET',
-                    path: '/ping',
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
-                },
-            }),
-        });
-
-        const server = new KizunaServer(jsonOnly);
-        const app = express();
-        server
-            .api({
-                router: {
-                    ping: () => ({
+                ping: jsonOnlyK
+                    .route({
+                        method: 'GET',
+                        path: '/ping',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    })
+                    .handler(() => ({
                         status: 200,
                         body: {
                             ok: true,
                         },
-                    }),
-                },
-                plugins: {
-                    openApi: openApiPluginServer(),
-                },
-            })
-            .mount(app);
+                    })),
+            }),
+        }).api;
+
+        const app = express();
+        jsonOnly.mount(app);
 
         expect((await request(app).get('/openapi.json')).status).toBe(200);
         expect((await request(app).get('/openapi.yaml')).status).toBe(200);

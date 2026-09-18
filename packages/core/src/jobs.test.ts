@@ -1,25 +1,34 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { isCompiledJob, isJobDefinition } from './jobs.js';
 import { cron } from './schedule.js';
 
-const scheduler = Kizuna.identity.bearer({
+interface Config {
+    identities: {
+        scheduler: typeof scheduler;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const scheduler = k.identity.bearer({
     description: 'The platform scheduler',
 });
 
-const k = new Kizuna({
+const config = {
     identities: {
         scheduler,
     },
-});
+};
 
 describe('k.jobs', () => {
     it('compiles a job, carrying its schedule and identity', () => {
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: '0 5 * * *',
-            },
+            }),
         });
         expect(jobs.sendDigests.schedule).toBe('0 5 * * *');
         expect(jobs.sendDigests.identity).toBe('scheduler');
@@ -27,39 +36,39 @@ describe('k.jobs', () => {
 
     it('leaves the identity undefined when declared without one', () => {
         const jobs = k.jobs({
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: '0 5 * * *',
-            },
+            }),
         });
         expect(jobs.sendDigests.identity).toBeUndefined();
     });
 
     it('answers 204 when the job declares no result', () => {
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: '0 5 * * *',
-            },
+            }),
         });
         expect(Object.keys(jobs.sendDigests.responses).sort()).toEqual(['204', '422', '500', '503']);
     });
 
     it('answers 200 with the result schema when declared', () => {
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: '0 5 * * *',
                 result: z.object({
                     sent: z.int(),
                 }),
-            },
+            }),
         });
         expect(Object.keys(jobs.sendDigests.responses).sort()).toEqual(['200', '422', '500', '503']);
     });
 
     it('always synthesizes the retry contract statuses', () => {
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: '0 5 * * *',
-            },
+            }),
         });
         const responses = jobs.sendDigests.responses as Record<number, unknown>;
         for (const status of [422, 500, 503]) {
@@ -88,12 +97,12 @@ describe('k.jobs', () => {
             lockedBy: z.string(),
         });
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: '0 5 * * *',
                 responses: {
                     409: conflict,
                 },
-            },
+            }),
         });
         expect((jobs.sendDigests.responses as Record<number, unknown>)[409]).toBe(conflict);
         expect((jobs.sendDigests.responses as Record<number, unknown>)[503]).toBeDefined();
@@ -101,21 +110,21 @@ describe('k.jobs', () => {
 
     it('accepts a schedule built by a helper', () => {
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: cron.daily('05:00'),
-            },
+            }),
         });
         expect(jobs.sendDigests.schedule).toBe('0 5 * * *');
     });
 
     it('accepts the object schedule form', () => {
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: {
                     cron: '0 5 * * *',
                     timezone: 'Europe/Oslo',
                 },
-            },
+            }),
         });
         expect(jobs.sendDigests.schedule).toEqual({
             cron: '0 5 * * *',
@@ -126,9 +135,9 @@ describe('k.jobs', () => {
     it('nests groups of jobs', () => {
         const jobs = k.jobs('scheduler', {
             billing: {
-                reconcileInvoices: {
+                reconcileInvoices: k.job({
                     schedule: '0 5 * * *',
-                },
+                }),
             },
         });
         expect(isCompiledJob(jobs.billing)).toBe(false);
@@ -146,9 +155,9 @@ describe('k.jobs', () => {
     it('rejects an invalid schedule, naming the job', () => {
         expect(() =>
             k.jobs('scheduler', {
-                sendDigests: {
+                sendDigests: k.job({
                     schedule: 'every morning',
-                },
+                }),
             })
         ).toThrow('Job "sendDigests" has an invalid schedule');
     });
@@ -157,9 +166,9 @@ describe('k.jobs', () => {
         expect(() =>
             k.jobs('scheduler', {
                 billing: {
-                    reconcileInvoices: {
+                    reconcileInvoices: k.job({
                         schedule: 'every morning',
-                    },
+                    }),
                 },
             })
         ).toThrow('Job "billing.reconcileInvoices" has an invalid schedule');
@@ -168,12 +177,12 @@ describe('k.jobs', () => {
     it('rejects a scheduled job whose input will not accept an empty payload', () => {
         expect(() =>
             k.jobs('scheduler', {
-                indexUser: {
+                indexUser: k.job({
                     schedule: '0 5 * * *',
                     input: z.object({
                         userId: z.string(),
                     }),
-                },
+                }),
             })
         ).toThrow('will not accept an empty payload');
     });
@@ -239,9 +248,9 @@ describe('isJobDefinition', () => {
 describe('isCompiledJob', () => {
     it('recognises a compiled job', () => {
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: '0 5 * * *',
-            },
+            }),
         });
         expect(isCompiledJob(jobs.sendDigests)).toBe(true);
     });
@@ -253,48 +262,52 @@ describe('isCompiledJob', () => {
 
 describe('k.contract with jobs', () => {
     const routes = k.routes({
-        listUsers: {
+        listUsers: k.route({
             method: 'GET',
             path: '/users',
             auth: false,
             responses: {
                 200: z.array(z.string()),
             },
-        },
+        }),
     });
 
     it('carries jobs alongside routes, not inside them', () => {
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: '0 5 * * *',
-            },
+            }),
         });
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes,
             jobs,
-        });
+        }).api;
         expect(Object.keys(contract.jobs ?? {})).toEqual(['sendDigests']);
         expect(Object.keys(contract.routes)).toEqual(['listUsers']);
     });
 
     it('leaves jobs undefined when none are declared', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes,
-        });
+        }).api;
         expect(contract.jobs).toBeUndefined();
     });
 
     it('does not require jobs in the auth map', () => {
         const jobs = k.jobs('scheduler', {
-            sendDigests: {
+            sendDigests: k.job({
                 schedule: '0 5 * * *',
-            },
+            }),
         });
-        expect(() =>
-            k.contract({
-                routes,
-                jobs,
-            })
+        expect(
+            () =>
+                defineConfig({
+                    ...config,
+                    routes,
+                    jobs,
+                }).api
         ).not.toThrow();
     });
 });
@@ -302,67 +315,79 @@ describe('k.contract with jobs', () => {
 describe('a job endpoint colliding with a route', () => {
     const routesAt = (path: `/${string}`) =>
         k.routes({
-            listJobs: {
+            listJobs: k.route({
                 method: 'POST',
                 auth: false,
                 path,
                 responses: {
                     200: z.array(z.string()),
                 },
-            },
+            }),
         });
 
     const scheduled = k.jobs('scheduler', {
-        sendDigests: {
+        sendDigests: k.job({
             schedule: '0 5 * * *',
-        },
+        }),
     });
 
     it.each([['/jobs/dispatch'], ['/jobs/run']] as const)('rejects a contract whose route already serves %s', (path) => {
-        expect(() =>
-            k.contract({
-                routes: routesAt(path),
-                jobs: scheduled,
-            })
+        expect(
+            () =>
+                defineConfig({
+                    ...config,
+                    routes: routesAt(path),
+                    jobs: scheduled,
+                }).api
         ).toThrow('which already serves it');
     });
 
     it('leaves the namespace itself free', () => {
-        expect(() =>
-            k.contract({
-                routes: routesAt('/jobs'),
-                jobs: scheduled,
-            })
+        expect(
+            () =>
+                defineConfig({
+                    ...config,
+                    routes: routesAt('/jobs'),
+                    jobs: scheduled,
+                }).api
         ).not.toThrow();
     });
 
     it('accepts the same route once the endpoints are moved', () => {
-        const moved = new Kizuna({
+        const movedPath: `/${string}` = '/internal/tick';
+        const movedConfig = {
             identities: {
                 scheduler,
             },
-            jobs: {
-                path: '/internal/tick',
+            jobsConfig: {
+                path: movedPath,
             },
-        });
-        expect(() =>
-            moved.contract({
-                routes: moved.routes({
-                    listJobs: {
-                        method: 'POST',
-                        path: '/jobs/dispatch',
-                        auth: false,
-                        responses: {
-                            200: z.array(z.string()),
-                        },
-                    },
-                }),
-                jobs: moved.jobs('scheduler', {
-                    sendDigests: {
-                        schedule: '0 5 * * *',
-                    },
-                }),
-            })
+        };
+        const moved = new Kizuna<{
+            identities: {
+                scheduler: typeof scheduler;
+            };
+        }>();
+        expect(
+            () =>
+                defineConfig({
+                    ...movedConfig,
+                    routes: moved.routes({
+                        listJobs: moved.route({
+                            method: 'POST',
+                            path: '/jobs/dispatch',
+                            auth: false,
+                            responses: {
+                                200: z.array(z.string()),
+                            },
+                        }),
+                    }),
+                    jobs: moved.jobs('scheduler', {
+                        sendDigests: moved.job({
+                            schedule: '0 5 * * *',
+                        }),
+                    }),
+                }).api
         ).not.toThrow();
     });
 });

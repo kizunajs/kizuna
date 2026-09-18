@@ -1,85 +1,90 @@
 import express from 'express';
+import { expressAdapter } from '@ts-kizuna/express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import type { Contract } from '@ts-kizuna/core';
-import { KizunaServer } from './server.js';
 import { createServer as createHttpServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { startJobsDevRunner, type JobsDevRunner } from '@ts-kizuna/core/jobs';
 
-const scheduler = Kizuna.identity.bearer({});
+interface Config {
+    adapter: typeof expressAdapter;
+    identities: {
+        scheduler: typeof scheduler;
+    };
+}
 
-const k = new Kizuna({
+const k = new Kizuna<Config>();
+
+const scheduler = k.identity.bearer({}).guard(({ bearer, deny }) => {
+    if (bearer?.token !== 'cron-secret')
+        return deny({
+            status: 401,
+            body: {
+                detail: 'Unauthorized',
+            },
+        });
+});
+
+const config = {
     identities: {
         scheduler,
     },
-});
+};
 
 const routes = k.routes({
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        auth: false,
-        responses: {
-            200: z.array(z.string()),
-        },
-    },
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            auth: false,
+            responses: {
+                200: z.array(z.string()),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: ['ada'],
+        })),
 });
 
 const jobs = k.jobs('scheduler', {
-    everyMinute: {
-        schedule: '* * * * *',
-        result: z.object({
-            ran: z.boolean(),
+    everyMinute: k
+        .job({
+            schedule: '* * * * *',
+            result: z.object({
+                ran: z.boolean(),
+            }),
+        })
+        .handler(() => {
+            ran();
+            return {
+                status: 200,
+                body: {
+                    ran: true,
+                },
+            };
         }),
-    },
-    never: {
-        schedule: '0 0 30 2 *',
-    },
+    never: k
+        .job({
+            schedule: '0 0 30 2 *',
+        })
+        .handler(() => {}),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
+    adapter: expressAdapter,
     routes,
     jobs,
-});
+}).api;
 
 const ran = vi.fn();
 
-const server = new KizunaServer(contract);
-
 const startServer = async (): Promise<{ httpServer: Server; baseUrl: string }> => {
-    const api = server.api({
-        router: server.router({
-            listUsers: () => ({
-                status: 200,
-                body: [],
-            }),
-        }),
-        guards: {
-            scheduler: server.guard('scheduler', ({ bearer, deny }) => {
-                if (bearer?.token !== 'cron-secret')
-                    return deny({
-                        status: 401,
-                        body: {
-                            detail: 'Unauthorized',
-                        },
-                    });
-            }),
-        },
-        jobs: server.jobs({
-            everyMinute: () => {
-                ran();
-                return {
-                    status: 200,
-                    body: {
-                        ran: true,
-                    },
-                };
-            },
-            never: () => {},
-        }),
-    });
+    const api = contract;
     const app = express();
     app.use(express.json());
     api.mount(app);

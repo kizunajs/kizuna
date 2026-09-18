@@ -2,9 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { RouteDefinition } from './types.js';
 import { Kizuna, type RouteAuthValue } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { createPlugin } from './plugin.js';
 
-const user = Kizuna.identity.bearer({
+interface Config {
+    identities: {
+        user: typeof user;
+        member: typeof member;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const user = k.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
@@ -21,7 +31,7 @@ const roles = Kizuna.roles(permissions, {
     owner: 'all',
 });
 
-const member = Kizuna.identity.apiKey({
+const member = k.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -52,17 +62,21 @@ const routeDefinition = (auth: Auth, path: `/${string}` = '/workspace') => ({
  * Resolves one route's `auth` and hands back the route `k.contract` wrote to.
  */
 const resolve = (auth: Auth): RouteDefinition => {
-    const k = new Kizuna({
+    const config = {
         identities,
-    });
+    };
+    const k = new Kizuna<{
+        identities: typeof identities;
+    }>();
     const route = routeDefinition(auth);
-    k.contract({
+    defineConfig({
+        ...config,
         routes: k.routes({
             workspace: {
                 getWorkspace: route,
             },
         }),
-    });
+    }).api;
     return route as RouteDefinition;
 };
 
@@ -123,28 +137,33 @@ describe('a route resolving its auth', () => {
     });
 
     it('resolves the same route again without keeping what the last one set', () => {
-        const k = new Kizuna({
+        const k2Config = {
             identities,
-        });
+        };
+        const k2 = new Kizuna<{
+            identities: typeof identities;
+        }>();
         const route = routeDefinition({
             identity: 'member',
             requires: {
                 workspace: ['delete'],
             },
         });
-        const routes = k.routes({
+        const routes = k2.routes({
             workspace: {
                 getWorkspace: route,
             },
         });
-        k.contract({
+        defineConfig({
+            ...k2Config,
             routes,
-        });
+        }).api;
 
         route.auth = 'member';
-        k.contract({
+        defineConfig({
+            ...k2Config,
             routes,
-        });
+        }).api;
 
         expect((route as RouteDefinition).requires).toBeUndefined();
         expect((route as RouteDefinition).roles).toBeUndefined();
@@ -207,32 +226,37 @@ describe('an auth the identities do not support', () => {
 
 describe('a route that declares no auth', () => {
     it('is refused when the instance declares an identity', () => {
-        const k = new Kizuna({
+        const k3Config = {
             identities,
-        });
+        };
+        const k3 = new Kizuna<{
+            identities: typeof identities;
+        }>();
 
-        expect(() =>
-            k.contract({
-                routes: k.routes({
-                    workspace: {
-                        // @ts-expect-error every route needs an auth once an identity exists
-                        getWorkspace: {
-                            method: 'GET',
-                            path: '/workspace',
-                            responses: {
-                                200: z.object({
-                                    ok: z.boolean(),
-                                }),
-                            },
+        expect(
+            () =>
+                defineConfig({
+                    ...k3Config,
+                    routes: k3.routes({
+                        workspace: {
+                            // @ts-expect-error every route needs an auth once an identity exists
+                            getWorkspace: k3.route({
+                                method: 'GET',
+                                path: '/workspace',
+                                responses: {
+                                    200: z.object({
+                                        ok: z.boolean(),
+                                    }),
+                                },
+                            }),
                         },
-                    },
-                }),
-            })
+                    }),
+                }).api
         ).toThrow(/declares no `auth`/);
     });
 
     it('is public when the instance declares none', () => {
-        const k = new Kizuna();
+        const k4 = new Kizuna();
         const route = {
             method: 'GET' as const,
             path: '/health' as const,
@@ -243,27 +267,31 @@ describe('a route that declares no auth', () => {
             },
         };
 
-        k.contract({
-            routes: k.routes({
+        defineConfig({
+            routes: k4.routes({
                 health: {
                     live: route,
                 },
             }),
-        });
+        }).api;
 
         expect((route as RouteDefinition).security).toEqual([]);
     });
 });
 
 describe('k.contract: plugins', () => {
-    const k = new Kizuna({
-        tags: Kizuna.tags({
-            api: 'API',
-        }),
+    const k5Tags = k.tags({
+        api: 'API',
     });
+    const k5Config = {
+        tags: k5Tags,
+    };
+    const k5 = new Kizuna<{
+        tags: typeof k5Tags;
+    }>();
 
-    const routes = k.routes('api', {
-        health: {
+    const routes = k5.routes('api', {
+        health: k5.route({
             method: 'GET',
             path: '/health',
             responses: {
@@ -271,13 +299,12 @@ describe('k.contract: plugins', () => {
                     ok: z.boolean(),
                 }),
             },
-        },
+        }),
     });
 
     const probePlugin = (props: { skip?: Record<string, boolean> } = {}) =>
         createPlugin({
             name: 'probe',
-            serverModule: '@example/probe/server',
             routes: {
                 status: {
                     method: 'GET',
@@ -290,62 +317,46 @@ describe('k.contract: plugins', () => {
                 },
             },
             props,
+            serve: (pluginProps) => ({
+                router: {
+                    status: () => ({
+                        status: 200 as const,
+                        body: {
+                            skipped: Object.keys(pluginProps.skip ?? {}),
+                        },
+                    }),
+                },
+            }),
         });
 
-    it('carries a plugin map onto the contract', () => {
-        const contract = k.contract({
+    it('carries every plugin onto the contract, keyed by its own name', () => {
+        const contract = defineConfig({
+            ...k5Config,
             routes,
-            plugins: {
-                probe: probePlugin(),
-            },
-        });
+            plugins: [probePlugin()],
+        }).api;
 
         expect(Object.keys(contract.plugins ?? {})).toEqual(['probe']);
     });
 
-    it('calls a plugins function with the contract routes', () => {
-        const seen: string[][] = [];
-
-        const contract = k.contract({
-            routes,
-            plugins: ({ routes: given }) => {
-                seen.push(Object.keys(given));
-                return {
-                    probe: probePlugin({
-                        skip: {
-                            health: true,
-                        },
-                    }),
-                };
-            },
-        });
-
-        expect(seen).toEqual([['health']]);
-        expect(contract.plugins?.['probe']?.props).toEqual({
-            skip: {
-                health: true,
-            },
-        });
-    });
-
     it('checks a plugin route against the contract routes', () => {
-        expect(() =>
-            k.contract({
-                routes: k.routes('api', {
-                    status: {
-                        method: 'GET',
-                        path: '/probe/status',
-                        responses: {
-                            200: z.object({
-                                ok: z.boolean(),
-                            }),
-                        },
-                    },
-                }),
-                plugins: {
-                    probe: probePlugin(),
-                },
-            })
+        expect(
+            () =>
+                defineConfig({
+                    ...k5Config,
+                    routes: k5.routes('api', {
+                        status: k5.route({
+                            method: 'GET',
+                            path: '/probe/status',
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        }),
+                    }),
+                    plugins: [probePlugin()],
+                }).api
         ).toThrow(/probe\/status/);
     });
 });

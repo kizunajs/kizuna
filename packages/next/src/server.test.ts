@@ -1,59 +1,39 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { KizunaServer, nextAdapter, NextRequest, NextResponse, type NextApi } from './server.js';
+import { nextAdapter, NextRequest, NextResponse, type NextApi } from './server.js';
 import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    adapter: typeof nextAdapter;
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const contractRoutes = k.routes('api', {
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: z.object({
-                id: z.string(),
-                name: z.string(),
-            }),
-            404: ProblemDetailsSchema,
-        },
-    },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string().min(1),
-            email: z.email(),
-        }),
-        responses: {
-            201: z.object({
-                id: z.string(),
-                name: z.string(),
-                email: z.string(),
-            }),
-        },
-    },
-});
-
-const contract = k.contract({
-    routes: contractRoutes,
-});
-
-interface User {
-    id: string;
-    name: string;
-    email: string;
-}
-const users = new Map<string, User>();
-
-const api = new KizunaServer(contract).api({
-    router: {
-        getUser: ({ params }) => {
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                    name: z.string(),
+                }),
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(({ params }) => {
             const user = users.get(params.id);
             if (!user) {
                 return {
@@ -70,8 +50,24 @@ const api = new KizunaServer(contract).api({
                     name: user.name,
                 },
             };
-        },
-        createUser: ({ body }) => {
+        }),
+    createUser: k
+        .route({
+            method: 'POST',
+            path: '/users',
+            body: z.object({
+                name: z.string().min(1),
+                email: z.email(),
+            }),
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                    name: z.string(),
+                    email: z.string(),
+                }),
+            },
+        })
+        .handler(({ body }) => {
             const id = String(users.size + 1);
             const user: User = {
                 id,
@@ -83,9 +79,23 @@ const api = new KizunaServer(contract).api({
                 status: 201,
                 body: user,
             };
-        },
-    },
+        }),
 });
+
+const contract = defineConfig({
+    adapter: nextAdapter,
+    ...config,
+    routes: contractRoutes,
+}).api;
+
+interface User {
+    id: string;
+    name: string;
+    email: string;
+}
+const users = new Map<string, User>();
+
+const api = contract;
 
 const { DELETE } = api.mount({
     basePath: '/api',
@@ -120,25 +130,27 @@ describe('Next.js handler', () => {
 
     it('routes onError hook overrides the default 500', async () => {
         const throwingRoutes = k.routes('api', {
-            boom: {
-                method: 'GET',
-                path: '/boom',
-                responses: {
-                    200: z.object({
-                        ok: z.boolean(),
-                    }),
-                },
-            },
+            boom: k
+                .route({
+                    method: 'GET',
+                    path: '/boom',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                })
+                .handler(() => {
+                    throw new Error('handler exploded');
+                }),
         });
-        const throwingContract = k.contract({
+        const { api: throwingApi } = defineConfig({
+            ...config,
+            adapter: nextAdapter,
             routes: throwingRoutes,
         });
-        const throwingApi = new KizunaServer(throwingContract).api({
-            router: {
-                boom: () => {
-                    throw new Error('handler exploded');
-                },
-            },
+        const { GET: boomGET } = throwingApi.mount({
+            basePath: '/api',
             onError: () =>
                 new NextResponse(JSON.stringify({ caught: true }), {
                     status: 503,
@@ -146,9 +158,6 @@ describe('Next.js handler', () => {
                         'content-type': 'application/json',
                     },
                 }),
-        });
-        const { GET: boomGET } = throwingApi.mount({
-            basePath: '/api',
         });
         const response = await boomGET(makeRequest('GET', '/api/boom'));
         expect(response.status).toBe(503);
@@ -159,44 +168,24 @@ describe('Next.js handler', () => {
 
 describe('Next.js handler: alternate content types', () => {
     const uploadRoutes = k.routes('api', {
-        uploadAvatar: {
-            method: 'POST',
-            path: '/avatar',
-            contentType: 'multipart/form-data',
-            body: z.object({
-                file: z.instanceof(File),
-                userId: z.string(),
-            }),
-            responses: {
-                200: z.object({
-                    size: z.number(),
-                    contents: z.string(),
+        uploadAvatar: k
+            .route({
+                method: 'POST',
+                path: '/avatar',
+                contentType: 'multipart/form-data',
+                body: z.object({
+                    file: z.instanceof(File),
                     userId: z.string(),
                 }),
-            },
-        },
-        submitForm: {
-            method: 'POST',
-            path: '/form',
-            contentType: 'application/x-www-form-urlencoded',
-            body: z.object({
-                name: z.string(),
-                age: z.string(),
-            }),
-            responses: {
-                200: z.object({
-                    name: z.string(),
-                    age: z.string(),
-                }),
-            },
-        },
-    });
-    const uploadContract = k.contract({
-        routes: uploadRoutes,
-    });
-    const uploadApi = new KizunaServer(uploadContract).api({
-        router: {
-            uploadAvatar: async ({ body }) => {
+                responses: {
+                    200: z.object({
+                        size: z.number(),
+                        contents: z.string(),
+                        userId: z.string(),
+                    }),
+                },
+            })
+            .handler(async ({ body }) => {
                 const contents = await body.file.text();
                 return {
                     status: 200,
@@ -206,8 +195,24 @@ describe('Next.js handler: alternate content types', () => {
                         userId: body.userId,
                     },
                 };
-            },
-            submitForm: ({ body }) => {
+            }),
+        submitForm: k
+            .route({
+                method: 'POST',
+                path: '/form',
+                contentType: 'application/x-www-form-urlencoded',
+                body: z.object({
+                    name: z.string(),
+                    age: z.string(),
+                }),
+                responses: {
+                    200: z.object({
+                        name: z.string(),
+                        age: z.string(),
+                    }),
+                },
+            })
+            .handler(({ body }) => {
                 return {
                     status: 200,
                     body: {
@@ -215,9 +220,14 @@ describe('Next.js handler: alternate content types', () => {
                         age: body.age,
                     },
                 };
-            },
-        },
+            }),
     });
+    const uploadContract = defineConfig({
+        adapter: nextAdapter,
+        ...config,
+        routes: uploadRoutes,
+    }).api;
+    const uploadApi = uploadContract;
 
     const { POST: uploadPOST } = uploadApi.mount({
         basePath: '/api',
@@ -261,36 +271,36 @@ describe('Next.js handler: alternate content types', () => {
 
 describe('Next.js handler: requestMiddleware', () => {
     const middlewareContractRoutes = k.routes('api', {
-        getResource: {
-            method: 'GET',
-            path: '/resources/:id',
-            responses: {
-                200: z.object({
-                    id: z.string(),
-                    userId: z.string(),
-                }),
-            },
-        },
+        getResource: k
+            .route({
+                method: 'GET',
+                path: '/resources/:id',
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                        userId: z.string(),
+                    }),
+                },
+            })
+            .handler(({ params, request }) => ({
+                status: 200,
+                body: {
+                    id: params.id,
+                    userId: (request as any).userId,
+                },
+            })),
     });
 
-    const middlewareContract = k.contract({
+    const middlewareContract = defineConfig({
+        adapter: nextAdapter,
+        ...config,
         routes: middlewareContractRoutes,
-    });
+    }).api;
 
     it('runs requestMiddleware before the handler with the matched route', async () => {
         const routesSeen: Array<{ path: string; method: string }> = [];
 
-        const middlewareApi = new KizunaServer(middlewareContract).api({
-            router: {
-                getResource: ({ params, request }) => ({
-                    status: 200,
-                    body: {
-                        id: params.id,
-                        userId: (request as any).userId,
-                    },
-                }),
-            },
-        });
+        const middlewareApi = middlewareContract;
 
         const { GET: middlewareGET } = middlewareApi.mount({
             basePath: '/api',
@@ -318,20 +328,7 @@ describe('Next.js handler: requestMiddleware', () => {
     it('short-circuits when middleware returns a Response', async () => {
         let handlerCalled = false;
 
-        const middlewareApi = new KizunaServer(middlewareContract).api({
-            router: {
-                getResource: ({ params }) => {
-                    handlerCalled = true;
-                    return {
-                        status: 200,
-                        body: {
-                            id: params.id,
-                            userId: '',
-                        },
-                    };
-                },
-            },
-        });
+        const middlewareApi = middlewareContract;
 
         const { GET: middlewareGET } = middlewareApi.mount({
             basePath: '/api',
@@ -357,17 +354,7 @@ describe('Next.js handler: requestMiddleware', () => {
     it('runs middleware functions in order and stops at the first Response', async () => {
         const order: number[] = [];
 
-        const middlewareApi = new KizunaServer(middlewareContract).api({
-            router: {
-                getResource: ({ params }) => ({
-                    status: 200,
-                    body: {
-                        id: params.id,
-                        userId: '',
-                    },
-                }),
-            },
-        });
+        const middlewareApi = middlewareContract;
 
         const { GET: middlewareGET } = middlewareApi.mount({
             basePath: '/api',
@@ -393,17 +380,7 @@ describe('Next.js handler: requestMiddleware', () => {
     it('skips middleware for unmatched routes and returns 404', async () => {
         let middlewareCalled = false;
 
-        const middlewareApi = new KizunaServer(middlewareContract).api({
-            router: {
-                getResource: ({ params }) => ({
-                    status: 200,
-                    body: {
-                        id: params.id,
-                        userId: '',
-                    },
-                }),
-            },
-        });
+        const middlewareApi = middlewareContract;
 
         const { GET: middlewareGET } = middlewareApi.mount({
             basePath: '/api',
@@ -422,13 +399,7 @@ describe('Next.js handler: requestMiddleware', () => {
 
 testAdapterFeatures({
     name: 'next',
-    initServerApi: (contract, options) =>
-        new Kizuna({
-            adapter: nextAdapter,
-        }).api({
-            contract,
-            ...(options as object),
-        }) as unknown as NextApi,
+    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: nextAdapter }).api as unknown as NextApi,
     mount: (api, { responseValidation }) => {
         const handlers = api.mount({
             basePath: '/api',

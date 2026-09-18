@@ -1,47 +1,59 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import type { JobHandlerArgs, JobHandlerReturn, JobHandlers } from './jobs.js';
 
-const scheduler = Kizuna.identity.bearer({
+interface Config {
+    identities: {
+        scheduler: typeof scheduler;
+    };
+    requestContext: {
+        analytics: typeof analytics;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const scheduler = k.identity.bearer({
     context: z.object({
         invokedBy: z.string(),
     }),
 });
 
-const analytics = Kizuna.requestContext(
+const analytics = k.requestContext(
     z.object({
         sessionId: z.string().nullable(),
     })
 );
 
-const k = new Kizuna({
+const config = {
     identities: {
         scheduler,
     },
     requestContext: {
         analytics,
     },
-});
+};
 
 const jobs = k.jobs('scheduler', {
-    sendDigests: {
+    sendDigests: k.job({
         schedule: '0 5 * * *',
         result: z.object({
             sent: z.int(),
         }),
-    },
-    reconcile: {
+    }),
+    reconcile: k.job({
         input: z.object({
             since: z.string(),
         }),
         result: z.object({
             reconciled: z.int(),
         }),
-    },
-    cleanup: {
+    }),
+    cleanup: k.job({
         schedule: '0 3 * * *',
-    },
+    }),
 });
 
 type SendDigests = (typeof jobs)['sendDigests']['definition'];
@@ -86,19 +98,20 @@ test('a status the job never declares is rejected', () => {
     expectTypeOf<{ status: 418; body: { detail: string } }>().not.toExtend<Return>();
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: k.routes({
-        listUsers: {
+        listUsers: k.route({
             method: 'GET',
             path: '/users',
             auth: false,
             responses: {
                 200: z.array(z.string()),
             },
-        },
+        }),
     }),
     jobs,
-});
+}).api;
 
 type ContractJobs = NonNullable<(typeof contract)['jobs']>;
 type Handlers = JobHandlers<ContractJobs>;
@@ -166,10 +179,11 @@ test('a nested job tree keeps its shape', () => {
             },
         },
     });
-    const nestedContract = k.contract({
+    const nestedContract = defineConfig({
+        ...config,
         routes: k.routes({}),
         jobs: nested,
-    });
+    }).api;
     type NestedHandlers = JobHandlers<NonNullable<(typeof nestedContract)['jobs']>>;
     expectTypeOf<keyof NestedHandlers>().toEqualTypeOf<'billing'>();
     expectTypeOf<keyof NestedHandlers['billing']>().toEqualTypeOf<'reconcileInvoices'>();
@@ -179,20 +193,26 @@ test('a nested job tree keeps its shape', () => {
 });
 
 test('jobs declared without an identity still get a runner', () => {
-    const bare = new Kizuna({
+    const bareConfig = {
         identities: {
             scheduler,
         },
-    });
+    };
+    const bare = new Kizuna<{
+        identities: {
+            scheduler: typeof scheduler;
+        };
+    }>();
     const publicJobs = bare.jobs({
-        cleanup: {
+        cleanup: bare.job({
             schedule: '0 3 * * *',
-        },
+        }),
     });
-    const bareContract = bare.contract({
+    const bareContract = defineConfig({
+        ...bareConfig,
         routes: bare.routes({}),
         jobs: publicJobs,
-    });
+    }).api;
     type BareHandlers = JobHandlers<NonNullable<(typeof bareContract)['jobs']>>;
     type Args = Parameters<BareHandlers['cleanup']>[0];
     expectTypeOf<Args>().not.toHaveProperty('auth');

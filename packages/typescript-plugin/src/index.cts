@@ -82,12 +82,29 @@ function init(modules: { typescript: TypeScriptModule }): {
         return undefined;
     };
 
+    /**
+     * The route a `k.route({ … })` call declares, reached through whatever is
+     * chained onto it.
+     */
+    const routeArgument = (expression: TypeScriptNamespace.Expression): TypeScriptNamespace.ObjectLiteralExpression | undefined => {
+        let current: TypeScriptNamespace.Expression = expression;
+        while (typescript.isCallExpression(current) && typescript.isPropertyAccessExpression(current.expression)) {
+            if (current.expression.name.text === 'route') {
+                const argument = current.arguments[0];
+                return argument && typescript.isObjectLiteralExpression(argument) ? argument : undefined;
+            }
+            current = current.expression.expression;
+        }
+        return undefined;
+    };
+
     const declarationDeprecation = (declaration: TypeScriptNamespace.Declaration): Deprecation | undefined => {
         if (!typescript.isPropertyAssignment(declaration)) return undefined;
         const initializer = declaration.initializer;
-        if (typescript.isObjectLiteralExpression(initializer)) {
-            if (!findProperty(initializer, 'method')) return undefined;
-            const deprecatedProperty = findProperty(initializer, 'deprecated');
+        const route = typescript.isObjectLiteralExpression(initializer) ? initializer : routeArgument(initializer);
+        if (route) {
+            if (!findProperty(route, 'method')) return undefined;
+            const deprecatedProperty = findProperty(route, 'deprecated');
             return deprecatedProperty ? declaredDeprecation(deprecatedProperty.initializer) : undefined;
         }
         return metaChainDeprecation(initializer);

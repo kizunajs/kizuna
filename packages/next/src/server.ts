@@ -22,7 +22,6 @@ import {
     REQUEST_CONTEXT_META,
     JOBS_META,
     TOOLS_META,
-    type ServerOptions,
     type JobsMeta,
     type ToolsMeta,
     jobRoutes,
@@ -31,10 +30,7 @@ import {
     toolRunnerFrom,
     type ToolRunner,
     type Tools,
-    createServerSurface,
-    type Server as CoreServer,
     type Adapter,
-    type ServerApiOptions,
     type ContractRouter,
     type ContractJobsRouter,
     type ContractToolsRouter,
@@ -418,39 +414,3 @@ export const nextAdapter: Adapter<NextHandlerContext, [options?: NextHandlerOpti
     name: 'next',
     mount: (api, options) => mountNext(api as NextApiWithRouter, options),
 };
-
-export interface Server<C extends Contract> extends CoreServer<C, NextHandlerContext, NextApi<RoutesOf<C>>> {
-    /**
-     * Next answers with its own error responses, so `api` also takes `onError`.
-     */
-    api(options: ServerApiOptions<C, NextHandlerContext> & { onError?: NextHandlerOptions['onError'] }): NextApi<RoutesOf<C>>;
-}
-
-/**
- * Turn a contract into a server handle: the serving counterpart to `Kizuna`.
- * Keep the instance and use `server.guard` to define guards, `server.router`
- * to write typed handlers, and `server.api` to assemble them.
- */
-export class KizunaServer<C extends Contract> implements Server<C> {
-    declare readonly guard: Server<C>['guard'];
-    declare readonly requestContext: Server<C>['requestContext'];
-    declare readonly router: Server<C>['router'];
-    declare readonly jobs: Server<C>['jobs'];
-    declare readonly tools: Server<C>['tools'];
-    declare readonly api: Server<C>['api'];
-
-    constructor(contract: C, options?: ServerOptions) {
-        Object.assign(
-            this,
-            createServerSurface<C, NextHandlerContext, NextApi<RoutesOf<C>>>(contract, options, (assembled, { onError }) => {
-                const api = assembled as NextApi<RoutesOf<C>>;
-                return Object.assign(api, {
-                    [_ON_ERROR]: onError as NextHandlerOptions['onError'],
-                    mount(mountOptions?: NextHandlerOptions) {
-                        return mountNext(this as unknown as NextApiWithRouter, mountOptions);
-                    },
-                });
-            })
-        );
-    }
-}

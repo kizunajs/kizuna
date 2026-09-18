@@ -6,11 +6,18 @@ import { ProblemDetailsSchema } from './error-response.js';
 import { encodeStreamBody, formatEvent, streamMode } from './stream.js';
 import type { RouteDefinition } from './types.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const decoder = new TextDecoder();
 

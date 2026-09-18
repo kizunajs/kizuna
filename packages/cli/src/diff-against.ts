@@ -34,7 +34,7 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
  * const changes = await diffAgainst('main', './src/contract.ts');
  */
 export const diffAgainst = async (ref: string, contractPath: string, options: DiffAgainstOptions = {}): Promise<Change[]> => {
-    const { exportName = 'contract', cwd = process.cwd() } = options;
+    const { exportName = 'api', cwd = process.cwd() } = options;
 
     const root = git(cwd, 'rev-parse', '--show-toplevel');
     const absolute = isAbsolute(contractPath) ? contractPath : resolve(cwd, contractPath);

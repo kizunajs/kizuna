@@ -1,31 +1,48 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { HANDLER_ARG_KEYS, adapterContextOf, assembleApi, createAdapter, type AdapterRequest } from './adapter.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
     identities: {
-        user: Kizuna.identity.bearer({
-            context: z.object({
-                userId: z.string(),
-            }),
-        }),
+        user: typeof kUser;
+    };
+    requestContext: {
+        analytics: typeof kAnalytics;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
+});
+const kUser = k.identity.bearer({
+    context: z.object({
+        userId: z.string(),
+    }),
+});
+const kAnalytics = k.requestContext({
+    context: z.object({
+        sessionId: z.string(),
+    }),
+});
+const config = {
+    tags: kTags,
+    identities: {
+        user: kUser,
     },
     requestContext: {
-        analytics: Kizuna.requestContext({
-            context: z.object({
-                sessionId: z.string(),
-            }),
-        }),
+        analytics: kAnalytics,
     },
-});
+};
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: k.routes('api', {
-        everything: {
+        everything: k.route({
             method: 'POST',
             path: '/everything/:id',
             auth: 'user',
@@ -40,9 +57,9 @@ const contract = k.contract({
                     ok: z.boolean(),
                 }),
             },
-        },
+        }),
     }),
-});
+}).api;
 
 /**
  * Drive one request through the pipeline and capture exactly what the handler

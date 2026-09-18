@@ -1,13 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { generateSwiftClient } from './generator.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const baseConfig = {
     namespaceName: 'TestAPI',
@@ -16,19 +24,20 @@ const baseConfig = {
 describe('Swift generator: z.void()', () => {
     it('emits no body param and Void return for z.void() body and response', () => {
         const contractRoutes = k.routes('api', {
-            ping: {
+            ping: k.route({
                 method: 'POST',
                 path: '/ping/:id',
                 body: z.void(),
                 responses: {
                     204: z.void(),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('func ping(_ params: TestAPIClient.Ping.Params) async throws(TestAPIClient.Ping.Failure)');
         // single path param → a Params struct + group-named `.params(id:)` factory, called as `.params(id: ...)`
@@ -40,7 +49,7 @@ describe('Swift generator: z.void()', () => {
 describe('Swift generator: z.union()', () => {
     it('resolves one-or-many union (array | single.transform) to array type', () => {
         const contractRoutes = k.routes('api', {
-            getByIds: {
+            getByIds: k.route({
                 method: 'GET',
                 path: '/items',
                 query: z.object({
@@ -57,12 +66,13 @@ describe('Swift generator: z.union()', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('ids: [String]');
         expect(output).not.toContain('AnyCodable');
@@ -70,7 +80,7 @@ describe('Swift generator: z.union()', () => {
 
     it('resolves union where all branches have the same type', () => {
         const contractRoutes = k.routes('api', {
-            search: {
+            search: k.route({
                 method: 'GET',
                 path: '/search',
                 query: z.object({
@@ -81,12 +91,13 @@ describe('Swift generator: z.union()', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('tag: String');
         expect(output).not.toContain('AnyCodable');
@@ -96,7 +107,7 @@ describe('Swift generator: z.union()', () => {
 describe('Swift generator: z.iso.datetime()', () => {
     it('maps z.iso.datetime() to Swift Date, not String', () => {
         const contractRoutes = k.routes('api', {
-            listEvents: {
+            listEvents: k.route({
                 method: 'GET',
                 path: '/events',
                 responses: {
@@ -104,12 +115,13 @@ describe('Swift generator: z.iso.datetime()', () => {
                         occurredAt: z.iso.datetime(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('let occurredAt: Date');
         expect(output).not.toContain('let occurredAt: String');
@@ -117,7 +129,7 @@ describe('Swift generator: z.iso.datetime()', () => {
 
     it('maps z.string().datetime() to Swift Date (legacy style)', () => {
         const contractRoutes = k.routes('api', {
-            listEvents: {
+            listEvents: k.route({
                 method: 'GET',
                 path: '/events',
                 responses: {
@@ -125,12 +137,13 @@ describe('Swift generator: z.iso.datetime()', () => {
                         occurredAt: z.string().datetime(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('let occurredAt: Date');
         expect(output).not.toContain('let occurredAt: String');
@@ -138,7 +151,7 @@ describe('Swift generator: z.iso.datetime()', () => {
 
     it('encodes Date with fractional-seconds ISO8601 in the generated client', () => {
         const contractRoutes = k.routes('api', {
-            createEvent: {
+            createEvent: k.route({
                 method: 'POST',
                 path: '/events',
                 body: z.object({
@@ -147,12 +160,13 @@ describe('Swift generator: z.iso.datetime()', () => {
                 responses: {
                     201: z.object({ ok: z.boolean() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('Kizuna.makeJSONEncoder()');
     });
@@ -161,7 +175,7 @@ describe('Swift generator: z.iso.datetime()', () => {
 describe('Swift generator: z.pipe() and z.string().transform()', () => {
     it('resolves a string→number pipe (transform().pipe(z.number())) to Double', () => {
         const contractRoutes = k.routes('api', {
-            search: {
+            search: k.route({
                 method: 'GET',
                 path: '/search',
                 query: z.object({
@@ -175,12 +189,13 @@ describe('Swift generator: z.pipe() and z.string().transform()', () => {
                         total: z.number(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('limit: Double');
         expect(output).not.toContain('AnyCodable');
@@ -188,7 +203,7 @@ describe('Swift generator: z.pipe() and z.string().transform()', () => {
 
     it('resolves z.string().transform() to String (input type)', () => {
         const contractRoutes = k.routes('api', {
-            list: {
+            list: k.route({
                 method: 'GET',
                 path: '/list',
                 query: z.object({
@@ -199,12 +214,13 @@ describe('Swift generator: z.pipe() and z.string().transform()', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('label: String');
         expect(output).not.toContain('AnyCodable');
@@ -214,18 +230,19 @@ describe('Swift generator: z.pipe() and z.string().transform()', () => {
 describe('Swift generator: namespace wrapper', () => {
     it('wraps all types in a public enum named after config.name', () => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
                     200: Kizuna.model({ title: 'Error', schema: z.object({ id: z.string() }) }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public enum TestAPI {');
         expect(output).toContain('    public struct Error:');
@@ -234,19 +251,20 @@ describe('Swift generator: namespace wrapper', () => {
 
     it('uses Swift.Error and Foundation.Data inside the namespace to avoid shadowing', () => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
                     200: z.object({ id: z.string() }),
                     404: z.object({ message: z.string() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('Swift.Error');
         expect(output).toContain('Foundation.Data');
@@ -258,7 +276,7 @@ describe('Swift generator: namespace wrapper', () => {
 describe('Swift generator: keyword property CodingKeys', () => {
     it('emits explicit CodingKeys when a field name is a Swift keyword', () => {
         const contractRoutes = k.routes('api', {
-            createUser: {
+            createUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({
@@ -268,12 +286,13 @@ describe('Swift generator: keyword property CodingKeys', () => {
                 responses: {
                     200: z.object({ ok: z.boolean() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public let `default`: String');
         expect(output).toContain('private enum CodingKeys');
@@ -282,9 +301,10 @@ describe('Swift generator: keyword property CodingKeys', () => {
 });
 
 describe('Swift generator: camelCaseProperties option', () => {
-    const contract = k.contract({
+    const contract = defineConfig({
+        ...config,
         routes: k.routes('api', {
-            getStats: {
+            getStats: k.route({
                 method: 'GET',
                 path: '/stats',
                 responses: {
@@ -293,9 +313,9 @@ describe('Swift generator: camelCaseProperties option', () => {
                         page_size: z.int(),
                     }),
                 },
-            },
+            }),
         }),
-    });
+    }).api;
 
     it('keeps wire names verbatim by default', () => {
         const output = generateSwiftClient(contract, baseConfig);
@@ -319,19 +339,20 @@ describe('Swift generator: camelCaseProperties option', () => {
 describe('Swift generator: Void error responses', () => {
     it('emits a bare enum case and a direct throw for a Void error status', () => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
                     200: z.object({ name: z.string() }),
                     401: z.void(),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('case unauthorized\n');
         expect(output).not.toContain('case unauthorized(Void)');
@@ -341,19 +362,20 @@ describe('Swift generator: Void error responses', () => {
 
     it('emits a bare enum case and a payload-free return for a Void arm in a multi-status success union', () => {
         const contractRoutes = k.routes('api', {
-            getMyWork: {
+            getMyWork: k.route({
                 method: 'GET',
                 path: '/work',
                 responses: {
                     200: z.object({ items: z.array(z.string()) }),
                     204: z.void(),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).not.toContain('decoder.decode(Void.self');
         expect(output).toContain('case status204');
@@ -366,7 +388,7 @@ describe('Swift generator: Void error responses', () => {
 describe('Swift generator: z.int() maps to Int', () => {
     it('maps z.int() to Swift Int, not Double', () => {
         const contractRoutes = k.routes('api', {
-            getStats: {
+            getStats: k.route({
                 method: 'GET',
                 path: '/stats',
                 responses: {
@@ -375,12 +397,13 @@ describe('Swift generator: z.int() maps to Int', () => {
                         ratio: z.number(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('let count: Int');
         expect(output).toContain('let ratio: Double');
@@ -390,18 +413,19 @@ describe('Swift generator: z.int() maps to Int', () => {
 describe('Swift generator: doc comments on auto-named types', () => {
     it('emits a /// doc comment for an auto-named struct with a description', () => {
         const contractRoutes = k.routes('api', {
-            healthCheck: {
+            healthCheck: k.route({
                 method: 'GET',
                 path: '/health',
                 responses: {
                     200: z.object({ ok: z.boolean() }).meta({ description: 'Health check response' }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('/// Health check response');
     });
@@ -410,18 +434,19 @@ describe('Swift generator: doc comments on auto-named types', () => {
 describe('Swift generator: array type qualification', () => {
     it('array response type is placed inside Result body field with correct syntax', () => {
         const contractRoutes = k.routes('api', {
-            listItems: {
+            listItems: k.route({
                 method: 'GET',
                 path: '/items',
                 responses: {
                     200: z.array(z.object({ id: z.string() })),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // return type is always Result, the array is the body, not the return type
         expect(output).toContain('-> TestAPIClient.ListItems.Result');
@@ -433,19 +458,20 @@ describe('Swift generator: array type qualification', () => {
     it('array response type in sub-client is placed inside Result body field with correct syntax', () => {
         const contractRoutes = k.routes('api', {
             items: {
-                list: {
+                list: k.route({
                     method: 'GET',
                     path: '/items',
                     responses: {
                         200: z.array(z.object({ id: z.string() })),
                     },
-                },
+                }),
             },
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('-> TestAPIClient.ItemsList.Result');
         expect(output).toContain('public let body: [ResponseItem]');
@@ -455,7 +481,7 @@ describe('Swift generator: array type qualification', () => {
     it('qualifies array element types in sub-client method parameters', () => {
         const contractRoutes = k.routes('api', {
             items: {
-                bulkCreate: {
+                bulkCreate: k.route({
                     method: 'POST',
                     path: '/items',
                     body: z.object({
@@ -464,13 +490,14 @@ describe('Swift generator: array type qualification', () => {
                     responses: {
                         200: z.object({ ok: z.boolean() }),
                     },
-                },
+                }),
             },
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // [String] is a primitive array, no namespace needed
         expect(output).toContain('tags: [String]');
@@ -480,7 +507,7 @@ describe('Swift generator: array type qualification', () => {
     it('qualifies array of user-defined types in query params', () => {
         const contractRoutes = k.routes('api', {
             items: {
-                list: {
+                list: k.route({
                     method: 'GET',
                     path: '/items',
                     query: z.object({
@@ -489,13 +516,14 @@ describe('Swift generator: array type qualification', () => {
                     responses: {
                         200: z.object({ ok: z.boolean() }),
                     },
-                },
+                }),
             },
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // single-field query → a Query struct; the array element is the operation-local enum (short name).
         // The element type must be well-formed `[Enum]` with the bracket outside any qualifier.
@@ -509,19 +537,20 @@ describe('Swift generator: nested sub-client routing', () => {
     it('emits a Sendable sub-client struct for a grouped router key', () => {
         const contractRoutes = k.routes('api', {
             users: {
-                getById: {
+                getById: k.route({
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
                         200: z.object({ id: z.string() }),
                     },
-                },
+                }),
             },
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public struct TestAPIUsersClient: Sendable');
         expect(output).toContain('private let client: TestAPIClient');
@@ -531,19 +560,20 @@ describe('Swift generator: nested sub-client routing', () => {
     it('uses the leaf method name for grouped routes, not the full joined name', () => {
         const contractRoutes = k.routes('api', {
             users: {
-                getById: {
+                getById: k.route({
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
                         200: z.object({ id: z.string() }),
                     },
-                },
+                }),
             },
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public func getById(_ params: TestAPIClient.UsersGetById.Params)');
         expect(output).not.toContain('public func usersGetById');
@@ -552,28 +582,29 @@ describe('Swift generator: nested sub-client routing', () => {
     it('uses the full joined name for type naming to avoid collisions across groups', () => {
         const contractRoutes = k.routes('api', {
             users: {
-                getById: {
+                getById: k.route({
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
                         200: z.object({ id: z.string() }),
                     },
-                },
+                }),
             },
             posts: {
-                getById: {
+                getById: k.route({
                     method: 'GET',
                     path: '/posts/:id',
                     responses: {
                         200: z.object({ id: z.string() }),
                     },
-                },
+                }),
             },
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('TestAPIClient.UsersGetById.Failure');
         expect(output).toContain('TestAPIClient.PostsGetById.Failure');
@@ -582,28 +613,29 @@ describe('Swift generator: nested sub-client routing', () => {
     it('sub-client methods forward to the held client without an actor hop', () => {
         const contractRoutes = k.routes('api', {
             health: {
-                check: {
+                check: k.route({
                     method: 'GET',
                     path: '/health',
                     auth: false,
                     responses: {
                         200: z.object({ ok: z.boolean() }),
                     },
-                },
-                publish: {
+                }),
+                publish: k.route({
                     method: 'POST',
                     path: '/health/publish',
                     body: z.object({ note: z.string() }),
                     responses: {
                         200: z.object({ ok: z.boolean() }),
                     },
-                },
+                }),
             },
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // The body reads client state directly through the held reference, no local rebind, no await.
         expect(output).toContain('init(client: TestAPIClient)');
@@ -613,28 +645,29 @@ describe('Swift generator: nested sub-client routing', () => {
 
     it('keeps flat routes directly on the client when mixed with grouped routes', () => {
         const contractRoutes = k.routes('api', {
-            ping: {
+            ping: k.route({
                 method: 'GET',
                 path: '/ping',
                 responses: {
                     200: z.object({ ok: z.boolean() }),
                 },
-            },
+            }),
             health: {
-                check: {
+                check: k.route({
                     method: 'GET',
                     path: '/health',
                     auth: false,
                     responses: {
                         200: z.object({ ok: z.boolean() }),
                     },
-                },
+                }),
             },
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // flat route still on actor
         expect(output).toContain('public func ping()');
@@ -647,7 +680,7 @@ describe('Swift generator: nested sub-client routing', () => {
 describe('Swift generator: responseHeaders', () => {
     it('emits a Result wrapper struct and changes the return type when response headers are declared', () => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
@@ -658,12 +691,13 @@ describe('Swift generator: responseHeaders', () => {
                         }),
                     },
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public struct Result: Sendable');
         expect(output).toContain('public let body:');
@@ -676,7 +710,7 @@ describe('Swift generator: responseHeaders', () => {
 
     it('reads the header from HTTPURLResponse and passes it to the Result init', () => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
@@ -687,12 +721,13 @@ describe('Swift generator: responseHeaders', () => {
                         }),
                     },
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('let (data, statusCode, httpResponse) = try await Kizuna.send(&request');
         expect(output).toContain('httpResponse.value(forHTTPHeaderField: "x-request-id")');
@@ -701,18 +736,19 @@ describe('Swift generator: responseHeaders', () => {
 
     it('routes without responseHeaders emit Result with body only: no headers property', () => {
         const contractRoutes = k.routes('api', {
-            ping: {
+            ping: k.route({
                 method: 'GET',
                 path: '/ping',
                 responses: {
                     200: z.object({ ok: z.boolean() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public struct Result: Sendable');
         expect(output).toContain('public let body:');
@@ -726,7 +762,7 @@ describe('Swift generator: responseHeaders', () => {
 describe('Swift generator: owned type nesting', () => {
     it('nests a string enum inside its owning struct and removes it from top level', () => {
         const contractRoutes = k.routes('api', {
-            getVideo: {
+            getVideo: k.route({
                 method: 'GET',
                 path: '/videos/:id',
                 responses: {
@@ -738,12 +774,13 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public struct Video');
         expect(output).toContain('public enum Status: String, Codable, Sendable');
@@ -757,7 +794,7 @@ describe('Swift generator: owned type nesting', () => {
             schema: z.enum(['g', 'ml']),
         });
         const contractRoutes = k.routes('api', {
-            getFood: {
+            getFood: k.route({
                 method: 'GET',
                 path: '/foods/:id',
                 responses: {
@@ -769,8 +806,8 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
-            getFoodEntry: {
+            }),
+            getFoodEntry: k.route({
                 method: 'GET',
                 path: '/food-entries/:id',
                 responses: {
@@ -782,12 +819,13 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output.match(/public enum BaseUnit: String, Codable, Sendable/g)).toHaveLength(1);
         expect(output).not.toContain('FoodBaseUnit');
@@ -801,7 +839,7 @@ describe('Swift generator: owned type nesting', () => {
             schema: z.enum(['manual', 'barcode']),
         });
         const contractRoutes = k.routes('api', {
-            getFood: {
+            getFood: k.route({
                 method: 'GET',
                 path: '/foods/:id',
                 responses: {
@@ -813,12 +851,13 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public enum FoodSource: String, Codable, Sendable');
         expect(output).toContain('public let source: FoodSource');
@@ -827,7 +866,7 @@ describe('Swift generator: owned type nesting', () => {
 
     it('sanitizes enum values that are not valid Swift identifiers into camelCase case names', () => {
         const contractRoutes = k.routes('api', {
-            getFile: {
+            getFile: k.route({
                 method: 'GET',
                 path: '/files/:id',
                 responses: {
@@ -839,12 +878,13 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // sanitized case name, original value preserved as the rawValue
         expect(output).toContain('case imageJpeg = "image/jpeg"');
@@ -859,7 +899,7 @@ describe('Swift generator: owned type nesting', () => {
 
     it('leaves enum values that are already valid Swift identifiers untouched, including snake_case', () => {
         const contractRoutes = k.routes('api', {
-            getOrder: {
+            getOrder: k.route({
                 method: 'GET',
                 path: '/orders/:id',
                 responses: {
@@ -871,12 +911,13 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // snake_case values are valid Swift identifiers, kept verbatim, NOT camelCased
         expect(output).toContain('case in_progress = "in_progress"');
@@ -888,7 +929,7 @@ describe('Swift generator: owned type nesting', () => {
 
     it('nests an inline object inside its parent struct', () => {
         const contractRoutes = k.routes('api', {
-            getPage: {
+            getPage: k.route({
                 method: 'GET',
                 path: '/pages/:id',
                 responses: {
@@ -903,12 +944,13 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public struct Page');
         expect(output).toContain('public struct Images');
@@ -925,7 +967,7 @@ describe('Swift generator: owned type nesting', () => {
             }),
         });
         const contractRoutes = k.routes('api', {
-            getPage: {
+            getPage: k.route({
                 method: 'GET',
                 path: '/pages/:id',
                 responses: {
@@ -937,12 +979,13 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public struct Page');
         expect(output).toContain('public struct Image');
@@ -956,7 +999,7 @@ describe('Swift generator: owned type nesting', () => {
 
     it('handles deeply nested inline objects', () => {
         const contractRoutes = k.routes('api', {
-            getPage: {
+            getPage: k.route({
                 method: 'GET',
                 path: '/pages/:id',
                 responses: {
@@ -971,12 +1014,13 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).not.toContain('public struct PageSettings');
         expect(output).not.toContain('public struct PageSettingsTheme');
@@ -986,7 +1030,7 @@ describe('Swift generator: owned type nesting', () => {
 
     it('keeps sibling anonymous objects apart when one field name is a prefix of another (identical shapes)', () => {
         const contractRoutes = k.routes('api', {
-            getOrderItem: {
+            getOrderItem: k.route({
                 method: 'GET',
                 path: '/order-items/:id',
                 responses: {
@@ -1012,12 +1056,13 @@ describe('Swift generator: owned type nesting', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // `ImagesItem` must nest under the parent, not get claimed by `Image` as `sItem`
         expect(output).toContain('public struct Image');
@@ -1036,15 +1081,15 @@ describe('Swift generator: @available(*, deprecated)', () => {
         }),
     });
     const deprecationRoutes = k.routes('api', {
-        getUserById: {
+        getUserById: k.route({
             method: 'GET',
             path: '/users/by-id/:id',
             deprecated: true,
             responses: {
                 200: DeprecatedFieldSchema,
             },
-        },
-        oldRoute: {
+        }),
+        oldRoute: k.route({
             method: 'GET',
             path: '/old',
             deprecated: 'use newRoute instead',
@@ -1053,8 +1098,8 @@ describe('Swift generator: @available(*, deprecated)', () => {
                     ok: z.boolean(),
                 }),
             },
-        },
-        sunsetRoute: {
+        }),
+        sunsetRoute: k.route({
             method: 'GET',
             path: '/sunset',
             deprecated: {
@@ -1068,15 +1113,15 @@ describe('Swift generator: @available(*, deprecated)', () => {
                     ok: z.boolean(),
                 }),
             },
-        },
-        getUser: {
+        }),
+        getUser: k.route({
             method: 'GET',
             path: '/users/:id',
             responses: {
                 200: DeprecatedFieldSchema,
             },
-        },
-        getUserByIdV2: {
+        }),
+        getUserByIdV2: k.route({
             method: 'GET',
             path: '/users/v2/:id',
             responses: {
@@ -1087,11 +1132,12 @@ describe('Swift generator: @available(*, deprecated)', () => {
                     }),
                 }),
             },
-        },
+        }),
     });
-    const deprecatedContract = k.contract({
+    const deprecatedContract = defineConfig({
+        ...config,
         routes: deprecationRoutes,
-    });
+    }).api;
 
     const generate = (routes: Contract['routes']): string => generateSwiftClient({ routes } as Contract, baseConfig);
 
@@ -1152,7 +1198,7 @@ describe('Swift generator: @available(*, deprecated)', () => {
 describe('Swift generator: HEAD method', () => {
     it('generates Void return type and no body decoding regardless of the response schema', () => {
         const contractRoutes = k.routes('api', {
-            checkUser: {
+            checkUser: k.route({
                 method: 'HEAD',
                 path: '/users/:id',
                 responses: {
@@ -1162,12 +1208,13 @@ describe('Swift generator: HEAD method', () => {
                     }),
                     404: z.void(),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('func checkUser(_ params: TestAPIClient.CheckUser.Params) async throws(TestAPIClient.CheckUser.Failure)');
         expect(output).not.toContain('Kizuna.decode(');
@@ -1176,7 +1223,7 @@ describe('Swift generator: HEAD method', () => {
 
     it('generates OPTIONS method with normal body decoding', () => {
         const contractRoutes = k.routes('api', {
-            describeUsers: {
+            describeUsers: k.route({
                 method: 'OPTIONS',
                 path: '/users',
                 responses: {
@@ -1184,12 +1231,13 @@ describe('Swift generator: HEAD method', () => {
                         allow: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('func describeUsers() async throws(TestAPIClient.DescribeUsers.Failure)');
         expect(output).toContain('Kizuna.decode(');
@@ -1199,7 +1247,7 @@ describe('Swift generator: HEAD method', () => {
 describe('Swift generator: automatic validation error', () => {
     it('adds badRequest case for route with body', () => {
         const contractRoutes = k.routes('api', {
-            createUser: {
+            createUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({
@@ -1210,12 +1258,13 @@ describe('Swift generator: automatic validation error', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('case badRequest(TestAPIClient.ValidationError)');
         expect(output).toContain('struct ValidationError');
@@ -1224,7 +1273,7 @@ describe('Swift generator: automatic validation error', () => {
 
     it('does not add validation case for route without body or query', () => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
@@ -1232,12 +1281,13 @@ describe('Swift generator: automatic validation error', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).not.toContain('ValidationError');
         expect(output).not.toContain('ValidationIssue');
@@ -1245,7 +1295,7 @@ describe('Swift generator: automatic validation error', () => {
 
     it('uses validationError case when route also declares 400', () => {
         const contractRoutes = k.routes('api', {
-            createUser: {
+            createUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({
@@ -1259,12 +1309,13 @@ describe('Swift generator: automatic validation error', () => {
                         message: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('case badRequest(Response400)');
         expect(output).toContain('case validationError(TestAPIClient.ValidationError)');
@@ -1272,7 +1323,7 @@ describe('Swift generator: automatic validation error', () => {
 
     it('groups duplicate status codes into a single switch case', () => {
         const contractRoutes = k.routes('api', {
-            createUser: {
+            createUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({
@@ -1286,12 +1337,13 @@ describe('Swift generator: automatic validation error', () => {
                         message: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         const matches = output.match(/case 400:/g);
         expect(matches).toHaveLength(1);
@@ -1299,7 +1351,7 @@ describe('Swift generator: automatic validation error', () => {
 
     it('tries each candidate type in a grouped case and throws the typed Failure without swallowing it', () => {
         const contractRoutes = k.routes('api', {
-            createUser: {
+            createUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({
@@ -1313,12 +1365,13 @@ describe('Swift generator: automatic validation error', () => {
                         message: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // The body POST adds an automatic validation 400, so 400 is a grouped case with
         // multiple candidate types. Each is a `Kizuna.firstError` attempt: the first `try?`
@@ -1335,19 +1388,20 @@ describe('Swift generator: automatic validation error', () => {
 describe('Swift generator: grouped request components (params/body/query/headers)', () => {
     it('emits each group as a distinct positional parameter with a group-named leading-dot factory', () => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 headers: z.object({ 'x-request-id': z.string() }),
                 responses: {
                     200: z.object({ id: z.string() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // distinct positional params (compile-checked required) → call site `.params(id: …), .headers(xRequestId: …)`
         expect(output).toContain('func getUser(_ params: TestAPIClient.GetUser.Params, _ headers: TestAPIClient.GetUser.Headers)');
@@ -1358,19 +1412,20 @@ describe('Swift generator: grouped request components (params/body/query/headers
 
     it('emits a multi-field group factory taking all fields', () => {
         const contractRoutes = k.routes('api', {
-            search: {
+            search: k.route({
                 method: 'GET',
                 path: '/search',
                 query: z.object({ q: z.string(), limit: z.int() }),
                 responses: {
                     200: z.object({ ok: z.boolean() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // required query (has required fields) → non-defaulted positional param
         expect(output).toContain('func search(_ query: TestAPIClient.Search.Query)');
@@ -1382,38 +1437,40 @@ describe('Swift generator: grouped request components (params/body/query/headers
 
     it('defaults an all-optional group to .query() so it can be omitted at the call site', () => {
         const contractRoutes = k.routes('api', {
-            list: {
+            list: k.route({
                 method: 'GET',
                 path: '/items',
                 query: z.object({ page: z.int().optional(), limit: z.int().optional() }),
                 responses: {
                     200: z.object({ ok: z.boolean() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('_ query: TestAPIClient.List.Query = .query()');
     });
 
     it('wraps an object body in a Body group with a .body(...) factory building the Codable payload', () => {
         const contractRoutes = k.routes('api', {
-            createUser: {
+            createUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: Kizuna.model({ title: 'CreateUserInput', schema: z.object({ name: z.string(), email: z.string().optional() }) }),
                 responses: {
                     201: z.object({ id: z.string() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // body is a Body group; the factory builds the Codable payload, encoded via body.payload
         expect(output).toContain('func createUser(_ body: TestAPIClient.CreateUser.Body)');
@@ -1423,7 +1480,7 @@ describe('Swift generator: grouped request components (params/body/query/headers
 
     it('emits a leading-dot static factory per discriminated-union variant (no .init at call site)', () => {
         const contractRoutes = k.routes('api', {
-            notify: {
+            notify: k.route({
                 method: 'POST',
                 path: '/notify',
                 body: z.discriminatedUnion('channel', [
@@ -1436,12 +1493,13 @@ describe('Swift generator: grouped request components (params/body/query/headers
                 responses: {
                     202: z.object({ accepted: z.boolean() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // call site: `body: .email(to:, subject:)`, the discriminator literal is injected inside the factory
         expect(output).toContain('public static func email(to: String, subject: String) ->');
@@ -1469,9 +1527,10 @@ describe('Swift generator: grouped request components (params/body/query/headers
             title: 'Attachment',
             schema: z.discriminatedUnion('kind', [ImageAttachment, VideoAttachment]),
         });
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: k.routes('api', {
-                getMessage: {
+                getMessage: k.route({
                     method: 'GET',
                     path: '/messages/:id',
                     responses: {
@@ -1483,9 +1542,9 @@ describe('Swift generator: grouped request components (params/body/query/headers
                             }),
                         }),
                     },
-                },
+                }),
             }),
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // Members are top-level structs; the enum cases wrap them by title.
         expect(output).toContain('public enum Attachment');
@@ -1505,19 +1564,20 @@ describe('Swift generator: grouped request components (params/body/query/headers
 describe('Swift generator: positional request groups (required-first, single signature)', () => {
     it('emits one signature with groups in required-first order', () => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 headers: z.object({ 'x-request-id': z.string() }),
                 responses: {
                     200: z.object({ id: z.string() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // exactly one signature, groups must be passed in declared order
         const signatureCount = output.split('func getUser(').length - 1;
@@ -1527,19 +1587,20 @@ describe('Swift generator: positional request groups (required-first, single sig
 
     it('orders required groups before optional ones so optional groups keep trailing defaults', () => {
         const contractRoutes = k.routes('api', {
-            list: {
+            list: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 query: z.object({ page: z.int().optional() }),
                 responses: {
                     200: z.object({ ok: z.boolean() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         // required params first, optional query trailing with a default so it may be omitted
         expect(output).toContain('func list(_ params: TestAPIClient.List.Params, _ query: TestAPIClient.List.Query = .query())');
@@ -1549,7 +1610,7 @@ describe('Swift generator: positional request groups (required-first, single sig
 });
 
 describe('Swift generator: request context', () => {
-    const analytics = Kizuna.requestContext({
+    const analytics = k.requestContext({
         headers: z.object({
             'x-session-id': z.string().optional(),
             'x-tenant': z.string(),
@@ -1559,16 +1620,22 @@ describe('Swift generator: request context', () => {
         }),
     });
 
-    const ctxK = new Kizuna({
+    const ctxKConfig = {
         requestContext: {
             analytics,
         },
-    });
+    };
+    const ctxK = new Kizuna<{
+        requestContext: {
+            analytics: typeof analytics;
+        };
+    }>();
 
-    const ctxContract = ctxK.contract({
+    const ctxContract = defineConfig({
+        ...ctxKConfig,
         routes: {
             users: ctxK.routes({
-                listUsers: {
+                listUsers: ctxK.route({
                     method: 'GET',
                     path: '/users',
                     responses: {
@@ -1576,10 +1643,10 @@ describe('Swift generator: request context', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             }),
         },
-    });
+    }).api;
 
     it('emits a RequestContext struct and a required init parameter', () => {
         const output = generateSwiftClient(ctxContract, baseConfig);
@@ -1592,9 +1659,10 @@ describe('Swift generator: request context', () => {
     });
 
     it('emits nothing when the contract declares no request context headers', () => {
-        const plainContract = k.contract({
+        const plainContract = defineConfig({
+            ...config,
             routes: k.routes('api', {
-                ping: {
+                ping: k.route({
                     method: 'GET',
                     path: '/ping',
                     responses: {
@@ -1602,9 +1670,9 @@ describe('Swift generator: request context', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             }),
-        });
+        }).api;
         const output = generateSwiftClient(plainContract, baseConfig);
         expect(output).not.toContain('RequestContext');
         expect(output).not.toContain('requestContextHeaders');
@@ -1612,17 +1680,18 @@ describe('Swift generator: request context', () => {
 });
 
 describe('Swift generator: Sendable client', () => {
-    const contract = k.contract({
+    const contract = defineConfig({
+        ...config,
         routes: k.routes('api', {
-            ping: {
+            ping: k.route({
                 method: 'GET',
                 path: '/ping',
                 responses: {
                     200: z.object({ ok: z.boolean() }),
                 },
-            },
+            }),
         }),
-    });
+    }).api;
 
     it('emits a Sendable final class with immutable middleware storage', () => {
         const output = generateSwiftClient(contract, baseConfig);
@@ -1633,18 +1702,19 @@ describe('Swift generator: Sendable client', () => {
 });
 
 describe('Swift generator: date handling', () => {
-    const contract = k.contract({
+    const contract = defineConfig({
+        ...config,
         routes: k.routes('api', {
-            events: {
+            events: k.route({
                 method: 'GET',
                 path: '/events',
                 query: z.object({ since: z.iso.datetime() }),
                 responses: {
                     200: z.object({ at: z.iso.datetime() }),
                 },
-            },
+            }),
         }),
-    });
+    }).api;
 
     it('uses Date.ISO8601FormatStyle for encoding and decoding', () => {
         const output = generateSwiftClient(contract, baseConfig);
@@ -1660,18 +1730,19 @@ describe('Swift generator: date handling', () => {
 });
 
 describe('Swift generator: JSONValue', () => {
-    const contract = k.contract({
+    const contract = defineConfig({
+        ...config,
         routes: k.routes('api', {
-            webhook: {
+            webhook: k.route({
                 method: 'POST',
                 path: '/webhook',
                 body: z.any(),
                 responses: {
                     200: z.object({ received: z.boolean() }),
                 },
-            },
+            }),
         }),
-    });
+    }).api;
 
     it('emits a natively-Codable JSONValue enum for unknown payloads', () => {
         const output = generateSwiftClient(contract, baseConfig);
@@ -1682,17 +1753,18 @@ describe('Swift generator: JSONValue', () => {
 });
 
 describe('Swift generator: failure surface', () => {
-    const contract = k.contract({
+    const contract = defineConfig({
+        ...config,
         routes: k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
                     200: z.object({ id: z.string() }),
                 },
-            },
+            }),
         }),
-    });
+    }).api;
 
     it('emits public failure protocols so apps can handle the shared cases generically', () => {
         const output = generateSwiftClient(contract, baseConfig);
@@ -1727,26 +1799,28 @@ describe('Swift generator: failure surface', () => {
 
 describe('Swift generator: Result init', () => {
     it('emits a public init(body:) so consumers can construct results for tests and mocks', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: k.routes('api', {
-                getUser: {
+                getUser: k.route({
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
                         200: z.object({ id: z.string() }),
                     },
-                },
+                }),
             }),
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('public struct Result: Sendable');
         expect(output).toMatch(/public init\(body: [^)]+\) \{\s*\n\s*self\.body = body/);
     });
 
     it('includes headers in the public init when the route returns response headers', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: k.routes('api', {
-                getUser: {
+                getUser: k.route({
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
@@ -1755,9 +1829,9 @@ describe('Swift generator: Result init', () => {
                             headers: z.object({ 'x-request-id': z.string().optional() }),
                         },
                     },
-                },
+                }),
             }),
-        });
+        }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toMatch(/public init\(body: [^,]+, headers: Headers\) \{/);
     });
@@ -1771,7 +1845,7 @@ describe('Swift generator: unknownEnumCase', () => {
 
     const enumContract = (values: [string, ...string[]]): Contract => {
         const contractRoutes = k.routes('api', {
-            getOrder: {
+            getOrder: k.route({
                 method: 'GET',
                 path: '/orders/:id',
                 responses: {
@@ -1783,11 +1857,12 @@ describe('Swift generator: unknownEnumCase', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
-        return k.contract({
+        return defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
     };
 
     it('emits a strict String-backed enum by default', () => {
@@ -1814,7 +1889,7 @@ describe('Swift generator: unknownEnumCase', () => {
 describe('Swift generator: union variants nest under their union', () => {
     const collidingContract = (): Contract => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
@@ -1825,8 +1900,8 @@ describe('Swift generator: union variants nest under their union', () => {
                         }),
                     }),
                 },
-            },
-            getActivity: {
+            }),
+            getActivity: k.route({
                 method: 'GET',
                 path: '/activity',
                 responses: {
@@ -1844,11 +1919,12 @@ describe('Swift generator: union variants nest under their union', () => {
                         ]),
                     }),
                 },
-            },
+            }),
         });
-        return k.contract({
+        return defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
     };
 
     it('nests variant payloads under the union, not the name-prefixed User struct', () => {
@@ -1872,7 +1948,7 @@ describe('Swift generator: union variants nest under their union', () => {
 
 describe('Swift generator: streamed responses', () => {
     const contractRoutes = k.routes('api', {
-        reply: {
+        reply: k.route({
             method: 'POST',
             path: '/reply',
             body: z.object({
@@ -1896,8 +1972,8 @@ describe('Swift generator: streamed responses', () => {
                     detail: z.string(),
                 }),
             },
-        },
-        lines: {
+        }),
+        lines: k.route({
             method: 'GET',
             path: '/lines',
             responses: {
@@ -1906,14 +1982,15 @@ describe('Swift generator: streamed responses', () => {
                     contentType: 'text/plain',
                 },
             },
-        },
+        }),
     });
 
     it('emits an event type per named event and reads the body as a stream', () => {
         const output = generateSwiftClient(
-            k.contract({
+            defineConfig({
+                ...config,
                 routes: contractRoutes,
-            }),
+            }).api,
             baseConfig
         );
         expect(output).toContain('public enum Event: Sendable, Equatable');
@@ -1929,9 +2006,10 @@ describe('Swift generator: streamed responses', () => {
 
     it('reads a text stream line by line', () => {
         const output = generateSwiftClient(
-            k.contract({
+            defineConfig({
+                ...config,
                 routes: contractRoutes,
-            }),
+            }).api,
             baseConfig
         );
         expect(output).toContain('AsyncThrowingStream<String, Swift.Error>');
@@ -1940,7 +2018,7 @@ describe('Swift generator: streamed responses', () => {
 
     it('skips a route that mixes a streamed status with another success status', () => {
         const mixed = k.routes('api', {
-            mixed: {
+            mixed: k.route({
                 method: 'GET',
                 path: '/mixed',
                 responses: {
@@ -1951,13 +2029,14 @@ describe('Swift generator: streamed responses', () => {
                         queued: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
         const output = generateSwiftClient(
-            k.contract({
+            defineConfig({
+                ...config,
                 routes: mixed,
-            }),
+            }).api,
             baseConfig
         );
         expect(output).not.toContain('mixed(');
@@ -1967,22 +2046,30 @@ describe('Swift generator: streamed responses', () => {
 });
 
 describe('Swift generator: the statuses the auth map adds', () => {
-    const guardedK = new Kizuna({
-        tags: Kizuna.tags({
-            api: 'API',
-        }),
-        identities: {
-            user: Kizuna.identity.bearer({
-                context: z.object({
-                    userId: z.string(),
-                }),
-            }),
-        },
+    const guardedKTags = k.tags({
+        api: 'API',
     });
+    const guardedKUser = k.identity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+    const guardedKConfig = {
+        tags: guardedKTags,
+        identities: {
+            user: guardedKUser,
+        },
+    };
+    const guardedK = new Kizuna<{
+        tags: typeof guardedKTags;
+        identities: {
+            user: typeof guardedKUser;
+        };
+    }>();
 
     const guardedContract = () => {
         const routes = guardedK.routes('api', {
-            getSecret: {
+            getSecret: guardedK.route({
                 method: 'GET',
                 path: '/secret',
                 auth: 'user',
@@ -1991,8 +2078,8 @@ describe('Swift generator: the statuses the auth map adds', () => {
                         value: z.string(),
                     }),
                 },
-            },
-            health: {
+            }),
+            health: guardedK.route({
                 method: 'GET',
                 path: '/health',
                 auth: false,
@@ -2001,11 +2088,12 @@ describe('Swift generator: the statuses the auth map adds', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
-        return guardedK.contract({
+        return defineConfig({
+            ...guardedKConfig,
             routes,
-        });
+        }).api;
     };
 
     it('gives a guarded route the unauthorized and forbidden cases it never declared', () => {

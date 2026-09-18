@@ -3,18 +3,23 @@ import express from 'express';
 import request from 'supertest';
 import { Kizuna } from '@ts-kizuna/core';
 import { expressAdapter } from './server.js';
-import { userContract, resetUsers } from '../../core/src/adapter-testing/fixtures.js';
+import { userInput, resetUsers } from '../../core/src/adapter-testing/fixtures.js';
+import { defineConfig } from '@ts-kizuna/core';
 
-const k = new Kizuna({
+interface Config {
+    adapter: typeof expressAdapter;
+}
+
+const k = new Kizuna<Config>();
+
+const config = {
     adapter: expressAdapter,
-});
+};
 
 describe('api.mount', () => {
     it('serves routes', async () => {
         resetUsers();
-        const api = k.api({
-            contract: userContract,
-        });
+        const api = defineConfig({ ...userInput, adapter: expressAdapter }).api;
         const app = express();
         app.use(express.json());
         api.mount(app);

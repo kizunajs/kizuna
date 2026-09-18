@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type AuthoredRoutes } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { diffContracts, formatChange, hasBreakingChange, type Change } from './diff-contracts.js';
 
 const k = new Kizuna();
@@ -8,11 +9,11 @@ const k = new Kizuna();
 const ok = { 200: z.object({ id: z.string() }) };
 
 const contractOf = (routes: AuthoredRoutes) =>
-    k.contract({
+    defineConfig({
         routes: {
             users: k.routes(routes),
         },
-    });
+    }).api;
 
 const base = contractOf({
     getUser: { method: 'GET', path: '/users/:id', responses: { ...ok, 404: z.object({ detail: z.string() }) } },
@@ -180,19 +181,19 @@ describe('schemas, compared field by field', () => {
 });
 
 describe('what a document cannot carry', () => {
-    const withJob = k.contract({
-        routes: { users: k.routes('users', { listUsers: { method: 'GET', path: '/users', responses: ok } }) },
+    const withJob = defineConfig({
+        routes: { users: k.routes('users', { listUsers: k.route({ method: 'GET', path: '/users', responses: ok }) }) },
         jobs: k.jobs({
             reconcile: {
                 description: 'Reconciles invoices',
                 input: z.object({ month: z.string() }),
             },
         }),
-    });
+    }).api;
 
-    const withoutJob = k.contract({
-        routes: { users: k.routes('users', { listUsers: { method: 'GET', path: '/users', responses: ok } }) },
-    });
+    const withoutJob = defineConfig({
+        routes: { users: k.routes('users', { listUsers: k.route({ method: 'GET', path: '/users', responses: ok }) }) },
+    }).api;
 
     it('reports a removed job key as breaking', () => {
         const changes = diffContracts(withJob, withoutJob);

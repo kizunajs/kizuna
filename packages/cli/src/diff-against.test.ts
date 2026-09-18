@@ -17,7 +17,7 @@ const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd,
  * A contract with no imports, so the repository needs no dependencies of its
  * own and the test is about the ref handling rather than module resolution.
  */
-const contractSource = (routes: string) => `export const contract = { routes: ${routes} };\n`;
+const contractSource = (routes: string) => `export const api = { routes: ${routes} };\n`;
 
 const repository = (initial: string) => {
     const directory = realpathSync(mkdtempSync(join(tmpdir(), 'kizuna-diff-against-')));
@@ -86,7 +86,7 @@ describe('diffAgainst', () => {
         writeFileSync(join(directory, 'contract.ts'), 'export const nothing = true;\n');
         git(directory, 'commit', '--quiet', '-am', 'no contract');
 
-        await expect(diffAgainst('HEAD', 'contract.ts', { cwd: directory })).rejects.toThrow('No `contract` export');
+        await expect(diffAgainst('HEAD', 'contract.ts', { cwd: directory })).rejects.toThrow('No `api` export');
         expect(git(directory, 'worktree', 'list').trim().split('\n')).toHaveLength(1);
     });
 

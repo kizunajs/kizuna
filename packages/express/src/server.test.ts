@@ -5,16 +5,11 @@ import type { AddressInfo } from 'node:net';
 import { Kizuna } from '@ts-kizuna/core';
 import { expressAdapter, type ExpressApi } from './server.js';
 import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { defineConfig } from '@ts-kizuna/core';
 
 testAdapterFeatures({
     name: 'express',
-    initServerApi: (contract, options) =>
-        new Kizuna({
-            adapter: expressAdapter,
-        }).api({
-            contract,
-            ...(options as object),
-        }) as unknown as ExpressApi,
+    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: expressAdapter }).api as unknown as ExpressApi,
     mount: (api, { responseValidation }) => {
         const app = express();
         app.use(express.json());

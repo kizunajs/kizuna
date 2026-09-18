@@ -1,6 +1,6 @@
-import { Kizuna } from '@ts-kizuna/core';
+import { k } from './k';
 
-export const tags = Kizuna.tags({
+export const tags = k.tags({
     health: {
         title: 'Health',
         description: 'Service health and uptime monitoring',

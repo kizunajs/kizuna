@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import type { Adapter, ApiWithRouter } from './adapter.js';
 import { ROUTER_META } from './adapter.js';
+import { HANDLER } from './types.js';
+
+interface Config {
+    adapter: typeof probeAdapter;
+    identities: {
+        user: typeof user;
+    };
+}
+
+const k = new Kizuna<Config>();
 
 const UserSchema = z.object({
     id: z.string(),
@@ -26,18 +37,22 @@ const probeAdapter: Adapter<{ native: string }, [label: string], string> = {
     },
 };
 
-const user = Kizuna.identity.bearer({
-    context: z.object({
-        userId: z.string(),
-    }),
-});
+const user = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    })
+    .guard(() => ({
+        userId: '1',
+    }));
 
-const k = new Kizuna({
+const config = {
     adapter: probeAdapter,
     identities: {
         user,
     },
-});
+};
 
 const getUser = k
     .route({
@@ -56,59 +71,31 @@ const getUser = k
         },
     }));
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: k.routes({
         users: {
             getUser,
         },
     }),
-});
+}).api;
 
-const requireUser = () => ({
-    userId: '1',
-});
-
-describe('k.api', () => {
+describe('defineConfig', () => {
     it('takes its handlers from the routes', () => {
-        const api = k.api({
-            contract,
-            guards: {
-                user: requireUser,
-            },
-        });
+        const router = (contract as unknown as Record<symbol, Record<string, Record<string, unknown>>>)[ROUTER_META]!;
 
-        const router = (api as unknown as Record<symbol, Record<string, Record<string, unknown>>>)[ROUTER_META]!;
-
-        expect(router.users!.getUser).toBe(getUser.handler);
+        expect(router.users!.getUser).toBe(getUser[HANDLER]);
     });
 
-    it('carries the contract it was built from', () => {
-        const api = k.api({
-            contract,
-            guards: {
-                user: requireUser,
-            },
-        });
-
-        expect(api.routes).toBe(contract.routes);
-        expect(api.securitySchemes).toBe(contract.securitySchemes);
+    it('mounts through the adapter the config names', () => {
+        expect(contract.mount('an-app')).toBe('an-app');
+        expect(mounted.api).toBe(contract);
     });
 
-    it('mounts through the adapter on the instance', () => {
-        const api = k.api({
-            contract,
-            guards: {
-                user: requireUser,
-            },
-        });
-
-        expect(api.mount('an-app')).toBe('an-app');
-        expect(mounted.api).toBe(api);
-    });
-
-    it('takes an adapter of its own when the instance declares none', () => {
+    it('mounts on whatever adapter the config names', () => {
         const plain = new Kizuna();
-        const plainContract = plain.contract({
+        const { api } = defineConfig({
+            adapter: probeAdapter,
             routes: plain.routes({
                 health: {
                     live: plain
@@ -131,20 +118,15 @@ describe('k.api', () => {
             }),
         });
 
-        const api = plain.api({
-            contract: plainContract,
-            adapter: probeAdapter,
-        });
-
         expect(api.mount('other-app')).toBe('other-app');
     });
 
-    it('refuses to mount with no adapter anywhere', () => {
-        const plain = new Kizuna();
-        const plainContract = plain.contract({
-            routes: plain.routes({
+    it('refuses to mount when the config names no adapter', () => {
+        const plain2 = new Kizuna();
+        const { api } = defineConfig({
+            routes: plain2.routes({
                 health: {
-                    live: {
+                    live: plain2.route({
                         method: 'GET',
                         path: '/health',
                         responses: {
@@ -152,16 +134,11 @@ describe('k.api', () => {
                                 ok: z.boolean(),
                             }),
                         },
-                    },
+                    }),
                 },
             }),
         });
 
-        // @ts-expect-error an instance with no adapter needs one here
-        const api = plain.api({
-            contract: plainContract,
-        });
-
-        expect(() => (api as { mount: (...args: unknown[]) => unknown }).mount('app')).toThrow(/no adapter to mount on/);
+        expect(() => (api as unknown as { mount: (...args: unknown[]) => unknown }).mount('app')).toThrow(/no adapter to mount on/);
     });
 });

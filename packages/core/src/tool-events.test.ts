@@ -192,17 +192,17 @@ describe('expandStreamTools', () => {
     const k = new Kizuna();
 
     const declared = k.tools({
-        countWords: {
+        countWords: k.tool({
             description: 'Count the words in a piece of text',
             input: z.object({
                 text: z.string(),
             }),
-        },
+        }),
     });
 
     it('folds the tool events into the stream and drops the tools field', () => {
         const routes = k.routes({
-            reply: {
+            reply: k.route({
                 method: 'POST',
                 path: '/reply',
                 responses: {
@@ -215,7 +215,7 @@ describe('expandStreamTools', () => {
                         tools: declared,
                     },
                 },
-            },
+            }),
         });
 
         const response = routes['reply']!.responses[200] as {
@@ -229,7 +229,7 @@ describe('expandStreamTools', () => {
     it('throws when the stream already names a tool event', () => {
         expect(() =>
             k.routes({
-                reply: {
+                reply: k.route({
                     method: 'POST',
                     path: '/reply',
                     responses: {
@@ -242,7 +242,7 @@ describe('expandStreamTools', () => {
                             tools: declared,
                         },
                     },
-                },
+                }),
             })
         ).toThrow(/already names an event "tool_call"/);
     });
@@ -250,7 +250,7 @@ describe('expandStreamTools', () => {
     it('throws when tools sit beside a single stream schema', () => {
         expect(() =>
             k.routes({
-                reply: {
+                reply: k.route({
                     method: 'POST',
                     path: '/reply',
                     responses: {
@@ -261,7 +261,7 @@ describe('expandStreamTools', () => {
                             tools: declared,
                         },
                     },
-                },
+                }),
             })
         ).toThrow(/beside a single stream schema/);
     });

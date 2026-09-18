@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { build, type Plugin } from 'esbuild';
 import { generateFetchClient } from '../packages/fetch/src/generator.js';
-import { contract } from '../apps/shared/src/contract.js';
+import { api } from '../apps/express-demo/kizuna.config.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
@@ -185,9 +185,9 @@ describe('the client-safe boundary', () => {
 
 /**
  * What a browser imports is the generated client, so that is what has to bundle.
- * The contract carries the handlers and stays on the server.
+ * The config carries the handlers and stays on the server.
  */
-const DEMO_CONTRACT = path.join(ROOT, 'apps/shared/src/contract.ts');
+const DEMO_CONFIG = path.join(ROOT, 'apps/express-demo/kizuna.config.ts');
 
 /**
  * Written inside the repository, so `@ts-kizuna/fetch` resolves the way it
@@ -195,7 +195,7 @@ const DEMO_CONTRACT = path.join(ROOT, 'apps/shared/src/contract.ts');
  */
 const generatedClient = (): string => {
     const file = path.join(ROOT, `tests/.generated-client-${process.pid}.ts`);
-    fs.writeFileSync(file, generateFetchClient(contract as never));
+    fs.writeFileSync(file, generateFetchClient(api as never));
     return file;
 };
 
@@ -283,9 +283,9 @@ describe('every plugin is covered', () => {
      * Without this a new plugin could skip the end-to-end case above and rest on
      * the classification alone.
      */
-    test('the demo contract installs every plugin', () => {
-        const installed = fs.readFileSync(DEMO_CONTRACT, 'utf8');
+    test('the demo config installs every plugin', () => {
+        const installed = fs.readFileSync(DEMO_CONFIG, 'utf8');
         const missing = [...declarations.keys()].filter((specifier) => !installed.includes(`from '${specifier}'`));
-        expect(missing, 'install these on apps/shared/src/contract.ts').toEqual([]);
+        expect(missing, 'install these on apps/express-demo/kizuna.config.ts').toEqual([]);
     });
 });

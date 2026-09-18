@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { assembleApi, TOOLS_META } from '@ts-kizuna/core/adapter';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { createMcpServer } from './mcp-server.js';
@@ -8,7 +9,7 @@ import { createMcpServer } from './mcp-server.js';
 const k = new Kizuna();
 
 const routes = k.routes({
-    health: {
+    health: k.route({
         method: 'GET',
         path: '/health',
         responses: {
@@ -16,12 +17,12 @@ const routes = k.routes({
                 ok: z.boolean(),
             }),
         },
-    },
+    }),
 });
 
 const tools = k.tools({
     weather: {
-        getForecast: {
+        getForecast: k.tool({
             title: 'Weather forecast',
             description: 'Look up the forecast for one city',
             input: z.object({
@@ -33,9 +34,9 @@ const tools = k.tools({
             annotations: {
                 readOnlyHint: true,
             },
-        },
+        }),
     },
-    countWords: {
+    countWords: k.tool({
         description: 'Count the words in a piece of text',
         input: z.object({
             text: z.string(),
@@ -43,16 +44,16 @@ const tools = k.tools({
         output: z.object({
             words: z.int(),
         }),
-    },
-    reindex: {
+    }),
+    reindex: k.tool({
         description: 'Rebuild the search index',
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
     routes,
     tools,
-});
+}).api;
 
 /**
  * Plain functions. None of them is reachable over HTTP, and none of them goes

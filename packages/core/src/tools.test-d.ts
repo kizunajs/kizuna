@@ -1,6 +1,7 @@
 import { describe, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import type { StreamBody, StreamMessageOf } from './stream.js';
 import { readToolCalls } from './tool-records.js';
 import { createToolRunner } from './tool-runner.js';
@@ -9,7 +10,7 @@ const k = new Kizuna();
 
 const tools = k.tools({
     weather: {
-        getForecast: {
+        getForecast: k.tool({
             description: 'Look up the forecast for one city',
             input: z.object({
                 city: z.string(),
@@ -17,15 +18,15 @@ const tools = k.tools({
             output: z.object({
                 tempC: z.number(),
             }),
-        },
+        }),
     },
-    ping: {
+    ping: k.tool({
         description: 'Answer that the server is up',
-    },
+    }),
 });
 
 const routes = k.routes({
-    reply: {
+    reply: k.route({
         method: 'POST',
         path: '/assistant/reply',
         body: z.object({
@@ -41,15 +42,15 @@ const routes = k.routes({
                 tools,
             },
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
     routes: {
         assistant: routes,
     },
     tools,
-});
+}).api;
 
 describe('tool events on a stream', () => {
     it('narrows a tool call to the named tool', () => {

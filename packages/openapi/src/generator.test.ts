@@ -2,15 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { generateOpenApi, renderOpenApi } from './generator.js';
 import type { GenerateOpenApiOptions } from './types.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const generateJson = (contract: Contract, options: GenerateOpenApiOptions) => renderOpenApi(contract, options)('json');
 
@@ -25,7 +33,7 @@ declare module 'vitest' {
 }
 
 const contractRoutes = k.routes('api', {
-    getUser: {
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         summary: 'Get a user',
@@ -38,8 +46,8 @@ const contractRoutes = k.routes('api', {
                 message: z.string(),
             }),
         },
-    },
-    createUser: {
+    }),
+    createUser: k.route({
         method: 'POST',
         path: '/users',
         summary: 'Create a user',
@@ -54,8 +62,8 @@ const contractRoutes = k.routes('api', {
                 email: z.string(),
             }),
         },
-    },
-    listUsers: {
+    }),
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         auth: false,
@@ -72,12 +80,13 @@ const contractRoutes = k.routes('api', {
                 ),
             }),
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: contractRoutes,
-});
+}).api;
 
 const baseConfig = {
     info: {
@@ -148,7 +157,7 @@ describe('generateOpenApi', () => {
     it('sets concatenated-path operationId for nested routers', () => {
         const nestedRoutes = k.routes('api', {
             users: {
-                getUser: {
+                getUser: k.route({
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
@@ -156,13 +165,14 @@ describe('generateOpenApi', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             },
         });
 
-        const nested = k.contract({
+        const nested = defineConfig({
+            ...config,
             routes: nestedRoutes,
-        });
+        }).api;
 
         const withTrue = generateJson(nested, { ...baseConfig, setOperationId: true });
         expect(withTrue.paths['/users/{id}']?.get?.operationId).toBe('getUser');
@@ -173,19 +183,20 @@ describe('generateOpenApi', () => {
 
     it('omits requestBody and response content for z.void()', () => {
         const voidContractRoutes = k.routes('api', {
-            ping: {
+            ping: k.route({
                 method: 'POST',
                 path: '/ping/:id',
                 body: z.void(),
                 responses: {
                     204: z.void(),
                 },
-            },
+            }),
         });
 
-        const voidContract = k.contract({
+        const voidContract = defineConfig({
+            ...config,
             routes: voidContractRoutes,
-        });
+        }).api;
         const doc = generateJson(voidContract, baseConfig);
         const operation = doc.paths['/ping/{id}']?.post;
         expect(operation?.requestBody).toBeUndefined();
@@ -221,18 +232,19 @@ describe('Zod meta() in OpenAPI output', () => {
     });
 
     const taggedContractRoutes = k.routes('api', {
-        getUser: {
+        getUser: k.route({
             method: 'GET',
             path: '/users/:id',
             responses: {
                 200: Tagged,
             },
-        },
+        }),
     });
 
-    const taggedContract = k.contract({
+    const taggedContract = defineConfig({
+        ...config,
         routes: taggedContractRoutes,
-    });
+    }).api;
 
     it('is a valid OpenAPI 3.1 document', async () => {
         const spec = generateJson(taggedContract, baseConfig);
@@ -266,18 +278,19 @@ describe('Zod meta() in OpenAPI output', () => {
                 id: 'RawTagged',
             });
         const rawRoutes = k.routes('api', {
-            getRaw: {
+            getRaw: k.route({
                 method: 'GET',
                 path: '/raw',
                 responses: {
                     200: rawTagged,
                 },
-            },
+            }),
         });
         const spec = generateJson(
-            k.contract({
+            defineConfig({
+                ...config,
                 routes: rawRoutes,
-            }),
+            }).api,
             baseConfig
         );
         expect(spec.components?.schemas?.RawTagged).toBeUndefined();
@@ -289,14 +302,18 @@ describe('Zod meta() in OpenAPI output', () => {
 });
 
 describe('operation metadata passthrough', () => {
-    const kTagged = new Kizuna({
-        tags: Kizuna.tags({
-            api: 'API',
-            users: 'Users',
-        }),
+    const kTaggedTags = k.tags({
+        api: 'API',
+        users: 'Users',
     });
+    const kTaggedConfig = {
+        tags: kTaggedTags,
+    };
+    const kTagged = new Kizuna<{
+        tags: typeof kTaggedTags;
+    }>();
     const annotatedRoutes = kTagged.routes('api', {
-        getUser: {
+        getUser: kTagged.route({
             method: 'GET',
             path: '/users/:id',
             tags: ['users'],
@@ -309,12 +326,13 @@ describe('operation metadata passthrough', () => {
                     id: z.string(),
                 }),
             },
-        },
+        }),
     });
 
-    const annotated = kTagged.contract({
+    const annotated = defineConfig({
+        ...kTaggedConfig,
         routes: annotatedRoutes,
-    });
+    }).api;
 
     it('is a valid OpenAPI 3.1 document', async () => {
         const spec = generateJson(annotated, baseConfig);
@@ -363,18 +381,22 @@ describe('operation metadata passthrough', () => {
     });
 
     it('merges route-level tags with the group tag', () => {
-        const k = new Kizuna({
-            tags: Kizuna.tags({
-                users: {
-                    title: 'Users',
-                },
-                health: {
-                    title: 'Health',
-                },
-            }),
+        const k2Tags = k.tags({
+            users: {
+                title: 'Users',
+            },
+            health: {
+                title: 'Health',
+            },
         });
-        const usersRoutes = k.routes('users', {
-            getUser: {
+        const k2Config = {
+            tags: k2Tags,
+        };
+        const k2 = new Kizuna<{
+            tags: typeof k2Tags;
+        }>();
+        const usersRoutes = k2.routes('users', {
+            getUser: k2.route({
                 method: 'GET',
                 path: '/users/:id',
                 tags: ['health'],
@@ -383,11 +405,12 @@ describe('operation metadata passthrough', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...k2Config,
             routes: usersRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, baseConfig);
         expect(spec.paths['/users/{id}']?.get?.tags).toEqual(['Users', 'Health']);
     });
@@ -410,18 +433,19 @@ describe('discriminated unions', () => {
             }),
         });
         const routeRoutes = k.routes('api', {
-            getMedia: {
+            getMedia: k.route({
                 method: 'GET',
                 path: '/media',
                 responses: {
                     200: z.discriminatedUnion('type', [Image, Video]),
                 },
-            },
+            }),
         });
 
-        const route = k.contract({
+        const route = defineConfig({
+            ...config,
             routes: routeRoutes,
-        });
+        }).api;
         await expect(generateJson(route, baseConfig)).toBeAValidOpenAPIDefinition();
     });
 
@@ -441,18 +465,19 @@ describe('discriminated unions', () => {
             }),
         });
         const routeRoutes = k.routes('api', {
-            getMedia: {
+            getMedia: k.route({
                 method: 'GET',
                 path: '/media',
                 responses: {
                     200: z.discriminatedUnion('type', [Image, Video]),
                 },
-            },
+            }),
         });
 
-        const route = k.contract({
+        const route = defineConfig({
+            ...config,
             routes: routeRoutes,
-        });
+        }).api;
         const spec = generateJson(route, baseConfig);
         const schema = spec.paths['/media']?.get?.responses['200']?.content?.['application/json']?.schema as Record<string, unknown>;
         expect(schema?.oneOf).toEqual([
@@ -474,7 +499,7 @@ describe('discriminated unions', () => {
 
     it('emits discriminator without mapping when variants are not id-tagged', () => {
         const routeRoutes = k.routes('api', {
-            getMedia: {
+            getMedia: k.route({
                 method: 'GET',
                 path: '/inline-media',
                 responses: {
@@ -489,12 +514,13 @@ describe('discriminated unions', () => {
                         }),
                     ]),
                 },
-            },
+            }),
         });
 
-        const route = k.contract({
+        const route = defineConfig({
+            ...config,
             routes: routeRoutes,
-        });
+        }).api;
         const spec = generateJson(route, baseConfig);
         const schema = spec.paths['/inline-media']?.get?.responses['200']?.content?.['application/json']?.schema as Record<string, unknown>;
         expect(Array.isArray(schema?.oneOf)).toBe(true);
@@ -524,7 +550,7 @@ describe('discriminated unions', () => {
             schema: z.discriminatedUnion('channel', [EmailEvent, SmsEvent]),
         });
         const routeRoutes = k.routes('api', {
-            sendNotification: {
+            sendNotification: k.route({
                 method: 'POST',
                 path: '/notifications',
                 body: NotificationEvent,
@@ -533,12 +559,13 @@ describe('discriminated unions', () => {
                         accepted: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
 
-        const route = k.contract({
+        const route = defineConfig({
+            ...config,
             routes: routeRoutes,
-        });
+        }).api;
         const spec = generateJson(route, baseConfig);
         const requestSchema = spec.paths['/notifications']?.post?.requestBody?.content?.['application/json']?.schema;
         expect(requestSchema).toEqual({
@@ -564,18 +591,19 @@ describe('discriminated unions', () => {
 
     it('does not add discriminator to plain z.union', () => {
         const routeRoutes = k.routes('api', {
-            getOne: {
+            getOne: k.route({
                 method: 'GET',
                 path: '/plain-union',
                 responses: {
                     200: z.union([z.string(), z.number()]),
                 },
-            },
+            }),
         });
 
-        const route = k.contract({
+        const route = defineConfig({
+            ...config,
             routes: routeRoutes,
-        });
+        }).api;
         const spec = generateJson(route, baseConfig);
         const schema = spec.paths['/plain-union']?.get?.responses['200']?.content?.['application/json']?.schema as Record<string, unknown>;
         expect(schema?.discriminator).toBeUndefined();
@@ -585,7 +613,7 @@ describe('discriminated unions', () => {
 describe('request body content types', () => {
     it('is a valid OpenAPI 3.1 document', async () => {
         const routeRoutes = k.routes('api', {
-            uploadAvatar: {
+            uploadAvatar: k.route({
                 method: 'POST',
                 path: '/avatar',
                 contentType: 'multipart/form-data',
@@ -598,8 +626,8 @@ describe('request body content types', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
-            postForm: {
+            }),
+            postForm: k.route({
                 method: 'POST',
                 path: '/form',
                 contentType: 'application/x-www-form-urlencoded',
@@ -611,8 +639,8 @@ describe('request body content types', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
-            postUser: {
+            }),
+            postUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({
@@ -623,18 +651,19 @@ describe('request body content types', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const route = k.contract({
+        const route = defineConfig({
+            ...config,
             routes: routeRoutes,
-        });
+        }).api;
         await expect(generateJson(route, baseConfig)).toBeAValidOpenAPIDefinition();
     });
 
     it('emits multipart/form-data when contentType is set, with format: binary for File fields', () => {
         const routeRoutes = k.routes('api', {
-            uploadAvatar: {
+            uploadAvatar: k.route({
                 method: 'POST',
                 path: '/avatar',
                 contentType: 'multipart/form-data',
@@ -647,12 +676,13 @@ describe('request body content types', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
 
-        const route = k.contract({
+        const route = defineConfig({
+            ...config,
             routes: routeRoutes,
-        });
+        }).api;
         const spec = generateJson(route, baseConfig);
         const body = spec.paths['/avatar']?.post?.requestBody;
         expect(body?.content?.['multipart/form-data']).toBeDefined();
@@ -670,7 +700,7 @@ describe('request body content types', () => {
 
     it('emits application/x-www-form-urlencoded when contentType is set', () => {
         const routeRoutes = k.routes('api', {
-            postForm: {
+            postForm: k.route({
                 method: 'POST',
                 path: '/form',
                 contentType: 'application/x-www-form-urlencoded',
@@ -682,12 +712,13 @@ describe('request body content types', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
 
-        const route = k.contract({
+        const route = defineConfig({
+            ...config,
             routes: routeRoutes,
-        });
+        }).api;
         const spec = generateJson(route, baseConfig);
         const body = spec.paths['/form']?.post?.requestBody;
         expect(body?.content?.['application/x-www-form-urlencoded']).toBeDefined();
@@ -696,7 +727,7 @@ describe('request body content types', () => {
 
     it('defaults to application/json when contentType is not set', () => {
         const routeRoutes = k.routes('api', {
-            postUser: {
+            postUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({
@@ -707,12 +738,13 @@ describe('request body content types', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const route = k.contract({
+        const route = defineConfig({
+            ...config,
             routes: routeRoutes,
-        });
+        }).api;
         const spec = generateJson(route, baseConfig);
         expect(spec.paths['/users']?.post?.requestBody?.content?.['application/json']).toBeDefined();
     });
@@ -721,7 +753,7 @@ describe('request body content types', () => {
 describe('transform field handling', () => {
     it('uses input schema for request body transform fields', () => {
         const contractRoutes = k.routes('api', {
-            createUser: {
+            createUser: k.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({
@@ -733,12 +765,13 @@ describe('transform field handling', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, baseConfig);
         const properties = spec.paths['/users']?.post?.requestBody?.content?.['application/json']?.schema?.properties as
             | Record<string, unknown>
@@ -753,7 +786,7 @@ describe('transform field handling', () => {
 
     it('uses input schema for transform fields in union query params', () => {
         const contractRoutes = k.routes('api', {
-            getItems: {
+            getItems: k.route({
                 method: 'GET',
                 path: '/items',
                 query: z.object({
@@ -770,12 +803,13 @@ describe('transform field handling', () => {
                         items: z.array(z.string()),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, baseConfig);
         const schema = spec.paths['/items']?.get?.parameters?.find((parameter) => parameter.name === 'ids')?.schema as
             | Record<string, unknown>
@@ -792,7 +826,7 @@ describe('complex transform edge cases', () => {
     it('handles transforms across nested objects, arrays, records, tuples, unions, nullable, and intersections without producing {}', () => {
         const insaneRoutes = k.routes('api', {
             users: {
-                create: {
+                create: k.route({
                     method: 'POST',
                     path: '/users',
                     body: z.object({
@@ -831,8 +865,8 @@ describe('complex transform edge cases', () => {
                             message: z.string(),
                         }),
                     },
-                },
-                list: {
+                }),
+                list: k.route({
                     method: 'GET',
                     path: '/users',
                     query: z.object({
@@ -859,13 +893,14 @@ describe('complex transform edge cases', () => {
                             total: z.number(),
                         }),
                     },
-                },
+                }),
             },
         });
 
-        const insane = k.contract({
+        const insane = defineConfig({
+            ...config,
             routes: insaneRoutes,
-        });
+        }).api;
 
         const spec = generateJson(insane, baseConfig);
         const json = JSON.stringify(spec);
@@ -900,7 +935,7 @@ describe('complex transform edge cases', () => {
 describe('response headers', () => {
     it('emits OpenAPI headers object on the response when headers are declared', () => {
         const contractRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
@@ -910,12 +945,13 @@ describe('response headers', () => {
                     },
                     404: z.object({ message: z.string() }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, {
             info: {
                 title: 'Test',
@@ -939,91 +975,106 @@ describe('response headers', () => {
 
 describe('contract-level tag grouping', () => {
     it('applies the group tag to all routes in that group', () => {
-        const k = new Kizuna({
-            tags: Kizuna.tags({
-                users: {
-                    title: 'Users',
-                },
-            }),
+        const k3Tags = k.tags({
+            users: {
+                title: 'Users',
+            },
         });
-        const usersRoutes = k.routes('users', {
-            listUsers: {
+        const k3Config = {
+            tags: k3Tags,
+        };
+        const k3 = new Kizuna<{
+            tags: typeof k3Tags;
+        }>();
+        const usersRoutes = k3.routes('users', {
+            listUsers: k3.route({
                 method: 'GET',
                 path: '/users',
                 auth: false,
                 responses: {
                     200: z.object({ users: z.array(z.string()) }),
                 },
-            },
-            createUser: {
+            }),
+            createUser: k3.route({
                 method: 'POST',
                 path: '/users',
                 body: z.object({ name: z.string() }),
                 responses: {
                     201: z.object({ id: z.string() }),
                 },
-            },
+            }),
         });
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...k3Config,
             routes: usersRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, baseConfig);
         expect(spec.paths['/users']?.get?.tags).toEqual(['Users']);
         expect(spec.paths['/users']?.post?.tags).toEqual(['Users']);
     });
 
     it('accumulates tags from nested tagged groups', () => {
-        const k = new Kizuna({
-            tags: Kizuna.tags({
-                users: {
-                    title: 'Users',
-                },
-                health: {
-                    title: 'Health',
-                },
-            }),
+        const k4Tags = k.tags({
+            users: {
+                title: 'Users',
+            },
+            health: {
+                title: 'Health',
+            },
         });
-        const healthRoutes = k.routes('health', {
-            deleteUser: {
+        const k4Config = {
+            tags: k4Tags,
+        };
+        const k4 = new Kizuna<{
+            tags: typeof k4Tags;
+        }>();
+        const healthRoutes = k4.routes('health', {
+            deleteUser: k4.route({
                 method: 'DELETE',
                 path: '/users/:id',
                 responses: {
                     200: z.object({ success: z.boolean() }),
                 },
-            },
+            }),
         });
-        const usersRoutes = k.routes('users', {
+        const usersRoutes = k4.routes('users', {
             health: healthRoutes,
         });
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...k4Config,
             routes: usersRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, baseConfig);
         expect(spec.paths['/users/{id}']?.delete?.tags).toEqual(['Users', 'Health']);
     });
 
     it('collects tag descriptions into the document tags', () => {
-        const k = new Kizuna({
-            tags: Kizuna.tags({
-                users: {
-                    title: 'Users',
-                    description: 'User management endpoints',
-                },
-            }),
+        const k5Tags = k.tags({
+            users: {
+                title: 'Users',
+                description: 'User management endpoints',
+            },
         });
-        const usersRoutes = k.routes('users', {
-            listUsers: {
+        const k5Config = {
+            tags: k5Tags,
+        };
+        const k5 = new Kizuna<{
+            tags: typeof k5Tags;
+        }>();
+        const usersRoutes = k5.routes('users', {
+            listUsers: k5.route({
                 method: 'GET',
                 path: '/users',
                 auth: false,
                 responses: {
                     200: z.object({ ok: z.boolean() }),
                 },
-            },
+            }),
         });
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...k5Config,
             routes: usersRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, baseConfig);
         expect(spec.tags).toEqual([
             {
@@ -1034,28 +1085,33 @@ describe('contract-level tag grouping', () => {
     });
 
     it('an untagged sub-group inside a tagged group inherits the outer tag', () => {
-        const k = new Kizuna({
-            tags: Kizuna.tags({
-                users: {
-                    title: 'Users',
-                },
-            }),
+        const k6Tags = k.tags({
+            users: {
+                title: 'Users',
+            },
         });
-        const usersRoutes = k.routes('users', {
+        const k6Config = {
+            tags: k6Tags,
+        };
+        const k6 = new Kizuna<{
+            tags: typeof k6Tags;
+        }>();
+        const usersRoutes = k6.routes('users', {
             nested: {
-                listUsers: {
+                listUsers: k6.route({
                     method: 'GET',
                     path: '/users',
                     auth: false,
                     responses: {
                         200: z.object({ users: z.array(z.string()) }),
                     },
-                },
+                }),
             },
         });
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...k6Config,
             routes: usersRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, baseConfig);
         expect(spec.paths['/users']?.get?.tags).toEqual(['Users']);
     });
@@ -1064,7 +1120,7 @@ describe('contract-level tag grouping', () => {
 describe('OpenAPI generator: HEAD method', () => {
     it('omits response content for HEAD routes', () => {
         const contractRoutes = k.routes('api', {
-            checkUser: {
+            checkUser: k.route({
                 method: 'HEAD',
                 path: '/users/:id',
                 responses: {
@@ -1073,12 +1129,13 @@ describe('OpenAPI generator: HEAD method', () => {
                     }),
                     404: z.void(),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, baseConfig);
         const headOp = spec.paths['/users/{id}']?.head;
         expect(headOp).toBeDefined();
@@ -1110,7 +1167,7 @@ describe('OpenAPI generator: HEAD method', () => {
 
     it('derivedHead leaves a declared HEAD route alone', () => {
         const contractRoutes = k.routes('api', {
-            getReport: {
+            getReport: k.route({
                 method: 'GET',
                 path: '/report',
                 responses: {
@@ -1118,20 +1175,21 @@ describe('OpenAPI generator: HEAD method', () => {
                         rows: z.number(),
                     }),
                 },
-            },
-            checkReport: {
+            }),
+            checkReport: k.route({
                 method: 'HEAD',
                 path: '/report',
                 summary: 'Check the report',
                 responses: {
                     204: z.void(),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, {
             ...baseConfig,
             derivedHead: true,
@@ -1144,7 +1202,7 @@ describe('OpenAPI generator: HEAD method', () => {
 
     it('OPTIONS routes emit response content normally', () => {
         const contractRoutes = k.routes('api', {
-            describeUsers: {
+            describeUsers: k.route({
                 method: 'OPTIONS',
                 path: '/users',
                 responses: {
@@ -1152,12 +1210,13 @@ describe('OpenAPI generator: HEAD method', () => {
                         allow: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const spec = generateJson(contract, baseConfig);
         const optionsOp = spec.paths['/users']?.options;
         expect(optionsOp).toBeDefined();
@@ -1192,7 +1251,7 @@ describe('automatic validation error response', () => {
 
     it('merges with a user-declared 400 using oneOf', () => {
         const contractWith400Routes = k.routes('api', {
-            createItem: {
+            createItem: k.route({
                 method: 'POST',
                 path: '/items',
                 body: z.object({ name: z.string() }),
@@ -1200,12 +1259,13 @@ describe('automatic validation error response', () => {
                     201: z.object({ id: z.string() }),
                     400: z.object({ error: z.string() }),
                 },
-            },
+            }),
         });
 
-        const contractWith400 = k.contract({
+        const contractWith400 = defineConfig({
+            ...config,
             routes: contractWith400Routes,
-        });
+        }).api;
         const spec = generateJson(contractWith400, baseConfig);
         const response = spec.paths['/items']?.post?.responses?.['400'];
         const schema = response?.content?.['application/problem+json']?.schema as Record<string, unknown> | undefined;
@@ -1234,14 +1294,14 @@ describe('deprecation from metadata', () => {
         }),
     });
     const deprecationRoutes = k.routes('api', {
-        getAccount: {
+        getAccount: k.route({
             method: 'GET',
             path: '/account',
             responses: {
                 200: AccountSchema,
             },
-        },
-        oldRoute: {
+        }),
+        oldRoute: k.route({
             method: 'GET',
             path: '/old',
             deprecated: 'use newRoute instead',
@@ -1250,8 +1310,8 @@ describe('deprecation from metadata', () => {
                     ok: z.boolean(),
                 }),
             },
-        },
-        inlineField: {
+        }),
+        inlineField: k.route({
             method: 'GET',
             path: '/inline',
             responses: {
@@ -1262,12 +1322,13 @@ describe('deprecation from metadata', () => {
                     fullName: z.string(),
                 }),
             },
-        },
+        }),
     });
 
-    const deprecationContract = k.contract({
+    const deprecationContract = defineConfig({
+        ...config,
         routes: deprecationRoutes,
-    });
+    }).api;
     const spec = generateJson(deprecationContract, baseConfig);
 
     it('marks a deprecated field on its component schema, normalising a string message to true', () => {
@@ -1307,15 +1368,15 @@ describe('examples from metadata', () => {
         }),
     });
     const exampleRoutes = k.routes('api', {
-        listEvents: {
+        listEvents: k.route({
             method: 'GET',
             path: '/events',
             auth: 'user',
             responses: {
                 200: EventSchema,
             },
-        },
-        createEvent: {
+        }),
+        createEvent: k.route({
             method: 'POST',
             path: '/events',
             body: z.object({
@@ -1326,12 +1387,13 @@ describe('examples from metadata', () => {
             responses: {
                 201: EventSchema,
             },
-        },
+        }),
     });
 
-    const exampleContract = k.contract({
+    const exampleContract = defineConfig({
+        ...config,
         routes: exampleRoutes,
-    });
+    }).api;
     const spec = generateJson(exampleContract, baseConfig);
     const eventSchema = spec.components?.schemas?.ExampleEvent as Record<string, Record<string, Record<string, unknown>>> | undefined;
 
@@ -1360,7 +1422,7 @@ describe('examples from metadata', () => {
 
 describe('deprecation and sunset headers', () => {
     const headerRoutes = k.routes('api', {
-        deleteUser: {
+        deleteUser: k.route({
             method: 'DELETE',
             path: '/users/:id',
             deprecated: {
@@ -1381,8 +1443,8 @@ describe('deprecation and sunset headers', () => {
                 }),
                 404: ProblemDetailsSchema,
             },
-        },
-        exportReport: {
+        }),
+        exportReport: k.route({
             method: 'GET',
             path: '/report',
             sunset: '2027-01-01T00:00:00Z',
@@ -1391,12 +1453,13 @@ describe('deprecation and sunset headers', () => {
                     ok: z.boolean(),
                 }),
             },
-        },
+        }),
     });
 
-    const headerContract = k.contract({
+    const headerContract = defineConfig({
+        ...config,
         routes: headerRoutes,
-    });
+    }).api;
     const spec = generateJson(headerContract, baseConfig);
 
     it('marks the object form deprecated operation', () => {
@@ -1418,9 +1481,10 @@ describe('deprecation and sunset headers', () => {
 
     it('documents no headers on a route with neither', () => {
         const plain = generateJson(
-            k.contract({
+            defineConfig({
+                ...config,
                 routes: k.routes('api', {
-                    getUser: {
+                    getUser: k.route({
                         method: 'GET',
                         path: '/users/:id',
                         responses: {
@@ -1428,9 +1492,9 @@ describe('deprecation and sunset headers', () => {
                                 id: z.string(),
                             }),
                         },
-                    },
+                    }),
                 }),
-            }),
+            }).api,
             baseConfig
         );
         expect(plain.paths['/users/{id}']?.get?.responses['200']?.headers).toBeUndefined();
@@ -1442,9 +1506,10 @@ describe('deprecation and sunset headers', () => {
 });
 
 describe('cache headers', () => {
-    const cachedContract = k.contract({
+    const cachedContract = defineConfig({
+        ...config,
         routes: k.routes('api', {
-            listUsers: {
+            listUsers: k.route({
                 method: 'GET',
                 path: '/users',
                 auth: false,
@@ -1461,8 +1526,8 @@ describe('cache headers', () => {
                     },
                     404: ProblemDetailsSchema,
                 },
-            },
-            getUser: {
+            }),
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
@@ -1477,8 +1542,8 @@ describe('cache headers', () => {
                         },
                     },
                 },
-            },
-            health: {
+            }),
+            health: k.route({
                 method: 'GET',
                 path: '/health',
                 responses: {
@@ -1489,8 +1554,8 @@ describe('cache headers', () => {
                         cache: 'no-store',
                     },
                 },
-            },
-            taggedUser: {
+            }),
+            taggedUser: k.route({
                 method: 'GET',
                 path: '/tagged-users/:id',
                 responses: {
@@ -1505,9 +1570,9 @@ describe('cache headers', () => {
                         etag: true,
                     },
                 },
-            },
+            }),
         }),
-    });
+    }).api;
     const spec = generateJson(cachedContract, baseConfig);
 
     it('documents Cache-Control and Vary on the response that declares them', () => {
@@ -1554,9 +1619,10 @@ describe('cache headers', () => {
 
     it('documents no cache headers on a route with no policy', () => {
         const plain = generateJson(
-            k.contract({
+            defineConfig({
+                ...config,
                 routes: k.routes('api', {
-                    getUser: {
+                    getUser: k.route({
                         method: 'GET',
                         path: '/users/:id',
                         responses: {
@@ -1564,9 +1630,9 @@ describe('cache headers', () => {
                                 id: z.string(),
                             }),
                         },
-                    },
+                    }),
                 }),
-            }),
+            }).api,
             baseConfig
         );
         expect(plain.paths['/users/{id}']?.get?.responses['200']?.headers).toBeUndefined();
@@ -1579,7 +1645,7 @@ describe('cache headers', () => {
 
 describe('error response media type (RFC 9457)', () => {
     const contractWithErrorsRoutes = k.routes('api', {
-        getUser: {
+        getUser: k.route({
             method: 'GET',
             path: '/users/{id}',
             params: z.object({ id: z.string() }),
@@ -1598,12 +1664,13 @@ describe('error response media type (RFC 9457)', () => {
                     detail: z.string(),
                 }),
             },
-        },
+        }),
     });
 
-    const contractWithErrors = k.contract({
+    const contractWithErrors = defineConfig({
+        ...config,
         routes: contractWithErrorsRoutes,
-    });
+    }).api;
     const spec = generateJson(contractWithErrors, baseConfig);
     const responses = spec.paths['/users/{id}']?.get?.responses;
 
@@ -1624,7 +1691,7 @@ describe('error response media type (RFC 9457)', () => {
 
     it('still applies field-level deprecation to an error response under application/problem+json', () => {
         const errorFieldRoutes = k.routes('api', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/{id}',
                 responses: {
@@ -1640,12 +1707,13 @@ describe('error response media type (RFC 9457)', () => {
                         }),
                     }),
                 },
-            },
+            }),
         });
         const deprecatedSpec = generateJson(
-            k.contract({
+            defineConfig({
+                ...config,
                 routes: errorFieldRoutes,
-            }),
+            }).api,
             baseConfig
         );
         const errorSchema = deprecatedSpec.paths['/users/{id}']?.get?.responses?.['404']?.content?.['application/problem+json']?.schema as
@@ -1657,7 +1725,7 @@ describe('error response media type (RFC 9457)', () => {
 
 describe('declared response contentType', () => {
     const contractWithContentTypeRoutes = k.routes('api', {
-        exportUsers: {
+        exportUsers: k.route({
             method: 'GET',
             path: '/users/export',
             responses: {
@@ -1666,8 +1734,8 @@ describe('declared response contentType', () => {
                     contentType: 'text/csv',
                 },
             },
-        },
-        getUser: {
+        }),
+        getUser: k.route({
             method: 'GET',
             path: '/users/{id}',
             params: z.object({ id: z.string() }),
@@ -1676,12 +1744,13 @@ describe('declared response contentType', () => {
                     body: z.object({ id: z.string() }),
                 },
             },
-        },
+        }),
     });
 
-    const contractWithContentType = k.contract({
+    const contractWithContentType = defineConfig({
+        ...config,
         routes: contractWithContentTypeRoutes,
-    });
+    }).api;
     const spec = generateJson(contractWithContentType, baseConfig);
 
     it('uses the declared media type for the response', () => {
@@ -1698,7 +1767,7 @@ describe('declared response contentType', () => {
 
 describe('binary response bodies', () => {
     const binaryContractRoutes = k.routes('api', {
-        downloadBadge: {
+        downloadBadge: k.route({
             method: 'GET',
             path: '/badge',
             responses: {
@@ -1707,12 +1776,13 @@ describe('binary response bodies', () => {
                     contentType: 'application/pdf',
                 },
             },
-        },
+        }),
     });
 
-    const binaryContract = k.contract({
+    const binaryContract = defineConfig({
+        ...config,
         routes: binaryContractRoutes,
-    });
+    }).api;
     const spec = generateJson(binaryContract, baseConfig);
 
     it('emits type: string, format: binary under the declared media type', () => {
@@ -1724,7 +1794,7 @@ describe('binary response bodies', () => {
 });
 
 describe('security from the contract', () => {
-    const user = Kizuna.identity.bearer({
+    const user = k.identity.bearer({
         context: z.object({
             userId: z.string(),
         }),
@@ -1742,7 +1812,7 @@ describe('security from the contract', () => {
         owner: 'all',
     });
 
-    const member = Kizuna.identity.apiKey({
+    const member = k.identity.apiKey({
         name: 'x-workspace-token',
         in: 'header',
         context: z.object({
@@ -1751,7 +1821,7 @@ describe('security from the contract', () => {
         roles,
     });
 
-    const partner = Kizuna.identity.oauth2({
+    const partner = k.identity.oauth2({
         flows: {
             clientCredentials: {
                 tokenUrl: 'https://auth.example.com/token',
@@ -1764,15 +1834,22 @@ describe('security from the contract', () => {
     });
 
     const makeSecuredContract = () => {
-        const securedK = new Kizuna({
+        const securedKConfig = {
             identities: {
                 user,
                 member,
                 partner,
             },
-        });
+        };
+        const securedK = new Kizuna<{
+            identities: {
+                user: typeof user;
+                member: typeof member;
+                partner: typeof partner;
+            };
+        }>();
         const routes = securedK.routes({
-            listUsers: {
+            listUsers: securedK.route({
                 method: 'GET',
                 path: '/users',
                 auth: false,
@@ -1781,8 +1858,8 @@ describe('security from the contract', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
-            getSecret: {
+            }),
+            getSecret: securedK.route({
                 method: 'GET',
                 path: '/secret',
                 auth: 'user',
@@ -1791,8 +1868,8 @@ describe('security from the contract', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
-            deleteWorkspace: {
+            }),
+            deleteWorkspace: securedK.route({
                 method: 'DELETE',
                 path: '/workspace',
                 auth: {
@@ -1807,8 +1884,8 @@ describe('security from the contract', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
-            scoped: {
+            }),
+            scoped: securedK.route({
                 method: 'GET',
                 path: '/scoped',
                 auth: {
@@ -1822,13 +1899,14 @@ describe('security from the contract', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
-        return securedK.contract({
+        return defineConfig({
+            ...securedKConfig,
             routes: {
                 api: routes,
             },
-        });
+        }).api;
     };
 
     const spec = generateJson(makeSecuredContract(), baseConfig);
@@ -1933,22 +2011,28 @@ describe('security from the contract', () => {
     });
 
     it('omits securitySchemes when the contract has no identities', () => {
-        const plain = k.contract({
+        const plain = defineConfig({
+            ...config,
             routes: contractRoutes,
-        });
+        }).api;
         const plainSpec = generateJson(plain, baseConfig);
         expect(plainSpec.components?.securitySchemes).toBeUndefined();
     });
 
     it('emits security resolved through a nested cascade', () => {
-        const nestedK = new Kizuna({
+        const nestedKConfig = {
             identities: {
                 user,
             },
-        });
+        };
+        const nestedK = new Kizuna<{
+            identities: {
+                user: typeof user;
+            };
+        }>();
         const members = nestedK.routes({
             session: {
-                login: {
+                login: nestedK.route({
                     method: 'POST',
                     path: '/auth/login',
                     auth: false,
@@ -1957,8 +2041,8 @@ describe('security from the contract', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
-                me: {
+                }),
+                me: nestedK.route({
                     method: 'GET',
                     path: '/auth/me',
                     auth: 'user',
@@ -1967,10 +2051,10 @@ describe('security from the contract', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             },
             events: {
-                listEvents: {
+                listEvents: nestedK.route({
                     method: 'GET',
                     path: '/events',
                     auth: 'user',
@@ -1979,14 +2063,15 @@ describe('security from the contract', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             },
         });
-        const nestedContract = nestedK.contract({
+        const nestedContract = defineConfig({
+            ...nestedKConfig,
             routes: {
                 members,
             },
-        });
+        }).api;
         const nestedSpec = generateJson(nestedContract, baseConfig);
         expect(nestedSpec.paths['/auth/login']?.post?.security).toBeUndefined();
         expect(nestedSpec.paths['/auth/me']?.get?.security).toEqual([
@@ -2004,26 +2089,32 @@ describe('security from the contract', () => {
 
 describe('shared scheme names', () => {
     it('emits one securitySchemes entry for identities sharing a scheme', () => {
-        const admin = Kizuna.identity.bearer({
+        const admin = k.identity.bearer({
             scheme: 'user',
             context: z.object({
                 userId: z.string(),
             }),
         });
-        const viewer = Kizuna.identity.bearer({
+        const viewer = k.identity.bearer({
             scheme: 'user',
             context: z.object({
                 userId: z.string(),
             }),
         });
-        const sharedK = new Kizuna({
+        const sharedKConfig = {
             identities: {
                 admin,
                 viewer,
             },
-        });
+        };
+        const sharedK = new Kizuna<{
+            identities: {
+                admin: typeof admin;
+                viewer: typeof viewer;
+            };
+        }>();
         const routes = sharedK.routes({
-            updateSettings: {
+            updateSettings: sharedK.route({
                 method: 'GET',
                 path: '/settings/update',
                 auth: 'admin',
@@ -2032,8 +2123,8 @@ describe('shared scheme names', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
-            getSettings: {
+            }),
+            getSettings: sharedK.route({
                 method: 'GET',
                 path: '/settings',
                 auth: 'viewer',
@@ -2042,13 +2133,14 @@ describe('shared scheme names', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
-        const sharedContract = sharedK.contract({
+        const sharedContract = defineConfig({
+            ...sharedKConfig,
             routes: {
                 api: routes,
             },
-        });
+        }).api;
         const spec = generateJson(sharedContract, baseConfig);
         expect(spec.components?.securitySchemes).toEqual({
             user: {
@@ -2070,27 +2162,33 @@ describe('shared scheme names', () => {
 });
 
 describe('custom identities (no OpenAPI scheme)', () => {
-    const user = Kizuna.identity.bearer({
+    const user = k.identity.bearer({
         context: z.object({
             userId: z.string(),
         }),
     });
 
-    const inviteToken = Kizuna.identity.custom({
+    const inviteToken = k.identity.custom({
         context: z.object({
             inviteId: z.string(),
         }),
     });
 
     const makeContract = () => {
-        const customK = new Kizuna({
+        const customKConfig = {
             identities: {
                 user,
                 inviteToken,
             },
-        });
+        };
+        const customK = new Kizuna<{
+            identities: {
+                user: typeof user;
+                inviteToken: typeof inviteToken;
+            };
+        }>();
         const routes = customK.routes({
-            getInvite: {
+            getInvite: customK.route({
                 method: 'GET',
                 path: '/invites/:token',
                 auth: 'inviteToken',
@@ -2099,8 +2197,8 @@ describe('custom identities (no OpenAPI scheme)', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
-            mixed: {
+            }),
+            mixed: customK.route({
                 method: 'GET',
                 path: '/mixed/:token',
                 auth: ['user', 'inviteToken'],
@@ -2109,8 +2207,8 @@ describe('custom identities (no OpenAPI scheme)', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
-            open: {
+            }),
+            open: customK.route({
                 method: 'GET',
                 path: '/open',
                 auth: false,
@@ -2119,13 +2217,14 @@ describe('custom identities (no OpenAPI scheme)', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
-        return customK.contract({
+        return defineConfig({
+            ...customKConfig,
             routes: {
                 api: routes,
             },
-        });
+        }).api;
     };
 
     const spec = generateJson(makeContract(), baseConfig);
@@ -2168,7 +2267,7 @@ describe('custom identities (no OpenAPI scheme)', () => {
 
 describe('streams', () => {
     const streamRoutes = k.routes('api', {
-        reply: {
+        reply: k.route({
             method: 'POST',
             path: '/reply',
             body: z.object({
@@ -2187,8 +2286,8 @@ describe('streams', () => {
                 },
                 400: ProblemDetailsSchema,
             },
-        },
-        ticks: {
+        }),
+        ticks: k.route({
             method: 'GET',
             path: '/ticks',
             responses: {
@@ -2198,8 +2297,8 @@ describe('streams', () => {
                     }),
                 },
             },
-        },
-        lines: {
+        }),
+        lines: k.route({
             method: 'GET',
             path: '/lines',
             responses: {
@@ -2208,11 +2307,12 @@ describe('streams', () => {
                     contentType: 'text/plain',
                 },
             },
-        },
+        }),
     });
-    const streamContract = k.contract({
+    const streamContract = defineConfig({
+        ...config,
         routes: streamRoutes,
-    });
+    }).api;
     const spec = generateJson(streamContract, {
         info: {
             title: 'Streams',
@@ -2280,7 +2380,8 @@ describe('streams', () => {
 
 describe('routes carrying handlers', () => {
     it('documents the route without its handler', () => {
-        const contract = k.contract({
+        const contract = defineConfig({
+            ...config,
             routes: k.routes({
                 users: {
                     getUser: k
@@ -2301,7 +2402,7 @@ describe('routes carrying handlers', () => {
                         })),
                 },
             }),
-        });
+        }).api;
 
         const spec = generateJson(contract, baseConfig);
 

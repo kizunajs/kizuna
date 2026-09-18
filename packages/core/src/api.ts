@@ -1,3 +1,4 @@
+import { HANDLER } from './types.js';
 import type { z } from 'zod';
 import { assembleContract, type Contract } from './contract.js';
 import {
@@ -70,9 +71,9 @@ const handlersFrom = (declarations: Record<string, unknown>): Record<string, unk
     const handlers: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(declarations)) {
         if (!value || typeof value !== 'object') continue;
-        const compiled = value as { definition?: { handler?: unknown } };
+        const compiled = value as { definition?: Record<symbol, unknown> };
         if (compiled.definition) {
-            if (compiled.definition.handler) handlers[key] = compiled.definition.handler;
+            if (compiled.definition[HANDLER]) handlers[key] = compiled.definition[HANDLER];
             continue;
         }
         handlers[key] = handlersFrom(value as Record<string, unknown>);

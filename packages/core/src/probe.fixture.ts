@@ -1,7 +1,16 @@
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 
-const user = Kizuna.identity.bearer({
+interface Config {
+    identities: {
+        user: typeof user;
+        member: typeof member;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const user = k.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
@@ -18,7 +27,7 @@ const roles = Kizuna.roles(permissions, {
     owner: 'all',
 });
 
-const member = Kizuna.identity.apiKey({
+const member = k.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -27,12 +36,12 @@ const member = Kizuna.identity.apiKey({
     roles,
 });
 
-const k = new Kizuna({
+const config = {
     identities: {
         user,
         member,
     },
-});
+};
 
 const routeDefinition = <const Auth>(path: `/${string}`, auth: Auth) => ({
     method: 'GET' as const,

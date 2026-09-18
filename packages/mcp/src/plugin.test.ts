@@ -1,37 +1,54 @@
 import { describe, expect, it, afterEach } from 'vitest';
+import { expressAdapter } from '@ts-kizuna/express';
 import { z } from 'zod';
 import express from 'express';
 import type { Server } from 'node:http';
 import { Kizuna } from '@ts-kizuna/core';
-import { KizunaServer } from '@ts-kizuna/express';
+import { defineConfig } from '@ts-kizuna/core';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';
-import { mcpPluginServer } from './server.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const routes = k.routes('api', {
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        summary: 'Get a user by id',
-        responses: {
-            200: z.object({
-                id: z.string(),
-                name: z.string(),
-            }),
-        },
-    },
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            summary: 'Get a user by id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                    name: z.string(),
+                }),
+            },
+        })
+        .handler(({ params }) => ({
+            status: 200,
+            body: {
+                id: params.id,
+                name: 'Ada',
+            },
+        })),
 });
 
-const contract = k.contract({
-    plugins: {
-        mcp: mcpPlugin({
+const contract = defineConfig({
+    adapter: expressAdapter,
+    ...config,
+    plugins: [
+        mcpPlugin({
             name: 'Test API',
             options: {
                 publishRoutes: {
@@ -39,26 +56,11 @@ const contract = k.contract({
                 },
             },
         }),
-    },
+    ],
     routes,
-});
+}).api;
 
-const server = new KizunaServer(contract);
-
-const api = server.api({
-    router: {
-        getUser: ({ params }) => ({
-            status: 200,
-            body: {
-                id: params.id,
-                name: 'Ada',
-            },
-        }),
-    },
-    plugins: {
-        mcp: mcpPluginServer(),
-    },
-});
+const api = contract;
 
 const start = async (): Promise<{ port: number; server: Server }> => {
     const app = express();
@@ -143,32 +145,46 @@ describe('mcpPlugin', () => {
 });
 
 const selective = k.routes('api', {
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        summary: 'List users',
-        responses: {
-            200: z.array(z.string()),
-        },
-    },
-    health: {
-        method: 'GET',
-        path: '/health',
-        summary: 'Health check',
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            summary: 'List users',
+            responses: {
+                200: z.array(z.string()),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: ['Ada'],
+        })),
+    health: k
+        .route({
+            method: 'GET',
+            path: '/health',
+            summary: 'Health check',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        })),
 });
 
-const selectiveContract = k.contract({
+const selectiveContract = defineConfig({
+    adapter: expressAdapter,
+    ...config,
     routes: selective,
-    plugins: ({ routes: contractRoutes }) => ({
-        mcp: mcpPlugin({
+    plugins: [
+        mcpPlugin({
             name: 'Selective API',
-            routes: contractRoutes,
+            routes: selective,
             options: {
                 publishRoutes: {
                     '*': true,
@@ -176,8 +192,8 @@ const selectiveContract = k.contract({
                 },
             },
         }),
-    }),
-});
+    ],
+}).api;
 
 describe('mcpPlugin: tool selection', () => {
     let running: Server | undefined;
@@ -194,23 +210,7 @@ describe('mcpPlugin: tool selection', () => {
     });
 
     it('serves only the routes the declaration exposes', async () => {
-        const selectiveApi = new KizunaServer(selectiveContract).api({
-            router: {
-                listUsers: () => ({
-                    status: 200,
-                    body: ['Ada'],
-                }),
-                health: () => ({
-                    status: 200,
-                    body: {
-                        ok: true,
-                    },
-                }),
-            },
-            plugins: {
-                mcp: mcpPluginServer(),
-            },
-        });
+        const selectiveApi = selectiveContract;
 
         const app = express();
         app.use(express.json());
@@ -237,23 +237,7 @@ describe('mcpPlugin: tool selection', () => {
     });
 
     it('still serves an excluded route over HTTP', async () => {
-        const selectiveApi = new KizunaServer(selectiveContract).api({
-            router: {
-                listUsers: () => ({
-                    status: 200,
-                    body: ['Ada'],
-                }),
-                health: () => ({
-                    status: 200,
-                    body: {
-                        ok: true,
-                    },
-                }),
-            },
-            plugins: {
-                mcp: mcpPluginServer(),
-            },
-        });
+        const selectiveApi = selectiveContract;
 
         const app = express();
         app.use(express.json());

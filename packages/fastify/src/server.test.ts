@@ -2,43 +2,52 @@ import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import type { AddressInfo } from 'node:net';
-import { KizunaServer, fastifyAdapter, type FastifyApi } from './server.js';
+import { fastifyAdapter, type FastifyApi } from './server.js';
 import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    adapter: typeof fastifyAdapter;
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 describe('Fastify: handler context', () => {
     it('provides the Fastify request and reply objects', async () => {
         const contextApp = Fastify();
         const contextRoutes = k.routes('api', {
-            echo: {
-                method: 'GET',
-                path: '/echo',
-                responses: {
-                    200: z.object({
-                        url: z.string(),
-                    }),
-                },
-            },
-        });
-        const contextContract = k.contract({
-            routes: contextRoutes,
-        });
-        const contextApi = new KizunaServer(contextContract).api({
-            router: {
-                echo: ({ request }) => ({
+            echo: k
+                .route({
+                    method: 'GET',
+                    path: '/echo',
+                    responses: {
+                        200: z.object({
+                            url: z.string(),
+                        }),
+                    },
+                })
+                .handler(({ request }) => ({
                     status: 200,
                     body: {
                         url: request.url,
                     },
-                }),
-            },
+                })),
         });
+        const contextContract = defineConfig({
+            adapter: fastifyAdapter,
+            ...config,
+            routes: contextRoutes,
+        }).api;
+        const contextApi = contextContract;
         await contextApi.mount(contextApp);
         await contextApp.ready();
 
@@ -54,13 +63,7 @@ describe('Fastify: handler context', () => {
 
 testAdapterFeatures({
     name: 'fastify',
-    initServerApi: (contract, options) =>
-        new Kizuna({
-            adapter: fastifyAdapter,
-        }).api({
-            contract,
-            ...(options as object),
-        }) as unknown as FastifyApi,
+    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: fastifyAdapter }).api as unknown as FastifyApi,
     mount: async (api, { responseValidation }) => {
         const app = Fastify();
         await api.mount(app, {

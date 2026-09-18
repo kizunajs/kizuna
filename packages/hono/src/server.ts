@@ -16,7 +16,6 @@ import {
     REQUEST_CONTEXT_META,
     JOBS_META,
     TOOLS_META,
-    type ServerOptions,
     type JobsMeta,
     type ToolsMeta,
     pluginRoutesOf,
@@ -27,8 +26,6 @@ import {
     jobRouter,
     jobRunnerFrom,
     toolRunnerFrom,
-    createServerSurface,
-    type Server as CoreServer,
     type Adapter,
     type ContractRouter,
     type ContractJobsRouter,
@@ -228,31 +225,3 @@ export const honoAdapter: Adapter<HonoHandlerContext<Env>, [app: Hono, options?:
     name: 'hono',
     mount: (api, app, options) => mountHono(api as HonoApi, app, options),
 };
-
-export interface Server<C extends Contract, E extends Env = Env> extends CoreServer<C, HonoHandlerContext<E>, HonoApi<RoutesOf<C>>> {}
-
-/**
- * Turn a contract into a server handle: the serving counterpart to `Kizuna`.
- * Keep the instance and use `server.guard` to define guards, `server.router`
- * to write typed handlers, and `server.api` to assemble them.
- */
-export class KizunaServer<C extends Contract, E extends Env = Env> implements Server<C, E> {
-    declare readonly guard: Server<C, E>['guard'];
-    declare readonly requestContext: Server<C, E>['requestContext'];
-    declare readonly router: Server<C, E>['router'];
-    declare readonly jobs: Server<C, E>['jobs'];
-    declare readonly tools: Server<C, E>['tools'];
-    declare readonly api: Server<C, E>['api'];
-
-    constructor(contract: C, options?: ServerOptions) {
-        Object.assign(
-            this,
-            createServerSurface<C, HonoHandlerContext<E>, HonoApi<RoutesOf<C>>>(contract, options, (assembled) => {
-                const api = assembled as HonoApi<RoutesOf<C>>;
-                return Object.assign(api, {
-                    mount: <Env_ extends Env = Env>(app: Hono<Env_>, mountOptions?: HonoOptions) => mountHono(api, app, mountOptions),
-                });
-            })
-        );
-    }
-}

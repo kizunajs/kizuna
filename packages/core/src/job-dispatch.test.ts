@@ -1,45 +1,55 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import type { Contract } from './contract.js';
 import { dispatchDueJobs, dispatchSucceeded, dueJobs } from './job-dispatch.js';
 
-const scheduler = Kizuna.identity.bearer({});
+interface Config {
+    identities: {
+        scheduler: typeof scheduler;
+    };
+}
 
-const k = new Kizuna({
+const k = new Kizuna<Config>();
+
+const scheduler = k.identity.bearer({});
+
+const config = {
     identities: {
         scheduler,
     },
-});
+};
 
 const jobs = k.jobs('scheduler', {
-    everyMinute: {
+    everyMinute: k.job({
         schedule: '* * * * *',
-    },
-    fiveAm: {
+    }),
+    fiveAm: k.job({
         schedule: '0 5 * * *',
-    },
-    quarterHour: {
+    }),
+    quarterHour: k.job({
         schedule: '*/15 * * * *',
-    },
-    never: {
+    }),
+    never: k.job({
         schedule: '0 0 30 2 *',
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: k.routes({
-        listUsers: {
+        listUsers: k.route({
             method: 'GET',
             path: '/users',
             auth: false,
             responses: {
                 200: z.array(z.string()),
             },
-        },
+        }),
     }),
     jobs,
-}) as unknown as Contract;
+}).api as unknown as Contract;
 
 const at = (iso: string): Date => new Date(iso);
 
@@ -67,9 +77,10 @@ describe('dueJobs', () => {
     });
 
     it('reports nothing for a contract with no jobs', () => {
-        const bare = k.contract({
+        const bare = defineConfig({
+            ...config,
             routes: k.routes({}),
-        }) as unknown as Contract;
+        }).api as unknown as Contract;
         expect(dueJobs(bare, { at: at('2026-08-05T05:00:00Z') })).toEqual([]);
     });
 });
@@ -149,9 +160,10 @@ describe('dispatchDueJobs', () => {
     });
 
     it('succeeds vacuously when nothing is due', async () => {
-        const bare = k.contract({
+        const bare = defineConfig({
+            ...config,
             routes: k.routes({}),
-        }) as unknown as Contract;
+        }).api as unknown as Contract;
         const result = await dispatchDueJobs(bare, {}, { at: at('2026-08-05T05:00:00Z') });
         expect(result.due).toEqual([]);
         expect(dispatchSucceeded(result)).toBe(true);

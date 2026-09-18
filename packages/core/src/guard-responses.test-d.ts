@@ -1,22 +1,40 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { ProblemDetailsSchema } from './error-response.js';
 import type { AutoResponsesBrand } from './types.js';
 import type { HandlerArgs } from './handler-pipeline.js';
 
-const k = new Kizuna({
+interface Config {
     identities: {
-        user: Kizuna.identity.bearer({
-            context: z.object({
-                userId: z.string(),
-            }),
-        }),
-    },
+        user: typeof kUser;
+    };
+}
+
+interface ScopedKConfig {
+    identities: {
+        user: typeof scopedKUser;
+    };
+    guardSchema: typeof scopedKGuardSchema;
+}
+
+const k = new Kizuna<Config>();
+const scopedK = new Kizuna<ScopedKConfig>();
+
+const kUser = k.identity.bearer({
+    context: z.object({
+        userId: z.string(),
+    }),
 });
+const config = {
+    identities: {
+        user: kUser,
+    },
+};
 
 const routes = k.routes({
-    listUsers: {
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         auth: 'user',
@@ -25,8 +43,8 @@ const routes = k.routes({
                 ok: z.boolean(),
             }),
         },
-    },
-    health: {
+    }),
+    health: k.route({
         method: 'GET',
         path: '/health',
         auth: false,
@@ -35,14 +53,15 @@ const routes = k.routes({
                 ok: z.boolean(),
             }),
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: {
         api: routes,
     },
-});
+}).api;
 
 type Guarded = (typeof contract.routes.api)['listUsers'];
 type Public = (typeof contract.routes.api)['health'];
@@ -63,21 +82,23 @@ test('the guarded route lets its handler answer the 403 it already declares, and
     expectTypeOf<PublicThrowable['status']>().toEqualTypeOf<200>();
 });
 
-const scopedK = new Kizuna({
-    identities: {
-        user: Kizuna.identity.bearer({
-            context: z.object({
-                userId: z.string(),
-            }),
-        }),
-    },
-    guardSchema: ProblemDetailsSchema.extend({
-        code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
+const scopedKUser = k.identity.bearer({
+    context: z.object({
+        userId: z.string(),
     }),
 });
+const scopedKGuardSchema = ProblemDetailsSchema.extend({
+    code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
+});
+const scopedKConfig = {
+    identities: {
+        user: scopedKUser,
+    },
+    guardSchema: scopedKGuardSchema,
+};
 
 const scopedRoutes = scopedK.routes({
-    listUsers: {
+    listUsers: scopedK.route({
         method: 'GET',
         path: '/users',
         auth: 'user',
@@ -86,14 +107,15 @@ const scopedRoutes = scopedK.routes({
                 ok: z.boolean(),
             }),
         },
-    },
+    }),
 });
 
-const scopedContract = scopedK.contract({
+const scopedContract = defineConfig({
+    ...scopedKConfig,
     routes: {
         api: scopedRoutes,
     },
-});
+}).api;
 
 type BodyOn<R> = R extends AutoResponsesBrand<number, infer Body> ? Body : never;
 

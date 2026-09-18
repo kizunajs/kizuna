@@ -3,20 +3,27 @@ import { z } from 'zod';
 import { ROUTES_TAG, type Routes } from './types.js';
 import { Kizuna } from './kizuna.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        users: {
-            title: 'Users',
-            description: 'User management endpoints',
-        },
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    users: {
+        title: 'Users',
+        description: 'User management endpoints',
+    },
 });
+const config = {
+    tags: kTags,
+};
 
 describe('k.routes', () => {
     it('throws when a route has an empty body schema', () => {
         expect(() =>
             k.routes('users', {
-                emptyAction: {
+                emptyAction: k.route({
                     method: 'POST',
                     path: '/empty',
                     body: z.object({}),
@@ -25,7 +32,7 @@ describe('k.routes', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             })
         ).toThrowError('Route "emptyAction" has an empty body schema (z.object({})). Use z.void() or omit the body field.');
     });
@@ -34,7 +41,7 @@ describe('k.routes', () => {
         expect(() =>
             k.routes('users', {
                 management: {
-                    update: {
+                    update: k.route({
                         method: 'PUT',
                         path: '/users/:id',
                         body: z.object({}),
@@ -43,7 +50,7 @@ describe('k.routes', () => {
                                 ok: z.boolean(),
                             }),
                         },
-                    },
+                    }),
                 },
             })
         ).toThrowError('has an empty body schema');
@@ -52,7 +59,7 @@ describe('k.routes', () => {
     it('accepts a route with a non-empty body schema', () => {
         expect(() =>
             k.routes('users', {
-                createUser: {
+                createUser: k.route({
                     method: 'POST',
                     path: '/users',
                     body: z.object({
@@ -63,7 +70,7 @@ describe('k.routes', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             })
         ).not.toThrow();
     });
@@ -71,14 +78,14 @@ describe('k.routes', () => {
     it('accepts a route with z.void() body', () => {
         expect(() =>
             k.routes('users', {
-                deleteUser: {
+                deleteUser: k.route({
                     method: 'DELETE',
                     path: '/users/:id',
                     body: z.void(),
                     responses: {
                         204: z.void(),
                     },
-                },
+                }),
             })
         ).not.toThrow();
     });
@@ -86,7 +93,7 @@ describe('k.routes', () => {
     it('accepts a route with no body', () => {
         expect(() =>
             k.routes('users', {
-                getUser: {
+                getUser: k.route({
                     method: 'GET',
                     path: '/users/:id',
                     responses: {
@@ -94,14 +101,14 @@ describe('k.routes', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             })
         ).not.toThrow();
     });
 
     it('stamps ROUTES_TAG with the group tag', () => {
         const routes = k.routes('users', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 responses: {
@@ -109,7 +116,7 @@ describe('k.routes', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
         expect((routes as Routes)[ROUTES_TAG]).toBe('users');
     });
@@ -119,7 +126,7 @@ describe('k.routes z.coerce ban', () => {
     it('throws when a top-level query schema is coerced', () => {
         expect(() =>
             k.routes('users', {
-                listItems: {
+                listItems: k.route({
                     method: 'GET',
                     path: '/items',
                     // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- intentional, asserts k.routes throws on z.coerce
@@ -129,7 +136,7 @@ describe('k.routes z.coerce ban', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             })
         ).toThrowError('Route "listItems" uses z.coerce at "query". z.coerce is not allowed in ts-kizuna contracts.');
     });
@@ -137,7 +144,7 @@ describe('k.routes z.coerce ban', () => {
     it('throws and points at the nested field path that uses z.coerce', () => {
         expect(() =>
             k.routes('users', {
-                listItems: {
+                listItems: k.route({
                     method: 'GET',
                     path: '/items',
                     query: z.object({
@@ -149,7 +156,7 @@ describe('k.routes z.coerce ban', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             })
         ).toThrowError('Route "listItems" uses z.coerce at "query.page". z.coerce is not allowed in ts-kizuna contracts.');
     });
@@ -157,7 +164,7 @@ describe('k.routes z.coerce ban', () => {
     it('finds z.coerce hidden inside arrays, wrappers, and unions', () => {
         expect(() =>
             k.routes('users', {
-                createItem: {
+                createItem: k.route({
                     method: 'POST',
                     path: '/items',
                     body: z.object({
@@ -169,7 +176,7 @@ describe('k.routes z.coerce ban', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             })
         ).toThrowError('Route "createItem" uses z.coerce at "body.prices". z.coerce is not allowed in ts-kizuna contracts.');
     });
@@ -177,7 +184,7 @@ describe('k.routes z.coerce ban', () => {
     it('rejects z.coerce in a response schema', () => {
         expect(() =>
             k.routes('users', {
-                getItem: {
+                getItem: k.route({
                     method: 'GET',
                     path: '/items/:id',
                     responses: {
@@ -186,7 +193,7 @@ describe('k.routes z.coerce ban', () => {
                             count: z.coerce.number(),
                         }),
                     },
-                },
+                }),
             })
         ).toThrowError('Route "getItem" uses z.coerce at "responses.200.count". z.coerce is not allowed in ts-kizuna contracts.');
     });
@@ -194,7 +201,7 @@ describe('k.routes z.coerce ban', () => {
     it('accepts plain z.number()/z.date()/z.bigint() and z.any()/z.unknown()', () => {
         expect(() =>
             k.routes('users', {
-                listItems: {
+                listItems: k.route({
                     method: 'GET',
                     path: '/items',
                     query: z.object({
@@ -209,7 +216,7 @@ describe('k.routes z.coerce ban', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             })
         ).not.toThrow();
     });
@@ -219,10 +226,11 @@ describe('k.routes pathParams/path agreement', () => {
     it('throws when pathParams declares a key the path does not have', () => {
         expect(() =>
             k.routes('users', {
-                getPlace: {
+                // @ts-expect-error intentional, asserts the mismatched key is refused
+                getPlace: k.route({
                     method: 'GET',
                     path: '/places/:plackeId',
-                    // @ts-expect-error intentional, asserts k.routes throws on a mismatched key
+                    // @ts-expect-error intentional, asserts the mismatched key is refused
                     pathParams: z.object({
                         placeId: z.uuid(),
                     }),
@@ -231,7 +239,7 @@ describe('k.routes pathParams/path agreement', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             })
         ).toThrowError(
             'Route "getPlace" has pathParams that do not match its path "/places/:plackeId": declared in pathParams but not in the path: placeId; in the path but not declared in pathParams: plackeId.'
@@ -241,7 +249,8 @@ describe('k.routes pathParams/path agreement', () => {
     it('throws when the path has a placeholder pathParams omits', () => {
         expect(() =>
             k.routes('users', {
-                getVisit: {
+                // @ts-expect-error intentional, asserts k.routes throws on a missing key
+                getVisit: k.route({
                     method: 'GET',
                     path: '/places/:placeId/visits/:visitId',
                     // @ts-expect-error intentional, asserts k.routes throws on a missing key
@@ -253,7 +262,7 @@ describe('k.routes pathParams/path agreement', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             })
         ).toThrowError('in the path but not declared in pathParams: visitId.');
     });
@@ -262,7 +271,8 @@ describe('k.routes pathParams/path agreement', () => {
         expect(() =>
             k.routes('users', {
                 management: {
-                    getPlace: {
+                    // @ts-expect-error intentional, asserts k.routes throws on a mismatched key
+                    getPlace: k.route({
                         method: 'GET',
                         path: '/places/:placeId',
                         // @ts-expect-error intentional, asserts k.routes throws on a mismatched key
@@ -274,7 +284,7 @@ describe('k.routes pathParams/path agreement', () => {
                                 id: z.string(),
                             }),
                         },
-                    },
+                    }),
                 },
             })
         ).toThrowError('Route "management.getPlace" has pathParams that do not match its path "/places/:placeId"');
@@ -283,7 +293,7 @@ describe('k.routes pathParams/path agreement', () => {
     it('accepts pathParams whose keys match the path', () => {
         expect(() =>
             k.routes('users', {
-                getVisit: {
+                getVisit: k.route({
                     method: 'GET',
                     path: '/places/:placeId/visits/:visitId',
                     pathParams: z.object({
@@ -295,7 +305,7 @@ describe('k.routes pathParams/path agreement', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             })
         ).not.toThrow();
     });
@@ -303,7 +313,7 @@ describe('k.routes pathParams/path agreement', () => {
     it('accepts a path parameter followed by a literal in the same segment', () => {
         expect(() =>
             k.routes('users', {
-                getReport: {
+                getReport: k.route({
                     method: 'GET',
                     path: '/reports/:reportId.pdf',
                     pathParams: z.object({
@@ -314,7 +324,7 @@ describe('k.routes pathParams/path agreement', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             })
         ).not.toThrow();
     });
@@ -322,7 +332,7 @@ describe('k.routes pathParams/path agreement', () => {
     it('accepts a route that omits pathParams entirely', () => {
         expect(() =>
             k.routes('users', {
-                getPlace: {
+                getPlace: k.route({
                     method: 'GET',
                     path: '/places/:placeId',
                     responses: {
@@ -330,7 +340,7 @@ describe('k.routes pathParams/path agreement', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             })
         ).not.toThrow();
     });
@@ -338,7 +348,7 @@ describe('k.routes pathParams/path agreement', () => {
     it('leaves a pathParams schema without a known key set alone', () => {
         expect(() =>
             k.routes('users', {
-                getPlace: {
+                getPlace: k.route({
                     method: 'GET',
                     path: '/places/:placeId',
                     pathParams: z.record(z.string(), z.string()),
@@ -347,7 +357,7 @@ describe('k.routes pathParams/path agreement', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             })
         ).not.toThrow();
     });
@@ -356,7 +366,7 @@ describe('k.routes pathParams/path agreement', () => {
 describe('k.routes structured path params', () => {
     const routeWith = (schema: z.ZodType) => () =>
         k.routes('users', {
-            getPlace: {
+            getPlace: k.route({
                 method: 'GET',
                 path: '/places/:value',
                 pathParams: z.object({
@@ -367,7 +377,7 @@ describe('k.routes structured path params', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
     it('throws for every structured schema kind, naming the parameter and pointing at query', () => {
@@ -400,7 +410,7 @@ describe('k.routes structured path params', () => {
     it('leaves an array in query alone', () => {
         expect(() =>
             k.routes('users', {
-                listPlaces: {
+                listPlaces: k.route({
                     method: 'GET',
                     path: '/places',
                     query: z.object({
@@ -411,7 +421,7 @@ describe('k.routes structured path params', () => {
                             id: z.string(),
                         }),
                     },
-                },
+                }),
             })
         ).not.toThrow();
     });

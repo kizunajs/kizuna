@@ -4,14 +4,22 @@ import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { useInfiniteQuery as useVueInfiniteQuery, useMutation as useVueMutation, useQuery as useVueQuery } from '@tanstack/vue-query';
 import { createInfiniteQuery, createMutation, createQuery } from '@tanstack/svelte-query';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { KizunaClient } from '@ts-kizuna/fetch';
 import { KizunaTanstackQuery } from './proxy.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        users: 'Users',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    users: 'Users',
 });
+const config = {
+    tags: kTags,
+};
 
 const UserSchema = z.object({
     id: z.string(),
@@ -19,7 +27,7 @@ const UserSchema = z.object({
 });
 
 const routes = k.routes('users', {
-    listUsers: {
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         responses: {
@@ -27,8 +35,8 @@ const routes = k.routes('users', {
                 users: z.array(UserSchema),
             }),
         },
-    },
-    getUser: {
+    }),
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
@@ -37,8 +45,8 @@ const routes = k.routes('users', {
                 title: z.string(),
             }),
         },
-    },
-    searchUsers: {
+    }),
+    searchUsers: k.route({
         method: 'GET',
         path: '/users/search',
         query: z.object({
@@ -51,8 +59,8 @@ const routes = k.routes('users', {
                 nextCursor: z.number().nullable(),
             }),
         },
-    },
-    createUser: {
+    }),
+    createUser: k.route({
         method: 'POST',
         path: '/users',
         body: z.object({
@@ -61,14 +69,15 @@ const routes = k.routes('users', {
         responses: {
             201: UserSchema,
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: {
         users: routes,
     },
-});
+}).api;
 
 const apiClient = new KizunaClient(contract, {
     baseUrl: 'http://localhost:8000',

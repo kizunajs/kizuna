@@ -11,8 +11,18 @@ import {
 } from './adapter.js';
 import type { RouteDefinition } from './types.js';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 
-const user = Kizuna.identity.bearer({
+interface Config {
+    identities: {
+        user: typeof user;
+        member: typeof member;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const user = k.identity.bearer({
     context: z.object({
         userId: z.string(),
     }),
@@ -29,7 +39,7 @@ const roles = Kizuna.roles(permissions, {
     owner: 'all',
 });
 
-const member = Kizuna.identity.apiKey({
+const member = k.identity.apiKey({
     name: 'x-workspace-token',
     in: 'header',
     context: z.object({
@@ -38,12 +48,12 @@ const member = Kizuna.identity.apiKey({
     roles,
 });
 
-const k = new Kizuna({
+const config = {
     identities: {
         user,
         member,
     },
-});
+};
 
 const routeDefinition = <const Auth>(path: `/${string}`, auth: Auth) => ({
     method: 'GET' as const,
@@ -73,9 +83,10 @@ const makeContract = () => {
             }),
         }),
     };
-    return k.contract({
+    return defineConfig({
+        ...config,
         routes,
-    });
+    }).api;
 };
 
 const makeRequest = (path: string, headers: Record<string, string> = {}): AdapterRequest<null> => ({
@@ -379,28 +390,34 @@ describe('guard pipeline', () => {
     });
 
     it('hands a handler behind roles from names the role alone', async () => {
-        const viewer = Kizuna.identity.bearer({
+        const viewer = k.identity.bearer({
             context: z.object({
                 userId: z.string(),
             }),
             roles: Kizuna.roles(['viewer', 'editor']),
         });
-        const plain = new Kizuna({
+        const plainConfig = {
             identities: {
                 viewer,
             },
-        });
+        };
+        const plain = new Kizuna<{
+            identities: {
+                viewer: typeof viewer;
+            };
+        }>();
         const docs = plain.routes({
             listDocs: routeDefinition('/docs', {
                 identity: 'viewer',
                 roles: 'editor',
             }),
         });
-        const contract = plain.contract({
+        const contract = defineConfig({
+            ...plainConfig,
             routes: {
                 docs,
             },
-        });
+        }).api;
         const { adapter, results } = makeAdapter();
         let received: unknown;
         await adapter.handle({
@@ -545,7 +562,7 @@ describe('extractCredential', () => {
     });
 
     it('extracts an apiKey from a query parameter', () => {
-        const queryKey = Kizuna.identity.apiKey({
+        const queryKey = k.identity.apiKey({
             name: 'api_key',
             in: 'query',
             context: z.object({}),
@@ -560,7 +577,7 @@ describe('extractCredential', () => {
     });
 
     it('extracts an apiKey from a cookie', () => {
-        const cookieKey = Kizuna.identity.apiKey({
+        const cookieKey = k.identity.apiKey({
             name: 'session',
             in: 'cookie',
             context: z.object({}),
@@ -575,7 +592,7 @@ describe('extractCredential', () => {
     });
 
     it('decodes basic credentials and tolerates malformed input', () => {
-        const admin = Kizuna.identity.basic({
+        const admin = k.identity.basic({
             context: z.object({}),
         });
         const encoded = Buffer.from('ada:secret').toString('base64');
@@ -591,11 +608,11 @@ describe('extractCredential', () => {
     });
 
     it('labels oauth2 and openIdConnect tokens by their scheme kind', () => {
-        const oauthUser = Kizuna.identity.oauth2({
+        const oauthUser = k.identity.oauth2({
             flows: {},
             context: z.object({}),
         });
-        const oidcUser = Kizuna.identity.openIdConnect({
+        const oidcUser = k.identity.openIdConnect({
             openIdConnectUrl: 'https://example.com/.well-known/openid-configuration',
             context: z.object({}),
         });
@@ -613,10 +630,11 @@ describe('extractCredential', () => {
 });
 
 describe('guard params and several roles', () => {
-    const withParams = k.contract({
+    const withParams = defineConfig({
+        ...config,
         routes: {
             items: k.routes({
-                getWorkspaceUser: {
+                getWorkspaceUser: k.route({
                     method: 'GET',
                     path: '/workspaces/:workspaceId/users/:id',
                     auth: 'user',
@@ -625,10 +643,10 @@ describe('guard params and several roles', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             }),
         },
-    });
+    }).api;
 
     it('passes the matched route params to the guard', async () => {
         const { adapter, results } = makeAdapter();
@@ -675,7 +693,7 @@ describe('guard params and several roles', () => {
         },
     });
 
-    const teamMember = Kizuna.identity.apiKey({
+    const teamMember = k.identity.apiKey({
         name: 'x-workspace-token',
         in: 'header',
         context: z.object({
@@ -684,16 +702,22 @@ describe('guard params and several roles', () => {
         roles: teamRoles,
     });
 
-    const teamK = new Kizuna({
+    const teamKConfig = {
         identities: {
             member: teamMember,
         },
-    });
+    };
+    const teamK = new Kizuna<{
+        identities: {
+            member: typeof teamMember;
+        };
+    }>();
 
-    const teamContract = teamK.contract({
+    const teamContract = defineConfig({
+        ...teamKConfig,
         routes: {
             users: teamK.routes({
-                exportUsers: {
+                exportUsers: teamK.route({
                     method: 'GET',
                     path: '/users/export',
                     auth: {
@@ -707,10 +731,10 @@ describe('guard params and several roles', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             }),
         },
-    });
+    }).api;
 
     const teamRouter = {
         users: {
@@ -761,22 +785,28 @@ describe('guard params and several roles', () => {
 });
 
 describe('custom identity guard', () => {
-    const inviteToken = Kizuna.identity.custom({
+    const inviteToken = k.identity.custom({
         context: z.object({
             inviteId: z.string(),
         }),
     });
 
-    const inviteK = new Kizuna({
+    const inviteKConfig = {
         identities: {
             inviteToken,
         },
-    });
+    };
+    const inviteK = new Kizuna<{
+        identities: {
+            inviteToken: typeof inviteToken;
+        };
+    }>();
 
-    const inviteContract = inviteK.contract({
+    const inviteContract = defineConfig({
+        ...inviteKConfig,
         routes: {
             invites: inviteK.routes({
-                getInvite: {
+                getInvite: inviteK.route({
                     method: 'GET',
                     path: '/invites/:token',
                     auth: 'inviteToken',
@@ -785,10 +815,10 @@ describe('custom identity guard', () => {
                             ok: z.boolean(),
                         }),
                     },
-                },
+                }),
             }),
         },
-    });
+    }).api;
 
     it('extracts no credential for a custom identity', () => {
         expect(extractCredential(inviteToken, makeRequest('/invites/tok'))).toEqual({});
@@ -865,7 +895,7 @@ describe('permissions within a role', () => {
         report: ['read', 'export'],
     });
 
-    const analyst = Kizuna.identity.apiKey({
+    const analyst = k.identity.apiKey({
         name: 'x-token',
         in: 'header',
         context: z.object({
@@ -881,11 +911,16 @@ describe('permissions within a role', () => {
         }),
     });
 
-    const granted = new Kizuna({
+    const grantedConfig = {
         identities: {
             analyst,
         },
-    });
+    };
+    const granted = new Kizuna<{
+        identities: {
+            analyst: typeof analyst;
+        };
+    }>();
 
     const reports = granted.routes({
         exportReport: routeDefinition('/reports/export', {
@@ -896,11 +931,12 @@ describe('permissions within a role', () => {
         }),
     });
 
-    const contract = granted.contract({
+    const contract = defineConfig({
+        ...grantedConfig,
         routes: {
             reports,
         },
-    });
+    }).api;
 
     const run = async (returned: Record<string, unknown>) => {
         const { adapter, results } = makeAdapter();
@@ -979,7 +1015,7 @@ describe('OAuth tokens', () => {
         report: ['read'],
     });
 
-    const partner = Kizuna.identity.oauth2({
+    const partner = k.identity.oauth2({
         flows: {
             clientCredentials: {
                 tokenUrl: 'https://auth.example.com/token',
@@ -1001,11 +1037,16 @@ describe('OAuth tokens', () => {
         }),
     });
 
-    const oauth = new Kizuna({
+    const oauthConfig = {
         identities: {
             partner,
         },
-    });
+    };
+    const oauth = new Kizuna<{
+        identities: {
+            partner: typeof partner;
+        };
+    }>();
 
     const users = oauth.routes({
         createUser: routeDefinition('/users', {
@@ -1022,11 +1063,12 @@ describe('OAuth tokens', () => {
         }),
     });
 
-    const contract = oauth.contract({
+    const contract = defineConfig({
+        ...oauthConfig,
         routes: {
             users,
         },
-    });
+    }).api;
 
     const run = async (path: `/${string}`, tokenScopes: string[]) => {
         const { adapter, results } = makeAdapter();

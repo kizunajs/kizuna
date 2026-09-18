@@ -1,15 +1,36 @@
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '../error-response.js';
 import { Kizuna } from '../kizuna.js';
-import { createPlugin, implementPlugin, rawResponse } from '../adapter.js';
+import { defineConfig } from '../define-config.js';
+import { createPlugin, rawResponse } from '../adapter.js';
 import type { Router } from '../handler-pipeline.js';
 import type { GuardDeny } from '../adapter.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+interface SecuredKConfig {
+    identities: {
+        user: typeof userIdentity;
+        member: typeof memberIdentity;
+    };
+}
+
+interface PluginKConfig {
+    tags: typeof pluginKTags;
+}
+
+const k = new Kizuna<Config>();
+const securedK = new Kizuna<SecuredKConfig>();
+const pluginK = new Kizuna<PluginKConfig>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 export interface User {
     id: string;
@@ -160,9 +181,12 @@ export const userRoutes = k.routes('api', {
 
 export type UserRoutes = typeof userRoutes;
 
-export const userContract = k.contract({
+export const userInput = {
+    ...config,
     routes: userRoutes,
-});
+};
+
+export const userContract = defineConfig(userInput).api;
 
 /**
  * A route whose handler returns a body the contract does not allow, for `responses.validation`.
@@ -186,9 +210,12 @@ export const brokenRoutes = k.routes('api', {
         })),
 });
 
-export const brokenContract = k.contract({
+export const brokenInput = {
+    ...config,
     routes: brokenRoutes,
-});
+};
+
+export const brokenContract = defineConfig(brokenInput).api;
 
 export const sessionToken = 'tok_ada';
 
@@ -198,11 +225,24 @@ export const sessionToken = 'tok_ada';
  */
 export const sessionAuthorization = `Bearer ${sessionToken}`;
 
-export const userIdentity = Kizuna.identity.bearer({
-    context: z.object({
-        userId: z.string(),
-    }),
-});
+export const userIdentity = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    })
+    .guard(({ bearer, deny }) => {
+        if (bearer?.token !== sessionToken)
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        return {
+            userId: '1',
+        };
+    });
 
 export const workspacePermissions = Kizuna.permissions({
     workspace: ['read', 'delete'],
@@ -215,24 +255,41 @@ export const workspaceRoles = Kizuna.roles(workspacePermissions, {
     owner: 'all',
 });
 
-export const memberIdentity = Kizuna.identity.apiKey({
-    name: 'x-workspace-token',
-    in: 'header',
-    context: z.object({
-        workspaceUserId: z.string(),
-    }),
-    roles: workspaceRoles,
-});
+export const memberIdentity = k.identity
+    .apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            workspaceUserId: z.string(),
+        }),
+        roles: workspaceRoles,
+    })
+    .guard(({ apiKey, deny }) => {
+        const membership = apiKey ? memberships.get(apiKey.value) : undefined;
+        if (!membership)
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'Forbidden',
+                },
+            });
+        return membership;
+    });
 
 export const ownerToken = 'wst_owner';
 export const adminToken = 'wst_admin';
 
-const securedK = new Kizuna({
+const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
+    [ownerToken, { workspaceUserId: '1', role: 'owner' }],
+    [adminToken, { workspaceUserId: '2', role: 'admin' }],
+]);
+
+const securedKConfig = {
     identities: {
         user: userIdentity,
         member: memberIdentity,
     },
-});
+};
 
 export const securedRoutes = securedK.routes({
     publicRoute: securedK
@@ -332,52 +389,14 @@ export const securedRoutes = securedK.routes({
         })),
 });
 
-export const securedContract = securedK.contract({
+export const securedInput = {
+    ...securedKConfig,
     routes: {
         api: securedRoutes,
     },
-});
-
-/**
- * The guard body every adapter shares. `server.guard` is an identity function in all four, so only the wiring differs.
- */
-export const requireUserGuard = ({ bearer, deny }: { bearer?: { token: string }; deny: GuardDeny }) => {
-    if (bearer?.token !== sessionToken)
-        return deny({
-            status: 401,
-            body: {
-                detail: 'Unauthorized',
-            },
-        });
-    return {
-        userId: '1',
-    };
 };
 
-const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | 'admin' }>([
-    [ownerToken, { workspaceUserId: '1', role: 'owner' }],
-    [adminToken, { workspaceUserId: '2', role: 'admin' }],
-]);
-
-export const requireMemberGuard = ({ apiKey, deny }: { apiKey?: { value: string } | null; deny: GuardDeny }) => {
-    const membership = apiKey ? memberships.get(apiKey.value) : undefined;
-    if (!membership)
-        return deny({
-            status: 403,
-            body: {
-                detail: 'Forbidden',
-            },
-        });
-    return membership;
-};
-
-/**
- * The guard bodies the `guards.*` features mount, keyed by identity name.
- */
-export const securedGuards = {
-    user: requireUserGuard,
-    member: requireMemberGuard,
-};
+export const securedContract = defineConfig(securedInput).api;
 
 /**
  * A one-route group at a distinct path, for the sub-router composition tests each adapter repeated.
@@ -401,11 +420,14 @@ export const subUserRoutes = k.routes('api', {
         })),
 });
 
-export const subUserContract = k.contract({
+export const subUserInput = {
+    ...config,
     routes: {
         users: subUserRoutes,
     },
-});
+};
+
+export const subUserContract = defineConfig(subUserInput).api;
 
 /**
  * Constraints covering each Zod issue code the kernel serializes, so every adapter proves it surfaces them.
@@ -438,9 +460,12 @@ export const issueRoutes = k.routes('api', {
         })),
 });
 
-export const issueContract = k.contract({
+export const issueInput = {
+    ...config,
     routes: issueRoutes,
-});
+};
+
+export const issueContract = defineConfig(issueInput).api;
 
 /**
  * Routes declaring non-JSON and empty response bodies.
@@ -512,9 +537,12 @@ export const responseShapeRoutes = k.routes('api', {
         })),
 });
 
-export const responseShapeContract = k.contract({
+export const responseShapeInput = {
+    ...config,
     routes: responseShapeRoutes,
-});
+};
+
+export const responseShapeContract = defineConfig(responseShapeInput).api;
 
 export const deprecatedRoutes = k.routes('api', {
     deleteUser: k
@@ -571,9 +599,12 @@ export const deprecatedRoutes = k.routes('api', {
         })),
 });
 
-export const deprecatedContract = k.contract({
+export const deprecatedInput = {
+    ...config,
     routes: deprecatedRoutes,
-});
+};
+
+export const deprecatedContract = defineConfig(deprecatedInput).api;
 
 export const cachedRoutes = k.routes('api', {
     listUsers: k
@@ -787,9 +818,12 @@ export const cachedRoutes = k.routes('api', {
         })),
 });
 
-export const cachedContract = k.contract({
+export const cachedInput = {
+    ...config,
     routes: cachedRoutes,
-});
+};
+
+export const cachedContract = defineConfig(cachedInput).api;
 
 const echoMethod = (method: string) => () => ({
     status: 200 as const,
@@ -903,79 +937,81 @@ export const methodRoutes = k.routes('api', {
         .handler(echoMethod('HEAD')),
 });
 
-export const methodContract = k.contract({
+export const methodInput = {
+    ...config,
     routes: methodRoutes,
-});
+};
 
-const probePlugin = createPlugin<{ label: () => string }>()({
-    name: 'probe',
-    routes: {
-        ping: {
-            method: 'GET',
-            path: '/probe/ping',
-            responses: {
-                200: z.object({
-                    pong: z.boolean(),
-                }),
-            },
-        },
-        overlap: {
-            method: 'GET',
-            path: '/which-label/:id',
-            responses: {
-                200: z.object({
-                    from: z.string(),
-                }),
-            },
-        },
-        stream: {
-            method: 'GET',
-            path: '/probe/stream',
-            responses: {
-                200: z.object({
-                    never: z.boolean(),
-                }),
-            },
-        },
-    },
-    serverModule: '@ts-kizuna/core/adapter-testing',
-});
+export const methodContract = defineConfig(methodInput).api;
 
-const probeServer = (config: { label: string }) =>
-    implementPlugin(probePlugin, () => ({
-        router: {
-            ping: () => ({
-                status: 200 as const,
-                body: {
-                    pong: true,
+const probePlugin = (settings: { label: string }) =>
+    createPlugin({
+        name: 'probe',
+        routes: {
+            ping: {
+                method: 'GET',
+                path: '/probe/ping',
+                responses: {
+                    200: z.object({
+                        pong: z.boolean(),
+                    }),
                 },
-            }),
-            overlap: () => ({
-                status: 200 as const,
-                body: {
-                    from: 'plugin',
+            },
+            overlap: {
+                method: 'GET',
+                path: '/which-label/:id',
+                responses: {
+                    200: z.object({
+                        from: z.string(),
+                    }),
                 },
-            }),
-            stream: () =>
-                rawResponse(
-                    new Response('not json at all', {
-                        status: 200,
-                        headers: {
-                            'Content-Type': 'text/plain',
-                        },
-                    })
-                ),
+            },
+            stream: {
+                method: 'GET',
+                path: '/probe/stream',
+                responses: {
+                    200: z.object({
+                        never: z.boolean(),
+                    }),
+                },
+            },
         },
-        exports: {
-            label: () => config.label,
-        },
-    }));
+        serve: () => ({
+            router: {
+                ping: () => ({
+                    status: 200 as const,
+                    body: {
+                        pong: true,
+                    },
+                }),
+                overlap: () => ({
+                    status: 200 as const,
+                    body: {
+                        from: 'plugin',
+                    },
+                }),
+                stream: () =>
+                    rawResponse(
+                        new Response('not json at all', {
+                            status: 200,
+                            headers: {
+                                'Content-Type': 'text/plain',
+                            },
+                        })
+                    ),
+            },
+            exports: {
+                label: () => settings.label,
+            },
+        }),
+    });
 
-const pluginK = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+const pluginKTags = k.tags({
+    api: 'API',
 });
+const pluginKConfig = {
+    tags: pluginKTags,
+};
 
 export const pluginRoutes = pluginK.routes('api', {
     whichLabel: pluginK
@@ -1012,18 +1048,17 @@ export const pluginRoutes = pluginK.routes('api', {
         })),
 });
 
-export const pluginContract = pluginK.contract({
+export const pluginInput = {
+    ...pluginKConfig,
     routes: pluginRoutes,
-    plugins: {
-        probe: probePlugin,
-    },
-});
-
-export const pluginImplementations = {
-    probe: probeServer({
-        label: 'probed',
-    }),
+    plugins: [
+        probePlugin({
+            label: 'probed',
+        }),
+    ],
 };
+
+export const pluginContract = defineConfig(pluginInput).api;
 
 // Holds the generator before its last event. Open by default; `hold()` arms it for one test.
 const createStreamGate = () => {
@@ -1179,9 +1214,12 @@ export const streamRoutes = k.routes('api', {
         })),
 });
 
-export const streamContract = k.contract({
+export const streamInput = {
+    ...config,
     routes: streamRoutes,
-});
+};
+
+export const streamContract = defineConfig(streamInput).api;
 
 export const streamedEventsText =
     'event: delta\ndata: {"text":"a"}\n\n: keep-alive\n\nevent: done\ndata: {"count":1}\nid: evt-1\nretry: 5000\n\n';

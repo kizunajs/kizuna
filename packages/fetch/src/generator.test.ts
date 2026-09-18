@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { generateFetchClient } from './generator.js';
 import { createGeneratedClient, type GeneratedRoutes } from './client.js';
 
@@ -17,7 +18,7 @@ const UserSchema = Kizuna.model({
 });
 
 const routes = k.routes('users', {
-    listUsers: {
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         query: z.object({
@@ -26,8 +27,8 @@ const routes = k.routes('users', {
         responses: {
             200: z.array(UserSchema),
         },
-    },
-    getUser: {
+    }),
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
@@ -36,8 +37,8 @@ const routes = k.routes('users', {
                 detail: z.string(),
             }),
         },
-    },
-    uploadAvatar: {
+    }),
+    uploadAvatar: k.route({
         method: 'POST',
         path: '/users/:id/avatar',
         contentType: 'multipart/form-data',
@@ -47,8 +48,8 @@ const routes = k.routes('users', {
         responses: {
             204: z.void(),
         },
-    },
-    watch: {
+    }),
+    watch: k.route({
         method: 'GET',
         path: '/users/:id/events',
         responses: {
@@ -58,14 +59,14 @@ const routes = k.routes('users', {
                 }),
             },
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
     routes: {
         users: routes,
     },
-});
+}).api;
 
 const source = generateFetchClient(contract, { source: '../src/contract.ts' });
 

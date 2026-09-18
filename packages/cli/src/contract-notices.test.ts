@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { contractNotices, formatNotice } from './contract-notices.js';
 
 const k = new Kizuna();
@@ -11,28 +12,28 @@ const ok = {
     },
 } as const;
 
-const contract = k.contract({
+const contract = defineConfig({
     routes: {
         users: k.routes('users', {
-            getUser: {
+            getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
                 ...ok,
-            },
-            listUsers: {
+            }),
+            listUsers: k.route({
                 method: 'GET',
                 path: '/users',
                 deprecated: 'Use searchUsers instead.',
                 sunset: '2026-10-01',
                 ...ok,
-            },
-            oldSearch: {
+            }),
+            oldSearch: k.route({
                 method: 'GET',
                 path: '/users/search',
                 deprecated: true,
                 ...ok,
-            },
-            legacyExport: {
+            }),
+            legacyExport: k.route({
                 method: 'GET',
                 path: '/users/export',
                 deprecated: {
@@ -41,16 +42,16 @@ const contract = k.contract({
                 },
                 sunset: '2026-09-20',
                 ...ok,
-            },
-            retired: {
+            }),
+            retired: k.route({
                 method: 'GET',
                 path: '/users/retired',
                 sunset: '2026-09-01',
                 ...ok,
-            },
+            }),
         }),
     },
-});
+}).api;
 
 const now = new Date('2026-09-15T00:00:00Z');
 const notices = contractNotices(contract, { now });

@@ -8,7 +8,7 @@ const k = new Kizuna();
 
 const tools = k.tools({
     weather: {
-        getForecast: {
+        getForecast: k.tool({
             title: 'Weather forecast',
             description: 'Look up the forecast for one city',
             input: z.object({
@@ -20,11 +20,11 @@ const tools = k.tools({
             annotations: {
                 readOnlyHint: true,
             },
-        },
+        }),
     },
-    ping: {
+    ping: k.tool({
         description: 'Answer that the server is up',
-    },
+    }),
 });
 
 type Handlers = ToolHandlers<typeof tools>;

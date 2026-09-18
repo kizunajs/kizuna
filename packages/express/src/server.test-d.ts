@@ -1,4 +1,5 @@
 import { expectTypeOf, test } from 'vitest';
+import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import type { HandlerContextOf } from '@ts-kizuna/core/adapter';
 import type { Request } from 'express';
@@ -18,90 +19,132 @@ import {
     type ExpectedRouteHandler,
     type ExpectedRouter,
 } from '../../core/src/adapter-testing/type-testing.js';
-import { KizunaServer, expressAdapter, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
+import { expressAdapter, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
 
-const securedServer = new KizunaServer(securedContract);
-const gateServer = new KizunaServer(gateContract);
-const requestContextServer = new KizunaServer(requestContextContract);
+interface LocalConfig {
+    adapter: typeof expressAdapter;
+    identities: {
+        user: typeof localUser;
+        member: typeof localMember;
+        apiConsumer: typeof localApiConsumer;
+    };
+    requestContext: {
+        analytics: typeof localAnalytics;
+    };
+}
+
+const k = new Kizuna<LocalConfig>();
+
+const localUser = k.identity.bearer({
+    context: z.object({
+        userId: z.string(),
+    }),
+});
+
+const localPermissions = Kizuna.permissions({
+    workspace: ['read', 'delete'],
+});
+
+const localRoles = Kizuna.roles(localPermissions, {
+    admin: {
+        workspace: ['read'],
+    },
+    owner: 'all',
+});
+
+const localMember = k.identity.apiKey({
+    name: 'x-workspace-token',
+    in: 'header',
+    context: z.object({
+        workspaceUserId: z.string(),
+    }),
+    roles: localRoles,
+});
+
+const localApiConsumer = k.identity.apiKey({
+    name: 'x-api-key',
+    in: 'header',
+});
+
+const localAnalytics = k.requestContext({
+    context: z.object({
+        sessionId: z.string().nullable(),
+    }),
+});
 
 test('conforms to the shared adapter type catalogue', () => {
     checkAdapterTypeFeatures('express', {
         'tools.handlerArg': () => {
-            new KizunaServer(toolInferenceContract).router({
-                summarize: async ({ body, tools }) => {
-                    expectTypeOf(tools.countWords.run).parameter(0).toEqualTypeOf<{ text: string }>();
-                    const counted = await tools.countWords.run({
-                        text: body.text,
-                    });
-                    expectTypeOf(counted).toEqualTypeOf<{ words: number }>();
-                    return {
-                        status: 200,
-                        body: counted,
+            const summarize: Router<typeof toolInferenceContract>['summarize'] = async ({ body, tools }) => {
+                expectTypeOf(tools.countWords.run).parameter(0).toEqualTypeOf<{ text: string }>();
+                const counted = await tools.countWords.run({
+                    text: body.text,
+                });
+                expectTypeOf(counted).toEqualTypeOf<{ words: number }>();
+                return {
+                    status: 200,
+                    body: counted,
+                };
+            };
+            void summarize;
+        },
+        'streams.bodyGenerator': () => {
+            const reply: Router<typeof streamInferenceContract>['reply'] = async ({ body }) => ({
+                status: 200,
+                body: async function* ({ signal }) {
+                    expectTypeOf(signal).toEqualTypeOf<AbortSignal>();
+                    yield {
+                        event: 'delta',
+                        data: {
+                            text: body.prompt,
+                        },
+                    };
+                    yield {
+                        comment: 'keep-alive',
+                    };
+                    yield {
+                        event: 'done',
+                        data: {
+                            count: 1,
+                        },
+                        id: 'evt-1',
                     };
                 },
             });
-        },
-        'streams.bodyGenerator': () => {
-            new KizunaServer(streamInferenceContract).router({
-                reply: async ({ body }) => ({
-                    status: 200,
-                    body: async function* ({ signal }) {
-                        expectTypeOf(signal).toEqualTypeOf<AbortSignal>();
-                        yield {
-                            event: 'delta',
-                            data: {
-                                text: body.prompt,
-                            },
-                        };
-                        yield {
-                            comment: 'keep-alive',
-                        };
-                        yield {
-                            event: 'done',
-                            data: {
-                                count: 1,
-                            },
-                            id: 'evt-1',
-                        };
-                    },
-                }),
-            });
-            new KizunaServer(streamInferenceContract).router({
-                // @ts-expect-error `done` carries a count, not text
-                reply: async () => ({
-                    status: 200,
-                    body: async function* () {
-                        yield {
-                            event: 'done',
-                            data: {
-                                text: 'x',
-                            },
-                        };
-                    },
-                }),
-            });
-        },
-        'streams.bodyRejectsValue': () => {
-            new KizunaServer(streamInferenceContract).router({
-                // @ts-expect-error a streamed status takes a generator, not a value
-                reply: async () => ({
-                    status: 200,
-                    body: {
-                        text: 'x',
-                    },
-                }),
-            });
-            new KizunaServer(streamInferenceContract).router({
-                reply: async ({ throwError }) => {
-                    expectTypeOf(throwError).parameter(0).toHaveProperty('status').toEqualTypeOf<400>();
-                    return throwError({
-                        status: 400,
-                        body: {
-                            detail: 'no',
+            void reply;
+            // @ts-expect-error `done` carries a count, not text
+            const wrongEvent: Router<typeof streamInferenceContract>['reply'] = async () => ({
+                status: 200,
+                body: async function* () {
+                    yield {
+                        event: 'done',
+                        data: {
+                            text: 'x',
                         },
-                    });
+                    };
                 },
             });
+            void wrongEvent;
+        },
+        'streams.bodyRejectsValue': () => {
+            // @ts-expect-error a streamed status takes a generator, not a value
+            const valueBody: Router<typeof streamInferenceContract>['reply'] = async () => ({
+                status: 200,
+                body: {
+                    text: 'x',
+                },
+            });
+            void valueBody;
+            const thrown: Router<typeof streamInferenceContract>['reply'] = async ({ throwError }) => {
+                expectTypeOf(throwError).parameter(0).toHaveProperty('status').toEqualTypeOf<400>();
+                return throwError({
+                    status: 400,
+                    body: {
+                        detail: 'no',
+                    },
+                });
+            };
+            void thrown;
         },
         'surface.router': () => {
             expectTypeOf<Router<typeof securedContract>>().toEqualTypeOf<ExpectedRouter<typeof securedContract, ExpressHandlerContext>>();
@@ -113,89 +156,19 @@ test('conforms to the shared adapter type catalogue', () => {
             >();
         },
         'surface.guardRun': () => {
-            expectTypeOf(
-                securedServer.guard('user', ({ deny }) =>
-                    deny({
-                        status: 401,
-                        body: {
-                            detail: 'Unauthorized',
-                        },
-                    })
-                )
-            ).toEqualTypeOf<GuardRun<ExpressHandlerContext>>();
+            expectTypeOf<Parameters<typeof localUser.guard>[0]>().parameter(0).toMatchTypeOf<ExpressHandlerContext>();
+            expectTypeOf<GuardRun<ExpressHandlerContext>>().parameter(0).toMatchTypeOf<ExpressHandlerContext>();
         },
         'surface.requestContextRun': () => {
-            expectTypeOf(
-                requestContextServer.requestContext('analytics', () => ({
-                    sessionId: null,
-                }))
-            ).toEqualTypeOf<RequestContextRun<ExpressHandlerContext>>();
-        },
-        'router.groupByName': () => {
-            const server = new KizunaServer(inferenceGroupContract);
-
-            const users = server.router('users', {
-                getUser: async () => ({
-                    status: 200,
-                    body: {
-                        id: '1',
-                        name: 'Ada',
-                    },
-                }),
-                createUser: async () => ({
-                    status: 201,
-                    body: {
-                        id: '1',
-                        name: 'Ada',
-                        email: 'ada@example.com',
-                    },
-                }),
-            });
-
-            server.api({
-                router: {
-                    users,
-                },
-            });
-        },
-        'router.bareRouteGroup': () => {
-            const server = new KizunaServer(inferenceGroupContract);
-
-            server.router(inferenceRoutes, {
-                getUser: () => ({
-                    status: 200,
-                    body: {
-                        id: '1',
-                        name: 'Ada',
-                    },
-                }),
-                createUser: () => ({
-                    status: 201,
-                    body: {
-                        id: '1',
-                        name: 'Ada',
-                        email: 'ada@example.com',
-                    },
-                }),
-            });
+            expectTypeOf<Parameters<typeof localAnalytics.handler>[0]>().parameter(0).toMatchTypeOf<ExpressHandlerContext>();
+            expectTypeOf<RequestContextRun<ExpressHandlerContext>>().parameter(0).toMatchTypeOf<ExpressHandlerContext>();
         },
         'router.undeclaredStatus': () => {
-            const server = new KizunaServer(inferenceGroupContract);
-
-            server.router('users', {
-                getUser: () => ({
-                    // @ts-expect-error 418 is not a declared response of getUser.
-                    status: 418,
-                }),
-                createUser: () => ({
-                    status: 201,
-                    body: {
-                        id: '1',
-                        name: 'Ada',
-                        email: 'ada@example.com',
-                    },
-                }),
+            const getUser: Router<typeof inferenceGroupContract>['users']['getUser'] = () => ({
+                // @ts-expect-error 418 is not a declared response of getUser.
+                status: 418,
             });
+            void getUser;
         },
         'handler.pathParams': () => {
             expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<{ params: { id: string } }>();
@@ -230,7 +203,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 .toMatchTypeOf<{ auth: { user: { userId: string } } }>();
         },
         'guards.credentialByKind': () => {
-            securedServer.guard('user', ({ bearer, deny }) => {
+            localUser.guard(({ bearer, deny }) => {
                 expectTypeOf(bearer).toEqualTypeOf<{ token: string } | null>();
                 if (!bearer)
                     return deny({
@@ -244,7 +217,7 @@ test('conforms to the shared adapter type catalogue', () => {
                 };
             });
 
-            securedServer.guard('member', ({ apiKey, deny }) => {
+            localMember.guard(({ apiKey, deny }) => {
                 expectTypeOf(apiKey).toEqualTypeOf<{ in: 'header'; name: 'x-workspace-token'; value: string } | null>();
                 if (!apiKey)
                     return deny({
@@ -260,8 +233,7 @@ test('conforms to the shared adapter type catalogue', () => {
             });
         },
         'guards.returnChecked': () => {
-            securedServer.guard(
-                'user',
+            localUser.guard(
                 // @ts-expect-error the guard result must match the identity's context schema
                 ({ deny }) => {
                     void deny;
@@ -272,7 +244,7 @@ test('conforms to the shared adapter type catalogue', () => {
             );
         },
         'guards.gateOnlyVoid': () => {
-            gateServer.guard('apiConsumer', ({ apiKey, deny }) => {
+            localApiConsumer.guard(({ apiKey, deny }) => {
                 if (!apiKey)
                     return deny({
                         status: 401,
@@ -282,8 +254,7 @@ test('conforms to the shared adapter type catalogue', () => {
                     });
             });
 
-            gateServer.guard(
-                'user',
+            localUser.guard(
                 // @ts-expect-error a context-ful guard must return its context, not void
                 ({ deny }) => {
                     void deny;
@@ -291,96 +262,15 @@ test('conforms to the shared adapter type catalogue', () => {
             );
         },
         'guards.unknownIdentity': () => {
-            // @ts-expect-error 'admin' is not a declared identity
-            securedServer.guard('admin', () => ({}));
-        },
-        'guards.completeMap': () => {
-            const requireUser = securedServer.guard('user', ({ deny }) =>
-                deny({
-                    status: 401,
-                    body: {
-                        detail: 'Unauthorized',
-                    },
-                })
-            );
-
-            new KizunaServer(securedContract).api({
-                router: {
-                    api: {
-                        publicRoute: () => ({
-                            status: 200,
-                            body: {
-                                ok: true,
-                            },
-                        }),
-                        whoAmI: ({ auth }) => ({
-                            status: 200,
-                            body: {
-                                userId: auth.user.userId,
-                            },
-                        }),
-                        ownerOnly: () => ({
-                            status: 200,
-                            body: {
-                                ok: true,
-                            },
-                        }),
-                        adminOnly: () => ({
-                            status: 200,
-                            body: {
-                                ok: true,
-                            },
-                        }),
-                        both: ({ auth }) => ({
-                            status: 200,
-                            body: {
-                                userId: auth.user.userId,
-                                workspaceUserId: auth.member.workspaceUserId,
-                            },
-                        }),
-                    },
-                },
-                // @ts-expect-error the member guard is missing
-                guards: {
-                    user: requireUser,
-                },
-            });
-            // @ts-expect-error guards is required when the contract declares identities
-            new KizunaServer(securedContract).api({
-                router: {
-                    api: {
-                        publicRoute: () => ({
-                            status: 200,
-                            body: {
-                                ok: true,
-                            },
-                        }),
-                        whoAmI: ({ auth }) => ({
-                            status: 200,
-                            body: {
-                                userId: auth.user.userId,
-                            },
-                        }),
-                        ownerOnly: () => ({
-                            status: 200,
-                            body: {
-                                ok: true,
-                            },
-                        }),
-                        adminOnly: () => ({
-                            status: 200,
-                            body: {
-                                ok: true,
-                            },
-                        }),
-                        both: ({ auth }) => ({
-                            status: 200,
-                            body: {
-                                userId: auth.user.userId,
-                                workspaceUserId: auth.member.workspaceUserId,
-                            },
-                        }),
-                    },
+            k.route({
+                method: 'GET',
+                path: '/admin',
+                // @ts-expect-error 'admin' is not a declared identity
+                auth: 'admin',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
                 },
             });
         },
@@ -390,7 +280,7 @@ test('conforms to the shared adapter type catalogue', () => {
             }>();
         },
         'requestContext.guardArg': () => {
-            requestContextServer.guard('user', ({ requestContext, bearer, deny }) => {
+            localUser.guard(({ requestContext, bearer, deny }) => {
                 expectTypeOf(requestContext.analytics).toEqualTypeOf<{ sessionId: string | null }>();
                 if (!bearer)
                     return deny({
@@ -405,8 +295,7 @@ test('conforms to the shared adapter type catalogue', () => {
             });
         },
         'requestContext.resolverReturn': () => {
-            requestContextServer.requestContext(
-                'analytics',
+            localAnalytics.handler(
                 // @ts-expect-error the resolver must return the schema's shape
                 () => ({
                     wrongField: true,
@@ -414,23 +303,17 @@ test('conforms to the shared adapter type catalogue', () => {
             );
         },
         'requestContext.unknownKey': () => {
-            // @ts-expect-error 'metrics' is not a declared context key
-            requestContextServer.requestContext('metrics', () => ({}));
-        },
-        'requestContext.requiredOnApi': () => {
-            // @ts-expect-error context resolvers are required when the contract declares context
-            new KizunaServer(requestContextContract).api({
-                router: {
-                    api: {
-                        publicRoute: () => ({
-                            status: 200,
-                            body: {
-                                ok: true,
-                            },
-                        }),
+            const handler: Router<typeof requestContextContract>['api']['publicRoute'] = ({ requestContext }) => {
+                // @ts-expect-error 'metrics' is not a declared context key
+                void requestContext.metrics;
+                return {
+                    status: 200,
+                    body: {
+                        ok: true,
                     },
-                },
-            });
+                };
+            };
+            void handler;
         },
         'standalone.routeHandlerAuth': () => {
             const whoAmI: RouteHandler<typeof securedContract.routes.api.whoAmI> = ({ auth }) => {
@@ -443,34 +326,8 @@ test('conforms to the shared adapter type catalogue', () => {
                 };
             };
 
-            new KizunaServer(securedContract).router('api', {
-                publicRoute: () => ({
-                    status: 200,
-                    body: {
-                        ok: true,
-                    },
-                }),
-                whoAmI,
-                ownerOnly: () => ({
-                    status: 200,
-                    body: {
-                        ok: true,
-                    },
-                }),
-                adminOnly: () => ({
-                    status: 200,
-                    body: {
-                        ok: true,
-                    },
-                }),
-                both: ({ auth }) => ({
-                    status: 200,
-                    body: {
-                        userId: auth.user.userId,
-                        workspaceUserId: auth.member.workspaceUserId,
-                    },
-                }),
-            });
+            const secured: Router<typeof securedContract>['api']['whoAmI'] = whoAmI;
+            void secured;
         },
         'standalone.routeGroupContractArgs': () => {
             type GroupArgs = Parameters<Router<typeof pluginTypeContract.routes>['whichLabel']>[0];
@@ -492,7 +349,8 @@ test('conforms to the shared adapter type catalogue', () => {
             }>();
         },
         'plugins.absentWhenUninstalled': () => {
-            expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).not.toHaveProperty('plugins');
+            type Args = Parameters<Router<typeof inferenceContract>['getUser']>[0];
+            expectTypeOf<'plugins' extends keyof Args ? true : false>().toEqualTypeOf<false>();
         },
         'standalone.routeHandlerContext': () => {
             const publicRoute: RouteHandler<typeof requestContextContract.routes.api.publicRoute> = ({ requestContext }) => {
@@ -505,9 +363,8 @@ test('conforms to the shared adapter type catalogue', () => {
                 };
             };
 
-            new KizunaServer(requestContextContract).router('api', {
-                publicRoute,
-            });
+            const installed: Router<typeof requestContextContract>['api']['publicRoute'] = publicRoute;
+            void installed;
         },
     });
 });
@@ -517,15 +374,11 @@ test('Express Request is augmented with kizunaRoute', () => {
 });
 
 test('a request context resolver reads the Express request', () => {
-    requestContextServer.requestContext('analytics', ({ req }) => ({
+    localAnalytics.handler(({ req }) => ({
         sessionId: req.header('x-posthog-session-id') ?? null,
     }));
 });
 
 test('the Express adapter is a value carrying its handler context', () => {
     expectTypeOf<HandlerContextOf<typeof expressAdapter>>().toEqualTypeOf<ExpressHandlerContext>();
-
-    new Kizuna({
-        adapter: expressAdapter,
-    });
 });

@@ -1,14 +1,29 @@
 import { describe, expect, it, afterEach } from 'vitest';
+import { expressAdapter } from '@ts-kizuna/express';
 import { z } from 'zod';
 import express from 'express';
 import type { Server } from 'node:http';
 import { Kizuna } from '@ts-kizuna/core';
-import { KizunaServer } from '@ts-kizuna/express';
+import { defineConfig } from '@ts-kizuna/core';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';
-import { mcpPluginServer } from './server.js';
 import { assertCanonicalResource, protectedResourceMetadataPath, protectedResourceMetadataUrl } from './oauth.js';
+
+interface Config {
+    tags: typeof kTags;
+    identities: {
+        user: typeof user;
+        member: typeof member;
+    };
+    requestContext: {
+        analytics: typeof kAnalytics;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+let guardRunHook: ((requestContext: { analytics: { sessionId: string | null } }) => void) | undefined;
 
 describe('protectedResourceMetadataPath', () => {
     it('appends the endpoint path to the well-known prefix', () => {
@@ -61,122 +76,187 @@ const catalog = Kizuna.permissions({
     report: ['read'],
 });
 
-const user = Kizuna.identity.oauth2({
-    issuer: 'https://auth.example.com',
-    flows: {
-        authorizationCode: {
-            authorizationUrl: 'https://auth.example.com/oauth2/authorize',
-            tokenUrl: 'https://auth.example.com/oauth2/token',
-            scopes: {
-                'users:read': 'Read users',
-                'users:write': 'Create and update users',
-                'report:read': 'Read reports',
+const user = k.identity
+    .oauth2({
+        issuer: 'https://auth.example.com',
+        flows: {
+            authorizationCode: {
+                authorizationUrl: 'https://auth.example.com/oauth2/authorize',
+                tokenUrl: 'https://auth.example.com/oauth2/token',
+                scopes: {
+                    'users:read': 'Read users',
+                    'users:write': 'Create and update users',
+                    'report:read': 'Read reports',
+                },
             },
         },
-    },
-    context: z.object({
-        userId: z.string(),
-    }),
-    roles: Kizuna.roles(catalog, {
-        employee: {
-            users: ['read', 'write'],
-        },
-        admin: 'all',
-    }),
-});
+        context: z.object({
+            userId: z.string(),
+        }),
+        roles: Kizuna.roles(catalog, {
+            employee: {
+                users: ['read', 'write'],
+            },
+            admin: 'all',
+        }),
+    })
+    .guard(({ oauth2, deny, requestContext }) => {
+        guardRunHook?.(requestContext);
+        const session = oauth2 ? TOKENS[oauth2.token] : undefined;
+        if (!session)
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Invalid or expired token',
+                },
+            });
+        const tokenScopes = session.scope.split(' ');
+        return {
+            userId: session.userId,
+            role: session.role,
+            permissions: catalog.names.filter((name) => tokenScopes.includes(name)),
+        };
+    });
 
-const member = Kizuna.identity.apiKey({
-    name: 'x-api-key',
-    in: 'header',
-});
+const member = k.identity
+    .apiKey({
+        name: 'x-api-key',
+        in: 'header',
+    })
+    .guard(({ apiKey, deny }) => {
+        if (apiKey?.value !== 'workspace-secret')
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'Forbidden',
+                },
+            });
+    });
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+const kTags = k.tags({
+    api: 'API',
+});
+const kAnalytics = k
+    .requestContext({
+        headers: z.object({
+            'x-session-id': z.string().optional(),
+        }),
+        context: z.object({
+            sessionId: z.string().nullable(),
+        }),
+    })
+    .handler(({ headers }) => ({
+        sessionId: headers['x-session-id'] ?? null,
+    }));
+const config = {
+    tags: kTags,
     identities: {
         user,
         member,
     },
     requestContext: {
-        analytics: Kizuna.requestContext({
-            headers: z.object({
-                'x-session-id': z.string().optional(),
-            }),
-            context: z.object({
-                sessionId: z.string().nullable(),
-            }),
-        }),
+        analytics: kAnalytics,
     },
-});
+};
 
 const apiRoutes = k.routes('api', {
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        auth: 'user',
-        summary: 'Get a user by id',
-        responses: {
-            200: z.object({
-                id: z.string(),
-                viewer: z.string(),
-            }),
-        },
-    },
-    createUser: {
-        method: 'POST',
-        auth: {
-            identity: 'user',
-            requires: {
-                users: ['write'],
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            auth: 'user',
+            summary: 'Get a user by id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                    viewer: z.string(),
+                }),
             },
-        },
-        path: '/users',
-        summary: 'Create a user',
-        body: z.object({
-            name: z.string(),
-        }),
-        responses: {
-            201: z.object({
-                id: z.string(),
-            }),
-        },
-    },
-    adminReport: {
-        method: 'GET',
-        auth: {
-            identity: 'user',
-            requires: {
-                report: ['read'],
+        })
+        .handler(({ params, auth }) => ({
+            status: 200,
+            body: {
+                id: params.id,
+                viewer: auth.user.userId,
             },
-        },
-        path: '/report',
-        summary: 'Admin report',
-        responses: {
-            200: z.object({
-                total: z.number(),
+        })),
+    createUser: k
+        .route({
+            method: 'POST',
+            auth: {
+                identity: 'user',
+                requires: {
+                    users: ['write'],
+                },
+            },
+            path: '/users',
+            summary: 'Create a user',
+            body: z.object({
+                name: z.string(),
             }),
-        },
-    },
-    memberFacts: {
-        method: 'GET',
-        path: '/member-facts',
-        auth: 'member',
-        summary: 'Facts for the workspace service',
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 201,
+            body: {
+                id: 'u-new',
+            },
+        })),
+    adminReport: k
+        .route({
+            method: 'GET',
+            auth: {
+                identity: 'user',
+                requires: {
+                    report: ['read'],
+                },
+            },
+            path: '/report',
+            summary: 'Admin report',
+            responses: {
+                200: z.object({
+                    total: z.number(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                total: 3,
+            },
+        })),
+    memberFacts: k
+        .route({
+            method: 'GET',
+            path: '/member-facts',
+            auth: 'member',
+            summary: 'Facts for the workspace service',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        })),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    adapter: expressAdapter,
+    ...config,
     routes: {
         api: apiRoutes,
     },
-    plugins: {
-        mcp: mcpPlugin({
+    plugins: [
+        mcpPlugin({
             name: 'OAuth API',
             options: {
                 publishRoutes: {
@@ -188,8 +268,8 @@ const contract = k.contract({
                 scheme: 'user',
             },
         }),
-    },
-});
+    ],
+}).api;
 
 const TOKENS: Record<string, { userId: string; role: 'employee' | 'admin'; scope: string }> = {
     reader: {
@@ -210,77 +290,8 @@ const TOKENS: Record<string, { userId: string; role: 'employee' | 'admin'; scope
 };
 
 const makeApi = (onGuardRun?: (requestContext: { analytics: { sessionId: string | null } }) => void) => {
-    const server = new KizunaServer(contract);
-    const captureAnalytics = server.requestContext('analytics', ({ headers }) => ({
-        sessionId: headers['x-session-id'] ?? null,
-    }));
-    const requireUser = server.guard('user', ({ oauth2, deny, requestContext }) => {
-        onGuardRun?.(requestContext);
-        const session = oauth2 ? TOKENS[oauth2.token] : undefined;
-        if (!session)
-            return deny({
-                status: 401,
-                body: {
-                    detail: 'Invalid or expired token',
-                },
-            });
-        const tokenScopes = session.scope.split(' ');
-        return {
-            userId: session.userId,
-            role: session.role,
-            permissions: catalog.names.filter((name) => tokenScopes.includes(name)),
-        };
-    });
-    const requireMember = server.guard('member', ({ apiKey, deny }) => {
-        if (apiKey?.value !== 'workspace-secret')
-            return deny({
-                status: 403,
-                body: {
-                    detail: 'Forbidden',
-                },
-            });
-    });
-    return server.api({
-        guards: {
-            user: requireUser,
-            member: requireMember,
-        },
-        requestContext: {
-            analytics: captureAnalytics,
-        },
-        router: {
-            api: {
-                getUser: ({ params, auth }) => ({
-                    status: 200,
-                    body: {
-                        id: params.id,
-                        viewer: auth.user.userId,
-                    },
-                }),
-                createUser: () => ({
-                    status: 201,
-                    body: {
-                        id: 'u-new',
-                    },
-                }),
-                adminReport: () => ({
-                    status: 200,
-                    body: {
-                        total: 3,
-                    },
-                }),
-                memberFacts: () => ({
-                    status: 200,
-                    body: {
-                        ok: true,
-                    },
-                }),
-            },
-        },
-        plugins: {
-            mcp: mcpPluginServer(),
-        },
-    });
+    guardRunHook = onGuardRun;
+    return contract;
 };
 
 describe('mcpPlugin: oauth', () => {
@@ -516,7 +527,7 @@ describe('mcpPlugin: oauth declaration', () => {
         ).toEqual(['endpoint', 'protectedResourceMetadata']);
     });
 
-    it('accepts an invalid resource at declaration time, so a contract loads without server env', () => {
+    it('names the plugin without checking the resource, so a declaration alone never throws', () => {
         expect(() =>
             mcpPlugin({
                 oauth: {
@@ -527,70 +538,22 @@ describe('mcpPlugin: oauth declaration', () => {
         ).not.toThrow();
     });
 
-    it('rejects an invalid resource when the server half serves it', () => {
-        const brokenContract = k.contract({
-            routes: {
-                api: apiRoutes,
-            },
-            plugins: {
-                mcp: mcpPlugin({
-                    oauth: {
-                        resource: '/mcp',
-                        scheme: 'user',
-                    },
-                }),
-            },
-        });
-        const server = new KizunaServer(brokenContract);
-        const requireUser = server.guard('user', () => ({
-            userId: 'u',
-            role: 'employee',
-        }));
-        const requireMember = server.guard('member', () => undefined);
-        const captureAnalytics = server.requestContext('analytics', () => ({
-            sessionId: null,
-        }));
+    it('rejects an invalid resource when the config assembles it', () => {
         expect(() =>
-            server.api({
-                guards: {
-                    user: requireUser,
-                    member: requireMember,
+            defineConfig({
+                ...config,
+                adapter: expressAdapter,
+                routes: {
+                    api: apiRoutes,
                 },
-                requestContext: {
-                    analytics: captureAnalytics,
-                },
-                router: {
-                    api: {
-                        getUser: () => ({
-                            status: 200,
-                            body: {
-                                id: '1',
-                                viewer: 'u',
-                            },
-                        }),
-                        createUser: () => ({
-                            status: 201,
-                            body: {
-                                id: '1',
-                            },
-                        }),
-                        adminReport: () => ({
-                            status: 200,
-                            body: {
-                                total: 0,
-                            },
-                        }),
-                        memberFacts: () => ({
-                            status: 200,
-                            body: {
-                                ok: true,
-                            },
-                        }),
-                    },
-                },
-                plugins: {
-                    mcp: mcpPluginServer(),
-                },
+                plugins: [
+                    mcpPlugin({
+                        oauth: {
+                            resource: '/mcp',
+                            scheme: 'user',
+                        },
+                    }),
+                ],
             })
         ).toThrow('not an absolute URI');
     });

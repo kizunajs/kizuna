@@ -1,18 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { renderOpenApi } from './generator.js';
 
-const scheduler = Kizuna.identity.bearer({});
+interface Config {
+    identities: {
+        scheduler: typeof scheduler;
+    };
+}
 
-const k = new Kizuna({
+const k = new Kizuna<Config>();
+
+const scheduler = k.identity.bearer({});
+
+const config = {
     identities: {
         scheduler,
     },
-});
+};
 
 const routes = k.routes({
-    listUsers: {
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         auth: false,
@@ -20,29 +29,30 @@ const routes = k.routes({
         responses: {
             200: z.array(z.string()),
         },
-    },
+    }),
 });
 
 const jobs = k.jobs('scheduler', {
-    sendDigests: {
+    sendDigests: k.job({
         schedule: '0 5 * * *',
         summary: 'Send daily digest emails',
         result: z.object({
             sent: z.int(),
         }),
-    },
-    reconcile: {
+    }),
+    reconcile: k.job({
         schedule: {
             cron: '*/15 * * * *',
             timezone: 'Europe/Oslo',
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes,
     jobs,
-}) as unknown as Contract;
+}).api as unknown as Contract;
 
 const generate = () =>
     renderOpenApi(contract, {

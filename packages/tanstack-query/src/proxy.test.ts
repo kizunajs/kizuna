@@ -2,14 +2,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { QueryClient, skipToken } from '@tanstack/query-core';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { KizunaTanstackQuery } from './proxy.js';
 import { NonStreamResponseError, UndeclaredResponseError, isNonStreamResponseError, isUndeclaredResponseError } from './errors.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        users: 'Users',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    users: 'Users',
 });
+const config = {
+    tags: kTags,
+};
 
 const UserSchema = z.object({
     id: z.string(),
@@ -17,7 +25,7 @@ const UserSchema = z.object({
 });
 
 const routes = k.routes('users', {
-    listUsers: {
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         responses: {
@@ -25,8 +33,8 @@ const routes = k.routes('users', {
                 users: z.array(UserSchema),
             }),
         },
-    },
-    getUser: {
+    }),
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         auth: 'user',
@@ -36,8 +44,8 @@ const routes = k.routes('users', {
                 title: z.string(),
             }),
         },
-    },
-    searchUsers: {
+    }),
+    searchUsers: k.route({
         method: 'GET',
         path: '/users/search',
         query: z.object({
@@ -50,8 +58,8 @@ const routes = k.routes('users', {
                 nextCursor: z.number().nullable(),
             }),
         },
-    },
-    createUser: {
+    }),
+    createUser: k.route({
         method: 'POST',
         path: '/users',
         body: z.object({
@@ -60,21 +68,22 @@ const routes = k.routes('users', {
         responses: {
             201: UserSchema,
         },
-    },
-    checkUser: {
+    }),
+    checkUser: k.route({
         method: 'HEAD',
         path: '/users/:id',
         responses: {
             200: z.object({}),
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: {
         users: routes,
     },
-});
+}).api;
 
 const ok = { status: 200, body: { id: '1', name: 'Ada' }, headers: {} };
 
@@ -214,29 +223,36 @@ describe('declared statuses', () => {
     });
 
     it('treats the 401 the auth map added as declared, on a route that never declared it', async () => {
-        const guardedK = new Kizuna({
-            identities: {
-                user: Kizuna.identity.bearer({
-                    context: z.object({
-                        userId: z.string(),
-                    }),
-                }),
-            },
+        const guardedKUser = k.identity.bearer({
+            context: z.object({
+                userId: z.string(),
+            }),
         });
-        const guardedContract = guardedK.contract({
+        const guardedKConfig = {
+            identities: {
+                user: guardedKUser,
+            },
+        };
+        const guardedK = new Kizuna<{
+            identities: {
+                user: typeof guardedKUser;
+            };
+        }>();
+        const guardedContract = defineConfig({
+            ...guardedKConfig,
             routes: {
                 users: guardedK.routes({
-                    getUser: {
+                    getUser: guardedK.route({
                         method: 'GET',
                         path: '/users/:id',
                         auth: 'user',
                         responses: {
                             200: UserSchema,
                         },
-                    },
+                    }),
                 }),
             },
-        });
+        }).api;
         const api = new KizunaTanstackQuery(guardedContract, {
             users: {
                 getUser: vi.fn().mockResolvedValue({ status: 401, body: { detail: 'Unauthorized' }, headers: {} }),
@@ -416,19 +432,20 @@ describe('passthrough', () => {
 describe('name collisions', () => {
     it('lets a route named like a factory win over it', () => {
         const collidingRoutes = k.routes('users', {
-            key: {
+            key: k.route({
                 method: 'GET',
                 path: '/key',
                 responses: {
                     200: z.object({ value: z.string() }),
                 },
-            },
+            }),
         });
-        const collidingContract = k.contract({
+        const collidingContract = defineConfig({
+            ...config,
             routes: {
                 users: collidingRoutes,
             },
-        });
+        }).api;
         const client = { users: { key: vi.fn().mockResolvedValue(ok) } };
         const api = new KizunaTanstackQuery(collidingContract, client as any);
 
@@ -438,7 +455,7 @@ describe('name collisions', () => {
 
 describe('streams', () => {
     const streamRoutes = k.routes('users', {
-        reply: {
+        reply: k.route({
             method: 'POST',
             path: '/reply',
             body: z.object({
@@ -456,13 +473,14 @@ describe('streams', () => {
                     detail: z.string(),
                 }),
             },
-        },
+        }),
     });
-    const streamContract = k.contract({
+    const streamContract = defineConfig({
+        ...config,
         routes: {
             assistant: streamRoutes,
         },
-    });
+    }).api;
     const messages = [
         { event: 'delta', data: { text: 'a' } },
         { event: 'delta', data: { text: 'b' } },

@@ -8,10 +8,10 @@ const LocalQuery = z.object({
 });
 
 export const routes = k.routes({
-    a: {
+    a: k.route({
         method: 'GET',
         path: '/a',
         query: LocalQuery,
         responses: {},
-    },
+    }),
 });

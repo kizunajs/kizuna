@@ -5,7 +5,11 @@ import { createJobTransport, type JobMessage, type JobWorkerContext } from './jo
 import { JOBS_META } from './adapter.js';
 import { startJobWorker } from './start-job-worker.js';
 
-const k = new Kizuna({});
+interface Config {}
+
+const k = new Kizuna<Config>();
+
+const config = {};
 
 const jobs = k.jobs({
     cleanup: {},

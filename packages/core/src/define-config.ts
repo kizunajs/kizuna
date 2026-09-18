@@ -19,6 +19,8 @@ import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { AnyAdapter, HandlerContextOf } from './adapter.js';
 import { permissionNames } from './permissions.js';
+import { GUARD } from './identity-builder.js';
+import { RESOLVER } from './request-context-builder.js';
 import { buildApi, type Api } from './api.js';
 import type { ClientTarget } from './config.js';
 
@@ -136,11 +138,11 @@ const resolveRouteAuth = (
  * declared. A declaration without one is left out, so what is missing surfaces
  * where it is used rather than as an empty function.
  */
-const handlersOf = (declarations: Record<string, unknown> | undefined, key: 'guard' | 'handler'): Record<string, unknown> | undefined => {
+const handlersOf = (declarations: Record<string, unknown> | undefined, key: string | symbol): Record<string, unknown> | undefined => {
     if (declarations === undefined) return undefined;
     const handlers: Record<string, unknown> = {};
     for (const [name, declaration] of Object.entries(declarations)) {
-        const handler = (declaration as Record<string, unknown> | undefined)?.[key];
+        const handler = (declaration as Record<string | symbol, unknown> | undefined)?.[key];
         if (handler !== undefined) handlers[name] = handler;
     }
     return handlers;
@@ -354,11 +356,19 @@ export const defineConfig = <
         jobsConfig: options.jobsConfig,
     }) as Contract;
 
+    const guards = handlersOf(identities, GUARD);
+    if (options.adapter !== undefined) {
+        for (const name of Object.keys(identities ?? {})) {
+            if (guards?.[name] !== undefined) continue;
+            throw new Error(`Identity '${name}' has no guard. Add \`.guard(...)\` to its declaration, so something authenticates it.`);
+        }
+    }
+
     const api = buildApi(
         contract,
         {
-            guards: handlersOf(identities, 'guard'),
-            requestContext: handlersOf(options.requestContext as Record<string, unknown> | undefined, 'handler'),
+            guards,
+            requestContext: handlersOf(options.requestContext as Record<string, unknown> | undefined, RESOLVER),
             jobTransport: options.jobTransport,
             onJobError: options.onJobError,
         },

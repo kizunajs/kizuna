@@ -1,17 +1,55 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type ProblemDetails, type ValidationError } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { KizunaClient } from './client.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+interface OptionalCtxKConfig {
+    requestContext: {
+        analytics: typeof analyticsContext;
+    };
+}
+
+interface RequiredCtxKConfig {
+    requestContext: {
+        analytics: typeof analyticsContext;
+        tenant: typeof tenantContext;
+    };
+}
+
+interface GuardedKConfig {
+    identities: {
+        user: typeof guardedKUser;
+    };
+}
+
+interface CodedKConfig {
+    identities: {
+        user: typeof codedKUser;
+    };
+    guardSchema: typeof codedKGuardSchema;
+}
+
+const k = new Kizuna<Config>();
+const optionalCtxK = new Kizuna<OptionalCtxKConfig>();
+const requiredCtxK = new Kizuna<RequiredCtxKConfig>();
+const guardedK = new Kizuna<GuardedKConfig>();
+const codedK = new Kizuna<CodedKConfig>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const contractRoutes = k.routes('api', {
-    getUser: {
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
@@ -28,8 +66,8 @@ const contractRoutes = k.routes('api', {
                 message: z.string(),
             }),
         },
-    },
-    createUser: {
+    }),
+    createUser: k.route({
         method: 'POST',
         path: '/users',
         body: z.object({
@@ -43,8 +81,8 @@ const contractRoutes = k.routes('api', {
                 email: z.string(),
             }),
         },
-    },
-    listUsers: {
+    }),
+    listUsers: k.route({
         method: 'GET',
         path: '/users',
         query: z.object({
@@ -55,8 +93,8 @@ const contractRoutes = k.routes('api', {
                 users: z.array(z.string()),
             }),
         },
-    },
-    typedQuery: {
+    }),
+    typedQuery: k.route({
         method: 'GET',
         path: '/typed',
         query: z.object({
@@ -71,8 +109,8 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    nestedTyped: {
+    }),
+    nestedTyped: k.route({
         method: 'POST',
         path: '/nested',
         body: z.object({
@@ -94,8 +132,8 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    discriminatedTyped: {
+    }),
+    discriminatedTyped: k.route({
         method: 'POST',
         path: '/discriminated',
         body: z.discriminatedUnion('kind', [
@@ -113,8 +151,8 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    arrayOfDiscriminatedTyped: {
+    }),
+    arrayOfDiscriminatedTyped: k.route({
         method: 'POST',
         path: '/array-of-discriminated',
         body: z.object({
@@ -137,8 +175,8 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    nestedDiscriminatedTyped: {
+    }),
+    nestedDiscriminatedTyped: k.route({
         method: 'POST',
         path: '/nested-discriminated',
         body: z.object({
@@ -160,8 +198,8 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    optionalHeaders: {
+    }),
+    optionalHeaders: k.route({
         method: 'GET',
         path: '/optional-headers',
         headers: z.object({
@@ -172,8 +210,8 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    requiredHeaders: {
+    }),
+    requiredHeaders: k.route({
         method: 'GET',
         path: '/required-headers',
         headers: z.object({
@@ -184,15 +222,16 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: contractRoutes,
-});
+}).api;
 
 const voidBodyContractRoutes = k.routes('api', {
-    deleteItem: {
+    deleteItem: k.route({
         method: 'DELETE',
         path: '/items/:id',
         body: z.void(),
@@ -201,12 +240,13 @@ const voidBodyContractRoutes = k.routes('api', {
                 success: z.boolean(),
             }),
         },
-    },
+    }),
 });
 
-const voidBodyContract = k.contract({
+const voidBodyContract = defineConfig({
+    ...config,
     routes: voidBodyContractRoutes,
-});
+}).api;
 
 const voidBodyClient = new KizunaClient(voidBodyContract, {
     baseUrl: 'http://localhost:3000',
@@ -225,7 +265,7 @@ test('route with body: z.void() rejects a non-void body', () => {
 
 const nestedContractRoutes = k.routes('api', {
     users: {
-        getUser: {
+        getUser: k.route({
             method: 'GET',
             path: '/users/:id',
             responses: {
@@ -237,8 +277,8 @@ const nestedContractRoutes = k.routes('api', {
                     message: z.string(),
                 }),
             },
-        },
-        createUser: {
+        }),
+        createUser: k.route({
             method: 'POST',
             path: '/users',
             body: z.object({
@@ -249,10 +289,10 @@ const nestedContractRoutes = k.routes('api', {
                     id: z.string(),
                 }),
             },
-        },
+        }),
     },
     posts: {
-        listPosts: {
+        listPosts: k.route({
             method: 'GET',
             path: '/posts',
             responses: {
@@ -260,13 +300,14 @@ const nestedContractRoutes = k.routes('api', {
                     posts: z.array(z.string()),
                 }),
             },
-        },
+        }),
     },
 });
 
-const nestedContract = k.contract({
+const nestedContract = defineConfig({
+    ...config,
     routes: nestedContractRoutes,
-});
+}).api;
 
 const nestedClient = new KizunaClient(nestedContract, {
     baseUrl: 'http://localhost:3000',
@@ -576,7 +617,7 @@ test('route without body or query does not include ValidationError', async () =>
 const UserIdSchema = z.string().brand<'UserId'>();
 
 const pathParamsContractRoutes = k.routes('api', {
-    getUserEvents: {
+    getUserEvents: k.route({
         method: 'GET',
         path: '/users/:userId/events/:eventId',
         pathParams: z.object({
@@ -588,8 +629,8 @@ const pathParamsContractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    listEventsByYear: {
+    }),
+    listEventsByYear: k.route({
         method: 'GET',
         path: '/events/:year',
         pathParams: z.object({
@@ -601,12 +642,13 @@ const pathParamsContractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
+    }),
 });
 
-const pathParamsContract = k.contract({
+const pathParamsContract = defineConfig({
+    ...config,
     routes: pathParamsContractRoutes,
-});
+}).api;
 
 const pathParamsClient = new KizunaClient(pathParamsContract, {
     baseUrl: 'http://localhost:3000',
@@ -648,7 +690,7 @@ test('routes without a pathParams schema keep template-derived params', () => {
     expectTypeOf<Parameters<typeof client.getUser>[0]['params']>().toEqualTypeOf<{ id: string }>();
 });
 
-const analyticsContext = Kizuna.requestContext({
+const analyticsContext = k.requestContext({
     headers: z.object({
         'x-session-id': z.string().optional(),
     }),
@@ -657,7 +699,7 @@ const analyticsContext = Kizuna.requestContext({
     }),
 });
 
-const tenantContext = Kizuna.requestContext({
+const tenantContext = k.requestContext({
     headers: z.object({
         'x-tenant': z.string(),
     }),
@@ -666,16 +708,17 @@ const tenantContext = Kizuna.requestContext({
     }),
 });
 
-const optionalCtxK = new Kizuna({
+const optionalCtxKConfig = {
     requestContext: {
         analytics: analyticsContext,
     },
-});
+};
 
-const optionalCtxContract = optionalCtxK.contract({
+const optionalCtxContract = defineConfig({
+    ...optionalCtxKConfig,
     routes: {
         users: optionalCtxK.routes({
-            listUsers: {
+            listUsers: optionalCtxK.route({
                 method: 'GET',
                 path: '/users',
                 responses: {
@@ -683,22 +726,23 @@ const optionalCtxContract = optionalCtxK.contract({
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         }),
     },
-});
+}).api;
 
-const requiredCtxK = new Kizuna({
+const requiredCtxKConfig = {
     requestContext: {
         analytics: analyticsContext,
         tenant: tenantContext,
     },
-});
+};
 
-const requiredCtxContract = requiredCtxK.contract({
+const requiredCtxContract = defineConfig({
+    ...requiredCtxKConfig,
     routes: {
         users: requiredCtxK.routes({
-            listUsers: {
+            listUsers: requiredCtxK.route({
                 method: 'GET',
                 path: '/users',
                 responses: {
@@ -706,10 +750,10 @@ const requiredCtxContract = requiredCtxK.contract({
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         }),
     },
-});
+}).api;
 
 test('requestContext config is optional when every declared header is optional', () => {
     new KizunaClient(optionalCtxContract, {
@@ -752,7 +796,7 @@ test('requestContext config is required when a declared header is required', () 
 });
 
 const activityRoutes = k.routes('api', {
-    getActivity: {
+    getActivity: k.route({
         method: 'GET',
         path: '/activity',
         responses: {
@@ -776,13 +820,14 @@ const activityRoutes = k.routes('api', {
                 ]),
             }),
         },
-    },
+    }),
 });
 
 const activityClient = new KizunaClient(
-    k.contract({
+    defineConfig({
+        ...config,
         routes: activityRoutes,
-    }),
+    }).api,
     {
         baseUrl: 'http://localhost:3000',
     }
@@ -797,7 +842,7 @@ test('a union response built from named models is the exact union, not any', asy
 
 test('a streamed status hands back an async iterable of typed messages', () => {
     const streamRoutes = k.routes('api', {
-        reply: {
+        reply: k.route({
             method: 'POST',
             path: '/reply',
             body: z.object({
@@ -816,8 +861,8 @@ test('a streamed status hands back an async iterable of typed messages', () => {
                 },
                 404: ProblemDetailsSchema,
             },
-        },
-        lines: {
+        }),
+        lines: k.route({
             method: 'GET',
             path: '/lines',
             responses: {
@@ -826,12 +871,13 @@ test('a streamed status hands back an async iterable of typed messages', () => {
                     contentType: 'text/plain',
                 },
             },
-        },
+        }),
     });
     const streamClient = new KizunaClient(
-        k.contract({
+        defineConfig({
+            ...config,
             routes: streamRoutes,
-        }),
+        }).api,
         {
             baseUrl: '',
         }
@@ -861,18 +907,19 @@ const MissingRelationSchema = ProblemDetailsSchema.extend({
     missingRelation: z.string(),
 });
 
-const guardedK = new Kizuna({
-    identities: {
-        user: Kizuna.identity.bearer({
-            context: z.object({
-                userId: z.string(),
-            }),
-        }),
-    },
+const guardedKUser = k.identity.bearer({
+    context: z.object({
+        userId: z.string(),
+    }),
 });
+const guardedKConfig = {
+    identities: {
+        user: guardedKUser,
+    },
+};
 
 const guardedRoutes = guardedK.routes({
-    whoAmI: {
+    whoAmI: guardedK.route({
         method: 'GET',
         path: '/who-am-i',
         auth: 'user',
@@ -881,8 +928,8 @@ const guardedRoutes = guardedK.routes({
                 userId: z.string(),
             }),
         },
-    },
-    declaresIts403: {
+    }),
+    declaresIts403: guardedK.route({
         method: 'GET',
         path: '/declares-its-403',
         auth: 'user',
@@ -892,8 +939,8 @@ const guardedRoutes = guardedK.routes({
             }),
             403: MissingRelationSchema,
         },
-    },
-    health: {
+    }),
+    health: guardedK.route({
         method: 'GET',
         path: '/health',
         auth: false,
@@ -902,14 +949,15 @@ const guardedRoutes = guardedK.routes({
                 ok: z.boolean(),
             }),
         },
-    },
+    }),
 });
 
-const guardedContract = guardedK.contract({
+const guardedContract = defineConfig({
+    ...guardedKConfig,
     routes: {
         api: guardedRoutes,
     },
-});
+}).api;
 
 const guardedClient = new KizunaClient(guardedContract, {
     baseUrl: 'http://localhost',
@@ -941,23 +989,26 @@ test('a public route gains neither', async () => {
     expectTypeOf(response.status).toEqualTypeOf<200>();
 });
 
-const codedK = new Kizuna({
-    identities: {
-        user: Kizuna.identity.bearer({
-            context: z.object({
-                userId: z.string(),
-            }),
-        }),
-    },
-    guardSchema: ProblemDetailsSchema.extend({
-        code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
+const codedKUser = k.identity.bearer({
+    context: z.object({
+        userId: z.string(),
     }),
 });
+const codedKGuardSchema = ProblemDetailsSchema.extend({
+    code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
+});
+const codedKConfig = {
+    identities: {
+        user: codedKUser,
+    },
+    guardSchema: codedKGuardSchema,
+};
 
-const codedContract = codedK.contract({
+const codedContract = defineConfig({
+    ...codedKConfig,
     routes: {
         api: codedK.routes({
-            whoAmI: {
+            whoAmI: codedK.route({
                 method: 'GET',
                 path: '/who-am-i',
                 auth: 'user',
@@ -966,10 +1017,10 @@ const codedContract = codedK.contract({
                         userId: z.string(),
                     }),
                 },
-            },
+            }),
         }),
     },
-});
+}).api;
 
 const codedClient = new KizunaClient(codedContract, {
     baseUrl: 'http://localhost',

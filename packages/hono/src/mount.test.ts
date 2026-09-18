@@ -2,18 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { Kizuna } from '@ts-kizuna/core';
 import { honoAdapter } from './server.js';
-import { userContract, resetUsers } from '../../core/src/adapter-testing/fixtures.js';
+import { userInput, resetUsers } from '../../core/src/adapter-testing/fixtures.js';
+import { defineConfig } from '@ts-kizuna/core';
 
-const k = new Kizuna({
+interface Config {
+    adapter: typeof honoAdapter;
+}
+
+const k = new Kizuna<Config>();
+
+const config = {
     adapter: honoAdapter,
-});
+};
 
 describe('api.mount', () => {
     it('serves routes', async () => {
         resetUsers();
-        const api = k.api({
-            contract: userContract,
-        });
+        const api = defineConfig({ ...userInput, adapter: honoAdapter }).api;
         const app = new Hono();
         api.mount(app);
         await app.request('/users', {

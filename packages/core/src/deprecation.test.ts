@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { deprecationHeaders } from './deprecation.js';
 import type { RouteDefinition } from './types.js';
 
@@ -152,13 +153,13 @@ describe('k.contract date validation', () => {
     const contractWith = (overrides: Partial<RouteDefinition>) => {
         const k = new Kizuna();
         return () =>
-            k.contract({
+            defineConfig({
                 routes: {
                     users: {
                         deleteUser: route(overrides),
                     },
                 },
-            });
+            }).api;
     };
 
     test('accepts ISO 8601 timestamps', () => {

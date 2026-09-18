@@ -37,22 +37,27 @@ export type GuardFor<Id, HandlerContext, RequestContext, GuardSchema> = (
     ? void | GuardDenial | Promise<void | GuardDenial>
     : GuardReturn<Id> | GuardDenial | Promise<GuardReturn<Id> | GuardDenial>;
 
+// Registry-global: a dual ESM/CJS install would otherwise hold two different symbols.
+export const GUARD: unique symbol = Symbol.for('ts-kizuna.guard') as symbol as typeof GUARD;
+
 /**
- * An identity and the guard that authenticates it.
+ * An identity and the guard that authenticates it. The guard is stored without
+ * its argument types, so a config that lists identities never depends on what a
+ * guard reads back off that config.
  */
 export type IdentityWithGuard<Id> = Id & {
-    /**
-     * Stored without its argument types, so a config that lists identities
-     * never depends on what a guard reads back off that config.
-     */
-    guard: (args: never) => unknown;
+    readonly [GUARD]: (args: never) => unknown;
 };
 
 /**
- * What one of the `k.identity` builders returns: the identity, waiting for its
- * guard.
+ * What one of the `k.identity` builders returns: the identity itself, and the
+ * `guard` that authenticates it. An identity nothing serves, one a generator or
+ * a client reads, needs no guard.
  */
-export interface IdentityBuilder<Id, HandlerContext, RequestContext, GuardSchema> {
+export type IdentityBuilder<Id, HandlerContext, RequestContext, GuardSchema> = Id &
+    IdentityGuardStep<Id, HandlerContext, RequestContext, GuardSchema>;
+
+interface IdentityGuardStep<Id, HandlerContext, RequestContext, GuardSchema> {
     /**
      * What runs before the handler of every route whose `auth` names this
      * identity.
@@ -144,10 +149,11 @@ export interface IdentityFactories<HandlerContext, RequestContext, GuardSchema> 
     ): IdentityBuilder<Identity<ContextSchema, RolesType, NoCredential, ParamsSchema>, HandlerContext, RequestContext, GuardSchema>;
 }
 
-const buildable = (identity: unknown) => ({
+const buildable = (identity: object) => ({
+    ...identity,
     guard: (fn: unknown) => ({
-        ...(identity as object),
-        guard: fn,
+        ...identity,
+        [GUARD]: fn,
         [DECLARATION]: 'identity' as const,
     }),
 });

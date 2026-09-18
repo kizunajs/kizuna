@@ -4,14 +4,21 @@ import { ProblemDetailsSchema } from './error-response.js';
 import type { RouteHandler, HandlerArgs, HandlerReturn, Router } from './handler-pipeline.js';
 import { Kizuna } from './kizuna.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const contractRoutes = k.routes('api', {
-    getUser: {
+    getUser: k.route({
         method: 'GET',
         path: '/users/:id',
         responses: {
@@ -21,8 +28,8 @@ const contractRoutes = k.routes('api', {
             }),
             404: ProblemDetailsSchema,
         },
-    },
-    createUser: {
+    }),
+    createUser: k.route({
         method: 'POST',
         path: '/users',
         body: z.object({
@@ -37,8 +44,8 @@ const contractRoutes = k.routes('api', {
                 conflictingId: z.string(),
             }),
         },
-    },
-    deleteUser: {
+    }),
+    deleteUser: k.route({
         method: 'DELETE',
         path: '/users/:id',
         responses: {
@@ -47,7 +54,7 @@ const contractRoutes = k.routes('api', {
             }),
             404: ProblemDetailsSchema,
         },
-    },
+    }),
 });
 
 type GetUserRoute = (typeof contractRoutes)['getUser'];
@@ -71,7 +78,7 @@ test('HandlerReturn rejects body that does not match the status', () => {
 
 test('error statuses (4xx/5xx) require a Problem Details schema: non-envelope shapes resolve to never', () => {
     const customErrorContractRoutes = k.routes('api', {
-        getThing: {
+        getThing: k.route({
             method: 'GET',
             path: '/things/:id',
             responses: {
@@ -85,7 +92,7 @@ test('error statuses (4xx/5xx) require a Problem Details schema: non-envelope sh
                     oops: z.string(),
                 }),
             },
-        },
+        }),
     });
 
     type Route = (typeof customErrorContractRoutes)['getThing'];

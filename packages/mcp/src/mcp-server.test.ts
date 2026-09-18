@@ -1,20 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
 import { assembleApi, TOOLS_META, type GuardDeny } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
 import { buildInstructions, buildToolDefinitions, createMcpServer } from './mcp-server.js';
 
-const k = new Kizuna({
-    tags: Kizuna.tags({
-        api: 'API',
-    }),
+interface Config {
+    tags: typeof kTags;
+}
+
+const k = new Kizuna<Config>();
+
+const kTags = k.tags({
+    api: 'API',
 });
+const config = {
+    tags: kTags,
+};
 
 const contractRoutes = k.routes('api', {
     users: {
-        listUsers: {
+        listUsers: k.route({
             method: 'GET',
             path: '/users',
             summary: 'List users with pagination',
@@ -32,8 +40,8 @@ const contractRoutes = k.routes('api', {
                     ),
                 }),
             },
-        },
-        getUser: {
+        }),
+        getUser: k.route({
             method: 'GET',
             path: '/users/:id',
             summary: 'Get a user by id',
@@ -46,8 +54,8 @@ const contractRoutes = k.routes('api', {
                     message: z.string(),
                 }),
             },
-        },
-        createUser: {
+        }),
+        createUser: k.route({
             method: 'POST',
             path: '/users',
             summary: 'Create a user',
@@ -62,9 +70,9 @@ const contractRoutes = k.routes('api', {
                     email: z.string(),
                 }),
             },
-        },
+        }),
     },
-    health: {
+    health: k.route({
         method: 'GET',
         path: '/health',
         responses: {
@@ -72,8 +80,8 @@ const contractRoutes = k.routes('api', {
                 ok: z.boolean(),
             }),
         },
-    },
-    uploadAvatar: {
+    }),
+    uploadAvatar: k.route({
         method: 'POST',
         path: '/avatar',
         contentType: 'multipart/form-data',
@@ -85,16 +93,16 @@ const contractRoutes = k.routes('api', {
                 size: z.number(),
             }),
         },
-    },
-    pingUser: {
+    }),
+    pingUser: k.route({
         method: 'POST',
         path: '/users/:id/ping',
         body: z.void(),
         responses: {
             204: z.void(),
         },
-    },
-    deleteUser: {
+    }),
+    deleteUser: k.route({
         method: 'DELETE',
         path: '/users/:id',
         responses: {
@@ -102,8 +110,8 @@ const contractRoutes = k.routes('api', {
                 success: z.boolean(),
             }),
         },
-    },
-    updateUser: {
+    }),
+    updateUser: k.route({
         method: 'PUT',
         path: '/users/:id',
         body: z.object({
@@ -115,12 +123,13 @@ const contractRoutes = k.routes('api', {
                 name: z.string(),
             }),
         },
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: contractRoutes,
-});
+}).api;
 
 const router = {
     users: {
@@ -455,7 +464,7 @@ describe('buildToolDefinitions: input schema', () => {
 
     it('handles non-object body (discriminated union)', () => {
         const unionContractRoutes = k.routes('api', {
-            sendNotification: {
+            sendNotification: k.route({
                 method: 'POST',
                 path: '/notifications',
                 body: z.discriminatedUnion('channel', [
@@ -473,12 +482,13 @@ describe('buildToolDefinitions: input schema', () => {
                         accepted: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
 
-        const unionContract = k.contract({
+        const unionContract = defineConfig({
+            ...config,
             routes: unionContractRoutes,
-        });
+        }).api;
 
         const definitions = buildToolDefinitions(unionContract.routes, publishAllRoutes);
         const send = definitions.find((definition) => definition.name === 'send_notification')!;
@@ -489,7 +499,7 @@ describe('buildToolDefinitions: input schema', () => {
 
     it('combines params, query, and body for complex routes', () => {
         const complexContractRoutes = k.routes('api', {
-            updateItem: {
+            updateItem: k.route({
                 method: 'PUT',
                 path: '/items/:id',
                 query: z.object({
@@ -503,12 +513,13 @@ describe('buildToolDefinitions: input schema', () => {
                         id: z.string(),
                     }),
                 },
-            },
+            }),
         });
 
-        const complexContract = k.contract({
+        const complexContract = defineConfig({
+            ...config,
             routes: complexContractRoutes,
-        });
+        }).api;
 
         const definitions = buildToolDefinitions(complexContract.routes, publishAllRoutes);
         const update = definitions.find((definition) => definition.name === 'update_item')!;
@@ -523,7 +534,7 @@ describe('buildToolDefinitions: input schema', () => {
 
     it('keeps a query with a required field required', () => {
         const contractRoutesWithRequiredQuery = k.routes('api', {
-            searchItems: {
+            searchItems: k.route({
                 method: 'GET',
                 path: '/items',
                 query: z.object({
@@ -535,13 +546,14 @@ describe('buildToolDefinitions: input schema', () => {
                         ids: z.array(z.string()),
                     }),
                 },
-            },
+            }),
         });
 
         const definitions = buildToolDefinitions(
-            k.contract({
+            defineConfig({
+                ...config,
                 routes: contractRoutesWithRequiredQuery,
-            }).routes,
+            }).api.routes,
             publishAllRoutes
         );
         const search = definitions.find((definition) => definition.name === 'search_items')!;
@@ -988,21 +1000,26 @@ describe('MCP server: guards', () => {
         admin: 'all',
     });
 
-    const user = Kizuna.identity.bearer({
+    const user = k.identity.bearer({
         context: z.object({
             userId: z.string(),
         }),
         roles,
     });
 
-    const securedK = new Kizuna({
+    const securedKConfig = {
         identities: {
             user,
         },
-    });
+    };
+    const securedK = new Kizuna<{
+        identities: {
+            user: typeof user;
+        };
+    }>();
 
     const securedRoutes = securedK.routes({
-        publicRoute: {
+        publicRoute: securedK.route({
             method: 'GET',
             path: '/public',
             auth: false,
@@ -1011,8 +1028,8 @@ describe('MCP server: guards', () => {
                     ok: z.boolean(),
                 }),
             },
-        },
-        whoAmI: {
+        }),
+        whoAmI: securedK.route({
             method: 'GET',
             path: '/who-am-i',
             auth: 'user',
@@ -1021,8 +1038,8 @@ describe('MCP server: guards', () => {
                     userId: z.string(),
                 }),
             },
-        },
-        ownerOnly: {
+        }),
+        ownerOnly: securedK.route({
             method: 'GET',
             auth: {
                 identity: 'user',
@@ -1037,14 +1054,15 @@ describe('MCP server: guards', () => {
                     ok: z.boolean(),
                 }),
             },
-        },
+        }),
     });
 
-    const securedContract = securedK.contract({
+    const securedContract = defineConfig({
+        ...securedKConfig,
         routes: {
             api: securedRoutes,
         },
-    });
+    }).api;
 
     const makeSecuredApi = () => {
         return assembleApi(securedContract, {
@@ -1238,7 +1256,7 @@ describe('MCP server: guards', () => {
 describe('streamed routes', () => {
     it('are never tools, since a tool result is one value', () => {
         const streamRoutes = k.routes('api', {
-            reply: {
+            reply: k.route({
                 method: 'POST',
                 path: '/reply',
                 auth: {
@@ -1260,8 +1278,8 @@ describe('streamed routes', () => {
                         },
                     },
                 },
-            },
-            ping: {
+            }),
+            ping: k.route({
                 method: 'GET',
                 path: '/ping',
                 responses: {
@@ -1269,7 +1287,7 @@ describe('streamed routes', () => {
                         ok: z.boolean(),
                     }),
                 },
-            },
+            }),
         });
         const definitions = buildToolDefinitions(streamRoutes, publishAllRoutes);
         expect(definitions.map((definition) => definition.name)).toEqual(['ping']);
@@ -1277,32 +1295,42 @@ describe('streamed routes', () => {
 });
 
 describe('MCP server: request context in guards', () => {
-    const user = Kizuna.identity.bearer({
+    const user = k.identity.bearer({
         context: z.object({
             userId: z.string(),
         }),
     });
 
-    const contextK = new Kizuna({
+    const contextKAnalytics = k.requestContext({
+        headers: z.object({
+            'x-session-id': z.string().optional(),
+        }),
+        context: z.object({
+            sessionId: z.string().nullable(),
+        }),
+    });
+    const contextKConfig = {
         identities: {
             user,
         },
         requestContext: {
-            analytics: Kizuna.requestContext({
-                headers: z.object({
-                    'x-session-id': z.string().optional(),
-                }),
-                context: z.object({
-                    sessionId: z.string().nullable(),
-                }),
-            }),
+            analytics: contextKAnalytics,
         },
-    });
+    };
+    const contextK = new Kizuna<{
+        identities: {
+            user: typeof user;
+        };
+        requestContext: {
+            analytics: typeof contextKAnalytics;
+        };
+    }>();
 
-    const contextContract = contextK.contract({
+    const contextContract = defineConfig({
+        ...contextKConfig,
         routes: {
             api: contextK.routes({
-                whoAmI: {
+                whoAmI: contextK.route({
                     method: 'GET',
                     path: '/who-am-i',
                     auth: 'user',
@@ -1311,15 +1339,15 @@ describe('MCP server: request context in guards', () => {
                             userId: z.string(),
                         }),
                     },
-                },
+                }),
             }),
         },
         tools: contextK.tools('user', {
-            reindex: {
+            reindex: contextK.tool({
                 description: 'Rebuild the search index',
-            },
+            }),
         }),
-    });
+    }).api;
 
     const connectWithContext = async () => {
         const seen: unknown[] = [];

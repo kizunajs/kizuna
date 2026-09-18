@@ -1,9 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { BinarySchema } from './schemas.js';
 import { cacheHeaders } from './cache.js';
 import type { CachePolicy } from './types.js';
+
+const k = new Kizuna();
 
 describe('cacheHeaders', () => {
     test('a response with no cache policy sends nothing', () => {
@@ -80,12 +83,10 @@ describe('cacheHeaders', () => {
     });
 });
 
-const k = new Kizuna();
-
 const contractWith = (cache: CachePolicy) =>
-    k.contract({
+    defineConfig({
         routes: k.routes('users', {
-            listUsers: {
+            listUsers: k.route({
                 method: 'GET',
                 path: '/users',
                 responses: {
@@ -96,9 +97,9 @@ const contractWith = (cache: CachePolicy) =>
                         cache,
                     },
                 },
-            },
+            }),
         }),
-    });
+    }).api;
 
 describe('assertValidCache', () => {
     test('an empty policy is rejected', () => {
@@ -221,40 +222,46 @@ describe('assertValidCache', () => {
     });
 
     test('a policy on an error response is checked too, and names that status', () => {
-        expect(() =>
-            k.contract({
-                routes: k.routes('users', {
-                    getUser: {
-                        method: 'GET',
-                        path: '/users/:id',
-                        responses: {
-                            200: z.object({
-                                ok: z.boolean(),
-                            }),
-                            404: {
-                                body: z.object({
-                                    detail: z.string(),
+        expect(
+            () =>
+                defineConfig({
+                    routes: k.routes('users', {
+                        getUser: k.route({
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
                                 }),
-                                cache: {
-                                    maxAge: -10,
+                                404: {
+                                    body: z.object({
+                                        detail: z.string(),
+                                    }),
+                                    cache: {
+                                        maxAge: -10,
+                                    },
                                 },
                             },
-                        },
-                    },
-                }),
-            })
+                        }),
+                    }),
+                }).api
         ).toThrow(/cache\.maxAge as -10 on its 404 response/);
     });
 
     test('a public scope on a route behind authentication is rejected', () => {
-        const user = Kizuna.identity.bearer({});
-        const secured = new Kizuna({
+        const user = k.identity.bearer({});
+        const securedConfig = {
             identities: {
                 user,
             },
-        });
+        };
+        const secured = new Kizuna<{
+            identities: {
+                user: typeof user;
+            };
+        }>();
         const routes = secured.routes('users', {
-            listUsers: {
+            listUsers: secured.route({
                 method: 'GET',
                 path: '/users',
                 auth: 'user',
@@ -269,100 +276,103 @@ describe('assertValidCache', () => {
                         },
                     },
                 },
-            },
+            }),
         });
-        expect(() =>
-            secured.contract({
-                routes: {
-                    users: routes,
-                },
-            })
+        expect(
+            () =>
+                defineConfig({
+                    ...securedConfig,
+                    routes: {
+                        users: routes,
+                    },
+                }).api
         ).toThrow(/declares cache\.scope 'public' on its 200 response, but the route is behind authentication/);
     });
 });
 
 describe('the policies the caching guide shows', () => {
     test('are all accepted by k.contract', () => {
-        expect(() =>
-            k.contract({
-                routes: k.routes('docs', {
-                    badge: {
-                        method: 'GET',
-                        path: '/users/:id/badge/:version',
-                        responses: {
-                            200: {
-                                body: BinarySchema,
-                                contentType: 'image/png',
-                                cache: {
-                                    scope: 'public',
-                                    maxAge: 31536000,
-                                    immutable: true,
+        expect(
+            () =>
+                defineConfig({
+                    routes: k.routes('docs', {
+                        badge: k.route({
+                            method: 'GET',
+                            path: '/users/:id/badge/:version',
+                            responses: {
+                                200: {
+                                    body: BinarySchema,
+                                    contentType: 'image/png',
+                                    cache: {
+                                        scope: 'public',
+                                        maxAge: 31536000,
+                                        immutable: true,
+                                    },
                                 },
                             },
-                        },
-                    },
-                    badgeFallback: {
-                        method: 'GET',
-                        path: '/users/:id/badge',
-                        responses: {
-                            200: {
-                                body: BinarySchema,
-                                contentType: 'image/png',
-                                cache: {
-                                    scope: 'public',
-                                    noCache: true,
-                                },
-                                etag: true,
-                            },
-                        },
-                    },
-                    catalogue: {
-                        method: 'GET',
-                        path: '/catalogue',
-                        responses: {
-                            200: {
-                                body: z.array(z.string()),
-                                cache: {
-                                    scope: 'public',
-                                    maxAge: 0,
-                                    sharedMaxAge: 600,
-                                    staleWhileRevalidate: 60,
+                        }),
+                        badgeFallback: k.route({
+                            method: 'GET',
+                            path: '/users/:id/badge',
+                            responses: {
+                                200: {
+                                    body: BinarySchema,
+                                    contentType: 'image/png',
+                                    cache: {
+                                        scope: 'public',
+                                        noCache: true,
+                                    },
+                                    etag: true,
                                 },
                             },
-                        },
-                    },
-                    invoices: {
-                        method: 'GET',
-                        path: '/invoices',
-                        responses: {
-                            200: {
-                                body: z.array(z.string()),
-                                cache: {
-                                    scope: 'private',
-                                    noCache: true,
-                                    vary: ['authorization'],
-                                },
-                                etag: true,
-                            },
-                        },
-                    },
-                    fingerprinted: {
-                        method: 'GET',
-                        path: '/assets/:hash',
-                        responses: {
-                            200: {
-                                body: BinarySchema,
-                                contentType: 'image/png',
-                                cache: {
-                                    scope: 'public',
-                                    maxAge: 31536000,
-                                    immutable: true,
+                        }),
+                        catalogue: k.route({
+                            method: 'GET',
+                            path: '/catalogue',
+                            responses: {
+                                200: {
+                                    body: z.array(z.string()),
+                                    cache: {
+                                        scope: 'public',
+                                        maxAge: 0,
+                                        sharedMaxAge: 600,
+                                        staleWhileRevalidate: 60,
+                                    },
                                 },
                             },
-                        },
-                    },
-                }),
-            })
+                        }),
+                        invoices: k.route({
+                            method: 'GET',
+                            path: '/invoices',
+                            responses: {
+                                200: {
+                                    body: z.array(z.string()),
+                                    cache: {
+                                        scope: 'private',
+                                        noCache: true,
+                                        vary: ['authorization'],
+                                    },
+                                    etag: true,
+                                },
+                            },
+                        }),
+                        fingerprinted: k.route({
+                            method: 'GET',
+                            path: '/assets/:hash',
+                            responses: {
+                                200: {
+                                    body: BinarySchema,
+                                    contentType: 'image/png',
+                                    cache: {
+                                        scope: 'public',
+                                        maxAge: 31536000,
+                                        immutable: true,
+                                    },
+                                },
+                            },
+                        }),
+                    }),
+                }).api
         ).not.toThrow();
     });
 });

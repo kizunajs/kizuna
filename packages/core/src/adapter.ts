@@ -1,3 +1,4 @@
+import { HANDLER } from './types.js';
 import { z } from 'zod';
 import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method, RequiredPermissions } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
@@ -121,21 +122,21 @@ export class ResponseValidationError extends Error {
     }
 }
 
-export const API_META: unique symbol = Symbol('ts-kizuna.api.meta');
-export const ROUTER_META: unique symbol = Symbol('ts-kizuna.router');
-export const GUARDS_META: unique symbol = Symbol('ts-kizuna.guards');
-export const SCHEMES_META: unique symbol = Symbol('ts-kizuna.schemes');
+export const API_META: unique symbol = Symbol.for('ts-kizuna.api.meta') as symbol as typeof API_META;
+export const ROUTER_META: unique symbol = Symbol.for('ts-kizuna.router') as symbol as typeof ROUTER_META;
+export const GUARDS_META: unique symbol = Symbol.for('ts-kizuna.guards') as symbol as typeof GUARDS_META;
+export const SCHEMES_META: unique symbol = Symbol.for('ts-kizuna.schemes') as symbol as typeof SCHEMES_META;
 
-export const GUARD_SCHEMA_META: unique symbol = Symbol('ts-kizuna.guardSchema');
-export const REQUEST_CONTEXT_META: unique symbol = Symbol('ts-kizuna.request-context');
+export const GUARD_SCHEMA_META: unique symbol = Symbol.for('ts-kizuna.guardSchema') as symbol as typeof GUARD_SCHEMA_META;
+export const REQUEST_CONTEXT_META: unique symbol = Symbol.for('ts-kizuna.request-context') as symbol as typeof REQUEST_CONTEXT_META;
 const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
-export const JOBS_META: unique symbol = Symbol('ts-kizuna.jobs');
+export const JOBS_META: unique symbol = Symbol.for('ts-kizuna.jobs') as symbol as typeof JOBS_META;
 
 /**
  * What `server.tools` stamps on the api: the contract's tools and the handler
  * for each.
  */
-export const TOOLS_META: unique symbol = Symbol('ts-kizuna.tools');
+export const TOOLS_META: unique symbol = Symbol.for('ts-kizuna.tools') as symbol as typeof TOOLS_META;
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
@@ -151,7 +152,7 @@ export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
  * The marker a guard's `deny` returns. Distinguishes a denial
  * from the context object a passing guard returns.
  */
-const GUARD_DENY: unique symbol = Symbol('ts-kizuna.guard.deny');
+const GUARD_DENY: unique symbol = Symbol.for('ts-kizuna.guard.deny') as symbol as typeof GUARD_DENY;
 
 /**
  * The result of `deny` inside a guard, short-circuits the
@@ -636,14 +637,7 @@ export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
-export {
-    createServerSurface,
-    type Server,
-    type ServerApiOptions,
-    type ContractRouter,
-    type ContractJobsRouter,
-    type ContractToolsRouter,
-} from './server-surface.js';
+export { type ContractRouter, type ContractJobsRouter, type ContractToolsRouter } from './server-surface.js';
 
 export type RouteMatcher = (method: string, path: string, routes: Routes, basePath?: string) => MatchResult;
 
@@ -910,7 +904,7 @@ export const routerFromRoutes = (routes: Routes): Record<string, unknown> => {
     const router: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(routes)) {
         if (isRouteDefinition(value)) {
-            if (value.handler) router[key] = value.handler;
+            if (value[HANDLER]) router[key] = value[HANDLER];
             continue;
         }
         if (value && typeof value === 'object') router[key] = routerFromRoutes(value as Routes);

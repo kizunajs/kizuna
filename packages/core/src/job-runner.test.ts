@@ -1,20 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import { defineConfig } from './define-config.js';
 import { createJobRunner, JobInputError } from './job-runner.js';
 import { createJobTransport, JobDispatchError, type JobMessage } from './job-transport.js';
 import { ResponseError } from './response-error.js';
 
-const scheduler = Kizuna.identity.bearer({});
+interface Config {
+    identities: {
+        scheduler: typeof scheduler;
+    };
+}
 
-const k = new Kizuna({
+const k = new Kizuna<Config>();
+
+const scheduler = k.identity.bearer({});
+
+const config = {
     identities: {
         scheduler,
     },
-});
+};
 
 const jobs = k.jobs('scheduler', {
-    indexPost: {
+    indexPost: k.job({
         input: z.object({
             postId: z.string(),
         }),
@@ -22,25 +31,26 @@ const jobs = k.jobs('scheduler', {
             indexed: z.boolean(),
         }),
         retry: 3,
-    },
-    cleanup: {
+    }),
+    cleanup: k.job({
         schedule: '0 3 * * *',
-    },
+    }),
 });
 
-const contract = k.contract({
+const contract = defineConfig({
+    ...config,
     routes: k.routes({
-        listUsers: {
+        listUsers: k.route({
             method: 'GET',
             path: '/users',
             auth: false,
             responses: {
                 200: z.array(z.string()),
             },
-        },
+        }),
     }),
     jobs,
-});
+}).api;
 
 const indexed = () => ({
     status: 200 as const,
@@ -199,23 +209,24 @@ describe('createJobRunner', () => {
     it('nests, so a large contract can group its jobs', async () => {
         const nested = k.jobs('scheduler', {
             billing: {
-                reconcileInvoices: {
+                reconcileInvoices: k.job({
                     input: z.object({
                         since: z.string(),
                     }),
                     result: z.object({
                         reconciled: z.int(),
                     }),
-                },
+                }),
             },
-            cleanup: {
+            cleanup: k.job({
                 schedule: '0 3 * * *',
-            },
+            }),
         });
-        const nestedContract = k.contract({
+        const nestedContract = defineConfig({
+            ...config,
             routes: k.routes({}),
             jobs: nested,
-        });
+        }).api;
         const runner = createJobRunner(nestedContract, {
             billing: {
                 reconcileInvoices: ({ input }) => ({

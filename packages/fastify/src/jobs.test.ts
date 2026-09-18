@@ -2,99 +2,108 @@ import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import { KizunaServer } from './server.js';
+import { defineConfig } from '@ts-kizuna/core';
+import { fastifyAdapter } from './server.js';
 
-const scheduler = Kizuna.identity.bearer({
-    context: z.object({
-        invokedBy: z.string(),
-    }),
-});
+let failing = false;
 
-const k = new Kizuna({
+interface Config {
+    adapter: typeof fastifyAdapter;
+    identities: {
+        scheduler: typeof scheduler;
+    };
+}
+
+const k = new Kizuna<Config>();
+
+const scheduler = k.identity
+    .bearer({
+        context: z.object({
+            invokedBy: z.string(),
+        }),
+    })
+    .guard(({ bearer, deny }) =>
+        bearer?.token === 'cron-secret'
+            ? { invokedBy: 'platform' }
+            : deny({
+                  status: 401,
+                  body: {
+                      detail: 'Unauthorized',
+                  },
+              })
+    );
+
+const config = {
     identities: {
         scheduler,
     },
-});
+};
 
 const routes = k.routes({
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        auth: false,
-        responses: {
-            200: z.array(z.string()),
-        },
-    },
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            auth: false,
+            responses: {
+                200: z.array(z.string()),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: ['ada'],
+        })),
 });
 
 const jobs = k.jobs('scheduler', {
-    sendDigests: {
-        schedule: '* * * * *',
-        result: z.object({
-            sent: z.int(),
-        }),
-    },
-    reconcile: {
-        input: z.object({
-            since: z.string(),
-        }),
-        result: z.object({
-            reconciled: z.int(),
-        }),
-    },
-    cleanup: {
-        schedule: '0 3 * * *',
-    },
-});
-
-const contract = k.contract({
-    routes,
-    jobs,
-});
-
-const server = new KizunaServer(contract);
-
-const requireScheduler = server.guard('scheduler', ({ bearer, deny }) =>
-    bearer?.token === 'cron-secret'
-        ? { invokedBy: 'platform' }
-        : deny({
-              status: 401,
-              body: {
-                  detail: 'Unauthorized',
-              },
-          })
-);
-
-const buildApp = async (options?: { failing?: boolean }) => {
-    const api = server.api({
-        router: server.router({
-            listUsers: () => ({
-                status: 200,
-                body: ['ada'],
+    sendDigests: k
+        .job({
+            schedule: '* * * * *',
+            result: z.object({
+                sent: z.int(),
             }),
-        }),
-        guards: {
-            scheduler: requireScheduler,
-        },
-        jobs: server.jobs({
-            sendDigests: () => {
-                if (options?.failing) throw new Error('the mailer is down');
-                return {
-                    status: 200,
-                    body: {
-                        sent: 8,
-                    },
-                };
-            },
-            reconcile: ({ input }) => ({
+        })
+        .handler(() => {
+            if (failing) throw new Error('the mailer is down');
+            return {
                 status: 200,
                 body: {
-                    reconciled: input.since.length,
+                    sent: 8,
                 },
-            }),
-            cleanup: () => {},
+            };
         }),
-    });
+    reconcile: k
+        .job({
+            input: z.object({
+                since: z.string(),
+            }),
+            result: z.object({
+                reconciled: z.int(),
+            }),
+        })
+        .handler(({ input }) => ({
+            status: 200,
+            body: {
+                reconciled: input.since.length,
+            },
+        })),
+    cleanup: k
+        .job({
+            schedule: '0 3 * * *',
+        })
+        .handler(() => {}),
+});
+
+const contract = defineConfig({
+    ...config,
+    adapter: fastifyAdapter,
+    routes,
+    jobs,
+}).api;
+
+const buildApp = async (options?: { failing?: boolean }) => {
+    failing = options?.failing ?? false;
+    const api = contract;
 
     const app = Fastify();
     await api.mount(app);
