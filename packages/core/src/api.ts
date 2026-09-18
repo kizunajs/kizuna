@@ -1,20 +1,11 @@
 import { HANDLER } from './types.js';
 import type { z } from 'zod';
 import { assembleContract, type Contract } from './contract.js';
-import {
-    assembleApi,
-    routerFromRoutes,
-    warnUnsupportedJobOptions,
-    JOBS_META,
-    TOOLS_META,
-    type ApiParts,
-    type ApiWithRouter,
-} from './adapter.js';
+import { assembleApi, routerFromRoutes, warnUnsupportedJobOptions, JOBS_META, type ApiParts, type ApiWithRouter } from './adapter.js';
 import type { AnyAdapter, MountArgsOf, MountedOf } from './adapter.js';
 import type { Jobs, JobsConfig } from './jobs.js';
 import type { JobTransport } from './job-transport.js';
 import type { JobErrorHandler } from './job-runner.js';
-import type { Tools } from './tools.js';
 import type { ContractPlugins } from './plugin.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
@@ -108,12 +99,6 @@ export const buildApi = (
                   onError: implementations.onJobError,
               }
             : undefined,
-        [TOOLS_META]: contract.tools
-            ? {
-                  tools: contract.tools,
-                  handlers: handlersFrom(contract.tools as unknown as Record<string, unknown>),
-              }
-            : undefined,
     }) as Record<string, unknown>;
 
     api.mount = (...args: unknown[]) => {
@@ -131,10 +116,9 @@ export const buildApi = (
 /**
  * The contract half of what `k.api` takes.
  */
-export interface ApiDeclaration<R extends Routes, J extends Jobs, T extends Tools, P extends ContractPlugins> {
+export interface ApiDeclaration<R extends Routes, J extends Jobs, P extends ContractPlugins> {
     routes: R;
     jobs?: J;
-    tools?: T;
     plugins?: P;
 }
 

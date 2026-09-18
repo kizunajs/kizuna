@@ -15,9 +15,7 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
-    TOOLS_META,
     type JobsMeta,
-    type ToolsMeta,
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
@@ -25,11 +23,9 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
-    toolRunnerFrom,
     type Adapter,
     type ContractRouter,
     type ContractJobsRouter,
-    type ContractToolsRouter,
     renderJsonResult,
     parseFetchBody,
     headersToObject,
@@ -41,7 +37,6 @@ export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
-    readonly [TOOLS_META]?: unknown;
     /**
      * Register every contract route on a Hono app.
      */
@@ -70,11 +65,6 @@ export type Router<C, E extends Env = Env> = ContractRouter<C, HonoHandlerContex
  * receives only the job's `input`, so the same handler can be run in process.
  */
 export type JobsRouter<C> = ContractJobsRouter<C>;
-
-/**
- * The handler for each of a contract's tools, typed against it.
- */
-export type ToolsRouter<C> = ContractToolsRouter<C>;
 
 export interface HonoOptions {
     /**
@@ -143,7 +133,6 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
-    const toolRunner = toolRunnerFrom(api[TOOLS_META] as ToolsMeta | undefined);
     const mountRoute = (
         routeKey: string,
         route: RouteDefinition,
@@ -182,7 +171,6 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                 requestContext,
                 pluginExports,
                 jobs: jobRunner,
-                tools: toolRunner,
                 responseValidation: options?.responseValidation,
             });
         };

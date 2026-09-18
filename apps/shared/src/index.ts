@@ -10,5 +10,5 @@ export { db, type Invite } from './db';
 export { permissions } from './permissions';
 export { roles } from './roles';
 export { jobs } from './jobs';
-export { tools } from './tools';
+export { assistantTools } from './routes/assistant-tools';
 export { replyWords, countWords, forecastFor, signupsOverDays } from './assistant';

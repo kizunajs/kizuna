@@ -4,7 +4,6 @@ import type { TagSet, TagOptions } from './tags.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { Jobs, JobsConfig } from './jobs.js';
-import type { Tools } from './tools.js';
 import type { ContractPlugins } from './plugin.js';
 
 /**
@@ -20,7 +19,6 @@ export interface Contract<
     RequestContext extends Record<string, RequestContextSchema> = Record<string, RequestContextSchema>,
     Plugins extends ContractPlugins = ContractPlugins,
     Jobs_ extends Jobs = Jobs,
-    Tools_ extends Tools = Tools,
     GuardSchema extends z.ZodType | undefined = z.ZodType | undefined,
 > {
     /**
@@ -47,11 +45,6 @@ export interface Contract<
      * The job settings passed to `new Kizuna()` under `jobs`.
      */
     jobsConfig?: JobsConfig;
-    /**
-     * The tools declared with `k.tools`, keyed by name. A model calls them;
-     * they are never routes, so nothing that walks `routes` sees them.
-     */
-    tools?: Tools_;
     /**
      * The tag set declared with `Kizuna.tags`. Routes reference its keys; the
      * OpenAPI generator resolves each key to its title and description.
@@ -96,14 +89,12 @@ export function assembleContract<
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
     const Plugins extends ContractPlugins = Record<string, never>,
     const Jobs_ extends Jobs = Record<string, never>,
-    const Tools_ extends Tools = Record<string, never>,
     GuardSchema extends z.ZodType | undefined = undefined,
 >(config: {
     routes: R;
     guardSchema?: GuardSchema;
     jobs?: Jobs_;
     jobsConfig?: JobsConfig;
-    tools?: Tools_;
     tags?: TagSet<Tags>;
     securitySchemes?: Schemes;
     requestContext?: RequestContext;
@@ -111,14 +102,13 @@ export function assembleContract<
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): Contract<R, Tags, Codes, Schemes, RequestContext, Plugins, Jobs_, Tools_, GuardSchema> {
+}): Contract<R, Tags, Codes, Schemes, RequestContext, Plugins, Jobs_, GuardSchema> {
     return {
         routes: config.routes,
         guardSchema: config.guardSchema,
         plugins: config.plugins,
         jobs: config.jobs,
         jobsConfig: config.jobsConfig,
-        tools: config.tools,
         tags: config.tags,
         securitySchemes: config.securitySchemes,
         requestContext: config.requestContext,
@@ -156,4 +146,3 @@ export type GuardSchemaOf<C extends Contract> = Extract<C['guardSchema'], z.ZodT
 /**
  * A contract's tools, or an empty map when it declares none.
  */
-export type ToolsOf<C extends Contract> = Exclude<C['tools'], undefined>;

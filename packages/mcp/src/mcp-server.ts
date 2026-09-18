@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { problemDetails } from '@ts-kizuna/core';
-import { McpServer } from '@modelcontextprotocol/server';
+import { McpServer, acceptedContent, inputRequired, type CallToolResult, type InputRequiredResult } from '@modelcontextprotocol/server';
 import { flattenRoutes, validateRequest } from '@ts-kizuna/core/adapter';
 import {
     ResponseError,
@@ -25,18 +25,10 @@ import { contractOf } from '@ts-kizuna/core/adapter';
 import type { Contract, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from '@ts-kizuna/core/generator';
-import { flattenTools, toolRunnerFrom, TOOLS_META, type ToolsMeta, type ToolRunner } from '@ts-kizuna/core/adapter';
-import { publishedTools, ToolExecutionError, ToolInputError, ToolOutputError, type PublishedTool, type Tools } from '@ts-kizuna/core';
 import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
-import { selectToolRoutes, selectTools, type ToolSelection } from './tool-selection.js';
+import { selectToolRoutes, toolOptionsOf } from './tool-selection.js';
 
 export interface McpServerOptions {
-    /**
-     * What the server offers: the contract's routes and tools, which routes to
-     * publish, and which tools to hide.
-     */
-    options?: ToolSelection;
-
     /**
      * Human-readable name for the MCP server.
      *
@@ -106,11 +98,79 @@ interface Annotations {
  * `destructiveHint` and `openWorldHint` to true, so only the hints that make a
  * tool safer than that are worth setting.
  */
-const buildToolAnnotations = (route: RouteDefinition): Annotations => ({
-    ...(isSafeMethod(route.method) ? { readOnlyHint: true } : {}),
-    ...(isIdempotentMethod(route.method) ? { idempotentHint: true } : {}),
-    ...(route.method === 'DELETE' ? { destructiveHint: true } : {}),
-});
+/**
+ * What the elicitation answer comes back under, and the key the retry echoes.
+ */
+const CONFIRM_KEY = 'confirm';
+
+/**
+ * What a tool handler is handed beyond its arguments. Only the answers to an
+ * earlier elicitation are read here.
+ */
+interface McpToolContext {
+    mcpReq?: {
+        inputResponses?: unknown;
+    };
+}
+
+/**
+ * Ask before running, when the route said to. Returns what the caller should
+ * answer with instead of running: the elicitation on the first call, a refusal
+ * when the person declined, and nothing once they have agreed.
+ */
+const confirmed = (route: RouteDefinition, context: McpToolContext): CallToolResult | InputRequiredResult | undefined => {
+    const message = toolOptionsOf(route)?.confirm;
+    if (message === undefined) return undefined;
+
+    const answer = acceptedContent<{ confirm?: boolean }>(context.mcpReq?.inputResponses as never, CONFIRM_KEY);
+    if (answer === undefined) {
+        return inputRequired({
+            inputRequests: {
+                [CONFIRM_KEY]: inputRequired.elicit({
+                    message,
+                    requestedSchema: {
+                        type: 'object',
+                        properties: {
+                            confirm: {
+                                type: 'boolean',
+                                title: 'Go ahead',
+                            },
+                        },
+                        required: [CONFIRM_KEY],
+                    },
+                }),
+            },
+        });
+    }
+
+    if (answer.confirm === true) return undefined;
+    return {
+        content: [
+            {
+                type: 'text' as const,
+                text: 'Declined, so nothing ran.',
+            },
+        ],
+        isError: true,
+    };
+};
+
+/**
+ * What the route says about itself, over what its method already implies.
+ */
+const buildToolAnnotations = (route: RouteDefinition): Annotations => {
+    const declared = toolOptionsOf(route) ?? {};
+    return {
+        ...(isSafeMethod(route.method) ? { readOnlyHint: true } : {}),
+        ...(isIdempotentMethod(route.method) ? { idempotentHint: true } : {}),
+        ...(route.method === 'DELETE' ? { destructiveHint: true } : {}),
+        ...(declared.title === undefined ? {} : { title: declared.title }),
+        ...(declared.readOnlyHint === undefined ? {} : { readOnlyHint: declared.readOnlyHint }),
+        ...(declared.idempotentHint === undefined ? {} : { idempotentHint: declared.idempotentHint }),
+        ...(declared.destructiveHint === undefined ? {} : { destructiveHint: declared.destructiveHint }),
+        ...(declared.openWorldHint === undefined ? {} : { openWorldHint: declared.openWorldHint }),
+    };
+};
 
 const describeRoles = (route: RouteDefinition): string | undefined =>
     route.roles !== undefined && route.roles.length > 0 ? `Roles: ${route.roles.join(', ')}` : undefined;
@@ -124,7 +184,9 @@ const describeRequires = (route: RouteDefinition): string | undefined => {
 
 const buildToolDescription = (route: RouteDefinition): string => {
     const parts: string[] = [];
-    if (route.summary) parts.push(route.summary);
+    const declared = toolOptionsOf(route)?.description;
+    if (declared) parts.push(declared);
+    else if (route.summary) parts.push(route.summary);
     if (route.description) parts.push(route.description);
     if (parts.length === 0) parts.push(`${route.method} ${route.path}`);
     parts.push(`\nHTTP: ${route.method} ${route.path}`);
@@ -153,7 +215,7 @@ export interface ToolDefinition {
 }
 
 export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions): ToolDefinition[] => {
-    const selected = selectToolRoutes(flattenRoutes(routes), options?.options);
+    const selected = selectToolRoutes(flattenRoutes(routes));
     const names = deriveToolNames(
         selected.map(({ routeKey }) => ({
             key: routeKey,
@@ -180,47 +242,17 @@ export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions)
 };
 
 /**
- * The declared tools a selection publishes. Everything handed over, unless
- * `expose` says otherwise. `publishedTools` does the naming, so a tool is named
- * in one place whichever surface publishes it.
- */
-export const buildDeclaredToolDefinitions = (tools: Tools | undefined, options?: McpServerOptions): PublishedTool[] => {
-    if (!tools) return [];
-    const selected = publishedTools(selectTools(flattenTools(tools), options?.options));
-    // Names are derived once more here so a bad key fails at startup, not at call time.
-    deriveToolNames(
-        selected.map(({ toolKey }) => ({
-            key: toolKey,
-            origin: 'tool',
-        }))
-    );
-    return selected;
-};
-
-/**
- * A declared tool's description, with the identity it needs appended the way a
- * route's requirements are.
- */
-const declaredDescription = (published: PublishedTool): string =>
-    published.identity === undefined ? published.description : `${published.description}\nRequires: ${published.identity}`;
-
-/**
  * What a client puts in front of the model before it picks a tool.
  */
 export const buildInstructions = (
     contract: Contract | undefined,
     definitions: readonly ToolDefinition[],
-    declared: readonly PublishedTool[],
     authored: string | undefined
 ): string => {
     const sections: string[] = [];
     if (definitions.length > 0) {
         sections.push('Every tool named after an HTTP route returns `{ status, body }`. A status of 400 or more means the call failed.');
     }
-    if (declared.length > 0) {
-        sections.push('The remaining tools return their own result directly.');
-    }
-
     const tags = contract?.tags?.tags;
     if (tags !== undefined) {
         // A group whose every route was excluded is not a group the model has.
@@ -535,98 +567,6 @@ const executeToolCall = async (
 };
 
 /**
- * Run one declared tool. There is no HTTP envelope here, so the result carries
- * the tool's own output and nothing more.
- */
-const executeDeclaredToolCall = async (
-    definition: PublishedTool,
-    args: Record<string, unknown>,
-    runner: ToolRunner<Tools> | undefined,
-    handlerContext?: Record<string, unknown>,
-    guards?: GuardMap,
-    schemes?: Record<string, SecurityScheme>,
-    credentialHeaders?: Record<string, string | string[] | undefined>,
-    contextResolvers?: RequestContextMap,
-    transportAuth?: McpServerOptions['transportAuth'],
-    guardSchema?: z.ZodType
-): Promise<ToolCallResult> => {
-    if (!runner) {
-        return toolError(500, {
-            detail: `No handler was bound for tool "${definition.toolKey}".`,
-        });
-    }
-
-    const { identity } = definition;
-    if (identity !== undefined) {
-        // A tool declares no path, so its guard runs over empty params.
-        const guardOutcome = await runGuards(
-            [
-                {
-                    scheme: identity,
-                    scopes: [],
-                },
-            ],
-            undefined,
-            undefined,
-            `tool "${definition.toolKey}"`,
-            {},
-            guards,
-            schemes,
-            handlerContext,
-            credentialHeaders,
-            await resolveRequestContext(contextResolvers, {}, credentialHeaders, handlerContext),
-            transportAuth,
-            guardSchema
-        );
-        if (!guardOutcome.ok) return guardOutcome.result;
-    }
-
-    try {
-        const output = await runner.call({
-            id: definition.name,
-            name: definition.toolKey,
-            input: args,
-        } as never);
-        const value = (output as { output?: unknown }).output;
-
-        return {
-            content: [
-                {
-                    type: 'text' as const,
-                    text: definition.output ? JSON.stringify(value, null, 2) : `${definition.toolKey} ran.`,
-                },
-            ],
-            ...(definition.output
-                ? {
-                      structuredContent: value as Record<string, unknown>,
-                  }
-                : {}),
-            isError: false,
-        };
-    } catch (error) {
-        if (error instanceof ToolExecutionError) {
-            return {
-                content: [
-                    {
-                        type: 'text' as const,
-                        text: error.message,
-                    },
-                ],
-                isError: true,
-            };
-        }
-        if (error instanceof ToolInputError || error instanceof ToolOutputError) {
-            return toolError(400, {
-                detail: error.message,
-            });
-        }
-        return toolError(500, {
-            detail: error instanceof Error ? error.message : 'Internal Server Error',
-        });
-    }
-};
-
-/**
  * Create an MCP server from a kizuna API.
  *
  * Each route in the routes becomes an MCP tool. When an AI assistant calls
@@ -647,22 +587,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     const contextResolvers = (api as unknown as Record<typeof REQUEST_CONTEXT_META, RequestContextMap | undefined>)[REQUEST_CONTEXT_META];
 
     const contract = contractOf<Contract | undefined>(api);
-    const toolsMeta = (api as unknown as Record<typeof TOOLS_META, ToolsMeta | undefined>)[TOOLS_META];
-    const toolRunner = toolRunnerFrom(toolsMeta);
 
     const definitions = buildToolDefinitions(api.routes, options);
-    const declared = buildDeclaredToolDefinitions(contract?.tools, options);
-
-    // Routes and declared tools share one name space, so a clash has to surface at startup.
-    const claimed = new Map(definitions.map((definition) => [definition.name, definition.routeKey]));
-    for (const definition of declared) {
-        const claimant = claimed.get(definition.name);
-        if (claimant !== undefined) {
-            throw new Error(
-                `Route "${claimant}" and tool "${definition.toolKey}" both publish as "${definition.name}". Rename one of them.`
-            );
-        }
-    }
 
     const server = new McpServer(
         {
@@ -670,7 +596,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
             version: options?.version ?? '1.0.0',
         },
         {
-            instructions: buildInstructions(contract, definitions, declared, options?.instructions),
+            instructions: buildInstructions(contract, definitions, options?.instructions),
         }
     );
 
@@ -688,8 +614,10 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                 outputSchema: definition.outputSchema,
                 annotations: buildToolAnnotations(definition.route),
             },
-            async (args: Record<string, unknown>) =>
-                executeToolCall(
+            async (args: Record<string, unknown>, context: McpToolContext) => {
+                const refusal = confirmed(definition.route, context);
+                if (refusal !== undefined) return refusal;
+                return executeToolCall(
                     definition.route,
                     definition.routeKey,
                     args ?? {},
@@ -701,37 +629,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     contextResolvers,
                     options?.transportAuth,
                     guardSchema
-                )
-        );
-    }
-
-    for (const definition of declared) {
-        server.registerTool(
-            definition.name,
-            {
-                ...(definition.title === undefined
-                    ? {}
-                    : {
-                          title: definition.title,
-                      }),
-                description: declaredDescription(definition),
-                inputSchema: definition.input,
-                outputSchema: definition.output,
-                annotations: definition.annotations ?? {},
-            },
-            async (args: unknown) =>
-                executeDeclaredToolCall(
-                    definition,
-                    (args ?? {}) as Record<string, unknown>,
-                    toolRunner,
-                    options?.handlerContext,
-                    guards,
-                    schemes,
-                    options?.credentialHeaders,
-                    contextResolvers,
-                    options?.transportAuth,
-                    guardSchema
-                )
+                );
+            }
         );
     }
 

@@ -1,6 +1,6 @@
 import type { Contract, RouteDefinition } from '@ts-kizuna/core';
 import { createGenerator, flattenJobs, toToolName } from '@ts-kizuna/core/generator';
-import { flattenTools } from '@ts-kizuna/core/adapter';
+import { flattenRoutes } from '@ts-kizuna/core/adapter';
 import { resolveResponseBody } from '@ts-kizuna/core/generator';
 import { diffSchemas, type Direction } from './diff-schemas.js';
 import type { z } from 'zod';
@@ -69,11 +69,15 @@ const jobKeys = (contract: Contract): Set<string> => {
     return new Set(flattenJobs(jobs as never).map((job) => job.jobKey));
 };
 
-const toolNames = (contract: Contract): Map<string, string> => {
-    const tools = (contract as { tools?: unknown }).tools;
-    if (!tools) return new Map();
-    return new Map(flattenTools(tools as never).map(({ toolKey }) => [toolKey, toToolName(toolKey)]));
-};
+/**
+ * The MCP name of every route that publishes as a tool, keyed by route key.
+ */
+const toolNames = (contract: Contract): Map<string, string> =>
+    new Map(
+        flattenRoutes(contract.routes)
+            .filter(({ route }) => route.tool !== undefined && route.tool !== false)
+            .map(({ routeKey }) => [routeKey, toToolName(routeKey)])
+    );
 
 /**
  * What changed between two contracts, worst first.

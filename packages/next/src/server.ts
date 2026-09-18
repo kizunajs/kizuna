@@ -21,19 +21,13 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
-    TOOLS_META,
     type JobsMeta,
-    type ToolsMeta,
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
-    toolRunnerFrom,
-    type ToolRunner,
-    type Tools,
     type Adapter,
     type ContractRouter,
     type ContractJobsRouter,
-    type ContractToolsRouter,
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
@@ -64,11 +58,6 @@ export type Router<C> = ContractRouter<C, NextHandlerContext>;
  * receives only the job's `input`, so the same handler can be run in process.
  */
 export type JobsRouter<C> = ContractJobsRouter<C>;
-
-/**
- * The handler for each of a contract's tools, typed against it.
- */
-export type ToolsRouter<C> = ContractToolsRouter<C>;
 
 /**
  * A contract's jobs paired with their handlers, both in the shape the request
@@ -135,8 +124,7 @@ export const handleNextRequest = async <T extends Routes>(
     schemes?: Record<string, SecurityScheme>,
     requestContext?: RequestContextMap<NextHandlerContext>,
     pluginExports?: Record<string, unknown>,
-    jobs?: MountedJobs,
-    tools?: ToolRunner<Tools>
+    jobs?: MountedJobs
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
 
@@ -202,7 +190,6 @@ export const handleNextRequest = async <T extends Routes>(
                 requestContext,
                 pluginExports,
                 jobs: jobs.runner,
-                tools,
                 responseValidation: options?.responseValidation,
             });
         }
@@ -253,7 +240,6 @@ export const handleNextRequest = async <T extends Routes>(
                 schemes,
                 requestContext,
                 jobs: jobs?.runner,
-                tools,
                 responseValidation: options?.responseValidation,
             });
         }
@@ -281,7 +267,6 @@ export const handleNextRequest = async <T extends Routes>(
         requestContext,
         pluginExports,
         jobs: jobs?.runner,
-        tools,
         basePath: options?.basePath,
         responseValidation: options?.responseValidation,
     });
@@ -306,7 +291,6 @@ export type NextApiWithRouter = ApiWithRouter & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
-    readonly [TOOLS_META]?: unknown;
 };
 
 export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
@@ -315,7 +299,6 @@ export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
-    readonly [TOOLS_META]?: unknown;
     mount: (options?: NextHandlerOptions) => HttpHandlers;
 };
 
@@ -333,7 +316,6 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
     const schemes = api[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
     const requestContext = api[REQUEST_CONTEXT_META] as RequestContextMap<NextHandlerContext> | undefined;
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
-    const toolRunner = toolRunnerFrom(api[TOOLS_META] as ToolsMeta | undefined);
     const mountedJobs = jobsMeta
         ? {
               routes: jobRoutes(jobsMeta),
@@ -368,8 +350,7 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
                     schemes,
                     requestContext,
                     pluginExports,
-                    undefined,
-                    toolRunner
+                    undefined
                 );
             }
         }
@@ -383,8 +364,7 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
             schemes,
             requestContext,
             pluginExports,
-            mountedJobs,
-            toolRunner
+            mountedJobs
         );
     };
     return {

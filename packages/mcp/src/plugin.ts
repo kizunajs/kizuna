@@ -1,29 +1,14 @@
 import { z } from 'zod';
 import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
 import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
-import type { Routes, Tools } from '@ts-kizuna/core';
-import type { ToolSelection } from './tool-selection.js';
 import { protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
 import { mcpServe } from './server.js';
 
-export interface McpPluginProps<R extends Routes = Routes, T extends Tools = Tools> {
-    /**
-     * The contract's routes. Name the ones to publish under `options.publishRoutes`.
-     */
-    routes?: R;
-
-    /**
-     * The contract's tools. Every one is published; drop any under
-     * `options.hideTools`.
-     */
-    tools?: T;
-
-    /**
-     * What the server offers: which routes to publish as tools, and which tools
-     * to hide.
-     */
-    options?: ToolSelection<R, T>;
-
+/**
+ * What the MCP endpoint is, and where. Which routes it publishes is each
+ * route's own business: declare `tool` on the ones a model may call.
+ */
+export interface McpPluginProps {
     /**
      * Path the endpoint is served from.
      *
@@ -130,8 +115,6 @@ const declare = (props: McpPluginProps) => {
  * });
  * ```
  */
-export function mcpPlugin<const R extends Routes = Routes, const T extends Tools = Tools>(
-    props?: McpPluginProps<R, T>
-): ReturnType<typeof declare> {
-    return declare((props ?? {}) as McpPluginProps);
+export function mcpPlugin(props?: McpPluginProps): ReturnType<typeof declare> {
+    return declare(props ?? {});
 }

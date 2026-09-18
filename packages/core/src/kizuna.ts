@@ -8,7 +8,6 @@ import {
     type RequestContextOf,
     type ContractPluginsOf,
     type JobsOf,
-    type ToolsOf,
     type GuardSchemaOf,
 } from './contract.js';
 
@@ -31,8 +30,6 @@ import {
 } from './jobs.js';
 import type { JobTransport } from './job-transport.js';
 import type { JobErrorHandler } from './job-runner.js';
-import { buildTools, type AuthoredTools, type CompiledTools, type ToolDefinition, type ToolHandlers, type Tools } from './tools.js';
-import type { ToolsArg } from './tool-runner.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import type { IdentityParamsOf, RolesOf } from './identity.js';
 import { createPermissions, createRoles, permissionNames, type CatalogOf, type PermissionSet, type RoleNamesOf } from './permissions.js';
@@ -57,7 +54,6 @@ import type { PathParamsCheck, RoutePathParamsCheck } from './path-params.js';
 import type { AuthCheck, RouteAuthCheck } from './auth-check.js';
 import { createRoute, type RouteBuilder } from './route.js';
 import { createJob, type JobBuilder } from './job.js';
-import { createTool, type ToolBuilder } from './tool.js';
 import type { AnyAdapter, HandlerContextOf } from './adapter.js';
 import { buildApi, type Api } from './api.js';
 import type { GuardFnsFor, GuardsFor, RequestResolverFnsFor } from './server-surface.js';
@@ -74,7 +70,6 @@ import type {
     ConfiguredRequestContext,
     ConfiguredRequestContextSchemas,
     ConfiguredTags,
-    ConfiguredTools,
     KizunaConfigShape,
 } from './configured.js';
 import type { PluginImplementations } from './plugin-server.js';
@@ -217,26 +212,6 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      */
     job<const Definition extends AuthoredJobDefinition>(definition: Definition): JobBuilder<Definition>;
     /**
-     * Declare one tool and the handler that answers it. `input` is typed from
-     * the tool's schema, and the return is checked against its `output`.
-     *
-     * @example
-     * export const getForecast = k
-     *     .tool({
-     *         description: 'Look up tomorrow forecast for one city',
-     *         input: z.object({
-     *             city: z.string(),
-     *         }),
-     *         output: z.object({
-     *             temperature: z.number(),
-     *         }),
-     *     })
-     *     .handler(async ({ input }) => ({
-     *         temperature: await lookup(input.city),
-     *     }));
-     */
-    tool<const Definition extends ToolDefinition>(definition: Definition): ToolBuilder<Definition>;
-    /**
      * Declare scheduled jobs. Pass the identity every job requires, the one
      * credential your scheduler sends, then the jobs themselves.
      *
@@ -258,36 +233,6 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      */
     jobs<const J extends AuthoredJobs, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: J): CompiledJobs<J, Name>;
     jobs<const J extends AuthoredJobs>(definitions: J): CompiledJobs<J, undefined>;
-    /**
-     * Declare tools a model may call. Pass the identity every tool requires,
-     * then the tools themselves.
-     *
-     * Tools are their own concept, not routes. A tool declares no path and no
-     * method, and never appears in `contract.routes`, the OpenAPI document, or
-     * the generated Swift and Kotlin clients. A streamed response names them
-     * under `tools`, and the MCP plugin publishes them.
-     *
-     * @example
-     * export const tools = k.tools({
-     *     weather: {
-     *         getForecast: {
-     *             description: 'Look up tomorrow forecast for one city',
-     *             input: z.object({
-     *                 city: z.string(),
-     *             }),
-     *             output: z.object({
-     *                 temperature: z.number(),
-     *                 summary: z.string(),
-     *             }),
-     *             annotations: {
-     *                 readOnlyHint: true,
-     *             },
-     *         },
-     *     },
-     * });
-     */
-    tools<const T extends AuthoredTools, const Name extends IdentityNamesOf<Spec>>(identity: Name, definitions: T): CompiledTools<T, Name>;
-    tools<const T extends AuthoredTools>(definitions: T): CompiledTools<T, undefined>;
     /**
      * Declare an identity and the guard that authenticates it. The builder you
      * pick is the authentication mechanism, and `guard` receives the credential
@@ -428,7 +373,6 @@ type SpecOf<Config> = {
 export type HandlerContextFor<Spec extends KizunaSpec, Definition> = AuthContextOf<Definition, Spec['identities']> &
     ConfiguredRequestContext<Spec['config']> &
     ConfiguredJobs<Spec['config']> &
-    ConfiguredTools<Spec['config']> &
     ConfiguredPlugins<Spec['config']> &
     ConfiguredAdapterContext<Spec['config']>;
 
@@ -443,19 +387,12 @@ const createSurface = <Config>(): K<SpecOf<Config>> => {
             ? buildJobs(undefined, identityOrDefinitions as AuthoredJobs)
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
-    const tools = ((identityOrDefinitions: string | AuthoredTools, definitions?: AuthoredTools) =>
-        definitions === undefined
-            ? buildTools(undefined, identityOrDefinitions as AuthoredTools)
-            : buildTools(identityOrDefinitions as string, definitions)) as K<Spec>['tools'];
-
     return {
         tags: createTags,
         route: createRoute as K<Spec>['route'],
         routes,
         job: createJob as K<Spec>['job'],
-        tool: createTool as K<Spec>['tool'],
         jobs,
-        tools,
         identity: identityFactories as unknown as K<Spec>['identity'],
         requestContext: ((config: never) =>
             createRequestContextBuilder(createRequestContext(config))) as unknown as K<Spec>['requestContext'],
@@ -497,9 +434,7 @@ export class Kizuna<Config extends KizunaConfigShape = Record<string, never>> im
     declare readonly route: K<SpecOf<Config>>['route'];
     declare readonly routes: K<SpecOf<Config>>['routes'];
     declare readonly job: K<SpecOf<Config>>['job'];
-    declare readonly tool: K<SpecOf<Config>>['tool'];
     declare readonly jobs: K<SpecOf<Config>>['jobs'];
-    declare readonly tools: K<SpecOf<Config>>['tools'];
     declare readonly identity: K<SpecOf<Config>>['identity'];
     declare readonly requestContext: K<SpecOf<Config>>['requestContext'];
     declare readonly issue: K<SpecOf<Config>>['issue'];

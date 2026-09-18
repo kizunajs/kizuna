@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
-import { assembleApi, TOOLS_META, type GuardDeny } from '@ts-kizuna/core/adapter';
+import { assembleApi, type GuardDeny } from '@ts-kizuna/core/adapter';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
 import { buildInstructions, buildToolDefinitions, createMcpServer } from './mcp-server.js';
@@ -25,6 +25,7 @@ const contractRoutes = k.routes('api', {
         listUsers: k.route({
             method: 'GET',
             path: '/users',
+            tool: true,
             summary: 'List users with pagination',
             query: z.object({
                 page: z.number().optional(),
@@ -44,6 +45,7 @@ const contractRoutes = k.routes('api', {
         getUser: k.route({
             method: 'GET',
             path: '/users/:id',
+            tool: true,
             summary: 'Get a user by id',
             responses: {
                 200: z.object({
@@ -58,6 +60,7 @@ const contractRoutes = k.routes('api', {
         createUser: k.route({
             method: 'POST',
             path: '/users',
+            tool: true,
             summary: 'Create a user',
             body: z.object({
                 name: z.string(),
@@ -75,6 +78,8 @@ const contractRoutes = k.routes('api', {
     health: k.route({
         method: 'GET',
         path: '/health',
+        tool: true,
+        summary: 'Test route health',
         responses: {
             200: z.object({
                 ok: z.boolean(),
@@ -84,6 +89,8 @@ const contractRoutes = k.routes('api', {
     uploadAvatar: k.route({
         method: 'POST',
         path: '/avatar',
+        tool: true,
+        summary: 'Test route upload avatar',
         contentType: 'multipart/form-data',
         body: z.object({
             file: z.instanceof(File),
@@ -97,6 +104,8 @@ const contractRoutes = k.routes('api', {
     pingUser: k.route({
         method: 'POST',
         path: '/users/:id/ping',
+        tool: true,
+        summary: 'Test route ping user',
         body: z.void(),
         responses: {
             204: z.void(),
@@ -105,6 +114,8 @@ const contractRoutes = k.routes('api', {
     deleteUser: k.route({
         method: 'DELETE',
         path: '/users/:id',
+        tool: true,
+        summary: 'Test route delete user',
         responses: {
             200: z.object({
                 success: z.boolean(),
@@ -114,6 +125,8 @@ const contractRoutes = k.routes('api', {
     updateUser: k.route({
         method: 'PUT',
         path: '/users/:id',
+        tool: true,
+        summary: 'Test route update user',
         body: z.object({
             name: z.string(),
         }),
@@ -214,18 +227,9 @@ const buildApi = (testRouter: Record<string, unknown> = router) =>
 
 const api = buildApi();
 
-const publishAllRoutes = {
-    options: {
-        publishRoutes: {
-            '*': true,
-        },
-    },
-};
-
 const baseOptions = {
     name: 'Test API',
     version: '1.0.0',
-    ...publishAllRoutes,
 };
 
 const connectMcpClient = async (testApi: Parameters<typeof createMcpServer>[0] = api, options?: Parameters<typeof createMcpServer>[1]) => {
@@ -276,134 +280,69 @@ describe('buildToolDefinitions', () => {
         const health = definitions.find((definition) => definition.name === 'health')!;
 
         expect(listUsers.title).toBe('List users with pagination');
-        expect(health.title).toBeUndefined();
+        expect(health.title).toBe('Test route health');
     });
 });
 
-describe('buildToolDefinitions: selection', () => {
-    const names = (options: Parameters<typeof buildToolDefinitions>[1]) =>
-        buildToolDefinitions(contract.routes, options).map((definition) => definition.name);
+describe('buildToolDefinitions: which routes publish', () => {
+    const names = () => buildToolDefinitions(contract.routes).map((definition) => definition.name);
 
-    it('takes no route unless the map names one', () => {
-        expect(names({})).toEqual([]);
-    });
-
-    it('takes every route under a top level star', () => {
-        expect(names(baseOptions)).toEqual(
+    it('publishes every route that declared `tool`', () => {
+        expect(names()).toEqual(
             expect.arrayContaining(['users_list_users', 'users_get_user', 'users_create_user', 'health', 'delete_user'])
         );
     });
 
-    it('publishes just the route the map names', () => {
-        expect(
-            names({
-                options: {
-                    publishRoutes: {
-                        deleteUser: true,
-                    },
+    it('takes no route from a tree that declares none', () => {
+        const quiet = k.routes('api', {
+            hidden: k.route({
+                method: 'GET',
+                path: '/hidden',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
                 },
+                summary: 'Answers, but no model may call it',
+            }),
+        });
+
+        expect(buildToolDefinitions(quiet)).toEqual([]);
+    });
+
+    it('takes `tool: false` as a refusal', () => {
+        const refused = k.routes('api', {
+            hidden: k.route({
+                method: 'GET',
+                path: '/hidden',
+                tool: false,
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+                summary: 'Answers, but no model may call it',
+            }),
+        });
+
+        expect(buildToolDefinitions(refused)).toEqual([]);
+    });
+
+    it('refuses a route that publishes but describes nothing', () => {
+        expect(() =>
+            k.routes('api', {
+                bare: k.route({
+                    method: 'GET',
+                    path: '/bare',
+                    tool: true,
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                }),
             })
-        ).toEqual(['delete_user']);
-    });
-
-    it('publishes a whole group with a star', () => {
-        const selected = names({
-            options: {
-                publishRoutes: {
-                    users: true,
-                },
-            },
-        });
-
-        expect(selected).toContain('users_get_user');
-        expect(selected).toContain('users_create_user');
-        expect(selected).not.toContain('health');
-    });
-
-    it('lets a route opt out of its group star', () => {
-        const selected = names({
-            options: {
-                publishRoutes: {
-                    users: {
-                        '*': true,
-                        createUser: false,
-                    },
-                },
-            },
-        });
-
-        expect(selected).toContain('users_get_user');
-        expect(selected).not.toContain('users_create_user');
-    });
-
-    it('lets a route override a false group', () => {
-        const selected = names({
-            options: {
-                publishRoutes: {
-                    users: {
-                        '*': false,
-                        getUser: true,
-                    },
-                },
-            },
-        });
-
-        expect(selected).toContain('users_get_user');
-        expect(selected).not.toContain('users_create_user');
-    });
-
-    it('curates down to a few tools with a top level star', () => {
-        const selected = names({
-            options: {
-                publishRoutes: {
-                    '*': false,
-                    users: {
-                        getUser: true,
-                    },
-                },
-            },
-        });
-
-        expect(selected).toEqual(['users_get_user']);
-    });
-
-    it('keeps multipart routes out whatever the map says', () => {
-        const selected = names({
-            options: {
-                publishRoutes: {
-                    uploadAvatar: true,
-                },
-            },
-        });
-
-        expect(selected).not.toContain('upload_avatar');
-    });
-
-    it('keeps multipart routes out even when the map asks for them', () => {
-        const selected = names({
-            options: {
-                publishRoutes: {
-                    uploadAvatar: true,
-                },
-            },
-        });
-
-        expect(selected).not.toContain('upload_avatar');
-    });
-
-    it('keeps only safe methods under onlyReadOnly', () => {
-        const selected = names({
-            options: {
-                ...publishAllRoutes.options,
-                onlyReadOnly: true,
-            },
-        });
-
-        expect(selected).toContain('users_get_user');
-        expect(selected).toContain('health');
-        expect(selected).not.toContain('users_create_user');
-        expect(selected).not.toContain('delete_user');
-        expect(selected).not.toContain('update_user');
+        ).toThrow(/describes nothing/);
     });
 });
 
@@ -467,6 +406,8 @@ describe('buildToolDefinitions: input schema', () => {
             sendNotification: k.route({
                 method: 'POST',
                 path: '/notifications',
+                tool: true,
+                summary: 'Test route send notification',
                 body: z.discriminatedUnion('channel', [
                     z.object({
                         channel: z.literal('email'),
@@ -490,7 +431,7 @@ describe('buildToolDefinitions: input schema', () => {
             routes: unionContractRoutes,
         }).api;
 
-        const definitions = buildToolDefinitions(unionContract.routes, publishAllRoutes);
+        const definitions = buildToolDefinitions(unionContract.routes, baseOptions);
         const send = definitions.find((definition) => definition.name === 'send_notification')!;
 
         expect(send.inputSchema.hasBody).toBe(true);
@@ -502,6 +443,8 @@ describe('buildToolDefinitions: input schema', () => {
             updateItem: k.route({
                 method: 'PUT',
                 path: '/items/:id',
+                tool: true,
+                summary: 'Test route update item',
                 query: z.object({
                     version: z.number(),
                 }),
@@ -521,7 +464,7 @@ describe('buildToolDefinitions: input schema', () => {
             routes: complexContractRoutes,
         }).api;
 
-        const definitions = buildToolDefinitions(complexContract.routes, publishAllRoutes);
+        const definitions = buildToolDefinitions(complexContract.routes, baseOptions);
         const update = definitions.find((definition) => definition.name === 'update_item')!;
 
         expect(update.inputSchema.hasParams).toBe(true);
@@ -537,6 +480,8 @@ describe('buildToolDefinitions: input schema', () => {
             searchItems: k.route({
                 method: 'GET',
                 path: '/items',
+                tool: true,
+                summary: 'Test route search items',
                 query: z.object({
                     term: z.string(),
                     page: z.number().optional(),
@@ -554,7 +499,7 @@ describe('buildToolDefinitions: input schema', () => {
                 ...config,
                 routes: contractRoutesWithRequiredQuery,
             }).api.routes,
-            publishAllRoutes
+            baseOptions
         );
         const search = definitions.find((definition) => definition.name === 'search_items')!;
 
@@ -678,28 +623,33 @@ describe('buildToolDefinitions: output schema', () => {
 
 describe('instructions', () => {
     it('lists the contract tag groups', () => {
-        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), [], undefined);
+        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), undefined);
 
         expect(instructions).toContain('{ status, body }');
         expect(instructions).toContain('- API');
     });
 
     it('appends the authored text after the generated overview', () => {
-        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), [], 'Every timestamp is UTC.');
+        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), 'Every timestamp is UTC.');
 
         expect(instructions.indexOf('- API')).toBeLessThan(instructions.indexOf('Every timestamp is UTC.'));
     });
 
-    it('leaves out a group whose every route was excluded', () => {
-        const trimmed = buildToolDefinitions(contract.routes, {
-            options: {
-                publishRoutes: {
-                    '*': false,
+    it('leaves out a group whose every route stayed quiet', () => {
+        const quiet = k.routes('api', {
+            hidden: k.route({
+                method: 'GET',
+                path: '/hidden',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
                 },
-            },
+                summary: 'Answers, but no model may call it',
+            }),
         });
 
-        expect(buildInstructions(contract, trimmed, [], undefined)).not.toContain('- API');
+        expect(buildInstructions(contract, buildToolDefinitions(quiet), undefined)).not.toContain('- API');
     });
 
     it('reaches the client over the protocol', async () => {
@@ -1022,6 +972,8 @@ describe('MCP server: guards', () => {
         publicRoute: securedK.route({
             method: 'GET',
             path: '/public',
+            tool: true,
+            summary: 'Test route public route',
             auth: false,
             responses: {
                 200: z.object({
@@ -1032,6 +984,8 @@ describe('MCP server: guards', () => {
         whoAmI: securedK.route({
             method: 'GET',
             path: '/who-am-i',
+            tool: true,
+            summary: 'Test route who am i',
             auth: 'user',
             responses: {
                 200: z.object({
@@ -1049,6 +1003,8 @@ describe('MCP server: guards', () => {
                 },
             },
             path: '/owner-only',
+            tool: true,
+            summary: 'Test route owner only',
             responses: {
                 200: z.object({
                     ok: z.boolean(),
@@ -1259,6 +1215,8 @@ describe('streamed routes', () => {
             reply: k.route({
                 method: 'POST',
                 path: '/reply',
+                tool: true,
+                summary: 'Test route reply',
                 auth: {
                     identity: 'user',
                     roles: 'admin',
@@ -1282,6 +1240,8 @@ describe('streamed routes', () => {
             ping: k.route({
                 method: 'GET',
                 path: '/ping',
+                tool: true,
+                summary: 'Test route ping',
                 responses: {
                     200: z.object({
                         ok: z.boolean(),
@@ -1289,7 +1249,7 @@ describe('streamed routes', () => {
                 },
             }),
         });
-        const definitions = buildToolDefinitions(streamRoutes, publishAllRoutes);
+        const definitions = buildToolDefinitions(streamRoutes, baseOptions);
         expect(definitions.map((definition) => definition.name)).toEqual(['ping']);
     });
 });
@@ -1333,6 +1293,8 @@ describe('MCP server: request context in guards', () => {
                 whoAmI: contextK.route({
                     method: 'GET',
                     path: '/who-am-i',
+                    tool: true,
+                    summary: 'Test route who am i',
                     auth: 'user',
                     responses: {
                         200: z.object({
@@ -1342,11 +1304,6 @@ describe('MCP server: request context in guards', () => {
                 }),
             }),
         },
-        tools: contextK.tools('user', {
-            reindex: contextK.tool({
-                description: 'Rebuild the search index',
-            }),
-        }),
     }).api;
 
     const connectWithContext = async () => {
@@ -1376,15 +1333,7 @@ describe('MCP server: request context in guards', () => {
                         sessionId: (headers['x-session-id'] as string | undefined) ?? null,
                     }),
                 },
-            }),
-            {
-                [TOOLS_META]: {
-                    tools: contextContract.tools!,
-                    handlers: {
-                        reindex: () => undefined,
-                    } as Record<string, unknown>,
-                },
-            }
+            })
         );
 
         const server = createMcpServer(api as Parameters<typeof createMcpServer>[0], {
@@ -1392,11 +1341,6 @@ describe('MCP server: request context in guards', () => {
             credentialHeaders: {
                 authorization: 'Bearer tok',
                 'x-session-id': 'session-9',
-            },
-            options: {
-                publishRoutes: {
-                    '*': true,
-                },
             },
         });
         const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -1432,11 +1376,11 @@ describe('MCP server: request context in guards', () => {
         await close();
     });
 
-    it('reaches the guard of a declared tool call', async () => {
+    it('reaches the guard of a tool call', async () => {
         const { client, seen, close } = await connectWithContext();
 
         await client.callTool({
-            name: 'reindex',
+            name: 'api_who_am_i',
             arguments: {},
         });
 

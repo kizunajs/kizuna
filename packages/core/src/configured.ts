@@ -1,5 +1,4 @@
 import type { AuthoredJobDefinition, JobHandlerReturn } from './jobs.js';
-import type { ToolDefinition, ToolHandlerReturn } from './tools.js';
 import type { JobQueueOptions } from './job-runner.js';
 import type { AnyAdapter, HandlerContextOf } from './adapter.js';
 import type { RequestContextValues } from './handler-pipeline.js';
@@ -33,7 +32,6 @@ export interface KizunaConfigShape {
     guardSchema?: unknown;
     issueCodes?: string;
     jobs?: unknown;
-    tools?: unknown;
     plugins?: unknown;
 }
 
@@ -64,15 +62,6 @@ export type JobsOfTree<Tree> = {
         : JobsOfTree<Tree[Key]>;
 };
 
-/**
- * A tree of tools, as a handler reaches them.
- */
-export type ToolsOfTree<Tree> = {
-    [Key in keyof Tree]: Tree[Key] extends { definition: infer Definition extends ToolDefinition }
-        ? (input: Definition extends { input: z.ZodType } ? z.input<Definition['input']> : void) => Promise<ToolHandlerReturn<Definition>>
-        : ToolsOfTree<Tree[Key]>;
-};
-
 export type ConfiguredTags<Config> = Config extends { tags: TagSet<infer Tags extends Record<string, TagOptions>> }
     ? Tags
     : Record<string, never>;
@@ -89,7 +78,6 @@ export type ConfiguredGuardSchema<Config> = Config extends { guardSchema: infer 
 export type ConfiguredAdapterValue<Config> = Config extends { adapter: infer Adapter extends AnyAdapter } ? Adapter : undefined;
 
 export type ConfiguredJobs<Config> = Config extends { jobs: infer Tree } ? { jobs: JobsOfTree<Tree> } : {};
-export type ConfiguredTools<Config> = Config extends { tools: infer Tree } ? { tools: ToolsOfTree<Tree> } : {};
 export type ConfiguredPlugins<Config> = Config extends { plugins: infer Plugins extends PluginList }
     ? PluginArgs<PluginsByName<Plugins>>
     : {};

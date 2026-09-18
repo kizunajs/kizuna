@@ -9,8 +9,6 @@ import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline
 import { jobClaims, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
 import type { JobTransport } from './job-transport.js';
 import type { JobErrorHandler } from './job-runner.js';
-import type { Tools } from './tools.js';
-import type { ToolsArg } from './tool-runner.js';
 import type { TagOptions, TagSet } from './tags.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
@@ -155,7 +153,6 @@ const handlersOf = (declarations: Record<string, unknown> | undefined, key: stri
 export type KizunaConfigInput<
     R extends Routes,
     J extends Jobs,
-    T extends Tools,
     P extends PluginList,
     Tags extends Record<string, TagOptions>,
     Codes extends string,
@@ -178,7 +175,6 @@ export type KizunaConfigInput<
      */
     routes: R;
     jobs?: J;
-    tools?: T;
     /**
      * What this API installs beside its own routes. Each plugin carries its own
      * name, which is what handlers reach it under.
@@ -245,7 +241,6 @@ export type KizunaConfigInput<
 export type ConfiguredApi<
     R extends Routes,
     J extends Jobs,
-    T extends Tools,
     P extends PluginList,
     Tags extends Record<string, TagOptions>,
     Codes extends string,
@@ -259,7 +254,7 @@ export type ConfiguredApi<
             R,
             Identities,
             RequestContext,
-            PluginArgs<PluginsByName<P>> & JobsArg<J> & ToolsArg<T>,
+            PluginArgs<PluginsByName<P>> & JobsArg<J>,
             GuardOutput<GuardSchema>,
             GuardBody<GuardSchema>
         >,
@@ -269,7 +264,6 @@ export type ConfiguredApi<
         RequestContext,
         PluginsByName<P>,
         J,
-        T,
         GuardSchema
     >,
     AdapterValue
@@ -295,7 +289,6 @@ export type ConfiguredApi<
 export const defineConfig = <
     const R extends Routes,
     const J extends Jobs = Record<string, never>,
-    const T extends Tools = Record<string, never>,
     const P extends PluginList = readonly [],
     const Tags extends Record<string, TagOptions> = Record<string, never>,
     const Codes extends string = never,
@@ -304,16 +297,15 @@ export const defineConfig = <
     GuardSchema extends z.ZodType | undefined = undefined,
     const AdapterValue extends AnyAdapter | undefined = undefined,
 >(
-    options: KizunaConfigInput<R, J, T, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>
+    options: KizunaConfigInput<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>
 ): {
-    api: ConfiguredApi<R, J, T, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
+    api: ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
     clients: readonly ClientTarget[];
 } => {
     if (options.guardSchema) assertFillableGuardSchema(options.guardSchema);
 
     const routes = options.routes as Routes;
     const jobs = options.jobs as Jobs | undefined;
-    const tools = options.tools as Tools | undefined;
     const identities = options.identities as Record<string, SecurityScheme> | undefined;
     const plugins = pluginsByName(options.plugins);
 
@@ -346,7 +338,6 @@ export const defineConfig = <
     const contract = assembleContract({
         routes,
         jobs,
-        tools,
         tags: options.tags as TagSet<Record<string, TagOptions>> | undefined,
         securitySchemes: identities,
         guardSchema: options.guardSchema,
@@ -373,7 +364,7 @@ export const defineConfig = <
             onJobError: options.onJobError,
         },
         options.adapter
-    ) as unknown as ConfiguredApi<R, J, T, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
+    ) as unknown as ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
 
     return {
         api,

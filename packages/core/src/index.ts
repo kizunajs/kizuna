@@ -16,7 +16,6 @@ export {
     type RequestContextOf,
     type ContractPluginsOf,
     type JobsOf,
-    type ToolsOf,
     type GuardSchemaOf,
 } from './contract.js';
 export {
@@ -126,24 +125,6 @@ export {
     type JobQueueOptions,
 } from './job-runner.js';
 export {
-    type ToolDefinition,
-    type ToolAnnotations,
-    type AuthoredTools,
-    type Tools,
-    type CompiledTool,
-    type CompiledTools,
-    type ToolHandler,
-    type ToolHandlers,
-    type ToolHandlerArgs,
-    type ToolHandlerReturn,
-    type FlattenedTool,
-    type NoTools,
-    isCompiledTool,
-    isToolDefinition,
-    flattenTools,
-    toolAt,
-} from './tools.js';
-export {
     toolEvents,
     expandStreamTools,
     type StreamWithTools,
@@ -155,22 +136,6 @@ export {
     type ToolAt,
 } from './tool-events.js';
 export { readToolCalls, type ToolCallRecord, type ToolCallState, type ToolCallMessage } from './tool-records.js';
-export {
-    createToolRunner,
-    publishTools,
-    publishedTools,
-    ToolInputError,
-    ToolOutputError,
-    ToolExecutionError,
-    type ToolRunner,
-    type ToolTree,
-    type ToolFn,
-    type ToolRunArgs,
-    type ToolRunReturn,
-    type ToolsArg,
-    type PublishedTool,
-    type ModelFacingTool,
-} from './tool-runner.js';
 export {
     createJobTransport,
     JobDispatchError,
@@ -254,14 +219,13 @@ export {
 } from './types.js';
 export { buildPath, parsePath, type ExtractPathParams, type PathParamName, type HasPathParams } from './path-params.js';
 export { type AuthCheck, type RouteAuthCheck } from './auth-check.js';
-export { type JobFnOf, type JobsOfTree, type ToolsOfTree, type KizunaConfigShape } from './configured.js';
+export { type JobFnOf, type JobsOfTree, type KizunaConfigShape } from './configured.js';
 export { defineConfig, type KizunaConfigInput, type ConfiguredApi } from './define-config.js';
-export { DECLARATION, type DeclarationKind } from './types.js';
+export { DECLARATION, type DeclarationKind, type RouteToolOptions } from './types.js';
 export { isRouteDefinition } from './handler-pipeline.js';
 export { type Api, type ApiImplementations } from './api.js';
 export { type RouteBuilder, type RouteWithHandler } from './route.js';
 export { type JobBuilder, type JobWithHandler, type JobHandlerFor } from './job.js';
-export { type ToolBuilder, type ToolWithHandler } from './tool.js';
 export {
     type AuthContextOf,
     type ContextFromAuth,

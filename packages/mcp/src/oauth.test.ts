@@ -164,6 +164,8 @@ const apiRoutes = k.routes('api', {
         .route({
             method: 'GET',
             path: '/users/:id',
+            tool: true,
+            summary: 'Test route get user',
             auth: 'user',
             summary: 'Get a user by id',
             responses: {
@@ -191,6 +193,7 @@ const apiRoutes = k.routes('api', {
             },
             path: '/users',
             summary: 'Create a user',
+            tool: true,
             body: z.object({
                 name: z.string(),
             }),
@@ -217,6 +220,7 @@ const apiRoutes = k.routes('api', {
             },
             path: '/report',
             summary: 'Admin report',
+            tool: true,
             responses: {
                 200: z.object({
                     total: z.number(),
@@ -233,6 +237,8 @@ const apiRoutes = k.routes('api', {
         .route({
             method: 'GET',
             path: '/member-facts',
+            tool: true,
+            summary: 'Test route member facts',
             auth: 'member',
             summary: 'Facts for the workspace service',
             responses: {
@@ -258,11 +264,6 @@ const contract = defineConfig({
     plugins: [
         mcpPlugin({
             name: 'OAuth API',
-            options: {
-                publishRoutes: {
-                    '*': true,
-                },
-            },
             oauth: {
                 resource: 'https://api.example.com/mcp',
                 scheme: 'user',

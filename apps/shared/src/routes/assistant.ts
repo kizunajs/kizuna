@@ -2,7 +2,7 @@ import { countWords, replyWords } from '../assistant';
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from '../k';
-import { tools } from '../tools';
+import { assistantTools } from './assistant-tools';
 
 export const assistantRoutes = k.routes('assistant', {
     reply: k
@@ -24,7 +24,7 @@ export const assistantRoutes = k.routes('assistant', {
                             outputTokens: z.int(),
                         }),
                     },
-                    tools,
+                    tools: assistantTools,
                 },
                 400: ProblemDetailsSchema,
             },

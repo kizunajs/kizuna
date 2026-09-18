@@ -17,9 +17,7 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
-    TOOLS_META,
     type JobsMeta,
-    type ToolsMeta,
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
@@ -29,10 +27,8 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
-    toolRunnerFrom,
     type ContractRouter,
     type ContractJobsRouter,
-    type ContractToolsRouter,
     type Adapter,
 } from '@ts-kizuna/core/adapter';
 import type { Contract, RoutesOf, SecurityScheme, GuardSuccess } from '@ts-kizuna/core';
@@ -42,7 +38,6 @@ export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
-    readonly [TOOLS_META]?: unknown;
     /**
      * Register every contract route on an Express app or router.
      */
@@ -74,11 +69,6 @@ export type Router<C> = ContractRouter<C, ExpressHandlerContext>;
  * receives only the job's `input`, so the same handler can be run in process.
  */
 export type JobsRouter<C> = ContractJobsRouter<C>;
-
-/**
- * The handler for each of a contract's tools, typed against it.
- */
-export type ToolsRouter<C> = ContractToolsRouter<C>;
 
 declare global {
     // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -202,7 +192,6 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
-    const toolRunner = toolRunnerFrom(api[TOOLS_META] as ToolsMeta | undefined);
     const expressRouter = createExpressRouter();
 
     const mountRoute = (
@@ -247,7 +236,6 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                     requestContext,
                     pluginExports,
                     jobs: jobRunner,
-                    tools: toolRunner,
                     responseValidation: options?.responseValidation,
                 });
             }

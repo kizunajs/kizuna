@@ -82,9 +82,6 @@ export const ADAPTER_TYPE_FEATURES = {
     'streams.bodyRejectsValue': {
         summary: 'A plain value is refused as the body of a streamed status, and `throwError` refuses a streamed status.',
     },
-    'tools.handlerArg': {
-        summary: "A contract declaring tools gives every handler a `tools` argument typed against each tool's own input and output.",
-    },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 
 export type AdapterTypeFeature = keyof typeof ADAPTER_TYPE_FEATURES;

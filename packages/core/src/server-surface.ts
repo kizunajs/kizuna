@@ -1,12 +1,10 @@
 import type { z } from 'zod';
-import type { Contract, RoutesOf, SchemesOf, RequestContextOf, ContractPluginsOf, JobsOf, ToolsOf, GuardSchemaOf } from './contract.js';
+import type { Contract, RoutesOf, SchemesOf, RequestContextOf, ContractPluginsOf, JobsOf, GuardSchemaOf } from './contract.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { CredentialOf } from './identity.js';
 import type { RequestContextSchema, RequestContextHeaderValues } from './request-context.js';
 import type { JobHandlers, JobsArg } from './jobs.js';
-import type { ToolHandlers } from './tools.js';
-import type { ToolsArg } from './tool-runner.js';
 import type { PluginArgs } from './plugin.js';
 import type { PluginImplementations } from './plugin-server.js';
 import type { GuardBody } from './problem-details.js';
@@ -22,7 +20,6 @@ import {
     assembleApi,
     warnUnsupportedJobOptions,
     JOBS_META,
-    TOOLS_META,
     type ApiParts,
     type ApiWithRouter,
     type GuardDeny,
@@ -41,11 +38,7 @@ import {
 export type ContractRouter<C, HandlerContext> = C extends Contract
     ? HandlersFromRoutes<
           RoutesOf<C>,
-          HandlerContext &
-              RequestContextValues<RequestContextOf<C>> &
-              PluginArgs<ContractPluginsOf<C>> &
-              JobsArg<JobsOf<C>> &
-              ToolsArg<ToolsOf<C>>,
+          HandlerContext & RequestContextValues<RequestContextOf<C>> & PluginArgs<ContractPluginsOf<C>> & JobsArg<JobsOf<C>>,
           SchemesOf<C>
       >
     : C extends Routes
@@ -57,13 +50,6 @@ export type ContractRouter<C, HandlerContext> = C extends Contract
  * job's `input`, so the same handler can be run in process.
  */
 export type ContractJobsRouter<C> = C extends Contract ? JobHandlers<JobsOf<C>> : never;
-
-/**
- * The handler for each of a contract's tools. Each receives only the tool's
- * `input` and `throwError`, so the same handler runs however the tool is
- * reached.
- */
-export type ContractToolsRouter<C> = C extends Contract ? ToolHandlers<ToolsOf<C>> : never;
 
 /**
  * The handlers for a group named on the contract, or for a bare route group.

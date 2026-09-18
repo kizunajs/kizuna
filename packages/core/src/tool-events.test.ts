@@ -1,25 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { buildTools } from './tools.js';
 import { toolEvents } from './tool-events.js';
 import { formatEvent } from './stream.js';
 import { Kizuna } from './kizuna.js';
 
-const tools = buildTools(undefined, {
+const toolRoutesK = new Kizuna();
+
+const tools = toolRoutesK.routes({
     weather: {
-        getForecast: {
-            description: 'Look up the forecast for one city',
-            input: z.object({
+        getForecast: toolRoutesK.route({
+            method: 'POST',
+            path: '/forecast',
+            body: z.object({
                 city: z.string(),
             }),
-            output: z.object({
-                tempC: z.number(),
+            responses: {
+                200: z.object({
+                    tempC: z.number(),
+                }),
+            },
+            summary: 'Look up the forecast for one city',
+            tool: true,
+        }),
+    },
+    ping: toolRoutesK.route({
+        method: 'GET',
+        path: '/ping',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
             }),
         },
-    },
-    ping: {
-        description: 'Answer that the server is up',
-    },
+        summary: 'Answer that the server is up',
+        tool: true,
+    }),
 });
 
 describe('toolEvents', () => {
@@ -28,7 +42,7 @@ describe('toolEvents', () => {
     });
 
     it('throws on a tool set with no tools in it', () => {
-        expect(() => toolEvents(buildTools(undefined, {}))).toThrow(/a tool set with no tools in it/);
+        expect(() => toolEvents({})).toThrow(/was given no routes/);
     });
 
     it('parses a call for the tool it names', () => {
@@ -38,14 +52,18 @@ describe('toolEvents', () => {
                 id: 'call_1',
                 name: 'weather.getForecast',
                 input: {
-                    city: 'Oslo',
+                    body: {
+                        city: 'Oslo',
+                    },
                 },
             })
         ).toEqual({
             id: 'call_1',
             name: 'weather.getForecast',
             input: {
-                city: 'Oslo',
+                body: {
+                    city: 'Oslo',
+                },
             },
         });
     });
@@ -70,7 +88,9 @@ describe('toolEvents', () => {
                 id: 'call_1',
                 name: 'weather.getHistory',
                 input: {
-                    city: 'Oslo',
+                    body: {
+                        city: 'Oslo',
+                    },
                 },
             }).success
         ).toBe(false);
@@ -136,10 +156,18 @@ describe('toolEvents', () => {
 
     it('builds a union even for a single tool', () => {
         const events = toolEvents(
-            buildTools(undefined, {
-                ping: {
-                    description: 'Answer that the server is up',
-                },
+            toolRoutesK.routes({
+                ping: toolRoutesK.route({
+                    method: 'GET',
+                    path: '/ping-only',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                    summary: 'Answer that the server is up',
+                    tool: true,
+                }),
             })
         );
         expect(
@@ -163,7 +191,9 @@ describe('the wire a tool event produces', () => {
                     id: 'toolu_01',
                     name: 'weather.getForecast',
                     input: {
-                        city: 'Oslo',
+                        body: {
+                            city: 'Oslo',
+                        },
                     },
                 },
             },
@@ -183,7 +213,7 @@ describe('the wire a tool event produces', () => {
             true
         );
 
-        expect(call).toBe('event: tool_call\ndata: {"id":"toolu_01","name":"weather.getForecast","input":{"city":"Oslo"}}\n\n');
+        expect(call).toBe('event: tool_call\ndata: {"id":"toolu_01","name":"weather.getForecast","input":{"body":{"city":"Oslo"}}}\n\n');
         expect(result).toBe('event: tool_result\ndata: {"id":"toolu_01","name":"weather.getForecast","output":{"tempC":14}}\n\n');
     });
 });
@@ -191,12 +221,20 @@ describe('the wire a tool event produces', () => {
 describe('expandStreamTools', () => {
     const k = new Kizuna();
 
-    const declared = k.tools({
-        countWords: k.tool({
-            description: 'Count the words in a piece of text',
-            input: z.object({
+    const declared = k.routes({
+        countWords: k.route({
+            method: 'POST',
+            path: '/word-count',
+            body: z.object({
                 text: z.string(),
             }),
+            responses: {
+                200: z.object({
+                    words: z.int(),
+                }),
+            },
+            summary: 'Count the words in a piece of text',
+            tool: true,
         }),
     });
 

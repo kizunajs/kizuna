@@ -8,7 +8,6 @@ import type { user, member, inviteToken, scheduler } from './identities';
 import type { jobs } from './jobs';
 import type { analytics } from './request-context';
 import type { tags } from './tags';
-import type { tools } from './tools';
 
 export interface Config {
     tags: typeof tags;
@@ -24,5 +23,4 @@ export interface Config {
     guardSchema: typeof GuardSchema;
     issueCodes: 'invalid_phone_number';
     jobs: typeof jobs;
-    tools: typeof tools;
 }

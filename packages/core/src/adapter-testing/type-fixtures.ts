@@ -117,24 +117,12 @@ export const streamInferenceContract = defineConfig({
     routes: streamInferenceRoutes,
 }).api;
 
-export const toolInferenceTools = k.tools({
-    countWords: k.tool({
-        description: 'Count the words in a piece of text',
-        input: z.object({
-            text: z.string(),
-        }),
-        output: z.object({
-            words: z.int(),
-        }),
-    }),
-});
-
 export const toolInferenceContract = defineConfig({
     ...config,
     routes: k.routes('api', {
-        summarize: k.route({
+        countWords: k.route({
             method: 'POST',
-            path: '/summarize',
+            path: '/word-count',
             body: z.object({
                 text: z.string(),
             }),
@@ -143,9 +131,10 @@ export const toolInferenceContract = defineConfig({
                     words: z.int(),
                 }),
             },
+            summary: 'Count the words in a piece of text',
+            tool: true,
         }),
     }),
-    tools: toolInferenceTools,
 }).api;
 
 export const inferenceGroupContract = defineConfig({

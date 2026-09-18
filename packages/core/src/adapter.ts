@@ -41,8 +41,6 @@ import {
 import { encodeStreamBody, EVENT_STREAM_MEDIA_TYPE, streamContentType, type EncodeStreamOptions } from './stream.js';
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
 import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
-import type { Tools } from './tools.js';
-import { createToolRunner, type ToolRunner } from './tool-runner.js';
 import {
     DispatchFailedSchema,
     DispatchResultSchema,
@@ -73,9 +71,6 @@ export {
     type PluginExportsOf,
 } from './plugin.js';
 export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from './jobs.js';
-export type { CompiledTool, Tools, ToolHandler, ToolHandlers, FlattenedTool } from './tools.js';
-export { flattenTools, isCompiledTool, toolAt } from './tools.js';
-export { createToolRunner, publishTools, type ToolRunner } from './tool-runner.js';
 export { flattenJobs, isCompiledJob, jobAt } from './jobs.js';
 export {
     createJobRunner,
@@ -136,7 +131,6 @@ export const JOBS_META: unique symbol = Symbol.for('ts-kizuna.jobs') as symbol a
  * What `server.tools` stamps on the api: the contract's tools and the handler
  * for each.
  */
-export const TOOLS_META: unique symbol = Symbol.for('ts-kizuna.tools') as symbol as typeof TOOLS_META;
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
@@ -582,17 +576,6 @@ export const jobRunnerFrom = (meta: JobsMeta | undefined): JobRunner<Jobs> | und
     meta ? createJobRunner(meta.jobs, meta.handlers as never, meta) : undefined;
 
 /**
- * What {@link TOOLS_META} carries: the contract's tools and the handler for each.
- */
-export interface ToolsMeta {
-    tools: Tools;
-    handlers: Record<string, unknown>;
-}
-
-export const toolRunnerFrom = (meta: ToolsMeta | undefined): ToolRunner<Tools> | undefined =>
-    meta ? createToolRunner(meta.tools, meta.handlers as never) : undefined;
-
-/**
  * The dotted keys of the jobs a handler was actually bound to. A job without one
  * cannot run, so nothing should schedule or subscribe to it.
  */
@@ -637,7 +620,7 @@ export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
-export { type ContractRouter, type ContractJobsRouter, type ContractToolsRouter } from './server-surface.js';
+export { type ContractRouter, type ContractJobsRouter } from './server-surface.js';
 
 export type RouteMatcher = (method: string, path: string, routes: Routes, basePath?: string) => MatchResult;
 
@@ -776,11 +759,6 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
      * `jobs`, so a route can run a job in process without an HTTP hop.
      */
     jobs?: JobRunner<Jobs>;
-    /**
-     * The contract's tools bound to their handlers. Every handler receives it as
-     * `tools`, so a route can run a tool a model asked for.
-     */
-    tools?: ToolRunner<Tools>;
     basePath?: string;
     responseValidation?: boolean;
 }
@@ -1150,7 +1128,6 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     contextResolvers: RequestContextMap<HandlerContext> | undefined,
     pluginExports: Record<string, unknown> | undefined,
     jobRunner: JobRunner<Jobs> | undefined,
-    toolRunner: ToolRunner<Tools> | undefined,
     basePath: string | undefined,
     responseValidation: boolean | undefined
 ): Promise<AdapterResult> => {
@@ -1169,7 +1146,6 @@ const runPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         contextResolvers,
         pluginExports,
         jobRunner,
-        toolRunner,
         responseValidation
     );
     const { route } = resolution.resolved;
@@ -1188,7 +1164,6 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     contextResolvers: RequestContextMap<HandlerContext> | undefined,
     pluginExports: Record<string, unknown> | undefined,
     jobRunner: JobRunner<Jobs> | undefined,
-    toolRunner: ToolRunner<Tools> | undefined,
     responseValidation: boolean | undefined
 ): Promise<AdapterResult> => {
     const { routeKey, route, params } = resolved;
@@ -1340,7 +1315,6 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             throwError,
             ...handlerContext,
             ...(jobRunner ? { jobs: jobRunner } : {}),
-            ...(toolRunner ? { tools: toolRunner } : {}),
             ...(hasRequestContext ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),
             ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),
@@ -1408,7 +1382,6 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
         requestContext,
         pluginExports,
         jobs,
-        tools,
         basePath,
         responseValidation,
     }) => {
@@ -1423,7 +1396,6 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
             requestContext,
             pluginExports,
             jobs,
-            tools,
             basePath,
             responseValidation
         );

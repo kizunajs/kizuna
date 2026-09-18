@@ -1,7 +1,6 @@
 import type { z } from 'zod';
 import type { KnownStatus } from './status-titles.js';
 import type { ProblemDetails } from './problem-details.js';
-import type { Tools } from './tools.js';
 
 export const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
 
@@ -48,11 +47,12 @@ export interface StreamResponseDefinition {
      */
     stream: StreamDefinition;
     /**
-     * Tools declared with `k.tools`. Their `tool_call`, `tool_result` and
+     * The routes a model may call while this response streams. Their
+     * `tool_call`, `tool_result` and
      * `tool_error` events join the ones `stream` names, each discriminated on
      * the tool's dotted key.
      */
-    tools?: Tools;
+    tools?: Routes;
     /**
      * Schema for the response headers. Each property becomes one
      * response header.
@@ -263,6 +263,56 @@ export const HANDLER: unique symbol = Symbol.for('ts-kizuna.handler') as symbol 
  */
 export type RouteHandlerFunction = (args: never) => unknown;
 
+/**
+ * What a route publishes as, over MCP. `description`, `title` and the four
+ * hints are MCP's own, field for field; `confirm` is kizuna's.
+ *
+ * Each hint defaults from the route's method, so a `GET` is already marked read
+ * only and a `DELETE` already destructive. Set one to say what the method
+ * cannot.
+ */
+export interface RouteToolOptions {
+    /**
+     * What a model reads before deciding to call this route. Defaults to the
+     * route's `summary`, which a route has to carry to be a tool at all.
+     */
+    description?: string;
+    /**
+     * A human-readable name, for a client listing tools. Defaults to the
+     * route's `summary`.
+     */
+    title?: string;
+    /**
+     * The route only reads. It changes nothing the caller could observe later.
+     * Defaults to true for `GET` and `HEAD`.
+     */
+    readOnlyHint?: boolean;
+    /**
+     * Calling twice with the same input does what calling once did. Defaults to
+     * true for `PUT` and `DELETE`.
+     */
+    idempotentHint?: boolean;
+    /**
+     * The route may remove or overwrite something. Defaults to true for
+     * `DELETE`, and to false for a read-only method.
+     */
+    destructiveHint?: boolean;
+    /**
+     * The route reaches something outside this API, such as the public
+     * internet.
+     */
+    openWorldHint?: boolean;
+    /**
+     * What the person reads before this route runs as a tool. They agree or
+     * decline, and declining leaves the handler uncalled.
+     *
+     * Kizuna's own, sent over MCP's elicitation. The four hints above say what
+     * the route does, and leave a client to decide whether that warrants
+     * asking; this asks.
+     */
+    confirm?: string;
+}
+
 export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {
     method: Method;
     /**
@@ -277,6 +327,21 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
     path: RoutePath;
     summary?: string;
     description?: string;
+    /**
+     * Publish this route over MCP, so a model may call it. `true` takes the
+     * route's `summary` as the description a model reads, and derives every
+     * hint from the method's RFC 9110 semantics.
+     *
+     * @example
+     * tool: true,
+     *
+     * @example
+     * tool: {
+     *     description: 'Look up tomorrow forecast for one city',
+     *     openWorldHint: true,
+     * },
+     */
+    tool?: boolean | RouteToolOptions;
     /**
      * Deprecates the route. Pass a message to tell callers what to use instead,
      * or the object form to announce the deprecation in response headers.

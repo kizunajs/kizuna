@@ -91,6 +91,20 @@ const assertPathParamsAreScalar = (route: RouteDefinition, routeKey: string): vo
     }
 };
 
+/**
+ * A tool's description is the one thing a model reads before choosing it, so a
+ * route that publishes as one has to carry it.
+ */
+const assertToolDescribed = (route: RouteDefinition, routeKey: string): void => {
+    if (route.tool === undefined || route.tool === false) return;
+    const described = route.tool === true ? route.summary : (route.tool.description ?? route.summary);
+    if (described) return;
+    throw new Error(
+        `Route "${routeKey}" declares \`tool\` but describes nothing. A model reads the description before it calls, ` +
+            'so give the route a `summary`, or `tool: { description }`.'
+    );
+};
+
 const validateRoutes = (routes: Routes, prefix?: string): void => {
     for (const [key, value] of Object.entries(routes)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
@@ -103,6 +117,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             assertPathParamsAreScalar(value, fullKey);
             assertNoCoercion(value, fullKey);
             assertValidStreams(value, fullKey);
+            assertToolDescribed(value, fullKey);
             resolveCoercionPlans(value);
         } else if (value && typeof value === 'object') {
             validateRoutes(value as Routes, fullKey);

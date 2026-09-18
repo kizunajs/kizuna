@@ -27,6 +27,7 @@ const routes = k.routes('api', {
         .route({
             method: 'GET',
             path: '/users/:id',
+            tool: true,
             summary: 'Get a user by id',
             responses: {
                 200: z.object({
@@ -50,11 +51,6 @@ const contract = defineConfig({
     plugins: [
         mcpPlugin({
             name: 'Test API',
-            options: {
-                publishRoutes: {
-                    '*': true,
-                },
-            },
         }),
     ],
     routes,
@@ -149,6 +145,7 @@ const selective = k.routes('api', {
         .route({
             method: 'GET',
             path: '/users',
+            tool: true,
             summary: 'List users',
             responses: {
                 200: z.array(z.string()),
@@ -184,18 +181,11 @@ const selectiveContract = defineConfig({
     plugins: [
         mcpPlugin({
             name: 'Selective API',
-            routes: selective,
-            options: {
-                publishRoutes: {
-                    '*': true,
-                    health: false,
-                },
-            },
         }),
     ],
 }).api;
 
-describe('mcpPlugin: tool selection', () => {
+describe('mcpPlugin: the routes that publish', () => {
     let running: Server | undefined;
     let client: Client | undefined;
 

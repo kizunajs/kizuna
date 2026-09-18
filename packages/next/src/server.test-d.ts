@@ -9,7 +9,6 @@ import {
     inferenceContract,
     inferenceGroupContract,
     streamInferenceContract,
-    toolInferenceContract,
     inferenceRoutes,
     pluginTypeContract,
     requestContextContract,
@@ -72,20 +71,6 @@ const localAnalytics = k.requestContext({
 
 test('conforms to the shared adapter type catalogue', () => {
     checkAdapterTypeFeatures('next', {
-        'tools.handlerArg': () => {
-            const summarize: Router<typeof toolInferenceContract>['summarize'] = async ({ body, tools }) => {
-                expectTypeOf(tools.countWords.run).parameter(0).toEqualTypeOf<{ text: string }>();
-                const counted = await tools.countWords.run({
-                    text: body.text,
-                });
-                expectTypeOf(counted).toEqualTypeOf<{ words: number }>();
-                return {
-                    status: 200,
-                    body: counted,
-                };
-            };
-            void summarize;
-        },
         'streams.bodyGenerator': () => {
             const reply: Router<typeof streamInferenceContract>['reply'] = async ({ body }) => ({
                 status: 200,

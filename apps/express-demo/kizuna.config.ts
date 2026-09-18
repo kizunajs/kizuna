@@ -2,7 +2,7 @@ import { defineConfig } from '@ts-kizuna/core';
 import { expressAdapter } from '@ts-kizuna/express';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { openApiPlugin } from '@ts-kizuna/openapi';
-import { GuardSchema, analytics, jobs, routes, tags, tools, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
+import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
 import { diagnostics } from './src/routes/diagnostics';
 
 /**
@@ -29,23 +29,9 @@ export const { api } = defineConfig({
     issueCodes: ['invalid_phone_number'],
     routes: served,
     jobs,
-    tools,
     plugins: [
         mcpPlugin({
             name: 'ts-kizuna demo',
-            routes: served,
-            tools,
-            options: {
-                publishRoutes: {
-                    users: {
-                        '*': true,
-                        exportUsers: false,
-                    },
-                    workspace: true,
-                    members: true,
-                },
-                hideTools: ['countWords'],
-            },
         }),
         openApiPlugin({
             info: {

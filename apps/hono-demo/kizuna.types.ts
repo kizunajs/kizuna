@@ -6,7 +6,7 @@
 import type { honoAdapter } from '@ts-kizuna/hono';
 import type { mcpPlugin } from '@ts-kizuna/mcp';
 import type { openApiPlugin } from '@ts-kizuna/openapi';
-import type { GuardSchema, analytics, jobs, tags, tools, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
+import type { GuardSchema, analytics, jobs, tags, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
 
 export interface Config {
     adapter: typeof honoAdapter;
@@ -23,6 +23,5 @@ export interface Config {
     guardSchema: typeof GuardSchema;
     issueCodes: 'invalid_phone_number';
     jobs: typeof jobs;
-    tools: typeof tools;
     plugins: [ReturnType<typeof mcpPlugin>, ReturnType<typeof openApiPlugin>];
 }

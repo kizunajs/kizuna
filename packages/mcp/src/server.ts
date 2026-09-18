@@ -22,7 +22,6 @@ import { assertCanonicalResource, protectedResourceMetadataUrl, type McpOAuthPro
 import { denialResponse, enforceOAuth } from './oauth-enforcement.js';
 
 export { createMcpServer, buildToolDefinitions, buildInstructions, type McpServerOptions, type ToolDefinition } from './mcp-server.js';
-export type { ToolMap, ToolEntry, ToolSelection } from './tool-selection.js';
 
 type HandlerArgs = {
     body: unknown;

@@ -18,9 +18,7 @@ import {
     SCHEMES_META,
     REQUEST_CONTEXT_META,
     JOBS_META,
-    TOOLS_META,
     type JobsMeta,
-    type ToolsMeta,
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
@@ -30,11 +28,9 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
-    toolRunnerFrom,
     type Adapter,
     type ContractRouter,
     type ContractJobsRouter,
-    type ContractToolsRouter,
 } from '@ts-kizuna/core/adapter';
 import type { Contract, RoutesOf, SecurityScheme, GuardSuccess } from '@ts-kizuna/core';
 
@@ -43,7 +39,6 @@ export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
-    readonly [TOOLS_META]?: unknown;
     /**
      * Register every contract route on a Fastify instance. Calls
      * `app.register` internally, so encapsulation behaves as Fastify expects.
@@ -78,11 +73,6 @@ export type Router<C> = ContractRouter<C, FastifyHandlerContext>;
  * receives only the job's `input`, so the same handler can be run in process.
  */
 export type JobsRouter<C> = ContractJobsRouter<C>;
-
-/**
- * The handler for each of a contract's tools, typed against it.
- */
-export type ToolsRouter<C> = ContractToolsRouter<C>;
 
 declare module 'fastify' {
     interface FastifyRequest {
@@ -205,7 +195,6 @@ export const fastifyKizuna = fastifyPlugin(
         const pluginExports = pluginExportsOf(api);
         const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
         const jobRunner = jobRunnerFrom(jobsMeta);
-        const toolRunner = toolRunnerFrom(api[TOOLS_META] as ToolsMeta | undefined);
         const mountRoute = (
             routeKey: string,
             route: RouteDefinition,
@@ -250,7 +239,6 @@ export const fastifyKizuna = fastifyPlugin(
                         requestContext,
                         pluginExports,
                         jobs: jobRunner,
-                        tools: toolRunner,
                         responseValidation: options?.responseValidation,
                     });
                 },
