@@ -80,7 +80,17 @@ export interface JobDefinition {
     responses?: {
         [status: number]: Exclude<ResponseDefinition, StreamResponseDefinition>;
     };
+    /**
+     * The handler that runs this job. Attach it with `k.job(...).handler(...)`,
+     * which types `input` from this job and checks the return against `result`.
+     */
+    handler?: (args: never) => unknown;
 }
+
+/**
+ * A job as authored in `k.job`.
+ */
+export type AuthoredJobDefinition = JobDefinition;
 
 /**
  * A job's synthesized responses. These are the retry contract: `503` asks for a
@@ -278,6 +288,8 @@ const isJobField = (name: string, value: unknown): boolean => {
         case 'input':
         case 'result':
             return value instanceof z.ZodType;
+        case 'handler':
+            return typeof value === 'function';
         case 'responses':
             return !!value && typeof value === 'object';
         default:

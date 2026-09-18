@@ -11,6 +11,8 @@ import {
 } from './adapter.js';
 import type { AnyAdapter, MountArgsOf, MountedOf } from './adapter.js';
 import type { Jobs, JobsConfig } from './jobs.js';
+import type { JobTransport } from './job-transport.js';
+import type { JobErrorHandler } from './job-runner.js';
 import type { Tools } from './tools.js';
 import type { ContractPlugins } from './plugin.js';
 import type { Routes } from './types.js';
@@ -40,6 +42,12 @@ export interface ApiImplementations {
     plugins?: Record<string, unknown>;
     jobs?: Record<string, unknown>;
     tools?: Record<string, unknown>;
+    /**
+     * Carries a queued job to whatever runs it. Without one, `queue` runs the
+     * job in this process and it is lost on a crash.
+     */
+    jobTransport?: JobTransport;
+    onJobError?: JobErrorHandler;
 }
 
 export interface BuildApiConfig {
@@ -55,15 +63,33 @@ export interface BuildApiConfig {
 }
 
 /**
+ * The handler tree a jobs or tools tree already carries, mirroring its shape so
+ * the runners find each declaration's own handler.
+ */
+const handlersFrom = (declarations: Record<string, unknown>): Record<string, unknown> => {
+    const handlers: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(declarations)) {
+        if (!value || typeof value !== 'object') continue;
+        const compiled = value as { definition?: { handler?: unknown } };
+        if (compiled.definition) {
+            if (compiled.definition.handler) handlers[key] = compiled.definition.handler;
+            continue;
+        }
+        handlers[key] = handlersFrom(value as Record<string, unknown>);
+    }
+    return handlers;
+};
+
+/**
  * Assemble a contract and its implementations into the object a framework
- * mounts. The handlers come from the routes themselves.
+ * mounts. The handlers come from the routes, jobs and tools themselves.
  */
 export const buildApi = (
     contract: Contract,
     implementations: ApiImplementations,
     adapter: AnyAdapter | undefined
 ): Record<string, unknown> => {
-    warnUnsupportedJobOptions(contract.jobs, undefined);
+    warnUnsupportedJobOptions(contract.jobs, implementations.jobTransport);
     const parts: ApiParts = {
         router: routerFromRoutes(contract.routes),
         guards: implementations.guards,
@@ -75,14 +101,16 @@ export const buildApi = (
         [JOBS_META]: contract.jobs
             ? {
                   jobs: contract.jobs,
-                  handlers: implementations.jobs ?? {},
+                  handlers: handlersFrom(contract.jobs as unknown as Record<string, unknown>),
                   config: contract.jobsConfig,
+                  transport: implementations.jobTransport,
+                  onError: implementations.onJobError,
               }
             : undefined,
         [TOOLS_META]: contract.tools
             ? {
                   tools: contract.tools,
-                  handlers: implementations.tools ?? {},
+                  handlers: handlersFrom(contract.tools as unknown as Record<string, unknown>),
               }
             : undefined,
     }) as Record<string, unknown>;

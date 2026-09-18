@@ -22,13 +22,16 @@ import {
     jobClaims,
     buildJobs,
     type AuthoredJobs,
+    type AuthoredJobDefinition,
     type CompiledJobs,
     type JobHandlers,
     type Jobs,
     type JobsArg,
     type JobsConfig,
 } from './jobs.js';
-import { buildTools, type AuthoredTools, type CompiledTools, type ToolHandlers, type Tools } from './tools.js';
+import type { JobTransport } from './job-transport.js';
+import type { JobErrorHandler } from './job-runner.js';
+import { buildTools, type AuthoredTools, type CompiledTools, type ToolDefinition, type ToolHandlers, type Tools } from './tools.js';
 import type { ToolsArg } from './tool-runner.js';
 import { createTags, type TagSet, type TagOptions } from './tags.js';
 import { createIdentity, type IdentityParamsOf, type RolesOf } from './identity.js';
@@ -51,6 +54,8 @@ import type { RequestContextSchema } from './request-context.js';
 import type { PathParamsCheck, RoutePathParamsCheck } from './path-params.js';
 import type { AuthCheck, RouteAuthCheck } from './auth-check.js';
 import { createRoute, type RouteBuilder } from './route.js';
+import { createJob, type JobBuilder } from './job.js';
+import { createTool, type ToolBuilder } from './tool.js';
 import type { AnyAdapter, HandlerContextOf } from './adapter.js';
 import { buildApi, type Api } from './api.js';
 import type { GuardFnsFor, GuardsFor, RequestResolverFnsFor } from './server-surface.js';
@@ -284,6 +289,46 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         defs: T & PathParamsCheck<T> & AuthCheck<T, Spec['identities']>
     ): T;
     /**
+     * Declare one job and the handler that runs it. `input` is typed from the
+     * job's schema, and the return is checked against its `result`.
+     *
+     * @example
+     * export const sendDigests = k
+     *     .job({
+     *         schedule: '0 5 * * *',
+     *         result: z.object({
+     *             sent: z.int(),
+     *         }),
+     *     })
+     *     .handler(async () => ({
+     *         status: 200,
+     *         body: {
+     *             sent: await sendPendingDigests(),
+     *         },
+     *     }));
+     */
+    job<const Definition extends AuthoredJobDefinition>(definition: Definition): JobBuilder<Definition>;
+    /**
+     * Declare one tool and the handler that answers it. `input` is typed from
+     * the tool's schema, and the return is checked against its `output`.
+     *
+     * @example
+     * export const getForecast = k
+     *     .tool({
+     *         description: 'Look up tomorrow forecast for one city',
+     *         input: z.object({
+     *             city: z.string(),
+     *         }),
+     *         output: z.object({
+     *             temperature: z.number(),
+     *         }),
+     *     })
+     *     .handler(async ({ input }) => ({
+     *         temperature: await lookup(input.city),
+     *     }));
+     */
+    tool<const Definition extends ToolDefinition>(definition: Definition): ToolBuilder<Definition>;
+    /**
      * Declare scheduled jobs. Pass the identity every job requires, the one
      * credential your scheduler sends, then the jobs themselves.
      *
@@ -503,8 +548,9 @@ export type ApiOptions<C extends Contract, Spec extends KizunaSpec> = {
     (string extends keyof RequestContextOf<C>
         ? { requestContext?: undefined }
         : { requestContext: NoInfer<{ [Name in keyof RequestContextOf<C>]: RequestContextRun<HandlerContextOf<Spec['adapter']>> }> }) &
-    (string extends keyof JobsOf<C> ? { jobs?: undefined } : { jobs: NoInfer<JobHandlers<JobsOf<C>>> }) &
-    (string extends keyof ToolsOf<C> ? { tools?: undefined } : { tools: NoInfer<ToolHandlers<ToolsOf<C>>> }) &
+    (string extends keyof JobsOf<C>
+        ? { jobTransport?: undefined; onJobError?: undefined }
+        : { jobTransport?: JobTransport; onJobError?: JobErrorHandler }) &
     (string extends keyof ContractPluginsOf<C>
         ? { plugins?: undefined }
         : { plugins: NoInfer<PluginImplementations<ContractPluginsOf<C>, HandlerContextOf<Spec['adapter']>>> }) &
@@ -680,6 +726,8 @@ const createSurface = <
             plugins,
             jobs: jobHandlers,
             tools: toolHandlers,
+            jobTransport,
+            onJobError,
         } = definition;
         return buildApi(
             apiContract as Contract,
@@ -689,6 +737,8 @@ const createSurface = <
                 plugins: plugins as Record<string, unknown> | undefined,
                 jobs: jobHandlers as Record<string, unknown> | undefined,
                 tools: toolHandlers as Record<string, unknown> | undefined,
+                jobTransport: jobTransport as JobTransport | undefined,
+                onJobError: onJobError as JobErrorHandler | undefined,
             },
             (apiAdapter as AnyAdapter | undefined) ?? config?.adapter
         );
@@ -696,6 +746,8 @@ const createSurface = <
 
     const k: K<Spec> = {
         api,
+        job: createJob as K<Spec>['job'],
+        tool: createTool as K<Spec>['tool'],
         guard: ((_name: string, run: unknown) => run) as K<Spec>['guard'],
         requestContext: ((_name: string, run: unknown) => run) as K<Spec>['requestContext'],
         route: createRoute as K<Spec>['route'],
@@ -750,6 +802,8 @@ export class Kizuna<
 
     declare readonly route: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['route'];
     declare readonly routes: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['routes'];
+    declare readonly job: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['job'];
+    declare readonly tool: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['tool'];
     declare readonly jobs: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['jobs'];
     declare readonly tools: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['tools'];
     declare readonly contract: K<SpecOf<Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>>['contract'];

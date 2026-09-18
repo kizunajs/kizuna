@@ -259,6 +259,8 @@ export { type AuthCheck, type RouteAuthCheck } from './auth-check.js';
 export { isRouteDefinition } from './handler-pipeline.js';
 export { type Api, type ApiImplementations } from './api.js';
 export { type RouteBuilder, type RouteWithHandler } from './route.js';
+export { type JobBuilder, type JobWithHandler, type JobHandlerFor } from './job.js';
+export { type ToolBuilder, type ToolWithHandler } from './tool.js';
 export {
     type AuthContextOf,
     type ContextFromAuth,

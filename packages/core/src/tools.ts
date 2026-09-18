@@ -46,6 +46,12 @@ export interface ToolDefinition {
      */
     input?: z.ZodType;
     /**
+     * The handler that answers this tool. Attach it with
+     * `k.tool(...).handler(...)`, which types `input` from this tool and checks
+     * the return against `output`.
+     */
+    handler?: (args: never) => unknown;
+    /**
      * Schema for what the tool returns. Becomes MCP's `outputSchema`. Omit it
      * for a tool that reports nothing back.
      */
@@ -143,6 +149,13 @@ export type ToolHandlerReturn<Definition extends ToolDefinition> = Definition ex
     ? z.input<Definition['output']>
     : void;
 
+/**
+ * A tool's handler, typed against the tool it answers.
+ */
+export type ToolHandlerFor<Definition extends ToolDefinition> = (
+    args: ToolHandlerArgs<Definition>
+) => Promise<ToolHandlerReturn<Definition>> | ToolHandlerReturn<Definition>;
+
 export type ToolHandler<Tool extends CompiledTool> = (
     args: ToolHandlerArgs<Tool['definition']>
 ) => Promise<ToolHandlerReturn<Tool['definition']>> | ToolHandlerReturn<Tool['definition']>;
@@ -178,6 +191,8 @@ const isToolField = (name: string, value: unknown): boolean => {
             return value instanceof z.ZodType;
         case 'annotations':
             return !!value && typeof value === 'object';
+        case 'handler':
+            return typeof value === 'function';
         default:
             return false;
     }
