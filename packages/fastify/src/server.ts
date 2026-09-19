@@ -7,7 +7,6 @@ import {
     type Method,
     type RouteDefinition,
     type Routes,
-    type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ApiWithRouter,
     type ErrorFormatter,
@@ -29,8 +28,6 @@ import {
     jobRouter,
     jobRunnerFrom,
     type Adapter,
-    type ContractRouter,
-    type ContractJobsRouter,
 } from '@ts-kizuna/core/adapter';
 import type { SecurityScheme } from '@ts-kizuna/core';
 
@@ -55,24 +52,6 @@ export interface FastifyHandlerContext {
     request: FastifyRequest;
     reply: FastifyReply;
 }
-
-/**
- * The handler type for a single route, typed against its contract definition.
- */
-export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, FastifyHandlerContext>;
-
-/**
- * The handler tree for a contract or route group, typed against it. Routes
- * whose `auth` names an identity additionally receive that identity's context
- * in their handler args, under `auth`, keyed by the identity's name.
- */
-export type Router<C> = ContractRouter<C, FastifyHandlerContext>;
-
-/**
- * The handler for each of a contract's scheduled jobs, typed against it. Each
- * receives only the job's `input`, so the same handler can be run in process.
- */
-export type JobsRouter<C> = ContractJobsRouter<C>;
 
 declare module 'fastify' {
     interface FastifyRequest {

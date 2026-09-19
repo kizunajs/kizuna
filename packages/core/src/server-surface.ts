@@ -4,16 +4,16 @@ import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { CredentialOf } from './identity.js';
 import type { RequestContextSchema, RequestContextHeaderValues } from './request-context.js';
-import type { JobHandlers, JobsArg } from './jobs.js';
+import type { JobsArg } from './jobs.js';
 import type { PluginArgs } from './plugin.js';
 import type { GuardBody } from './problem-details.js';
 import type { GuardReturn, GuardSuccess, HandlersFromRoutes, RequestContextValues, Router as CoreRouter } from './handler-pipeline.js';
 import { type GuardDeny, type GuardDenial, type GuardRun } from './adapter.js';
 
 /**
- * The handler tree for a contract or route group, typed against it. A route
- * whose `auth` names an identity additionally receives that identity's context
- * in its handler args, under `auth`, keyed by the identity's name.
+ * The handler tree for a contract or route group, typed against it, with an
+ * adapter's handler context substituted in. Adapter packages check their own
+ * surface against this; an app types a handler by writing it on the route.
  */
 export type ContractRouter<C, HandlerContext> = C extends Contract
     ? HandlersFromRoutes<
@@ -24,21 +24,6 @@ export type ContractRouter<C, HandlerContext> = C extends Contract
     : C extends Routes
       ? CoreRouter<C, HandlerContext>
       : never;
-
-/**
- * The handler for each of a contract's scheduled jobs. Each receives only the
- * job's `input`, so the same handler can be run in process.
- */
-export type ContractJobsRouter<C> = C extends Contract ? JobHandlers<JobsOf<C>> : never;
-
-/**
- * The handlers for a group named on the contract, or for a bare route group.
- * Both forms resolve through one signature: a second candidate of the same
- * arity costs zero-argument handlers their contextual type.
- */
-export type ContractGroupRouter<Source, GroupOrRoutes, HandlerContext> = GroupOrRoutes extends string
-    ? ContractRouter<Source, HandlerContext>[Extract<GroupOrRoutes, keyof ContractRouter<Source, HandlerContext>>]
-    : ContractRouter<GroupOrRoutes, HandlerContext>;
 
 /**
  * A guard per identity, keyed by name. Each receives the handler context, the

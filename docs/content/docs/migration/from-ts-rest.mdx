@@ -200,9 +200,9 @@ export const users = k.routes('users', {
 });
 ```
 
-### `RouterImpl` → `RouteHandler`
+### `RouterImpl` has no counterpart
 
-A handler is typed where you write it, so most code needs no annotation. When you keep one in its own file, `RouteHandler` types it:
+ts-rest types a handler tree because the tree is where handlers live. In ts-kizuna the handler sits on the route, typed from the declaration above it, so there is nothing to annotate and no second tree to keep in step.
 
 ```ts title="ts-rest"
 import type { RouterImpl } from '@ts-rest/express';
@@ -211,10 +211,9 @@ const router: RouterImpl<typeof contract> = { ... };
 ```
 
 ```ts title="ts-kizuna"
-import type { RouteHandler } from '@ts-kizuna/express';
-import type { getUserRoute } from './get-user';
-
-const getUser: RouteHandler<typeof getUserRoute> = async ({ params }) => { ... };
+getUser: k
+    .route({ ... })
+    .handler(async ({ params }) => { ... }),
 ```
 
 ## Express adapter

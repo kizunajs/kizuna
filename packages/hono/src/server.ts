@@ -4,7 +4,6 @@ import {
     type AdapterRequest,
     type RouteDefinition,
     type Routes,
-    type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ApiWithRouter,
     type ErrorFormatter,
@@ -24,8 +23,6 @@ import {
     jobRouter,
     jobRunnerFrom,
     type Adapter,
-    type ContractRouter,
-    type ContractJobsRouter,
     renderJsonResult,
     parseFetchBody,
     headersToObject,
@@ -46,25 +43,6 @@ export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
 export interface HonoHandlerContext<E extends Env = Env> {
     c: Context<E>;
 }
-
-/**
- * The handler type for a single route, typed against its contract definition.
- */
-export type RouteHandler<R extends RouteDefinition, E extends Env = Env> = CoreRouteHandler<R, HonoHandlerContext<E>>;
-
-/**
- * The handler tree for a contract or route group, typed against it. Preserves
- * Hono's {@link Env} generic for the handler context. Routes secured by the
- * contract's `auth` map additionally receive each required identity's context
- * in their handler args, under `auth`, keyed by the identity's name.
- */
-export type Router<C, E extends Env = Env> = ContractRouter<C, HonoHandlerContext<E>>;
-
-/**
- * The handler for each of a contract's scheduled jobs, typed against it. Each
- * receives only the job's `input`, so the same handler can be run in process.
- */
-export type JobsRouter<C> = ContractJobsRouter<C>;
 
 export interface HonoOptions {
     /**

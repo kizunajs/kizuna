@@ -1,12 +1,6 @@
 import type { AdapterFeatureMeta, AdapterName } from './features.js';
 
 export const ADAPTER_TYPE_FEATURES = {
-    'surface.router': {
-        summary: '`Router<C>` resolves to the handler tree core derives for the adapter’s handler context.',
-    },
-    'surface.routeHandler': {
-        summary: '`RouteHandler<R>` resolves to core’s handler for the adapter’s handler context.',
-    },
     'surface.guardRun': {
         summary: '`k.identity.*(…).guard` returns a `GuardRun` over the adapter’s handler context.',
     },
@@ -57,18 +51,6 @@ export const ADAPTER_TYPE_FEATURES = {
     },
     'requestContext.unknownKey': {
         summary: 'A context key the contract does not declare is refused.',
-    },
-    'standalone.routeHandlerAuth': {
-        summary: 'A standalone `RouteHandler` carries the route’s auth and drops into the group router.',
-    },
-    'standalone.routeHandlerContext': {
-        summary: 'A standalone `RouteHandler` carries the contract’s request context.',
-    },
-    'standalone.routeGroupContractArgs': {
-        summary: 'A router typed from a route group carries the contract’s plugins and jobs.',
-    },
-    'standalone.routeHandlerContractArgs': {
-        summary: 'A standalone `RouteHandler` carries the contract’s plugins and jobs.',
     },
     'plugins.exportsTyped': {
         summary: 'A handler’s `plugins` carries each installed plugin’s exports, typed and keyed by install name.',

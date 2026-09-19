@@ -1,9 +1,7 @@
 import {
     type AdapterRequest,
     type AdapterResult,
-    type RouteDefinition,
     type Routes,
-    type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ErrorFormatter,
     type GuardMap,
@@ -26,8 +24,6 @@ import {
     jobRouter,
     jobRunnerFrom,
     type Adapter,
-    type ContractRouter,
-    type ContractJobsRouter,
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
@@ -40,24 +36,6 @@ export { NextRequest, NextResponse } from 'next/server';
 export interface NextHandlerContext {
     request: NextRequest;
 }
-
-/**
- * The handler type for a single route, typed against its contract definition.
- */
-export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, NextHandlerContext>;
-
-/**
- * The handler tree for a contract, typed against it. Routes secured by the
- * contract's `auth` map additionally receive each required identity's context
- * in their handler args, under `auth`, keyed by the identity's name.
- */
-export type Router<C> = ContractRouter<C, NextHandlerContext>;
-
-/**
- * The handler for each of a contract's scheduled jobs, typed against it. Each
- * receives only the job's `input`, so the same handler can be run in process.
- */
-export type JobsRouter<C> = ContractJobsRouter<C>;
 
 /**
  * A contract's jobs paired with their handlers, both in the shape the request

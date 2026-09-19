@@ -208,34 +208,6 @@ Both middleware and handlers are then typed:
 
 The adapter also sets `request.kizunaRoute` on every matched request, holding the route that matched.
 
-## Writing a handler in its own file
-
-A handler passed to `.handler()` is typed where you write it. When you keep one in a separate file, `RouteHandler` gives it the same types:
-
-```ts title="src/routes/get-user.handler.ts"
-import { getUserRoute } from './get-user';
-
-type GetUserHandler = Parameters<typeof getUserRoute.handler>[0];
-
-export const getUser: GetUserHandler = async ({ params }) => {
-    const user = await db.users.findById(params.id);
-    if (!user) {
-        return {
-            status: 404,
-            body: {
-                detail: 'Not found',
-            },
-        };
-    }
-    return {
-        status: 200,
-        body: user,
-    };
-};
-```
-
-The route's own `handler` is what carries the types, so its parameter gives you the framework context, the route's `auth`, and the request context, with nothing to keep in step.
-
 ## Streams
 
 A [stream](/docs/streaming) response hijacks the reply and is piped to `reply.raw` after its headers are flushed. The generator's `signal` fires when the raw response closes before the stream has finished.

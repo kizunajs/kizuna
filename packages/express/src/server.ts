@@ -6,7 +6,6 @@ import {
     type AdapterRequest,
     type RouteDefinition,
     type Routes,
-    type RouteHandler as CoreRouteHandler,
     type Router as CoreRouter,
     type ApiWithRouter,
     type ErrorFormatter,
@@ -27,8 +26,6 @@ import {
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
-    type ContractRouter,
-    type ContractJobsRouter,
     type Adapter,
 } from '@ts-kizuna/core/adapter';
 import type { SecurityScheme } from '@ts-kizuna/core';
@@ -51,24 +48,6 @@ export interface ExpressHandlerContext {
     req: Request;
     res: Response;
 }
-
-/**
- * The handler for a single route, typed against its contract definition.
- */
-export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, ExpressHandlerContext>;
-
-/**
- * The handler tree for a contract or route group, typed against it. Routes
- * whose `auth` names an identity additionally receive that identity's context
- * in their handler args, under `auth`, keyed by the identity's name.
- */
-export type Router<C> = ContractRouter<C, ExpressHandlerContext>;
-
-/**
- * The handler for each of a contract's scheduled jobs, typed against it. Each
- * receives only the job's `input`, so the same handler can be run in process.
- */
-export type JobsRouter<C> = ContractJobsRouter<C>;
 
 declare global {
     // eslint-disable-next-line @typescript-eslint/no-namespace

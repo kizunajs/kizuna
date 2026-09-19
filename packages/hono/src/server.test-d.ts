@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import type { HandlerContextOf } from '@ts-kizuna/core/adapter';
+import type { HandlerContextOf, ContractRouter } from '@ts-kizuna/core/adapter';
 import type { Env } from 'hono';
 import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
 import {
@@ -14,10 +14,8 @@ import {
     pluginTypeContract,
     requestContextContract,
     securedContract,
-    type ExpectedRouteHandler,
-    type ExpectedRouter,
 } from '../../core/src/adapter-testing/type-testing.js';
-import { honoAdapter, type HonoHandlerContext, type RouteHandler, type Router } from './server.js';
+import { honoAdapter, type HonoHandlerContext } from './server.js';
 
 interface SessionEnv extends Env {
     Variables: {
@@ -76,10 +74,16 @@ const localAnalytics = k.requestContext({
     }),
 });
 
+/**
+ * The handler tree for a contract, with this adapter's handler context, which is
+ * what every `handler.*` and `guards.*` feature below is checked against.
+ */
+type Handlers<C> = ContractRouter<C, HonoHandlerContext>;
+
 test('conforms to the shared adapter type catalogue', () => {
     checkAdapterTypeFeatures('hono', {
         'streams.bodyGenerator': () => {
-            const reply: Router<typeof streamInferenceContract>['reply'] = async ({ body }) => ({
+            const reply: Handlers<typeof streamInferenceContract>['reply'] = async ({ body }) => ({
                 status: 200,
                 body: async function* ({ signal }) {
                     expectTypeOf(signal).toEqualTypeOf<AbortSignal>();
@@ -103,7 +107,7 @@ test('conforms to the shared adapter type catalogue', () => {
             });
             void reply;
             // @ts-expect-error `done` carries a count, not text
-            const wrongEvent: Router<typeof streamInferenceContract>['reply'] = async () => ({
+            const wrongEvent: Handlers<typeof streamInferenceContract>['reply'] = async () => ({
                 status: 200,
                 body: async function* () {
                     yield {
@@ -118,14 +122,14 @@ test('conforms to the shared adapter type catalogue', () => {
         },
         'streams.bodyRejectsValue': () => {
             // @ts-expect-error a streamed status takes a generator, not a value
-            const valueBody: Router<typeof streamInferenceContract>['reply'] = async () => ({
+            const valueBody: Handlers<typeof streamInferenceContract>['reply'] = async () => ({
                 status: 200,
                 body: {
                     text: 'x',
                 },
             });
             void valueBody;
-            const thrown: Router<typeof streamInferenceContract>['reply'] = async ({ throwError }) => {
+            const thrown: Handlers<typeof streamInferenceContract>['reply'] = async ({ throwError }) => {
                 expectTypeOf(throwError).parameter(0).toHaveProperty('status').toEqualTypeOf<400>();
                 return throwError({
                     status: 400,
@@ -136,15 +140,6 @@ test('conforms to the shared adapter type catalogue', () => {
             };
             void thrown;
         },
-        'surface.router': () => {
-            expectTypeOf<Router<typeof securedContract>>().toEqualTypeOf<ExpectedRouter<typeof securedContract, HonoHandlerContext>>();
-            expectTypeOf<Router<typeof inferenceRoutes>>().toEqualTypeOf<ExpectedRouter<typeof inferenceRoutes, HonoHandlerContext>>();
-        },
-        'surface.routeHandler': () => {
-            expectTypeOf<RouteHandler<typeof inferenceRoutes.getUser>>().toEqualTypeOf<
-                ExpectedRouteHandler<typeof inferenceRoutes.getUser, HonoHandlerContext>
-            >();
-        },
         'surface.guardRun': () => {
             expectTypeOf<Parameters<typeof localUser.guard>[0]>().parameter(0).toMatchTypeOf<HonoHandlerContext>();
             expectTypeOf<GuardRun<HonoHandlerContext>>().parameter(0).toMatchTypeOf<HonoHandlerContext>();
@@ -154,41 +149,41 @@ test('conforms to the shared adapter type catalogue', () => {
             expectTypeOf<RequestContextRun<HonoHandlerContext>>().parameter(0).toMatchTypeOf<HonoHandlerContext>();
         },
         'router.undeclaredStatus': () => {
-            const getUser: Router<typeof inferenceGroupContract>['users']['getUser'] = () => ({
+            const getUser: Handlers<typeof inferenceGroupContract>['users']['getUser'] = () => ({
                 // @ts-expect-error 418 is not a declared response of getUser.
                 status: 418,
             });
             void getUser;
         },
         'handler.pathParams': () => {
-            expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<{ params: { id: string } }>();
+            expectTypeOf<Handlers<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<{ params: { id: string } }>();
         },
         'handler.body': () => {
-            expectTypeOf<Router<typeof inferenceContract>['createUser']>()
+            expectTypeOf<Handlers<typeof inferenceContract>['createUser']>()
                 .parameter(0)
                 .toMatchTypeOf<{ body: { name: string; email: string } }>();
-            expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<{ body: undefined }>();
+            expectTypeOf<Handlers<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<{ body: undefined }>();
         },
         'handler.context': () => {
-            expectTypeOf<Router<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<HonoHandlerContext>();
+            expectTypeOf<Handlers<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<HonoHandlerContext>();
         },
         'guards.identityContext': () => {
-            expectTypeOf<Router<typeof securedContract>['api']['whoAmI']>()
+            expectTypeOf<Handlers<typeof securedContract>['api']['whoAmI']>()
                 .parameter(0)
                 .toMatchTypeOf<{ auth: { user: { userId: string } } }>();
-            expectTypeOf<Router<typeof securedContract>['api']['ownerOnly']>().parameter(0).toMatchTypeOf<{
+            expectTypeOf<Handlers<typeof securedContract>['api']['ownerOnly']>().parameter(0).toMatchTypeOf<{
                 auth: { member: { workspaceUserId: string; role: 'owner' | 'admin' | readonly ('owner' | 'admin')[] } };
             }>();
-            expectTypeOf<Router<typeof securedContract>['api']['both']>().parameter(0).toMatchTypeOf<{
+            expectTypeOf<Handlers<typeof securedContract>['api']['both']>().parameter(0).toMatchTypeOf<{
                 auth: { user: { userId: string }; member: { workspaceUserId: string } };
             }>();
         },
         'guards.publicNoAuth': () => {
-            expectTypeOf<Router<typeof securedContract>['api']['publicRoute']>().parameter(0).not.toHaveProperty('auth');
+            expectTypeOf<Handlers<typeof securedContract>['api']['publicRoute']>().parameter(0).not.toHaveProperty('auth');
         },
         'guards.gateOnlyNoAuth': () => {
-            expectTypeOf<Router<typeof gateContract>['api']['apiOnly']>().parameter(0).not.toHaveProperty('auth');
-            expectTypeOf<Router<typeof gateContract>['api']['whoAmI']>()
+            expectTypeOf<Handlers<typeof gateContract>['api']['apiOnly']>().parameter(0).not.toHaveProperty('auth');
+            expectTypeOf<Handlers<typeof gateContract>['api']['whoAmI']>()
                 .parameter(0)
                 .toMatchTypeOf<{ auth: { user: { userId: string } } }>();
         },
@@ -265,7 +260,7 @@ test('conforms to the shared adapter type catalogue', () => {
             });
         },
         'requestContext.handlerArg': () => {
-            expectTypeOf<Router<typeof requestContextContract>['api']['publicRoute']>().parameter(0).toMatchTypeOf<{
+            expectTypeOf<Handlers<typeof requestContextContract>['api']['publicRoute']>().parameter(0).toMatchTypeOf<{
                 requestContext: { analytics: { sessionId: string | null } };
             }>();
         },
@@ -293,7 +288,7 @@ test('conforms to the shared adapter type catalogue', () => {
             );
         },
         'requestContext.unknownKey': () => {
-            const handler: Router<typeof requestContextContract>['api']['publicRoute'] = ({ requestContext }) => {
+            const handler: Handlers<typeof requestContextContract>['api']['publicRoute'] = ({ requestContext }) => {
                 // @ts-expect-error 'metrics' is not a declared context key
                 void requestContext.metrics;
                 return {
@@ -305,56 +300,14 @@ test('conforms to the shared adapter type catalogue', () => {
             };
             void handler;
         },
-        'standalone.routeHandlerAuth': () => {
-            const whoAmI: RouteHandler<typeof securedContract.routes.api.whoAmI> = ({ auth }) => {
-                expectTypeOf(auth.user).toEqualTypeOf<{ userId: string }>();
-                return {
-                    status: 200,
-                    body: {
-                        userId: auth.user.userId,
-                    },
-                };
-            };
-
-            const secured: Router<typeof securedContract>['api']['whoAmI'] = whoAmI;
-            void secured;
-        },
-        'standalone.routeGroupContractArgs': () => {
-            type GroupArgs = Parameters<Router<typeof pluginTypeContract.routes>['whichLabel']>[0];
-            type ContractArgs = Parameters<Router<typeof pluginTypeContract>['whichLabel']>[0];
-
-            expectTypeOf<GroupArgs['plugins']>().toEqualTypeOf<ContractArgs['plugins']>();
-            expectTypeOf<GroupArgs['jobs']>().toEqualTypeOf<ContractArgs['jobs']>();
-        },
-        'standalone.routeHandlerContractArgs': () => {
-            type RouteArgs = Parameters<RouteHandler<typeof pluginTypeContract.routes.whichLabel>>[0];
-            type ContractArgs = Parameters<Router<typeof pluginTypeContract>['whichLabel']>[0];
-
-            expectTypeOf<RouteArgs['plugins']>().toEqualTypeOf<ContractArgs['plugins']>();
-            expectTypeOf<RouteArgs['jobs']>().toEqualTypeOf<ContractArgs['jobs']>();
-        },
         'plugins.exportsTyped': () => {
-            expectTypeOf<Router<typeof pluginTypeContract>['whichLabel']>().parameter(0).toMatchTypeOf<{
+            expectTypeOf<Handlers<typeof pluginTypeContract>['whichLabel']>().parameter(0).toMatchTypeOf<{
                 plugins: { probe: { label: () => string } };
             }>();
         },
         'plugins.absentWhenUninstalled': () => {
-            type Args = Parameters<Router<typeof inferenceContract>['getUser']>[0];
+            type Args = Parameters<Handlers<typeof inferenceContract>['getUser']>[0];
             expectTypeOf<'plugins' extends keyof Args ? true : false>().toEqualTypeOf<false>();
-        },
-        'standalone.routeHandlerContext': () => {
-            const publicRoute: RouteHandler<typeof requestContextContract.routes.api.publicRoute> = ({ requestContext }) => {
-                expectTypeOf(requestContext.analytics).toEqualTypeOf<{ sessionId: string | null }>();
-                return {
-                    status: 200,
-                    body: {
-                        ok: true,
-                    },
-                };
-            };
-
-            const installed: Router<typeof requestContextContract>['api']['publicRoute'] = publicRoute;
-            void installed;
         },
     });
 });
@@ -367,10 +320,9 @@ test('a request context resolver reads the Hono context', () => {
 
 test('the Env generic threads through the handler context', () => {
     expectTypeOf<HonoHandlerContext<SessionEnv>['c']['var']['sessionId']>().toEqualTypeOf<string>();
-    expectTypeOf<Router<typeof inferenceContract, SessionEnv>['getUser']>().parameter(0).toMatchTypeOf<HonoHandlerContext<SessionEnv>>();
-    expectTypeOf<RouteHandler<typeof inferenceRoutes.getUser, SessionEnv>>().toEqualTypeOf<
-        ExpectedRouteHandler<typeof inferenceRoutes.getUser, HonoHandlerContext<SessionEnv>>
-    >();
+    expectTypeOf<ContractRouter<typeof inferenceContract, HonoHandlerContext<SessionEnv>>['getUser']>()
+        .parameter(0)
+        .toMatchTypeOf<HonoHandlerContext<SessionEnv>>();
 });
 
 test('the Hono adapter is a value carrying its handler context', () => {
