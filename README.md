@@ -40,7 +40,7 @@ Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typ
 
 ### Declare your routes
 
-Export a `k` instance once. Its type parameter is the `Config` written from your `kizuna.config.ts`, and that is what types everything a handler receives.
+Export a `k` instance once, typed by the `Config` generated from your config.
 
 ```ts
 // src/k.ts
@@ -50,7 +50,7 @@ import type { Config } from '../kizuna.types';
 export const k = new Kizuna<Config>();
 ```
 
-Then declare each route: pick a method and path, describe what it takes in and sends back with Zod, and attach the handler that answers it.
+Then declare each route: a method, a path, Zod schemas, and the handler that answers it.
 
 ```ts
 // src/routes/users.ts
@@ -89,11 +89,9 @@ export const users = k.routes({
 });
 ```
 
-The handler's `params` are typed from the declaration right above it, and its return is checked against that route's `responses`.
-
 ### Assemble it
 
-`kizuna.config.ts` is where the adapter, the routes, the identities, the jobs and the plugins come together. Naming a framework is what puts its own request in every handler's args, typed.
+Name your framework and your routes. The adapter decides what handlers get alongside their inputs.
 
 ```ts
 // kizuna.config.ts
@@ -125,7 +123,7 @@ app.listen(3000);
 
 ### Use the API on the client
 
-Every route, input, and response comes from the same declarations, so the client already knows them.
+The client is generated from the same declarations, so it already knows every route.
 
 ```ts
 // src/lib/api-client.ts
