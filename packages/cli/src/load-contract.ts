@@ -55,9 +55,11 @@ export const loadContract = async (
         files.push(...Object.keys(cache).filter((file) => !file.includes('node_modules') && (!before.has(file) || evicted.has(file))));
     }
 
-    const candidate = loaded?.[exportName] ?? loaded?.default;
+    // A `kizuna.config.ts` default-exports its config, so the api is one step in.
+    const config = loaded?.default as Record<string, unknown> | undefined;
+    const candidate = loaded?.[exportName] ?? config?.[exportName] ?? config;
 
     // `interopDefault` hands back the namespace when a module has no default,
-    // so a module without a contract would otherwise look like one.
+    // so a module without a config would otherwise look like one.
     return isContract(candidate) ? candidate : undefined;
 };

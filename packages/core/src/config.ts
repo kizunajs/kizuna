@@ -23,8 +23,8 @@ export interface ClientTarget {
 }
 
 /**
- * One API as the CLI reads it back out of `kizuna.config.ts`: what it serves,
- * and what is generated from it.
+ * What `kizuna.config.ts` default-exports: the api its config assembles, and
+ * what is generated from it.
  */
 export interface ApiEntry {
     api: Contract;
@@ -32,22 +32,19 @@ export interface ApiEntry {
 }
 
 /**
- * Every API a `kizuna.config.ts` module exports, as `[name, entry]` pairs. A
- * repository serving one API exports it as `api`, which reports as `default`;
- * one serving several exports several, each reported under its export name.
+ * The config a `kizuna.config.ts` module default-exports. A repository serving
+ * several APIs writes a config file for each.
  */
 export const apiEntries = (module: Record<string, unknown>): [string, ApiEntry][] => {
-    const entries: [string, ApiEntry][] = [];
-    for (const [name, value] of Object.entries(module)) {
-        if (value === null || typeof value !== 'object') continue;
-        if (!('routes' in value)) continue;
-        entries.push([
-            name === 'api' ? 'default' : name,
+    const config = (module.default ?? module) as Partial<ApiEntry>;
+    if (config.api === undefined) return [];
+    return [
+        [
+            'default',
             {
-                api: value as Contract,
-                clients: (module.clients as readonly ClientTarget[] | undefined) ?? [],
+                api: config.api,
+                clients: config.clients ?? [],
             },
-        ]);
-    }
-    return entries;
+        ],
+    ];
 };

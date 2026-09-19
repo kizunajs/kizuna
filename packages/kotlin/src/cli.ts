@@ -5,11 +5,11 @@ import { parseArgs } from 'node:util';
 import { loadContract } from '@ts-kizuna/cli';
 import { generateKotlinClient } from './generator.js';
 
-const usage = `Usage: ts-kizuna-kotlin generate --contract <path> --out <path> --namespace-name <name>
+const usage = `Usage: ts-kizuna-kotlin generate --config <path> --out <path> --namespace-name <name>
 
 Required:
-  --contract <path>        TypeScript or JS module exporting a kizuna contract (k.contract).
-                           Suffix with the export to read: src/api.ts:appContract.
+  --config <path>          Path to a kizuna.config.ts. Suffix with an export to read
+                           something other than the default: src/apis.ts:workspace.
   --out <path>             File path to write the generated .kt file.
   --namespace-name <name>  Public object wrapping all generated types (e.g. MyAPI).
 
@@ -19,7 +19,7 @@ Optional:
                            Default: keep wire names verbatim.
   --unknown-enum-case      Emit enums as a sealed interface with an Unknown(wireValue) member
                            so unrecognised wire values decode instead of throwing. Default: off.
-  --export <name>          Export name when none is suffixed. Default: contract.
+  --export <name>          Export name when none is suffixed. Default: api.
 `;
 
 const die = (message: string, code = 1): never => {
@@ -37,7 +37,7 @@ const main = async (): Promise<void> => {
     const { values } = parseArgs({
         args: argv.slice(1),
         options: {
-            contract: {
+            config: {
                 type: 'string',
             },
             out: {
@@ -62,14 +62,13 @@ const main = async (): Promise<void> => {
         strict: true,
     });
 
-    const contractArg = values.contract ?? die('Missing --contract\n\n' + usage);
+    const configArg = values.config ?? die('Missing --config\n\n' + usage);
     const outArg = values.out ?? die('Missing --out\n\n' + usage);
     const namespaceName = values['namespace-name'] ?? die('Missing --namespace-name\n\n' + usage);
 
-    const [pathPart, exportName = values.export ?? 'contract'] = contractArg.split(':');
-    const contractPath = resolve(process.cwd(), pathPart!);
-    const contract =
-        (await loadContract(contractPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${contractPath}`);
+    const [pathPart, exportName = values.export ?? 'api'] = configArg.split(':');
+    const configPath = resolve(process.cwd(), pathPart!);
+    const contract = (await loadContract(configPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${configPath}`);
     const kotlinSource = generateKotlinClient(contract, {
         namespaceName,
         packageName: values.package,

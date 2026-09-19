@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 
-import { api } from '../kizuna.config';
+import config from '../kizuna.config';
 
 const app = Fastify();
 
@@ -30,7 +30,7 @@ app.get('/', async (_request, reply) => {
 </html>`);
 });
 
-await api.mount(app);
+await config.api.mount(app);
 
 const port = Number(process.env.PORT ?? 8002);
 app.listen(

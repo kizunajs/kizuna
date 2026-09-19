@@ -497,6 +497,14 @@ public final class APIClient: Sendable {
         APIAssistantClient(client: self)
     }
 
+    public var tools: APIToolsClient {
+        APIToolsClient(client: self)
+    }
+
+    public var diagnostics: APIDiagnosticsClient {
+        APIDiagnosticsClient(client: self)
+    }
+
     public enum UsersListUsers {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -2036,14 +2044,14 @@ public final class APIClient: Sendable {
         }
 
         public enum ToolCall: Codable, Sendable, Equatable {
-            case weather_getForecast(ToolCallWeatherGetForecast)
-            case charts_plotSignups(ToolCallChartsPlotSignups)
+            case getForecast(ToolCallGetForecast)
+            case plotSignups(ToolCallPlotSignups)
             case countWords(ToolCallCountWords)
-            public static func weather_getForecast(id: String, input: APIClient.AssistantReply.ToolCallWeatherGetForecastInput) -> ToolCall {
-                .weather_getForecast(ToolCallWeatherGetForecast(id: id, name: "weather.getForecast", input: input))
+            public static func getForecast(id: String, input: APIClient.AssistantReply.ToolCallGetForecastInput) -> ToolCall {
+                .getForecast(ToolCallGetForecast(id: id, name: "getForecast", input: input))
             }
-            public static func charts_plotSignups(id: String, input: APIClient.AssistantReply.ToolCallChartsPlotSignupsInput) -> ToolCall {
-                .charts_plotSignups(ToolCallChartsPlotSignups(id: id, name: "charts.plotSignups", input: input))
+            public static func plotSignups(id: String, input: APIClient.AssistantReply.ToolCallPlotSignupsInput) -> ToolCall {
+                .plotSignups(ToolCallPlotSignups(id: id, name: "plotSignups", input: input))
             }
             public static func countWords(id: String, input: APIClient.AssistantReply.ToolCallCountWordsInput) -> ToolCall {
                 .countWords(ToolCallCountWords(id: id, name: "countWords", input: input))
@@ -2051,16 +2059,16 @@ public final class APIClient: Sendable {
 
             public var id: String {
                 switch self {
-                case .weather_getForecast(let payload): return payload.id
-                case .charts_plotSignups(let payload): return payload.id
+                case .getForecast(let payload): return payload.id
+                case .plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
                 }
             }
 
             public var name: String {
                 switch self {
-                case .weather_getForecast(let payload): return payload.name
-                case .charts_plotSignups(let payload): return payload.name
+                case .getForecast(let payload): return payload.name
+                case .plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
                 }
             }
@@ -2074,10 +2082,10 @@ public final class APIClient: Sendable {
                 let kind = try container.decode(String.self, forKey: .discriminator)
                 let single = try decoder.singleValueContainer()
                 switch kind {
-                case "weather.getForecast":
-                    self = .weather_getForecast(try single.decode(ToolCallWeatherGetForecast.self))
-                case "charts.plotSignups":
-                    self = .charts_plotSignups(try single.decode(ToolCallChartsPlotSignups.self))
+                case "getForecast":
+                    self = .getForecast(try single.decode(ToolCallGetForecast.self))
+                case "plotSignups":
+                    self = .plotSignups(try single.decode(ToolCallPlotSignups.self))
                 case "countWords":
                     self = .countWords(try single.decode(ToolCallCountWords.self))
                 default:
@@ -2088,9 +2096,9 @@ public final class APIClient: Sendable {
             public func encode(to encoder: Encoder) throws {
                 var single = encoder.singleValueContainer()
                 switch self {
-                case .weather_getForecast(let payload):
+                case .getForecast(let payload):
                     try single.encode(payload)
-                case .charts_plotSignups(let payload):
+                case .plotSignups(let payload):
                     try single.encode(payload)
                 case .countWords(let payload):
                     try single.encode(payload)
@@ -2098,15 +2106,15 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolCallWeatherGetForecast: Codable, Sendable, Equatable {
+        public struct ToolCallGetForecast: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
-            public let input: ToolCallWeatherGetForecastInput
+            public let input: ToolCallGetForecastInput
 
             public init(
                 id: String,
                 name: String,
-                input: ToolCallWeatherGetForecastInput
+                input: ToolCallGetForecastInput
             ) {
                 self.id = id
                 self.name = name
@@ -2114,33 +2122,49 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolCallWeatherGetForecastInput: Codable, Sendable, Equatable {
-            public let city: String
-            public let unit: ToolCallWeatherGetForecastInputUnit?
+        public struct ToolCallGetForecastInput: Codable, Sendable, Equatable {
+            public let params: ToolCallGetForecastInputParams
+            public let query: ToolCallGetForecastInputQuery
 
             public init(
-                city: String,
-                unit: ToolCallWeatherGetForecastInputUnit? = nil
+                params: ToolCallGetForecastInputParams,
+                query: ToolCallGetForecastInputQuery
             ) {
+                self.params = params
+                self.query = query
+            }
+        }
+
+        public struct ToolCallGetForecastInputParams: Codable, Sendable, Equatable {
+            public let city: String
+
+            public init(city: String) {
                 self.city = city
+            }
+        }
+
+        public struct ToolCallGetForecastInputQuery: Codable, Sendable, Equatable {
+            public let unit: ToolCallGetForecastInputQueryUnit?
+
+            public init(unit: ToolCallGetForecastInputQueryUnit? = nil) {
                 self.unit = unit
             }
         }
 
-        public enum ToolCallWeatherGetForecastInputUnit: String, Codable, Sendable {
+        public enum ToolCallGetForecastInputQueryUnit: String, Codable, Sendable {
             case celsius = "celsius"
             case fahrenheit = "fahrenheit"
         }
 
-        public struct ToolCallChartsPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolCallPlotSignups: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
-            public let input: ToolCallChartsPlotSignupsInput
+            public let input: ToolCallPlotSignupsInput
 
             public init(
                 id: String,
                 name: String,
-                input: ToolCallChartsPlotSignupsInput
+                input: ToolCallPlotSignupsInput
             ) {
                 self.id = id
                 self.name = name
@@ -2148,7 +2172,15 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolCallChartsPlotSignupsInput: Codable, Sendable, Equatable {
+        public struct ToolCallPlotSignupsInput: Codable, Sendable, Equatable {
+            public let query: ToolCallPlotSignupsInputQuery
+
+            public init(query: ToolCallPlotSignupsInputQuery) {
+                self.query = query
+            }
+        }
+
+        public struct ToolCallPlotSignupsInputQuery: Codable, Sendable, Equatable {
             public let days: Int
 
             public init(days: Int) {
@@ -2173,6 +2205,14 @@ public final class APIClient: Sendable {
         }
 
         public struct ToolCallCountWordsInput: Codable, Sendable, Equatable {
+            public let body: ToolCallCountWordsInputBody
+
+            public init(body: ToolCallCountWordsInputBody) {
+                self.body = body
+            }
+        }
+
+        public struct ToolCallCountWordsInputBody: Codable, Sendable, Equatable {
             public let text: String
 
             public init(text: String) {
@@ -2181,14 +2221,14 @@ public final class APIClient: Sendable {
         }
 
         public enum ToolResult: Codable, Sendable, Equatable {
-            case weather_getForecast(ToolResultWeatherGetForecast)
-            case charts_plotSignups(ToolResultChartsPlotSignups)
+            case getForecast(ToolResultGetForecast)
+            case plotSignups(ToolResultPlotSignups)
             case countWords(ToolResultCountWords)
-            public static func weather_getForecast(id: String, output: APIClient.AssistantReply.ToolResultWeatherGetForecastOutput) -> ToolResult {
-                .weather_getForecast(ToolResultWeatherGetForecast(id: id, name: "weather.getForecast", output: output))
+            public static func getForecast(id: String, output: APIClient.AssistantReply.ToolResultGetForecastOutput) -> ToolResult {
+                .getForecast(ToolResultGetForecast(id: id, name: "getForecast", output: output))
             }
-            public static func charts_plotSignups(id: String, output: APIClient.AssistantReply.ToolResultChartsPlotSignupsOutput) -> ToolResult {
-                .charts_plotSignups(ToolResultChartsPlotSignups(id: id, name: "charts.plotSignups", output: output))
+            public static func plotSignups(id: String, output: APIClient.AssistantReply.ToolResultPlotSignupsOutput) -> ToolResult {
+                .plotSignups(ToolResultPlotSignups(id: id, name: "plotSignups", output: output))
             }
             public static func countWords(id: String, output: APIClient.AssistantReply.ToolResultCountWordsOutput) -> ToolResult {
                 .countWords(ToolResultCountWords(id: id, name: "countWords", output: output))
@@ -2196,16 +2236,16 @@ public final class APIClient: Sendable {
 
             public var id: String {
                 switch self {
-                case .weather_getForecast(let payload): return payload.id
-                case .charts_plotSignups(let payload): return payload.id
+                case .getForecast(let payload): return payload.id
+                case .plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
                 }
             }
 
             public var name: String {
                 switch self {
-                case .weather_getForecast(let payload): return payload.name
-                case .charts_plotSignups(let payload): return payload.name
+                case .getForecast(let payload): return payload.name
+                case .plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
                 }
             }
@@ -2219,10 +2259,10 @@ public final class APIClient: Sendable {
                 let kind = try container.decode(String.self, forKey: .discriminator)
                 let single = try decoder.singleValueContainer()
                 switch kind {
-                case "weather.getForecast":
-                    self = .weather_getForecast(try single.decode(ToolResultWeatherGetForecast.self))
-                case "charts.plotSignups":
-                    self = .charts_plotSignups(try single.decode(ToolResultChartsPlotSignups.self))
+                case "getForecast":
+                    self = .getForecast(try single.decode(ToolResultGetForecast.self))
+                case "plotSignups":
+                    self = .plotSignups(try single.decode(ToolResultPlotSignups.self))
                 case "countWords":
                     self = .countWords(try single.decode(ToolResultCountWords.self))
                 default:
@@ -2233,9 +2273,9 @@ public final class APIClient: Sendable {
             public func encode(to encoder: Encoder) throws {
                 var single = encoder.singleValueContainer()
                 switch self {
-                case .weather_getForecast(let payload):
+                case .getForecast(let payload):
                     try single.encode(payload)
-                case .charts_plotSignups(let payload):
+                case .plotSignups(let payload):
                     try single.encode(payload)
                 case .countWords(let payload):
                     try single.encode(payload)
@@ -2243,15 +2283,15 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolResultWeatherGetForecast: Codable, Sendable, Equatable {
+        public struct ToolResultGetForecast: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
-            public let output: ToolResultWeatherGetForecastOutput
+            public let output: ToolResultGetForecastOutput
 
             public init(
                 id: String,
                 name: String,
-                output: ToolResultWeatherGetForecastOutput
+                output: ToolResultGetForecastOutput
             ) {
                 self.id = id
                 self.name = name
@@ -2259,14 +2299,14 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolResultWeatherGetForecastOutput: Codable, Sendable, Equatable {
+        public struct ToolResultGetForecastOutput: Codable, Sendable, Equatable {
             public let temperature: Double
-            public let unit: ToolResultWeatherGetForecastOutputUnit
+            public let unit: ToolResultGetForecastOutputUnit
             public let summary: String
 
             public init(
                 temperature: Double,
-                unit: ToolResultWeatherGetForecastOutputUnit,
+                unit: ToolResultGetForecastOutputUnit,
                 summary: String
             ) {
                 self.temperature = temperature
@@ -2275,20 +2315,20 @@ public final class APIClient: Sendable {
             }
         }
 
-        public enum ToolResultWeatherGetForecastOutputUnit: String, Codable, Sendable {
+        public enum ToolResultGetForecastOutputUnit: String, Codable, Sendable {
             case celsius = "celsius"
             case fahrenheit = "fahrenheit"
         }
 
-        public struct ToolResultChartsPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolResultPlotSignups: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
-            public let output: ToolResultChartsPlotSignupsOutput
+            public let output: ToolResultPlotSignupsOutput
 
             public init(
                 id: String,
                 name: String,
-                output: ToolResultChartsPlotSignupsOutput
+                output: ToolResultPlotSignupsOutput
             ) {
                 self.id = id
                 self.name = name
@@ -2296,15 +2336,15 @@ public final class APIClient: Sendable {
             }
         }
 
-        public struct ToolResultChartsPlotSignupsOutput: Codable, Sendable, Equatable {
-            public let points: [ToolResultChartsPlotSignupsOutputPointsItem]
+        public struct ToolResultPlotSignupsOutput: Codable, Sendable, Equatable {
+            public let points: [ToolResultPlotSignupsOutputPointsItem]
 
-            public init(points: [ToolResultChartsPlotSignupsOutputPointsItem]) {
+            public init(points: [ToolResultPlotSignupsOutputPointsItem]) {
                 self.points = points
             }
         }
 
-        public struct ToolResultChartsPlotSignupsOutputPointsItem: Codable, Sendable, Equatable {
+        public struct ToolResultPlotSignupsOutputPointsItem: Codable, Sendable, Equatable {
             public let date: String
             public let signups: Int
 
@@ -2358,8 +2398,8 @@ public final class APIClient: Sendable {
         }
 
         public enum ToolErrorName: String, Codable, Sendable {
-            case weatherGetForecast = "weather.getForecast"
-            case chartsPlotSignups = "charts.plotSignups"
+            case getForecast = "getForecast"
+            case plotSignups = "plotSignups"
             case countWords = "countWords"
         }
 
@@ -2454,6 +2494,242 @@ public final class APIClient: Sendable {
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(API.ProblemDetails)
             case validationError(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum ToolsGetForecast {
+
+        public enum QueryUnit: String, Codable, Sendable {
+            case celsius = "celsius"
+            case fahrenheit = "fahrenheit"
+        }
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let temperature: Double
+            public let unit: ResponseUnit
+            public let summary: String
+
+            public init(
+                temperature: Double,
+                unit: ResponseUnit,
+                summary: String
+            ) {
+                self.temperature = temperature
+                self.unit = unit
+                self.summary = summary
+            }
+        }
+
+        public enum ResponseUnit: String, Codable, Sendable {
+            case celsius = "celsius"
+            case fahrenheit = "fahrenheit"
+        }
+
+        public struct Params: Sendable {
+            public let city: String
+
+            public init(city: String) {
+                self.city = city
+            }
+
+            public static func params(city: String) -> Self {
+                .init(city: city)
+            }
+        }
+
+        public struct Query: Sendable {
+            public let unit: QueryUnit?
+
+            public init(unit: QueryUnit? = nil) {
+                self.unit = unit
+            }
+
+            public static func query(unit: QueryUnit? = nil) -> Self {
+                .init(unit: unit)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum ToolsPlotSignups {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let points: [ResponsePointsItem]
+
+            public init(points: [ResponsePointsItem]) {
+                self.points = points
+            }
+        }
+
+        public struct ResponsePointsItem: Codable, Sendable, Equatable {
+            public let date: String
+            public let signups: Int
+
+            public init(
+                date: String,
+                signups: Int
+            ) {
+                self.date = date
+                self.signups = signups
+            }
+        }
+
+        public struct Query: Sendable {
+            public let days: Int
+
+            public init(days: Int) {
+                self.days = days
+            }
+
+            public static func query(days: Int) -> Self {
+                .init(days: days)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum ToolsCountWords {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let text: String
+
+            public init(text: String) {
+                self.text = text
+            }
+        }
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let words: Int
+
+            public init(words: Int) {
+                self.words = words
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(text: String) -> Self {
+                .init(payload: Input(text: text))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum DiagnosticsWhoAmI {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let ip: String
+            public let `protocol`: String
+            public let userAgent: String?
+
+            private enum CodingKeys: String, CodingKey {
+                case ip
+                case `protocol`
+                case userAgent
+            }
+
+            public init(
+                ip: String,
+                `protocol`: String,
+                userAgent: String? = nil
+            ) {
+                self.ip = ip
+                self.`protocol` = `protocol`
+                self.userAgent = userAgent
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -3251,6 +3527,106 @@ public struct APIAssistantClient: Sendable {
         default:
             let data = try await Kizuna.collect(bytes, failure: APIClient.AssistantReply.Failure.self)
             throw APIClient.AssistantReply.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct APIToolsClient: Sendable {
+    private let client: APIClient
+
+    init(client: APIClient) {
+        self.client = client
+    }
+
+    /// Look up tomorrow forecast for one city
+    public func getForecast(_ params: APIClient.ToolsGetForecast.Params, _ query: APIClient.ToolsGetForecast.Query = .query()) async throws(APIClient.ToolsGetForecast.Failure) -> APIClient.ToolsGetForecast.Result {
+        var path = "/forecast/:city"
+        path = path.replacingOccurrences(of: ":city", with: Kizuna.encodePathSegment(params.city))
+        var queryItems: [URLQueryItem] = []
+        queryItems += Kizuna.queryItems(name: "unit", value: query.unit)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: APIClient.ToolsGetForecast.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.ToolsGetForecast.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.ToolsGetForecast.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.ToolsGetForecast.Failure.self)
+            return APIClient.ToolsGetForecast.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.ToolsGetForecast.Failure.self)
+            throw APIClient.ToolsGetForecast.Failure.badRequest(payload)
+        default:
+            throw APIClient.ToolsGetForecast.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Plot signups per day over the last N days, for the client to draw as a chart
+    public func plotSignups(_ query: APIClient.ToolsPlotSignups.Query) async throws(APIClient.ToolsPlotSignups.Failure) -> APIClient.ToolsPlotSignups.Result {
+        let path = "/signups"
+        var queryItems: [URLQueryItem] = []
+        queryItems += Kizuna.queryItems(name: "days", value: query.days)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: APIClient.ToolsPlotSignups.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.ToolsPlotSignups.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.ToolsPlotSignups.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.ToolsPlotSignups.Failure.self)
+            return APIClient.ToolsPlotSignups.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.ToolsPlotSignups.Failure.self)
+            throw APIClient.ToolsPlotSignups.Failure.badRequest(payload)
+        default:
+            throw APIClient.ToolsPlotSignups.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Count the words in a piece of text
+    public func countWords(_ body: APIClient.ToolsCountWords.Body) async throws(APIClient.ToolsCountWords.Failure) -> APIClient.ToolsCountWords.Result {
+        let path = "/text/word-count"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.ToolsCountWords.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.ToolsCountWords.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.ToolsCountWords.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.ToolsCountWords.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.ToolsCountWords.Failure.self)
+            return APIClient.ToolsCountWords.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.ToolsCountWords.Failure.self)
+            throw APIClient.ToolsCountWords.Failure.badRequest(payload)
+        default:
+            throw APIClient.ToolsCountWords.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct APIDiagnosticsClient: Sendable {
+    private let client: APIClient
+
+    init(client: APIClient) {
+        self.client = client
+    }
+
+    /// Report the caller as Express sees it
+    public func whoAmI() async throws(APIClient.DiagnosticsWhoAmI.Failure) -> APIClient.DiagnosticsWhoAmI.Result {
+        let path = "/diagnostics/caller"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.DiagnosticsWhoAmI.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.DiagnosticsWhoAmI.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.DiagnosticsWhoAmI.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.DiagnosticsWhoAmI.Failure.self)
+            return APIClient.DiagnosticsWhoAmI.Result(body: body)
+        default:
+            throw APIClient.DiagnosticsWhoAmI.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }

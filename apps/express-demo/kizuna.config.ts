@@ -13,7 +13,7 @@ const served = {
     diagnostics,
 };
 
-export const { api } = defineConfig({
+export default defineConfig({
     adapter: expressAdapter(),
     tags,
     identities: {

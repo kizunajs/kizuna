@@ -5,11 +5,11 @@ import { parseArgs } from 'node:util';
 import { loadContract } from '@ts-kizuna/cli';
 import { generateSwiftClient } from './generator.js';
 
-const usage = `Usage: ts-kizuna-swift generate --contract <path> --output <path> --namespace-name <name>
+const usage = `Usage: ts-kizuna-swift generate --config <path> --output <path> --namespace-name <name>
 
 Required:
-  --contract <path>        TypeScript or JS module exporting a kizuna contract (k.contract).
-                           Suffix with the export to read: src/api.ts:appContract.
+  --config <path>          Path to a kizuna.config.ts. Suffix with an export to read
+                           something other than the default: src/apis.ts:workspace.
   --output <path>          File path to write the generated .swift file.
   --namespace-name <name>  Public enum wrapping all generated types (e.g. MyAPI).
 
@@ -18,7 +18,7 @@ Optional:
                            Default: keep wire names verbatim.
   --unknown-enum-case      Emit enums with an unknown(String) fallback so unrecognised
                            wire values decode instead of throwing. Default: off.
-  --export <name>          Export name when none is suffixed. Default: contract.
+  --export <name>          Export name when none is suffixed. Default: api.
 `;
 
 const die = (message: string, code = 1): never => {
@@ -36,7 +36,7 @@ const main = async (): Promise<void> => {
     const { values } = parseArgs({
         args: argv.slice(1),
         options: {
-            contract: {
+            config: {
                 type: 'string',
             },
             output: {
@@ -58,14 +58,13 @@ const main = async (): Promise<void> => {
         strict: true,
     });
 
-    const contractArg = values.contract ?? die('Missing --contract\n\n' + usage);
+    const configArg = values.config ?? die('Missing --config\n\n' + usage);
     const outArg = values.output ?? die('Missing --output\n\n' + usage);
     const namespaceName = values['namespace-name'] ?? die('Missing --namespace-name\n\n' + usage);
 
-    const [pathPart, exportName = values.export ?? 'contract'] = contractArg.split(':');
-    const contractPath = resolve(process.cwd(), pathPart!);
-    const contract =
-        (await loadContract(contractPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${contractPath}`);
+    const [pathPart, exportName = values.export ?? 'api'] = configArg.split(':');
+    const configPath = resolve(process.cwd(), pathPart!);
+    const contract = (await loadContract(configPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${configPath}`);
     const swiftSource = generateSwiftClient(contract, {
         namespaceName,
         camelCaseProperties: values['camel-case'],

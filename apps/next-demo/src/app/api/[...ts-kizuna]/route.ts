@@ -1,5 +1,5 @@
-import { api } from '../../../../kizuna.config';
+import config from '../../../../kizuna.config';
 
-export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = config.api.mount({
     basePath: '/api',
 });

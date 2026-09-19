@@ -584,6 +584,14 @@ public final class OpenEnumAPIClient: Sendable {
         OpenEnumAPIAssistantClient(client: self)
     }
 
+    public var tools: OpenEnumAPIToolsClient {
+        OpenEnumAPIToolsClient(client: self)
+    }
+
+    public var diagnostics: OpenEnumAPIDiagnosticsClient {
+        OpenEnumAPIDiagnosticsClient(client: self)
+    }
+
     public enum UsersListUsers {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -2154,14 +2162,14 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public enum ToolCall: Codable, Sendable, Equatable {
-            case weather_getForecast(ToolCallWeatherGetForecast)
-            case charts_plotSignups(ToolCallChartsPlotSignups)
+            case getForecast(ToolCallGetForecast)
+            case plotSignups(ToolCallPlotSignups)
             case countWords(ToolCallCountWords)
-            public static func weather_getForecast(id: String, input: OpenEnumAPIClient.AssistantReply.ToolCallWeatherGetForecastInput) -> ToolCall {
-                .weather_getForecast(ToolCallWeatherGetForecast(id: id, name: "weather.getForecast", input: input))
+            public static func getForecast(id: String, input: OpenEnumAPIClient.AssistantReply.ToolCallGetForecastInput) -> ToolCall {
+                .getForecast(ToolCallGetForecast(id: id, name: "getForecast", input: input))
             }
-            public static func charts_plotSignups(id: String, input: OpenEnumAPIClient.AssistantReply.ToolCallChartsPlotSignupsInput) -> ToolCall {
-                .charts_plotSignups(ToolCallChartsPlotSignups(id: id, name: "charts.plotSignups", input: input))
+            public static func plotSignups(id: String, input: OpenEnumAPIClient.AssistantReply.ToolCallPlotSignupsInput) -> ToolCall {
+                .plotSignups(ToolCallPlotSignups(id: id, name: "plotSignups", input: input))
             }
             public static func countWords(id: String, input: OpenEnumAPIClient.AssistantReply.ToolCallCountWordsInput) -> ToolCall {
                 .countWords(ToolCallCountWords(id: id, name: "countWords", input: input))
@@ -2169,16 +2177,16 @@ public final class OpenEnumAPIClient: Sendable {
 
             public var id: String {
                 switch self {
-                case .weather_getForecast(let payload): return payload.id
-                case .charts_plotSignups(let payload): return payload.id
+                case .getForecast(let payload): return payload.id
+                case .plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
                 }
             }
 
             public var name: String {
                 switch self {
-                case .weather_getForecast(let payload): return payload.name
-                case .charts_plotSignups(let payload): return payload.name
+                case .getForecast(let payload): return payload.name
+                case .plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
                 }
             }
@@ -2192,10 +2200,10 @@ public final class OpenEnumAPIClient: Sendable {
                 let kind = try container.decode(String.self, forKey: .discriminator)
                 let single = try decoder.singleValueContainer()
                 switch kind {
-                case "weather.getForecast":
-                    self = .weather_getForecast(try single.decode(ToolCallWeatherGetForecast.self))
-                case "charts.plotSignups":
-                    self = .charts_plotSignups(try single.decode(ToolCallChartsPlotSignups.self))
+                case "getForecast":
+                    self = .getForecast(try single.decode(ToolCallGetForecast.self))
+                case "plotSignups":
+                    self = .plotSignups(try single.decode(ToolCallPlotSignups.self))
                 case "countWords":
                     self = .countWords(try single.decode(ToolCallCountWords.self))
                 default:
@@ -2206,9 +2214,9 @@ public final class OpenEnumAPIClient: Sendable {
             public func encode(to encoder: Encoder) throws {
                 var single = encoder.singleValueContainer()
                 switch self {
-                case .weather_getForecast(let payload):
+                case .getForecast(let payload):
                     try single.encode(payload)
-                case .charts_plotSignups(let payload):
+                case .plotSignups(let payload):
                     try single.encode(payload)
                 case .countWords(let payload):
                     try single.encode(payload)
@@ -2216,15 +2224,15 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallWeatherGetForecast: Codable, Sendable, Equatable {
+        public struct ToolCallGetForecast: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
-            public let input: ToolCallWeatherGetForecastInput
+            public let input: ToolCallGetForecastInput
 
             public init(
                 id: String,
                 name: String,
-                input: ToolCallWeatherGetForecastInput
+                input: ToolCallGetForecastInput
             ) {
                 self.id = id
                 self.name = name
@@ -2232,20 +2240,36 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallWeatherGetForecastInput: Codable, Sendable, Equatable {
-            public let city: String
-            public let unit: ToolCallWeatherGetForecastInputUnit?
+        public struct ToolCallGetForecastInput: Codable, Sendable, Equatable {
+            public let params: ToolCallGetForecastInputParams
+            public let query: ToolCallGetForecastInputQuery
 
             public init(
-                city: String,
-                unit: ToolCallWeatherGetForecastInputUnit? = nil
+                params: ToolCallGetForecastInputParams,
+                query: ToolCallGetForecastInputQuery
             ) {
+                self.params = params
+                self.query = query
+            }
+        }
+
+        public struct ToolCallGetForecastInputParams: Codable, Sendable, Equatable {
+            public let city: String
+
+            public init(city: String) {
                 self.city = city
+            }
+        }
+
+        public struct ToolCallGetForecastInputQuery: Codable, Sendable, Equatable {
+            public let unit: ToolCallGetForecastInputQueryUnit?
+
+            public init(unit: ToolCallGetForecastInputQueryUnit? = nil) {
                 self.unit = unit
             }
         }
 
-        public enum ToolCallWeatherGetForecastInputUnit: RawRepresentable, Codable, Sendable, Hashable {
+        public enum ToolCallGetForecastInputQueryUnit: RawRepresentable, Codable, Sendable, Hashable {
             case celsius
             case fahrenheit
             case unknown(String)
@@ -2277,15 +2301,15 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallChartsPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolCallPlotSignups: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
-            public let input: ToolCallChartsPlotSignupsInput
+            public let input: ToolCallPlotSignupsInput
 
             public init(
                 id: String,
                 name: String,
-                input: ToolCallChartsPlotSignupsInput
+                input: ToolCallPlotSignupsInput
             ) {
                 self.id = id
                 self.name = name
@@ -2293,7 +2317,15 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolCallChartsPlotSignupsInput: Codable, Sendable, Equatable {
+        public struct ToolCallPlotSignupsInput: Codable, Sendable, Equatable {
+            public let query: ToolCallPlotSignupsInputQuery
+
+            public init(query: ToolCallPlotSignupsInputQuery) {
+                self.query = query
+            }
+        }
+
+        public struct ToolCallPlotSignupsInputQuery: Codable, Sendable, Equatable {
             public let days: Int
 
             public init(days: Int) {
@@ -2318,6 +2350,14 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public struct ToolCallCountWordsInput: Codable, Sendable, Equatable {
+            public let body: ToolCallCountWordsInputBody
+
+            public init(body: ToolCallCountWordsInputBody) {
+                self.body = body
+            }
+        }
+
+        public struct ToolCallCountWordsInputBody: Codable, Sendable, Equatable {
             public let text: String
 
             public init(text: String) {
@@ -2326,14 +2366,14 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public enum ToolResult: Codable, Sendable, Equatable {
-            case weather_getForecast(ToolResultWeatherGetForecast)
-            case charts_plotSignups(ToolResultChartsPlotSignups)
+            case getForecast(ToolResultGetForecast)
+            case plotSignups(ToolResultPlotSignups)
             case countWords(ToolResultCountWords)
-            public static func weather_getForecast(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultWeatherGetForecastOutput) -> ToolResult {
-                .weather_getForecast(ToolResultWeatherGetForecast(id: id, name: "weather.getForecast", output: output))
+            public static func getForecast(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultGetForecastOutput) -> ToolResult {
+                .getForecast(ToolResultGetForecast(id: id, name: "getForecast", output: output))
             }
-            public static func charts_plotSignups(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultChartsPlotSignupsOutput) -> ToolResult {
-                .charts_plotSignups(ToolResultChartsPlotSignups(id: id, name: "charts.plotSignups", output: output))
+            public static func plotSignups(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultPlotSignupsOutput) -> ToolResult {
+                .plotSignups(ToolResultPlotSignups(id: id, name: "plotSignups", output: output))
             }
             public static func countWords(id: String, output: OpenEnumAPIClient.AssistantReply.ToolResultCountWordsOutput) -> ToolResult {
                 .countWords(ToolResultCountWords(id: id, name: "countWords", output: output))
@@ -2341,16 +2381,16 @@ public final class OpenEnumAPIClient: Sendable {
 
             public var id: String {
                 switch self {
-                case .weather_getForecast(let payload): return payload.id
-                case .charts_plotSignups(let payload): return payload.id
+                case .getForecast(let payload): return payload.id
+                case .plotSignups(let payload): return payload.id
                 case .countWords(let payload): return payload.id
                 }
             }
 
             public var name: String {
                 switch self {
-                case .weather_getForecast(let payload): return payload.name
-                case .charts_plotSignups(let payload): return payload.name
+                case .getForecast(let payload): return payload.name
+                case .plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
                 }
             }
@@ -2364,10 +2404,10 @@ public final class OpenEnumAPIClient: Sendable {
                 let kind = try container.decode(String.self, forKey: .discriminator)
                 let single = try decoder.singleValueContainer()
                 switch kind {
-                case "weather.getForecast":
-                    self = .weather_getForecast(try single.decode(ToolResultWeatherGetForecast.self))
-                case "charts.plotSignups":
-                    self = .charts_plotSignups(try single.decode(ToolResultChartsPlotSignups.self))
+                case "getForecast":
+                    self = .getForecast(try single.decode(ToolResultGetForecast.self))
+                case "plotSignups":
+                    self = .plotSignups(try single.decode(ToolResultPlotSignups.self))
                 case "countWords":
                     self = .countWords(try single.decode(ToolResultCountWords.self))
                 default:
@@ -2378,9 +2418,9 @@ public final class OpenEnumAPIClient: Sendable {
             public func encode(to encoder: Encoder) throws {
                 var single = encoder.singleValueContainer()
                 switch self {
-                case .weather_getForecast(let payload):
+                case .getForecast(let payload):
                     try single.encode(payload)
-                case .charts_plotSignups(let payload):
+                case .plotSignups(let payload):
                     try single.encode(payload)
                 case .countWords(let payload):
                     try single.encode(payload)
@@ -2388,15 +2428,15 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultWeatherGetForecast: Codable, Sendable, Equatable {
+        public struct ToolResultGetForecast: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
-            public let output: ToolResultWeatherGetForecastOutput
+            public let output: ToolResultGetForecastOutput
 
             public init(
                 id: String,
                 name: String,
-                output: ToolResultWeatherGetForecastOutput
+                output: ToolResultGetForecastOutput
             ) {
                 self.id = id
                 self.name = name
@@ -2404,14 +2444,14 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultWeatherGetForecastOutput: Codable, Sendable, Equatable {
+        public struct ToolResultGetForecastOutput: Codable, Sendable, Equatable {
             public let temperature: Double
-            public let unit: ToolResultWeatherGetForecastOutputUnit
+            public let unit: ToolResultGetForecastOutputUnit
             public let summary: String
 
             public init(
                 temperature: Double,
-                unit: ToolResultWeatherGetForecastOutputUnit,
+                unit: ToolResultGetForecastOutputUnit,
                 summary: String
             ) {
                 self.temperature = temperature
@@ -2420,7 +2460,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public enum ToolResultWeatherGetForecastOutputUnit: RawRepresentable, Codable, Sendable, Hashable {
+        public enum ToolResultGetForecastOutputUnit: RawRepresentable, Codable, Sendable, Hashable {
             case celsius
             case fahrenheit
             case unknown(String)
@@ -2452,15 +2492,15 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultChartsPlotSignups: Codable, Sendable, Equatable {
+        public struct ToolResultPlotSignups: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
-            public let output: ToolResultChartsPlotSignupsOutput
+            public let output: ToolResultPlotSignupsOutput
 
             public init(
                 id: String,
                 name: String,
-                output: ToolResultChartsPlotSignupsOutput
+                output: ToolResultPlotSignupsOutput
             ) {
                 self.id = id
                 self.name = name
@@ -2468,15 +2508,15 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
 
-        public struct ToolResultChartsPlotSignupsOutput: Codable, Sendable, Equatable {
-            public let points: [ToolResultChartsPlotSignupsOutputPointsItem]
+        public struct ToolResultPlotSignupsOutput: Codable, Sendable, Equatable {
+            public let points: [ToolResultPlotSignupsOutputPointsItem]
 
-            public init(points: [ToolResultChartsPlotSignupsOutputPointsItem]) {
+            public init(points: [ToolResultPlotSignupsOutputPointsItem]) {
                 self.points = points
             }
         }
 
-        public struct ToolResultChartsPlotSignupsOutputPointsItem: Codable, Sendable, Equatable {
+        public struct ToolResultPlotSignupsOutputPointsItem: Codable, Sendable, Equatable {
             public let date: String
             public let signups: Int
 
@@ -2530,15 +2570,15 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public enum ToolErrorName: RawRepresentable, Codable, Sendable, Hashable {
-            case weatherGetForecast
-            case chartsPlotSignups
+            case getForecast
+            case plotSignups
             case countWords
             case unknown(String)
 
             public init(rawValue: String) {
                 switch rawValue {
-                case "weather.getForecast": self = .weatherGetForecast
-                case "charts.plotSignups": self = .chartsPlotSignups
+                case "getForecast": self = .getForecast
+                case "plotSignups": self = .plotSignups
                 case "countWords": self = .countWords
                 default: self = .unknown(rawValue)
                 }
@@ -2546,8 +2586,8 @@ public final class OpenEnumAPIClient: Sendable {
 
             public var rawValue: String {
                 switch self {
-                case .weatherGetForecast: return "weather.getForecast"
-                case .chartsPlotSignups: return "charts.plotSignups"
+                case .getForecast: return "getForecast"
+                case .plotSignups: return "plotSignups"
                 case .countWords: return "countWords"
                 case let .unknown(value): return value
                 }
@@ -2655,6 +2695,296 @@ public final class OpenEnumAPIClient: Sendable {
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(OpenEnumAPI.ProblemDetails)
             case validationError(OpenEnumAPIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum ToolsGetForecast {
+
+        public enum QueryUnit: RawRepresentable, Codable, Sendable, Hashable {
+            case celsius
+            case fahrenheit
+            case unknown(String)
+
+            public init(rawValue: String) {
+                switch rawValue {
+                case "celsius": self = .celsius
+                case "fahrenheit": self = .fahrenheit
+                default: self = .unknown(rawValue)
+                }
+            }
+
+            public var rawValue: String {
+                switch self {
+                case .celsius: return "celsius"
+                case .fahrenheit: return "fahrenheit"
+                case let .unknown(value): return value
+                }
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                self.init(rawValue: try container.decode(String.self))
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let temperature: Double
+            public let unit: ResponseUnit
+            public let summary: String
+
+            public init(
+                temperature: Double,
+                unit: ResponseUnit,
+                summary: String
+            ) {
+                self.temperature = temperature
+                self.unit = unit
+                self.summary = summary
+            }
+        }
+
+        public enum ResponseUnit: RawRepresentable, Codable, Sendable, Hashable {
+            case celsius
+            case fahrenheit
+            case unknown(String)
+
+            public init(rawValue: String) {
+                switch rawValue {
+                case "celsius": self = .celsius
+                case "fahrenheit": self = .fahrenheit
+                default: self = .unknown(rawValue)
+                }
+            }
+
+            public var rawValue: String {
+                switch self {
+                case .celsius: return "celsius"
+                case .fahrenheit: return "fahrenheit"
+                case let .unknown(value): return value
+                }
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                self.init(rawValue: try container.decode(String.self))
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                try container.encode(rawValue)
+            }
+        }
+
+        public struct Params: Sendable {
+            public let city: String
+
+            public init(city: String) {
+                self.city = city
+            }
+
+            public static func params(city: String) -> Self {
+                .init(city: city)
+            }
+        }
+
+        public struct Query: Sendable {
+            public let unit: QueryUnit?
+
+            public init(unit: QueryUnit? = nil) {
+                self.unit = unit
+            }
+
+            public static func query(unit: QueryUnit? = nil) -> Self {
+                .init(unit: unit)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(OpenEnumAPIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum ToolsPlotSignups {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let points: [ResponsePointsItem]
+
+            public init(points: [ResponsePointsItem]) {
+                self.points = points
+            }
+        }
+
+        public struct ResponsePointsItem: Codable, Sendable, Equatable {
+            public let date: String
+            public let signups: Int
+
+            public init(
+                date: String,
+                signups: Int
+            ) {
+                self.date = date
+                self.signups = signups
+            }
+        }
+
+        public struct Query: Sendable {
+            public let days: Int
+
+            public init(days: Int) {
+                self.days = days
+            }
+
+            public static func query(days: Int) -> Self {
+                .init(days: days)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(OpenEnumAPIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum ToolsCountWords {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let text: String
+
+            public init(text: String) {
+                self.text = text
+            }
+        }
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let words: Int
+
+            public init(words: Int) {
+                self.words = words
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(text: String) -> Self {
+                .init(payload: Input(text: text))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(OpenEnumAPIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum DiagnosticsWhoAmI {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let ip: String
+            public let `protocol`: String
+            public let userAgent: String?
+
+            private enum CodingKeys: String, CodingKey {
+                case ip
+                case `protocol`
+                case userAgent
+            }
+
+            public init(
+                ip: String,
+                `protocol`: String,
+                userAgent: String? = nil
+            ) {
+                self.ip = ip
+                self.`protocol` = `protocol`
+                self.userAgent = userAgent
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -3452,6 +3782,106 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         default:
             let data = try await Kizuna.collect(bytes, failure: OpenEnumAPIClient.AssistantReply.Failure.self)
             throw OpenEnumAPIClient.AssistantReply.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct OpenEnumAPIToolsClient: Sendable {
+    private let client: OpenEnumAPIClient
+
+    init(client: OpenEnumAPIClient) {
+        self.client = client
+    }
+
+    /// Look up tomorrow forecast for one city
+    public func getForecast(_ params: OpenEnumAPIClient.ToolsGetForecast.Params, _ query: OpenEnumAPIClient.ToolsGetForecast.Query = .query()) async throws(OpenEnumAPIClient.ToolsGetForecast.Failure) -> OpenEnumAPIClient.ToolsGetForecast.Result {
+        var path = "/forecast/:city"
+        path = path.replacingOccurrences(of: ":city", with: Kizuna.encodePathSegment(params.city))
+        var queryItems: [URLQueryItem] = []
+        queryItems += Kizuna.queryItems(name: "unit", value: query.unit)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: OpenEnumAPIClient.ToolsGetForecast.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.ToolsGetForecast.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPIClient.ToolsGetForecast.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.ToolsGetForecast.Failure.self)
+            return OpenEnumAPIClient.ToolsGetForecast.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.ToolsGetForecast.Failure.self)
+            throw OpenEnumAPIClient.ToolsGetForecast.Failure.badRequest(payload)
+        default:
+            throw OpenEnumAPIClient.ToolsGetForecast.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Plot signups per day over the last N days, for the client to draw as a chart
+    public func plotSignups(_ query: OpenEnumAPIClient.ToolsPlotSignups.Query) async throws(OpenEnumAPIClient.ToolsPlotSignups.Failure) -> OpenEnumAPIClient.ToolsPlotSignups.Result {
+        let path = "/signups"
+        var queryItems: [URLQueryItem] = []
+        queryItems += Kizuna.queryItems(name: "days", value: query.days)
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: OpenEnumAPIClient.ToolsPlotSignups.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.ToolsPlotSignups.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPIClient.ToolsPlotSignups.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.ToolsPlotSignups.Failure.self)
+            return OpenEnumAPIClient.ToolsPlotSignups.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.ToolsPlotSignups.Failure.self)
+            throw OpenEnumAPIClient.ToolsPlotSignups.Failure.badRequest(payload)
+        default:
+            throw OpenEnumAPIClient.ToolsPlotSignups.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Count the words in a piece of text
+    public func countWords(_ body: OpenEnumAPIClient.ToolsCountWords.Body) async throws(OpenEnumAPIClient.ToolsCountWords.Failure) -> OpenEnumAPIClient.ToolsCountWords.Result {
+        let path = "/text/word-count"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.ToolsCountWords.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.ToolsCountWords.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.ToolsCountWords.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPIClient.ToolsCountWords.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.ToolsCountWords.Failure.self)
+            return OpenEnumAPIClient.ToolsCountWords.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.ToolsCountWords.Failure.self)
+            throw OpenEnumAPIClient.ToolsCountWords.Failure.badRequest(payload)
+        default:
+            throw OpenEnumAPIClient.ToolsCountWords.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct OpenEnumAPIDiagnosticsClient: Sendable {
+    private let client: OpenEnumAPIClient
+
+    init(client: OpenEnumAPIClient) {
+        self.client = client
+    }
+
+    /// Report the caller as Express sees it
+    public func whoAmI() async throws(OpenEnumAPIClient.DiagnosticsWhoAmI.Failure) -> OpenEnumAPIClient.DiagnosticsWhoAmI.Result {
+        let path = "/diagnostics/caller"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPIClient.DiagnosticsWhoAmI.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.self)
+            return OpenEnumAPIClient.DiagnosticsWhoAmI.Result(body: body)
+        default:
+            throw OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }

@@ -59,38 +59,28 @@ describe('defineConfig', () => {
 });
 
 describe('apiEntries', () => {
-    it('reports an api exported as `api` under `default`', () => {
-        const { api } = defineConfig({
+    it('reads the config a module default-exports', () => {
+        const config = defineConfig({
             routes: {
                 users: routes,
             },
         });
 
-        expect(apiEntries({ api }).map(([name]) => name)).toEqual(['default']);
+        expect(apiEntries({ default: config }).map(([name]) => name)).toEqual(['default']);
     });
 
-    it('reports each api a module exports under its own name', () => {
-        const app = defineConfig({
+    it('carries the clients the config declares', () => {
+        const config = defineConfig({
             routes: {
                 users: routes,
             },
-        }).api;
-        const workspace = defineConfig({
-            routes: {
-                users: routes,
-            },
-        }).api;
-
-        expect(apiEntries({ app, workspace }).map(([name]) => name)).toEqual(['app', 'workspace']);
-    });
-
-    it('carries the clients a module exports alongside its api', () => {
-        const { api } = defineConfig({
-            routes: {
-                users: routes,
-            },
+            clients: [swiftClient],
         });
 
-        expect(apiEntries({ api, clients: [swiftClient] })[0]?.[1].clients).toEqual([swiftClient]);
+        expect(apiEntries({ default: config })[0]?.[1].clients).toEqual([swiftClient]);
+    });
+
+    it('reports nothing for a module with no config', () => {
+        expect(apiEntries({ notAConfig: 1 })).toEqual([]);
     });
 });
