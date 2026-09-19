@@ -1,13 +1,16 @@
+import type { z } from 'zod';
 import type { Contract, RouteDefinition, Routes } from '@ts-kizuna/core';
 import {
     isStreamResponse,
+    readObjectShape,
     resolveResponseBody,
     resolveResponseHeaders,
     streamContentType,
     toPascalCase,
+    unwrapOptionalWrappers,
     type StreamMode,
 } from '@ts-kizuna/core/generator';
-import { TypeCollector, typeOf } from './zod-to-typescript.js';
+import { TypeCollector, docComment, sampleObject, sampleValue, typeOf } from './zod-to-typescript.js';
 
 /**
  * What a generated client is called and where its runtime comes from.
@@ -77,6 +80,66 @@ interface RouteEmit {
     table: string;
 }
 
+/**
+ * The call a route's `@example` shows: the arguments it cannot be called
+ * without, filled with values of the shape each schema declares.
+ */
+const exampleCall = (routeKey: string, route: RouteDefinition): string => {
+    const entries: string[] = [];
+    const params = pathParamNames(route.path);
+    if (params.length > 0) {
+        const shape = route.pathParams ? readObjectShape(route.pathParams) : undefined;
+        const fields = params.map((name) => {
+            const declared = shape?.[name];
+            return `${name}: ${declared ? sampleValue(declared, 0, name) : "'1'"},`;
+        });
+        entries.push(`params: {\n${indent(fields.join('\n'))}\n},`);
+    }
+    if (route.query && requiresArgument(route.query)) entries.push(`query: ${sampleObject(route.query)},`);
+    if (route.body && requiresArgument(route.body)) entries.push(`body: ${sampleValue(route.body)},`);
+
+    const args = entries.length > 0 ? `{\n${indent(entries.join('\n'))}\n}` : '';
+    return `const result = await client.${routeKey}(${args});`;
+};
+
+/**
+ * Whether a schema has anything a caller has to pass, so a route whose query is
+ * every-field-optional keeps its example to the call itself.
+ */
+const requiresArgument = (schema: z.core.$ZodType): boolean => {
+    const shape = readObjectShape(schema);
+    if (!shape) return true;
+    return Object.values(shape).some((field) => !unwrapOptionalWrappers(field).optional);
+};
+
+/**
+ * What an editor shows above a client method: what the route is for, whether it
+ * is on its way out, and how it is called.
+ */
+const routeDoc = (routeKey: string, route: RouteDefinition): string => {
+    const lines: string[] = [];
+    if (route.summary) lines.push(route.summary);
+    if (route.description) {
+        if (lines.length > 0) lines.push('');
+        lines.push(route.description);
+    }
+
+    if (route.deprecated !== undefined && route.deprecated !== false) {
+        const message =
+            typeof route.deprecated === 'string'
+                ? route.deprecated
+                : typeof route.deprecated === 'object'
+                  ? route.deprecated.message
+                  : undefined;
+        if (lines.length > 0) lines.push('');
+        lines.push(`@deprecated ${message ?? ''}`.trimEnd());
+    }
+
+    if (lines.length > 0) lines.push('');
+    lines.push('@example', exampleCall(routeKey, route));
+    return docComment(lines);
+};
+
 const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collector: TypeCollector): RouteEmit => {
     const namespace = routeKey.split('.').map(toPascalCase).join('');
     const members: string[] = [];
@@ -142,7 +205,7 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
 
     return {
         namespace,
-        signature: `${key}(args${optional ? '?' : ''}: ${argsType}): Promise<API.${namespace}.Result>;`,
+        signature: `${routeDoc(routeKey, route)}${key}(args${optional ? '?' : ''}: ${argsType}): Promise<API.${namespace}.Result>;`,
         declaration: `export namespace ${namespace} {\n${indent(members.join('\n\n'))}\n}`,
         table: `${key}: {\n${indent(tableEntries.map((entry) => `${entry},`).join('\n'))}\n},`,
     };

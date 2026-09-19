@@ -272,6 +272,23 @@ export const readDeprecation = (schema: z.core.$ZodType): { message: string | un
 };
 
 /**
+ * Reads the example values a schema declares, `example` first and then
+ * `examples`, both of which take one value or a list. Looks through optional
+ * wrappers, so `z.string().meta({ example: 'usr_123' }).optional()` still reads
+ * as having one.
+ */
+export const readMetaExamples = (schema: z.core.$ZodType): readonly unknown[] => {
+    for (const candidate of [schema, unwrapOptionalWrappers(schema).inner]) {
+        const meta = readMeta(candidate);
+        if (meta === undefined) continue;
+        const asList = (value: unknown): readonly unknown[] => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
+        const examples = [...asList(meta['example']), ...asList(meta['examples'])];
+        if (examples.length > 0) return examples;
+    }
+    return [];
+};
+
+/**
  * Returns a schema's `description` metadata, or undefined.
  */
 export const readMetaDescription = (schema: z.core.$ZodType): string | undefined => {

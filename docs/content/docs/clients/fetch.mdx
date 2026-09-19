@@ -346,6 +346,39 @@ export function UserCard({ user }: { user: API.User }) {
 
 `users.getUser` becomes `UsersGetUser` in every generated client, so the three read as one API.
 
+## Documentation in the client
+
+Each method carries what the route declared, so an editor shows it at the call site: the route's `summary` and `description`, `@deprecated` with its migration message, and an `@example` of the call with the arguments it cannot be called without.
+
+```ts
+/**
+ * Delete a user
+ *
+ * @deprecated use `archiveUser` instead
+ *
+ * @example
+ * const result = await client.users.deleteUser({
+ *     params: {
+ *         id: '1',
+ *     },
+ * });
+ */
+deleteUser(args: { params: API.UsersDeleteUser.Params }): Promise<API.UsersDeleteUser.Result>;
+```
+
+Fields carry theirs too. A schema's `description` becomes the field's doc comment, and anything it declares under `example` or `examples` in [Zod metadata](https://zod.dev/metadata) becomes an `@example`:
+
+```ts
+const UserSchema = z.object({
+    email: z.email().meta({
+        description: 'Email address',
+        example: 'alice@example.com',
+    }),
+});
+```
+
+The same metadata is what the OpenAPI document publishes as its examples, so the two never drift.
+
 ## What ships
 
 The generated file imports `@ts-kizuna/fetch` and nothing else. No schema library, no handlers, no server code. The table it carries is method, path, content type, and which responses stream:

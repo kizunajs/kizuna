@@ -8,13 +8,33 @@ import { createGeneratedClient, type ClientConfig, type GeneratedRoutes } from '
 
 export namespace API {
     export type CreateUserInput = {
-        /** Display name */
+        /**
+         * Display name
+         *
+         * @example
+         * 'Alice Johnson'
+         */
         name: string;
-        /** Email address */
+        /**
+         * Email address
+         *
+         * @example
+         * 'alice@example.com'
+         */
         email: string;
-        /** Family name. Snake_case wire key, kept verbatim by both clients. */
+        /**
+         * Family name. Snake_case wire key, kept verbatim by both clients.
+         *
+         * @example
+         * 'Hopper'
+         */
         last_name?: string;
-        /** Phone number in E.164-ish form. Demonstrates a custom-coded validation issue. */
+        /**
+         * Phone number in E.164-ish form. Demonstrates a custom-coded validation issue.
+         *
+         * @example
+         * '+15551234567'
+         */
         phone?: string;
     };
 
@@ -59,17 +79,46 @@ export namespace API {
      * A user in the system
      */
     export type User = {
-        /** Unique user identifier */
+        /**
+         * Unique user identifier
+         *
+         * @example
+         * 'usr_abc123'
+         */
         id: string;
-        /** Display name */
+        /**
+         * Display name
+         *
+         * @example
+         * 'Alice Johnson'
+         */
         name: string;
-        /** Email address */
+        /**
+         * Email address
+         *
+         * @deprecated use `email_address` instead.
+         *
+         * @example
+         * 'alice@example.com'
+         */
         email: string;
-        /** Email address */
+        /**
+         * Email address
+         *
+         * @example
+         * 'alice@example.com'
+         */
         email_address?: string;
-        /** Family name on the wire as `last_name`, exercises snake_case fidelity through the generators. */
+        /**
+         * Family name on the wire as `last_name`, exercises snake_case fidelity through the generators.
+         *
+         * @example
+         * 'Hopper'
+         */
         last_name?: string;
-        /** Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another. */
+        /**
+         * Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.
+         */
         avatar?: {
             id: string;
             url: string;
@@ -82,9 +131,19 @@ export namespace API {
 
     export namespace UsersListUsers {
         export type Query = {
-            /** Page number, starting at 1 */
+            /**
+             * Page number, starting at 1
+             *
+             * @example
+             * 1
+             */
             page?: number;
-            /** Page size (1–100) */
+            /**
+             * Page size (1–100)
+             *
+             * @example
+             * 10
+             */
             limit?: number;
         };
 
@@ -305,14 +364,22 @@ export namespace API {
 
     export namespace NotificationsListEvents {
         export type Query = {
-            /** Lower bound for occurredAt, wire format is ISO-8601 */
+            /**
+             * Lower bound for occurredAt, wire format is ISO-8601
+             */
             since?: string;
             kind?: "login" | "logout" | "signup";
-            /** Filter by id; repeated query param */
+            /**
+             * Filter by id; repeated query param
+             */
             ids?: Array<string>;
-            /** Arbitrary label, exercises z.string().transform() */
+            /**
+             * Arbitrary label, exercises z.string().transform()
+             */
             label?: unknown;
-            /** One or many tag IDs, exercises non-discriminated union codegen */
+            /**
+             * One or many tag IDs, exercises non-discriminated union codegen
+             */
             tagIds?: Array<string> | unknown;
         };
 
@@ -582,115 +649,322 @@ export namespace API {
 
 export interface Client {
     users: {
+        /**
+         * List users with pagination
+         *
+         * @example
+         * const result = await client.users.listUsers();
+         */
         listUsers(args?: {
             query?: API.UsersListUsers.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersListUsers.Result>;
+        /**
+         * Export users as CSV, exercises a non-JSON (text/csv) raw response body
+         *
+         * @example
+         * const result = await client.users.exportUsers();
+         */
         exportUsers(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersExportUsers.Result>;
+        /**
+         * Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag
+         *
+         * @example
+         * const result = await client.users.userBadge({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
         userBadge(args: {
             params: API.UsersUserBadge.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersUserBadge.Result>;
+        /**
+         * A user's most recent login or logout, inline union variants nest under the User model in native clients
+         *
+         * @example
+         * const result = await client.users.lastSessionEvent({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
         lastSessionEvent(args: {
             params: API.UsersLastSessionEvent.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersLastSessionEvent.Result>;
+        /**
+         * Search users, required coerced limit and cursor
+         *
+         * @example
+         * const result = await client.users.searchUsers({
+         *     query: {
+         *         q: 'string',
+         *         limit: 1,
+         *         cursor: 1,
+         *     },
+         * });
+         */
         searchUsers(args?: {
             query?: API.UsersSearchUsers.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersSearchUsers.Result>;
+        /**
+         * Get a user by id
+         *
+         * @example
+         * const result = await client.users.getUser({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
         getUser(args: {
             params: API.UsersGetUser.Params;
             headers?: API.UsersGetUser.Headers;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersGetUser.Result>;
+        /**
+         * Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response
+         *
+         * @example
+         * const result = await client.users.userActivity({
+         *     params: {
+         *         id: '1',
+         *         year: 1,
+         *     },
+         * });
+         */
         userActivity(args: {
             params: API.UsersUserActivity.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersUserActivity.Result>;
+        /**
+         * Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with
+         *
+         * @example
+         * const result = await client.users.userProfile({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
         userProfile(args: {
             params: API.UsersUserProfile.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersUserProfile.Result>;
+        /**
+         * Create a user
+         *
+         * @example
+         * const result = await client.users.createUser({
+         *     body: {
+         *         name: 'Alice Johnson',
+         *         email: 'alice@example.com',
+         *     },
+         * });
+         */
         createUser(args: {
             body: API.UsersCreateUser.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersCreateUser.Result>;
+        /**
+         * Delete a user
+         *
+         * @deprecated use `archiveUser` instead
+         *
+         * @example
+         * const result = await client.users.deleteUser({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
         deleteUser(args: {
             params: API.UsersDeleteUser.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersDeleteUser.Result>;
+        /**
+         * Archive a user, first call returns 201, subsequent calls 200
+         *
+         * @example
+         * const result = await client.users.archiveUser({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
         archiveUser(args: {
             params: API.UsersArchiveUser.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersArchiveUser.Result>;
+        /**
+         * Upload an avatar image
+         *
+         * @example
+         * const result = await client.users.uploadAvatar({
+         *     body: {
+         *         file: new File([], 'upload.txt'),
+         *         userId: '1',
+         *     },
+         * });
+         */
         uploadAvatar(args: {
             body: API.UsersUploadAvatar.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersUploadAvatar.Result>;
+        /**
+         * Ping a user, exercises z.void() body and response
+         *
+         * @example
+         * const result = await client.users.pingUser({
+         *     params: {
+         *         id: '1',
+         *     },
+         *     body: undefined,
+         * });
+         */
         pingUser(args: {
             params: API.UsersPingUser.Params;
             body: API.UsersPingUser.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersPingUser.Result>;
+        /**
+         * List work items, exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers
+         *
+         * @example
+         * const result = await client.users.getMyWork();
+         */
         getMyWork(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersGetMyWork.Result>;
+        /**
+         * Check user existence, exercises HEAD body stripping
+         *
+         * @example
+         * const result = await client.users.checkUser({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
         checkUser(args: {
             params: API.UsersCheckUser.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersCheckUser.Result>;
+        /**
+         * Describe allowed operations, exercises OPTIONS routing
+         *
+         * @example
+         * const result = await client.users.describeUsers();
+         */
         describeUsers(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.UsersDescribeUsers.Result>;
     };
     health: {
+        /**
+         * Health check, exercises nested sub-client routing
+         *
+         * @example
+         * const result = await client.health.check();
+         */
         check(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.HealthCheck.Result>;
+        /**
+         * Version, exercises second method in a sub-client group
+         *
+         * @example
+         * const result = await client.health.version();
+         */
         version(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.HealthVersion.Result>;
+        /**
+         * Health history, exercises array return type qualification
+         *
+         * @example
+         * const result = await client.health.history();
+         */
         history(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.HealthHistory.Result>;
     };
     notifications: {
+        /**
+         * Send a notification (discriminated by channel)
+         *
+         * @example
+         * const result = await client.notifications.sendNotification({
+         *     body: {
+         *         channel: 'email',
+         *         to: 'ada@example.com',
+         *         subject: 'string',
+         *     },
+         * });
+         */
         sendNotification(args: {
             body: API.NotificationsSendNotification.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.NotificationsSendNotification.Result>;
+        /**
+         * List events, exercises Date / enum / array query params
+         *
+         * @example
+         * const result = await client.notifications.listEvents();
+         */
         listEvents(args?: {
             query?: API.NotificationsListEvents.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.NotificationsListEvents.Result>;
+        /**
+         * Validate schemas, exercises generator bug coverage
+         *
+         * @example
+         * const result = await client.notifications.validateConfig({
+         *     body: {
+         *         default: 'string',
+         *         interval: 1,
+         *     },
+         * });
+         */
         validateConfig(args: {
             body: API.NotificationsValidateConfig.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.NotificationsValidateConfig.Result>;
+        /**
+         * Receive arbitrary webhook payload, exercises z.any() / AnyCodable codegen
+         *
+         * @example
+         * const result = await client.notifications.webhook({
+         *     body: undefined,
+         * });
+         */
         webhook(args: {
             body: API.NotificationsWebhook.Body;
             headers?: Record<string, string>;
@@ -698,15 +972,41 @@ export interface Client {
         }): Promise<API.NotificationsWebhook.Result>;
     };
     members: {
+        /**
+         * List workspace members
+         *
+         * @example
+         * const result = await client.members.listMembers();
+         */
         listMembers(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.MembersListMembers.Result>;
+        /**
+         * Invite a member to the workspace
+         *
+         * @example
+         * const result = await client.members.inviteMember({
+         *     body: {
+         *         email: 'ada@example.com',
+         *     },
+         * });
+         */
         inviteMember(args: {
             body: API.MembersInviteMember.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.MembersInviteMember.Result>;
+        /**
+         * Cancel an invite, an admin only their own
+         *
+         * @example
+         * const result = await client.members.cancelInvite({
+         *     params: {
+         *         inviteId: '1',
+         *     },
+         * });
+         */
         cancelInvite(args: {
             params: API.MembersCancelInvite.Params;
             headers?: Record<string, string>;
@@ -714,14 +1014,36 @@ export interface Client {
         }): Promise<API.MembersCancelInvite.Result>;
     };
     workspace: {
+        /**
+         * Get workspace info
+         *
+         * @example
+         * const result = await client.workspace.getWorkspace();
+         */
         getWorkspace(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.WorkspaceGetWorkspace.Result>;
+        /**
+         * Delete the workspace, owner only
+         *
+         * @example
+         * const result = await client.workspace.deleteWorkspace();
+         */
         deleteWorkspace(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.WorkspaceDeleteWorkspace.Result>;
+        /**
+         * Transfer ownership, owner only
+         *
+         * @example
+         * const result = await client.workspace.transfer({
+         *     body: {
+         *         toUserId: '1',
+         *     },
+         * });
+         */
         transfer(args: {
             body: API.WorkspaceTransfer.Body;
             headers?: Record<string, string>;
@@ -729,11 +1051,34 @@ export interface Client {
         }): Promise<API.WorkspaceTransfer.Result>;
     };
     invites: {
+        /**
+         * Resolve an invite by its capability-URL token, guarded by a custom path-token identity
+         *
+         * @example
+         * const result = await client.invites.getInvite({
+         *     params: {
+         *         token: '1',
+         *     },
+         * });
+         */
         getInvite(args: {
             params: API.InvitesGetInvite.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.InvitesGetInvite.Result>;
+        /**
+         * Accept an invite via the capability URL
+         *
+         * @example
+         * const result = await client.invites.acceptInvite({
+         *     params: {
+         *         token: '1',
+         *     },
+         *     body: {
+         *         name: 'string',
+         *     },
+         * });
+         */
         acceptInvite(args: {
             params: API.InvitesAcceptInvite.Params;
             body: API.InvitesAcceptInvite.Body;
@@ -742,6 +1087,16 @@ export interface Client {
         }): Promise<API.InvitesAcceptInvite.Result>;
     };
     assistant: {
+        /**
+         * Stream an assistant reply, exercises a server-sent events response
+         *
+         * @example
+         * const result = await client.assistant.reply({
+         *     body: {
+         *         prompt: 'string',
+         *     },
+         * });
+         */
         reply(args: {
             body: API.AssistantReply.Body;
             headers?: Record<string, string>;
@@ -749,17 +1104,47 @@ export interface Client {
         }): Promise<API.AssistantReply.Result>;
     };
     tools: {
+        /**
+         * Look up tomorrow forecast for one city
+         *
+         * @example
+         * const result = await client.tools.getForecast({
+         *     params: {
+         *         city: 'string',
+         *     },
+         * });
+         */
         getForecast(args: {
             params: API.ToolsGetForecast.Params;
             query?: API.ToolsGetForecast.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.ToolsGetForecast.Result>;
+        /**
+         * Plot signups per day over the last N days, for the client to draw as a chart
+         *
+         * @example
+         * const result = await client.tools.plotSignups({
+         *     query: {
+         *         days: 1,
+         *     },
+         * });
+         */
         plotSignups(args?: {
             query?: API.ToolsPlotSignups.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }): Promise<API.ToolsPlotSignups.Result>;
+        /**
+         * Count the words in a piece of text
+         *
+         * @example
+         * const result = await client.tools.countWords({
+         *     body: {
+         *         text: 'string',
+         *     },
+         * });
+         */
         countWords(args: {
             body: API.ToolsCountWords.Body;
             headers?: Record<string, string>;
@@ -767,6 +1152,12 @@ export interface Client {
         }): Promise<API.ToolsCountWords.Result>;
     };
     diagnostics: {
+        /**
+         * Report the caller as Hono sees it
+         *
+         * @example
+         * const result = await client.diagnostics.whoAmI();
+         */
         whoAmI(args?: {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;

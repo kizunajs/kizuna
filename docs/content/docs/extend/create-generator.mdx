@@ -82,3 +82,13 @@ if (deprecation) {
 ```
 
 See [Deprecations](/docs/deprecations) for the authoring side.
+
+## Examples
+
+A schema's declared example values read off the same surface, with `readMetaExamples`. It takes `example` first and then `examples`, each of which holds one value or a list, and answers with them in order:
+
+```ts
+import { readMetaExamples } from '@ts-kizuna/core/generator';
+
+const [example] = readMetaExamples(fieldSchema);
+```

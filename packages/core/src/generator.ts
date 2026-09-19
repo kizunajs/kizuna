@@ -24,6 +24,7 @@ export {
     readMeta,
     readMetaId,
     readMetaDescription,
+    readMetaExamples,
     readDeprecation,
     readDiscriminatorLiteral,
     readDiscriminatorStringLiteral,
