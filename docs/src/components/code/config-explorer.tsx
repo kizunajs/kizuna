@@ -139,7 +139,7 @@ if (res.status === 200) {
         file: 'user-list.tsx',
         fileIcon: brandIcons.typescript,
         lang: 'tsx',
-        code: `const api = new KizunaTanstackQuery(kizuna.api, apiClient);
+        code: `const api = new KizunaTanstackQuery(apiClient);
 
 const { data } = useQuery(
   api.users.getUser.queryOptions({

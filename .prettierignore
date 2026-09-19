@@ -13,3 +13,5 @@ tsconfig.json
 
 # kizuna generated output
 .kizuna/
+*.generated.ts
+**/*.generated.ts

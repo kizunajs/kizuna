@@ -508,7 +508,7 @@ export const UserSchema = Kizuna.model({
 
 - **OpenAPI**: extracted into `components.schemas.User`, and every usage becomes a `$ref`
 - **Swift**: emitted as a shared `public struct User`
-- **TypeScript**: pair it with an exported type (see [Exporting types](#exporting-types))
+- **TypeScript**: emitted as `API.User` in the generated client (see [Named types](/docs/clients/fetch#named-types))
 
 ### Splitting routes across files
 
@@ -624,26 +624,6 @@ getUser: k
 ```
 
 Your editor, the OpenAPI spec, and the Swift and Kotlin clients pick both up. A route also takes a deprecation `date` and a `sunset` timestamp, both ISO 8601, and every response from it then announces them in the `Deprecation` and `Sunset` headers. See [Deprecations](/docs/deprecations).
-
-### Exporting types
-
-Infer TypeScript types from your schemas in a separate `types.ts` so consumers can import them without pulling in runtime code:
-
-```ts title="src/types.ts"
-import type { z } from 'zod';
-import { UserSchema, CreateUserSchema } from './routes/schemas';
-
-export type User = z.infer<typeof UserSchema>;
-export type CreateUserInput = z.infer<typeof CreateUserSchema>;
-```
-
-```tsx title="UserCard.tsx"
-import type { User } from '@/types';
-
-function UserCard({ user }: { user: User }) {
-    return <div>{user.name}</div>;
-}
-```
 
 ## Reference
 

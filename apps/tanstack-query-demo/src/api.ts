@@ -31,4 +31,4 @@ export const apiClient = new KizunaClient(kizuna.api, {
     },
 });
 
-export const api = new KizunaTanstackQuery(kizuna.api, apiClient);
+export const api = new KizunaTanstackQuery(apiClient);

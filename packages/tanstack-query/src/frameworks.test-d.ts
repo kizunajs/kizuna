@@ -83,7 +83,7 @@ const apiClient = new KizunaClient(contract, {
     baseUrl: 'http://localhost:8000',
 });
 
-const api = new KizunaTanstackQuery(contract, apiClient);
+const api = new KizunaTanstackQuery(apiClient);
 
 type GetUserResponse = Awaited<ReturnType<typeof apiClient.users.getUser>>;
 type SearchUsersResponse = Awaited<ReturnType<typeof apiClient.users.searchUsers>>;

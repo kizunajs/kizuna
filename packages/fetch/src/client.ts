@@ -201,8 +201,21 @@ const buildQueryString = (query: Record<string, unknown>): string => {
     return result.length > 0 ? `?${result}` : '';
 };
 
+/**
+ * Registry-global: what a client method was built from. Anything wrapping a
+ * client reads the route here rather than being handed the api a second time.
+ */
+export const CLIENT_ROUTE: unique symbol = Symbol.for('ts-kizuna.client-route') as symbol as typeof CLIENT_ROUTE;
+
+/**
+ * The route a client method answers, or `undefined` for anything that is not
+ * one.
+ */
+export const routeOf = (value: unknown): RouteDefinition | undefined =>
+    typeof value === 'function' ? ((value as unknown as Record<symbol, unknown>)[CLIENT_ROUTE] as RouteDefinition | undefined) : undefined;
+
 const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
-    return async (
+    const call = async (
         args: {
             params?: Record<string, string | number | bigint | Date>;
             query?: Record<string, unknown>;
@@ -269,6 +282,9 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             headers: responseHeaders,
         };
     };
+
+    (call as unknown as Record<symbol, unknown>)[CLIENT_ROUTE] = route;
+    return call;
 };
 
 const readStream = (body: ReadableStream<Uint8Array>, definition: StreamResponseDefinition): AsyncIterable<unknown> => {
@@ -295,19 +311,24 @@ const buildClientTree = (router: Routes, config: ClientConfig): Record<string, u
     return result;
 };
 
-function buildClient(contract: Contract, config: ClientConfig): unknown {
+/**
+ * Folds the request context headers into `baseHeaders`, so every request
+ * carries them. An explicit `baseHeaders` entry wins.
+ */
+const withContextHeaders = (config: ClientConfig): ClientConfig => {
     const contextHeaders = (config as { requestContext?: Record<string, string | undefined> }).requestContext;
-    const resolvedConfig: ClientConfig = contextHeaders
-        ? {
-              ...config,
-              baseHeaders: {
-                  ...Object.fromEntries(Object.entries(contextHeaders).filter(([, value]) => value !== undefined)),
-                  ...(config.baseHeaders ?? {}),
-              } as Record<string, string>,
-          }
-        : config;
+    if (!contextHeaders) return config;
+    return {
+        ...config,
+        baseHeaders: {
+            ...Object.fromEntries(Object.entries(contextHeaders).filter(([, value]) => value !== undefined)),
+            ...(config.baseHeaders ?? {}),
+        } as Record<string, string>,
+    };
+};
 
-    return buildClientTree(contract.routes, resolvedConfig);
+function buildClient(contract: Contract, config: ClientConfig): unknown {
+    return buildClientTree(contract.routes, withContextHeaders(config));
 }
 
 /**
@@ -375,4 +396,4 @@ export interface GeneratedRoutes {
  * types; this owns the requests.
  */
 export const createGeneratedClient = (routes: GeneratedRoutes, config: ClientConfig): Record<string, unknown> =>
-    buildClientTree(routes as unknown as Routes, config);
+    buildClientTree(routes as unknown as Routes, withContextHeaders(config));

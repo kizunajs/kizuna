@@ -56,10 +56,10 @@ export const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
 });
 
-export const api = new KizunaTanstackQuery(kizuna.api, apiClient);
+export const api = new KizunaTanstackQuery(apiClient);
 ```
 
-`KizunaTanstackQuery` reads `routes` off the api to build its keys, so it takes the api alongside the client.
+Every client method carries the route it answers, so the client is the only argument. That holds for a generated client too.
 
 </Step>
 

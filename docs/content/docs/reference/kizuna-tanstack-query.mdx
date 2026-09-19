@@ -20,15 +20,14 @@ import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
 ## Parameters
 
 ```ts
-new KizunaTanstackQuery(contract: Contract, client: Client): KizunaQueryProxy
+new KizunaTanstackQuery(client: Client): KizunaQueryProxy
 ```
 
-| Parameter  | Type       | Description                                                                              |
-| ---------- | ---------- | ---------------------------------------------------------------------------------------- |
-| `contract` | `Contract` | The `api` from [`defineConfig`](/docs/reference/define-config)                           |
-| `client`   | `Client`   | A client from [`new KizunaClient()`](/docs/reference/kizuna-client), built from that api |
+| Parameter | Type     | Description                                                                             |
+| --------- | -------- | --------------------------------------------------------------------------------------- |
+| `client`  | `Client` | A client from [`new KizunaClient()`](/docs/reference/kizuna-client), or a generated one |
 
-The api is needed as well as the client: each route's `method` decides which factories it gets, and its `responses` decide which statuses are data.
+Every client method carries the route it answers, so nothing else is needed: each route's `method` decides which factories it gets, and its `responses` decide which statuses are data.
 
 ## Returns
 
@@ -99,7 +98,7 @@ const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
 });
 
-const api = new KizunaTanstackQuery(kizuna.api, apiClient);
+const api = new KizunaTanstackQuery(apiClient);
 
 const { data } = useQuery(
     api.users.listUsers.queryOptions({

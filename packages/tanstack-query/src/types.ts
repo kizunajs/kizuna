@@ -224,10 +224,8 @@ export type KizunaQueryProxy<T extends Routes, Codes extends string = never> = {
 
 export interface KizunaTanstackQueryConstructor {
     /**
-     * Only `routes` is read from the contract, so any contract satisfies this.
+     * The client is the only argument: each of its methods carries the route it
+     * answers, so nothing has to hand over the api a second time.
      */
-    new <T extends Routes, Codes extends string = never>(
-        contract: { routes: T },
-        client: Client<T, Codes>
-    ): KizunaQueryProxy<T, Codes> & PathProcedures;
+    new <T extends Routes, Codes extends string = never>(client: Client<T, Codes>): KizunaQueryProxy<T, Codes> & PathProcedures;
 }

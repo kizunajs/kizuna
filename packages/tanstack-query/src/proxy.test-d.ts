@@ -80,7 +80,7 @@ const apiClient = new KizunaClient(contract, {
     baseUrl: 'http://localhost:8000',
 });
 
-const api = new KizunaTanstackQuery(contract, apiClient);
+const api = new KizunaTanstackQuery(apiClient);
 
 test('a route with a required query demands input', () => {
     // @ts-expect-error searchUsers declares a required `term`
@@ -131,7 +131,6 @@ test('a streamed route offers streamOptions with the messages as data, and no qu
         },
     }).api;
     const api = new KizunaTanstackQuery(
-        streamContract,
         new KizunaClient(streamContract, {
             baseUrl: '',
         })

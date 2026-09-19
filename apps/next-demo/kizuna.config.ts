@@ -1,4 +1,5 @@
 import { defineConfig } from '@ts-kizuna/core';
+import { fetchClient } from '@ts-kizuna/fetch/server';
 import { nextAdapter } from '@ts-kizuna/next';
 import { mcpPlugin } from '@ts-kizuna/mcp';
 import { openApiPlugin } from '@ts-kizuna/openapi';
@@ -33,6 +34,11 @@ export default defineConfig({
     },
     routes: served,
     jobs,
+    clients: [
+        fetchClient({
+            output: './src/lib/api-client.generated.ts',
+        }),
+    ],
     plugins: [
         mcpPlugin({
             name: 'ts-kizuna demo',

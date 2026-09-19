@@ -1,6 +1,6 @@
 import { experimental_streamedQuery as streamedQuery, skipToken } from '@tanstack/query-core';
-import { routeStreams, streamStatuses, type RouteDefinition, type Routes } from '@ts-kizuna/core';
-import { isRouteDefinition } from '@ts-kizuna/core/adapter';
+import { routeStreams, streamStatuses, type RouteDefinition } from '@ts-kizuna/core';
+import { routeOf } from '@ts-kizuna/fetch';
 import { NonStreamResponseError, UndeclaredResponseError } from './errors.js';
 import { buildPathKey, buildQueryKey } from './keys.js';
 import type { KizunaTanstackQueryConstructor } from './types.js';
@@ -130,27 +130,33 @@ const buildProcedure = (segments: readonly string[], route: RouteDefinition, cli
     };
 };
 
-const buildNode = (segments: readonly string[], routes: Routes, clientNode: Record<string, unknown>): Record<string, unknown> => {
+/**
+ * Walks the client itself. Each method carries the route it answers, so the
+ * shape of the client is the shape of the proxy and nothing else is needed.
+ */
+const buildNode = (segments: readonly string[], clientNode: Record<string, unknown>): Record<string, unknown> => {
     // Path-level factories go on first so a route sharing their name wins.
     const node: Record<string, unknown> = {
         key: () => buildPathKey(segments),
     };
 
-    for (const routeName of Object.keys(routes)) {
-        const value = routes[routeName];
+    for (const routeName of Object.keys(clientNode)) {
+        const child = clientNode[routeName];
         const childSegments = [...segments, routeName];
-        const childClient = clientNode[routeName];
+        const route = routeOf(child);
 
-        node[routeName] = isRouteDefinition(value)
-            ? buildProcedure(childSegments, value, childClient as ClientNode)
-            : buildNode(childSegments, value as Routes, childClient as Record<string, unknown>);
+        if (route) {
+            node[routeName] = buildProcedure(childSegments, route, child as ClientNode);
+        } else if (child && typeof child === 'object') {
+            node[routeName] = buildNode(childSegments, child as Record<string, unknown>);
+        }
     }
 
     return node;
 };
 
-function buildQueryProxy(contract: { routes: Routes }, client: Record<string, unknown>): unknown {
-    return buildNode([], contract.routes, client);
+function buildQueryProxy(client: Record<string, unknown>): unknown {
+    return buildNode([], client);
 }
 
 /**
@@ -162,7 +168,7 @@ function buildQueryProxy(contract: { routes: Routes }, client: Record<string, un
  * import { contract } from './contract.js';
  * import { apiClient } from './api-client.js';
  *
- * const api = new KizunaTanstackQuery(contract, apiClient);
+ * const api = new KizunaTanstackQuery(apiClient);
  *
  * useQuery(
  *     api.users.listUsers.queryOptions({

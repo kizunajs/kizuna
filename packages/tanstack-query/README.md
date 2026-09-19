@@ -20,7 +20,7 @@ const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
 });
 
-const api = new KizunaTanstackQuery(kizuna.api, apiClient);
+const api = new KizunaTanstackQuery(apiClient);
 
 const { data } = useQuery(
     api.users.getUser.queryOptions({

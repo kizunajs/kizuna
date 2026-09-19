@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { QueryClient, skipToken } from '@tanstack/query-core';
 import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
+import { CLIENT_ROUTE } from '@ts-kizuna/fetch';
 import { KizunaTanstackQuery } from './proxy.js';
 import { NonStreamResponseError, UndeclaredResponseError, isNonStreamResponseError, isUndeclaredResponseError } from './errors.js';
 
@@ -91,19 +92,26 @@ const ok = { status: 200, body: { id: '1', name: 'Ada' }, headers: {} };
  * A stand-in for the fetch client: the same nested shape, with every route a spy
  * resolving whatever the test needs.
  */
+/**
+ * A real client carries the route each method answers, so a stand-in has to as
+ * well: that is what the proxy walks.
+ */
+const asRoute = (definition: unknown, fn: unknown) => Object.assign(fn as object, { [CLIENT_ROUTE]: definition });
+
 const buildClient = (result: unknown = ok) => {
-    const route = () => vi.fn().mockResolvedValue(result);
+    const route = (definition: unknown) => asRoute(definition, vi.fn().mockResolvedValue(result));
+    const users = contract.routes.users as Record<string, unknown>;
     return {
         users: {
-            listUsers: route(),
-            getUser: route(),
-            searchUsers: route(),
-            createUser: route(),
-            checkUser: route(),
+            listUsers: route(users.listUsers),
+            getUser: route(users.getUser),
+            searchUsers: route(users.searchUsers),
+            createUser: route(users.createUser),
+            checkUser: route(users.checkUser),
         },
     };
 };
-const buildApi = (client: ReturnType<typeof buildClient>) => new KizunaTanstackQuery(contract, client as any);
+const buildApi = (client: ReturnType<typeof buildClient>) => new KizunaTanstackQuery<typeof contract.routes>(client as never);
 
 const runQueryFn = (options: { queryFn: unknown }, context: Record<string, unknown> = {}) =>
     (options.queryFn as (context: unknown) => Promise<unknown>)({ signal: undefined, ...context });
@@ -257,9 +265,12 @@ describe('declared statuses', () => {
                 }),
             },
         }).api;
-        const api = new KizunaTanstackQuery(guardedContract, {
+        const api = new KizunaTanstackQuery<typeof guardedContract.routes>({
             users: {
-                getUser: vi.fn().mockResolvedValue({ status: 401, body: { detail: 'Unauthorized' }, headers: {} }),
+                getUser: asRoute(
+                    (guardedContract.routes.users as Record<string, unknown>).getUser,
+                    vi.fn().mockResolvedValue({ status: 401, body: { detail: 'Unauthorized' }, headers: {} })
+                ),
             },
         } as never);
 
@@ -450,8 +461,10 @@ describe('name collisions', () => {
                 users: collidingRoutes,
             },
         }).api;
-        const client = { users: { key: vi.fn().mockResolvedValue(ok) } };
-        const api = new KizunaTanstackQuery(collidingContract, client as any);
+        const client = {
+            users: { key: asRoute((collidingContract.routes.users as Record<string, unknown>).key, vi.fn().mockResolvedValue(ok)) },
+        };
+        const api = new KizunaTanstackQuery<typeof collidingContract.routes>(client as never);
 
         expect(api.users.key).toHaveProperty('queryOptions');
     });
@@ -493,9 +506,9 @@ describe('streams', () => {
         for (const message of messages) yield message;
     };
     const buildStreamApi = (result: unknown) =>
-        new KizunaTanstackQuery(streamContract, {
+        new KizunaTanstackQuery<typeof streamContract.routes>({
             assistant: {
-                reply: vi.fn().mockResolvedValue(result),
+                reply: asRoute((streamContract.routes.assistant as Record<string, unknown>).reply, vi.fn().mockResolvedValue(result)),
             },
         } as any);
     const input = {
