@@ -1,9 +1,9 @@
 ---
 title: generateSwiftClient
-description: Generate a native Swift client from a ts-kizuna contract with URLSession and Codable.
+description: Generate a native Swift client from a ts-kizuna API with URLSession and Codable.
 ---
 
-Generate a native Swift client from a contract, built on `URLSession` and `Codable`.
+Generate a native Swift client from your routes, built on `URLSession` and `Codable`.
 
 <InstallTabs packageName="@ts-kizuna/swift" />
 
@@ -17,10 +17,10 @@ import { generateSwiftClient } from '@ts-kizuna/swift';
 generateSwiftClient(contract: Contract, config: SwiftConfig): string
 ```
 
-| Parameter  | Type          | Description                                                       |
-| ---------- | ------------- | ----------------------------------------------------------------- |
-| `contract` | `Contract`    | The contract from [`defineConfig`](/docs/reference/define-config) |
-| `config`   | `SwiftConfig` | Generation configuration                                          |
+| Parameter  | Type          | Description                                                    |
+| ---------- | ------------- | -------------------------------------------------------------- |
+| `contract` | `Contract`    | The `api` from [`defineConfig`](/docs/reference/define-config) |
+| `config`   | `SwiftConfig` | Generation configuration                                       |
 
 ## `SwiftConfig`
 
@@ -35,9 +35,9 @@ generateSwiftClient(contract: Contract, config: SwiftConfig): string
 ```ts title="generate-swift-client.ts"
 import { writeFileSync } from 'node:fs';
 import { generateSwiftClient } from '@ts-kizuna/swift';
-import { contract } from '../src/contract';
+import kizuna from '../kizuna.config';
 
-const source = generateSwiftClient(contract, {
+const source = generateSwiftClient(kizuna.api, {
     namespaceName: 'API',
 });
 

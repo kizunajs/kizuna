@@ -2,7 +2,7 @@
 
 ![ts-kizuna](https://raw.githubusercontent.com/ts-kizuna/kizuna/main/docs/public/readme-beta.png)
 
-Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
+Build fully typed REST APIs with TypeScript. Declare a route once. Get a typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
 
 [![npm](https://img.shields.io/npm/v/@ts-kizuna/core?color=blue&label=npm)](https://www.npmjs.com/package/@ts-kizuna/core)
 ![license](https://img.shields.io/badge/license-MIT-blue)
@@ -18,7 +18,7 @@ Build fully typed REST APIs with TypeScript. Write one contract. Get a fully typ
 
 ## Features
 
-- **Contract-first**: define request/response schemas once, share between server and client
+- **One declaration**: a method, a path, its schemas and the handler that answers it, in one place
 - **Type-safe everywhere**: full inference on both sides, no casting
 - **Typed authentication**: identities carrying their own guard, roles, and an `auth` on every route
 - **RPC-like client**: call your API like a function, get fully typed responses back
@@ -149,22 +149,22 @@ if (result.status === 200) {
 
 ## Packages
 
-| Package                        | Description                                           |
-| ------------------------------ | ----------------------------------------------------- |
-| `@ts-kizuna/core`              | Routes & contract definition, validation, adapter API |
-| `@ts-kizuna/fetch`             | Typed fetch-based client                              |
-| `@ts-kizuna/tanstack-query`    | TanStack Query client                                 |
-| `@ts-kizuna/express`           | Express adapter                                       |
-| `@ts-kizuna/fastify`           | Fastify adapter                                       |
-| `@ts-kizuna/hono`              | Hono adapter                                          |
-| `@ts-kizuna/next`              | Next.js App Router adapter                            |
-| `@ts-kizuna/openapi`           | OpenAPI generation                                    |
-| `@ts-kizuna/swift`             | Swift client generation                               |
-| `@ts-kizuna/kotlin`            | Kotlin client generation                              |
-| `@ts-kizuna/mcp`               | MCP server generation                                 |
-| `@ts-kizuna/eslint-plugin`     | ESLint rules                                          |
-| `@ts-kizuna/typescript-plugin` | Deprecation highlighting in the editor                |
-| `@ts-kizuna/cli`               | Command line tooling                                  |
+| Package                        | Description                                        |
+| ------------------------------ | -------------------------------------------------- |
+| `@ts-kizuna/core`              | Route declaration, validation, and the adapter API |
+| `@ts-kizuna/fetch`             | Typed fetch-based client                           |
+| `@ts-kizuna/tanstack-query`    | TanStack Query client                              |
+| `@ts-kizuna/express`           | Express adapter                                    |
+| `@ts-kizuna/fastify`           | Fastify adapter                                    |
+| `@ts-kizuna/hono`              | Hono adapter                                       |
+| `@ts-kizuna/next`              | Next.js App Router adapter                         |
+| `@ts-kizuna/openapi`           | OpenAPI generation                                 |
+| `@ts-kizuna/swift`             | Swift client generation                            |
+| `@ts-kizuna/kotlin`            | Kotlin client generation                           |
+| `@ts-kizuna/mcp`               | MCP server generation                              |
+| `@ts-kizuna/eslint-plugin`     | ESLint rules                                       |
+| `@ts-kizuna/typescript-plugin` | Deprecation highlighting in the editor             |
+| `@ts-kizuna/cli`               | Command line tooling                               |
 
 ## License
 

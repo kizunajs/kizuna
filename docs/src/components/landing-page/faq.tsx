@@ -6,9 +6,9 @@ import TsLogo from '@/icons/TypeScript.svg';
 import styles from './faq.module.css';
 
 const TRPC_EXAMPLE = `import { KizunaClient } from '@ts-kizuna/fetch';
-import { contract } from '@shared/contract';
+import kizuna from '../kizuna.config';
 
-const client = new KizunaClient(contract, {
+const client = new KizunaClient(kizuna.api, {
     baseUrl: 'https://api.example.com',
 });
 
@@ -29,11 +29,11 @@ export const questions: Question[] = [
         question: 'Why ts-kizuna?',
         answer: (
             <>
-                <p className={styles.body}>One contract, a fully typed stack.</p>
+                <p className={styles.body}>One config, a fully typed stack.</p>
                 <p className={styles.body}>
-                    Describe your API once. ts-kizuna infers a typed server and a client you call like a function straight from the
-                    contract, and generates OpenAPI docs, native Swift and Kotlin clients, and an MCP server from the same definition. No
-                    copying types between repos, no docs to keep up to date by hand.
+                    Describe your API once. ts-kizuna infers a typed server and a client you call like a function straight from your routes,
+                    and generates OpenAPI docs, native Swift and Kotlin clients, and an MCP server from the same definition. No copying
+                    types between repos, no docs to keep up to date by hand.
                 </p>
                 <p className={styles.body}>
                     Change the API and your editor shows you everything that breaks, right then. Deprecate a field and every caller sees it
@@ -85,7 +85,7 @@ export const questions: Question[] = [
                 <p className={styles.body}>Where ts-kizuna is headed:</p>
                 <ul className={styles.bullets}>
                     <li>A stable v2 syntax, with the way you define and call your API locked in</li>
-                    <li>Webhooks, declared in the contract like routes</li>
+                    <li>Webhooks, declared like routes</li>
                     <li>OpenAPI 3.2.0 output</li>
                     <li>A TanStack Start adapter</li>
                     <li>Whatever the future brings</li>
@@ -106,8 +106,8 @@ export const questions: Question[] = [
         question: 'Can I use my API from non-TypeScript clients?',
         answer: (
             <p className={styles.body}>
-                Yes. ts-kizuna describes a real REST API, so anything that speaks HTTP can call it. The same contract also generates an
-                OpenAPI document, native Swift and Kotlin clients, and an MCP server.
+                Yes. ts-kizuna describes a real REST API, so anything that speaks HTTP can call it. The same routes also generate an OpenAPI
+                document, native Swift and Kotlin clients, and an MCP server.
             </p>
         ),
     },
@@ -150,7 +150,7 @@ export const questions: Question[] = [
                 </div>
                 <p className={styles.body}>
                     ts-kizuna fits better when your API has consumers outside that client: another language, a public integration, or
-                    anything reading the OpenAPI spec. The same contract also generates native Swift and Kotlin clients, so your iOS and
+                    anything reading the OpenAPI spec. The same routes also generate native Swift and Kotlin clients, so your iOS and
                     Android apps are typed against the API too.
                 </p>
             </>

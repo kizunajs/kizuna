@@ -5,7 +5,7 @@ description: Connect any queue or scheduler to your kizuna jobs by implementing 
 
 <AlphaNotice>
 
-The transport API is new and still settling. The message shape and the dispatch contract may change before v2, so pin your version if you depend on them.
+The transport API is new and still settling. The message shape and what a transport must implement may change before v2, so pin your version if you depend on them.
 
 </AlphaNotice>
 
@@ -69,7 +69,7 @@ Resolve once the queue has accepted the message, which is before the job runs. R
 start?: (context: JobWorkerContext) => Promise<JobWorker>;
 ```
 
-You get every job the contract declares, so you can subscribe by name, and a `run` that invokes one through the same handler a route would reach.
+You get every job your API declares, so you can subscribe by name, and a `run` that invokes one through the same handler a route would reach.
 
 ```ts title="job-transport.ts"
 start: async ({ jobs, run }) => {
@@ -266,7 +266,7 @@ export const bullmq = (connection: ConnectionOptions, queueName = 'jobs') => {
                 queueName,
                 async (stored) => {
                     const job = byName.get(stored.name);
-                    if (!job) throw new Error(`No job named "${stored.name}" on this contract.`);
+                    if (!job) throw new Error(`No job named "${stored.name}" on this API.`);
                     await run({ ...job, input: stored.data });
                 },
                 { connection }

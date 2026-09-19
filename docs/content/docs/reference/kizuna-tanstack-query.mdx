@@ -1,6 +1,6 @@
 ---
 title: new KizunaTanstackQuery()
-description: Build TanStack Query options from a ts-kizuna contract and a fetch client.
+description: Build TanStack Query options from a ts-kizuna API and a fetch client.
 ---
 
 <BetaNotice>
@@ -9,7 +9,7 @@ The TanStack Query client is new and still settling. Its API surface may change 
 
 </BetaNotice>
 
-Build TanStack Query options from a contract. See the [TanStack Query guide](/docs/clients/tanstack-query) for usage.
+Build TanStack Query options from your routes. See the [TanStack Query guide](/docs/clients/tanstack-query) for usage.
 
 <InstallTabs packageName="@ts-kizuna/tanstack-query" />
 
@@ -23,16 +23,16 @@ import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
 new KizunaTanstackQuery(contract: Contract, client: Client): KizunaQueryProxy
 ```
 
-| Parameter  | Type       | Description                                                                                   |
-| ---------- | ---------- | --------------------------------------------------------------------------------------------- |
-| `contract` | `Contract` | The contract from [`defineConfig`](/docs/reference/define-config)                             |
-| `client`   | `Client`   | A client from [`new KizunaClient()`](/docs/reference/kizuna-client), built from that contract |
+| Parameter  | Type       | Description                                                                              |
+| ---------- | ---------- | ---------------------------------------------------------------------------------------- |
+| `contract` | `Contract` | The `api` from [`defineConfig`](/docs/reference/define-config)                           |
+| `client`   | `Client`   | A client from [`new KizunaClient()`](/docs/reference/kizuna-client), built from that api |
 
-The contract is needed as well as the client: each route's `method` decides which factories it gets, and its `responses` decide which statuses are data.
+The api is needed as well as the client: each route's `method` decides which factories it gets, and its `responses` decide which statuses are data.
 
 ## Returns
 
-An object mirroring the contract's route groups.
+An object mirroring your route groups.
 
 **`GET` and `HEAD` routes**
 
@@ -81,7 +81,7 @@ type KizunaQueryKey = readonly [readonly string[], { input?: unknown; type: 'que
 type KizunaPathKey = readonly [readonly string[]];
 ```
 
-Segments are the route's path through the contract, so `api.users.key()` prefixes every key under `users`. `fetchOptions` is stripped from the input first.
+Segments are the route's path through your routes, so `api.users.key()` prefixes every key under `users`. `fetchOptions` is stripped from the input first.
 
 ## Errors
 
@@ -99,7 +99,7 @@ const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
 });
 
-const api = new KizunaTanstackQuery(contract, apiClient);
+const api = new KizunaTanstackQuery(kizuna.api, apiClient);
 
 const { data } = useQuery(
     api.users.listUsers.queryOptions({

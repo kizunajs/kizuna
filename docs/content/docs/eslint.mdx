@@ -51,7 +51,7 @@ Flags anything using something ts-kizuna can't support: `body`, `query`, `pathPa
 
 ### `z.coerce`
 
-kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/building/contract#query-path-and-header-coercion)), so `z.coerce` is redundant, and `k.routes` throws on it. Use the plain schema:
+kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/routes#query-path-and-header-coercion)), so `z.coerce` is redundant, and `k.routes` throws on it. Use the plain schema:
 
 ```ts
 // flagged

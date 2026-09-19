@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
-import { contractNotices, formatNotice } from './contract-notices.js';
+import { apiNotices, formatNotice } from './api-notices.js';
 
 const k = new Kizuna();
 
@@ -54,9 +54,9 @@ const contract = defineConfig({
 }).api;
 
 const now = new Date('2026-09-15T00:00:00Z');
-const notices = contractNotices(contract, { now });
+const notices = apiNotices(contract, { now });
 
-describe('contractNotices', () => {
+describe('apiNotices', () => {
     it('reports only routes that announce their own retirement', () => {
         expect(notices.map((notice) => notice.routeKey)).not.toContain('users.getUser');
         expect(notices).toHaveLength(4);

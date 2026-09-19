@@ -1,11 +1,11 @@
 ---
 title: Zod
-description: Contracts are written in Zod, and the schema carries more than validation.
+description: Routes are written in Zod, and the schema carries more than validation.
 ---
 
 <Supports items={['Zod 4']} />
 
-A kizuna contract is written in [Zod](https://zod.dev). Validation is the smaller job: the same schemas generate the OpenAPI document, the Swift and Kotlin clients, and the MCP tools, so what you can say in Zod is what your API can say. Every package that works with schemas declares `zod@^4.0.0` as a peer dependency.
+A kizuna route is written in [Zod](https://zod.dev). Validation is the smaller job: the same schemas generate the OpenAPI document, the Swift and Kotlin clients, and the MCP tools, so what you can say in Zod is what your API can say. Every package that works with schemas declares `zod@^4.0.0` as a peer dependency.
 
 ## Standard Schema
 
@@ -32,7 +32,7 @@ One `z.date()`, and every surface gets the real type:
 
 A validator-neutral description cannot say any of that. JSON Schema has no `Date`, `bigint`, or transform to describe, a file upload flattens to a string, and a discriminated union loses its discriminator.
 
-Reading one library also pays inside kizuna: the OpenAPI, Swift, Kotlin, and MCP generators share one toolkit for walking schemas, so a fix or a feature in that reading lands in all of them at once. Contracts take Zod, and kizuna reads all of it.
+Reading one library also pays inside kizuna: the OpenAPI, Swift, Kotlin, and MCP generators share one toolkit for walking schemas, so a fix or a feature in that reading lands in all of them at once. Routes take Zod, and kizuna reads all of it.
 
 We wanted every client to behave the same, whatever the language, and one deeply read library is what keeps that true.
 
@@ -61,7 +61,7 @@ Routes deprecate too, with dates and sunset headers. See [Deprecations](/docs/de
 
 ## Coercion
 
-Path parameters, query parameters, and headers arrive as strings, and kizuna coerces them to the declared schema, so `z.number()` in a query means the handler receives a number. Declare plain schemas; `k.routes` throws on `z.coerce`, since coercion is already built in. See [coercion](/docs/building/contract#query-path-and-header-coercion).
+Path parameters, query parameters, and headers arrive as strings, and kizuna coerces them to the declared schema, so `z.number()` in a query means the handler receives a number. Declare plain schemas; `k.routes` throws on `z.coerce`, since coercion is already built in. See [coercion](/docs/routes#query-path-and-header-coercion).
 
 ## Custom issue codes
 

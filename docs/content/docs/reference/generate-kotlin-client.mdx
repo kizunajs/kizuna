@@ -1,6 +1,6 @@
 ---
 title: generateKotlinClient
-description: Generate a native Kotlin client from a ts-kizuna contract with OkHttp, kotlinx.serialization, and coroutines.
+description: Generate a native Kotlin client from a ts-kizuna API with OkHttp, kotlinx.serialization, and coroutines.
 ---
 
 <BetaNotice>
@@ -9,7 +9,7 @@ The Kotlin client is new and still settling. The generated API surface may chang
 
 </BetaNotice>
 
-Generate a native Kotlin client from a contract. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
+Generate a native Kotlin client from your routes. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
 
 <InstallTabs packageName="@ts-kizuna/kotlin" />
 
@@ -23,10 +23,10 @@ import { generateKotlinClient } from '@ts-kizuna/kotlin';
 generateKotlinClient(contract: Contract, config: KotlinConfig): string
 ```
 
-| Parameter  | Type           | Description                                                       |
-| ---------- | -------------- | ----------------------------------------------------------------- |
-| `contract` | `Contract`     | The contract from [`defineConfig`](/docs/reference/define-config) |
-| `config`   | `KotlinConfig` | Generation configuration                                          |
+| Parameter  | Type           | Description                                                    |
+| ---------- | -------------- | -------------------------------------------------------------- |
+| `contract` | `Contract`     | The `api` from [`defineConfig`](/docs/reference/define-config) |
+| `config`   | `KotlinConfig` | Generation configuration                                       |
 
 ## `KotlinConfig`
 
@@ -43,9 +43,9 @@ generateKotlinClient(contract: Contract, config: KotlinConfig): string
 import path from 'path';
 import { writeFileSync } from 'fs';
 import { generateKotlinClient } from '@ts-kizuna/kotlin';
-import { contract } from '../src/contract';
+import kizuna from '../kizuna.config';
 
-const kotlin = generateKotlinClient(contract, {
+const kotlin = generateKotlinClient(kizuna.api, {
     namespaceName: 'API',
     packageName: 'com.example.api',
 });

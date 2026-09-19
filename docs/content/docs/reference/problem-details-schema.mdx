@@ -27,9 +27,9 @@ import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 | `status` | HTTP status code.                                                                       |
 | `detail` | Human-readable explanation specific to this occurrence.                                 |
 
-## Usage in contracts
+## Usage in routes
 
-Use `ProblemDetailsSchema` in your contract's `responses` to document error status codes:
+Use `ProblemDetailsSchema` in a route's `responses` to document error status codes:
 
 ```ts title="src/routes/users.ts"
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
@@ -187,7 +187,7 @@ api.mount(app, {
 });
 ```
 
-The input is always the canonical problem; only the outgoing bytes change, so the contract stays Problem Details. Reach for it when extension members can't reproduce the old body. See [Migrating an existing API](/docs/migration/existing-api).
+The input is always the canonical problem; only the outgoing bytes change, so what you declared stays Problem Details. Reach for it when extension members can't reproduce the old body. See [Migrating an existing API](/docs/migration/existing-api).
 
 ## What produces it
 

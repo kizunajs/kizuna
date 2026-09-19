@@ -1,13 +1,13 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { Contract } from '@ts-kizuna/core';
-import { loadContract } from './load-contract.js';
-import { contractNotices, type Notice } from './contract-notices.js';
+import { loadConfig } from './load-config.js';
+import { apiNotices, type Notice } from './api-notices.js';
 
 /**
  * What a watcher reports each time it reloads.
  */
-export interface ContractChange {
+export interface ConfigChange {
     contract: Contract;
     /**
      * The file whose change triggered this reload, absent on the first load.
@@ -23,7 +23,7 @@ export interface ContractChange {
     notices: Notice[];
 }
 
-export interface WatchContractOptions {
+export interface WatchConfigOptions {
     /**
      * Named export to read the contract from.
      *
@@ -54,10 +54,10 @@ export interface WatchContractOptions {
  * reported reading, so nothing has to name a directory. Returns a function that
  * stops watching.
  */
-export const watchContract = async (
+export const watchConfig = async (
     contractPath: string,
-    onChange: (change: ContractChange) => void | Promise<void>,
-    options: WatchContractOptions = {}
+    onChange: (change: ConfigChange) => void | Promise<void>,
+    options: WatchConfigOptions = {}
 ): Promise<() => void> => {
     const { exportName = 'api', debounce = 60 } = options;
 
@@ -77,12 +77,12 @@ export const watchContract = async (
 
     const reload = async (changed?: string): Promise<void> => {
         const files: string[] = [];
-        const contract = await loadContract(contractPath, { exportName, files, reread: known });
+        const contract = await loadConfig(contractPath, { exportName, files, reread: known });
         if (contract === undefined) throw new Error(`No \`${exportName}\` export in ${contractPath}`);
 
         known = files;
         watchDirectories(files);
-        await onChange({ contract, changed, files, notices: contractNotices(contract, {}) });
+        await onChange({ contract, changed, files, notices: apiNotices(contract, {}) });
     };
 
     const watchDirectories = (files: string[]): void => {

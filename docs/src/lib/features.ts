@@ -23,7 +23,7 @@ export const features: Feature[] = [
         icons: [FileText],
         title: 'OpenAPI generation',
         href: '/docs/openapi',
-        description: 'Generate a complete OpenAPI spec from the contract you already wrote.',
+        description: 'Generate a complete OpenAPI spec from the routes you already wrote.',
     },
     {
         icons: [SwiftLogo, KotlinLogo],
@@ -53,7 +53,7 @@ export const features: Feature[] = [
         icons: [KeyRound],
         title: 'Typed authentication',
         href: '/docs/authentication',
-        description: 'Identities, roles, and per-route access control declared on the contract.',
+        description: 'Identities carrying their own guard, roles, and an auth on every route.',
     },
     {
         icons: [Radio],
@@ -70,8 +70,8 @@ export const features: Feature[] = [
     {
         icons: [Puzzle],
         title: 'Plugins',
-        href: '/docs/plugins',
-        description: 'Extend your API with features built on the contract you already wrote, fully typed in your handlers.',
+        href: '/docs/extend/create-plugin',
+        description: 'Extend your API with features built on the routes you already wrote, fully typed in your handlers.',
     },
     {
         icons: [Layers],

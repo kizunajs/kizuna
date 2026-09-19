@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type AuthoredRoutes } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
-import { diffContracts, formatChange, hasBreakingChange, type Change } from './diff-contracts.js';
+import { diffApis, formatChange, hasBreakingChange, type Change } from './diff-apis.js';
 
 const k = new Kizuna();
 
@@ -25,7 +25,7 @@ const summaries = (changes: Change[]) => changes.map((change) => change.summary)
 describe('routes that come and go', () => {
     it('reports a removed route as breaking', () => {
         const after = contractOf({ listUsers: { method: 'GET', path: '/users', responses: ok } });
-        const changes = diffContracts(base, after);
+        const changes = diffApis(base, after);
 
         expect(changes[0]).toMatchObject({ level: 'breaking', key: 'users.getUser' });
         expect(summaries(changes)).toContain('users.getUser is gone');
@@ -37,7 +37,7 @@ describe('routes that come and go', () => {
             listUsers: { method: 'GET', path: '/users', responses: ok },
             archiveUser: { method: 'POST', path: '/users/:id/archive', responses: ok },
         });
-        const changes = diffContracts(base, after);
+        const changes = diffApis(base, after);
 
         expect(changes).toHaveLength(1);
         expect(changes[0]?.level).toBe('added');
@@ -51,7 +51,7 @@ describe('a rename, which OpenAPI cannot see', () => {
             fetchUser: { method: 'GET', path: '/users/:id', responses: { ...ok, 404: z.object({ detail: z.string() }) } },
             listUsers: { method: 'GET', path: '/users', responses: ok },
         });
-        const changes = diffContracts(base, after);
+        const changes = diffApis(base, after);
 
         expect(changes).toHaveLength(1);
         expect(changes[0]).toMatchObject({
@@ -69,7 +69,7 @@ describe('the shape of a route', () => {
             listUsers: { method: 'GET', path: '/users', responses: ok },
         });
 
-        expect(summaries(diffContracts(base, after))).toContain('users.getUser moved from /users/:id to /people/:id');
+        expect(summaries(diffApis(base, after))).toContain('users.getUser moved from /users/:id to /people/:id');
     });
 
     it('reports a changed method as breaking', () => {
@@ -78,7 +78,7 @@ describe('the shape of a route', () => {
             listUsers: { method: 'GET', path: '/users', responses: ok },
         });
 
-        expect(summaries(diffContracts(base, after))).toContain('users.getUser answers POST instead of GET');
+        expect(summaries(diffApis(base, after))).toContain('users.getUser answers POST instead of GET');
     });
 
     it('reports a dropped status as breaking and a new one as changed', () => {
@@ -86,7 +86,7 @@ describe('the shape of a route', () => {
             getUser: { method: 'GET', path: '/users/:id', responses: { ...ok, 410: z.object({ detail: z.string() }) } },
             listUsers: { method: 'GET', path: '/users', responses: ok },
         });
-        const changes = diffContracts(base, after);
+        const changes = diffApis(base, after);
 
         expect(summaries(changes)).toContain('users.getUser no longer answers 404');
         expect(summaries(changes)).toContain('users.getUser can now answer 410');
@@ -105,7 +105,7 @@ describe('the shape of a route', () => {
             },
             listUsers: { method: 'GET', path: '/users', responses: ok },
         });
-        const changes = diffContracts(base, after);
+        const changes = diffApis(base, after);
 
         expect(summaries(changes)).toContain('users.getUser is now deprecated');
         expect(summaries(changes)).toContain('users.getUser sunsets on 2027-01-01');
@@ -133,8 +133,8 @@ describe('schemas, compared field by field', () => {
             },
         });
 
-        expect(summaries(diffContracts(withBody, after))).toContain('users.createUser body.organisationId is now required');
-        expect(hasBreakingChange(diffContracts(withBody, after))).toBe(true);
+        expect(summaries(diffApis(withBody, after))).toContain('users.createUser body.organisationId is now required');
+        expect(hasBreakingChange(diffApis(withBody, after))).toBe(true);
     });
 
     it('does not report an optional request field', () => {
@@ -147,7 +147,7 @@ describe('schemas, compared field by field', () => {
             },
         });
 
-        expect(diffContracts(withBody, after)).toEqual([]);
+        expect(diffApis(withBody, after)).toEqual([]);
     });
 
     it('reports a removed response field as breaking', () => {
@@ -160,7 +160,7 @@ describe('schemas, compared field by field', () => {
             },
         });
 
-        expect(summaries(diffContracts(withBody, after))).toContain('users.createUser 201.nickname is gone');
+        expect(summaries(diffApis(withBody, after))).toContain('users.createUser 201.nickname is gone');
     });
 
     it('reports a narrowed query param as breaking', () => {
@@ -176,7 +176,7 @@ describe('schemas, compared field by field', () => {
             },
         });
 
-        expect(summaries(diffContracts(before, after))).toContain('users.listUsers query.sort is enum instead of string');
+        expect(summaries(diffApis(before, after))).toContain('users.listUsers query.sort is enum instead of string');
     });
 });
 
@@ -196,7 +196,7 @@ describe('what a document cannot carry', () => {
     }).api;
 
     it('reports a removed job key as breaking', () => {
-        const changes = diffContracts(withJob, withoutJob);
+        const changes = diffApis(withJob, withoutJob);
 
         expect(changes).toHaveLength(1);
         expect(changes[0]).toMatchObject({ level: 'breaking', key: 'reconcile' });
@@ -211,19 +211,17 @@ describe('reporting', () => {
             archiveUser: { method: 'POST', path: '/users/:id/archive', responses: ok },
         });
 
-        expect(diffContracts(base, after).map((change) => change.level)).toEqual(['breaking', 'added']);
+        expect(diffApis(base, after).map((change) => change.level)).toEqual(['breaking', 'added']);
     });
 
     it('reads as a block with the cost underneath', () => {
         const after = contractOf({ listUsers: { method: 'GET', path: '/users', responses: ok } });
 
-        expect(formatChange(diffContracts(base, after)[0]!)).toBe(
-            'BREAKING users.getUser is gone\n         GET /users/:id no longer exists'
-        );
+        expect(formatChange(diffApis(base, after)[0]!)).toBe('BREAKING users.getUser is gone\n         GET /users/:id no longer exists');
     });
 
     it('says nothing when nothing changed', () => {
-        expect(diffContracts(base, base)).toEqual([]);
+        expect(diffApis(base, base)).toEqual([]);
         expect(hasBreakingChange([])).toBe(false);
     });
 });

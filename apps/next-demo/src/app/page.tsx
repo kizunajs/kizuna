@@ -20,7 +20,7 @@ export default async function Home() {
                 margin: '0 auto',
             }}>
             <h1>ts-kizuna demos</h1>
-            <p>The same shared contract powers both demos. This page is a server component fetching via the typed client.</p>
+            <p>The same shared routes power both demos. This page is a server component fetching via the typed client.</p>
             <nav
                 style={{
                     display: 'flex',

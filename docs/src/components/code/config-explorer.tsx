@@ -8,7 +8,7 @@ import McpLogo from '@/icons/Mcp.svg';
 import SwiftLogo from '@/icons/Swift.svg';
 import TanstackLogo from '@/icons/TanStack.svg';
 import TsLogo from '@/icons/TypeScript.svg';
-import styles from './contract-explorer.module.css';
+import styles from './config-explorer.module.css';
 
 const icons = {
     server: <Server className={styles.icon} />,
@@ -59,36 +59,9 @@ type OutputNode = CodeOutputNode | CustomOutputNode;
 
 const NODES: OutputNode[] = [
     {
-        icon: icons.server,
-        label: 'Server',
-        description: 'Validated inputs, type-checked responses',
-        file: 'router.ts',
-        fileIcon: brandIcons.typescript,
-        lang: 'ts',
-        code: `server.router({
-  users: {
-    getUser: async ({ params, throwError }) => {
-      const user = await db.users.findById(params.id);
-
-      if (!user) throwError({
-        status: 404,
-        body: {
-          detail: 'Not found',
-        },
-      });
-
-      return {
-        status: 200,
-        body: user,
-      };
-    },
-  },
-});`,
-    },
-    {
         icon: icons.file,
         label: 'OpenAPI',
-        description: 'Generated from the contract',
+        description: 'Generated from your config',
         file: 'openapi.yaml',
         lang: 'yaml',
         code: `/users/{id}:
@@ -143,7 +116,7 @@ Content-Type: application/problem+json
         file: 'api-client.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `const apiClient = new KizunaClient(contract, {
+        code: `const apiClient = new KizunaClient(kizuna.api, {
   baseUrl: 'http://localhost:3000',
 });
 
@@ -166,7 +139,7 @@ if (res.status === 200) {
         file: 'user-list.tsx',
         fileIcon: brandIcons.typescript,
         lang: 'tsx',
-        code: `const api = new KizunaTanstackQuery(contract, apiClient);
+        code: `const api = new KizunaTanstackQuery(kizuna.api, apiClient);
 
 const { data } = useQuery(
   api.users.getUser.queryOptions({
@@ -236,7 +209,7 @@ try {
     {
         icon: icons.shield,
         label: 'Built-in validation',
-        description: 'Every request checked against the contract',
+        description: 'Every request checked against its route',
         file: 'localhost:3000/users',
         fileIcon: <Method name="POST" />,
         lang: 'http',
@@ -260,7 +233,7 @@ Content-Type: application/problem+json
     {
         icon: icons.alert,
         label: 'Deprecation and sunset',
-        description: 'Phase out routes from the contract',
+        description: 'Phase out routes, with warnings everywhere',
         file: 'routes.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
@@ -344,9 +317,7 @@ Content-Type: application/problem+json
     },
 ];
 
-const CONTRACT_CODE = `export const k = new Kizuna();
-
-const UserSchema = Kizuna.model({ // shows up as a named User in OpenAPI, Swift, and Kotlin
+const CONFIG_CODE = `const UserSchema = Kizuna.model({ // a named User in OpenAPI, Swift, and Kotlin
   title: 'User',
   schema: z.object({
     id: z.string(),
@@ -354,28 +325,41 @@ const UserSchema = Kizuna.model({ // shows up as a named User in OpenAPI, Swift,
   }),
 });
 
-const users = k.routes({
-  getUser: {
-    method: 'GET',
-    path: '/users/:id',
-    responses: {
-      200: UserSchema,
-      404: ProblemDetailsSchema, // or ProblemDetailsSchema.extend({ ... }) to add extra fields
-    },
-  },
+export const users = k.routes('users', {
+  getUser: k
+    .route({
+      method: 'GET',
+      path: '/users/:id',
+      auth: 'user',
+      responses: {
+        200: UserSchema,
+        404: ProblemDetailsSchema, // or .extend({ ... }) to add fields
+      },
+    })
+    .handler(async ({ params, auth }) => ({
+      status: 200,
+      body: await db.users.find(params.id, auth.user.userId),
+    })),
 });
 
-export const contract = k.contract({
+// kizuna.config.ts
+export default defineConfig({
+  adapter: expressAdapter(),
   routes: {
     users,
   },
+  auth: {
+    identities: {
+      user,
+    },
+  },
 });`;
 
-export function ContractExplorer({ className }: { className?: string }) {
+export function ConfigExplorer({ className }: { className?: string }) {
     return (
         <div className={clsx(styles.root, className)}>
             <div className={styles.card}>
-                <CodeWindow lang="ts" code={CONTRACT_CODE} title="contract.ts" icon={brandIcons.typescript} dots />
+                <CodeWindow lang="ts" code={CONFIG_CODE} title="kizuna.config.ts" icon={brandIcons.typescript} dots />
             </div>
             <div className={styles.connector}>
                 <svg

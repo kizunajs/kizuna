@@ -54,7 +54,7 @@ kizuna.api.mount(app);
 
 ## What it hands back
 
-The `api`, which is the contract plus the ability to serve it. It carries `routes`, `securitySchemes`, `tags` and the rest, so anything that reads a contract takes it directly:
+The `api`: everything you declared, plus the ability to serve it. It carries `routes`, `securitySchemes`, `tags` and the rest, so anything that reads a declaration takes it directly:
 
 ```ts title="scripts/generate-openapi.ts"
 import { generateOpenApi } from '@ts-kizuna/openapi';
@@ -127,4 +127,4 @@ export default defineConfig({
 });
 ```
 
-Their routes are served by `api.mount` and stay out of `api.routes`, so the client and the generators do not see them. See [Plugins](/docs/plugins).
+Their routes are served by `api.mount` and stay out of `api.routes`, so the client and the generators do not see them. See [Create a Plugin](/docs/extend/create-plugin).

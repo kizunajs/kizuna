@@ -67,7 +67,7 @@ An instance that declares no identities has nothing to state, so `auth` is optio
 
 ## Nothing runs at import
 
-`kizuna generate` imports your route files to read the contract, so whatever a module does at the top level, it does on every generate. Importing a database client is fine. Opening a connection, reading a file, or throwing on a missing environment variable is not, so keep that inside the handler.
+`kizuna generate` imports your route files to read them, so whatever a module does at the top level, it does on every generate. Importing a database client is fine. Opening a connection, reading a file, or throwing on a missing environment variable is not, so keep that inside the handler.
 
 ## Reference
 

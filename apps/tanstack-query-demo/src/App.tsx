@@ -171,7 +171,7 @@ function MissingUser() {
 
     return (
         <p className={styles.note}>
-            The contract declares 404, so it arrives on <code className={styles.code}>data</code> with{' '}
+            The route declares 404, so it arrives on <code className={styles.code}>data</code> with{' '}
             <code className={styles.code}>status: {missing.data?.status}</code>, not on <code className={styles.code}>error</code>.
         </p>
     );
@@ -181,7 +181,7 @@ export function App() {
     return (
         <main className={styles.page}>
             <h1 className={styles.title}>ts-kizuna + TanStack Query</h1>
-            <p className={styles.lede}>Every query and mutation below is built from the same contract as the express demo it talks to.</p>
+            <p className={styles.lede}>Every query and mutation below is built from the same routes as the express demo it talks to.</p>
 
             <section className={styles.section}>
                 <h2 className={styles.heading}>Users</h2>

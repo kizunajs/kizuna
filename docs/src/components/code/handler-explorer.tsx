@@ -120,7 +120,7 @@ const FEATURES: Feature[] = [
     {
         id: 'jobs',
         file: 'users.router.ts',
-        note: 'Every job the contract declares. Queue it and answer now, or run it and wait for the result.',
+        note: 'Every job your config declares. Queue it and answer now, or run it and wait for the result.',
         code: `createUser: async ({ body, jobs }) => {
     await db.users.create({
         data: body,
@@ -136,7 +136,7 @@ const FEATURES: Feature[] = [
     {
         id: 'plugins',
         file: 'users.router.ts',
-        note: 'Plugins ride on the contract, so their features arrive typed under their own names.',
+        note: 'Plugins are named on your config, so their features arrive typed under their own names.',
         code: `updateUser: async ({ params, body, plugins }) => {
     const user = await db.users.update(params.userId, body);
 
@@ -152,7 +152,7 @@ const FEATURES: Feature[] = [
     {
         id: 'throwError',
         file: 'users.router.ts',
-        note: 'Failure responses live in the contract, so a handler can only throw what its route declares.',
+        note: 'Failure responses live on the route, so a handler can only throw what it declares.',
         code: `deleteUser: async ({ params, throwError }) => {
     const user = await db.users.findById(params.userId);
     if (!user) throwError({
@@ -174,7 +174,7 @@ export function HandlerExplorer({ className }: { className?: string }) {
         <section className={clsx('not-prose', styles.root, className)}>
             <div className={styles.copy}>
                 <h2 className={styles.title}>Inside a handler</h2>
-                <p className={styles.description}>Whatever the contract declares, the handler gets it validated and typed.</p>
+                <p className={styles.description}>Whatever the route declares, the handler gets it validated and typed.</p>
                 <div className={styles.tokens}>
                     {FEATURES.map((candidate) => (
                         <button

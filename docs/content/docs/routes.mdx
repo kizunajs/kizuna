@@ -1,9 +1,9 @@
 ---
-title: Contract
-description: Define your routes and bundle them into a contract, the source of truth shared by your server and clients.
+title: Routes
+description: Declare a route, the schemas it takes and answers with, and the handler that serves it.
 ---
 
-What you declare with `k` is the source of truth for your API: the routes, what each one takes and answers, and who may call it. [`defineConfig`](/docs/reference/define-config) assembles it into the api you serve, and the generators read the same declarations to write your OpenAPI document and your clients.
+A route is a method, a path, the schemas it takes and answers with, and the handler that serves it. Everything else is read from that: [`defineConfig`](/docs/reference/define-config) assembles your routes into the api you mount, and the generators write your OpenAPI document and your clients from the same declarations.
 
 ## Create the surface
 
@@ -87,7 +87,7 @@ export const users = k.routes('users', {
 });
 ```
 
-The handler's `query` and `body` are typed from the declaration right above it, and its return is checked against that route's `responses`. See [Handlers](/docs/building/handlers) for everything a handler receives.
+The handler's `query` and `body` are typed from the declaration right above it, and its return is checked against that route's `responses`. See [Handlers](/docs/handlers) for everything a handler receives.
 
 A route only a generator or a client reads can skip `.handler()`. One your config serves cannot.
 
@@ -250,28 +250,9 @@ export const users = k.routes('users', {
 
 ### Nothing runs at import
 
-`kizuna generate` imports your route files to read the contract, so whatever a module does at the top level, it does on every generate. Importing a database client is fine. Opening a connection, reading a file, or throwing on a missing environment variable is not, so keep that inside the handler.
+`kizuna generate` imports your route files to read them, so whatever a module does at the top level, it does on every generate. Importing a database client is fine. Opening a connection, reading a file, or throwing on a missing environment variable is not, so keep that inside the handler.
 
-## Assemble it
-
-`defineConfig` takes your route groups and everything else the API is made of, and hands back the `api` you mount. It lives in `kizuna.config.ts` at the root of your app:
-
-```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
-import { tags } from './src/tags';
-import { users } from './src/routes/users';
-
-export default defineConfig({
-    adapter: expressAdapter(),
-    tags,
-    routes: {
-        users,
-    },
-});
-```
-
-API-wide settings go here too, so you set them once: `tags`, `guardSchema`, and [`issueCodes`](/docs/reference/k-issue) for custom validation codes. See [`defineConfig`](/docs/reference/define-config) for the full list, and [Mounting](/docs/building/mounting) for serving it.
+## Non-JSON responses
 
 For non-JSON responses, set `contentType` to send the body as-is instead of JSON. Responses default to `application/json`, errors to `application/problem+json`, and a [stream](/docs/streaming) to `text/event-stream`. Declare a non-JSON body as `z.string()`:
 
@@ -296,26 +277,6 @@ responses: {
     },
 },
 ```
-
-## Authentication
-
-Authentication is declared too: [`k.identity`](/docs/reference/k-identity) says how a credential travels and what a passing guard provides, the guard sits on that identity, you name them under `identities` on `defineConfig`, and each route's [`auth`](/docs/reference/k-route) says which identity, roles, or permissions it requires. That one declaration drives runtime enforcement, typed handler context, and the OpenAPI spec's security. The [Authentication](/docs/authentication) and [Access Control](/docs/access-control) guides walk the whole pipeline.
-
-## Jobs
-
-Scheduled work is declared too. [`k.jobs`](/docs/reference/k-jobs) takes the identity every job requires and the jobs themselves, each carrying its own handler, and the result goes under `jobs` on `defineConfig`, beside `routes`:
-
-```ts title="kizuna.config.ts"
-export default defineConfig({
-    adapter: expressAdapter(),
-    routes: {
-        users,
-    },
-    jobs,
-});
-```
-
-A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. The [Jobs guide](/docs/jobs) covers declaring, handling, and triggering them.
 
 ## Going further
 
@@ -485,5 +446,5 @@ function UserCard({ user }: { user: User }) {
 
 ## Next steps
 
-- [Handlers](/docs/building/handlers) for everything a handler receives
-- [Mounting](/docs/building/mounting) to assemble it and serve it
+- [Handlers](/docs/handlers) for everything a handler receives
+- [Mounting](/docs/config) to assemble it and serve it

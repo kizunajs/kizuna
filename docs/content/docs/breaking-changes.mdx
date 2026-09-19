@@ -3,23 +3,23 @@ title: Breaking Changes
 description: Catch a change that breaks callers before it ships.
 ---
 
-`kizuna diff` compares two contracts and reports what each change costs the people already calling your API.
+`kizuna diff` compares two versions of your API and reports what each change costs the people already calling your API.
 
 It reads the declarations, so route keys, MCP tool names and job keys are all in view, and every Zod schema is compared field by field.
 
-## Comparing contracts
+## Comparing two versions
 
 ```ts title="scripts/diff.ts"
 import { diffAgainst, formatChange, hasBreakingChange } from '@ts-kizuna/cli';
 
-const changes = await diffAgainst(process.argv[2] ?? 'main', './src/contract.ts');
+const changes = await diffAgainst(process.argv[2] ?? 'main', './kizuna.config.ts');
 
 for (const change of changes) console.log(formatChange(change));
 
 if (hasBreakingChange(changes)) process.exit(1);
 ```
 
-`diffAgainst` checks the ref out into a git worktree inside the repository, loads the contract from there, and removes it afterwards. **Nothing is installed for the base tree**: it sits inside your repository, so Node resolves dependencies by walking up to the `node_modules` you already have.
+`diffAgainst` checks the ref out into a git worktree inside the repository, loads the config from there, and removes it afterwards. **Nothing is installed for the base tree**: it sits inside your repository, so Node resolves dependencies by walking up to the `node_modules` you already have.
 
 ```
 BREAKING users.patchUser renamed to users.updateUser
@@ -80,11 +80,11 @@ BREAKING users.listUsers 200.items[].id is number instead of string
 A generated client that has fallen behind is a compile error waiting to happen in whatever imports it. Check it in the same pipeline:
 
 ```ts title="scripts/check-clients.ts"
-import { checkClients, formatStale, loadContract } from '@ts-kizuna/cli';
+import { checkClients, formatStale, loadConfig } from '@ts-kizuna/cli';
 import { config } from '../kizuna.config';
 
-const contract = await loadContract('./src/contract.ts');
-const stale = checkClients(contract!, config.clients ?? []);
+const api = await loadConfig('./kizuna.config.ts');
+const stale = checkClients(api!, config.clients ?? []);
 
 if (stale.length > 0) {
     console.error(formatStale(stale));
@@ -94,14 +94,14 @@ if (stale.length > 0) {
 
 ```
 A generated client is out of date:
-  src/api-client.ts is behind the contract
+  src/api-client.ts is behind the config
 
 Run `kizuna generate` and commit the result.
 ```
 
-Editors get the same signal sooner. The [VS Code extension](/docs/vscode) reports a generated client older than the contract it came from, pointing at the file rather than at a missing property three files away. It reads the `Source:` line in the generated header and compares against every file the contract imports.
+Editors get the same signal sooner. The [VS Code extension](/docs/vscode) reports a generated client older than the routes it came from, pointing at the file rather than at a missing property three files away. It reads the `Source:` line in the generated header and compares against every file the config imports.
 
-That works when the contract and the client sit in one TypeScript program. When the client is published from its own package, the editor cannot see the contract, and the check above is what catches it.
+That works when the routes and the client sit in one TypeScript program. When the client is published from its own package, the editor cannot see them, and the check above is what catches it.
 
 ## GitHub Actions
 
@@ -130,7 +130,7 @@ jobs:
 
             - run: pnpm install --frozen-lockfile
 
-            - name: Compare contracts
+            - name: Compare against main
               id: diff
               run: pnpm tsx scripts/diff.ts ${{ github.event.pull_request.base.sha }}
 
@@ -150,5 +150,5 @@ A breaking change blocks the pull request until someone adds the `breaking chang
 ## Reference
 
 - [Deprecations](/docs/deprecations), for retiring a route rather than removing it
-- [Watching](/docs/watching), which reloads the contract as you edit
-- [Configuration](/docs/configuration)
+- [Watching](/docs/watching), which reloads your API as you edit
+- [Configuration](/docs/config)

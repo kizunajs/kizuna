@@ -25,9 +25,9 @@ Every `GET` route answers `HEAD` too. [RFC 9110 §9.3.2](https://www.rfc-editor.
 
 ## OpenAPI
 
-| Standard                                              | What it governs                                             |
-| ----------------------------------------------------- | ----------------------------------------------------------- |
-| [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) | The document `@ts-kizuna/openapi` generates from a contract |
+| Standard                                              | What it governs                                              |
+| ----------------------------------------------------- | ------------------------------------------------------------ |
+| [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) | The document `@ts-kizuna/openapi` generates from your routes |
 
 See [OpenAPI](/docs/openapi) for the generator and the reference UI it serves.
 
@@ -61,4 +61,4 @@ No standard covers streamed tool calls. MCP deliberately has none, having replac
 | Omission                                                  | Why                                                                                   |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | `TRACE` is absent from `Method`                           | Disabled in production everywhere, and unsupported by the frameworks kizuna mounts on |
-| Support for [Standard Schema](https://standardschema.dev) | Contracts take Zod alone, see [Zod](/docs/zod)                                        |
+| Support for [Standard Schema](https://standardschema.dev) | Routes take Zod alone, see [Zod](/docs/zod)                                           |

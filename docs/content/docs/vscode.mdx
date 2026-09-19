@@ -5,17 +5,17 @@ description: A VS Code extension that strikes through deprecated routes and fiel
 
 <BetaNotice>
 
-The extension and `@ts-kizuna/typescript-plugin` are both new and still settling. What gets struck through, and how the plugin reads the contract, may change before v2, so pin the plugin version if you depend on it.
+The extension and `@ts-kizuna/typescript-plugin` are both new and still settling. What gets struck through, and how the plugin reads your routes, may change before v2, so pin the plugin version if you depend on it.
 
 </BetaNotice>
 
 <ExtensionCard />
 
-The ts-kizuna extension shows [deprecations](/docs/deprecations) as you type. A deprecated route or field is struck through everywhere the contract's types flow, `client.deleteUser(...)` at the call site and `user.email` on a response alike. Hovering shows the migration message.
+The ts-kizuna extension shows [deprecations](/docs/deprecations) as you type. A deprecated route or field is struck through everywhere your API's types flow, `client.deleteUser(...)` at the call site and `user.email` on a response alike. Hovering shows the migration message.
 
 ## Troubleshooting
 
-Deprecations not showing after a change to the contract or to `tsconfig.json`? Run **TypeScript: Restart TS Server** from the command palette.
+Deprecations not showing after a change to your routes or to `tsconfig.json`? Run **TypeScript: Restart TS Server** from the command palette.
 
 ## Other editors
 

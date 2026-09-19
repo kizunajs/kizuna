@@ -149,7 +149,7 @@ export const notificationsRoutes = k.routes('notifications', {
     validateConfig: k
         .route({
             method: 'POST',
-            path: '/contract/validate',
+            path: '/schemas/validate',
             auth: false,
             body: z.object({
                 default: z.string(),
@@ -166,7 +166,7 @@ export const notificationsRoutes = k.routes('notifications', {
                 400: ProblemDetailsSchema,
                 401: z.void(),
             },
-            summary: 'Validate contract, exercises generator bug coverage',
+            summary: 'Validate schemas, exercises generator bug coverage',
         })
         .handler(() => ({
             status: 200,

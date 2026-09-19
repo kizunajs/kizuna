@@ -25,7 +25,7 @@ Only error statuses (`>= 400`) are constrained. A `2xx`/`3xx` response can be an
 
 ## Errors are Problem Details
 
-A contract that declares an error with a bespoke shape no longer typechecks, and the handler's error body resolves to `never`:
+A route that declares an error with a bespoke shape no longer typechecks, and the handler's error body resolves to `never`:
 
 ```ts
 responses: {
@@ -97,7 +97,7 @@ Extension members only add top-level fields. They cannot nest, rename, or replac
 
 ## `formatError`, the escape hatch
 
-`formatError` decides the bytes for an error response. Use it to stamp a different content type or reshape the body into a legacy structure. Because it receives the request, you can serve old and new clients at once. Your contract, types, and OpenAPI spec stay pure Problem Details; only the wire output changes.
+`formatError` decides the bytes for an error response. Use it to stamp a different content type or reshape the body into a legacy structure. Because it receives the request, you can serve old and new clients at once. Your routes, types, and OpenAPI spec stay pure Problem Details; only the wire output changes.
 
 Say old clients expect this body, as `application/json`:
 

@@ -30,7 +30,7 @@ my-api/
 Each route carries the handler that answers it, so there is no second tree to keep in step. The same holds for the rest: a guard sits on its identity, a resolver sits on its request context value, and a job's handler sits on the job.
 
 - **`k.ts`** constructs the surface once, typed by the `Config` in `kizuna.types.ts`. Everything else imports `k` from here.
-- **`routes/`** holds one file per group, each calling `k.routes`, with an `index.ts` re-exporting them so the config has one import to make. See [splitting routes across files](/docs/building/contract#splitting-routes-across-files).
+- **`routes/`** holds one file per group, each calling `k.routes`, with an `index.ts` re-exporting them so the config has one import to make. See [splitting routes across files](/docs/routes#splitting-routes-across-files).
 - **`identities.ts`** names who can call the API, and each identity's `guard` is what authenticates them. See [Authentication](/docs/authentication).
 - **`roles.ts`** names who a caller can be, and each route's `auth` says who may call it. See [Access Control](/docs/access-control).
 - **`kizuna.config.ts`** is where the adapter, the routes, the identities, the jobs and the plugins come together.
@@ -55,7 +55,7 @@ export default defineConfig({
 });
 ```
 
-See [Clients](/docs/clients/fetch) for what each generator writes, and [Configuration](/docs/configuration) for the CLI that runs them.
+See [Clients](/docs/clients/fetch) for what each generator writes, and [Configuration](/docs/config) for the CLI that runs them.
 
 ## The `@/` alias
 
@@ -73,5 +73,5 @@ Examples throughout these docs import from `@/k` and `@/routes`. That is `@/` po
 
 ## Next steps
 
-- [Building an API](/docs/building/contract) covers routes, handlers, and mounting in depth
+- [Building an API](/docs/routes) covers routes, handlers, and mounting in depth
 - [Adapters](/docs/adapters/express) covers the setup for each framework

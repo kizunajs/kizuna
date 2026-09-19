@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { ContractExplorer } from '@/components/code/contract-explorer';
+import { ConfigExplorer } from '@/components/code/config-explorer';
 import { HandlerExplorer } from '@/components/code/handler-explorer';
 import { Adapters } from '@/components/landing-page/adapters';
 import { Beta } from '@/components/landing-page/beta';
@@ -33,7 +33,7 @@ export default function HomePage() {
                 <Section
                     title="The idea"
                     description="One contract is the source of truth. Your server, your clients, and every generated artifact read from it.">
-                    <ContractExplorer />
+                    <ConfigExplorer />
                 </Section>
 
                 <HandlerExplorer />

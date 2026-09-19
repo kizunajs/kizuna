@@ -1,6 +1,6 @@
 ---
-title: Configuration
-description: Assemble your API in kizuna.config.ts, and say where its generated clients go.
+title: Config
+description: Assemble your API in kizuna.config.ts, mount it, and say where its generated clients go.
 ---
 
 `kizuna.config.ts` sits at the root of your app, beside `package.json`. It assembles everything the API is made of, hands back the `api` you mount, and says where each generated client is written. The tooling looks for it by name.
@@ -39,7 +39,115 @@ import kizuna from '../kizuna.config';
 kizuna.api.mount(app);
 ```
 
+`adapter` decides what every handler receives beside its validated inputs, so naming Express here is what puts `req` and `res` in scope for all of them, typed.
+
 See [`defineConfig`](/docs/reference/define-config) for every field it takes.
+
+## What each key brings
+
+| Key              | What naming it does                                                                                                                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`           | The identities a route's `auth` can name. Each carries its own guard, so this is all the config names. An identity a route names without a guard refuses to assemble. See [Authentication](/docs/authentication). |
+| `requestContext` | Values every handler receives, resolved once per request. Resolvers run on every route, before the guards, and never deny. See [Request Context](/docs/request-context).                                          |
+| `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.                                 |
+| `plugins`        | Routes and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                                |
+| `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                                 |
+| `tags`           | The OpenAPI tags route groups sit under. See [`k.tags`](/docs/reference/k-tags).                                                                                                                                  |
+
+## Using what a plugin offers
+
+A plugin can hand your handlers functions to call, under `plugins`:
+
+```ts title="src/routes/users.ts"
+updateUser: k
+    .route({
+        method: 'PATCH',
+        path: '/users/:id',
+        body: UpdateUserSchema,
+        responses: {
+            200: UserSchema,
+        },
+    })
+    .handler(async ({ params, body, plugins }) => {
+        const user = await db.users.update(params.id, body);
+        plugins.audit.record('users.updateUser');
+
+        return {
+            status: 200,
+            body: user,
+        };
+    }),
+```
+
+Plugin slugs come from other people, so they are namespaced under `plugins` rather than spread into the handler args, where one called `body` would shadow your request body. Destructure it for the short form:
+
+```ts
+.handler(async ({ params, body, plugins: { audit } }) => {
+```
+
+A config with no plugins gets no `plugins` argument at all.
+
+## Mounting
+
+Import the config and mount `kizuna.api`:
+
+**Express:**
+
+```ts title="src/index.ts"
+import express from 'express';
+import kizuna from '../kizuna.config';
+
+const app = express();
+app.use(express.json());
+
+kizuna.api.mount(app);
+
+app.listen(3000);
+```
+
+**Fastify:**
+
+```ts title="src/index.ts"
+import Fastify from 'fastify';
+import kizuna from '../kizuna.config';
+
+const app = Fastify();
+
+await kizuna.api.mount(app);
+
+app.listen({
+    port: 3000,
+});
+```
+
+**Hono:**
+
+```ts title="src/index.ts"
+import { Hono } from 'hono';
+import kizuna from '../kizuna.config';
+
+const app = new Hono();
+
+kizuna.api.mount(app);
+
+export default app;
+```
+
+**Next.js:**
+
+```ts title="src/app/api/[...ts-kizuna]/route.ts"
+import kizuna from '../../../../kizuna.config';
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
+    basePath: '/api',
+});
+```
+
+Each [adapter page](/docs/adapters/express) covers its own options, error handling, and middleware.
+
+## Middleware
+
+Rate limiting, multipart parsing, and the rest go in your framework's own middleware (`app.use`, Fastify hooks). Authentication belongs in [guards](/docs/authentication), request-scoped values in [`requestContext`](/docs/request-context).
 
 ## Clients
 
@@ -195,7 +303,7 @@ The same work without writing. It names whatever has fallen behind and exits `1`
 
 ```text
   kizuna.types.ts is behind the config
-  src/api-client.ts is behind the contract
+  src/api-client.ts is behind the config
 ```
 
 Run it in CI beside your typecheck. See [Breaking changes](/docs/breaking-changes) for the rest of the pipeline, and [Watching](/docs/watching) for regenerating as you edit.
@@ -205,6 +313,6 @@ Run it in CI beside your typecheck. See [Breaking changes](/docs/breaking-change
 ## Reference
 
 - [`defineConfig`](/docs/reference/define-config)
-- [Fetch client](/docs/clients/fetch)
-- [Swift client](/docs/clients/swift)
-- [Kotlin client](/docs/clients/kotlin)
+- [Routes](/docs/routes) for what you put under `routes`
+- [Handlers](/docs/handlers) for what a handler receives
+- [Fetch client](/docs/clients/fetch), [Swift](/docs/clients/swift), [Kotlin](/docs/clients/kotlin)

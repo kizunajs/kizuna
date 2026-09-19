@@ -41,7 +41,7 @@ const daysBetween = (from: Date, to: Date): number => Math.ceil((to.getTime() - 
  * Reads the same `deprecated` field `@ts-kizuna/typescript-plugin` reports in an
  * editor, so a watcher and a hover agree.
  */
-export const contractNotices = createGenerator<{ now?: Date }, Notice[]>((options) => {
+export const apiNotices = createGenerator<{ now?: Date }, Notice[]>((options) => {
     const now = options.now ?? new Date();
     const notices: Notice[] = [];
 

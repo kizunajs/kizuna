@@ -1,13 +1,13 @@
 {
   "name": "@ts-kizuna/core",
   "version": "1.64.1",
-  "description": "Contract and route definition, validation, and the adapter API for ts-kizuna",
+  "description": "Route declaration, validation, and the adapter API for ts-kizuna",
   "keywords": [
     "ts-kizuna",
     "typescript",
     "zod",
     "openapi",
-    "contract-first",
+    "spec-driven",
     "type-safe",
     "rest",
     "api",

@@ -114,6 +114,20 @@ serve: (props, api) => ({
 
 That is how [`mcpPlugin`](/docs/reference/mcp-plugin) finds the routes declaring `tool`, and how [`openApiPlugin`](/docs/reference/openapi-plugin) builds a document without being handed one.
 
+## Plugin routes
+
+A plugin's routes run through the same pipeline as yours, with the same validation, guards, access control and problem details. They never join `api.routes`, so they stay out of everything generated from it.
+
+|                           | your routes | a plugin's routes |
+| ------------------------- | ----------- | ----------------- |
+| declared with             | `k.routes`  | the plugin        |
+| served by `api.mount`     | yes         | yes               |
+| validated, guarded        | yes         | yes               |
+| in your fetch client      | yes         | **no**            |
+| in OpenAPI, Swift, Kotlin | yes         | **no**            |
+
+If a plugin claims a path your routes already use, `defineConfig` throws and names both.
+
 ## Answering with something that is not JSON
 
 A plugin route can return `rawResponse` when its wire format is not a JSON body, which is how MCP serves JSON-RPC over server-sent events:
@@ -147,6 +161,6 @@ A plugin is always `server`: it is named on a config, and a config carries handl
 
 ## Reference
 
-- [Plugins](/docs/plugins) for installing and using one
+- [Config](/docs/config) for installing one
 - [`mcpPlugin`](/docs/reference/mcp-plugin) for a worked example
 - [Create an Adapter](/docs/extend/create-adapter) if the runtime itself is missing

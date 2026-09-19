@@ -1,6 +1,6 @@
 ---
 title: Kotlin
-description: Generate a native Kotlin client from your contract with the ts-kizuna-kotlin CLI.
+description: Generate a native Kotlin client from your routes with the ts-kizuna-kotlin CLI.
 ---
 
 <BetaNotice>
@@ -9,7 +9,7 @@ The Kotlin client is new and still settling. The generated API surface may chang
 
 </BetaNotice>
 
-`@ts-kizuna/kotlin` generates a native Kotlin client from your ts-kizuna contract. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
+`@ts-kizuna/kotlin` generates a native Kotlin client from your ts-kizuna routes. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
 
 <InstallTabs packageName="@ts-kizuna/kotlin" />
 
@@ -52,7 +52,7 @@ ts-kizuna-kotlin generate --config kizuna.config.ts --out android/app/src/main/k
 
 The CLI loads the config at runtime.
 
-Most projects name the generator under `clients` in the config instead and run [`kizuna generate`](/docs/configuration), which writes every client in one command.
+Most projects name the generator under `clients` in the config instead and run [`kizuna generate`](/docs/config), which writes every client in one command.
 
 </Step>
 

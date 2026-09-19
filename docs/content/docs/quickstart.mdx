@@ -1,0 +1,255 @@
+---
+title: Quickstart
+description: Declare your routes, serve them on your framework, and call them from a typed client in 8 minutes.
+---
+
+A ts-kizuna project has three parts:
+
+1. **`kizuna.config.ts`** names the framework you serve on and everything the API is made of.
+2. **The routes** you declare with `k`: a method, a path, its Zod schemas, and the handler that answers it.
+3. **The client**, generated from those same declarations, so it knows every route, input and response.
+
+## Installation
+
+Install `@ts-kizuna/core`, together with Zod 4 for the schemas.
+
+<InstallTabs packageName="@ts-kizuna/core zod" />
+
+Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
+
+```json title="tsconfig.json"
+{
+    "compilerOptions": {
+        "strict": true
+    }
+}
+```
+
+<Steps>
+
+<Step>
+
+## Start with the config
+
+`kizuna.config.ts` sits at the root of your app. Name the framework you serve on, and the routes you serve:
+
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { nextAdapter } from '@ts-kizuna/next'; // or express, fastify, hono
+import { users } from './src/routes/users';
+
+export default defineConfig({
+    adapter: nextAdapter(),
+    routes: {
+        users,
+    },
+});
+```
+
+Naming an adapter is what puts that framework's own request in every handler's args, typed. Run `kizuna generate` and the `Config` in `kizuna.types.ts` follows from it.
+
+</Step>
+
+<Step>
+
+## Declare the routes
+
+Keep one `k` for the API and export it:
+
+```ts title="src/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import type { Config } from '../kizuna.types';
+
+export const k = new Kizuna<Config>();
+```
+
+`k` is typed by the `Config` that `kizuna generate` writes, so every name you use is checked against what your config declares. See [`new Kizuna()`](/docs/reference/kizuna).
+
+Each route pairs a method and path with Zod schemas, and carries the handler that answers it:
+
+```ts title="src/routes/users.ts"
+import { z } from 'zod';
+import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { k } from '../k';
+
+export const UserSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.email(),
+});
+
+export const users = k.routes({
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            query: z.object({
+                page: z.int().min(1).default(1),
+                limit: z.int().min(1).max(100).default(10),
+            }),
+            responses: {
+                200: z.object({
+                    users: z.array(UserSchema),
+                    total: z.number(),
+                }),
+            },
+        })
+        .handler(async ({ query }) => ({
+            status: 200,
+            body: {
+                users: await db.users.findMany({
+                    skip: (query.page - 1) * query.limit,
+                    take: query.limit,
+                }),
+                total: await db.users.count(),
+            },
+        })),
+    createUser: k
+        .route({
+            method: 'POST',
+            path: '/users',
+            body: z.object({
+                name: z.string().min(1),
+                email: z.email(),
+            }),
+            responses: {
+                201: UserSchema,
+                400: ProblemDetailsSchema,
+            },
+        })
+        .handler(async ({ body }) => {
+            const existing = await db.users.findByEmail(body.email);
+            if (existing) {
+                return {
+                    status: 400,
+                    body: {
+                        detail: 'Email already in use',
+                    },
+                };
+            }
+            return {
+                status: 201,
+                body: await db.users.create(body),
+            };
+        }),
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: UserSchema,
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(async ({ params }) => {
+            const user = await db.users.findById(params.id);
+            if (!user) {
+                return {
+                    status: 404,
+                    body: {
+                        detail: 'User not found',
+                    },
+                };
+            }
+            return {
+                status: 200,
+                body: user,
+            };
+        }),
+});
+```
+
+The handler's `query`, `body` and `params` are typed from the declaration right above it, and its return is checked against that route's `responses`.
+
+</Step>
+
+<Step>
+
+## Mount it
+
+```ts title="src/app/api/[...ts-kizuna]/route.ts"
+import kizuna from '../../../../kizuna.config';
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
+    basePath: '/api',
+});
+```
+
+</Step>
+
+<Step>
+
+## Call it from a typed client
+
+The client is built from the same declarations, so every route, input, and response is typed.
+
+<InstallTabs packageName="@ts-kizuna/fetch" />
+
+```ts title="src/lib/api-client.ts"
+import { KizunaClient } from '@ts-kizuna/fetch';
+import kizuna from '../../kizuna.config';
+
+export const apiClient = new KizunaClient(kizuna.api, {
+    baseUrl: 'http://localhost:3000/api',
+});
+```
+
+Your config carries the handlers, so it stays on the server. For a browser, point `clients` at a generated file and import that instead. See [Clients](/docs/clients/fetch).
+
+```tsx title="page.tsx"
+import { apiClient } from '@/lib/api-client';
+
+export default async function UsersPage() {
+    const { body } = await apiClient.users.listUsers({
+        query: {
+            page: 1,
+            limit: 10,
+        },
+    });
+
+    // body.users is User[]
+    return (
+        <ul>
+            {body.users.map((user) => (
+                <li key={user.id}>{user.name}</li>
+            ))}
+        </ul>
+    );
+}
+```
+
+Writing is the same:
+
+```tsx title="actions.ts"
+'use server';
+
+import { apiClient } from '@/lib/api-client';
+
+export async function createUser(name: string, email: string) {
+    const result = await apiClient.users.createUser({
+        body: {
+            name,
+            email,
+        },
+    });
+
+    // result.status is 201 | 400, and TypeScript narrows the body from there
+    if (result.status === 201) {
+        return result.body.id;
+    }
+
+    throw new Error(result.body.detail);
+}
+```
+
+</Step>
+
+</Steps>
+
+## Next steps
+
+- [Building an API](/docs/routes) covers routes, handlers, and mounting in depth
+- [Authentication](/docs/authentication) declares identities and the guards on them, [Access Control](/docs/access-control) says who may call each route, and handler types and OpenAPI security follow
+- [Adapters](/docs/adapters/express) covers Express, Fastify, Hono, and Next.js setup and options
+- [Fetch client](/docs/clients/fetch) covers headers, custom fetch, and error handling
+- [OpenAPI generation](/docs/openapi) serves a spec alongside your API

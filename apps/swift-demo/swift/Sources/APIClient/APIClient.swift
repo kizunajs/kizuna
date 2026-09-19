@@ -3201,9 +3201,9 @@ public struct APINotificationsClient: Sendable {
         }
     }
 
-    /// Validate contract, exercises generator bug coverage
+    /// Validate schemas, exercises generator bug coverage
     public func validateConfig(_ body: APIClient.NotificationsValidateConfig.Body) async throws(APIClient.NotificationsValidateConfig.Failure) -> APIClient.NotificationsValidateConfig.Result {
-        let path = "/contract/validate"
+        let path = "/schemas/validate"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NotificationsValidateConfig.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"

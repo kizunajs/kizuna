@@ -2,7 +2,7 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { watchContract, type ContractChange } from './watch-contract.js';
+import { watchConfig, type ConfigChange } from './watch-config.js';
 import type { Contract, RouteDefinition, Routes } from '@ts-kizuna/core';
 
 /**
@@ -90,12 +90,12 @@ export const routes = k.routes('users', {
 });
 `;
 
-describe('watchContract', () => {
+describe('watchConfig', () => {
     it('reports the contract once before anything changes', async () => {
         const directory = project('/users/:id');
-        const changes: ContractChange[] = [];
+        const changes: ConfigChange[] = [];
 
-        const stop = await watchContract(join(directory, 'contract.ts'), (change) => {
+        const stop = await watchConfig(join(directory, 'contract.ts'), (change) => {
             changes.push(change);
         });
         cleanups.push(stop);
@@ -107,9 +107,9 @@ describe('watchContract', () => {
 
     it('watches every file the contract was built from, not just the entry', async () => {
         const directory = project('/users/:id');
-        const changes: ContractChange[] = [];
+        const changes: ConfigChange[] = [];
 
-        const stop = await watchContract(join(directory, 'contract.ts'), (change) => {
+        const stop = await watchConfig(join(directory, 'contract.ts'), (change) => {
             changes.push(change);
         });
         cleanups.push(stop);
@@ -124,9 +124,9 @@ describe('watchContract', () => {
 
     it('reloads when an imported file changes', async () => {
         const directory = project('/users/:id');
-        const changes: ContractChange[] = [];
+        const changes: ConfigChange[] = [];
 
-        const stop = await watchContract(join(directory, 'contract.ts'), (change) => {
+        const stop = await watchConfig(join(directory, 'contract.ts'), (change) => {
             changes.push(change);
         });
         cleanups.push(stop);
@@ -160,10 +160,10 @@ export const routes = k.routes('users', {
 
     it('keeps the last good contract when an edit does not parse', async () => {
         const directory = project('/users/:id');
-        const changes: ContractChange[] = [];
+        const changes: ConfigChange[] = [];
         const errors: unknown[] = [];
 
-        const stop = await watchContract(
+        const stop = await watchConfig(
             join(directory, 'contract.ts'),
             (change) => {
                 changes.push(change);
@@ -194,7 +194,7 @@ export const routes = k.routes('users', {
             console.error = original;
         });
 
-        const stop = await watchContract(join(directory, 'contract.ts'), () => {});
+        const stop = await watchConfig(join(directory, 'contract.ts'), () => {});
         cleanups.push(stop);
 
         writeFileSync(join(directory, 'routes.ts'), 'export const routes = {');
@@ -211,14 +211,14 @@ export const routes = k.routes('users', {
         const directory = project('/users/:id');
         writeFileSync(join(directory, 'routes.ts'), 'export const routes = {');
 
-        await expect(watchContract(join(directory, 'contract.ts'), () => {})).rejects.toThrow();
+        await expect(watchConfig(join(directory, 'contract.ts'), () => {})).rejects.toThrow();
     });
 
     it('stops watching when told to', async () => {
         const directory = project('/users/:id');
-        const changes: ContractChange[] = [];
+        const changes: ConfigChange[] = [];
 
-        const stop = await watchContract(join(directory, 'contract.ts'), (change) => {
+        const stop = await watchConfig(join(directory, 'contract.ts'), (change) => {
             changes.push(change);
         });
 

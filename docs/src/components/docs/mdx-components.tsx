@@ -6,13 +6,14 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 import { AdapterTabs } from './adapter-tabs';
 import { AccessStyle, AccessStyleSwitch } from './access-style';
-import { ContractExplorer } from '@/components/code/contract-explorer';
+import { ConfigExplorer } from '@/components/code/config-explorer';
 import { HandlerExplorer } from '@/components/code/handler-explorer';
 import { AlphaNotice } from './alpha-notice';
 import { BetaNotice } from './beta-notice';
 import { InstallTabs } from './install-tabs';
 import { ExtensionCard } from './extension-card';
 import { FeatureList } from './feature-list';
+import { GeneratedSurfaces } from './generated-surfaces';
 import { Supports } from './supports';
 
 import blockStyles from './mdx-block.module.css';
@@ -32,13 +33,14 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         AdapterTabs,
         AccessStyle,
         AccessStyleSwitch,
-        ContractExplorer: () => <ContractExplorer className={blockStyles.block} />,
+        ConfigExplorer: () => <ConfigExplorer className={blockStyles.block} />,
         HandlerExplorer: () => <HandlerExplorer className={blockStyles.block} />,
         AlphaNotice,
         BetaNotice,
         InstallTabs,
         ExtensionCard,
         FeatureList,
+        GeneratedSurfaces,
         Supports,
     };
 }

@@ -4,7 +4,7 @@ import { db } from './db';
 import { k } from './k';
 
 /**
- * The API's scheduled jobs, grouped the way a real contract would be.
+ * The API's scheduled jobs, grouped the way a real API would be.
  */
 export const jobs = k.jobs('scheduler', {
     users: {

@@ -1,19 +1,19 @@
 ---
 title: Watching
-description: Reload a contract when it changes, so nothing you generate from it is ever out of date by hand.
+description: Reload your API when it changes, so nothing you generate from it is ever out of date by hand.
 ---
 
-Anything generated from a contract falls behind the moment you edit a route. `watchContract` closes that gap: it reloads the contract when any file it was built from changes, and hands you the new one.
+Anything generated from your API falls behind the moment you edit a route. `watchConfig` closes that gap: it reloads the config when any file it was built from changes, and hands you the new api.
 
 You wire it up once. After that you never run a generator by hand.
 
 ```ts title="scripts/dev.ts"
 import { writeFileSync } from 'node:fs';
-import { watchContract } from '@ts-kizuna/cli';
+import { watchConfig } from '@ts-kizuna/cli';
 import { generateFetchClient } from '@ts-kizuna/fetch/server';
 
-await watchContract('./src/contract.ts', ({ contract }) => {
-    writeFileSync('./src/api-client.ts', generateFetchClient(contract));
+await watchConfig('./kizuna.config.ts', ({ api }) => {
+    writeFileSync('./src/api-client.ts', generateFetchClient(api));
 });
 ```
 
@@ -21,12 +21,12 @@ It returns a function that stops watching.
 
 ## What it watches
 
-The contract's own import graph, taken from what the loader read. Nothing names a directory, so a route file added three imports deep is watched the moment it is first loaded.
+The config's own import graph, taken from what the loader read. Nothing names a directory, so a route file added three imports deep is watched the moment it is first loaded.
 
 Dependencies are left out, and so is the build output of a workspace sibling, since neither is something you edit.
 
 ```ts
-await watchContract('./src/contract.ts', ({ files }) => {
+await watchConfig('./kizuna.config.ts', ({ files }) => {
     console.log(`watching ${files.length} files`);
 });
 ```
@@ -34,7 +34,7 @@ await watchContract('./src/contract.ts', ({ files }) => {
 ## Every reload
 
 ```ts
-interface ContractChange {
+interface ConfigChange {
     contract: Contract;
     changed?: string;
     files: string[];
@@ -46,33 +46,33 @@ interface ContractChange {
 
 ## A broken edit
 
-Half-typed files do not parse, and they are the normal state of a file while you are working in it. A reload that throws leaves the last good contract in place, and the watcher keeps going:
+Half-typed files do not parse, and they are the normal state of a file while you are working in it. A reload that throws leaves the last good api in place, and the watcher keeps going:
 
 ```
-Could not load the contract after src/routes/users.ts changed.
+Could not load the config after src/routes/users.ts changed.
 Unexpected end of input
 ```
 
-Your next good save recovers. Nothing is written from a contract that failed to load.
+Your next good save recovers. Nothing is written from a config that failed to load.
 
 Pass `onError` to handle it yourself:
 
 ```ts
-await watchContract('./src/contract.ts', onChange, {
-    onError: (error, changed) => logger.warn({ error, changed }, 'contract reload failed'),
+await watchConfig('./kizuna.config.ts', onChange, {
+    onError: (error, changed) => logger.warn({ error, changed }, 'config reload failed'),
 });
 ```
 
-A contract that is already broken when you start is a different matter: `watchContract` rejects rather than watching something that never loaded.
+A config that is already broken when you start is a different matter: `watchConfig` rejects rather than watching something that never loaded.
 
 ## Deprecations and sunsets
 
 Every reload reports the routes that announce their own retirement, soonest sunset first:
 
 ```ts
-import { formatNotice, watchContract } from '@ts-kizuna/cli';
+import { formatNotice, watchConfig } from '@ts-kizuna/cli';
 
-await watchContract('./src/contract.ts', ({ notices }) => {
+await watchConfig('./kizuna.config.ts', ({ notices }) => {
     for (const notice of notices) console.log(formatNotice(notice));
 });
 ```
@@ -92,7 +92,7 @@ This reads the same [`deprecated`](/docs/deprecations) field the [VS Code extens
 
 | Option       | Description                                                          |
 | ------------ | -------------------------------------------------------------------- |
-| `exportName` | Named export to read the contract from, `contract` by default        |
+| `exportName` | Named export to read the api from, `api` by default                  |
 | `debounce`   | How long to wait for a run of writes to settle, 60ms by default      |
 | `onError`    | Called when a reload throws, reports to stderr when you pass nothing |
 
@@ -112,6 +112,6 @@ Editors save in bursts, and a compiler writing a directory is a burst of its own
 
 ## Reference
 
-- [Configuration](/docs/configuration)
+- [Configuration](/docs/config)
 - [Deprecations](/docs/deprecations)
 - [Generated TypeScript client](/docs/clients/fetch#generating-the-client)

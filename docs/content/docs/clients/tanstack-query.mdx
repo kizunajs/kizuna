@@ -1,6 +1,6 @@
 ---
 title: TanStack Query
-description: Build TanStack Query options from your contract, with query keys derived from your routes.
+description: Build TanStack Query options from your routes, with query keys derived from your routes.
 ---
 
 <Supports items={['React Query', 'Vue Query', 'Svelte Query']} />
@@ -11,7 +11,7 @@ The TanStack Query client is new and still settling. Its API surface may change 
 
 </BetaNotice>
 
-`@ts-kizuna/tanstack-query` turns a contract and a [fetch client](/docs/clients/fetch) into TanStack Query options. Query keys come from each route's own path, so invalidation is a method call.
+`@ts-kizuna/tanstack-query` turns your api and a [fetch client](/docs/clients/fetch) into TanStack Query options. Query keys come from each route's own path, so invalidation is a method call.
 
 It builds on `@tanstack/query-core`, the package every TanStack Query adapter shares, and returns options objects. You pass them to your own framework's hooks.
 
@@ -50,16 +50,16 @@ The examples here use React.
 ```ts title="src/api.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
 import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
-import { apiContract } from './api-client';
+import kizuna from '../kizuna.config';
 
-export const apiClient = new KizunaClient(apiContract, {
+export const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
 });
 
-export const api = new KizunaTanstackQuery(apiContract, apiClient);
+export const api = new KizunaTanstackQuery(kizuna.api, apiClient);
 ```
 
-`apiContract` is what the generated client exports. See [Fetch client](/docs/clients/fetch) for generating it.
+`KizunaTanstackQuery` reads `routes` off the api to build its keys, so it takes the api alongside the client.
 
 </Step>
 
@@ -154,7 +154,7 @@ const search = useInfiniteQuery(
 
 ## Keys and invalidation
 
-Keys are `[segments, { input, type }]`, where the segments are the route's path through the contract. A group's key is a prefix of every key beneath it.
+Keys are `[segments, { input, type }]`, where the segments are the route's path through your routes. A group's key is a prefix of every key beneath it.
 
 | Factory                  | Returns                                   | Use it for                          |
 | ------------------------ | ----------------------------------------- | ----------------------------------- |
@@ -184,7 +184,7 @@ queryClient.setQueryData(
 
 ## Error handling
 
-A status your contract declares arrives as `data`. Anything else throws `UndeclaredResponseError`, so `retry`, `throwOnError`, and error boundaries work.
+A status the route declares arrives as `data`. Anything else throws `UndeclaredResponseError`, so `retry`, `throwOnError`, and error boundaries work.
 
 ```tsx title="user-profile.tsx"
 import { isUndeclaredResponseError } from '@ts-kizuna/tanstack-query';
@@ -208,7 +208,7 @@ if (error !== null && isUndeclaredResponseError(error)) {
 }
 ```
 
-Declaring a status changes this: a contract declaring `500` has said a 500 is an outcome, so it arrives as data and is not retried. Network failures reject on their own.
+Declaring a status changes this: a route declaring `500` has said a 500 is an outcome, so it arrives as data and is not retried. Network failures reject on their own.
 
 ## Disabling a query
 

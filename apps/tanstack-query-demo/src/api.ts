@@ -3,7 +3,7 @@ import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
 import { defineConfig } from '@ts-kizuna/core';
 import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
 
-const { api: contract } = defineConfig({
+const kizuna = defineConfig({
     tags,
     auth: {
         identities: {
@@ -24,11 +24,11 @@ const { api: contract } = defineConfig({
     jobs,
 });
 
-export const apiClient = new KizunaClient(contract, {
+export const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: '/api',
     requestContext: {
         'x-posthog-session-id': 'tanstack-query-demo',
     },
 });
 
-export const api = new KizunaTanstackQuery(contract, apiClient);
+export const api = new KizunaTanstackQuery(kizuna.api, apiClient);

@@ -1,7 +1,7 @@
 import { createJiti } from 'jiti';
 import type { Contract } from '@ts-kizuna/core';
 
-export interface LoadContractOptions {
+export interface LoadConfigOptions {
     /**
      * Named export to read the contract from.
      *
@@ -31,9 +31,9 @@ const cacheOf = (jiti: unknown): Record<string, unknown> => (jiti as { cache?: R
  * step) and returns the named export (default `contract`) or the default export.
  * Returns undefined when neither is present.
  */
-export const loadContract = async (
+export const loadConfig = async (
     contractPath: string,
-    exportNameOrOptions: string | LoadContractOptions = 'api'
+    exportNameOrOptions: string | LoadConfigOptions = 'api'
 ): Promise<Contract | undefined> => {
     const options = typeof exportNameOrOptions === 'string' ? { exportName: exportNameOrOptions } : exportNameOrOptions;
     const { exportName = 'api', files, reread } = options;

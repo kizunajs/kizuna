@@ -8,9 +8,9 @@ const destinations = [
         description: 'Build a working API and a typed client in 8 minutes.',
     },
     {
-        title: 'Building an API',
-        href: '/docs/building/contract',
-        description: 'Contract, router, and mounting, explained in depth.',
+        title: 'Routes',
+        href: '/docs/routes',
+        description: 'A method, a path, its schemas, and the handler that serves it.',
     },
     {
         title: 'Adapters',

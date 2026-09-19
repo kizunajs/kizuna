@@ -5,7 +5,7 @@ description: A fully typed HTTP client for consuming ts-kizuna routes in the bro
 
 `@ts-kizuna/fetch` is the typed client for your routes, a wrapper around the native `fetch` API. It runs anywhere `fetch` does, [React Native](#react-native) included.
 
-You generate it from your contract. The generated file carries named types and a table of methods and paths, and imports nothing else.
+You generate it from your routes. The generated file carries named types and a table of methods and paths, and imports nothing else.
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
@@ -23,7 +23,7 @@ import kizuna from '../kizuna.config';
 writeFileSync('./src/api-client.ts', generateFetchClient(kizuna.api));
 ```
 
-Name it in [`kizuna.config.ts`](/docs/configuration) with `fetchClient({ output })` so the rest of your tooling knows where it goes.
+Name it in [`kizuna.config.ts`](/docs/config) with `fetchClient({ output })` so the rest of your tooling knows where it goes.
 
 ```ts title="src/api-client.ts"
 /* eslint-disable */
@@ -121,7 +121,7 @@ const { status, body } = await apiClient.users.getUser({
 When the route declares a `pathParams` schema, `params` is typed by that schema's output type instead of the path template, the same typing the server-side handler receives. Refinements like `.brand()` flow to the caller:
 
 ```ts title="users.ts"
-// contract declares: pathParams: z.object({ id: z.string().brand<'UserId'>() })
+// the route declares: pathParams: z.object({ id: z.string().brand<'UserId'>() })
 const { body } = await apiClient.users.getUser({
     params: {
         id: userId, // must be a UserId, a plain string is a type error
@@ -169,7 +169,7 @@ Routes without a `headers` schema accept an optional `headers?: Record<string, s
 
 ## Authentication
 
-When the contract secures routes with [identities](/docs/authentication), send the credential in `baseHeaders`. The server's guards read it, and answer `401`/`403` when it's missing or insufficient:
+When your routes name an identity with [identities](/docs/authentication), send the credential in `baseHeaders`. The server's guards read it, and answer `401`/`403` when it's missing or insufficient:
 
 ```ts title="src/lib/api-client.ts"
 const apiClient = createClient({
@@ -282,7 +282,7 @@ if (result.status === 403) {
 
 ## React Native
 
-The client works in Expo and in bare React Native, importing the [same contract](/docs/project-structure) as your website.
+The client works in Expo and in bare React Native, importing the [same generated client](/docs/project-structure) as your website.
 
 ### Reading a token from storage
 
@@ -328,7 +328,7 @@ const { status } = await apiClient.users.uploadAvatar({
 });
 ```
 
-The cast is there because the contract types the field as the `File` the server receives once the multipart request lands.
+The cast is there because the route types the field as the `File` the server receives once the multipart request lands.
 
 Bare React Native has no `File` it can build from a path. Append a `{ uri, name, type }` descriptor in its place and leave `fetch` out of the client config, since that form is the one the global `fetch` understands.
 
@@ -375,4 +375,4 @@ The file can fall behind your routes, and it fails loudly when it does: add a ro
 
 - [`new KizunaClient()`](/docs/reference/kizuna-client)
 - [`isValidationError`](/docs/reference/is-validation-error)
-- [Configuration](/docs/configuration)
+- [Configuration](/docs/config)

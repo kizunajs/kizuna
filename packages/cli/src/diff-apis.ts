@@ -85,7 +85,7 @@ const toolNames = (contract: Contract): Map<string, string> =>
  * Compares the declarations rather than an OpenAPI document, so it sees route
  * keys, MCP tool names and job keys, none of which a document carries.
  */
-export const diffContracts = (before: Contract, after: Contract): Change[] => {
+export const diffApis = (before: Contract, after: Contract): Change[] => {
     const changes: Change[] = [];
 
     const beforeRoutes = routeFacts(before, {});

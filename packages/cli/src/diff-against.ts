@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import type { Contract } from '@ts-kizuna/core';
-import { loadContract } from './load-contract.js';
-import { diffContracts, type Change } from './diff-contracts.js';
+import { loadConfig } from './load-config.js';
+import { diffApis, type Change } from './diff-apis.js';
 
 export interface DiffAgainstOptions {
     /**
@@ -49,13 +49,13 @@ export const diffAgainst = async (ref: string, contractPath: string, options: Di
     try {
         git(root, 'worktree', 'add', '--detach', '--force', worktree, ref);
 
-        const before = await loadContract(join(worktree, fromRoot), { exportName });
+        const before = await loadConfig(join(worktree, fromRoot), { exportName });
         if (before === undefined) throw new Error(`No \`${exportName}\` export in ${fromRoot} at ${ref}`);
 
-        const after = await loadContract(absolute, { exportName });
+        const after = await loadConfig(absolute, { exportName });
         if (after === undefined) throw new Error(`No \`${exportName}\` export in ${contractPath}`);
 
-        return diffContracts(before as Contract, after as Contract);
+        return diffApis(before as Contract, after as Contract);
     } finally {
         try {
             git(root, 'worktree', 'remove', '--force', worktree);

@@ -1,9 +1,9 @@
 ---
 title: OpenAPI
-description: Generate an OpenAPI 3.1.0 document from your contract, and serve it with a reference UI.
+description: Generate an OpenAPI 3.1.0 document from your routes, and serve it with a reference UI.
 ---
 
-`@ts-kizuna/openapi` generates an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from your contract.
+`@ts-kizuna/openapi` generates an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from your routes.
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
@@ -58,7 +58,7 @@ openApiPlugin({
 });
 ```
 
-The UI embeds the document, so `docsPath` alone is enough to browse the API. All three are [plugin routes](/docs/plugins#plugin-routes), so they stay out of your fetch client and out of the document itself.
+The UI embeds the document, so `docsPath` alone is enough to browse the API. All three are [plugin routes](/docs/extend/create-plugin#plugin-routes), so they stay out of your fetch client and out of the document itself.
 
 The routes are public. Gate them with your framework's own middleware if that is not what you want.
 
@@ -225,8 +225,8 @@ A response declared with [`stream`](/docs/streaming) is documented under `text/e
 
 ## Breaking changes
 
-`kizuna diff` compares your contract against a git ref and reports what each change costs a caller. See [Breaking Changes](/docs/breaking-changes).
+`kizuna diff` compares your API against a git ref and reports what each change costs a caller. See [Breaking Changes](/docs/breaking-changes).
 
 ## Scheduled jobs
 
-[Scheduled jobs](/docs/jobs) live under `jobs` on the contract, not `routes`, so they are not in the document.
+[Scheduled jobs](/docs/jobs) live under `jobs` on your config, not `routes`, so they are not in the document.

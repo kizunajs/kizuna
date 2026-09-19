@@ -2,7 +2,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { loadContract } from '@ts-kizuna/cli';
+import { loadConfig } from '@ts-kizuna/cli';
 import { generateKotlinClient } from './generator.js';
 
 const usage = `Usage: ts-kizuna-kotlin generate --config <path> --out <path> --namespace-name <name>
@@ -68,7 +68,7 @@ const main = async (): Promise<void> => {
 
     const [pathPart, exportName = values.export ?? 'api'] = configArg.split(':');
     const configPath = resolve(process.cwd(), pathPart!);
-    const contract = (await loadContract(configPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${configPath}`);
+    const contract = (await loadConfig(configPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${configPath}`);
     const kotlinSource = generateKotlinClient(contract, {
         namespaceName,
         packageName: values.package,
