@@ -1,6 +1,6 @@
 # @ts-kizuna/tanstack-query
 
-`@ts-kizuna/tanstack-query` provides `new KizunaTanstackQuery()`, which builds TanStack Query options from a ts-kizuna contract. Query keys, caching, and invalidation come from the contract you already wrote.
+`@ts-kizuna/tanstack-query` provides `new KizunaTanstackQuery()`, which builds TanStack Query options from a ts-kizuna api. Query keys, caching, and invalidation come from the routes you already wrote.
 
 ## Installation
 

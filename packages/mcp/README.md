@@ -48,4 +48,4 @@ getForecast: k
 
 ## Documentation
 
-[MCP server generation](https://ts-kizuna.com/docs/mcp)
+[MCP](https://ts-kizuna.com/docs/mcp)

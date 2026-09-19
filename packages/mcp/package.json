@@ -1,7 +1,7 @@
 {
   "name": "@ts-kizuna/mcp",
   "version": "1.64.1",
-  "description": "MCP server generation for ts-kizuna contracts",
+  "description": "MCP endpoint for ts-kizuna, so AI assistants can call your routes",
   "keywords": [
     "ts-kizuna",
     "typescript",

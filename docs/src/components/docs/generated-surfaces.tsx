@@ -1,4 +1,4 @@
-import { FileText, Terminal } from 'lucide-react';
+import { FileText, Globe } from 'lucide-react';
 import type { ComponentType } from 'react';
 import KotlinLogo from '@/icons/Kotlin.svg';
 import McpLogo from '@/icons/Mcp.svg';
@@ -14,10 +14,22 @@ interface Surface {
 
 const SURFACES: Surface[] = [
     {
+        icon: Globe,
+        title: 'REST routes',
+        detail: 'Validated and guarded',
+        href: '/docs/routes',
+    },
+    {
         icon: FileText,
         title: 'OpenAPI 3.1',
-        detail: 'Paths, schemas and security',
+        detail: 'Document and reference UI',
         href: '/docs/openapi',
+    },
+    {
+        icon: McpLogo,
+        title: 'MCP tools',
+        detail: 'Routes a model can call',
+        href: '/docs/mcp',
     },
     {
         icon: TypeScriptLogo,
@@ -28,43 +40,30 @@ const SURFACES: Surface[] = [
     {
         icon: SwiftLogo,
         title: 'Swift',
-        detail: 'URLSession and Codable types',
+        detail: 'URLSession and Codable',
         href: '/docs/clients/swift',
     },
     {
         icon: KotlinLogo,
         title: 'Kotlin',
-        detail: 'OkHttp and kotlinx.serialization',
+        detail: 'OkHttp and kotlinx',
         href: '/docs/clients/kotlin',
-    },
-    {
-        icon: McpLogo,
-        title: 'MCP tools',
-        detail: 'Tools an assistant can call',
-        href: '/docs/mcp',
     },
 ];
 
 export function GeneratedSurfaces() {
     return (
-        <div className="not-prose my-8 flex flex-col items-center gap-0">
+        <div className="not-prose my-8 flex flex-col items-center">
             <div className="w-full max-w-md rounded-xl border bg-fd-card px-4 py-3 text-center">
                 <div className="font-mono text-sm font-semibold text-fd-foreground">kizuna.config.ts</div>
-                <div className="mt-0.5 text-xs text-fd-muted-foreground">Your adapter, routes, identities, jobs and plugins</div>
+                <div className="mt-1 text-sm text-fd-muted-foreground">Your adapter, routes, identities, jobs and plugins</div>
             </div>
 
-            <div aria-hidden className="h-5 w-px bg-fd-border" />
-
-            <div className="inline-flex items-center gap-2 rounded-lg border bg-fd-card px-3 py-1.5">
-                <Terminal className="size-3.5 text-fd-muted-foreground" />
-                <span className="font-mono text-sm font-medium text-fd-foreground">kizuna generate</span>
-            </div>
-
-            <div aria-hidden className="h-5 w-px bg-fd-border" />
+            <div aria-hidden className="h-6 w-px bg-fd-border" />
 
             <div aria-hidden className="relative hidden h-5 w-full lg:block">
-                <div className="absolute top-0 right-[calc((100%-3rem)/10)] left-[calc((100%-3rem)/10)] h-px bg-fd-border" />
-                <div className="grid h-full grid-cols-5 gap-x-3">
+                <div className="absolute top-0 right-[calc((100%-3.75rem)/12)] left-[calc((100%-3.75rem)/12)] h-px bg-fd-border" />
+                <div className="grid h-full grid-cols-6 gap-x-3">
                     {SURFACES.map(({ title }) => (
                         <div key={title} className="flex justify-center">
                             <div className="h-full w-px bg-fd-border" />
@@ -73,7 +72,7 @@ export function GeneratedSurfaces() {
                 </div>
             </div>
 
-            <div className="grid w-full grid-cols-2 gap-x-3 gap-y-3 pt-3 sm:grid-cols-3 lg:grid-cols-5 lg:pt-0">
+            <div className="grid w-full grid-cols-2 gap-3 pt-3 sm:grid-cols-3 lg:grid-cols-6 lg:pt-0">
                 {SURFACES.map(({ icon: Icon, title, detail, href }) => (
                     <a
                         key={title}
@@ -81,7 +80,7 @@ export function GeneratedSurfaces() {
                         className="flex flex-col items-center gap-1.5 rounded-xl border bg-fd-card px-3 py-4 text-center no-underline transition-colors hover:border-fd-primary/40">
                         <Icon className="size-[22px] text-fd-foreground" />
                         <span className="text-sm font-semibold text-fd-foreground">{title}</span>
-                        <span className="text-xs leading-snug text-fd-muted-foreground">{detail}</span>
+                        <span className="text-[13px] leading-snug text-fd-muted-foreground">{detail}</span>
                     </a>
                 ))}
             </div>

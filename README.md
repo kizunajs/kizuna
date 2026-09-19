@@ -32,7 +32,7 @@ Build fully typed REST APIs with TypeScript. Declare a route once. Get a typed s
 - **OpenAPI generation**: from the same routes, no annotations needed
 - **Native client generation**: typed API clients for Swift (iOS/macOS) and Kotlin (Android/JVM)
 - **Plugins**: extend your API with features built on the routes you already wrote, and get them fully typed in your handlers
-- **MCP server generation**: expose your API as MCP tools so AI assistants can call your endpoints
+- **MCP endpoint**: serve the routes declaring a tool so AI assistants can call them, behind the same guards
 - **Scheduled jobs**: declare cron work next to its handler, tick it from any platform scheduler, or run it in process from a route handler
 - **Deprecation and sunset support**: deprecate routes and fields, and it shows up in your editor, OpenAPI, Swift, Kotlin, and the response headers
 
@@ -161,7 +161,7 @@ if (result.status === 200) {
 | `@ts-kizuna/openapi`           | OpenAPI generation                                 |
 | `@ts-kizuna/swift`             | Swift client generation                            |
 | `@ts-kizuna/kotlin`            | Kotlin client generation                           |
-| `@ts-kizuna/mcp`               | MCP server generation                              |
+| `@ts-kizuna/mcp`               | MCP endpoint for AI assistants                     |
 | `@ts-kizuna/eslint-plugin`     | ESLint rules                                       |
 | `@ts-kizuna/typescript-plugin` | Deprecation highlighting in the editor             |
 | `@ts-kizuna/cli`               | Command line tooling                               |

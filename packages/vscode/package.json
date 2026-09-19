@@ -3,7 +3,7 @@
   "displayName": "ts-kizuna",
   "version": "1.64.1",
   "private": true,
-  "description": "Deprecation strikethroughs and hovers for ts-kizuna contracts",
+  "description": "Deprecation strikethroughs and hovers for ts-kizuna routes",
   "license": "MIT",
   "homepage": "https://ts-kizuna.com/docs",
   "repository": {

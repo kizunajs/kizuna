@@ -1,6 +1,6 @@
 # @ts-kizuna/openapi
 
-`@ts-kizuna/openapi` generates an OpenAPI 3.1.0 document from your contract, and serves it with a reference UI on any adapter.
+`@ts-kizuna/openapi` generates an OpenAPI 3.1.0 document from your routes, and serves it with a reference UI on any adapter.
 
 ## Installation
 

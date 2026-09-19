@@ -1,6 +1,6 @@
 # ts-kizuna for VS Code
 
-Shows [ts-kizuna](https://ts-kizuna.com) deprecations where you code: deprecated routes and fields are struck through everywhere the contract's types flow, and hovering shows the migration message.
+Shows [ts-kizuna](https://ts-kizuna.com) deprecations where you code: deprecated routes and fields are struck through everywhere your API's types flow, and hovering shows the migration message.
 
 Deprecations are declared once, on the route:
 

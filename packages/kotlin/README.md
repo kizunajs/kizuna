@@ -1,6 +1,6 @@
 # @ts-kizuna/kotlin
 
-`@ts-kizuna/kotlin` generates a native Kotlin client from your ts-kizuna contract. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
+`@ts-kizuna/kotlin` generates a native Kotlin client from your ts-kizuna routes. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
 
 ## Installation
 

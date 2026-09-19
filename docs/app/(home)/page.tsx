@@ -15,7 +15,7 @@ export const metadata: Metadata = {
         absolute: 'ts-kizuna | Build fully typed REST APIs with TypeScript',
     },
     description:
-        'Write one contract. Get a fully typed server, typed auth, scheduled jobs, an OpenAPI spec, Swift and Kotlin clients, an MCP server, and more.',
+        'Write one config. Get a fully typed server, typed auth, scheduled jobs, an OpenAPI spec, Swift and Kotlin clients, an MCP endpoint, and more.',
 };
 
 export default function HomePage() {
@@ -32,7 +32,7 @@ export default function HomePage() {
             <div className={styles.sections}>
                 <Section
                     title="The idea"
-                    description="One contract is the source of truth. Your server, your clients, and every generated artifact read from it.">
+                    description="One config is the source of truth. Your server, your clients, and everything generated from it read the same declarations.">
                     <ConfigExplorer />
                 </Section>
 
@@ -40,7 +40,7 @@ export default function HomePage() {
 
                 <Section
                     title="Runs anywhere"
-                    description="The same contract and router move between adapters, and the framework underneath stays available to you.">
+                    description="The same routes and handlers move between adapters, and the framework underneath stays available to you.">
                     <Adapters />
                 </Section>
 
