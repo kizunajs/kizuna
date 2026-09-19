@@ -27,7 +27,9 @@
     "lint:fix": "pnpm --filter @ts-kizuna/eslint-plugin build && eslint . --fix",
     "docs": "pnpm --filter docs dev",
     "release": "release-it",
-    "package:vscode": "node tools/package-vscode.cjs"
+    "package:vscode": "node tools/package-vscode.cjs",
+    "kizuna:generate": "pnpm -r --filter \"@ts-kizuna-demo/express\" --filter \"@ts-kizuna-demo/fastify\" --filter \"@ts-kizuna-demo/hono\" --filter \"@ts-kizuna-demo/next\" kizuna:generate",
+    "kizuna:check": "pnpm -r --filter \"@ts-kizuna-demo/express\" --filter \"@ts-kizuna-demo/fastify\" --filter \"@ts-kizuna-demo/hono\" --filter \"@ts-kizuna-demo/next\" kizuna:check"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.4",

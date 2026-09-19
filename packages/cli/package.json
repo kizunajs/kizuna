@@ -1,7 +1,7 @@
 {
   "name": "@ts-kizuna/cli",
   "version": "1.64.1",
-  "description": "The contract loader the Swift and Kotlin client generators share",
+  "description": "Command line tooling for ts-kizuna",
   "keywords": [
     "ts-kizuna",
     "typescript",
@@ -41,6 +41,9 @@
       }
     }
   },
+  "bin": {
+    "kizuna": "./dist/cli.mjs"
+  },
   "kizuna": {
     "entries": {
       ".": "server"
@@ -53,12 +56,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external jiti",
+    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external jiti --external typescript",
     "prepare": "pnpm run build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "jiti": "^2.7.0"
+    "jiti": "^2.7.0",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "@ts-kizuna/core": "workspace:*",

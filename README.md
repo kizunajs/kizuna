@@ -164,7 +164,7 @@ if (result.status === 200) {
 | `@ts-kizuna/mcp`               | MCP server generation                                 |
 | `@ts-kizuna/eslint-plugin`     | ESLint rules                                          |
 | `@ts-kizuna/typescript-plugin` | Deprecation highlighting in the editor                |
-| `@ts-kizuna/cli`               | Shared CLI and build tooling                          |
+| `@ts-kizuna/cli`               | Command line tooling                                  |
 
 ## License
 

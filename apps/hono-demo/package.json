@@ -9,7 +9,9 @@
     "server:once": "tsx src/index.ts",
     "client": "tsx src/scripts/run-client.ts",
     "typecheck": "tsc --noEmit",
-    "openapi": "tsx scripts/generate-openapi.ts"
+    "openapi": "tsx scripts/generate-openapi.ts",
+    "kizuna:generate": "kizuna generate",
+    "kizuna:check": "kizuna generate --check"
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
@@ -23,6 +25,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@ts-kizuna/cli": "workspace:*",
     "@types/node": "catalog:",
     "concurrently": "catalog:",
     "tsx": "catalog:",

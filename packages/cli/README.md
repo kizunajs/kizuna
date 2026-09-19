@@ -1,6 +1,6 @@
 # @ts-kizuna/cli
 
-`loadContract` imports a `kizuna.config.ts` from TypeScript source, no build step needed. The Swift and Kotlin generators use it to load the api they generate from. `writeClients` and `checkClients` write every client a config declares, and report the ones that have fallen behind.
+The `kizuna` command, which writes the `Config` your `kizuna.config.ts` implies and every client it declares. The package also exports the config loader the Swift and Kotlin generators share.
 
 ## Installation
 
@@ -10,13 +10,18 @@ pnpm add -D @ts-kizuna/cli
 
 ## Usage
 
-```ts
-import { loadContract, checkClients } from '@ts-kizuna/cli';
-
-const api = await loadContract('./kizuna.config.ts');
-const stale = checkClients(api, clients);
+```sh
+kizuna generate
 ```
+
+Writes `kizuna.types.ts` beside your config, and every target under `clients`. A file that already matches is left alone.
+
+```sh
+kizuna generate --check
+```
+
+The same work without writing. Names whatever has fallen behind and exits `1`, for a pipeline to fail on.
 
 ## Documentation
 
-[ts-kizuna docs](https://ts-kizuna.com/docs)
+[Configuration](https://ts-kizuna.com/docs/configuration)

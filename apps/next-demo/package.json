@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start -p 3030",
     "typecheck": "tsc --noEmit",
-    "openapi": "tsx scripts/generate-openapi.ts"
+    "openapi": "tsx scripts/generate-openapi.ts",
+    "kizuna:generate": "kizuna generate",
+    "kizuna:check": "kizuna generate --check"
   },
   "dependencies": {
     "@scalar/nextjs-api-reference": "^0.10.11",
@@ -23,6 +25,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@ts-kizuna/cli": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
