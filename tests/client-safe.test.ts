@@ -238,54 +238,49 @@ describe('a generated client stays client-safe end to end', () => {
 });
 
 /**
- * The server halves a declaration names, read off the bundled entry so the
- * pairing is checked against what ships, not against a second list. Bundling
- * drops comments, so a `serverModule` in an example does not count.
+ * Every package that declares a plugin, found by the `createPlugin` call that
+ * makes one. Read from source rather than from a list, so a new plugin is
+ * covered the moment it exists.
  */
-const declaredServerModules = async (entry: Bundleable): Promise<string[]> => {
-    const result = await build({
-        entryPoints: [entry.file],
-        bundle: true,
-        write: false,
-        logLevel: 'silent',
-        format: 'esm',
-        platform: 'browser',
-        legalComments: 'none',
-        external: entry.external,
-    });
-    const text = result.outputFiles[0]?.text ?? '';
-    return Array.from(text.matchAll(/serverModule:\s*["']([^"']+)["']/g)).map((match) => match[1]!);
+const pluginPackages = (): string[] => {
+    const declaring: string[] = [];
+    for (const packageDir of packageDirs()) {
+        const manifest = readManifest(packageDir);
+        if (manifest.name === '@ts-kizuna/core') continue;
+        const sourceDir = path.join(packageDir, 'src');
+        if (!fs.existsSync(sourceDir)) continue;
+        const declaresPlugin = fs
+            .readdirSync(sourceDir, { recursive: true })
+            .filter((entry): entry is string => typeof entry === 'string' && entry.endsWith('.ts') && !entry.includes('.test.'))
+            .some((entry) => fs.readFileSync(path.join(sourceDir, entry), 'utf8').includes('createPlugin('));
+        if (declaresPlugin) declaring.push(manifest.name);
+    }
+    return declaring;
 };
 
 describe('every plugin is covered', () => {
-    const declarations = new Map<string, string[]>();
+    const plugins = pluginPackages();
 
-    beforeAll(async () => {
-        for (const entry of entries.filter((candidate) => candidate.reach === 'client')) {
-            const serverModules = await declaredServerModules(entry);
-            if (serverModules.length > 0) declarations.set(entry.specifier, serverModules);
-        }
-    }, 60_000);
+    /**
+     * The list is derived, so an empty one means the detection broke rather than
+     * that the repository ships no plugins.
+     */
+    test('the repository declares plugins', () => {
+        expect(plugins.length).toBeGreaterThan(0);
+    });
 
-    test('every declaration names a server half that exists', () => {
-        const problems: string[] = [];
-        for (const [specifier, serverModules] of declarations) {
-            for (const serverModule of serverModules) {
-                if (entries.find((entry) => entry.specifier === serverModule)?.reach !== 'server') {
-                    problems.push(`${specifier} names '${serverModule}' as its server half, which is not a server entry`);
-                }
-            }
-        }
-        expect(problems).toEqual([]);
+    test('a plugin package is a server entry', () => {
+        const mislabelled = plugins.filter((name) => entries.find((entry) => entry.specifier === name)?.reach !== 'server');
+        expect(mislabelled, 'a plugin is named on a config, which never reaches a browser').toEqual([]);
     });
 
     /**
-     * Without this a new plugin could skip the end-to-end case above and rest on
-     * the classification alone.
+     * Without this a new plugin could rest on its classification alone and never
+     * be mounted, guarded or bundled by the cases above.
      */
     test('the demo config installs every plugin', () => {
         const installed = fs.readFileSync(DEMO_CONFIG, 'utf8');
-        const missing = [...declarations.keys()].filter((specifier) => !installed.includes(`from '${specifier}'`));
+        const missing = plugins.filter((name) => !installed.includes(`from '${name}'`));
         expect(missing, 'install these on apps/express-demo/kizuna.config.ts').toEqual([]);
     });
 });
