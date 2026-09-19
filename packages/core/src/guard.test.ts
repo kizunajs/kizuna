@@ -14,9 +14,11 @@ import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 
 interface Config {
-    identities: {
-        user: typeof user;
-        member: typeof member;
+    auth: {
+        identities: {
+            user: typeof user;
+            member: typeof member;
+        };
     };
 }
 
@@ -49,9 +51,11 @@ const member = k.identity.apiKey({
 });
 
 const config = {
-    identities: {
-        user,
-        member,
+    auth: {
+        identities: {
+            user,
+            member,
+        },
     },
 };
 
@@ -397,13 +401,17 @@ describe('guard pipeline', () => {
             roles: Kizuna.roles(['viewer', 'editor']),
         });
         const plainConfig = {
-            identities: {
-                viewer,
+            auth: {
+                identities: {
+                    viewer,
+                },
             },
         };
         const plain = new Kizuna<{
-            identities: {
-                viewer: typeof viewer;
+            auth: {
+                identities: {
+                    viewer: typeof viewer;
+                };
             };
         }>();
         const docs = plain.routes({
@@ -703,13 +711,17 @@ describe('guard params and several roles', () => {
     });
 
     const teamKConfig = {
-        identities: {
-            member: teamMember,
+        auth: {
+            identities: {
+                member: teamMember,
+            },
         },
     };
     const teamK = new Kizuna<{
-        identities: {
-            member: typeof teamMember;
+        auth: {
+            identities: {
+                member: typeof teamMember;
+            };
         };
     }>();
 
@@ -792,13 +804,17 @@ describe('custom identity guard', () => {
     });
 
     const inviteKConfig = {
-        identities: {
-            inviteToken,
+        auth: {
+            identities: {
+                inviteToken,
+            },
         },
     };
     const inviteK = new Kizuna<{
-        identities: {
-            inviteToken: typeof inviteToken;
+        auth: {
+            identities: {
+                inviteToken: typeof inviteToken;
+            };
         };
     }>();
 
@@ -912,13 +928,17 @@ describe('permissions within a role', () => {
     });
 
     const grantedConfig = {
-        identities: {
-            analyst,
+        auth: {
+            identities: {
+                analyst,
+            },
         },
     };
     const granted = new Kizuna<{
-        identities: {
-            analyst: typeof analyst;
+        auth: {
+            identities: {
+                analyst: typeof analyst;
+            };
         };
     }>();
 
@@ -1038,13 +1058,17 @@ describe('OAuth tokens', () => {
     });
 
     const oauthConfig = {
-        identities: {
-            partner,
+        auth: {
+            identities: {
+                partner,
+            },
         },
     };
     const oauth = new Kizuna<{
-        identities: {
-            partner: typeof partner;
+        auth: {
+            identities: {
+                partner: typeof partner;
+            };
         };
     }>();
 

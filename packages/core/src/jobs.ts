@@ -3,7 +3,8 @@ import { ProblemDetailsSchema } from './error-response.js';
 import { assertValidSchedule, type JobSchedule } from './schedule.js';
 import type { ResponseDefinition, StreamResponseDefinition } from './types.js';
 import type { HandlerReturn } from './handler-pipeline.js';
-import type { JobRunner as JobRunnerOf } from './job-runner.js';
+import type { JobRunner as JobRunnerOf, JobErrorHandler } from './job-runner.js';
+import type { JobTransport } from './job-transport.js';
 import type { PathClaim } from './path-claims.js';
 
 /**
@@ -45,6 +46,24 @@ export interface JobsConfig {
      * Never dispatch these.
      */
     exclude?: readonly string[];
+}
+
+/**
+ * How a deployment runs the jobs it declares: where the two endpoints sit, what
+ * carries queued work out of the process, and where a failure that happened
+ * after the response went out is reported.
+ */
+export interface JobRunnerConfig extends JobsConfig {
+    /**
+     * Carries a queued job to whatever runs it. Without one, `queue` runs the
+     * job in this process and it is lost on a crash.
+     */
+    transport?: JobTransport;
+    /**
+     * Reached when a job fails after its response was sent, which is the only
+     * point where nothing else can report it.
+     */
+    onError?: JobErrorHandler;
 }
 
 /**

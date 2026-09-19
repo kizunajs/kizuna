@@ -11,16 +11,20 @@ import type { tags } from './tags';
 
 export interface Config {
     tags: typeof tags;
-    identities: {
-        user: typeof user;
-        member: typeof member;
-        inviteToken: typeof inviteToken;
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            user: typeof user;
+            member: typeof member;
+            inviteToken: typeof inviteToken;
+            scheduler: typeof scheduler;
+        };
+        guardSchema: typeof GuardSchema;
     };
     requestContext: {
         analytics: typeof analytics;
     };
-    guardSchema: typeof GuardSchema;
-    issueCodes: 'invalid_phone_number';
+    validation: {
+        issueCodes: 'invalid_phone_number';
+    };
     jobs: typeof jobs;
 }

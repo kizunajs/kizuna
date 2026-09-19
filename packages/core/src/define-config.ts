@@ -6,9 +6,7 @@ import { assertValidDeprecationDates } from './deprecation.js';
 import { assertValidCache } from './cache.js';
 import { injectGuardResponses } from './guard-responses.js';
 import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline.js';
-import { jobClaims, type Jobs, type JobsArg, type JobsConfig } from './jobs.js';
-import type { JobTransport } from './job-transport.js';
-import type { JobErrorHandler } from './job-runner.js';
+import { jobClaims, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
 import type { TagOptions, TagSet } from './tags.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
@@ -185,41 +183,61 @@ export type KizunaConfigInput<
     plugins?: P;
     tags?: TagSet<Tags>;
     /**
-     * The identities routes name under `auth`, each declared with `k.identity`
-     * and carrying the guard that authenticates it.
+     * Who may call this API: the identities a route's `auth` names, and the
+     * body their guards refuse with.
      */
-    identities?: Identities;
+    auth?: {
+        /**
+         * The identities routes name under `auth`, each declared with
+         * `k.identity` and carrying the guard that authenticates it.
+         */
+        identities?: Identities;
+        /**
+         * The body every guard's `deny()` produces, and the body each guarded
+         * route's `401` and `403` carry. Extend `ProblemDetailsSchema`. Every
+         * field you add must be optional or carry a `.default()`, because
+         * kizuna sends this itself when a route's `requires` turns a caller
+         * away.
+         *
+         * @example
+         * guardSchema: ProblemDetailsSchema.extend({
+         *     code: z.enum(['unauthenticated', 'expired_token', 'forbidden']).default('forbidden'),
+         * }),
+         */
+        guardSchema?: GuardSchema & GuardSchemaCheck<GuardSchema>;
+    };
     /**
      * What every route resolves before its guards run, each declared with
      * `k.requestContext` and carrying the resolver that fills it.
      */
     requestContext?: RequestContext;
     /**
-     * The body every guard's `deny()` produces, and the body each guarded
-     * route's `401` and `403` carry. Extend `ProblemDetailsSchema`. Every field
-     * you add must be optional or carry a `.default()`, because kizuna sends
-     * this itself when a route's `requires` turns a caller away.
+     * How a request is checked before a handler sees it.
+     */
+    validation?: {
+        /**
+         * The `code` values `k.issue` may emit, beyond Zod's own.
+         */
+        issueCodes?: readonly Codes[];
+    };
+    /**
+     * How this deployment runs the jobs it declares: where the two endpoints
+     * sit, what carries queued work out of the process, and where a failure is
+     * reported. The jobs themselves are declared with `k.jobs` and go under
+     * `jobs`.
+     */
+    jobRunner?: JobRunnerConfig;
+    /**
+     * What `kizuna generate` writes the `Config` to.
      *
      * @example
-     * guardSchema: ProblemDetailsSchema.extend({
-     *     code: z.enum(['unauthenticated', 'expired_token', 'forbidden']).default('forbidden'),
-     * }),
+     * typescript: {
+     *     outputFile: './kizuna.types.ts',
+     * },
      */
-    guardSchema?: GuardSchema & GuardSchemaCheck<GuardSchema>;
-    /**
-     * The `code` values `k.issue` may emit, beyond Zod's own.
-     */
-    issueCodes?: readonly Codes[];
-    /**
-     * Settings shared by every job. The jobs themselves are declared with `k.jobs`.
-     */
-    jobsConfig?: JobsConfig;
-    /**
-     * Carries a queued job to whatever runs it. Without one, `queue` runs the
-     * job in this process and it is lost on a crash.
-     */
-    jobTransport?: JobTransport;
-    onJobError?: JobErrorHandler;
+    typescript?: {
+        outputFile?: string;
+    };
     /**
      * What `kizuna generate` writes from this API: one entry per generated
      * client.
@@ -276,15 +294,15 @@ export type ConfiguredApi<
  * `api` it hands back mounts onto the adapter's framework.
  *
  * @example
- * export const { api } = defineConfig({
+ * export default defineConfig({
  *     adapter: expressAdapter(),
- *     identities: {
- *         user,
- *     },
  *     routes,
+ *     auth: {
+ *         identities: {
+ *             user,
+ *         },
+ *     },
  * });
- *
- * api.mount(app);
  */
 export const defineConfig = <
     const R extends Routes,
@@ -301,18 +319,20 @@ export const defineConfig = <
 ): {
     api: ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
     clients: readonly ClientTarget[];
+    typescript: { outputFile?: string } | undefined;
 } => {
-    if (options.guardSchema) assertFillableGuardSchema(options.guardSchema);
+    const guardSchema = options.auth?.guardSchema;
+    if (guardSchema) assertFillableGuardSchema(guardSchema);
 
     const routes = options.routes as Routes;
     const jobs = options.jobs as Jobs | undefined;
-    const identities = options.identities as Record<string, SecurityScheme> | undefined;
+    const identities = options.auth?.identities as Record<string, SecurityScheme> | undefined;
     const plugins = pluginsBySlug(options.plugins);
 
     assertNoPathCollisions([
         ...routeClaims(routes),
         ...routeClaims(pluginRouteTree(plugins), 'Plugin route'),
-        ...jobClaims(jobs, options.jobsConfig),
+        ...jobClaims(jobs, options.jobRunner),
     ]);
     assertValidDeprecationDates(routes);
     assertValidDeprecationDates(pluginRouteTree(plugins));
@@ -331,7 +351,7 @@ export const defineConfig = <
         resolveRouteAuth(route, route.auth, identities, routeKey);
     }
     // After every route's `auth` resolves, so both of these can read `security`.
-    injectGuardResponses(routes, identities, options.guardSchema);
+    injectGuardResponses(routes, identities, guardSchema);
     assertValidCache(routes);
     assertValidCache(pluginRouteTree(plugins));
 
@@ -340,11 +360,11 @@ export const defineConfig = <
         jobs,
         tags: options.tags as TagSet<Record<string, TagOptions>> | undefined,
         securitySchemes: identities,
-        guardSchema: options.guardSchema,
+        guardSchema,
         requestContext: options.requestContext as Record<string, RequestContextSchema> | undefined,
-        validation: options.issueCodes ? { issueCodes: options.issueCodes } : undefined,
+        validation: options.validation?.issueCodes ? { issueCodes: options.validation.issueCodes } : undefined,
         plugins,
-        jobsConfig: options.jobsConfig,
+        jobsConfig: options.jobRunner,
     }) as Contract;
 
     const guards = handlersOf(identities, GUARD);
@@ -360,8 +380,8 @@ export const defineConfig = <
         {
             guards,
             requestContext: handlersOf(options.requestContext as Record<string, unknown> | undefined, RESOLVER),
-            jobTransport: options.jobTransport,
-            onJobError: options.onJobError,
+            jobTransport: options.jobRunner?.transport,
+            onJobError: options.jobRunner?.onError,
         },
         options.adapter
     ) as unknown as ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
@@ -369,5 +389,6 @@ export const defineConfig = <
     return {
         api,
         clients: options.clients ?? [],
+        typescript: options.typescript,
     };
 };

@@ -20,10 +20,12 @@ import { expressAdapter, type ExpressHandlerContext } from './server.js';
 
 interface LocalConfig {
     adapter: ReturnType<typeof expressAdapter>;
-    identities: {
-        user: typeof localUser;
-        member: typeof localMember;
-        apiConsumer: typeof localApiConsumer;
+    auth: {
+        identities: {
+            user: typeof localUser;
+            member: typeof localMember;
+            apiConsumer: typeof localApiConsumer;
+        };
     };
     requestContext: {
         analytics: typeof localAnalytics;

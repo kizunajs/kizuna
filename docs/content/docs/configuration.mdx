@@ -17,8 +17,10 @@ import { user } from './src/identities';
 export default defineConfig({
     adapter: expressAdapter(),
     routes,
-    identities: {
-        user,
+    auth: {
+        identities: {
+            user,
+        },
     },
     clients: [
         swiftClient({
@@ -123,7 +125,19 @@ It writes two things from `kizuna.config.ts`: the `Config` in `kizuna.types.ts`,
 | ---------- | ------------------ | --------------------------------------------------------------------------------------- |
 | `--check`  | off                | Report what would be rewritten and write nothing. See [below](#kizuna-generate---check) |
 | `--config` | `kizuna.config.ts` | The config to read                                                                      |
-| `--types`  | beside the config  | Where `kizuna.types.ts` is written                                                      |
+| `--types`  | the config's own   | Where the `Config` is written, overriding `typescript.outputFile`                       |
+
+Where the types land is usually the config's business rather than the command's:
+
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    typescript: {
+        outputFile: './src/kizuna.types.ts',
+    },
+});
+```
 
 Add it to your `package.json` and run it after changing the config:
 
@@ -152,13 +166,15 @@ import type { tags, user } from '@my-repo/api';
 export interface Config {
     adapter: ReturnType<typeof expressAdapter>;
     tags: typeof tags;
-    identities: {
-        user: typeof user;
+    auth: {
+        identities: {
+            user: typeof user;
+        };
     };
 }
 ```
 
-It carries `adapter`, `tags`, `identities`, `requestContext`, `guardSchema`, `issueCodes`, `jobs` and `plugins`. Your `routes` stay out: they are read at runtime, and typing against them would make the config a prerequisite for declaring the routes it serves.
+It carries `adapter`, `tags`, `auth`, `requestContext`, `validation`, `jobs` and `plugins`. Your `routes` stay out: they are read at runtime, and typing against them would make the config a prerequisite for declaring the routes it serves.
 
 Point `new Kizuna<Config>()` at it once and every name you write is checked against it:
 

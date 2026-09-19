@@ -25,10 +25,12 @@ interface SessionEnv extends Env {
 
 interface LocalConfig {
     adapter: ReturnType<typeof honoAdapter>;
-    identities: {
-        user: typeof localUser;
-        member: typeof localMember;
-        apiConsumer: typeof localApiConsumer;
+    auth: {
+        identities: {
+            user: typeof localUser;
+            member: typeof localMember;
+            apiConsumer: typeof localApiConsumer;
+        };
     };
     requestContext: {
         analytics: typeof localAnalytics;

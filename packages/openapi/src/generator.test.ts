@@ -1835,17 +1835,21 @@ describe('security from the contract', () => {
 
     const makeSecuredContract = () => {
         const securedKConfig = {
-            identities: {
-                user,
-                member,
-                partner,
+            auth: {
+                identities: {
+                    user,
+                    member,
+                    partner,
+                },
             },
         };
         const securedK = new Kizuna<{
-            identities: {
-                user: typeof user;
-                member: typeof member;
-                partner: typeof partner;
+            auth: {
+                identities: {
+                    user: typeof user;
+                    member: typeof member;
+                    partner: typeof partner;
+                };
             };
         }>();
         const routes = securedK.routes({
@@ -2021,13 +2025,17 @@ describe('security from the contract', () => {
 
     it('emits security resolved through a nested cascade', () => {
         const nestedKConfig = {
-            identities: {
-                user,
+            auth: {
+                identities: {
+                    user,
+                },
             },
         };
         const nestedK = new Kizuna<{
-            identities: {
-                user: typeof user;
+            auth: {
+                identities: {
+                    user: typeof user;
+                };
             };
         }>();
         const members = nestedK.routes({
@@ -2102,15 +2110,19 @@ describe('shared scheme names', () => {
             }),
         });
         const sharedKConfig = {
-            identities: {
-                admin,
-                viewer,
+            auth: {
+                identities: {
+                    admin,
+                    viewer,
+                },
             },
         };
         const sharedK = new Kizuna<{
-            identities: {
-                admin: typeof admin;
-                viewer: typeof viewer;
+            auth: {
+                identities: {
+                    admin: typeof admin;
+                    viewer: typeof viewer;
+                };
             };
         }>();
         const routes = sharedK.routes({
@@ -2176,15 +2188,19 @@ describe('custom identities (no OpenAPI scheme)', () => {
 
     const makeContract = () => {
         const customKConfig = {
-            identities: {
-                user,
-                inviteToken,
+            auth: {
+                identities: {
+                    user,
+                    inviteToken,
+                },
             },
         };
         const customK = new Kizuna<{
-            identities: {
-                user: typeof user;
-                inviteToken: typeof inviteToken;
+            auth: {
+                identities: {
+                    user: typeof user;
+                    inviteToken: typeof inviteToken;
+                };
             };
         }>();
         const routes = customK.routes({

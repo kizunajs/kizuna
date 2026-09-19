@@ -5,8 +5,10 @@ import { defineConfig } from '@ts-kizuna/core';
 import { renderOpenApi } from './generator.js';
 
 interface Config {
-    identities: {
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            scheduler: typeof scheduler;
+        };
     };
 }
 
@@ -15,8 +17,10 @@ const k = new Kizuna<Config>();
 const scheduler = k.identity.bearer({});
 
 const config = {
-    identities: {
-        scheduler,
+    auth: {
+        identities: {
+            scheduler,
+        },
     },
 };
 

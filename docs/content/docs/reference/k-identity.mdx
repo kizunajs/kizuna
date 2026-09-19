@@ -171,11 +171,13 @@ import { routes } from './src/routes';
 
 export default defineConfig({
     adapter: expressAdapter(),
-    identities: {
-        user,
-        member,
-    },
     routes,
+    auth: {
+        identities: {
+            user,
+            member,
+        },
+    },
 });
 ```
 

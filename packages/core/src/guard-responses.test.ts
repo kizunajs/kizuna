@@ -6,9 +6,11 @@ import { ProblemDetailsSchema } from './error-response.js';
 import type { RouteDefinition } from './types.js';
 
 interface Config {
-    identities: {
-        user: typeof user;
-        member: typeof member;
+    auth: {
+        identities: {
+            user: typeof user;
+            member: typeof member;
+        };
     };
 }
 
@@ -29,9 +31,11 @@ const member = k.identity.apiKey({
 });
 
 const config = {
-    identities: {
-        user,
-        member,
+    auth: {
+        identities: {
+            user,
+            member,
+        },
     },
 };
 
@@ -241,16 +245,20 @@ describe('a contract that declares a guardSchema', () => {
         }),
     });
     const scopedConfig = {
-        identities: {
-            user: scopedUser,
+        auth: {
+            identities: {
+                user: scopedUser,
+            },
+            guardSchema: GuardSchema,
         },
-        guardSchema: GuardSchema,
     };
     const scoped = new Kizuna<{
-        identities: {
-            user: typeof scopedUser;
+        auth: {
+            identities: {
+                user: typeof scopedUser;
+            };
+            guardSchema: typeof GuardSchema;
         };
-        guardSchema: typeof GuardSchema;
     }>();
 
     const build = () =>
@@ -281,9 +289,11 @@ describe('a contract that declares a guardSchema', () => {
         expect(() =>
             defineConfig({
                 routes: {},
-                guardSchema: z.object({
-                    reason: z.string(),
-                }) as never,
+                auth: {
+                    guardSchema: z.object({
+                        reason: z.string(),
+                    }) as never,
+                },
             })
         ).toThrow(/must extend `ProblemDetailsSchema`/);
     });
@@ -292,9 +302,11 @@ describe('a contract that declares a guardSchema', () => {
         expect(() =>
             defineConfig({
                 routes: {},
-                guardSchema: ProblemDetailsSchema.extend({
-                    code: z.string(),
-                }),
+                auth: {
+                    guardSchema: ProblemDetailsSchema.extend({
+                        code: z.string(),
+                    }),
+                },
             })
         ).toThrow(/`.optional\(\)` or a `.default\(\)`/);
     });

@@ -9,9 +9,11 @@ interface Config {
 }
 
 interface SecuredKConfig {
-    identities: {
-        user: typeof userIdentity;
-        member: typeof memberIdentity;
+    auth: {
+        identities: {
+            user: typeof userIdentity;
+            member: typeof memberIdentity;
+        };
     };
 }
 
@@ -283,9 +285,11 @@ const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | '
 ]);
 
 const securedKConfig = {
-    identities: {
-        user: userIdentity,
-        member: memberIdentity,
+    auth: {
+        identities: {
+            user: userIdentity,
+            member: memberIdentity,
+        },
     },
 };
 

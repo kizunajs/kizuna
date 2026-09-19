@@ -251,13 +251,17 @@ describe('assertValidCache', () => {
     test('a public scope on a route behind authentication is rejected', () => {
         const user = k.identity.bearer({});
         const securedConfig = {
-            identities: {
-                user,
+            auth: {
+                identities: {
+                    user,
+                },
             },
         };
         const secured = new Kizuna<{
-            identities: {
-                user: typeof user;
+            auth: {
+                identities: {
+                    user: typeof user;
+                };
             };
         }>();
         const routes = secured.routes('users', {

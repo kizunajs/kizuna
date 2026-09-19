@@ -5,8 +5,10 @@ import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 
 interface Config {
-    identities: {
-        user: typeof user;
+    auth: {
+        identities: {
+            user: typeof user;
+        };
     };
     requestContext: {
         analytics: typeof kAnalytics;
@@ -27,8 +29,10 @@ const kAnalytics = k.requestContext(
     })
 );
 const config = {
-    identities: {
-        user,
+    auth: {
+        identities: {
+            user,
+        },
     },
     requestContext: {
         analytics: kAnalytics,

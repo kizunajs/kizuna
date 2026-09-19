@@ -2,9 +2,11 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 
 interface Config {
-    identities: {
-        user: typeof user;
-        member: typeof member;
+    auth: {
+        identities: {
+            user: typeof user;
+            member: typeof member;
+        };
     };
 }
 

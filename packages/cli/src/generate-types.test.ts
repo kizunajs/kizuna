@@ -41,19 +41,24 @@ export default defineConfig({
         expect(types).not.toContain('@ts-kizuna/swift');
     });
 
-    it('expands identities and request context per key', () => {
+    it('nests the identities under auth, and expands each one', () => {
         const types = generateConfigTypes(`
 import { defineConfig } from '@ts-kizuna/core';
 import { user, member } from './src/identities';
 import { analytics } from './src/request-context';
+import { GuardSchema } from './src/guard-schema';
 
 export default defineConfig({
-    identities: { user, member },
+    auth: {
+        identities: { user, member },
+        guardSchema: GuardSchema,
+    },
     requestContext: { analytics },
 });
 `);
-        expect(types).toContain('        user: typeof user;');
-        expect(types).toContain('        member: typeof member;');
+        expect(types).toContain('            user: typeof user;');
+        expect(types).toContain('            member: typeof member;');
+        expect(types).toContain('        guardSchema: typeof GuardSchema;');
         expect(types).toContain('        analytics: typeof analytics;');
     });
 
@@ -62,7 +67,9 @@ export default defineConfig({
 import { defineConfig } from '@ts-kizuna/core';
 
 export default defineConfig({
-    issueCodes: ['invalid_phone_number', 'unreachable_host'],
+    validation: {
+        issueCodes: ['invalid_phone_number', 'unreachable_host'],
+    },
 });
 `);
         expect(types).toContain("issueCodes: 'invalid_phone_number' | 'unreachable_host';");
@@ -120,7 +127,7 @@ export default config;
 import { defineConfig } from '@ts-kizuna/core';
 import { codes } from './codes';
 
-export default defineConfig({ issueCodes: codes });
+export default defineConfig({ validation: { issueCodes: codes } });
 `)
         ).toThrow(/array of string literals/);
     });

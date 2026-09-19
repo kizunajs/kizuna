@@ -957,13 +957,17 @@ describe('MCP server: guards', () => {
     });
 
     const securedKConfig = {
-        identities: {
-            user,
+        auth: {
+            identities: {
+                user,
+            },
         },
     };
     const securedK = new Kizuna<{
-        identities: {
-            user: typeof user;
+        auth: {
+            identities: {
+                user: typeof user;
+            };
         };
     }>();
 
@@ -1269,16 +1273,20 @@ describe('MCP server: request context in guards', () => {
         }),
     });
     const contextKConfig = {
-        identities: {
-            user,
+        auth: {
+            identities: {
+                user,
+            },
         },
         requestContext: {
             analytics: contextKAnalytics,
         },
     };
     const contextK = new Kizuna<{
-        identities: {
-            user: typeof user;
+        auth: {
+            identities: {
+                user: typeof user;
+            };
         };
         requestContext: {
             analytics: typeof contextKAnalytics;

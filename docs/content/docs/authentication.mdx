@@ -177,8 +177,10 @@ import { user } from './src/identities';
 export default defineConfig({
     adapter: expressAdapter(),
     routes,
-    identities: {
-        user,
+    auth: {
+        identities: {
+            user,
+        },
     },
 });
 ```
@@ -261,11 +263,13 @@ export const GuardSchema = Kizuna.model({
 export default defineConfig({
     adapter: expressAdapter(),
     routes,
-    identities: {
-        user,
-        member,
+    auth: {
+        identities: {
+            user,
+            member,
+        },
+        guardSchema: GuardSchema,
     },
-    guardSchema: GuardSchema,
 });
 ```
 

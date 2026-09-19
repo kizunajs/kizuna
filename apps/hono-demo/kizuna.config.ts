@@ -16,17 +16,21 @@ const served = {
 export default defineConfig({
     adapter: honoAdapter(),
     tags,
-    identities: {
-        user,
-        member,
-        inviteToken,
-        scheduler,
+    auth: {
+        identities: {
+            user,
+            member,
+            inviteToken,
+            scheduler,
+        },
+        guardSchema: GuardSchema,
     },
     requestContext: {
         analytics,
     },
-    guardSchema: GuardSchema,
-    issueCodes: ['invalid_phone_number'],
+    validation: {
+        issueCodes: ['invalid_phone_number'],
+    },
     routes: served,
     jobs,
     plugins: [
@@ -37,7 +41,6 @@ export default defineConfig({
             info: {
                 title: 'ts-kizuna demo',
                 version: '1.0.0',
-                description: 'The ts-kizuna user API, shared by every adapter demo.',
             },
             setOperationId: true,
             docsPath: '/docs',

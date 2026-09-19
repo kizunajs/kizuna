@@ -7,8 +7,10 @@ import { defineConfig } from '@ts-kizuna/core';
 
 interface Config {
     adapter: ReturnType<typeof nextAdapter>;
-    identities: {
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            scheduler: typeof scheduler;
+        };
     };
 }
 
@@ -32,8 +34,10 @@ const scheduler = k.identity
     );
 
 const config = {
-    identities: {
-        scheduler,
+    auth: {
+        identities: {
+            scheduler,
+        },
     },
 };
 

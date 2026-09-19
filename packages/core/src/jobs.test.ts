@@ -6,8 +6,10 @@ import { isCompiledJob, isJobDefinition } from './jobs.js';
 import { cron } from './schedule.js';
 
 interface Config {
-    identities: {
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            scheduler: typeof scheduler;
+        };
     };
 }
 
@@ -18,8 +20,10 @@ const scheduler = k.identity.bearer({
 });
 
 const config = {
-    identities: {
-        scheduler,
+    auth: {
+        identities: {
+            scheduler,
+        },
     },
 };
 
@@ -356,16 +360,20 @@ describe('a job endpoint colliding with a route', () => {
     it('accepts the same route once the endpoints are moved', () => {
         const movedPath: `/${string}` = '/internal/tick';
         const movedConfig = {
-            identities: {
-                scheduler,
+            auth: {
+                identities: {
+                    scheduler,
+                },
             },
-            jobsConfig: {
+            jobRunner: {
                 path: movedPath,
             },
         };
         const moved = new Kizuna<{
-            identities: {
-                scheduler: typeof scheduler;
+            auth: {
+                identities: {
+                    scheduler: typeof scheduler;
+                };
             };
         }>();
         expect(

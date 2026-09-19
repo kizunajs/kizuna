@@ -2056,14 +2056,18 @@ describe('Swift generator: the statuses the auth map adds', () => {
     });
     const guardedKConfig = {
         tags: guardedKTags,
-        identities: {
-            user: guardedKUser,
+        auth: {
+            identities: {
+                user: guardedKUser,
+            },
         },
     };
     const guardedK = new Kizuna<{
         tags: typeof guardedKTags;
-        identities: {
-            user: typeof guardedKUser;
+        auth: {
+            identities: {
+                user: typeof guardedKUser;
+            };
         };
     }>();
 

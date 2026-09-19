@@ -33,7 +33,9 @@ export default defineConfig({
     adapter: expressAdapter(),
     routes,
     jobs,
-    jobTransport: myQueue,
+    jobRunner: {
+        transport: myQueue,
+    },
 });
 ```
 
@@ -191,11 +193,13 @@ export default defineConfig({
     adapter: nextAdapter(),
     routes,
     jobs,
-    jobTransport: qstash({
-        token: process.env.QSTASH_TOKEN,
-        baseUrl: 'https://api.example.com',
-        schedulerSecret: process.env.CRON_SECRET,
-    }),
+    jobRunner: {
+        transport: qstash({
+            token: process.env.QSTASH_TOKEN,
+            baseUrl: 'https://api.example.com',
+            schedulerSecret: process.env.CRON_SECRET,
+        }),
+    },
 });
 ```
 

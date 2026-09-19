@@ -8,8 +8,10 @@ import { HANDLER } from './types.js';
 
 interface Config {
     adapter: typeof probeAdapter;
-    identities: {
-        user: typeof user;
+    auth: {
+        identities: {
+            user: typeof user;
+        };
     };
 }
 
@@ -49,8 +51,10 @@ const user = k.identity
 
 const config = {
     adapter: probeAdapter,
-    identities: {
-        user,
+    auth: {
+        identities: {
+            user,
+        },
     },
 };
 

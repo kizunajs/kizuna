@@ -6,8 +6,10 @@ import type { Contract } from './contract.js';
 import { dispatchDueJobs, dispatchSucceeded, dueJobs } from './job-dispatch.js';
 
 interface Config {
-    identities: {
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            scheduler: typeof scheduler;
+        };
     };
 }
 
@@ -16,8 +18,10 @@ const k = new Kizuna<Config>();
 const scheduler = k.identity.bearer({});
 
 const config = {
-    identities: {
-        scheduler,
+    auth: {
+        identities: {
+            scheduler,
+        },
     },
 };
 

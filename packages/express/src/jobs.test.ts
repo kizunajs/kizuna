@@ -13,8 +13,10 @@ let failing = false;
 interface Config {
     jobs: typeof jobs;
     adapter: ReturnType<typeof expressAdapter>;
-    identities: {
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            scheduler: typeof scheduler;
+        };
     };
 }
 
@@ -38,8 +40,10 @@ const scheduler = k.identity
     );
 
 const config = {
-    identities: {
-        scheduler,
+    auth: {
+        identities: {
+            scheduler,
+        },
     },
 };
 
@@ -352,7 +356,9 @@ describe('onJobError', () => {
                     })
                     .handler(() => {}),
             }),
-            onJobError,
+            jobRunner: {
+                onError: onJobError,
+            },
         });
         const app = express();
         app.use(express.json());

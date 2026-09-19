@@ -2011,8 +2011,10 @@ describe('Kotlin generator: the statuses the auth map adds', () => {
         }),
     });
     const guardedKConfig = {
-        identities: {
-            user: guardedKUser,
+        auth: {
+            identities: {
+                user: guardedKUser,
+            },
         },
     };
 

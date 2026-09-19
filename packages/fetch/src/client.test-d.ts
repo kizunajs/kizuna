@@ -23,16 +23,20 @@ interface RequiredCtxKConfig {
 }
 
 interface GuardedKConfig {
-    identities: {
-        user: typeof guardedKUser;
+    auth: {
+        identities: {
+            user: typeof guardedKUser;
+        };
     };
 }
 
 interface CodedKConfig {
-    identities: {
-        user: typeof codedKUser;
+    auth: {
+        identities: {
+            user: typeof codedKUser;
+        };
+        guardSchema: typeof codedKGuardSchema;
     };
-    guardSchema: typeof codedKGuardSchema;
 }
 
 const k = new Kizuna<Config>();
@@ -913,8 +917,10 @@ const guardedKUser = k.identity.bearer({
     }),
 });
 const guardedKConfig = {
-    identities: {
-        user: guardedKUser,
+    auth: {
+        identities: {
+            user: guardedKUser,
+        },
     },
 };
 
@@ -998,10 +1004,12 @@ const codedKGuardSchema = ProblemDetailsSchema.extend({
     code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
 });
 const codedKConfig = {
-    identities: {
-        user: codedKUser,
+    auth: {
+        identities: {
+            user: codedKUser,
+        },
+        guardSchema: codedKGuardSchema,
     },
-    guardSchema: codedKGuardSchema,
 };
 
 const codedContract = defineConfig({

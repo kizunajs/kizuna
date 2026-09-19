@@ -16,7 +16,8 @@ Options:
   --check           Report what would be rewritten and write nothing. Exits 1
                     when anything is behind, for a pipeline to fail on.
   --config <path>   Path to the config. Default: kizuna.config.ts
-  --types <path>    Where kizuna.types.ts is written. Default: beside the config.
+  --types <path>    Where kizuna.types.ts is written. Beats the config's
+                    typescript.outputFile. Default: beside the config.
 `;
 
 /**
@@ -37,14 +38,16 @@ const die: (message: string, code?: number) => never = (message, code = 1) => {
  * The config's own default export, loaded with jiti so a `.ts` config needs no
  * build step.
  */
-const loadConfig = async (configPath: string): Promise<{ api: Contract; clients: readonly ClientTarget[] }> => {
+const loadConfig = async (
+    configPath: string
+): Promise<{ api: Contract; clients: readonly ClientTarget[]; typesOutput: string | undefined }> => {
     const jiti = createJiti(import.meta.url, {
         interopDefault: true,
     });
     const loaded = (await jiti.import(configPath)) as Record<string, unknown>;
     const [entry] = apiEntries(loaded);
     if (!entry) die(`No config found at ${configPath}. A kizuna config default-exports its \`defineConfig(...)\` call.`);
-    return { api: entry[1].api, clients: entry[1].clients ?? [] };
+    return { api: entry[1].api, clients: entry[1].clients ?? [], typesOutput: entry[1].typescript?.outputFile };
 };
 
 const main = async (): Promise<void> => {
@@ -74,8 +77,6 @@ const main = async (): Promise<void> => {
     if (!existsSync(configPath)) {
         die(`No config at ${displayPath(configPath)}. Pass --config to point at one.`);
     }
-    const typesPath = values.types ? resolve(process.cwd(), values.types) : resolve(dirname(configPath), 'kizuna.types.ts');
-
     let types: string;
     try {
         types = generateConfigTypes(readFileSync(configPath, 'utf8'), configPath);
@@ -84,9 +85,11 @@ const main = async (): Promise<void> => {
         throw error;
     }
 
+    const config = await loadConfig(configPath);
+    // `--types` beats the config, which beats the file beside the config.
+    const typesPath = resolve(dirname(configPath), values.types ?? config.typesOutput ?? 'kizuna.types.ts');
     const typesCurrent = existsSync(typesPath) ? readFileSync(typesPath, 'utf8') : undefined;
     const typesBehind = typesCurrent !== types;
-    const config = await loadConfig(configPath);
 
     if (values.check) {
         const stale = checkClients(config.api, config.clients);

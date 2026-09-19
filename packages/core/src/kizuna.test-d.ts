@@ -15,15 +15,19 @@ import { defineConfig } from './define-config.js';
 import { type CredentialOf } from './identity.js';
 
 interface Config {
-    identities: {
-        user: typeof user;
-        member: typeof member;
+    auth: {
+        identities: {
+            user: typeof user;
+            member: typeof member;
+        };
     };
 }
 
 interface InviteKConfig {
-    identities: {
-        inviteToken: typeof inviteToken;
+    auth: {
+        identities: {
+            inviteToken: typeof inviteToken;
+        };
     };
 }
 
@@ -60,9 +64,11 @@ type MemberRole = 'owner' | 'admin' | readonly ('owner' | 'admin')[];
 type MemberPermission = 'workspace:read' | 'workspace:delete';
 
 const config = {
-    identities: {
-        user,
-        member,
+    auth: {
+        identities: {
+            user,
+            member,
+        },
     },
 };
 
@@ -144,13 +150,17 @@ test('roles from names give the handler a role and no permissions', () => {
         roles: Kizuna.roles(['viewer', 'editor']),
     });
     const plainConfig = {
-        identities: {
-            viewer,
+        auth: {
+            identities: {
+                viewer,
+            },
         },
     };
     const plain = new Kizuna<{
-        identities: {
-            viewer: typeof viewer;
+        auth: {
+            identities: {
+                viewer: typeof viewer;
+            };
         };
     }>();
     const docs = plain.routes({
@@ -498,8 +508,10 @@ const inviteToken = k.identity.custom({
 });
 
 const inviteKConfig = {
-    identities: {
-        inviteToken,
+    auth: {
+        identities: {
+            inviteToken,
+        },
     },
 };
 

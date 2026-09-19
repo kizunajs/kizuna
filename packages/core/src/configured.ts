@@ -19,7 +19,7 @@ import type { z } from 'zod';
  * export interface Config {
  *     adapter: ReturnType<typeof expressAdapter>;
  *     tags: typeof tags;
- *     identities: { user: typeof user };
+ *     auth: { identities: { user: typeof user } };
  *     jobs: typeof jobs;
  * }
  * ```
@@ -27,10 +27,14 @@ import type { z } from 'zod';
 export interface KizunaConfigShape {
     adapter?: unknown;
     tags?: unknown;
-    identities?: unknown;
+    auth?: {
+        identities?: unknown;
+        guardSchema?: unknown;
+    };
     requestContext?: unknown;
-    guardSchema?: unknown;
-    issueCodes?: string;
+    validation?: {
+        issueCodes?: string;
+    };
     jobs?: unknown;
     plugins?: unknown;
 }
@@ -65,8 +69,8 @@ export type JobsOfTree<Tree> = {
 export type ConfiguredTags<Config> = Config extends { tags: TagSet<infer Tags extends Record<string, TagOptions>> }
     ? Tags
     : Record<string, never>;
-export type ConfiguredCodes<Config> = Config extends { issueCodes: infer Codes extends string } ? Codes : never;
-export type ConfiguredIdentities<Config> = Config extends { identities: infer Identities extends Record<string, SecurityScheme> }
+export type ConfiguredCodes<Config> = Config extends { validation: { issueCodes: infer Codes extends string } } ? Codes : never;
+export type ConfiguredIdentities<Config> = Config extends { auth: { identities: infer Identities extends Record<string, SecurityScheme> } }
     ? Identities
     : Record<string, never>;
 export type ConfiguredRequestContextSchemas<Config> = Config extends {
@@ -74,7 +78,7 @@ export type ConfiguredRequestContextSchemas<Config> = Config extends {
 }
     ? Declarations
     : Record<string, never>;
-export type ConfiguredGuardSchema<Config> = Config extends { guardSchema: infer Schema extends z.ZodType } ? Schema : undefined;
+export type ConfiguredGuardSchema<Config> = Config extends { auth: { guardSchema: infer Schema extends z.ZodType } } ? Schema : undefined;
 export type ConfiguredAdapterValue<Config> = Config extends { adapter: infer Adapter extends AnyAdapter } ? Adapter : undefined;
 
 export type ConfiguredJobs<Config> = Config extends { jobs: infer Tree } ? { jobs: JobsOfTree<Tree> } : {};

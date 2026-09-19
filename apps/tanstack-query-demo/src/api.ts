@@ -5,17 +5,21 @@ import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, 
 
 const { api: contract } = defineConfig({
     tags,
-    identities: {
-        user,
-        member,
-        inviteToken,
-        scheduler,
+    auth: {
+        identities: {
+            user,
+            member,
+            inviteToken,
+            scheduler,
+        },
+        guardSchema: GuardSchema,
     },
     requestContext: {
         analytics,
     },
-    guardSchema: GuardSchema,
-    issueCodes: ['invalid_phone_number'],
+    validation: {
+        issueCodes: ['invalid_phone_number'],
+    },
     routes,
     jobs,
 });

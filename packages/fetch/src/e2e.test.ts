@@ -14,10 +14,12 @@ interface Config {
 }
 
 interface SecuredKConfig {
-    identities: {
-        user: typeof userIdentity;
+    auth: {
+        identities: {
+            user: typeof userIdentity;
+        };
+        guardSchema: typeof securedKGuardSchema;
     };
-    guardSchema: typeof securedKGuardSchema;
 }
 
 const k = new Kizuna<Config>();
@@ -263,10 +265,12 @@ const securedKGuardSchema = ProblemDetailsSchema.extend({
     code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
 });
 const securedKConfig = {
-    identities: {
-        user: userIdentity,
+    auth: {
+        identities: {
+            user: userIdentity,
+        },
+        guardSchema: securedKGuardSchema,
     },
-    guardSchema: securedKGuardSchema,
 };
 
 const securedRoutes = securedK.routes({

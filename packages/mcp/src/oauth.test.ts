@@ -12,9 +12,11 @@ import { assertCanonicalResource, protectedResourceMetadataPath, protectedResour
 
 interface Config {
     tags: typeof kTags;
-    identities: {
-        user: typeof user;
-        member: typeof member;
+    auth: {
+        identities: {
+            user: typeof user;
+            member: typeof member;
+        };
     };
     requestContext: {
         analytics: typeof kAnalytics;
@@ -150,9 +152,11 @@ const kAnalytics = k
     }));
 const config = {
     tags: kTags,
-    identities: {
-        user,
-        member,
+    auth: {
+        identities: {
+            user,
+            member,
+        },
     },
     requestContext: {
         analytics: kAnalytics,

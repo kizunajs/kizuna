@@ -11,17 +11,21 @@ import type { GuardSchema, analytics, jobs, tags, user, member, inviteToken, sch
 export interface Config {
     adapter: ReturnType<typeof fastifyAdapter>;
     tags: typeof tags;
-    identities: {
-        user: typeof user;
-        member: typeof member;
-        inviteToken: typeof inviteToken;
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            user: typeof user;
+            member: typeof member;
+            inviteToken: typeof inviteToken;
+            scheduler: typeof scheduler;
+        };
+        guardSchema: typeof GuardSchema;
     };
     requestContext: {
         analytics: typeof analytics;
     };
-    guardSchema: typeof GuardSchema;
-    issueCodes: 'invalid_phone_number';
+    validation: {
+        issueCodes: 'invalid_phone_number';
+    };
     jobs: typeof jobs;
     plugins: [ReturnType<typeof mcpPlugin>, ReturnType<typeof openApiPlugin>];
 }

@@ -18,10 +18,12 @@ import { fastifyAdapter, type FastifyHandlerContext, type FastifyPreHandler } fr
 
 interface LocalConfig {
     adapter: ReturnType<typeof fastifyAdapter>;
-    identities: {
-        user: typeof localUser;
-        member: typeof localMember;
-        apiConsumer: typeof localApiConsumer;
+    auth: {
+        identities: {
+            user: typeof localUser;
+            member: typeof localMember;
+            apiConsumer: typeof localApiConsumer;
+        };
     };
     requestContext: {
         analytics: typeof localAnalytics;

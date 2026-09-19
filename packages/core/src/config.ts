@@ -29,6 +29,13 @@ export interface ClientTarget {
 export interface ApiEntry {
     api: Contract;
     clients?: readonly ClientTarget[];
+    /**
+     * Where `kizuna generate` writes the `Config`. Absent when the config says
+     * nothing, and the command falls back to `kizuna.types.ts` beside it.
+     */
+    typescript?: {
+        outputFile?: string;
+    };
 }
 
 /**
@@ -44,6 +51,7 @@ export const apiEntries = (module: Record<string, unknown>): [string, ApiEntry][
             {
                 api: config.api,
                 clients: config.clients ?? [],
+                typescript: config.typescript,
             },
         ],
     ];

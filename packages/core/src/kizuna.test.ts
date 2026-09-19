@@ -6,9 +6,11 @@ import { defineConfig } from './define-config.js';
 import { createPlugin } from './plugin.js';
 
 interface Config {
-    identities: {
-        user: typeof user;
-        member: typeof member;
+    auth: {
+        identities: {
+            user: typeof user;
+            member: typeof member;
+        };
     };
 }
 
@@ -63,10 +65,12 @@ const routeDefinition = (auth: Auth, path: `/${string}` = '/workspace') => ({
  */
 const resolve = (auth: Auth): RouteDefinition => {
     const config = {
-        identities,
+        auth: {
+            identities,
+        },
     };
     const k = new Kizuna<{
-        identities: typeof identities;
+        auth: { identities: typeof identities };
     }>();
     const route = routeDefinition(auth);
     defineConfig({
@@ -138,10 +142,12 @@ describe('a route resolving its auth', () => {
 
     it('resolves the same route again without keeping what the last one set', () => {
         const k2Config = {
-            identities,
+            auth: {
+                identities,
+            },
         };
         const k2 = new Kizuna<{
-            identities: typeof identities;
+            auth: { identities: typeof identities };
         }>();
         const route = routeDefinition({
             identity: 'member',
@@ -227,10 +233,12 @@ describe('an auth the identities do not support', () => {
 describe('a route that declares no auth', () => {
     it('is refused when the instance declares an identity', () => {
         const k3Config = {
-            identities,
+            auth: {
+                identities,
+            },
         };
         const k3 = new Kizuna<{
-            identities: typeof identities;
+            auth: { identities: typeof identities };
         }>();
 
         expect(

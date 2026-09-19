@@ -6,8 +6,10 @@ import { HANDLER_ARG_KEYS, adapterContextOf, assembleApi, createAdapter, type Ad
 
 interface Config {
     tags: typeof kTags;
-    identities: {
-        user: typeof kUser;
+    auth: {
+        identities: {
+            user: typeof kUser;
+        };
     };
     requestContext: {
         analytics: typeof kAnalytics;
@@ -31,8 +33,10 @@ const kAnalytics = k.requestContext({
 });
 const config = {
     tags: kTags,
-    identities: {
-        user: kUser,
+    auth: {
+        identities: {
+            user: kUser,
+        },
     },
     requestContext: {
         analytics: kAnalytics,

@@ -5,8 +5,10 @@ import { defineConfig } from './define-config.js';
 import type { JobHandlerArgs, JobHandlerReturn, JobHandlers } from './jobs.js';
 
 interface Config {
-    identities: {
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            scheduler: typeof scheduler;
+        };
     };
     requestContext: {
         analytics: typeof analytics;
@@ -28,8 +30,10 @@ const analytics = k.requestContext(
 );
 
 const config = {
-    identities: {
-        scheduler,
+    auth: {
+        identities: {
+            scheduler,
+        },
     },
     requestContext: {
         analytics,
@@ -194,13 +198,17 @@ test('a nested job tree keeps its shape', () => {
 
 test('jobs declared without an identity still get a runner', () => {
     const bareConfig = {
-        identities: {
-            scheduler,
+        auth: {
+            identities: {
+                scheduler,
+            },
         },
     };
     const bare = new Kizuna<{
-        identities: {
-            scheduler: typeof scheduler;
+        auth: {
+            identities: {
+                scheduler: typeof scheduler;
+            };
         };
     }>();
     const publicJobs = bare.jobs({

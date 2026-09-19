@@ -229,13 +229,17 @@ describe('declared statuses', () => {
             }),
         });
         const guardedKConfig = {
-            identities: {
-                user: guardedKUser,
+            auth: {
+                identities: {
+                    user: guardedKUser,
+                },
             },
         };
         const guardedK = new Kizuna<{
-            identities: {
-                user: typeof guardedKUser;
+            auth: {
+                identities: {
+                    user: typeof guardedKUser;
+                };
             };
         }>();
         const guardedContract = defineConfig({

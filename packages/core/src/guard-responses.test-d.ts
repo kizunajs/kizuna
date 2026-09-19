@@ -7,16 +7,20 @@ import type { AutoResponsesBrand } from './types.js';
 import type { HandlerArgs } from './handler-pipeline.js';
 
 interface Config {
-    identities: {
-        user: typeof kUser;
+    auth: {
+        identities: {
+            user: typeof kUser;
+        };
     };
 }
 
 interface ScopedKConfig {
-    identities: {
-        user: typeof scopedKUser;
+    auth: {
+        identities: {
+            user: typeof scopedKUser;
+        };
+        guardSchema: typeof scopedKGuardSchema;
     };
-    guardSchema: typeof scopedKGuardSchema;
 }
 
 const k = new Kizuna<Config>();
@@ -28,8 +32,10 @@ const kUser = k.identity.bearer({
     }),
 });
 const config = {
-    identities: {
-        user: kUser,
+    auth: {
+        identities: {
+            user: kUser,
+        },
     },
 };
 
@@ -91,10 +97,12 @@ const scopedKGuardSchema = ProblemDetailsSchema.extend({
     code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
 });
 const scopedKConfig = {
-    identities: {
-        user: scopedKUser,
+    auth: {
+        identities: {
+            user: scopedKUser,
+        },
+        guardSchema: scopedKGuardSchema,
     },
-    guardSchema: scopedKGuardSchema,
 };
 
 const scopedRoutes = scopedK.routes({

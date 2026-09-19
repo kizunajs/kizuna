@@ -11,22 +11,28 @@ interface Config {
 }
 
 interface SecuredKConfig {
-    identities: {
-        user: typeof userIdentity;
-        member: typeof memberIdentity;
+    auth: {
+        identities: {
+            user: typeof userIdentity;
+            member: typeof memberIdentity;
+        };
     };
 }
 
 interface GateKConfig {
-    identities: {
-        user: typeof userIdentity;
-        apiConsumer: typeof apiConsumerIdentity;
+    auth: {
+        identities: {
+            user: typeof userIdentity;
+            apiConsumer: typeof apiConsumerIdentity;
+        };
     };
 }
 
 interface RequestContextKConfig {
-    identities: {
-        user: typeof userIdentity;
+    auth: {
+        identities: {
+            user: typeof userIdentity;
+        };
     };
     requestContext: {
         analytics: typeof analyticsContext;
@@ -171,9 +177,11 @@ export const memberIdentity = k.identity.apiKey({
 });
 
 const securedKConfig = {
-    identities: {
-        user: userIdentity,
-        member: memberIdentity,
+    auth: {
+        identities: {
+            user: userIdentity,
+            member: memberIdentity,
+        },
     },
 };
 
@@ -252,9 +260,11 @@ export const apiConsumerIdentity = k.identity.apiKey({
 });
 
 const gateKConfig = {
-    identities: {
-        user: userIdentity,
-        apiConsumer: apiConsumerIdentity,
+    auth: {
+        identities: {
+            user: userIdentity,
+            apiConsumer: apiConsumerIdentity,
+        },
     },
 };
 
@@ -305,8 +315,10 @@ export const analyticsContext = k.requestContext(
 );
 
 const requestContextKConfig = {
-    identities: {
-        user: userIdentity,
+    auth: {
+        identities: {
+            user: userIdentity,
+        },
     },
     requestContext: {
         analytics: analyticsContext,

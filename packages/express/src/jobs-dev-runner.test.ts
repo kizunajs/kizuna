@@ -11,8 +11,10 @@ import { startJobsDevRunner, type JobsDevRunner } from '@ts-kizuna/core/jobs';
 
 interface Config {
     adapter: ReturnType<typeof expressAdapter>;
-    identities: {
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            scheduler: typeof scheduler;
+        };
     };
 }
 
@@ -29,8 +31,10 @@ const scheduler = k.identity.bearer({}).guard(({ bearer, deny }) => {
 });
 
 const config = {
-    identities: {
-        scheduler,
+    auth: {
+        identities: {
+            scheduler,
+        },
     },
 };
 

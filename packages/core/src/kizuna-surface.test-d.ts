@@ -4,7 +4,9 @@ import { Kizuna } from './kizuna.js';
 
 interface Config {
     tags: typeof kTags;
-    issueCodes: 'invalid_phone_number';
+    validation: {
+        issueCodes: 'invalid_phone_number';
+    };
 }
 
 const k = new Kizuna<Config>();

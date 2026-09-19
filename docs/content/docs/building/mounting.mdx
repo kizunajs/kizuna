@@ -18,9 +18,11 @@ export default defineConfig({
     adapter: expressAdapter(),
     tags,
     routes,
-    identities: {
-        user,
-        member,
+    auth: {
+        identities: {
+            user,
+            member,
+        },
     },
 });
 ```

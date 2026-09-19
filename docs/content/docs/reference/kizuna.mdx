@@ -47,14 +47,18 @@ Some declarations are shared across APIs rather than bound to one, so they stay 
 export interface Config {
     adapter: ReturnType<typeof expressAdapter>;
     tags: typeof tags;
-    identities: {
-        user: typeof user;
-        member: typeof member;
+    auth: {
+        identities: {
+            user: typeof user;
+            member: typeof member;
+        };
     };
     requestContext: {
         analytics: typeof analytics;
     };
-    issueCodes: 'invalid_phone_number';
+    validation: {
+        issueCodes: 'invalid_phone_number';
+    };
     jobs: typeof jobs;
 }
 ```

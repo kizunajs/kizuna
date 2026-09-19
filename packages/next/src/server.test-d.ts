@@ -18,10 +18,12 @@ import { nextAdapter, type NextHandlerContext, type NextMiddlewareHandler } from
 
 interface LocalConfig {
     adapter: ReturnType<typeof nextAdapter>;
-    identities: {
-        user: typeof localUser;
-        member: typeof localMember;
-        apiConsumer: typeof localApiConsumer;
+    auth: {
+        identities: {
+            user: typeof localUser;
+            member: typeof localMember;
+            apiConsumer: typeof localApiConsumer;
+        };
     };
     requestContext: {
         analytics: typeof localAnalytics;

@@ -9,8 +9,10 @@ let failing = false;
 
 interface Config {
     adapter: ReturnType<typeof fastifyAdapter>;
-    identities: {
-        scheduler: typeof scheduler;
+    auth: {
+        identities: {
+            scheduler: typeof scheduler;
+        };
     };
 }
 
@@ -34,8 +36,10 @@ const scheduler = k.identity
     );
 
 const config = {
-    identities: {
-        scheduler,
+    auth: {
+        identities: {
+            scheduler,
+        },
     },
 };
 
