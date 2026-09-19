@@ -17,7 +17,7 @@ const k = new Kizuna<Config>();
 
 const probePlugin = (settings: { label: string }) =>
     createPlugin({
-        name: 'probe',
+        slug: 'probe',
         routes: {
             ping: {
                 method: 'GET',
@@ -108,7 +108,7 @@ describe('plugin lane', () => {
 
     it('reports a path a plugin and the contract both claim', () => {
         const collidingPlugin = createPlugin({
-            name: 'collide',
+            slug: 'collide',
             serve: () => ({
                 router: {
                     clash: () => ({

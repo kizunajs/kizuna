@@ -281,14 +281,15 @@ export const fastifyKizuna = fastifyPlugin(
 );
 
 /**
- * The Fastify adapter, as a value. Pass it to `new Kizuna({ adapter })`.
+ * Serve an API on Fastify. What it takes is what every route is served with.
  *
  * @example
- * import { fastifyAdapter } from '@ts-kizuna/fastify';
- *
- * export const k = new Kizuna({
+ * export const { api } = defineConfig({
  *     adapter: fastifyAdapter(),
+ *     routes,
  * });
+ *
+ * await api.mount(app);
  */
 export const fastifyAdapter = (
     defaults?: FastifyOptions

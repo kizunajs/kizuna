@@ -1,16 +1,23 @@
 import { z } from 'zod';
-import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
+import { createPlugin, type RoutePath, type WithSlug } from '@ts-kizuna/core/plugin';
 import { openApiServe } from './server.js';
 import type { DocsProvider } from './docs-html.js';
 import type { GenerateOpenApiOptions } from './types.js';
 
-export const OPENAPI_PLUGIN_NAME = 'openApi';
+export const OPENAPI_PLUGIN_SLUG = 'openApi';
 
 export type JsonDocumentPath = `${RoutePath}.json`;
 
 export type YamlDocumentPath = `${RoutePath}.yaml`;
 
-export interface OpenApiPluginProps extends GenerateOpenApiOptions {
+export interface OpenApiPluginProps<Slug extends string = typeof OPENAPI_PLUGIN_SLUG> extends GenerateOpenApiOptions {
+    /**
+     * What handlers reach this plugin under. Give a second document its own.
+     *
+     * @default 'openApi'
+     */
+    slug?: Slug;
+
     /**
      * Where the reference UI is served.
      */
@@ -58,30 +65,28 @@ export interface OpenApiPluginProps extends GenerateOpenApiOptions {
  * Serve an API reference UI for the contract's OpenAPI document, and the
  * document itself if you publish it.
  *
- * Pass `openApiPluginServer()` from `@ts-kizuna/openapi/server` to
- * `server.api({ plugins })` to serve it.
  *
  * The routes are public. Gate them with your framework's own middleware if that
  * is not what you want.
  *
  * @example
  * ```ts
- * export const k = new Kizuna({
- *     tags,
- *     plugins: {
- *         openApi: openApiPlugin({
+ * export const { api } = defineConfig({
+ *     routes,
+ *     plugins: [
+ *         openApiPlugin({
  *             info: {
  *                 title: 'My API',
  *                 version: '1.0.0',
  *             },
  *         }),
- *     },
+ *     ],
  * });
  * ```
  */
-export const openApiPlugin = (props: OpenApiPluginProps) =>
+const declare = (slug: string, props: OpenApiPluginProps<string>) =>
     createPlugin({
-        name: OPENAPI_PLUGIN_NAME,
+        slug,
         routes: {
             ...(props.docsPath === undefined
                 ? {}
@@ -123,3 +128,9 @@ export const openApiPlugin = (props: OpenApiPluginProps) =>
         props,
         serve: (pluginProps, api) => openApiServe(pluginProps, api),
     });
+
+export function openApiPlugin<const Slug extends string = typeof OPENAPI_PLUGIN_SLUG>(
+    props: OpenApiPluginProps<Slug>
+): WithSlug<ReturnType<typeof declare>, Slug> {
+    return declare(props.slug ?? OPENAPI_PLUGIN_SLUG, props as OpenApiPluginProps<string>) as never;
+}

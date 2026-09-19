@@ -26,7 +26,7 @@ import {
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
 import type { Contract, RequiredPermissions, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
-import { OPENAPI_PLUGIN_NAME } from './plugin.js';
+import { OPENAPI_PLUGIN_SLUG } from './plugin.js';
 import type { StreamResponseDefinition } from '@ts-kizuna/core';
 import type {
     GenerateOpenApiOptions,
@@ -616,7 +616,7 @@ const tagsFromContract = (contract: Contract): OpenApiTag[] => {
  */
 const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions => {
     for (const declaration of Object.values(contract.plugins ?? {})) {
-        if (declaration.name === OPENAPI_PLUGIN_NAME) return declaration.props as unknown as GenerateOpenApiOptions;
+        if (declaration.slug === OPENAPI_PLUGIN_SLUG) return declaration.props as unknown as GenerateOpenApiOptions;
     }
     throw new Error(
         "generateOpenApi reads its options from the contract. Install `openApiPlugin` on `new Kizuna()` with the API's `info`."

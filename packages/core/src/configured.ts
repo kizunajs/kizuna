@@ -4,7 +4,7 @@ import type { AnyAdapter, HandlerContextOf } from './adapter.js';
 import type { RequestContextValues } from './handler-pipeline.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { SecurityScheme } from './security-scheme.js';
-import type { PluginArgs, PluginList, PluginsByName } from './plugin.js';
+import type { PluginArgs, PluginList, PluginsBySlug } from './plugin.js';
 import type { TagOptions, TagSet } from './tags.js';
 import type { z } from 'zod';
 
@@ -79,7 +79,7 @@ export type ConfiguredAdapterValue<Config> = Config extends { adapter: infer Ada
 
 export type ConfiguredJobs<Config> = Config extends { jobs: infer Tree } ? { jobs: JobsOfTree<Tree> } : {};
 export type ConfiguredPlugins<Config> = Config extends { plugins: infer Plugins extends PluginList }
-    ? PluginArgs<PluginsByName<Plugins>>
+    ? PluginArgs<PluginsBySlug<Plugins>>
     : {};
 export type ConfiguredAdapterContext<Config> = HandlerContextOf<ConfiguredAdapterValue<Config>>;
 export type ConfiguredRequestContext<Config> = RequestContextValues<ConfiguredRequestContextSchemas<Config>>;

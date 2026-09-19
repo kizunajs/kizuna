@@ -131,7 +131,7 @@ const toolCallTarget = (
  * });
  * ```
  */
-export const mcpServe = (props: McpPluginProps, api: unknown) => {
+export const mcpServe = (props: McpPluginProps<string>, api: unknown) => {
     const serverApi = api as ApiWithRouter;
     const enforcement = props.oauth === undefined ? undefined : prepareOAuth(props.oauth, props.path ?? '/mcp', serverApi);
 

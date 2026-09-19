@@ -334,7 +334,7 @@ export const requestContextContract = defineConfig({
 }).api;
 
 const typedProbePlugin = createPlugin({
-    name: 'probe',
+    slug: 'probe',
     routes: {
         ping: {
             method: 'GET',

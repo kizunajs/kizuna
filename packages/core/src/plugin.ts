@@ -18,19 +18,24 @@ export type PluginRoutes = Record<string, RouteDefinition>;
 
 /**
  * A plugin's contract-time half: what it declares, as data. `server.api({ plugins })`
- * joins it to the server half named in `serverModule`.
+ * joins it to what `serve` answers with.
  */
 export interface PluginDeclaration<
     R extends PluginRoutes = PluginRoutes,
     Props = unknown,
     Exports = unknown,
-    Name extends string = string,
+    Slug extends string = string,
     HandlerContext = unknown,
 > {
     /**
      * What handlers reach this plugin under, and the key it is installed at.
      */
-    name: Name;
+    /**
+     * What handlers reach this plugin under, and the key it is installed at.
+     * Each plugin defaults it; an app installing two of the same plugin gives
+     * the second one its own.
+     */
+    slug: Slug;
     routes: R;
     /**
      * Passed to `serve`, so the app never restates it.
@@ -38,14 +43,14 @@ export interface PluginDeclaration<
     props: Props;
     /**
      * What answers this plugin's routes, and what it hands handlers under
-     * `plugins.<name>`.
+     * `plugins.<slug>`.
      */
     serve: (props: Props, api: unknown) => PluginServe<R, Exports, HandlerContext>;
 }
 
 /**
  * What a plugin's `serve` returns: one handler per declared route, and whatever
- * it hands handlers under `plugins.<name>`.
+ * it hands handlers under `plugins.<slug>`.
  */
 export interface PluginServe<R extends PluginRoutes, Exports, HandlerContext> {
     router: PluginRouter<R, HandlerContext>;
@@ -55,9 +60,12 @@ export interface PluginServe<R extends PluginRoutes, Exports, HandlerContext> {
 /**
  * What {@link createPlugin} takes.
  */
-export interface PluginDefinition<R extends PluginRoutes, Props, Exports, Name extends string, HandlerContext> {
-    name: Name;
+export interface PluginDefinition<R extends PluginRoutes, Props, Exports, Slug extends string, HandlerContext> {
+    slug: Slug;
     routes: R;
+    /**
+     * Passed to `serve`, so the app never restates it.
+     */
     props?: Props;
     serve: (props: NoInfer<Props>, api: unknown) => PluginServe<NoInfer<R>, Exports, HandlerContext>;
 }
@@ -72,7 +80,7 @@ export interface PluginDefinition<R extends PluginRoutes, Props, Exports, Name e
  *
  * export const auditPlugin = (props: AuditPluginProps = {}) =>
  *     createPlugin<AuditExports>()({
- *         name: 'audit',
+ *         slug: 'audit',
  *         serverModule: '@ts-kizuna/audit/server',
  *         routes: {
  *             recent: {
@@ -87,24 +95,18 @@ export interface PluginDefinition<R extends PluginRoutes, Props, Exports, Name e
  *     });
  * ```
  */
-export const createPlugin = <
-    const R extends PluginRoutes,
-    const Name extends string,
-    Props = undefined,
-    Exports = undefined,
-    HandlerContext = unknown,
->(
-    definition: PluginDefinition<R, Props, Exports, Name, HandlerContext>
-): PluginDeclaration<R, Props, Exports, Name, HandlerContext> => ({
-    name: definition.name,
+export const createPlugin = <Props, const R extends PluginRoutes, const Slug extends string, Exports = undefined, HandlerContext = unknown>(
+    definition: PluginDefinition<R, Props, Exports, Slug, HandlerContext>
+): PluginDeclaration<R, Props, Exports, Slug, HandlerContext> => ({
+    slug: definition.slug,
     routes: definition.routes,
     props: definition.props as Props,
     serve: definition.serve,
 });
 
 /**
- * Plugins keyed by the name they were installed under on `k.contract`. That key
- * is what `plugins.*` in handler args resolves against.
+ * Plugins keyed by their slug, which is what `plugins.*` in handler args
+ * resolves against.
  */
 export type ContractPlugins = Record<string, AnyPlugin>;
 
@@ -116,16 +118,32 @@ export type ContractPlugins = Record<string, AnyPlugin>;
 export type AnyPlugin = PluginDeclaration<any, any, any, string, any>;
 
 /**
- * The plugins a config installs, as an array. Each carries its own name, which
+ * The plugins a config installs, as an array. Each carries its own slug, which
  * is what handlers reach it under.
  */
 export type PluginList = readonly AnyPlugin[];
 
 /**
- * A plugin list as a record keyed by each plugin's own name.
+ * One plugin declaration under a different slug, for a factory that lets an app
+ * rename what it installs.
+ *
+ * @example
+ * export function auditPlugin<const Slug extends string = 'audit'>(
+ *     props?: AuditProps<Slug>
+ * ): WithSlug<ReturnType<typeof declare>, Slug> {
+ *     return declare(props?.slug ?? 'audit', props ?? {}) as never;
+ * }
  */
-export type PluginsByName<Plugins extends PluginList> = {
-    [Plugin in Plugins[number] as Plugin['name']]: Plugin;
+export type WithSlug<Declaration, Slug extends string> =
+    Declaration extends PluginDeclaration<infer R, infer Props, infer Exports, string, infer HandlerContext>
+        ? PluginDeclaration<R, Props, Exports, Slug, HandlerContext>
+        : never;
+
+/**
+ * A plugin list as a record keyed by each plugin's own slug.
+ */
+export type PluginsBySlug<Plugins extends PluginList> = {
+    [Plugin in Plugins[number] as Plugin['slug']]: Plugin;
 };
 
 export type PluginRoutesOf<Declaration> = Declaration extends PluginDeclaration<infer R, infer _P, infer _E, string, infer _H> ? R : never;
@@ -175,10 +193,10 @@ export type PluginRouter<R extends PluginRoutes, HandlerContext> = {
 };
 
 /**
- * Every plugin in a list, keyed by its own name.
+ * Every plugin in a list, keyed by its own slug.
  */
-export const pluginsByName = (plugins: PluginList | undefined): ContractPlugins => {
-    const byName: Record<string, unknown> = {};
-    for (const plugin of plugins ?? []) byName[plugin.name] = plugin;
-    return byName as ContractPlugins;
+export const pluginsBySlug = (plugins: PluginList | undefined): ContractPlugins => {
+    const bySlug: Record<string, unknown> = {};
+    for (const plugin of plugins ?? []) bySlug[plugin.slug] = plugin;
+    return bySlug as ContractPlugins;
 };

@@ -269,14 +269,15 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
 }
 
 /**
- * The Express adapter, as a value. Pass it to `new Kizuna({ adapter })`.
+ * Serve an API on Express. What it takes is what every route is served with.
  *
  * @example
- * import { expressAdapter } from '@ts-kizuna/express';
- *
- * export const k = new Kizuna({
+ * export const { api } = defineConfig({
  *     adapter: expressAdapter(),
+ *     routes,
  * });
+ *
+ * api.mount(app);
  */
 export const expressAdapter = (
     defaults?: ExpressOptions

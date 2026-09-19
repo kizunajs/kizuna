@@ -35,11 +35,11 @@ export const isTagSet = (value: unknown): value is TagSet =>
 
 /**
  * Define a set of tags. A tag value may be a full {@link TagOptions} object or a
- * string, which is shorthand for `{ title }`. Pass the result to
- * `new Kizuna({ tags })`.
+ * string, which is shorthand for `{ title }`. Pass the result to `defineConfig`
+ * under `tags`.
  *
  * @example
- * const tags = Kizuna.tags({
+ * const tags = k.tags({
  *     orders: {
  *         title: 'Orders',
  *         description: 'Create and manage orders',

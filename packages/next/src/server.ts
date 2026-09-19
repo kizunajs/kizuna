@@ -379,16 +379,17 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
 }
 
 /**
- * The Next adapter, as a value. Pass it to `new Kizuna({ adapter })`. Next
+ * Serve an API on Next. What it takes is what every route is served with. Next
  * routes by file, so mounting returns the route handlers to re-export rather
  * than registering them on an app.
  *
  * @example
- * import { nextAdapter } from '@ts-kizuna/next';
- *
- * export const k = new Kizuna({
+ * export const { api } = defineConfig({
  *     adapter: nextAdapter(),
+ *     routes,
  * });
+ *
+ * export const { GET, POST } = api.mount({ basePath: '/api' });
  */
 export const nextAdapter = (defaults?: NextHandlerOptions): Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> => ({
     name: 'next',

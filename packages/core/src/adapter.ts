@@ -357,15 +357,17 @@ export const jobRouter = <HandlerContext>(meta: JobsMeta): Router<Routes, Handle
 export declare const ADAPTER_CONTEXT: unique symbol;
 
 /**
- * One framework's adapter, as a value. Pass it to `new Kizuna({ adapter })`,
- * and the api it produces mounts onto that framework's app.
+ * What serves an API on one framework. Name it under `adapter` in
+ * `defineConfig`, and the `api` you get back mounts onto that framework's app,
+ * hands every handler that framework's own request, and types both.
  *
  * @example
- * import { expressAdapter } from '@ts-kizuna/express';
- *
- * export const k = new Kizuna({
+ * export const { api } = defineConfig({
  *     adapter: expressAdapter(),
+ *     routes,
  * });
+ *
+ * api.mount(app);
  */
 export interface Adapter<HandlerContext = unknown, MountArgs extends readonly unknown[] = readonly unknown[], Mounted = unknown> {
     /**

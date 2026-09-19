@@ -200,14 +200,15 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
 }
 
 /**
- * The Hono adapter, as a value. Pass it to `new Kizuna({ adapter })`.
+ * Serve an API on Hono. What it takes is what every route is served with.
  *
  * @example
- * import { honoAdapter } from '@ts-kizuna/hono';
- *
- * export const k = new Kizuna({
+ * export const { api } = defineConfig({
  *     adapter: honoAdapter(),
+ *     routes,
  * });
+ *
+ * api.mount(app);
  */
 export const honoAdapter = (defaults?: HonoOptions): Adapter<HonoHandlerContext<Env>, [app: Hono, options?: HonoOptions], void> => ({
     name: 'hono',

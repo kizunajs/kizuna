@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createPlugin, type RoutePath } from '@ts-kizuna/core/plugin';
+import { createPlugin, type RoutePath, type WithSlug } from '@ts-kizuna/core/plugin';
 import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
 import { protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
 import { mcpServe } from './server.js';
@@ -8,7 +8,14 @@ import { mcpServe } from './server.js';
  * What the MCP endpoint is, and where. Which routes it publishes is each
  * route's own business: declare `tool` on the ones a model may call.
  */
-export interface McpPluginProps {
+export interface McpPluginProps<Slug extends string = 'mcp'> {
+    /**
+     * What handlers reach this plugin under. Give a second MCP endpoint its own.
+     *
+     * @default 'mcp'
+     */
+    slug?: Slug;
+
     /**
      * Path the endpoint is served from.
      *
@@ -44,10 +51,10 @@ export interface McpPluginProps {
     oauth?: McpOAuthProps;
 }
 
-const declare = (props: McpPluginProps) => {
+const declare = (slug: string, props: McpPluginProps<string>) => {
     const endpointPath = props.path ?? '/mcp';
     return createPlugin({
-        name: 'mcp',
+        slug,
         routes: {
             endpoint: {
                 method: 'POST',
@@ -115,6 +122,7 @@ const declare = (props: McpPluginProps) => {
  * });
  * ```
  */
-export function mcpPlugin(props?: McpPluginProps): ReturnType<typeof declare> {
-    return declare(props ?? {});
+export function mcpPlugin<const Slug extends string = 'mcp'>(props?: McpPluginProps<Slug>): WithSlug<ReturnType<typeof declare>, Slug> {
+    const settings = props ?? ({} as McpPluginProps<Slug>);
+    return declare(settings.slug ?? 'mcp', settings as McpPluginProps<string>) as never;
 }

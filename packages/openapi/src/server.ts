@@ -33,7 +33,7 @@ const sent = (body: string, contentType: string): Response =>
  * });
  * ```
  */
-export const openApiServe = (props: OpenApiPluginProps, api: unknown) => {
+export const openApiServe = (props: OpenApiPluginProps<string>, api: unknown) => {
     const spec = renderOpenApi(contractOf<Contract>(api), props);
 
     return {

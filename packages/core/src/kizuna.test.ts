@@ -304,7 +304,7 @@ describe('k.contract: plugins', () => {
 
     const probePlugin = (props: { skip?: Record<string, boolean> } = {}) =>
         createPlugin({
-            name: 'probe',
+            slug: 'probe',
             routes: {
                 status: {
                     method: 'GET',

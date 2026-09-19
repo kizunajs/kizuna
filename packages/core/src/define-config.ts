@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { assembleContract, type Contract } from './contract.js';
-import { pluginRouteTree, pluginsByName, type PluginArgs, type PluginList, type PluginsByName } from './plugin.js';
+import { pluginRouteTree, pluginsBySlug, type PluginArgs, type PluginList, type PluginsBySlug } from './plugin.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { assertValidDeprecationDates } from './deprecation.js';
 import { assertValidCache } from './cache.js';
@@ -254,7 +254,7 @@ export type ConfiguredApi<
             R,
             Identities,
             RequestContext,
-            PluginArgs<PluginsByName<P>> & JobsArg<J>,
+            PluginArgs<PluginsBySlug<P>> & JobsArg<J>,
             GuardOutput<GuardSchema>,
             GuardBody<GuardSchema>
         >,
@@ -262,7 +262,7 @@ export type ConfiguredApi<
         Codes,
         Identities,
         RequestContext,
-        PluginsByName<P>,
+        PluginsBySlug<P>,
         J,
         GuardSchema
     >,
@@ -307,7 +307,7 @@ export const defineConfig = <
     const routes = options.routes as Routes;
     const jobs = options.jobs as Jobs | undefined;
     const identities = options.identities as Record<string, SecurityScheme> | undefined;
-    const plugins = pluginsByName(options.plugins);
+    const plugins = pluginsBySlug(options.plugins);
 
     assertNoPathCollisions([
         ...routeClaims(routes),

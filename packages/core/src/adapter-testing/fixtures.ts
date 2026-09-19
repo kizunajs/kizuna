@@ -944,7 +944,7 @@ export const methodContract = defineConfig(methodInput).api;
 
 const probePlugin = (settings: { label: string }) =>
     createPlugin({
-        name: 'probe',
+        slug: 'probe',
         routes: {
             ping: {
                 method: 'GET',

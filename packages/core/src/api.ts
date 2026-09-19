@@ -103,9 +103,7 @@ export const buildApi = (
 
     api.mount = (...args: unknown[]) => {
         if (!adapter) {
-            throw new Error(
-                'This api has no adapter to mount on. Pass one to `new Kizuna({ adapter })`, or to `k.api({ adapter })` when the contract serves more than one framework.'
-            );
+            throw new Error('This api has no adapter to mount on. Name one under `adapter` in `defineConfig`.');
         }
         return (adapter.mount as (api: unknown, ...rest: unknown[]) => unknown)(api, ...args);
     };
@@ -114,7 +112,7 @@ export const buildApi = (
 };
 
 /**
- * The contract half of what `k.api` takes.
+ * What a config declares, before anything serves it.
  */
 export interface ApiDeclaration<R extends Routes, J extends Jobs, P extends ContractPlugins> {
     routes: R;
