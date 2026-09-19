@@ -1,0 +1,208 @@
+---
+title: k.identity
+description: Declare who can call your API, the context a passing guard provides, the roles its callers hold, and the guard that authenticates them.
+---
+
+<BetaNotice>
+
+Authentication is still settling. `k.identity` may change before v2, so pin your version if you depend on it.
+
+</BetaNotice>
+
+An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing guard provides to handlers), and optionally the `roles` its callers hold, which a route's [`auth`](/docs/reference/k-route) is checked against. See [Authentication](/docs/authentication) and [Access Control](/docs/access-control) for the walkthroughs.
+
+<InstallTabs packageName="@ts-kizuna/core" />
+
+```ts
+import { k } from './k';
+```
+
+## Builders
+
+| Builder                         | Credential source                            | OpenAPI scheme                       |
+| ------------------------------- | -------------------------------------------- | ------------------------------------ |
+| `k.identity.bearer`        | `Authorization: Bearer <token>`              | `{ type: 'http', scheme: 'bearer' }` |
+| `k.identity.apiKey`        | A named header, query parameter, or cookie   | `{ type: 'apiKey', name, in }`       |
+| `k.identity.basic`         | `Authorization: Basic <base64>`, decoded     | `{ type: 'http', scheme: 'basic' }`  |
+| `k.identity.oauth2`        | `Authorization: Bearer <token>`, with scopes | `{ type: 'oauth2', flows }`          |
+| `k.identity.openIdConnect` | `Authorization: Bearer <token>`              | `{ type: 'openIdConnect', ... }`     |
+| `k.identity.custom`        | Read by the guard (e.g. a path segment)      | none, emits `x-kizuna-guarded`       |
+
+Each builder hands back the identity, waiting for its `guard`. Every one takes `context` (optional), `roles` (optional), `description` (optional), and `scheme` (optional, where identities sharing one credential set the same `scheme` name and emit a single OpenAPI scheme). Method-specific fields:
+
+| Builder                         | Extra fields                                                                                                                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `k.identity.bearer`        | `bearerFormat?` (e.g. `'JWT'`)                                                                                                                                                                    |
+| `k.identity.apiKey`        | `name`, `in: 'header' \| 'query' \| 'cookie'`                                                                                                                                                     |
+| `k.identity.oauth2`        | `flows` (OpenAPI OAuth Flows object), `issuer?` (the authorization server's RFC 8414 issuer identifier), `resourceMetadata?` (this API's RFC 9728 metadata URL, sent in every `Bearer` challenge) |
+| `k.identity.openIdConnect` | `openIdConnectUrl`, `resourceMetadata?`                                                                                                                                                           |
+
+## Example
+
+```ts title="identities.ts"
+import { z } from 'zod';
+import { k } from './k';
+
+export const user = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    })
+    .guard(async ({ bearer, deny }) => {
+        const session = bearer ? await db.sessions.findByToken(bearer.token) : null;
+        if (!session)
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        return {
+            userId: session.userId,
+        };
+    });
+
+export const member = k.identity
+    .apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            workspaceUserId: z.string(),
+        }),
+        roles,
+    })
+    .guard(async ({ apiKey, deny }) => {
+        const membership = apiKey ? await db.memberships.findByApiKey(apiKey.value) : null;
+        if (!membership)
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'Forbidden',
+                },
+            });
+        return membership;
+    });
+```
+
+## The guard
+
+`guard` is what runs before the handler of every route whose `auth` names this identity. It receives the credential the method extracted, the path params the identity declares, your framework's own request, and `deny`. Return the identity's `context`, or call `deny({ status, body })` to refuse.
+
+It sits on the identity because that is the one place it belongs to. An identity with no guard cannot authenticate anyone, and [`defineConfig`](/docs/reference/define-config) refuses to assemble an API whose routes name one.
+
+## `context` vs `roles`
+
+- **`context`** is who the caller is. A guard must return it, and handlers of secured routes receive it under `auth`, keyed by the identity's name (`auth.user`, `auth.member`).
+- **`roles`** is who the caller can be, declared with [`Kizuna.roles`](/docs/reference/kizuna-roles). The guard returns the caller's `role` beside the context, a route's `roles` or `requires` is checked against it, and handlers read `auth.member.role`. Roles built from a permission catalog add `auth.member.permissions`, everything the caller holds.
+
+An identity with neither can still be required by a route's `auth` (`'user'`), just not narrowed.
+
+## Authentication-only identities
+
+An identity that only proves the caller is known, such as an API key, has nothing to hand the handler. Omit `context` and `roles`:
+
+Its guard returns nothing on success, or `deny(...)` to reject:
+
+```ts title="identities.ts"
+export const apiConsumer = k.identity
+    .apiKey({
+        name: 'x-api-key',
+        in: 'header',
+    })
+    .guard(async ({ apiKey, deny }) => {
+        if (!apiKey || !(await isKnownKey(apiKey.value)))
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+    });
+```
+
+A route secured only by such an identity gets no `auth` entry for it.
+
+## Custom identities
+
+Some credentials don't fit any OpenAPI security scheme. A capability URL is the common case: you email or SMS a link like `/invites/:token`, and the path token _is_ the credential. OpenAPI's `apiKey` can't describe it, since its `in` allows only `header`, `query`, and `cookie` with no `path` option, so declaring one would emit a scheme a generated client would act on incorrectly.
+
+`k.identity.custom` is the escape hatch. It has no OpenAPI scheme; its guard reads the credential itself from wherever it lives:
+
+```ts title="identities.ts"
+export const inviteToken = k.identity
+    .custom({
+        context: z.object({
+            inviteId: z.string(),
+        }),
+        params: z.object({
+            token: z.string(),
+        }),
+    })
+    .guard(async ({ params, deny }) => {
+        const inviteId = await resolveInvite(params.token);
+        if (!inviteId)
+            return deny({
+                status: 404,
+                body: {
+                    detail: 'Not found',
+                },
+            });
+        return {
+            inviteId,
+        };
+    });
+```
+
+The guard receives the usual `{ params, deny }` (plus your framework's handler context) with no credential key, since there is nothing for the runtime to pre-extract. Everything else is ordinary typed auth: the identity is named under `identities`, a route's `auth` references it, handlers read `auth.inviteToken.inviteId`, and `roles` work as usual.
+
+Because it emits no `security`, a custom-guarded route would otherwise look public in the spec. To keep the distinction honest, [`generateOpenApi`](/docs/reference/generate-openapi) marks the operation with an `x-kizuna-guarded` extension listing the custom identities, so a genuinely public route (no `security`, no extension) stays distinguishable from one protected out-of-band.
+
+Reach for `custom` only when the credential is truly inexpressible. A token belongs in `bearer`, a signature header in `apiKey`; mutual TLS has its own OpenAPI type.
+
+## Naming identities
+
+Name identities in [`defineConfig`](/docs/reference/define-config) under `identities`. Their keys become the names everything else uses: a route's `auth`, and the handler context keys:
+
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { user, member } from './src/identities';
+import { routes } from './src/routes';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    identities: {
+        user,
+        member,
+    },
+    routes,
+});
+```
+
+## Securing routes
+
+A route's `auth` names the identity it requires, keyed by the names above:
+
+```ts title="src/routes/workspace.ts"
+export const workspaceRoutes = k.routes('workspace', {
+    getWorkspace: k
+        .route({
+            method: 'GET',
+            path: '/workspace',
+            auth: 'member',
+            responses: {
+                200: WorkspaceSchema,
+            },
+        })
+        .handler(({ auth }) => ({
+            status: 200,
+            body: db.workspaces.find(auth.member.workspaceId),
+        })),
+});
+```
+
+See [`k.route`](/docs/reference/k-route) for every value form.
+
+## OpenAPI emission
+
+[`generateOpenApi`](/docs/reference/generate-openapi) emits identities under `components.securitySchemes`, and each secured route references them in its `security`, with the permissions an OAuth route requires as its scopes, the roles it accepts under `x-kizuna-roles`, and the permissions it requires under `x-kizuna-requires`.

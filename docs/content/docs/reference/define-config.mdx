@@ -1,0 +1,128 @@
+---
+title: defineConfig
+description: Assemble everything one API is made of, and get back the api you mount.
+---
+
+`defineConfig({ adapter, routes, identities, ... })` is where an API comes together. It takes what you declared with `k`, resolves each route's `auth`, checks the pieces against one another, and hands back the `api` you mount.
+
+It lives in `kizuna.config.ts` at the root of your app, which is where the CLI looks for it.
+
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
+import { routes } from './src/routes';
+import { user } from './src/identities';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    identities: {
+        user,
+    },
+});
+```
+
+```ts title="src/index.ts"
+import express from 'express';
+import kizuna from '../kizuna.config';
+
+const app = express();
+app.use(express.json());
+
+kizuna.api.mount(app);
+```
+
+## What it takes
+
+| Field | What it is |
+| --- | --- |
+| `adapter` | The framework this API is served on, as a call: `expressAdapter()`. Its request reaches every handler, typed. |
+| `routes` | The route groups [`k.routes`](/docs/reference/k-routes) returned. Each route carries its own handler. |
+| `identities` | The identities a route's `auth` names, each declared with [`k.identity`](/docs/reference/k-identity) and carrying its own guard. |
+| `requestContext` | What every route resolves before its guards run, declared with [`k.requestContext`](/docs/reference/k-request-context). |
+| `jobs` | Scheduled work, declared with [`k.jobs`](/docs/reference/k-jobs). |
+| `plugins` | What this API installs beside its own routes, as a list. |
+| `tags` | The OpenAPI tags routes are grouped under, from [`k.tags`](/docs/reference/k-tags). |
+| `guardSchema` | The body every guard's `deny()` produces. |
+| `issueCodes` | The `code` values [`k.issue`](/docs/reference/k-issue) may emit, beyond Zod's own. |
+| `clients` | What `kizuna generate` writes from this API. |
+| `jobsConfig` | Settings shared by every job, such as the path its endpoints are served from. |
+| `jobTransport` | Carries a queued job to whatever runs it. |
+| `onJobError` | Reached when a job fails after its response was sent. |
+
+## What it hands back
+
+The `api`, which is the contract plus the ability to serve it. It carries `routes`, `securitySchemes`, `tags` and the rest, so anything that reads a contract takes it directly:
+
+```ts title="scripts/generate-openapi.ts"
+import { generateOpenApi } from '@ts-kizuna/openapi';
+import kizuna from '../kizuna.config';
+
+const document = generateOpenApi(kizuna.api);
+```
+
+And `clients`, which the CLI reads when it generates.
+
+## Access control
+
+Every route carries its own [`auth`](/docs/reference/k-route): the identity it requires, and the roles it accepts or the permissions the caller has to hold. Once a config declares an identity, a route without an `auth` does not compile, so public takes an explicit `false`. See [Access Control](/docs/access-control) for the walkthrough.
+
+```ts title="src/routes/workspace.ts"
+export const workspaceRoutes = k.routes('workspace', {
+    getWorkspace: k
+        .route({
+            method: 'GET',
+            path: '/workspace',
+            auth: 'member',
+            responses: {
+                200: WorkspaceSchema,
+            },
+        })
+        .handler(({ auth }) => ({
+            status: 200,
+            body: db.workspaces.find(auth.member.workspaceId),
+        })),
+});
+```
+
+`defineConfig` resolves each `auth` onto that route's `security`, `roles` and `requires`, which the [guards](/docs/reference/k-identity), the [route handler](/docs/reference/k-route) types, and the [OpenAPI document](/docs/reference/generate-openapi) all read.
+
+An identity a route names has to carry a guard, or the config refuses to assemble.
+
+## Jobs
+
+Jobs declared with [`k.jobs`](/docs/reference/k-jobs) go under `jobs`, beside `routes`:
+
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    jobs,
+});
+```
+
+A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin and MCP surfaces. See [Jobs](/docs/jobs).
+
+## Plugins
+
+Plugins go under `plugins`, as a list. Each carries the slug your handlers read it under:
+
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    plugins: [
+        mcpPlugin({
+            name: 'My API',
+        }),
+        openApiPlugin({
+            info: {
+                title: 'My API',
+                version: '1.0.0',
+            },
+        }),
+    ],
+});
+```
+
+Their routes are served by `api.mount` and stay out of `api.routes`, so the client and the generators do not see them. See [Plugins](/docs/plugins).

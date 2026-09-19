@@ -1,7 +1,13 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src", "kizuna.config.ts"]
+  "include": [
+    "src",
+    "kizuna.config.ts",
+    "scripts"
+  ]
 }
