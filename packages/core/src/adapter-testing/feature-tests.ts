@@ -23,15 +23,7 @@ import {
     streamedTicksText,
     streamedLinesText,
 } from './fixtures.js';
-import {
-    collectStreamText,
-    readStreamText,
-    readStreamUntil,
-    toMountedApi,
-    type MountedApi,
-    type Transport,
-    type TestResponse,
-} from './transport.js';
+import { collectStreamText, readStreamUntil, toMountedApi, type MountedApi, type Transport, type TestResponse } from './transport.js';
 
 /**
  * One adapter, described by its parts. The `never` parameters are what let a contract known only at runtime reach a

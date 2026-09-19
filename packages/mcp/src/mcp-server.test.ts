@@ -146,7 +146,7 @@ const contract = defineConfig({
 
 const router = {
     users: {
-        listUsers: ({ query }: { query: { page?: number; limit?: number } }) => ({
+        listUsers: (_args: { query: { page?: number; limit?: number } }) => ({
             status: 200,
             body: {
                 users: [
@@ -205,7 +205,7 @@ const router = {
         status: 204,
         body: undefined,
     }),
-    deleteUser: ({ params }: { params: { id: string } }) => ({
+    deleteUser: (_args: { params: { id: string } }) => ({
         status: 200,
         body: {
             success: true,
@@ -257,7 +257,7 @@ const connectMcpClient = async (testApi: Parameters<typeof createMcpServer>[0] =
 
 describe('buildToolDefinitions', () => {
     it('generates tool definitions from a contract', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes);
         const names = definitions.map((definition) => definition.name);
 
         expect(names).toContain('users_list_users');
@@ -268,14 +268,14 @@ describe('buildToolDefinitions', () => {
     });
 
     it('excludes multipart/form-data routes by default', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes);
         const names = definitions.map((definition) => definition.name);
 
         expect(names).not.toContain('upload_avatar');
     });
 
     it('carries the summary as the tool title', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes);
         const listUsers = definitions.find((definition) => definition.name === 'users_list_users')!;
         const health = definitions.find((definition) => definition.name === 'health')!;
 
@@ -348,7 +348,7 @@ describe('buildToolDefinitions: which routes publish', () => {
 
 describe('buildToolDefinitions: input schema', () => {
     it('puts query under a query key', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes);
         const listUsers = definitions.find((definition) => definition.name === 'users_list_users')!;
 
         expect(listUsers.inputSchema.shape).toBeDefined();
@@ -359,7 +359,7 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('leaves an all-optional query out of required', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes);
         const listUsers = definitions.find((definition) => definition.name === 'users_list_users')!;
 
         expect(z.object(listUsers.inputSchema.shape!).safeParse({}).success).toBe(true);
@@ -367,7 +367,7 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('puts path params under a params key', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes);
         const getUser = definitions.find((definition) => definition.name === 'users_get_user')!;
 
         expect(getUser.inputSchema.shape).toBeDefined();
@@ -376,7 +376,7 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('puts body under a body key', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes);
         const createUser = definitions.find((definition) => definition.name === 'users_create_user')!;
 
         expect(createUser.inputSchema.shape).toBeDefined();
@@ -385,14 +385,14 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('returns undefined shape for routes with no inputs', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes);
         const health = definitions.find((definition) => definition.name === 'health')!;
 
         expect(health.inputSchema.shape).toBeUndefined();
     });
 
     it('excludes void body from the input schema', () => {
-        const definitions = buildToolDefinitions(contract.routes, baseOptions);
+        const definitions = buildToolDefinitions(contract.routes);
         const ping = definitions.find((definition) => definition.name === 'ping_user')!;
 
         expect(ping.inputSchema.hasParams).toBe(true);
@@ -431,7 +431,7 @@ describe('buildToolDefinitions: input schema', () => {
             routes: unionContractRoutes,
         }).api;
 
-        const definitions = buildToolDefinitions(unionContract.routes, baseOptions);
+        const definitions = buildToolDefinitions(unionContract.routes);
         const send = definitions.find((definition) => definition.name === 'send_notification')!;
 
         expect(send.inputSchema.hasBody).toBe(true);
@@ -464,7 +464,7 @@ describe('buildToolDefinitions: input schema', () => {
             routes: complexContractRoutes,
         }).api;
 
-        const definitions = buildToolDefinitions(complexContract.routes, baseOptions);
+        const definitions = buildToolDefinitions(complexContract.routes);
         const update = definitions.find((definition) => definition.name === 'update_item')!;
 
         expect(update.inputSchema.hasParams).toBe(true);
@@ -498,8 +498,7 @@ describe('buildToolDefinitions: input schema', () => {
             defineConfig({
                 ...config,
                 routes: contractRoutesWithRequiredQuery,
-            }).api.routes,
-            baseOptions
+            }).api.routes
         );
         const search = definitions.find((definition) => definition.name === 'search_items')!;
 
@@ -623,14 +622,14 @@ describe('buildToolDefinitions: output schema', () => {
 
 describe('instructions', () => {
     it('lists the contract tag groups', () => {
-        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), undefined);
+        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes), undefined);
 
         expect(instructions).toContain('{ status, body }');
         expect(instructions).toContain('- API');
     });
 
     it('appends the authored text after the generated overview', () => {
-        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes, baseOptions), 'Every timestamp is UTC.');
+        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes), 'Every timestamp is UTC.');
 
         expect(instructions.indexOf('- API')).toBeLessThan(instructions.indexOf('Every timestamp is UTC.'));
     });
@@ -1249,7 +1248,7 @@ describe('streamed routes', () => {
                 },
             }),
         });
-        const definitions = buildToolDefinitions(streamRoutes, baseOptions);
+        const definitions = buildToolDefinitions(streamRoutes);
         expect(definitions.map((definition) => definition.name)).toEqual(['ping']);
     });
 });

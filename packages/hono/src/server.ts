@@ -30,7 +30,7 @@ import {
     parseFetchBody,
     headersToObject,
 } from '@ts-kizuna/core/adapter';
-import type { Contract, RoutesOf, SecurityScheme, GuardSuccess } from '@ts-kizuna/core';
+import type { SecurityScheme } from '@ts-kizuna/core';
 
 export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;

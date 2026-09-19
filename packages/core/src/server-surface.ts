@@ -1,33 +1,14 @@
 import type { z } from 'zod';
-import type { Contract, RoutesOf, SchemesOf, RequestContextOf, ContractPluginsOf, JobsOf, GuardSchemaOf } from './contract.js';
+import type { Contract, RoutesOf, SchemesOf, RequestContextOf, ContractPluginsOf, JobsOf } from './contract.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { CredentialOf } from './identity.js';
 import type { RequestContextSchema, RequestContextHeaderValues } from './request-context.js';
 import type { JobHandlers, JobsArg } from './jobs.js';
 import type { PluginArgs } from './plugin.js';
-import type { PluginImplementations } from './plugin-server.js';
 import type { GuardBody } from './problem-details.js';
-import type {
-    GuardReturn,
-    GuardSuccess,
-    HandlersFromRoutes,
-    GuardParams,
-    RequestContextValues,
-    Router as CoreRouter,
-} from './handler-pipeline.js';
-import {
-    assembleApi,
-    warnUnsupportedJobOptions,
-    JOBS_META,
-    type ApiParts,
-    type ApiWithRouter,
-    type GuardDeny,
-    type GuardDenial,
-    type GuardRun,
-    type RequestContextRun,
-    type ServerOptions,
-} from './adapter.js';
+import type { GuardReturn, GuardSuccess, HandlersFromRoutes, RequestContextValues, Router as CoreRouter } from './handler-pipeline.js';
+import { type GuardDeny, type GuardDenial, type GuardRun } from './adapter.js';
 
 /**
  * The handler tree for a contract or route group, typed against it. Routes

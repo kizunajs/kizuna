@@ -13,9 +13,6 @@ const k = new Kizuna<Config>();
 const kTags = k.tags({
     api: 'API',
 });
-const config = {
-    tags: kTags,
-};
 
 const contractRoutes = k.routes('api', {
     getUser: k.route({

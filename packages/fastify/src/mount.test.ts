@@ -1,19 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
-import { Kizuna } from '@ts-kizuna/core';
 import { fastifyAdapter, fastifyKizuna } from './server.js';
 import { userInput, resetUsers } from '../../core/src/adapter-testing/fixtures.js';
 import { defineConfig } from '@ts-kizuna/core';
-
-interface Config {
-    adapter: typeof fastifyAdapter;
-}
-
-const k = new Kizuna<Config>();
-
-const config = {
-    adapter: fastifyAdapter,
-};
 
 describe('api.mount and the fastify plugin', () => {
     it('mount(app) serves routes', async () => {

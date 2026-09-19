@@ -1,7 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import type { ValidationIssueCode } from './validation-error.js';
 import type { CodedIssue } from './coded-issue.js';
-import { Kizuna } from './kizuna.js';
 
 test('ValidationIssueCode accepts built-in codes and arbitrary strings', () => {
     expectTypeOf<'invalid_type'>().toMatchTypeOf<ValidationIssueCode>();

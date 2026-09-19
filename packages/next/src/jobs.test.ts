@@ -5,8 +5,6 @@ import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 
-let failing = false;
-
 interface Config {
     adapter: typeof nextAdapter;
     identities: {
@@ -64,7 +62,6 @@ const jobs = k.jobs('scheduler', {
             }),
         })
         .handler(() => {
-            if (failing) throw new Error('the mailer is down');
             return {
                 status: 200,
                 body: {

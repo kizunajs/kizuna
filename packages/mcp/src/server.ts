@@ -50,12 +50,7 @@ interface OAuthEnforcement {
     tools: Map<string, ToolDefinition>;
 }
 
-const prepareOAuth = (
-    oauth: McpOAuthProps,
-    endpointPath: `/${string}`,
-    api: ApiWithRouter,
-    selection: Parameters<typeof buildToolDefinitions>[1]
-): OAuthEnforcement => {
+const prepareOAuth = (oauth: McpOAuthProps, endpointPath: `/${string}`, api: ApiWithRouter): OAuthEnforcement => {
     assertCanonicalResource(oauth, endpointPath);
     const guards = (api as unknown as Record<typeof GUARDS_META, GuardMap | undefined>)[GUARDS_META];
     const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
@@ -78,7 +73,7 @@ const prepareOAuth = (
         }),
         metadataUrl: protectedResourceMetadataUrl(oauth, endpointPath),
         scopesSupported: declaredScopes(schemeDefinition),
-        tools: new Map(buildToolDefinitions(api.routes, selection).map((definition) => [definition.name, definition])),
+        tools: new Map(buildToolDefinitions(api.routes).map((definition) => [definition.name, definition])),
     };
 };
 
@@ -138,12 +133,7 @@ const toolCallTarget = (
  */
 export const mcpServe = (props: McpPluginProps, api: unknown) => {
     const serverApi = api as ApiWithRouter;
-    const enforcement =
-        props.oauth === undefined
-            ? undefined
-            : prepareOAuth(props.oauth, props.path ?? '/mcp', serverApi, {
-                  ...props,
-              });
+    const enforcement = props.oauth === undefined ? undefined : prepareOAuth(props.oauth, props.path ?? '/mcp', serverApi);
 
     return {
         router: {

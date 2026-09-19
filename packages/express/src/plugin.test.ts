@@ -138,9 +138,6 @@ describe('plugin lane', () => {
         const collidingKConfig = {
             tags: collidingKTags,
         };
-        const collidingK = new Kizuna<{
-            tags: typeof collidingKTags;
-        }>();
         // Contract time, because the plugins are on the kizuna instance that built it.
         expect(
             () =>

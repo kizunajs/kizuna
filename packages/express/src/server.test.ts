@@ -2,7 +2,6 @@ import express from 'express';
 import request from 'supertest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { Kizuna } from '@ts-kizuna/core';
 import { expressAdapter, type ExpressApi } from './server.js';
 import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 import { defineConfig } from '@ts-kizuna/core';

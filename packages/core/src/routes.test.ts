@@ -15,9 +15,6 @@ const kTags = k.tags({
         description: 'User management endpoints',
     },
 });
-const config = {
-    tags: kTags,
-};
 
 describe('k.routes', () => {
     it('throws when a route has an empty body schema', () => {

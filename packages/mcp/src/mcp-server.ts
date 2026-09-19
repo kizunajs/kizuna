@@ -214,7 +214,7 @@ export interface ToolDefinition {
     tags: string[];
 }
 
-export const buildToolDefinitions = (routes: Routes, options?: McpServerOptions): ToolDefinition[] => {
+export const buildToolDefinitions = (routes: Routes): ToolDefinition[] => {
     const selected = selectToolRoutes(flattenRoutes(routes));
     const names = deriveToolNames(
         selected.map(({ routeKey }) => ({
@@ -588,7 +588,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
 
     const contract = contractOf<Contract | undefined>(api);
 
-    const definitions = buildToolDefinitions(api.routes, options);
+    const definitions = buildToolDefinitions(api.routes);
 
     const server = new McpServer(
         {

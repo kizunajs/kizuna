@@ -36,13 +36,6 @@ const member = k.identity.apiKey({
     roles,
 });
 
-const config = {
-    identities: {
-        user,
-        member,
-    },
-};
-
 const routeDefinition = <const Auth>(path: `/${string}`, auth: Auth) => ({
     method: 'GET' as const,
     path,

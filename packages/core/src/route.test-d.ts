@@ -13,9 +13,6 @@ const k = new Kizuna<Config>();
 const kTags = k.tags({
     users: 'Users',
 });
-const config = {
-    tags: kTags,
-};
 
 const UserSchema = z.object({
     id: z.string(),
@@ -132,7 +129,7 @@ test('the handler cannot read a path parameter the path does not carry', () => {
         },
     }).handler(({ params }) => {
         // @ts-expect-error the path declares id, not slug
-        params.slug;
+        void params.slug;
         return {
             status: 200,
             body: {

@@ -32,7 +32,7 @@ import {
     pluginExportsOf,
     pluginRouterOf,
 } from '@ts-kizuna/core/adapter';
-import type { Contract, RoutesOf, SecurityScheme } from '@ts-kizuna/core';
+import type { SecurityScheme } from '@ts-kizuna/core';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export { NextRequest, NextResponse } from 'next/server';

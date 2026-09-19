@@ -337,7 +337,7 @@ const buildRouteMethod = (
     };
 };
 
-const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, contract: Contract) => {
+const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, _contract: Contract) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
 

@@ -3,8 +3,6 @@ import { ProblemDetailsSchema } from '../error-response.js';
 import { Kizuna } from '../kizuna.js';
 import { defineConfig } from '../define-config.js';
 import { createPlugin, rawResponse } from '../adapter.js';
-import type { Router } from '../handler-pipeline.js';
-import type { GuardDeny } from '../adapter.js';
 
 interface Config {
     tags: typeof kTags;

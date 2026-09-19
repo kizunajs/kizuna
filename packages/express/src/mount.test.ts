@@ -1,20 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { Kizuna } from '@ts-kizuna/core';
 import { expressAdapter } from './server.js';
 import { userInput, resetUsers } from '../../core/src/adapter-testing/fixtures.js';
 import { defineConfig } from '@ts-kizuna/core';
-
-interface Config {
-    adapter: typeof expressAdapter;
-}
-
-const k = new Kizuna<Config>();
-
-const config = {
-    adapter: expressAdapter,
-};
 
 describe('api.mount', () => {
     it('serves routes', async () => {

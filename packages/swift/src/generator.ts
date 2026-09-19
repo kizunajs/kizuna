@@ -19,7 +19,6 @@ import {
     statusToCamelCase,
     isSuccessStatus,
     mergeHeaderFields,
-    type Routes,
     type RouteDefinition,
     isStreamResponse,
     isNamedStream,
@@ -350,7 +349,7 @@ const buildRouteMethod = (
     };
 };
 
-const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, contract: Contract) => {
+const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, _contract: Contract) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
 

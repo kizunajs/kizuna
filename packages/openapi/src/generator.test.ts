@@ -4,7 +4,7 @@ import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type Contract } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { generateOpenApi, renderOpenApi } from './generator.js';
+import { renderOpenApi } from './generator.js';
 import type { GenerateOpenApiOptions } from './types.js';
 
 interface Config {

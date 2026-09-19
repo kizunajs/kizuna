@@ -270,6 +270,8 @@ describe('Next.js handler: alternate content types', () => {
 });
 
 describe('Next.js handler: requestMiddleware', () => {
+    let handlerRan = false;
+
     const middlewareContractRoutes = k.routes('api', {
         getResource: k
             .route({
@@ -282,13 +284,16 @@ describe('Next.js handler: requestMiddleware', () => {
                     }),
                 },
             })
-            .handler(({ params, request }) => ({
-                status: 200,
-                body: {
-                    id: params.id,
-                    userId: (request as any).userId,
-                },
-            })),
+            .handler(({ params, request }) => {
+                handlerRan = true;
+                return {
+                    status: 200,
+                    body: {
+                        id: params.id,
+                        userId: (request as any).userId,
+                    },
+                };
+            }),
     });
 
     const middlewareContract = defineConfig({
@@ -326,7 +331,7 @@ describe('Next.js handler: requestMiddleware', () => {
     });
 
     it('short-circuits when middleware returns a Response', async () => {
-        let handlerCalled = false;
+        handlerRan = false;
 
         const middlewareApi = middlewareContract;
 
@@ -348,7 +353,7 @@ describe('Next.js handler: requestMiddleware', () => {
         expect(response.status).toBe(403);
         const body = await response.json();
         expect(body.message).toBe('Forbidden');
-        expect(handlerCalled).toBe(false);
+        expect(handlerRan).toBe(false);
     });
 
     it('runs middleware functions in order and stops at the first Response', async () => {

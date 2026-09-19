@@ -15,7 +15,7 @@ import { readObjectShape } from './zod-internals.js';
 import type { Routes, RouteDefinition, RouteAuth, SecurityRequirement, RequiredPermissions } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
-import type { AnyAdapter, HandlerContextOf } from './adapter.js';
+import type { AnyAdapter } from './adapter.js';
 import { permissionNames } from './permissions.js';
 import { GUARD } from './identity-builder.js';
 import { RESOLVER } from './request-context-builder.js';

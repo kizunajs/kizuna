@@ -2015,11 +2015,6 @@ describe('Kotlin generator: the statuses the auth map adds', () => {
             user: guardedKUser,
         },
     };
-    const guardedK = new Kizuna<{
-        identities: {
-            user: typeof guardedKUser;
-        };
-    }>();
 
     const guardedContract = () =>
         defineConfig({

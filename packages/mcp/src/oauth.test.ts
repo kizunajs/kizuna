@@ -165,7 +165,6 @@ const apiRoutes = k.routes('api', {
             method: 'GET',
             path: '/users/:id',
             tool: true,
-            summary: 'Test route get user',
             auth: 'user',
             summary: 'Get a user by id',
             responses: {
@@ -238,7 +237,6 @@ const apiRoutes = k.routes('api', {
             method: 'GET',
             path: '/member-facts',
             tool: true,
-            summary: 'Test route member facts',
             auth: 'member',
             summary: 'Facts for the workspace service',
             responses: {

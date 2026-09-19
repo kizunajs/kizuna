@@ -1,19 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
-import { Kizuna } from '@ts-kizuna/core';
 import { honoAdapter } from './server.js';
 import { userInput, resetUsers } from '../../core/src/adapter-testing/fixtures.js';
 import { defineConfig } from '@ts-kizuna/core';
-
-interface Config {
-    adapter: typeof honoAdapter;
-}
-
-const k = new Kizuna<Config>();
-
-const config = {
-    adapter: honoAdapter,
-};
 
 describe('api.mount', () => {
     it('serves routes', async () => {

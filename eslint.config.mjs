@@ -40,12 +40,26 @@ export default [
             rules: {
                 'prettier/prettier': 'warn',
                 '@typescript-eslint/no-empty-object-type': 'off',
-                '@typescript-eslint/no-unused-vars': 'off',
+                '@typescript-eslint/no-unused-vars': [
+                    'error',
+                    {
+                        args: 'after-used',
+                        argsIgnorePattern: '^_',
+                        varsIgnorePattern: '^_',
+                        caughtErrors: 'none',
+                    },
+                ],
                 '@typescript-eslint/no-explicit-any': 'off',
                 'jsdoc/multiline-blocks': ['warn', { noSingleLineBlocks: true }],
                 'jsdoc/require-asterisk-prefix': ['warn', 'always'],
             },
         }
     ),
+    {
+        files: ['**/*.test.ts', '**/*.test-d.ts', '**/*.fixture.ts'],
+        rules: {
+            '@typescript-eslint/no-unused-vars': 'off',
+        },
+    },
     kizuna.configs.recommended,
 ];

@@ -9,8 +9,6 @@ interface Config {}
 
 const k = new Kizuna<Config>();
 
-const config = {};
-
 const jobs = k.jobs({
     cleanup: {},
     users: {

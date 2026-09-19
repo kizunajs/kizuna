@@ -176,9 +176,7 @@ type StreamOptionsOut<U, TData, TError> = Omit<NoInfer<U>, 'input' | 'refetchMod
     queryFn: U extends { input: SkipToken } ? SkipToken : QueryFunction<TData, KizunaQueryKey>;
 };
 
-type StreamOptionsFn<R extends RouteDefinition, Codes extends string> = <
-    U extends QueryInput<R> & StreamExtras<StreamMessageOfRoute<R>[], DefaultError>,
->(
+type StreamOptionsFn<R extends RouteDefinition> = <U extends QueryInput<R> & StreamExtras<StreamMessageOfRoute<R>[], DefaultError>>(
     options: U
 ) => StreamOptionsOut<U, StreamMessageOfRoute<R>[], DefaultError>;
 
@@ -191,7 +189,7 @@ export interface StreamProcedure<R extends RouteDefinition, Codes extends string
      * Options for `useQuery`, over TanStack's `streamedQuery`. A status other than
      * the streamed one throws `NonStreamResponseError`.
      */
-    streamOptions: StreamOptionsFn<R, Codes>;
+    streamOptions: StreamOptionsFn<R>;
     /**
      * The stream query's full key.
      */

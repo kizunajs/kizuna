@@ -76,7 +76,7 @@ const resolve = (auth: Auth): RouteDefinition => {
                 getWorkspace: route,
             },
         }),
-    }).api;
+    });
     return route as RouteDefinition;
 };
 
@@ -157,13 +157,13 @@ describe('a route resolving its auth', () => {
         defineConfig({
             ...k2Config,
             routes,
-        }).api;
+        });
 
         route.auth = 'member';
         defineConfig({
             ...k2Config,
             routes,
-        }).api;
+        });
 
         expect((route as RouteDefinition).requires).toBeUndefined();
         expect((route as RouteDefinition).roles).toBeUndefined();
@@ -273,7 +273,7 @@ describe('a route that declares no auth', () => {
                     live: route,
                 },
             }),
-        }).api;
+        });
 
         expect((route as RouteDefinition).security).toEqual([]);
     });

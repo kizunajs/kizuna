@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 import { deprecationHeaders } from './deprecation.js';
 import type { RouteDefinition } from './types.js';
@@ -151,7 +150,6 @@ describe('deprecationHeaders', () => {
 
 describe('k.contract date validation', () => {
     const contractWith = (overrides: Partial<RouteDefinition>) => {
-        const k = new Kizuna();
         return () =>
             defineConfig({
                 routes: {

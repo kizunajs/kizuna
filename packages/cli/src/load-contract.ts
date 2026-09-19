@@ -27,13 +27,6 @@ const isContract = (value: unknown): value is Contract =>
 const cacheOf = (jiti: unknown): Record<string, unknown> => (jiti as { cache?: Record<string, unknown> }).cache ?? {};
 
 /**
- * Whether a file is one an author edits. Dependencies arrive from
- * `node_modules`, and a workspace sibling arrives from its `dist`, so neither
- * belongs in a contract's own source graph.
- */
-const isSource = (file: string): boolean => !file.includes('node_modules') && !file.includes('/dist/');
-
-/**
  * Imports a contract module with jiti (so a `.ts` entry works without a build
  * step) and returns the named export (default `contract`) or the default export.
  * Returns undefined when neither is present.

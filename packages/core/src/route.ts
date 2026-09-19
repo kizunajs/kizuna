@@ -7,7 +7,7 @@ import type { AuthoredRouteDefinition, RouteHandlerFunction } from './types.js';
  * argument types, so a config that lists routes never depends on what a handler
  * reads back off that config.
  */
-export type RouteWithHandler<Definition extends AuthoredRouteDefinition, HandlerContext = unknown> = Definition & {
+export type RouteWithHandler<Definition extends AuthoredRouteDefinition> = Definition & {
     readonly [HANDLER]: RouteHandlerFunction;
 };
 
@@ -24,7 +24,7 @@ interface RouteHandlerStep<Definition extends AuthoredRouteDefinition, HandlerCo
      * `headers` are typed from the route, and the return is checked against its
      * `responses`.
      */
-    handler(fn: RouteHandler<Definition, HandlerContext>): RouteWithHandler<Definition, HandlerContext>;
+    handler(fn: RouteHandler<Definition, HandlerContext>): RouteWithHandler<Definition>;
 }
 
 export const createRoute = <Definition extends AuthoredRouteDefinition>(definition: Definition): RouteBuilder<Definition> =>

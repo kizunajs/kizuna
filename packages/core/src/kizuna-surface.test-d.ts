@@ -10,9 +10,6 @@ interface Config {
 const k = new Kizuna<Config>();
 
 const kTags = k.tags({ users: { title: 'Users' } });
-const config = {
-    tags: kTags,
-};
 
 test('issueCodes literal is preserved, not widened to string', () => {
     const schema = z.string().superRefine((value, ctx) => {

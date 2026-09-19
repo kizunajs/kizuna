@@ -1,6 +1,6 @@
 import { HANDLER } from './types.js';
 import { z } from 'zod';
-import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method, RequiredPermissions } from './types.js';
+import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import { authenticationChallenge, resolveSecurityRequirements } from './security-scheme.js';
 import type { Credential, NoCredential } from './identity.js';
@@ -126,11 +126,6 @@ export const GUARD_SCHEMA_META: unique symbol = Symbol.for('ts-kizuna.guardSchem
 export const REQUEST_CONTEXT_META: unique symbol = Symbol.for('ts-kizuna.request-context') as symbol as typeof REQUEST_CONTEXT_META;
 const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
 export const JOBS_META: unique symbol = Symbol.for('ts-kizuna.jobs') as symbol as typeof JOBS_META;
-
-/**
- * What `server.tools` stamps on the api: the contract's tools and the handler
- * for each.
- */
 
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
