@@ -9,7 +9,7 @@ import { createPlugin } from '@ts-kizuna/core/adapter';
 
 interface Config {
     plugins: [ReturnType<typeof probePlugin>];
-    adapter: typeof expressAdapter;
+    adapter: ReturnType<typeof expressAdapter>;
     tags: typeof kTags;
 }
 
@@ -71,7 +71,7 @@ const routes = k.routes('api', {
 });
 
 const contract = defineConfig({
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     ...config,
     plugins: [probePlugin({ label: 'probed' })],
     routes,

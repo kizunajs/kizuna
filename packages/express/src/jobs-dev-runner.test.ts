@@ -10,7 +10,7 @@ import type { AddressInfo } from 'node:net';
 import { startJobsDevRunner, type JobsDevRunner } from '@ts-kizuna/core/jobs';
 
 interface Config {
-    adapter: typeof expressAdapter;
+    adapter: ReturnType<typeof expressAdapter>;
     identities: {
         scheduler: typeof scheduler;
     };
@@ -76,7 +76,7 @@ const jobs = k.jobs('scheduler', {
 
 const contract = defineConfig({
     ...config,
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     routes,
     jobs,
 }).api;

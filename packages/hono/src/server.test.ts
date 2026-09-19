@@ -7,7 +7,7 @@ import { honoAdapter, type HonoApi } from './server.js';
 import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 interface Config {
-    adapter: typeof honoAdapter;
+    adapter: ReturnType<typeof honoAdapter>;
     tags: typeof kTags;
 }
 
@@ -42,7 +42,7 @@ describe('Hono: handler context', () => {
                 })),
         });
         const contextContract = defineConfig({
-            adapter: honoAdapter,
+            adapter: honoAdapter(),
             ...config,
             routes: contextRoutes,
         }).api;
@@ -58,7 +58,7 @@ describe('Hono: handler context', () => {
 
 testAdapterFeatures({
     name: 'hono',
-    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: honoAdapter }).api as unknown as HonoApi,
+    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: honoAdapter() }).api as unknown as HonoApi,
     mount: (api, { responseValidation }) => {
         const app = new Hono();
         api.mount(app, {

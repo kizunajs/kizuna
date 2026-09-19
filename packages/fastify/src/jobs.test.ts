@@ -8,7 +8,7 @@ import { fastifyAdapter } from './server.js';
 let failing = false;
 
 interface Config {
-    adapter: typeof fastifyAdapter;
+    adapter: ReturnType<typeof fastifyAdapter>;
     identities: {
         scheduler: typeof scheduler;
     };
@@ -96,7 +96,7 @@ const jobs = k.jobs('scheduler', {
 
 const contract = defineConfig({
     ...config,
-    adapter: fastifyAdapter,
+    adapter: fastifyAdapter(),
     routes,
     jobs,
 }).api;

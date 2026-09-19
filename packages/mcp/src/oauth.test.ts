@@ -254,7 +254,7 @@ const apiRoutes = k.routes('api', {
 });
 
 const contract = defineConfig({
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     ...config,
     routes: {
         api: apiRoutes,
@@ -541,7 +541,7 @@ describe('mcpPlugin: oauth declaration', () => {
         expect(() =>
             defineConfig({
                 ...config,
-                adapter: expressAdapter,
+                adapter: expressAdapter(),
                 routes: {
                     api: apiRoutes,
                 },

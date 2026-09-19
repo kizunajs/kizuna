@@ -19,7 +19,7 @@ import {
 import { fastifyAdapter, type FastifyHandlerContext, type FastifyPreHandler, type RouteHandler, type Router } from './server.js';
 
 interface LocalConfig {
-    adapter: typeof fastifyAdapter;
+    adapter: ReturnType<typeof fastifyAdapter>;
     identities: {
         user: typeof localUser;
         member: typeof localMember;
@@ -364,5 +364,5 @@ test('FastifyPreHandler matches a plugin prehandler', () => {
 });
 
 test('the Fastify adapter is a value carrying its handler context', () => {
-    expectTypeOf<HandlerContextOf<typeof fastifyAdapter>>().toEqualTypeOf<FastifyHandlerContext>();
+    expectTypeOf<HandlerContextOf<ReturnType<typeof fastifyAdapter>>>().toEqualTypeOf<FastifyHandlerContext>();
 });

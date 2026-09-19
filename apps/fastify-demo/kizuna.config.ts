@@ -14,7 +14,7 @@ const served = {
 };
 
 export const { api } = defineConfig({
-    adapter: fastifyAdapter,
+    adapter: fastifyAdapter(),
     tags,
     identities: {
         user,

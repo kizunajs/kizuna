@@ -19,7 +19,7 @@ import {
 import { nextAdapter, type NextHandlerContext, type NextMiddlewareHandler, type RouteHandler, type Router } from './server.js';
 
 interface LocalConfig {
-    adapter: typeof nextAdapter;
+    adapter: ReturnType<typeof nextAdapter>;
     identities: {
         user: typeof localUser;
         member: typeof localMember;
@@ -363,5 +363,5 @@ test('NextMiddlewareHandler receives the Next request', () => {
 });
 
 test('the Next adapter is a value carrying its handler context', () => {
-    expectTypeOf<HandlerContextOf<typeof nextAdapter>>().toEqualTypeOf<NextHandlerContext>();
+    expectTypeOf<HandlerContextOf<ReturnType<typeof nextAdapter>>>().toEqualTypeOf<NextHandlerContext>();
 });

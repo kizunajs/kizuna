@@ -7,7 +7,7 @@ import { nextAdapter, NextRequest, NextResponse, type NextApi } from './server.j
 import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 interface Config {
-    adapter: typeof nextAdapter;
+    adapter: ReturnType<typeof nextAdapter>;
     tags: typeof kTags;
 }
 
@@ -83,7 +83,7 @@ const contractRoutes = k.routes('api', {
 });
 
 const contract = defineConfig({
-    adapter: nextAdapter,
+    adapter: nextAdapter(),
     ...config,
     routes: contractRoutes,
 }).api;
@@ -146,7 +146,7 @@ describe('Next.js handler', () => {
         });
         const { api: throwingApi } = defineConfig({
             ...config,
-            adapter: nextAdapter,
+            adapter: nextAdapter(),
             routes: throwingRoutes,
         });
         const { GET: boomGET } = throwingApi.mount({
@@ -223,7 +223,7 @@ describe('Next.js handler: alternate content types', () => {
             }),
     });
     const uploadContract = defineConfig({
-        adapter: nextAdapter,
+        adapter: nextAdapter(),
         ...config,
         routes: uploadRoutes,
     }).api;
@@ -297,7 +297,7 @@ describe('Next.js handler: requestMiddleware', () => {
     });
 
     const middlewareContract = defineConfig({
-        adapter: nextAdapter,
+        adapter: nextAdapter(),
         ...config,
         routes: middlewareContractRoutes,
     }).api;
@@ -404,7 +404,7 @@ describe('Next.js handler: requestMiddleware', () => {
 
 testAdapterFeatures({
     name: 'next',
-    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: nextAdapter }).api as unknown as NextApi,
+    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: nextAdapter() }).api as unknown as NextApi,
     mount: (api, { responseValidation }) => {
         const handlers = api.mount({
             basePath: '/api',

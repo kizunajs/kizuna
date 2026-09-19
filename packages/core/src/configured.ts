@@ -17,7 +17,7 @@ import type { z } from 'zod';
  * ```ts
  * // src/kizuna.types.ts, generated
  * export interface Config {
- *     adapter: typeof expressAdapter;
+ *     adapter: ReturnType<typeof expressAdapter>;
  *     tags: typeof tags;
  *     identities: { user: typeof user };
  *     jobs: typeof jobs;

@@ -7,7 +7,7 @@ import { defineConfig } from '@ts-kizuna/core';
 describe('api.mount', () => {
     it('serves routes', async () => {
         resetUsers();
-        const api = defineConfig({ ...userInput, adapter: honoAdapter }).api;
+        const api = defineConfig({ ...userInput, adapter: honoAdapter() }).api;
         const app = new Hono();
         api.mount(app);
         await app.request('/users', {

@@ -21,7 +21,7 @@ import {
 import { expressAdapter, type ExpressHandlerContext, type RouteHandler, type Router } from './server.js';
 
 interface LocalConfig {
-    adapter: typeof expressAdapter;
+    adapter: ReturnType<typeof expressAdapter>;
     identities: {
         user: typeof localUser;
         member: typeof localMember;
@@ -365,5 +365,5 @@ test('a request context resolver reads the Express request', () => {
 });
 
 test('the Express adapter is a value carrying its handler context', () => {
-    expectTypeOf<HandlerContextOf<typeof expressAdapter>>().toEqualTypeOf<ExpressHandlerContext>();
+    expectTypeOf<HandlerContextOf<ReturnType<typeof expressAdapter>>>().toEqualTypeOf<ExpressHandlerContext>();
 });

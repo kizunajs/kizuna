@@ -9,7 +9,7 @@ import type { openApiPlugin } from '@ts-kizuna/openapi';
 import type { GuardSchema, analytics, jobs, tags, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
 
 export interface Config {
-    adapter: typeof honoAdapter;
+    adapter: ReturnType<typeof honoAdapter>;
     tags: typeof tags;
     identities: {
         user: typeof user;

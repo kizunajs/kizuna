@@ -14,7 +14,7 @@ const served = {
 };
 
 export const { api } = defineConfig({
-    adapter: honoAdapter,
+    adapter: honoAdapter(),
     tags,
     identities: {
         user,

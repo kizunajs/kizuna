@@ -364,7 +364,7 @@ export declare const ADAPTER_CONTEXT: unique symbol;
  * import { expressAdapter } from '@ts-kizuna/express';
  *
  * export const k = new Kizuna({
- *     adapter: expressAdapter,
+ *     adapter: expressAdapter(),
  * });
  */
 export interface Adapter<HandlerContext = unknown, MountArgs extends readonly unknown[] = readonly unknown[], Mounted = unknown> {

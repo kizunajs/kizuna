@@ -26,7 +26,7 @@ interface SessionEnv extends Env {
 }
 
 interface LocalConfig {
-    adapter: typeof honoAdapter;
+    adapter: ReturnType<typeof honoAdapter>;
     identities: {
         user: typeof localUser;
         member: typeof localMember;
@@ -374,5 +374,5 @@ test('the Env generic threads through the handler context', () => {
 });
 
 test('the Hono adapter is a value carrying its handler context', () => {
-    expectTypeOf<HandlerContextOf<typeof honoAdapter>>().toEqualTypeOf<HonoHandlerContext<Env>>();
+    expectTypeOf<HandlerContextOf<ReturnType<typeof honoAdapter>>>().toEqualTypeOf<HonoHandlerContext<Env>>();
 });

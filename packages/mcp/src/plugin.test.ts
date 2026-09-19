@@ -46,7 +46,7 @@ const routes = k.routes('api', {
 });
 
 const contract = defineConfig({
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     ...config,
     plugins: [
         mcpPlugin({
@@ -175,7 +175,7 @@ const selective = k.routes('api', {
 });
 
 const selectiveContract = defineConfig({
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     ...config,
     routes: selective,
     plugins: [

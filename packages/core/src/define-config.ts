@@ -277,7 +277,7 @@ export type ConfiguredApi<
  *
  * @example
  * export const { api } = defineConfig({
- *     adapter: expressAdapter,
+ *     adapter: expressAdapter(),
  *     identities: {
  *         user,
  *     },

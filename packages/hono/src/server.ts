@@ -206,10 +206,10 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
  * import { honoAdapter } from '@ts-kizuna/hono';
  *
  * export const k = new Kizuna({
- *     adapter: honoAdapter,
+ *     adapter: honoAdapter(),
  * });
  */
-export const honoAdapter: Adapter<HonoHandlerContext<Env>, [app: Hono, options?: HonoOptions], void> = {
+export const honoAdapter = (defaults?: HonoOptions): Adapter<HonoHandlerContext<Env>, [app: Hono, options?: HonoOptions], void> => ({
     name: 'hono',
-    mount: (api, app, options) => mountHono(api as HonoApi, app, options),
-};
+    mount: (api, app, options) => mountHono(api as HonoApi, app, { ...defaults, ...options }),
+});

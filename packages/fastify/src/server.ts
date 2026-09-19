@@ -287,15 +287,18 @@ export const fastifyKizuna = fastifyPlugin(
  * import { fastifyAdapter } from '@ts-kizuna/fastify';
  *
  * export const k = new Kizuna({
- *     adapter: fastifyAdapter,
+ *     adapter: fastifyAdapter(),
  * });
  */
-export const fastifyAdapter: Adapter<FastifyHandlerContext, [app: FastifyInstance, options?: FastifyOptions], Promise<void>> = {
+export const fastifyAdapter = (
+    defaults?: FastifyOptions
+): Adapter<FastifyHandlerContext, [app: FastifyInstance, options?: FastifyOptions], Promise<void>> => ({
     name: 'fastify',
     mount: async (api, app, options) => {
         await app.register(fastifyKizuna, {
-            ...(options ?? {}),
+            ...defaults,
+            ...options,
             api: api as FastifyApi,
         });
     },
-};
+});

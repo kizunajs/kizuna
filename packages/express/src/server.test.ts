@@ -8,7 +8,7 @@ import { defineConfig } from '@ts-kizuna/core';
 
 testAdapterFeatures({
     name: 'express',
-    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: expressAdapter }).api as unknown as ExpressApi,
+    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: expressAdapter() }).api as unknown as ExpressApi,
     mount: (api, { responseValidation }) => {
         const app = express();
         app.use(express.json());

@@ -8,7 +8,7 @@ import { fastifyAdapter, type FastifyApi } from './server.js';
 import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 interface Config {
-    adapter: typeof fastifyAdapter;
+    adapter: ReturnType<typeof fastifyAdapter>;
     tags: typeof kTags;
 }
 
@@ -43,7 +43,7 @@ describe('Fastify: handler context', () => {
                 })),
         });
         const contextContract = defineConfig({
-            adapter: fastifyAdapter,
+            adapter: fastifyAdapter(),
             ...config,
             routes: contextRoutes,
         }).api;
@@ -63,7 +63,7 @@ describe('Fastify: handler context', () => {
 
 testAdapterFeatures({
     name: 'fastify',
-    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: fastifyAdapter }).api as unknown as FastifyApi,
+    createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: fastifyAdapter() }).api as unknown as FastifyApi,
     mount: async (api, { responseValidation }) => {
         const app = Fastify();
         await api.mount(app, {

@@ -36,7 +36,7 @@ export interface AdapterUnderTest<Api> {
      * the api and its `mount` come from the same copy of core.
      *
      * @example
-     * createApi: (input) => defineConfig({ ...input, adapter: expressAdapter }).api
+     * createApi: (input) => defineConfig({ ...input, adapter: expressAdapter() }).api
      */
     createApi: (input: never) => Api;
     mount: (api: Api, options: { responseValidation?: boolean }) => Transport | Promise<Transport>;

@@ -275,10 +275,12 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
  * import { expressAdapter } from '@ts-kizuna/express';
  *
  * export const k = new Kizuna({
- *     adapter: expressAdapter,
+ *     adapter: expressAdapter(),
  * });
  */
-export const expressAdapter: Adapter<ExpressHandlerContext, [app: AppLike, options?: ExpressOptions], ExpressRouter> = {
+export const expressAdapter = (
+    defaults?: ExpressOptions
+): Adapter<ExpressHandlerContext, [app: AppLike, options?: ExpressOptions], ExpressRouter> => ({
     name: 'express',
-    mount: (api, app, options) => mountExpress(api as ExpressApi, app, options),
-};
+    mount: (api, app, options) => mountExpress(api as ExpressApi, app, { ...defaults, ...options }),
+});

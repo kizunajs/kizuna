@@ -22,7 +22,7 @@ const config = {
 };
 
 const contract = defineConfig({
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     ...config,
     plugins: [
         openApiPlugin({
@@ -99,7 +99,7 @@ describe('openApiPlugin', () => {
             tags: typeof servedKTags;
         }>();
         const servedContract = defineConfig({
-            adapter: expressAdapter,
+            adapter: expressAdapter(),
             ...servedKConfig,
             plugins: [
                 openApiPlugin({
@@ -178,7 +178,7 @@ describe('openApiPlugin', () => {
             tags: typeof specOnlyKTags;
         }>();
         const specOnly = defineConfig({
-            adapter: expressAdapter,
+            adapter: expressAdapter(),
             ...specOnlyKConfig,
             plugins: [
                 openApiPlugin({
@@ -227,7 +227,7 @@ describe('openApiPlugin', () => {
             tags: typeof customKTags;
         }>();
         const custom = defineConfig({
-            adapter: expressAdapter,
+            adapter: expressAdapter(),
             ...customKConfig,
             plugins: [
                 openApiPlugin({
@@ -279,7 +279,7 @@ describe('openApiPlugin', () => {
             tags: typeof jsonOnlyKTags;
         }>();
         const jsonOnly = defineConfig({
-            adapter: expressAdapter,
+            adapter: expressAdapter(),
             ...jsonOnlyKConfig,
             plugins: [
                 openApiPlugin({

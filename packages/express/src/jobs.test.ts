@@ -12,7 +12,7 @@ let failing = false;
 
 interface Config {
     jobs: typeof jobs;
-    adapter: typeof expressAdapter;
+    adapter: ReturnType<typeof expressAdapter>;
     identities: {
         scheduler: typeof scheduler;
     };
@@ -131,7 +131,7 @@ const jobs = k.jobs('scheduler', {
 
 const contract = defineConfig({
     ...config,
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     routes,
     jobs,
 }).api;
@@ -294,7 +294,7 @@ describe('a job outside a tick', () => {
     it('reports a job with no handler as failed rather than 500ing the tick', async () => {
         const { api } = defineConfig({
             ...config,
-            adapter: expressAdapter,
+            adapter: expressAdapter(),
             routes,
             jobs: k.jobs('scheduler', {
                 sendDigests: k.job({
@@ -318,7 +318,7 @@ describe('onJobError', () => {
     const buildAppWithout = (onJobError?: (job: string, error: unknown) => void) => {
         const { api } = defineConfig({
             ...config,
-            adapter: expressAdapter,
+            adapter: expressAdapter(),
             routes,
             jobs: k.jobs('scheduler', {
                 sendDigests: k

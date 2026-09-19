@@ -6,7 +6,7 @@ import { defineConfig } from '@ts-kizuna/core';
 import { honoAdapter } from './server.js';
 
 interface Config {
-    adapter: typeof honoAdapter;
+    adapter: ReturnType<typeof honoAdapter>;
     identities: {
         scheduler: typeof scheduler;
     };
@@ -94,7 +94,7 @@ const jobs = k.jobs('scheduler', {
 
 const contract = defineConfig({
     ...config,
-    adapter: honoAdapter,
+    adapter: honoAdapter(),
     routes,
     jobs,
 }).api;

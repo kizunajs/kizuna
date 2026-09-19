@@ -6,7 +6,7 @@ import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 
 interface Config {
-    adapter: typeof nextAdapter;
+    adapter: ReturnType<typeof nextAdapter>;
     identities: {
         scheduler: typeof scheduler;
     };
@@ -93,7 +93,7 @@ const jobs = k.jobs('scheduler', {
 
 const contract = defineConfig({
     ...config,
-    adapter: nextAdapter,
+    adapter: nextAdapter(),
     routes,
     jobs,
 }).api;

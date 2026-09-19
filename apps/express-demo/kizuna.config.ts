@@ -14,7 +14,7 @@ const served = {
 };
 
 export const { api } = defineConfig({
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     tags,
     identities: {
         user,

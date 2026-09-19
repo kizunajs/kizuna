@@ -8,7 +8,7 @@ import { defineConfig } from '@ts-kizuna/core';
 describe('api.mount', () => {
     it('serves routes', async () => {
         resetUsers();
-        const api = defineConfig({ ...userInput, adapter: expressAdapter }).api;
+        const api = defineConfig({ ...userInput, adapter: expressAdapter() }).api;
         const app = express();
         app.use(express.json());
         api.mount(app);

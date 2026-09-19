@@ -387,10 +387,10 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
  * import { nextAdapter } from '@ts-kizuna/next';
  *
  * export const k = new Kizuna({
- *     adapter: nextAdapter,
+ *     adapter: nextAdapter(),
  * });
  */
-export const nextAdapter: Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> = {
+export const nextAdapter = (defaults?: NextHandlerOptions): Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> => ({
     name: 'next',
-    mount: (api, options) => mountNext(api as NextApiWithRouter, options),
-};
+    mount: (api, options) => mountNext(api as NextApiWithRouter, { ...defaults, ...options }),
+});

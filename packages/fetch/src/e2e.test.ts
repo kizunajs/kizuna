@@ -9,7 +9,7 @@ import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { KizunaClient, type Client } from '@ts-kizuna/fetch';
 
 interface Config {
-    adapter: typeof expressAdapter;
+    adapter: ReturnType<typeof expressAdapter>;
     tags: typeof kTags;
 }
 
@@ -93,7 +93,7 @@ const contractRoutes = k.routes('api', {
 const users = new Map<string, { id: string; name: string; email: string }>();
 
 const contract = defineConfig({
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     ...config,
     routes: contractRoutes,
 }).api;
@@ -194,7 +194,7 @@ const contractWithResponseHeadersRoutes = k.routes('api', {
 });
 
 const contractWithResponseHeaders = defineConfig({
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     ...config,
     routes: contractWithResponseHeadersRoutes,
 }).api;
@@ -290,7 +290,7 @@ const securedRoutes = securedK.routes({
 });
 
 const securedContract = defineConfig({
-    adapter: expressAdapter,
+    adapter: expressAdapter(),
     ...securedKConfig,
     routes: {
         api: securedRoutes,

@@ -7,7 +7,7 @@ import { defineConfig } from '@ts-kizuna/core';
 describe('api.mount and the fastify plugin', () => {
     it('mount(app) serves routes', async () => {
         resetUsers();
-        const api = defineConfig({ ...userInput, adapter: fastifyAdapter }).api;
+        const api = defineConfig({ ...userInput, adapter: fastifyAdapter() }).api;
         const app = Fastify();
         await api.mount(app);
         await app.inject({ method: 'POST', url: '/users', payload: { name: 'Ada', email: 'ada@example.com' } });
@@ -16,7 +16,7 @@ describe('api.mount and the fastify plugin', () => {
 
     it('app.register(fastifyKizuna) serves routes', async () => {
         resetUsers();
-        const api = defineConfig({ ...userInput, adapter: fastifyAdapter }).api;
+        const api = defineConfig({ ...userInput, adapter: fastifyAdapter() }).api;
         const app = Fastify();
         await app.register(fastifyKizuna, { api: api as never });
         await app.inject({ method: 'POST', url: '/users', payload: { name: 'Ada', email: 'ada@example.com' } });
