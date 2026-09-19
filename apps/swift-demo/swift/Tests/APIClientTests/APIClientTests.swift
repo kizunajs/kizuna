@@ -493,9 +493,9 @@ final class APIClientTests: XCTestCase {
 
     func testTrackToolCallsFoldsCallsAndResults() throws {
         let events: [APIClient.AssistantReply.Event] = [
-            .tool_call(.countWords(id: "toolu_01", input: .init(text: "one two three"))),
+            .tool_call(.countWords(id: "toolu_01", input: .init(body: .init(text: "one two three")))),
             .tool_result(.countWords(id: "toolu_01", output: .init(words: 3))),
-            .tool_call(.weather_getForecast(id: "toolu_02", input: .init(city: "Oslo", unit: .celsius))),
+            .tool_call(.getForecast(id: "toolu_02", input: .init(params: .init(city: "Oslo"), query: .init(unit: .celsius)))),
         ]
 
         let tracked = APIClient.AssistantReply.readToolCalls(events)
