@@ -65,7 +65,7 @@ Path parameters, query parameters, and headers arrive as strings, and kizuna coe
 
 ## Custom issue codes
 
-A `.refine()` failure reports its code as `custom`. Declare `issueCodes` in [`defineConfig`](/docs/reference/define-config) and raise them with [`k.issue`](/docs/reference/k-issue) to put a typed, machine-readable code in `errors[].code` instead.
+A `.refine()` failure reports its code as `custom`. Declare `validation.issueCodes` in [`defineConfig`](/docs/reference/define-config) and raise them with [`k.issue`](/docs/reference/k-issue) to put a typed, machine-readable code in `errors[].code` instead.
 
 ## Binary bodies and uploads
 

@@ -7,7 +7,6 @@
         "project-structure",
         "---Writing routes---",
         "routes",
-        "handlers",
         "streaming",
         "caching",
         "deprecations",

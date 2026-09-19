@@ -87,7 +87,7 @@ export const users = k.routes('users', {
 });
 ```
 
-The handler's `query` and `body` are typed from the declaration right above it, and its return is checked against that route's `responses`. See [Handlers](/docs/handlers) for everything a handler receives.
+The handler's `query` and `body` are typed from the declaration right above it, and its return is checked against that route's `responses`. See [Routes](/docs/routes) for everything a handler receives.
 
 A route only a generator or a client reads can skip `.handler()`. One your config serves cannot.
 
@@ -143,6 +143,214 @@ pathParams: z.object({
     tags: z.string().transform((value) => value.split(',')),
 }),
 ```
+
+## Handler arguments
+
+Each handler receives an object with the validated inputs for that route:
+
+| Property           | Available when                                                     |
+| ------------------ | ------------------------------------------------------------------ |
+| `params`           | Route path has `:param` placeholders                               |
+| `query`            | Route has a `query` schema                                         |
+| `body`             | Route has a `body` schema                                          |
+| `headers`          | Route has a `headers` schema                                       |
+| `throwError`       | Always                                                             |
+| `auth`             | Route's [`auth`](/docs/access-control) names an identity           |
+| `requestContext`   | Config declares [request context](/docs/request-context)           |
+| `plugins`          | Config declares [plugins](/docs/config#using-what-a-plugin-offers) |
+| `jobs`             | Config declares [jobs](/docs/jobs)                                 |
+| `req`, `res`       | Express adapter                                                    |
+| `c`                | Hono adapter                                                       |
+| `request`, `reply` | Fastify adapter                                                    |
+| `request`          | Next.js adapter                                                    |
+
+Which framework object arrives is decided by the `adapter` your config names, so a handler reads `req` or `c` without importing either framework's types.
+
+## Identity context
+
+When a route's [`auth`](/docs/access-control) names an identity, the handler receives that identity's context under `auth`, keyed by the identity's name. The context is whatever its guard returned, typed by the identity's `context` schema, with `role` beside it when the identity declares roles, and `permissions` when those roles come from a catalog. A row check goes here too, with `auth` in hand. See [Access Control](/docs/access-control#one-row).
+
+```ts title="src/routes/members.ts"
+listMembers: k
+    .route({
+        method: 'GET',
+        path: '/members',
+        auth: 'user',
+        responses: {
+            200: MemberListSchema,
+        },
+    })
+    .handler(({ auth }) => ({
+        status: 200,
+        body: {
+            members: findMembersExcept(auth.user.userId),
+        },
+    })),
+```
+
+A route requiring several identities receives all of them under `auth`:
+
+```ts title="src/routes/workspace.ts"
+.handler(({ body, auth }) => {
+    // auth.user.userId and auth.member.workspaceUserId are both there, typed
+});
+```
+
+A route whose `auth` names `roles` or `requires` is checked before the handler runs, so the handler never asks whether the caller may be there. It reads the role when it needs it for something else, such as an audit line:
+
+```ts title="src/routes/workspace.ts"
+deleteWorkspace: k
+    .route({
+        method: 'DELETE',
+        path: '/workspace',
+        auth: {
+            identity: 'member',
+            requires: {
+                workspace: ['delete'],
+            },
+        },
+        responses: {
+            200: OkSchema,
+        },
+    })
+    .handler(async ({ auth }) => {
+        await audit('workspace.deleted', {
+            by: auth.member.workspaceUserId,
+            as: auth.member.role,
+        });
+
+        return {
+            status: 200,
+            body: {
+                ok: true,
+            },
+        };
+    }),
+```
+
+Values declared as [request context](/docs/request-context) arrive the same way, under `requestContext` on every route.
+
+## Return type
+
+Return `{ status, body }` matching one of the route's declared responses. TypeScript enforces that the status and body match.
+
+```ts
+// Route: responses: { 200: UserSchema, 404: ProblemDetailsSchema }
+return {
+    status: 200,
+    body: user,
+};
+
+return {
+    status: 404,
+    body: {
+        detail: 'User not found',
+    },
+};
+```
+
+For routes with typed response headers, include `headers` too:
+
+```ts
+return {
+    status: 200,
+    body: user,
+    headers: {
+        'x-request-id': req.headers['x-request-id'] ?? '',
+    },
+};
+```
+
+A status declared with [`stream`](/docs/streaming) takes an async generator function as `body`. kizuna sends the status and headers, then writes each `yield` as it happens:
+
+```ts
+return {
+    status: 200,
+    body: async function* ({ signal }) {
+        yield {
+            event: 'delta',
+            data: {
+                text: 'Hello',
+            },
+        };
+    },
+};
+```
+
+`signal` fires when the client goes away. `throwError` takes no streamed status.
+
+A response with a [cache policy](/docs/caching) sends its `Cache-Control` whenever your handler returns that status. The declaration wins, so returning a `cache-control` of your own does not change it.
+
+## Error responses
+
+Use [`ProblemDetailsSchema`](/docs/reference/problem-details-schema) from `@ts-kizuna/core/schemas` for error status codes. This is the same shape [`deny()`](/docs/reference/k-identity) produces in guards, and the one every built-in kizuna error uses.
+
+In the handler, `throwError` returns a typed error response. It takes the same `{ status, body }` as a normal return but throws internally, which is useful in branching logic where you want to bail out early:
+
+```ts title="src/routes/users.ts"
+.handler(async ({ params, throwError }) => {
+    const user = await db.users.findById(params.id);
+    if (!user) {
+        return throwError({
+            status: 404,
+            body: {
+                detail: 'Not found',
+            },
+        });
+    }
+    return {
+        status: 200,
+        body: user,
+    };
+});
+```
+
+TypeScript enforces the status and body the same way it does for a return value.
+
+## Validation errors
+
+When a request body or query fails schema validation, kizuna returns a `400` before the handler runs:
+
+```json
+{
+    "type": "about:blank",
+    "title": "Bad Request",
+    "status": 400,
+    "detail": "Request validation failed",
+    "errors": [
+        {
+            "code": "invalid_type",
+            "path": ["email"],
+            "message": "Expected string, received number"
+        },
+        {
+            "code": "invalid_phone_number",
+            "path": ["phone"],
+            "message": "Must include country code"
+        }
+    ]
+}
+```
+
+Each issue includes a `code` that tells you _why_ the field failed, not just _that_ it failed. Codes come from Zod's built-in validation:
+
+| Code                    | When it fires                             |
+| ----------------------- | ----------------------------------------- |
+| `invalid_type`          | Wrong type or missing required field      |
+| `too_small`             | Below `min()` / `minLength()`             |
+| `too_big`               | Above `max()` / `maxLength()`             |
+| `invalid_string_format` | Failed `email()`, `url()`, `uuid()`, etc. |
+| `unrecognized_keys`     | Extra keys when using `strict()`          |
+| `not_multiple_of`       | Failed `multipleOf()`                     |
+| `custom`                | `.refine()` or `.superRefine()` check     |
+
+User-defined checks (`.refine()`) report as `custom` by default. To emit a **typed** code instead, like `invalid_phone_number` above, declare it under `validation.issueCodes` on [`defineConfig`](/docs/reference/define-config) and raise it with [`k.issue`](/docs/reference/k-issue). It then shows up in `errors[].code` as a typed literal on both the server and the generated client, not a bare `string`.
+
+The `message` and `path` fields come from your Zod schemas, custom messages (`z.string().min(1, 'Name is required')`) included.
+
+This `400` is reflected in the [fetch client](/docs/clients/fetch#validation-errors) return type and the [OpenAPI spec](/docs/openapi) for any route that declares a `body` or `query` schema.
+
+If you declare your own `400` response, the client sees a union of both your type and kizuna's `ValidationError`. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) on the client to distinguish them.
 
 ## Query, path, and header coercion
 
@@ -443,8 +651,9 @@ function UserCard({ user }: { user: User }) {
 - [`k.route`](/docs/reference/k-route)
 - [`Kizuna.model`](/docs/reference/kizuna-model)
 - [`k.tags`](/docs/reference/k-tags)
+- [`isValidationError`](/docs/reference/is-validation-error)
 
 ## Next steps
 
-- [Handlers](/docs/handlers) for everything a handler receives
-- [Mounting](/docs/config) to assemble it and serve it
+- [Config](/docs/config) to assemble your routes and serve them
+- [Authentication](/docs/authentication) for the identities a route's `auth` names

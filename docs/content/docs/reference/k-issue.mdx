@@ -5,13 +5,13 @@ description: Emit a validation issue with a machine-readable code, checked again
 
 <BetaNotice>
 
-Custom issue codes are new and still settling. `k.issue` and the `issueCodes` option may change before v2, so pin your version if you depend on them.
+Custom issue codes are new and still settling. `k.issue` and the `validation.issueCodes` option may change before v2, so pin your version if you depend on them.
 
 </BetaNotice>
 
 Emit a single Zod validation issue carrying a custom machine-readable `code`. The code is surfaced verbatim in the `errors[].code` field of kizuna's [`ValidationErrorSchema`](/docs/reference/is-validation-error).
 
-The code is checked against the `issueCodes` you declared on [`defineConfig`](/docs/reference/define-config), so a typo is a compile error.
+The code is checked against the `validation.issueCodes` you declared on [`defineConfig`](/docs/reference/define-config), so a typo is a compile error.
 
 Zod's types restrict `ctx.addIssue()` to its built-in issue union, so a custom code needs a cast at every call site. `k.issue` holds that cast.
 
@@ -24,12 +24,12 @@ k.issue<Input>(
 ): void
 ```
 
-| Parameter       | Type                           | Description                                                                                              |
-| --------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `ctx`           | `z.core.$RefinementCtx<Input>` | The refinement context from `.superRefine()`.                                                            |
-| `issue.code`    | `Codes \| BuiltinIssueCode`    | One of the `issueCodes` declared on `defineConfig`, or a built-in Zod code. Surfaced in `errors[].code`. |
-| `issue.message` | `string`                       | Human-readable description of the failure.                                                               |
-| `issue.input`   | `Input`                        | The value that failed validation.                                                                        |
+| Parameter       | Type                           | Description                                                                                                         |
+| --------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `ctx`           | `z.core.$RefinementCtx<Input>` | The refinement context from `.superRefine()`.                                                                       |
+| `issue.code`    | `Codes \| BuiltinIssueCode`    | One of the `validation.issueCodes` declared on `defineConfig`, or a built-in Zod code. Surfaced in `errors[].code`. |
+| `issue.message` | `string`                       | Human-readable description of the failure.                                                                          |
+| `issue.input`   | `Input`                        | The value that failed validation.                                                                                   |
 
 ## Example
 
@@ -71,7 +71,7 @@ A request whose body fails this refinement returns `400` with the custom code in
 
 By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/is-validation-error), so the built-in Zod codes are suggested in autocomplete and any custom string is accepted, but your `invalid_phone_number` is not _suggested_ (it lives only inside the refinement callback, where TypeScript can't see it).
 
-To make the client suggest your custom codes, declare them under `issueCodes` on `defineConfig` and pass the api to [`new KizunaClient()`](/docs/reference/kizuna-client):
+To make the client suggest your custom codes, declare them under `validation.issueCodes` on `defineConfig` and pass the api to [`new KizunaClient()`](/docs/reference/kizuna-client):
 
 ```ts title="k.ts"
 import { defineConfig } from '@ts-kizuna/core';
@@ -81,7 +81,9 @@ import { routes } from './src/routes';
 export default defineConfig({
     tags,
     routes,
-    issueCodes: ['invalid_phone_number'],
+    validation: {
+        issueCodes: ['invalid_phone_number'],
+    },
 });
 ```
 
