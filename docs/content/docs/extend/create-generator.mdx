@@ -26,13 +26,12 @@ You provide a factory function that receives your options and returns two method
 
 ```ts title="generator.ts"
 import { createGenerator, type GeneratorRouteContext } from '@ts-kizuna/core/generator';
-import { contract } from './contract';
 
 interface MyOptions {
     prefix?: string;
 }
 
-const generateRouteList = createGenerator((options: MyOptions) => {
+export const generateRouteList = createGenerator((options: MyOptions) => {
     const lines: string[] = [];
 
     return {
@@ -46,8 +45,13 @@ const generateRouteList = createGenerator((options: MyOptions) => {
         },
     };
 });
+```
 
-const list = generateRouteList(contract, {
+```ts title="scripts/list-routes.ts"
+import kizuna from '../kizuna.config';
+import { generateRouteList } from './generator';
+
+const list = generateRouteList(kizuna.api, {
     prefix: '> ',
 });
 ```

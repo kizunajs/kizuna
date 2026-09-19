@@ -319,7 +319,7 @@ function buildClient(contract: Contract, config: ClientConfig): unknown {
  * values under `requestContext`; the client sends them with every request.
  *
  * @example
- * export const apiClient = new KizunaClient(contract, {
+ * export const apiClient = new KizunaClient(kizuna.api, {
  *     baseUrl: 'https://api.example.com',
  * });
  *

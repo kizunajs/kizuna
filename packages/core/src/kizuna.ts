@@ -143,7 +143,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         HandlerContextFor<Spec, Definition>
     >;
     /**
-     * Define a group of routes. Pass a tag (one of the keys from `Kizuna.tags`)
+     * Define a group of routes. Pass a tag (one of the keys from `k.tags`)
      * to group them in the OpenAPI document, or omit it for an untagged group.
      */
     routes<const T extends AuthoredRoutes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>>(
@@ -368,7 +368,7 @@ const createSurface = <Config>(): K<SpecOf<Config>> => {
  * and what types everything a handler receives.
  *
  * `k.route` declares a route with its handler, `k.routes` groups them, and
- * `k.job`, `k.tool`, `k.jobs` and `k.tools` do the same for jobs and tools.
+ * `k.job` and `k.jobs` do the same for jobs.
  * `defineConfig` assembles them.
  *
  * @example

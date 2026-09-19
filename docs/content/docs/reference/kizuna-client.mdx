@@ -17,21 +17,21 @@ import { KizunaClient } from '@ts-kizuna/fetch';
 new KizunaClient(contract: Contract, config: ClientConfig): Client
 ```
 
-| Parameter  | Type           | Description                                                  |
-| ---------- | -------------- | ------------------------------------------------------------ |
-| `contract` | `Contract`     | The contract from [`k.contract`](/docs/reference/k-contract) |
-| `config`   | `ClientConfig` | Client configuration                                         |
+| Parameter  | Type           | Description                                                       |
+| ---------- | -------------- | ----------------------------------------------------------------- |
+| `contract` | `Contract`     | The contract from [`defineConfig`](/docs/reference/define-config) |
+| `config`   | `ClientConfig` | Client configuration                                              |
 
 ## `ClientConfig`
 
-| Option           | Type                                 | Required | Description                                                                                                                                                                      |
-| ---------------- | ------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `baseUrl`        | `string`                             | Yes      | Base URL prepended to every route path                                                                                                                                           |
-| `baseHeaders`    | `Record<string, string>`             | No       | Headers merged into every request                                                                                                                                                |
-| `credentials`    | `RequestCredentials`                 | No       | Passed as `credentials` to every `fetch` call                                                                                                                                    |
-| `fetch`          | `typeof fetch`                       | No       | Custom fetch implementation (e.g. for testing or a polyfill)                                                                                                                     |
-| `onRequest`      | `(context) => void \| Promise<void>` | No       | Callback before each request, receiving `{ url, method, headers, route }`. May be async.                                                                                         |
-| `requestContext` | `ContextHeaderInputs`                | \*       | Header values for the contract's [request context](/docs/reference/kizuna-request-context). Present only when the contract declares one, and required when any of its headers is |
+| Option           | Type                                 | Required | Description                                                                                                                                                                 |
+| ---------------- | ------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseUrl`        | `string`                             | Yes      | Base URL prepended to every route path                                                                                                                                      |
+| `baseHeaders`    | `Record<string, string>`             | No       | Headers merged into every request                                                                                                                                           |
+| `credentials`    | `RequestCredentials`                 | No       | Passed as `credentials` to every `fetch` call                                                                                                                               |
+| `fetch`          | `typeof fetch`                       | No       | Custom fetch implementation (e.g. for testing or a polyfill)                                                                                                                |
+| `onRequest`      | `(context) => void \| Promise<void>` | No       | Callback before each request, receiving `{ url, method, headers, route }`. May be async.                                                                                    |
+| `requestContext` | `ContextHeaderInputs`                | \*       | Header values for the contract's [request context](/docs/reference/k-request-context). Present only when the contract declares one, and required when any of its headers is |
 
 `requestContext` values are typed from the declared header schemas, so an optional header stays optional and a coerced one takes the schema's input type.
 
@@ -49,9 +49,9 @@ When the contract secures routes with [identities](/docs/authentication), send t
 
 ```ts title="api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
-import { contract } from './contract';
+import kizuna from '../kizuna.config';
 
-const apiClient = new KizunaClient(contract, {
+const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
     baseHeaders: {
         Authorization: `Bearer ${token}`,

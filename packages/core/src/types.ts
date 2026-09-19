@@ -80,7 +80,7 @@ export type CachePolicy =
            * Which caches may store the response. `private` is the caller's own
            * browser; `public` is any cache in between, including a CDN or a
            * corporate proxy. A response on a route behind `security` wants
-           * `private`, and `k.contract` throws on `public` there.
+           * `private`, and `defineConfig` throws on `public` there.
            */
           scope?: 'public' | 'private';
           /**
@@ -187,8 +187,8 @@ export type ResponseDefinition =
     | StreamResponseDefinition;
 
 /**
- * A single security requirement on a route, as `k.contract` writes it from the
- * access control map: a scheme name, or a map of scheme name to the scopes it
+ * A single security requirement on a route, as `defineConfig` writes it from
+ * that route's `auth`: a scheme name, or a map of scheme name to the scopes it
  * requires. Mirrors an entry of OpenAPI's `operation.security` array.
  */
 export type SecurityRequirement<SchemeNames extends string = string> = SchemeNames | { [Name in SchemeNames]?: readonly string[] };
@@ -199,8 +199,7 @@ export type SecurityRequirement<SchemeNames extends string = string> = SchemeNam
 export type SchemeNameOf<Entry> = Entry extends string ? Entry : Extract<keyof Entry, string>;
 
 /**
- * The permissions a route requires, set by `k.contract` from the access control map's
- * `requires`. Keyed by what is acted on, listing the verbs, e.g.
+ * The permissions a route requires, set by `defineConfig` from its `auth.requires`. Keyed by what is acted on, listing the verbs, e.g.
  * `{ workspace: ['delete'] }`. The caller has to hold every one of them.
  */
 export type RequiredPermissions = Record<string, readonly string[]>;
@@ -401,24 +400,25 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
           };
     /**
      * Tag keys grouping this route in the OpenAPI spec. Keys come from the tag set
-     * declared with `Kizuna.tags`; `k.routes` stamps the group's tag onto every
+     * declared with `k.tags`; `k.routes` stamps the group's tag onto every
      * route, and the generator resolves each key to its `title` for the spec.
      */
     tags?: readonly TagKeys[];
     /**
-     * The security schemes this route requires, referencing identities registered
-     * on the `kizuna` factory. Each entry is a scheme name or a `{ scheme: scopes }`
-     * map. Set by `k.contract` from the access control map; `[]` marks the route public.
+     * The security schemes this route requires, referencing identities named
+     * under `identities` on `defineConfig`. Each entry is a scheme name or a
+     * `{ scheme: scopes }` map. Set by `defineConfig` from the route's `auth`;
+     * `[]` marks the route public.
      */
     security?: readonly SecurityRequirement<SchemeNames>[];
     /**
-     * The roles the route accepts, set by `k.contract` from the access control
-     * map's `roles`. The caller holds at least one of them.
+     * The roles the route accepts, set by `defineConfig` from its `auth.roles`.
+     * The caller holds at least one of them.
      */
     roles?: readonly string[];
     /**
-     * The permissions the caller has to hold, set by `k.contract` from the
-     * access control map's `requires`. See {@link RequiredPermissions}.
+     * The permissions the caller has to hold, set by `defineConfig` from its
+     * `auth.requires`. See {@link RequiredPermissions}.
      */
     requires?: RequiredPermissions;
     externalDocs?: {
@@ -475,7 +475,7 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
 export const ROUTES_TAG: unique symbol = Symbol.for('ts-kizuna.routes.tag') as symbol as typeof ROUTES_TAG;
 
 /**
- * Type-only key under which `k.contract` brands each route with its resolved
+ * Type-only key under which `defineConfig` brands each route with its resolved
  * handler context. Never written at runtime.
  */
 export const HANDLER_CONTEXT_BRAND: unique symbol = Symbol.for('ts-kizuna.route.handlerContext') as symbol as typeof HANDLER_CONTEXT_BRAND;
@@ -485,7 +485,7 @@ export interface HandlerContextBrand<Context> {
 }
 
 /**
- * Type-only key under which `k.contract` brands a guarded route with the
+ * Type-only key under which `defineConfig` brands a guarded route with the
  * statuses its guard answers for it. Never written at runtime.
  */
 export const AUTO_RESPONSES_BRAND: unique symbol = Symbol.for('ts-kizuna.route.autoResponses') as symbol as typeof AUTO_RESPONSES_BRAND;
@@ -505,7 +505,7 @@ export interface AutoResponsesBrand<Statuses extends number, Body = ProblemDetai
 }
 
 /**
- * The statuses the access control map puts on a guarded route.
+ * The statuses a route's `auth` puts on it once it names an identity.
  */
 export type GuardStatus = Extract<KnownStatus, 401 | 403>;
 
@@ -516,7 +516,7 @@ export interface Routes<TagKeys extends string = string, SchemeNames extends str
 
 /**
  * A route as authored in `k.route` and `k.routes`: the route shape minus
- * `security`, `roles` and `requires`, which `k.contract` resolves from its
+ * `security`, `roles` and `requires`, which `defineConfig` resolves from its
  * `auth`. Writing any of them on a route is a type error.
  */
 export type AuthoredRouteDefinition<TagKeys extends string = string, Names extends string = string> = Omit<

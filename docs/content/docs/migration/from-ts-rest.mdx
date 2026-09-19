@@ -14,60 +14,74 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneer
 | `@ts-rest/next`     | `@ts-kizuna/next`                      |                                    |
 | `@ts-rest/open-api` | `@ts-kizuna/openapi`                   |                                    |
 
+## The biggest difference
+
+In ts-rest a route is a shape, and its implementation lives in a parallel tree you keep in step by hand. In ts-kizuna a route carries the handler that answers it:
+
+```ts title="ts-kizuna"
+export const users = k.routes('users', {
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: UserSchema,
+            },
+        })
+        .handler(async ({ params }) => ({
+            status: 200,
+            body: await db.users.findById(params.id),
+        })),
+});
+```
+
+Most of the mapping below follows from that: there is no router to build, and nothing to keep aligned.
+
 ## Routes
 
-### `initContract` -> `new Kizuna()` + `k.routes`
+### `initContract` → `new Kizuna()` + `k.routes`
 
-There is no `initContract`. Create your surface with `new Kizuna()` once, then define groups with `k.routes`.
+There is no `initContract`. Create your surface with `new Kizuna()` once, then declare groups with `k.routes`.
 
 ```ts title="ts-rest"
-// ts-rest
 import { initContract } from '@ts-rest/core';
+
 const c = initContract();
+
 export const contract = c.router({ ... });
 ```
 
 ```ts title="ts-kizuna"
-// ts-kizuna
 import { Kizuna } from '@ts-kizuna/core';
+import type { Config } from '../kizuna.types';
 
-const tags = Kizuna.tags({
-    users: 'Users',
-});
-
-export const k = new Kizuna({
-    tags,
-});
+export const k = new Kizuna<Config>();
 
 export const users = k.routes('users', { ... });
 ```
 
+`Config` is written by `kizuna generate` from your `kizuna.config.ts`. It is what types every handler and checks every name you write. See [`new Kizuna()`](/docs/reference/kizuna).
+
 ### Nested routes
 
 ```ts title="ts-rest"
-// ts-rest
 export const contract = c.router({
     users: c.router({ ... }),
 });
 ```
 
 ```ts title="ts-kizuna"
-// ts-kizuna: one group per tag, assembled in the contract
 export const users = k.routes('users', { ... });
 export const health = k.routes('health', { ... });
 ```
 
-The tag passed to `k.routes` (a key of your `Kizuna.tags` set) sets the OpenAPI tag for all routes in that group.
+The tag passed to `k.routes` (a key of your `k.tags` set) sets the OpenAPI tag for every route in that group.
 
 ### `c.noBody()` → `z.void()`
 
-ts-rest uses `c.noBody()` to mark a route as having no request body or to mark a response as having no body. In ts-kizuna, use `z.void()` instead. Routes don't require a `body` field, so remove it.
+ts-rest uses `c.noBody()` to mark a route as having no request body, or a response as having no body. In ts-kizuna, use `z.void()` for the response and omit `body` entirely.
 
 ```ts title="ts-rest"
-// ts-rest
-import { initContract } from '@ts-rest/core';
-const c = initContract();
-
 export const contract = c.router({
     deleteUser: {
         method: 'DELETE',
@@ -81,125 +95,147 @@ export const contract = c.router({
 ```
 
 ```ts title="ts-kizuna"
-// ts-kizuna: remove `body`, use z.void() for empty responses
-import { z } from 'zod';
-import { k } from './k';
-
 export const users = k.routes('users', {
-    deleteUser: {
-        method: 'DELETE',
-        path: '/users/:id',
-        responses: {
-            204: z.void(),
-        },
-    },
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/users/:id',
+            responses: {
+                204: z.void(),
+            },
+        })
+        .handler(async ({ params }) => {
+            await db.users.delete(params.id);
+            return {
+                status: 204,
+            };
+        }),
 });
 ```
 
-Use `z.void()` for responses that return no body, such as `204`.
+## Assembling it
 
-## Contract
+ts-rest passes its router straight to the client and the server. ts-kizuna assembles everything in one `kizuna.config.ts` at the root of your app, which is also where the CLI looks:
 
-ts-rest passes its router straight to the client and server. ts-kizuna adds one step: assemble your route groups into a contract with `k.contract`, then pass that everywhere (`client`, `createServer`).
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
+import { users } from './src/routes/users';
 
-```ts title="ts-kizuna"
-// ts-kizuna
-import { k } from './k';
-import { users } from './routes';
-
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
     routes: {
         users,
     },
 });
 ```
 
+`adapter` is the one field with no ts-rest counterpart. Naming a framework there is what types every handler's `req`, `c` or `request`, so you never import your framework's types into a route file.
+
+See [`defineConfig`](/docs/reference/define-config).
+
 ## Client
 
 ```ts title="ts-rest"
-// ts-rest
 import { initClient } from '@ts-rest/core';
+
 const client = initClient(contract, {
     baseUrl: '...',
 });
 ```
 
 ```ts title="ts-kizuna"
-// ts-kizuna
 import { KizunaClient } from '@ts-kizuna/fetch';
-const client = new KizunaClient(contract, {
+import kizuna from '../kizuna.config';
+
+const client = new KizunaClient(kizuna.api, {
     baseUrl: '...',
 });
 ```
 
-## Server
+Your config holds the handlers, so it stays on the server. For a browser, point `clients` at a generated file instead and import that:
 
-### `initServer` maps to `new KizunaServer()`
-
-There is no `initServer`. Create the server with `new KizunaServer()`, use `server.router` for the implementations, and `server.api` to produce a mountable API object.
-
-```ts title="ts-rest"
-// ts-rest
-import { initServer } from '@ts-rest/express';
-const s = initServer();
-const router = s.router(contract, { ... });
+```ts title="kizuna.config.ts"
+clients: [
+    fetchClient({
+        output: '../website/src/lib/api-client.ts',
+    }),
+],
 ```
 
-```ts title="ts-kizuna"
-// ts-kizuna
-import { KizunaServer } from '@ts-kizuna/express';
+See [Clients](/docs/clients/fetch).
 
-const server = new KizunaServer(contract);
+## Server
 
-const router = server.router({ ... });
+### `initServer` → the route's own `handler`
 
-export const api = server.api({
-    router,
+There is no `initServer` and no router. The implementation sits on the route.
+
+```ts title="ts-rest"
+import { initServer } from '@ts-rest/express';
+
+const s = initServer();
+const router = s.router(contract, {
+    getUser: async ({ params }) => ({
+        status: 200,
+        body: await db.users.findById(params.id),
+    }),
 });
 ```
 
-### `RouterImpl` → `Router`, `Handler` → `RouteHandler`
+```ts title="ts-kizuna"
+export const users = k.routes('users', {
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: UserSchema,
+            },
+        })
+        .handler(async ({ params }) => ({
+            status: 200,
+            body: await db.users.findById(params.id),
+        })),
+});
+```
+
+### `RouterImpl` → `RouteHandler`
+
+A handler is typed where you write it, so most code needs no annotation. When you keep one in its own file, `RouteHandler` types it:
 
 ```ts title="ts-rest"
-// ts-rest
 import type { RouterImpl } from '@ts-rest/express';
+
 const router: RouterImpl<typeof contract> = { ... };
 ```
 
 ```ts title="ts-kizuna"
-// ts-kizuna
-import type { Router, RouteHandler } from '@ts-kizuna/express';
-import { contract } from './contract';
+import type { RouteHandler } from '@ts-kizuna/express';
+import type { getUserRoute } from './get-user';
 
-// Whole handler tree
-const router: Router<typeof contract> = { ... };
-
-// Single route
-const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => { ... };
+const getUser: RouteHandler<typeof getUserRoute> = async ({ params }) => { ... };
 ```
 
 ## Express adapter
 
-### `createExpressEndpoints` → `api.mount`
+### `createExpressEndpoints` → `kizuna.api.mount`
 
 ```ts title="ts-rest"
-// ts-rest
 createExpressEndpoints(contract, router, app);
 ```
 
 ```ts title="ts-kizuna"
-// ts-kizuna
-api.mount(app);
-```
+import kizuna from '../kizuna.config';
 
-`api.mount(app)` is a method on the `api` object that `server.api` produces.
+kizuna.api.mount(app);
+```
 
 ## Next.js adapter
 
 ### Route file setup
 
 ```ts title="ts-rest"
-// ts-rest: App Router via @ts-rest/serverless/next
 import { createNextHandler } from '@ts-rest/serverless/next';
 import { contract } from '@/contract';
 import { router } from './router';
@@ -212,13 +248,41 @@ export { handler as GET, handler as POST, handler as PUT, handler as PATCH, hand
 ```
 
 ```ts title="ts-kizuna"
-// ts-kizuna: App Router catch-all
-import { api } from '@/server/api';
+import kizuna from '../../../../kizuna.config';
 
-export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
     basePath: '/api',
 });
 ```
+
+## Authentication
+
+ts-rest leaves authentication to your framework's middleware. ts-kizuna declares it: an [identity](/docs/reference/k-identity) says how the credential travels and what a passing guard provides, the guard sits on that identity, and a route's `auth` names the one it requires.
+
+```ts title="src/identities.ts"
+export const user = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    })
+    .guard(async ({ bearer, deny }) => {
+        const session = bearer ? await verifySession(bearer.token) : undefined;
+        if (!session) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        }
+        return {
+            userId: session.userId,
+        };
+    });
+```
+
+Handlers of a route with `auth: 'user'` then read `auth.user.userId`, typed, and the identity is emitted into your OpenAPI document as a security scheme. See [Authentication](/docs/authentication).
 
 ## Zod version
 
@@ -234,7 +298,7 @@ If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this cha
 
 ## Error responses
 
-ts-kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response. Error responses in a contract must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array (instead of ts-rest's `{ message, issues }`). If you're porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.
+ts-kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response. Error responses must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array, instead of ts-rest's `{ message, issues }`. If you are porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.
 
 ## Method mismatch behaviour
 

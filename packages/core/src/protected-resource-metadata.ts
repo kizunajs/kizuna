@@ -39,7 +39,7 @@ export const buildProtectedResourceMetadata = (config: ProtectedResourceConfig):
     const issuer = authorizationServerIssuer(config.scheme);
     if (issuer === undefined) {
         throw new Error(
-            'The identity names no authorization server. Declare it with Kizuna.identity.oauth2 and an issuer, or Kizuna.identity.openIdConnect.'
+            'The identity names no authorization server. Declare it with k.identity.oauth2 and an issuer, or k.identity.openIdConnect.'
         );
     }
     const scopes = declaredScopes(config.scheme);

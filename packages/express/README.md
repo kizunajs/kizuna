@@ -1,6 +1,6 @@
 # @ts-kizuna/express
 
-`@ts-kizuna/express` connects a ts-kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by your contract.
+`@ts-kizuna/express` connects a ts-kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
 
 **Requires Express >= 5.**
 
@@ -13,21 +13,26 @@ pnpm add @ts-kizuna/express express
 ## Usage
 
 ```ts
-import express from 'express';
-import { KizunaServer } from '@ts-kizuna/express';
-import { contract } from './contract';
-import { router } from './router';
+// kizuna.config.ts
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
+import { routes } from './src/routes';
 
-const server = new KizunaServer(contract);
-
-const api = server.api({
-    router,
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
 });
+```
+
+```ts
+// src/index.ts
+import express from 'express';
+import kizuna from '../kizuna.config';
 
 const app = express();
 app.use(express.json());
 
-api.mount(app);
+kizuna.api.mount(app);
 
 app.listen(3000);
 ```

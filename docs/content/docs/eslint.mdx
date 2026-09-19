@@ -81,13 +81,15 @@ export const PaginationQuery = z.object({
 import { PaginationQuery } from './pagination.js';
 
 export const users = k.routes('users', {
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        query: PaginationQuery, // flagged here, PaginationQuery uses z.coerce
-        responses: {
-            200: UserListSchema,
-        },
-    },
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            query: PaginationQuery, // flagged here, PaginationQuery uses z.coerce
+            responses: {
+                200: UserListSchema,
+            },
+        })
+        .handler(/* ... */),
 });
 ```

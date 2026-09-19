@@ -618,13 +618,11 @@ const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions 
     for (const declaration of Object.values(contract.plugins ?? {})) {
         if (declaration.slug === OPENAPI_PLUGIN_SLUG) return declaration.props as unknown as GenerateOpenApiOptions;
     }
-    throw new Error(
-        "generateOpenApi reads its options from the contract. Install `openApiPlugin` on `new Kizuna()` with the API's `info`."
-    );
+    throw new Error("generateOpenApi reads its options from the config. Name `openApiPlugin` under `plugins` with the API's `info`.");
 };
 
 /**
- * Render from options held directly, for `openApiPluginServer`.
+ * Render from options held directly, for the plugin's own routes.
  */
 export function renderOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
     const renderer = openApiGenerator(contract, {

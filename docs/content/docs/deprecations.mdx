@@ -18,18 +18,20 @@ Set `deprecated` on the route, either `true`, a migration message, or the object
 
 <Tab value="Boolean">
 
-```ts title="contract/index.ts"
-export const usersRoutes = k.routes('users', {
-    deleteUser: {
-        method: 'DELETE',
-        path: '/users/:id',
-        deprecated: true,
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
+```ts title="src/routes/users.ts"
+export const users = k.routes('users', {
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/users/:id',
+            deprecated: true,
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -37,18 +39,20 @@ export const usersRoutes = k.routes('users', {
 
 <Tab value="Message">
 
-```ts title="contract/index.ts"
-export const usersRoutes = k.routes('users', {
-    deleteUser: {
-        method: 'DELETE',
-        path: '/users/:id',
-        deprecated: 'use `archiveUser` instead',
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
+```ts title="src/routes/users.ts"
+export const users = k.routes('users', {
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/users/:id',
+            deprecated: 'use `archiveUser` instead',
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -56,22 +60,24 @@ export const usersRoutes = k.routes('users', {
 
 <Tab value="Message, date, and link">
 
-```ts title="contract/index.ts"
-export const usersRoutes = k.routes('users', {
-    deleteUser: {
-        method: 'DELETE',
-        path: '/users/:id',
-        deprecated: {
-            message: 'use `archiveUser` instead',
-            date: '2026-03-01', // or '2026-03-01T12:00:00Z'
-            link: 'https://example.com/changelog/delete-user',
-        },
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
+```ts title="src/routes/users.ts"
+export const users = k.routes('users', {
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/users/:id',
+            deprecated: {
+                message: 'use `archiveUser` instead',
+                date: '2026-03-01', // or '2026-03-01T12:00:00Z'
+                link: 'https://example.com/changelog/delete-user',
+            },
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -96,19 +102,21 @@ A route scheduled for removal declares when. The object form adds a link to the 
 
 <Tab value="Date">
 
-```ts title="contract/index.ts"
-export const usersRoutes = k.routes('users', {
-    deleteUser: {
-        method: 'DELETE',
-        path: '/users/:id',
-        deprecated: 'use `archiveUser` instead',
-        sunset: '2027-01-01', // or '2027-01-01T12:00:00Z'
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
+```ts title="src/routes/users.ts"
+export const users = k.routes('users', {
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/users/:id',
+            deprecated: 'use `archiveUser` instead',
+            sunset: '2027-01-01', // or '2027-01-01T12:00:00Z'
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -116,22 +124,24 @@ export const usersRoutes = k.routes('users', {
 
 <Tab value="Date and link">
 
-```ts title="contract/index.ts"
-export const usersRoutes = k.routes('users', {
-    deleteUser: {
-        method: 'DELETE',
-        path: '/users/:id',
-        deprecated: 'use `archiveUser` instead',
-        sunset: {
-            date: '2027-01-01', // or '2027-01-01T12:00:00Z'
-            link: 'https://example.com/retirement-policy',
-        },
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
+```ts title="src/routes/users.ts"
+export const users = k.routes('users', {
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/users/:id',
+            deprecated: 'use `archiveUser` instead',
+            sunset: {
+                date: '2027-01-01', // or '2027-01-01T12:00:00Z'
+                link: 'https://example.com/retirement-policy',
+            },
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -146,7 +156,7 @@ Sunset: Fri, 01 Jan 2027 00:00:00 GMT
 Link: <https://example.com/retirement-policy>; rel="sunset"
 ```
 
-`sunset` stands on its own, a route can sunset without being deprecated. `k.contract` rejects a `sunset` or `deprecated.date` that does not parse as ISO 8601.
+`sunset` stands on its own, a route can sunset without being deprecated. `defineConfig` rejects a `sunset` or `deprecated.date` that does not parse as ISO 8601.
 
 ## Fields
 

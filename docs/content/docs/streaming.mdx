@@ -19,32 +19,30 @@ An assistant's reply arrives one token at a time, and a caller who has to wait f
 
 A `stream` takes the place of a `body` on the response:
 
-```ts title="contract/assistant.ts"
+```ts title="src/routes/assistant.ts"
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { k } from './k';
+import { k } from '../k';
 
-export const assistantRoutes = k.routes('assistant', {
-    reply: {
-        method: 'POST',
-        path: '/assistant/reply',
-        body: z.object({
-            prompt: z.string().min(1),
-        }),
-        responses: {
-            200: {
-                stream: {
-                    delta: z.object({
-                        text: z.string(),
-                    }),
-                    done: z.object({
-                        inputTokens: z.int(),
-                        outputTokens: z.int(),
-                    }),
-                },
+export const replyRoute = k.route({
+    method: 'POST',
+    path: '/assistant/reply',
+    body: z.object({
+        prompt: z.string().min(1),
+    }),
+    responses: {
+        200: {
+            stream: {
+                delta: z.object({
+                    text: z.string(),
+                }),
+                done: z.object({
+                    inputTokens: z.int(),
+                    outputTokens: z.int(),
+                }),
             },
-            400: ProblemDetailsSchema,
         },
+        400: ProblemDetailsSchema,
     },
 });
 ```
@@ -61,15 +59,13 @@ Two `body`s meet on a route like this. The route's own `body` is the request bod
 
 The handler returns the status, and for `body` an async generator function. kizuna sends the status and headers, calls the function, and writes each `yield` the moment it happens:
 
-```ts title="router/assistant.ts"
+```ts title="src/routes/assistant.ts"
 import Anthropic from '@anthropic-ai/sdk';
-import type { Router } from '@ts-kizuna/express';
-import type { contract } from '@/contract';
 
 const anthropic = new Anthropic();
 
-export const assistant: Router<typeof contract.routes.assistant> = {
-    reply: async ({ body }) => ({
+export const assistant = k.routes('assistant', {
+    reply: replyRoute.handler(async ({ body }) => ({
         status: 200,
         body: async function* ({ signal }) {
             const stream = anthropic.messages.stream(
@@ -106,11 +102,11 @@ export const assistant: Router<typeof contract.routes.assistant> = {
                 },
             };
         },
-    }),
-};
+    })),
+});
 ```
 
-Each `yield` names its `event` and carries `data` matching that event's schema, and TypeScript checks the pair, so a `delta` carrying a `done` payload is a compile error. The provider's own events stay inside the handler. The contract describes your API, and the client on the other side reads `delta` and `done` without knowing which model answered.
+Each `yield` names its `event` and carries `data` matching that event's schema, and TypeScript checks the pair, so a `delta` carrying a `done` payload is a compile error. The provider's own events stay inside the handler. What you declared describes your API, and the client on the other side reads `delta` and `done` without knowing which model answered.
 
 The wire is `text/event-stream`, one block per yield, with `data` as JSON:
 
@@ -200,7 +196,7 @@ On the server the generator's `signal` fires, so an upstream call that took it s
 
 Give `stream` one schema when every message has the same shape. The handler yields `{ data }`, the wire carries `data:` lines alone, and the client reads `message.data`:
 
-```ts title="contract/notifications.ts"
+```ts title="src/routes/notifications.ts"
 watchEvents: {
     method: 'GET',
     path: '/events/watch',
@@ -212,7 +208,7 @@ watchEvents: {
 },
 ```
 
-```ts title="router/notifications.ts"
+```ts title="src/routes/notifications.ts"
 watchEvents: async () => ({
     status: 200,
     body: async function* ({ signal }) {
@@ -254,7 +250,7 @@ The client hands `id` and `retry` back on each message and drops comments.
 
 A client that reconnects sends the last `id` it saw as `Last-Event-ID`. Declare the header and the handler reads it like any other:
 
-```ts title="contract/notifications.ts"
+```ts title="src/routes/notifications.ts"
 watchEvents: {
     method: 'GET',
     path: '/events/watch',
@@ -275,7 +271,7 @@ The fetch client reads one connection and leaves reconnecting to you. The browse
 
 A `z.string()` schema with a `text/*` content type, or `BinarySchema` with any other, writes each yield as it is, with no framing around it:
 
-```ts title="contract/reports.ts"
+```ts title="src/routes/reports.ts"
 exportEvents: {
     method: 'GET',
     path: '/events/export.csv',
@@ -288,7 +284,7 @@ exportEvents: {
 },
 ```
 
-```ts title="router/reports.ts"
+```ts title="src/routes/reports.ts"
 exportEvents: async () => ({
     status: 200,
     body: async function* () {
@@ -302,7 +298,7 @@ exportEvents: async () => ({
 
 For bytes, hand over a `ReadableStream` in place of the generator. That is how a route passes a file from storage through without holding it in memory:
 
-```ts title="contract/reports.ts"
+```ts title="src/routes/reports.ts"
 downloadArchive: {
     method: 'GET',
     path: '/reports/:id/archive',
@@ -315,7 +311,7 @@ downloadArchive: {
 },
 ```
 
-```ts title="router/reports.ts"
+```ts title="src/routes/reports.ts"
 downloadArchive: async ({ params }) => {
     const upstream = await fetch(storage.archiveUrl(params.id));
     return {
@@ -331,10 +327,11 @@ The client iterates strings for a text stream and `Uint8Array` chunks for a bina
 
 An inline generator function sits inside the route's return type, so its event names infer as literals. One declared on its own has nothing to infer from, and TypeScript widens `event` to `string`. Annotate it with `StreamBody`, naming the route and the status:
 
-```ts title="router/assistant.ts"
+```ts title="src/routes/canned-reply.ts"
 import type { StreamBody } from '@ts-kizuna/core';
+import { replyRoute } from './assistant';
 
-const cannedReply: StreamBody<typeof contract.routes.assistant.reply, 200> = async function* () {
+const cannedReply: StreamBody<typeof replyRoute, 200> = async function* () {
     yield {
         event: 'delta',
         data: {
@@ -350,12 +347,12 @@ const cannedReply: StreamBody<typeof contract.routes.assistant.reply, 200> = asy
     };
 };
 
-export const assistant: Router<typeof contract.routes.assistant> = {
-    reply: async () => ({
+export const assistant = k.routes('assistant', {
+    reply: replyRoute.handler(async () => ({
         status: 200,
         body: cannedReply,
-    }),
-};
+    })),
+});
 ```
 
 ## Errors
@@ -392,5 +389,5 @@ Each is discriminated on the tool's dotted key. See [tools](/docs/tools).
 ## Reference
 
 - [`k.routes`](/docs/reference/k-routes)
-- [`server.router`](/docs/reference/server-router)
+- [a route's `handler`](/docs/reference/k-route)
 - [`new KizunaClient()`](/docs/reference/kizuna-client)

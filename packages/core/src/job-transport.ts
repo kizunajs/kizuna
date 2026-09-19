@@ -27,7 +27,7 @@ export interface JobMessage {
 }
 
 /**
- * What a transport honours. `server.api` warns when a job asks for something
+ * What a transport honours. `defineConfig` warns when a job asks for something
  * left out.
  */
 export interface JobTransportSupports {

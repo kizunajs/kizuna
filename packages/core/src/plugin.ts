@@ -17,8 +17,8 @@ export const PLUGIN_SERVERS_META_KEY: unique symbol = Symbol.for('ts-kizuna.plug
 export type PluginRoutes = Record<string, RouteDefinition>;
 
 /**
- * A plugin's contract-time half: what it declares, as data. `server.api({ plugins })`
- * joins it to what `serve` answers with.
+ * What a plugin is: the routes it declares, the props it was configured with,
+ * and the `serve` that answers them.
  */
 export interface PluginDeclaration<
     R extends PluginRoutes = PluginRoutes,
@@ -71,17 +71,18 @@ export interface PluginDefinition<R extends PluginRoutes, Props, Exports, Slug e
 }
 
 /**
- * Declare a plugin's contract-time half: its routes and its props, as data.
- * Everything live goes in the server half, built with `implementPlugin`.
+ * Declare a plugin: the routes it serves, the props an app configures it with,
+ * and the `serve` that answers those routes. Whatever `serve` returns under
+ * `exports` reaches every handler as `plugins.<slug>`.
+ *
+ * Give the factory a `Slug` parameter and {@link WithSlug} so an app can rename
+ * what it installs, or install two of them.
  *
  * @example
  * ```ts
- * import type { AuditExports } from './server.js';
- *
- * export const auditPlugin = (props: AuditPluginProps = {}) =>
- *     createPlugin<AuditExports>()({
- *         slug: 'audit',
- *         serverModule: '@ts-kizuna/audit/server',
+ * const declare = (slug: string, props: AuditProps) =>
+ *     createPlugin({
+ *         slug,
  *         routes: {
  *             recent: {
  *                 method: 'GET',
@@ -92,7 +93,21 @@ export interface PluginDefinition<R extends PluginRoutes, Props, Exports, Slug e
  *             },
  *         },
  *         props,
+ *         serve: ({ store }) => ({
+ *             router: {
+ *                 recent: async () => ({ status: 200, body: await store.recent() }),
+ *             },
+ *             exports: {
+ *                 record: (routeKey: string) => store.write(routeKey),
+ *             },
+ *         }),
  *     });
+ *
+ * export function auditPlugin<const Slug extends string = 'audit'>(
+ *     props: AuditProps<Slug>
+ * ): WithSlug<ReturnType<typeof declare>, Slug> {
+ *     return declare(props.slug ?? 'audit', props) as never;
+ * }
  * ```
  */
 export const createPlugin = <Props, const R extends PluginRoutes, const Slug extends string, Exports = undefined, HandlerContext = unknown>(

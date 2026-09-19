@@ -51,16 +51,16 @@ export type OpenApiSecuritySchemeObject =
       };
 
 /**
- * A security scheme declared with the `Kizuna.identity` builders. It carries two
+ * A security scheme declared with the `k.identity` builders. It carries two
  * things:
  *
  * - the OpenAPI definition (`type`, `scheme`, …), emitted under
  *   `components.securitySchemes`, and
  * - a `context` schema describing what a passing guard provides to the handler.
  *
- * Register schemes on the `kizuna` factory under `identities`; the contract's
- * access control map then references them by name, and handlers of secured routes
- * receive the scheme's context (`z.output` of `context`) in their args.
+ * Name identities under `identities` on `defineConfig`; a route's `auth` then
+ * references them by name, and handlers of secured routes receive the scheme's
+ * context (`z.output` of `context`) in their args.
  */
 export interface SecurityScheme<ContextSchema extends z.ZodType | undefined = z.ZodType | undefined> {
     readonly __brand: 'SecurityScheme';

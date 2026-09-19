@@ -11,7 +11,7 @@ pnpm add -D @ts-kizuna/kotlin
 ## Usage
 
 ```sh
-ts-kizuna-kotlin generate --contract src/contract/index.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
+ts-kizuna-kotlin generate --config kizuna.config.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
 ```
 
 ## Documentation

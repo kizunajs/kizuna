@@ -17,13 +17,13 @@ Four steps: declare the identity, secure the routes, verify in the guard, and se
 
 A scope is a permission the token carries. Declare the permissions once, and the roles built from them, as on [Access Control](/docs/access-control):
 
-```ts title="contract/permissions.ts"
+```ts title="src/permissions.ts"
 export const permissions = Kizuna.permissions({
     users: ['read', 'write'],
 });
 ```
 
-```ts title="contract/roles.ts"
+```ts title="src/roles.ts"
 export const roles = Kizuna.roles(permissions, {
     member: {
         users: ['read'],
@@ -34,28 +34,29 @@ export const roles = Kizuna.roles(permissions, {
 
 The identity carries everything about the authorization server. `issuer` is the server's identifier ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)), `flows` names its endpoints and the scopes it issues for the OpenAPI spec, and `resourceMetadata` is where your [discovery document](#serve-the-discovery-document) is served:
 
-```ts title="contract/identities.ts"
-import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+```ts title="src/identities.ts"
+import { k } from './k';
 
-export const user = Kizuna.identity.oauth2({
-    issuer: 'https://auth.example.com',
-    resourceMetadata: 'https://api.example.com/.well-known/oauth-protected-resource',
-    flows: {
-        authorizationCode: {
-            authorizationUrl: 'https://auth.example.com/oauth2/authorize',
-            tokenUrl: 'https://auth.example.com/oauth2/token',
-            scopes: {
-                'users:read': 'Read users',
-                'users:write': 'Create and update users',
+export const user = k.identity
+    .oauth2({
+        issuer: 'https://auth.example.com',
+        resourceMetadata: 'https://api.example.com/.well-known/oauth-protected-resource',
+        flows: {
+            authorizationCode: {
+                authorizationUrl: 'https://auth.example.com/oauth2/authorize',
+                tokenUrl: 'https://auth.example.com/oauth2/token',
+                scopes: {
+                    'users:read': 'Read users',
+                    'users:write': 'Create and update users',
+                },
             },
         },
-    },
-    context: z.object({
-        userId: z.string(),
-    }),
-    roles,
-});
+        context: z.object({
+            userId: z.string(),
+        }),
+        roles,
+    })
+    .guard(/* below */);
 ```
 
 Give the authorization server the same list, so a token can only carry permissions the code declares. With Better Auth:
@@ -66,45 +67,49 @@ oauthProvider({
 });
 ```
 
-For an OpenID Connect server, `Kizuna.identity.openIdConnect({ openIdConnectUrl, resourceMetadata, roles })` is the whole declaration; the issuer derives from the discovery URL.
+For an OpenID Connect server, `k.identity.openIdConnect({ openIdConnectUrl, resourceMetadata, roles })` takes the place of `oauth2` above, and the issuer derives from the discovery URL.
 
 ## Secure the routes
 
 A route names what it requires, as for any identity:
 
-```ts title="contract/routes/users.ts"
+```ts title="src/routes/users.ts"
 export const usersRoutes = k.routes('users', {
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        auth: {
-            identity: 'user',
-            requires: {
-                users: ['write'],
+    createUser: k
+        .route({
+            method: 'POST',
+            path: '/users',
+            auth: {
+                identity: 'user',
+                requires: {
+                    users: ['write'],
+                },
             },
-        },
-        body: CreateUserSchema,
-        responses: {
-            201: UserSchema,
-        },
-    },
+            body: CreateUserSchema,
+            responses: {
+                201: UserSchema,
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
-`k.contract` writes `users:write` into the route's security requirement, so the OpenAPI document lists it as the scope `createUser` needs.
+`defineConfig` writes `users:write` into the route's security requirement, so the OpenAPI document lists it as the scope `createUser` needs.
 
 ## Verify in the guard
 
 The guard receives the token as `oauth2`. Check the signature against the authorization server's JWKS, the issuer, and the audience, then return the user's role and the token's scopes as `permissions`:
 
-```ts title="server/guards.ts"
+The guard sits on the identity, so this continues the declaration above:
+
+```ts title="src/identities.ts"
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { permissions } from '../contract/permissions';
-import { server } from './server';
+import { permissions } from './permissions';
 
 const jwks = createRemoteJWKSet(new URL('https://auth.example.com/oauth2/jwks'));
 
-export const requireUser = server.guard('user', async ({ oauth2, deny }) => {
+// ...continues `export const user = k.identity.oauth2({ ... })`
+.guard(async ({ oauth2, deny }) => {
     if (!oauth2) {
         return deny({
             status: 401,
@@ -138,6 +143,8 @@ export const requireUser = server.guard('user', async ({ oauth2, deny }) => {
     };
 });
 ```
+
+Name it under `identities` on your config and a route's `auth: 'user'` runs it.
 
 The caller holds what both the role and the token allow. When a route requires a permission the role holds but the token lacks, kizuna answers `403` with the `insufficient_scope` challenge ([RFC 6750](https://www.rfc-editor.org/rfc/rfc6750)), so the client knows a new token would pass. When the role lacks it, the `403` has no challenge, since no token could help.
 
@@ -222,6 +229,6 @@ See [`ProtectedResourceMetadataSchema`](/docs/reference/protected-resource-metad
 ## Reference
 
 - [Authentication](/docs/authentication) for identities and guards
-- [Access Control](/docs/access-control) for the access control map
-- [`Kizuna.identity`](/docs/reference/kizuna-identity)
+- [Access Control](/docs/access-control) for what a route's `auth` can say
+- [`k.identity`](/docs/reference/k-identity)
 - [`ProtectedResourceMetadataSchema`](/docs/reference/protected-resource-metadata-schema)

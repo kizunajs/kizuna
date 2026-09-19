@@ -24,7 +24,7 @@ export interface BasicCredential {
  * the identity named, with `in`/`name` echoing where it came from.
  *
  * @example
- * // for Kizuna.identity.apiKey({ name: 'x-workspace-token', in: 'header' }):
+ * // for k.identity.apiKey({ name: 'x-workspace-token', in: 'header' }):
  * // { in: 'header'; name: 'x-workspace-token'; value: string }
  */
 export interface ApiKeyCredential<In extends 'header' | 'query' | 'cookie' = 'header' | 'query' | 'cookie', Name extends string = string> {
@@ -55,7 +55,7 @@ export type NoCredential = Record<never, never>;
 declare const CREDENTIAL: unique symbol;
 
 /**
- * An authenticated caller, defined with the `Kizuna.identity` builders. Extends
+ * An authenticated caller, defined with the `k.identity` builders. Extends
  * {@link SecurityScheme} with what its callers hold and the credential its
  * authentication method extracts from the request.
  */
@@ -270,7 +270,7 @@ export interface CustomConfig<
  * no handler args.
  *
  * @example
- * const member = Kizuna.identity.apiKey({
+ * const member = k.identity.apiKey({
  *     name: 'x-workspace-token',
  *     in: 'header',
  *     context: z.object({
@@ -281,7 +281,7 @@ export interface CustomConfig<
  *
  * @example
  * // Authentication-only, no context, no handler args:
- * const apiConsumer = Kizuna.identity.apiKey({
+ * const apiConsumer = k.identity.apiKey({
  *     name: 'x-api-key',
  *     in: 'header',
  * });
@@ -354,7 +354,7 @@ export const createIdentity = {
      * header; reach for `custom` only when neither fits.
      *
      * @example
-     * const inviteToken = Kizuna.identity.custom({
+     * const inviteToken = k.identity.custom({
      *     context: z.object({
      *         inviteId: z.string(),
      *     }),

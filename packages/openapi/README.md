@@ -10,36 +10,27 @@ pnpm add @ts-kizuna/openapi
 
 ## Usage
 
-Declare the plugin on `k.contract`:
+Name the plugin under `plugins` in your config, and `api.mount` serves the document and its reference UI:
 
 ```ts
+// kizuna.config.ts
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
 import { openApiPlugin } from '@ts-kizuna/openapi';
-import { k } from './k';
-import { routes } from './routes';
+import { routes } from './src/routes';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
     routes,
-    plugins: {
-        openApi: openApiPlugin({
+    plugins: [
+        openApiPlugin({
             info: {
                 title: 'My API',
                 version: '1.0.0',
             },
+            docsPath: '/docs',
         }),
-    },
-});
-```
-
-Then pass its server half to `server.api`, where the generator lives:
-
-```ts
-import { openApiPluginServer } from '@ts-kizuna/openapi/server';
-
-export const api = server.api({
-    router,
-    plugins: {
-        openApi: openApiPluginServer(),
-    },
+    ],
 });
 ```
 

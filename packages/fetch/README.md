@@ -12,9 +12,9 @@ pnpm add @ts-kizuna/fetch
 
 ```ts
 import { KizunaClient } from '@ts-kizuna/fetch';
-import { contract } from './contract';
+import kizuna from '../kizuna.config';
 
-const apiClient = new KizunaClient(contract, {
+const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
 });
 

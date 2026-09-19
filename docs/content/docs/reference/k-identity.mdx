@@ -19,8 +19,8 @@ import { k } from './k';
 
 ## Builders
 
-| Builder                         | Credential source                            | OpenAPI scheme                       |
-| ------------------------------- | -------------------------------------------- | ------------------------------------ |
+| Builder                    | Credential source                            | OpenAPI scheme                       |
+| -------------------------- | -------------------------------------------- | ------------------------------------ |
 | `k.identity.bearer`        | `Authorization: Bearer <token>`              | `{ type: 'http', scheme: 'bearer' }` |
 | `k.identity.apiKey`        | A named header, query parameter, or cookie   | `{ type: 'apiKey', name, in }`       |
 | `k.identity.basic`         | `Authorization: Basic <base64>`, decoded     | `{ type: 'http', scheme: 'basic' }`  |
@@ -30,8 +30,8 @@ import { k } from './k';
 
 Each builder hands back the identity, waiting for its `guard`. Every one takes `context` (optional), `roles` (optional), `description` (optional), and `scheme` (optional, where identities sharing one credential set the same `scheme` name and emit a single OpenAPI scheme). Method-specific fields:
 
-| Builder                         | Extra fields                                                                                                                                                                                      |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Builder                    | Extra fields                                                                                                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `k.identity.bearer`        | `bearerFormat?` (e.g. `'JWT'`)                                                                                                                                                                    |
 | `k.identity.apiKey`        | `name`, `in: 'header' \| 'query' \| 'cookie'`                                                                                                                                                     |
 | `k.identity.oauth2`        | `flows` (OpenAPI OAuth Flows object), `issuer?` (the authorization server's RFC 8414 issuer identifier), `resourceMetadata?` (this API's RFC 9728 metadata URL, sent in every `Bearer` challenge) |

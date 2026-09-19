@@ -13,19 +13,25 @@ pnpm add @ts-kizuna/hono hono
 ## Usage
 
 ```ts
-import { Hono } from 'hono';
-import { KizunaServer } from '@ts-kizuna/hono';
-import { contract } from './contract';
-import { router } from './router';
+// kizuna.config.ts
+import { defineConfig } from '@ts-kizuna/core';
+import { honoAdapter } from '@ts-kizuna/hono';
+import { routes } from './src/routes';
 
-const server = new KizunaServer(contract);
-
-const api = server.api({
-    router,
+export default defineConfig({
+    adapter: honoAdapter(),
+    routes,
 });
+```
+
+```ts
+// src/index.ts
+import { Hono } from 'hono';
+import kizuna from '../kizuna.config';
 
 const app = new Hono();
-api.mount(app);
+
+kizuna.api.mount(app);
 
 export default app;
 ```

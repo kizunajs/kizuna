@@ -24,15 +24,17 @@ Declare the plugin in `tsconfig.json`:
 }
 ```
 
-Deprecations are declared once, on the contract:
+Deprecations are declared once, on the route:
 
 ```ts
-deleteUser: {
-    method: 'DELETE',
-    path: '/users/:id',
-    deprecated: 'use archiveUser instead',
-    // ...
-},
+deleteUser: k
+    .route({
+        method: 'DELETE',
+        path: '/users/:id',
+        deprecated: 'use archiveUser instead',
+        // ...
+    })
+    .handler(/* ... */),
 ```
 
 [Documentation](https://ts-kizuna.com/docs/vscode)

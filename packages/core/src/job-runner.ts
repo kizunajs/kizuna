@@ -129,13 +129,12 @@ const handlerAt = (handlers: unknown, jobKey: string): unknown => {
 };
 
 /**
- * Pair a contract's jobs with their handlers so they can be run from anywhere.
- *
- * Every handler already receives this as `jobs`, so reach for it directly only
- * outside a request: in a script, a seed, or a test.
+ * Pair a job tree with the handlers that run it, so the jobs can be run from
+ * anywhere. `defineConfig` builds one from the handlers each job carries, and
+ * every route and job handler receives it as `jobs`.
  *
  * @example
- * const jobs = createJobRunner(contract, jobHandlers);
+ * const jobs = createJobRunner(jobTree, handlers);
  *
  * await jobs.billing.reconcileInvoices.run({ since: '2026-08-01' });
  * await jobs.indexUser.queue({

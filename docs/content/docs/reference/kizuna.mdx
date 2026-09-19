@@ -1,116 +1,87 @@
 ---
 title: new Kizuna()
-description: Declare one API surface, with its tags, identities, request contexts, and validation codes, and keep it as `k`.
+description: The authoring surface for one API, typed by the Config that kizuna generate writes.
 ---
 
-`new Kizuna()` creates one API surface. Keep the instance as `k`, then use `k.routes` to define route groups and `k.contract` to assemble them.
+`new Kizuna<Config>()` is what you declare routes with. It takes nothing at runtime: its type parameter is the `Config` generated from your `kizuna.config.ts`, and that is what types everything a handler receives and checks every name you write.
+
+Keep the instance as `k`, usually in `src/k.ts`, and import it wherever you declare.
 
 <InstallTabs packageName="@ts-kizuna/core" />
 
-```ts
+```ts title="src/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
+import type { Config } from '../kizuna.types';
+
+export const k = new Kizuna<Config>();
 ```
 
-## Parameters
+## What it gives you
 
-```ts
-new Kizuna(config?: {
-    adapter?: Adapter;
-    identities?: Record<string, SecurityScheme>;
-    requestContext?: Record<string, RequestContext>;
-    tags?: TagSet;
-    validation?: { issueCodes?: readonly string[] };
-    jobs?: JobsConfig;
-}): K
+| Member             | Signature                                                              | Description                                                                                          |
+| ------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `k.route`          | `(definition) => RouteBuilder`                                         | Declare one route and the [`handler`](/docs/reference/k-route) that answers it.                      |
+| `k.routes`         | `(tag, defs) => Routes`                                                | Group routes under one of the tag set's keys.                                                        |
+| `k.tags`           | `(tags) => TagSet`                                                     | Declare the [OpenAPI tags](/docs/reference/k-tags) routes are grouped under.                         |
+| `k.identity`       | `.bearer`, `.apiKey`, `.basic`, `.oauth2`, `.openIdConnect`, `.custom` | Declare an [identity](/docs/reference/k-identity) and the `guard` that authenticates it.             |
+| `k.requestContext` | `(config) => RequestContextBuilder`                                    | Declare a [request-scoped value](/docs/reference/k-request-context) and the `handler` that fills it. |
+| `k.job`            | `(definition) => JobBuilder`                                           | Declare one job and the handler that runs it.                                                        |
+| `k.jobs`           | `(identity, definitions) => Jobs`                                      | Group [jobs](/docs/reference/k-jobs) and name the identity they require.                             |
+| `k.issue`          | `(ctx, issue) => void`                                                 | Raise a [typed validation code](/docs/reference/k-issue) inside a Zod refinement.                    |
+
+## Statics
+
+Some declarations are shared across APIs rather than bound to one, so they stay on the class:
+
+| Member               | Description                                                                    |
+| -------------------- | ------------------------------------------------------------------------------ |
+| `Kizuna.model`       | Name a [schema](/docs/reference/kizuna-model) so every client reuses one type. |
+| `Kizuna.permissions` | Declare a [permission catalog](/docs/reference/kizuna-permissions).            |
+| `Kizuna.roles`       | Declare the [roles](/docs/reference/kizuna-roles) callers hold.                |
+
+## What Config carries
+
+`kizuna.types.ts` is written by `kizuna generate` from your config. Every name you write against `k` is checked against it, and everything a handler receives comes from it.
+
+```ts title="kizuna.types.ts"
+export interface Config {
+    adapter: ReturnType<typeof expressAdapter>;
+    tags: typeof tags;
+    identities: {
+        user: typeof user;
+        member: typeof member;
+    };
+    requestContext: {
+        analytics: typeof analytics;
+    };
+    issueCodes: 'invalid_phone_number';
+    jobs: typeof jobs;
+}
 ```
 
-| Field                   | Type                             | Description                                                                                                                                                               |
-| ----------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `adapter`               | `Adapter`                        | Optional. The framework this API is served on, as a value: `expressAdapter`, `fastifyAdapter`, `honoAdapter` or `nextAdapter`. Its handler context reaches every handler. |
-| `identities`            | `Record<string, SecurityScheme>` | Optional. The API's identities from the [`Kizuna.identity` builders](/docs/reference/kizuna-identity). The keys become the names a route's `auth` and the guards use.     |
-| `requestContext`        | `Record<string, RequestContext>` | Optional. Declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values every handler receives.                          |
-| `tags`                  | `TagSet`                         | Optional. A tag set from [`Kizuna.tags`](/docs/reference/kizuna-tags). Its keys become the allowed group tags.                                                            |
-| `validation.issueCodes` | `readonly string[]`              | Optional. Custom validation issue codes this API's handlers may emit via `k.issue`. Captured as a literal union.                                                          |
-| `jobs`                  | `JobsConfig`                     | Optional. Settings shared by every job. The jobs themselves are declared with `k.jobs`. See [Jobs](/docs/jobs).                                                           |
-
-### `JobsConfig`
-
-Settings shared by every job. The jobs themselves are declared with [`k.jobs`](/docs/reference/k-jobs).
-
-| Field      | Default   | Description                                                                        |
-| ---------- | --------- | ---------------------------------------------------------------------------------- |
-| `path`     | `'/jobs'` | The namespace both job endpoints are mounted under. Nothing is served on it itself |
-| `method`   | `'POST'`  | `'GET'` instead, for schedulers that only send `GET`, such as Vercel Cron          |
-| `windowMs` | `60000`   | How far back a tick looks for due jobs. Widen it when the scheduler delivers late  |
-| `only`     | none      | Dispatch only these jobs                                                           |
-| `exclude`  | none      | Never dispatch these                                                               |
-
-## Returns
-
-The instance, the authoring surface for this API:
-
-| Method       | Signature                                 | Description                                                                  |
-| ------------ | ----------------------------------------- | ---------------------------------------------------------------------------- |
-| `k.routes`   | `(tag, defs) => Routes`                   | Define a route group under one of the tag set's keys.                        |
-| `k.jobs`     | `(identity, definitions) => Jobs`         | Declare scheduled jobs and the identity they require.                        |
-| `k.contract` | `({ routes, jobs, plugins }) => Contract` | Assemble route groups, plugins and all, into the contract shared everywhere. |
-| `k.issue`    | `(ctx, issue) => void`                    | Raise a typed validation issue code inside a Zod refinement.                 |
+So a route's `auth` only accepts a declared identity, `k.routes('users', ...)` only accepts a declared tag, and a handler reads `auth.user`, `requestContext.analytics`, `jobs.indexUser` and your framework's own request without importing any of them.
 
 ## Example
 
-Construct it once, usually in a `k.ts` file, then import `k` wherever you define routes.
-
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
-import { tags } from './tags';
-import { user, member } from './identities';
-import { analytics } from './request-context';
-
-export const k = new Kizuna({
-    identities: {
-        user,
-        member,
-    },
-    requestContext: {
-        analytics,
-    },
-    tags,
-    validation: {
-        issueCodes: ['invalid_phone_number'],
-    },
-});
-```
-
-## Request context
-
-`requestContext` registers declarations from [`Kizuna.requestContext`](/docs/reference/kizuna-request-context), the request-scoped values like analytics ids or a logger. Every handler receives them typed under `requestContext`, keyed by their name; each is resolved per request by a [`server.requestContext`](/docs/reference/server-request-context) resolver wired on `server.api`.
-
-```ts title="request-context.ts"
+```ts title="src/routes/users.ts"
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+import { k } from '../k';
 
-export const analytics = Kizuna.requestContext(
-    z.object({
-        sessionId: z.string().nullable(),
-    })
-);
-```
-
-```ts title="k.ts"
-import { analytics } from './request-context';
-
-export const k = new Kizuna({
-    requestContext: {
-        analytics,
-    },
+export const usersRoutes = k.routes('users', {
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            auth: 'user',
+            responses: {
+                200: UserSchema,
+            },
+        })
+        .handler(async ({ params, auth, req }) => ({
+            status: 200,
+            body: await db.users.find(params.id, auth.user.userId),
+        })),
 });
 ```
 
-```ts title="users.ts"
-listUsers: ({ query, requestContext }) => {
-    track(requestContext.analytics.sessionId, 'listUsers');
-    // ...
-},
-```
-
-See the [Contract guide](/docs/building/contract) for response schemas, deprecation, typed response headers, and nesting.
+Assemble them with [`defineConfig`](/docs/reference/define-config). See the [Config guide](/docs/building/contract) for response schemas, deprecation, typed response headers, and nesting.

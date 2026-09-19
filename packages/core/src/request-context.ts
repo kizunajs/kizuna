@@ -1,11 +1,10 @@
 import type { z } from 'zod';
 
 /**
- * A request context declaration from `Kizuna.requestContext`: the schema
- * of a request-scoped value every handler receives, and optionally the request
- * headers it derives from. Resolved per adapter with
- * `server.requestContext` and wired on `server.api` under
- * `requestContext`.
+ * A request context declaration from `k.requestContext`: the schema of a
+ * request-scoped value every handler receives, and optionally the request
+ * headers it derives from. The declaration carries its own `handler`, and
+ * `defineConfig` names it under `requestContext`.
  */
 export interface RequestContextSchema<
     ContextSchema extends z.ZodType = z.ZodType,
@@ -32,7 +31,7 @@ export interface RequestContextConfig<ContextSchema extends z.ZodType, HeadersSc
 
 /**
  * Declare a request-scoped value, an analytics id, a logger, the caller's locale.
- * Register it on `new Kizuna()` under `requestContext`; handlers receive it typed
+ * Name it in `defineConfig` under `requestContext`; handlers receive it typed
  * under its registered name.
  *
  * Pass a schema alone for a server-derived value, or `{ context, headers }`
@@ -40,7 +39,7 @@ export interface RequestContextConfig<ContextSchema extends z.ZodType, HeadersSc
  * them once, on the client initializer.
  *
  * @example
- * export const analytics = Kizuna.requestContext({
+ * export const analytics = k.requestContext({
  *     headers: z.object({
  *         'x-posthog-session-id': z.string().optional(),
  *     }),

@@ -85,40 +85,18 @@ const declare = (slug: string, props: McpPluginProps<string>) => {
 
 /**
  * Let AI assistants use the API. Serves an MCP (Model Context Protocol)
- * endpoint where every route is a tool an assistant can discover and call,
- * behind the same guards as the HTTP endpoints.
- *
- * Everything `k.tools` declares is published, because a tool is a tool.
- * A route is an HTTP endpoint rather than a tool, so name the ones worth
- * publishing under `options.publishRoutes`. `options.hideTools` drops a declared
- * tool you would rather keep to yourself.
+ * endpoint where every route declaring `tool` is one an assistant can discover
+ * and call, behind the same guards as the HTTP endpoints.
  *
  * The endpoint is an ordinary kizuna route, so `api.mount` serves it on any
- * adapter, and it stays out of `contract.routes` so the client and the
- * generators do not see it.
- *
- * Pass `mcpPluginServer()` from `@ts-kizuna/mcp/server` to
- * `server.api({ plugins })` to serve it.
+ * adapter, and it stays out of `api.routes` so the client and the generators do
+ * not see it.
  *
  * @example
  * ```ts
- * export const contract = k.contract({
+ * export default defineConfig({
  *     routes,
- *     tools,
- *     plugins: ({ routes, tools }) => ({
- *         mcp: mcpPlugin({
- *             name: 'My API',
- *             routes,
- *             tools,
- *             options: {
- *                 publishRoutes: {
- *                     users: {
- *                         '*': true,
- *                     },
- *                 },
- *             },
- *         }),
- *     }),
+ *     plugins: [mcpPlugin({ name: 'My API' })],
  * });
  * ```
  */

@@ -3,73 +3,88 @@ title: Plugins
 description: Add endpoints and helpers to your API, fully typed in your handlers, on any adapter.
 ---
 
-A plugin adds endpoints, helpers your handlers can call, or both. It gets your contract, and everything it adds is typed.
+A plugin adds endpoints, helpers your handlers can call, or both. It gets your api, and everything it adds is typed.
 
 ## Installing one
 
-A plugin ships as two modules. The declaration goes on `k.contract`:
+Plugins go under `plugins` on [`defineConfig`](/docs/reference/define-config), as a list:
 
-```ts title="contract.ts"
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
 import { mcpPlugin } from '@ts-kizuna/mcp';
-import { k } from './k';
-import { routes } from './routes';
+import { routes } from './src/routes';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
     routes,
-    plugins: {
-        mcp: mcpPlugin({
+    plugins: [
+        mcpPlugin({
             name: 'My API',
         }),
-    },
+    ],
 });
 ```
 
-The server half goes on `server.api`, under the same key:
+`api.mount` then serves its routes along with yours, on every adapter.
 
-```ts title="api.ts"
-import { mcpPluginServer } from '@ts-kizuna/mcp/server';
+## Slugs
 
-export const api = server.api({
-    router,
-    plugins: {
-        mcp: mcpPluginServer(),
-    },
-});
+Each plugin carries a slug, which is the key it installs at and what handlers reach it under. Every plugin defaults its own, so a list is all you write.
+
+Installing two of the same plugin is where you override one:
+
+```ts title="kizuna.config.ts"
+plugins: [
+    mcpPlugin({
+        name: 'My API',
+    }),
+    mcpPlugin({
+        slug: 'internalMcp',
+        path: '/internal/mcp',
+        name: 'My API, internal',
+    }),
+],
 ```
 
-The key you choose is the plugin's name everywhere else, and handlers read it under `plugins.mcp`. Miss the second half and `server.api` throws, naming the module to import.
-
-The declaration takes plain data; the contract it rides on is shared with your clients. Anything live, a store, a driver, an SDK, goes in the server half.
-
-`api.mount` serves its routes along with yours, on every adapter.
+Handlers then read the first under `plugins.mcp` and the second under `plugins.internalMcp`.
 
 ## Using what a plugin offers
 
 A plugin can hand your handlers functions to call, under `plugins`:
 
-```ts title="router/index.ts"
-updateUser: async ({ params, body, plugins }) => {
-    const user = await db.users.update(params.id, body);
-    plugins.audit.record('users.updateUser');
+```ts title="src/routes/users.ts"
+updateUser: k
+    .route({
+        method: 'PATCH',
+        path: '/users/:id',
+        body: UpdateUserSchema,
+        responses: {
+            200: UserSchema,
+        },
+    })
+    .handler(async ({ params, body, plugins }) => {
+        const user = await db.users.update(params.id, body);
+        plugins.audit.record('users.updateUser');
 
-    return {
-        status: 200,
-        body: user,
-    };
-},
+        return {
+            status: 200,
+            body: user,
+        };
+    }),
 ```
 
-Plugin names come from other people, so they are namespaced under `plugins` rather than spread into the handler args, where one called `body` would shadow your request body. Destructure it for the short form:
+Plugin slugs come from other people, so they are namespaced under `plugins` rather than spread into the handler args, where one called `body` would shadow your request body. Destructure it for the short form:
 
-```ts title="users.ts"
-updateUser: async ({ params, body, plugins: { audit } }) => {
+```ts
+.handler(async ({ params, body, plugins: { audit } }) => {
 ```
 
-A contract with no plugins gets no `plugins` argument at all.
+A config with no plugins gets no `plugins` argument at all.
 
 ## Plugin routes
 
-A plugin's routes run through the same pipeline as yours, with the same validation, guards, access control and problem details. They never join `contract.routes`, so they stay out of everything generated from it.
+A plugin's routes run through the same pipeline as yours, with the same validation, guards, access control and problem details. They never join `api.routes`, so they stay out of everything generated from it.
 
 |                           | your routes | a plugin's routes |
 | ------------------------- | ----------- | ----------------- |
@@ -79,28 +94,20 @@ A plugin's routes run through the same pipeline as yours, with the same validati
 | in your fetch client      | yes         | **no**            |
 | in OpenAPI, Swift, Kotlin | yes         | **no**            |
 
-If a plugin claims a path your routes already use, `k.contract` throws and names both.
+If a plugin claims a path your routes already use, `defineConfig` throws and names both.
 
-## Props that name routes
+## What a plugin sees
 
-Some plugins take config keyed by route: which routes to expose, which to rate-limit, which to skip. Write `plugins` as a function to get the routes, typed:
+A plugin is handed the api when it starts serving, so it can read every route, tag, identity and schema you declared. That is how [`mcpPlugin`](/docs/reference/mcp-plugin) knows which routes say `tool`, and how [`openApiPlugin`](/docs/reference/openapi-plugin) builds a document without being told what is in your API.
 
-```ts title="contract.ts"
-export const contract = k.contract({
-    routes,
-    plugins: ({ routes }) => ({
-        audit: auditPlugin(routes, {
-            skip: {
-                health: true,
-            },
-        }),
-    }),
-});
-```
+Your config stays a list of plugins, with no routes to pass across.
 
-`k.contract` calls it with a context carrying the contract's own routes, so a route name that does not exist is a compile error. Passing `routes` to the plugin is what types its keys, and it cannot be forgotten the way an explicit type argument can. The context is an object, so it can carry more later without changing every plugin.
+## Where a plugin runs
+
+A plugin's `serve` runs on the server, beside your handlers, so it may import anything they may: Node built-ins, a database driver, an SDK. Your config is server-side too, and a browser imports the client [`kizuna generate`](/docs/configuration) writes rather than the config itself.
 
 ## Next
 
 - [Create a Plugin](/docs/extend/create-plugin) to write your own
-- [MCP](/docs/mcp), a plugin that turns your routes into AI-callable tools
+- [MCP](/docs/mcp), a plugin that publishes the routes declaring `tool`
+- [OpenAPI](/docs/openapi), a plugin that serves your document and a reference UI

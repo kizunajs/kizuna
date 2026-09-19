@@ -61,7 +61,7 @@ Every field of a route definition, plus `auth`. See [`k.routes`](/docs/reference
 | `['user', 'member']`              | Either identity                          |
 | `{ identity, roles?, requires? }` | The same, narrowed                       |
 
-`k.contract` resolves it onto the route's `security`, `roles` and `requires`, which the OpenAPI document and the generated clients read. A role or permission the route names must be one the identity declares, so a typo does not compile.
+`defineConfig` resolves it onto the route's `security`, `roles` and `requires`, which the OpenAPI document and the generated clients read. A role or permission the route names must be one the identity declares, so a typo does not compile.
 
 An instance that declares no identities has nothing to state, so `auth` is optional there and every route is public.
 
@@ -72,5 +72,5 @@ An instance that declares no identities has nothing to state, so `auth` is optio
 ## Reference
 
 - [`k.routes`](/docs/reference/k-routes)
-- [`k.contract`](/docs/reference/k-contract)
+- [`defineConfig`](/docs/reference/define-config)
 - [Access control](/docs/access-control)

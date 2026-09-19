@@ -17,41 +17,24 @@ description: Generate an OpenAPI 3.1.0 document from your contract, and serve it
 
 ## Declare the plugin
 
-```ts title="contract.ts"
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
 import { openApiPlugin } from '@ts-kizuna/openapi';
-import { k } from './k';
-import { routes } from './routes';
+import { routes } from './src/routes';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
     routes,
-    plugins: {
-        openApi: openApiPlugin({
+    plugins: [
+        openApiPlugin({
             info: {
                 title: 'My API',
                 version: '1.0.0',
             },
             docsPath: '/docs',
         }),
-    },
-});
-```
-
-</Step>
-
-<Step>
-
-## Register its server half
-
-`server.api` is where the generator itself lives:
-
-```ts title="api.ts"
-import { openApiPluginServer } from '@ts-kizuna/openapi/server';
-
-export const api = server.api({
-    router,
-    plugins: {
-        openApi: openApiPluginServer(),
-    },
+    ],
 });
 ```
 
@@ -81,12 +64,12 @@ The routes are public. Gate them with your framework's own middleware if that is
 
 ### Writing it to disk
 
-```ts title="generate-openapi.ts"
-import { writeFileSync } from 'fs';
-import { generateOpenApi } from '@ts-kizuna/openapi/server';
-import { contract } from '../src/contract';
+```ts title="scripts/generate-openapi.ts"
+import { writeFileSync } from 'node:fs';
+import { generateOpenApi } from '@ts-kizuna/openapi';
+import kizuna from '../kizuna.config';
 
-const spec = generateOpenApi(contract);
+const spec = generateOpenApi(kizuna.api);
 
 writeFileSync('openapi.yaml', spec('yaml'));
 ```
@@ -100,14 +83,14 @@ tsx scripts/generate-openapi.ts
 [`generateOpenApi`](#generateopenapi) renders the document directly:
 
 ```ts title="src/index.ts"
-const spec = generateOpenApi(contract);
+const spec = generateOpenApi(kizuna.api);
 
 app.get('/openapi.yaml', (_req, res) => {
     res.type('text/yaml; charset=utf-8').send(spec('yaml'));
 });
 ```
 
-Leave `yamlPath` unset when you do, or two handlers claim the path and whichever registered first wins. Kizuna sees collisions between the contract and a plugin, but a route you register on the app yourself is invisible to it.
+Leave `yamlPath` unset when you do, or two handlers claim the path and whichever registered first wins. Kizuna sees collisions between your routes and a plugin's, but a route you register on the app yourself is invisible to it.
 
 Mixing is the useful case: set `jsonPath` and leave `docsPath` unset, and the plugin serves the document while you render your own UI.
 
@@ -124,13 +107,13 @@ Point `cdnUrl` at a self-hosted copy for air-gapped deployments or a strict CSP.
 
 ## `generateOpenApi`
 
-`generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the contract, declared once on [`openApiPlugin`](#declare-the-plugin).
+`generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the api, declared once on [`openApiPlugin`](#declare-the-plugin).
 
-```ts title="generate-openapi.ts"
-import { generateOpenApi } from '@ts-kizuna/openapi/server';
-import { contract } from '@/contract';
+```ts title="scripts/generate-openapi.ts"
+import { generateOpenApi } from '@ts-kizuna/openapi';
+import kizuna from '../kizuna.config';
 
-const spec = generateOpenApi(contract);
+const spec = generateOpenApi(kizuna.api);
 
 spec('json'); // OpenApiDocument object
 spec('yaml'); // YAML string
@@ -162,9 +145,9 @@ Pass an array for several. It lands as JSON Schema `examples` on the field's sch
 
 ## Options
 
-They go on `openApiPlugin` on the contract, and `generateOpenApi` reads them from there.
+They go on `openApiPlugin` in your config, and `generateOpenApi` reads them from there.
 
-```ts title="contract.ts"
+```ts title="kizuna.config.ts"
 openApiPlugin({
     info: {
         title: 'My API',
@@ -195,14 +178,16 @@ openApiPlugin({
 
 ## Security
 
-Security comes from the contract. The [identities](/docs/authentication) you register on `new Kizuna()` are emitted as `components.securitySchemes`, and the contract's access control map becomes each operation's `security`, with the permissions an OAuth route requires as its scopes, the roles a route accepts under `x-kizuna-roles`, and the permissions it requires under `x-kizuna-requires`. There are no generator options for it, so the spec cannot disagree with what the server enforces.
+Security comes from what you declared. The [identities](/docs/authentication) you name under `identities` on `defineConfig` are emitted as `components.securitySchemes`, and each route's `auth` becomes that operation's `security`, with the permissions an OAuth route requires as its scopes, the roles a route accepts under `x-kizuna-roles`, and the permissions it requires under `x-kizuna-requires`. There are no generator options for it, so the spec cannot disagree with what the server enforces.
 
-```ts title="identities.ts"
-export const user = Kizuna.identity.bearer({
-    context: z.object({
-        userId: z.string(),
-    }),
-});
+```ts title="src/identities.ts"
+export const user = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    })
+    .guard(/* ... */);
 ```
 
 ```yaml title="openapi.yaml"
@@ -219,7 +204,7 @@ paths:
                 - user: []
 ```
 
-Routes marked `false` in the access control map get no `security` entry. A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity also emits no `security`, since OpenAPI can't describe its credential, but its routes carry an `x-kizuna-guarded` extension so they stay distinguishable from public ones.
+Routes with `auth: false` get no `security` entry. A [`custom`](/docs/reference/k-identity#custom-identities) identity also emits no `security`, since OpenAPI can't describe its credential, but its routes carry an `x-kizuna-guarded` extension so they stay distinguishable from public ones.
 
 ## Validation errors
 
@@ -227,7 +212,7 @@ Routes with a `body` or `query` schema automatically include a `400` validation 
 
 ## Refusals
 
-A route the [access control map](/docs/access-control) guards includes `401` and `403` as [Problem Details](/docs/reference/problem-details-schema). The `401` documents the `WWW-Authenticate` header too, required when every identity on the route has a challenge and optional when only some do. A route behind an API key declares no header.
+A route whose [`auth`](/docs/access-control) names an identity includes `401` and `403` as [Problem Details](/docs/reference/problem-details-schema). The `401` documents the `WWW-Authenticate` header too, required when every identity on the route has a challenge and optional when only some do. A route behind an API key declares no header.
 
 ## Streams
 

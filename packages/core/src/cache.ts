@@ -51,7 +51,7 @@ const declaresNothing = (cache: ObjectPolicy): boolean =>
     DELTA_SECONDS.every(([field]) => cache[field] === undefined);
 
 /**
- * Rejects a cache policy that cannot mean what it says. Called by `k.contract`,
+ * Rejects a cache policy that cannot mean what it says. Called by `defineConfig`,
  * so a bad policy fails at contract assembly rather than on the first response.
  */
 export const assertValidCache = (routes: Routes): void => {

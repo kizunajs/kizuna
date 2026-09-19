@@ -2,15 +2,17 @@
 
 Shows [ts-kizuna](https://ts-kizuna.com) deprecations where you code: deprecated routes and fields are struck through everywhere the contract's types flow, and hovering shows the migration message.
 
-Deprecations are declared once, on the contract:
+Deprecations are declared once, on the route:
 
 ```ts
-deleteUser: {
-    method: 'DELETE',
-    path: '/users/:id',
-    deprecated: 'use archiveUser instead',
-    // ...
-},
+deleteUser: k
+    .route({
+        method: 'DELETE',
+        path: '/users/:id',
+        deprecated: 'use archiveUser instead',
+        // ...
+    })
+    .handler(/* ... */),
 ```
 
 The extension picks them up with zero configuration, and stays inert in projects that don't use ts-kizuna.

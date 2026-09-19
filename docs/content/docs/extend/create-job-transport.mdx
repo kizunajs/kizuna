@@ -28,8 +28,11 @@ export const myQueue = createJobTransport({
 });
 ```
 
-```ts title="server.ts"
-export const server = new KizunaServer(contract, {
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    jobs,
     jobTransport: myQueue,
 });
 ```
@@ -183,8 +186,11 @@ export const qstash = (options: QstashOptions) =>
     });
 ```
 
-```ts title="server.ts"
-export const server = new KizunaServer(contract, {
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: nextAdapter(),
+    routes,
+    jobs,
     jobTransport: qstash({
         token: process.env.QSTASH_TOKEN,
         baseUrl: 'https://api.example.com',
@@ -198,7 +204,7 @@ Two things that are easy to get wrong here, and both look like a delivered job t
 - **`upstash-retries` is off by one.** kizuna's `retry` is a number of attempts; QStash's header is retries _after_ the first.
 - **The body is the message, not the input.** QStash delivers what you publish verbatim, and the run endpoint reads `job` from it. Publishing the bare input leaves it with nothing to run.
 
-`register` is worth implementing for QStash in particular: `CRON_TZ=` expresses a time zone, which platform cron cannot, since Vercel and GitHub read every expression as UTC. Note that a job you delete leaves its schedule behind, so prune what the contract no longer declares.
+`register` is worth implementing for QStash in particular: `CRON_TZ=` expresses a time zone, which platform cron cannot, since Vercel and GitHub read every expression as UTC. Note that a job you delete leaves its schedule behind, so prune what your config no longer declares.
 
 Check the [QStash docs](https://upstash.com/docs/qstash) for the current header set before relying on the names above.
 
@@ -206,10 +212,10 @@ Check the [QStash docs](https://upstash.com/docs/qstash) for the current header 
 
 QStash calls the run endpoint, so the jobs' identity guards it. Forwarding the secret, as above, is the simplest thing that works: it arrives as `Authorization` and an ordinary bearer guard reads it, the same trust model as Vercel Cron's `CRON_SECRET`.
 
-```ts title="guards.ts"
-export const requireScheduler = server.guard('scheduler', ({ bearer, deny }) =>
+```ts title="src/identities.ts"
+export const scheduler = k.identity.bearer({}).guard(({ bearer, deny }) =>
     bearer?.token === process.env.CRON_SECRET
-        ? {}
+        ? undefined
         : deny({
               status: 401,
               body: {

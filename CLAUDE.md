@@ -21,7 +21,7 @@ ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RF
 - **RFC 8414** (OAuth 2.0 Authorization Server Metadata, June 2018): an identity's `issuer`
 - **RFC 8707** (Resource Indicators for OAuth 2.0, February 2020): the canonical `resource` URI and the audience a guard checks
 - **RFC 6750** (OAuth 2.0 Bearer Token Usage, October 2012): the `WWW-Authenticate` challenge, including `insufficient_scope`
-- **Model Context Protocol**: the MCP endpoint, its tools, their names, and its authorization. A tool declared with `k.tools` follows the `Tool` object field for field
+- **Model Context Protocol**: the MCP endpoint, its tools, their names, and its authorization. A route's `tool` follows the `Tool` object field for field
 
 ### MCP tool names
 
@@ -40,7 +40,7 @@ Every GET route answers HEAD (RFC 9110 section 9.3.2): same status and headers, 
 
 Jobs (`k.jobs`) are the one non-HTTP-shaped concept. Settled; don't relitigate.
 
-- A job is a sibling of a route, never inside one. Nothing that walks `contract.routes` sees a job.
+- A job is a sibling of a route, never inside one. Nothing that walks `api.routes` sees a job.
 - A handler receives only `input` and `throwError`. Anything more it imports, as a route handler would.
 - A job declares no path and no method. `schedule` is optional.
 - Two endpoints serve every job, both under the `jobs.path` namespace (default `/jobs`, which serves nothing itself): `POST /jobs/dispatch` runs whatever is due, `POST /jobs/run` runs the one job its `{ job, input }` body names. A job is addressed by its dotted key.
@@ -50,15 +50,15 @@ Deliberate omissions: no first-party transports, no stored state, and no per-job
 
 # Tools
 
-Tools (`k.tools`) are what a model calls. Settled; don't relitigate.
+A tool is a route a model may call. Settled; don't relitigate.
 
-- A tool is a sibling of a route, never inside one. It declares no path and no method, and nothing that walks `contract.routes` sees one.
-- The fields are MCP's `Tool`, field for field: `title`, `description`, `input`, `output`, `annotations`. `description` is required, because it is the one thing a model reads before calling.
-- A handler receives only `input` and `throwError`. Anything more it imports, as a route handler would. `throwError` takes the message the model reads, not a `{ status, body }` envelope, because a tool has no HTTP status.
+- A tool is not a second kind of declaration. A route says `tool` and it publishes, so there is one place a route runs whoever asked.
+- `tool: true` takes the route's `summary` as what a model reads, so a route that publishes carries one. The object form's fields are MCP's own, field for field: `description`, `title`, `readOnlyHint`, `idempotentHint`, `destructiveHint`, `openWorldHint`.
+- `confirm` is kizuna's own, and the one field MCP cannot declare. It asks the person over MCP elicitation before the handler runs, and declining leaves it uncalled. It sits on the declaration because the handler also answers HTTP, where there is nobody to ask.
+- The hints default from the method's RFC 9110 semantics. Declare one only to say what the method cannot.
 - A tool is addressed by its dotted key, `weather.getForecast`, and publishes as `weather_get_forecast`.
-- A streamed response names them under `tools`, adding `tool_call`, `tool_result` and `tool_error` to the events it declares.
-- Every declared tool publishes over MCP, because a tool is a tool. `options.hideTools` drops one.
-- A route is an HTTP endpoint rather than a tool, so publishing one is the opt in, through `options.publishRoutes`.
+- A route that streams, or that takes a form body, never publishes: a tool result is one value and tool input is JSON.
+- A streamed response names routes under `tools`, adding `tool_call`, `tool_result` and `tool_error` to the events it declares.
 - `readToolCalls` folds a message list into one row per call. Core exports it; the Swift and Kotlin generators emit it per route.
 
 Deliberate omissions: no LLM clients, no agent loop, no provider wire shapes, and no progressive tool input.
@@ -137,14 +137,16 @@ First-party adapters (in `packages/`) always ship with:
 
 # Plugins
 
-A plugin ships in two halves, and which half a module belongs to decides what it may import:
+A plugin is one module, built with `createPlugin` from `@ts-kizuna/core/plugin`. It is named under `plugins` on `defineConfig`, as a list, and a config never reaches a browser, so a plugin may import anything a handler may.
 
-- **Declaration**: the package's main entry, built with `createPlugin` from `@ts-kizuna/core/plugin`. Installed under `plugins` on `k.contract`, where props that name routes are checked against them: write `plugins` as a function and its `routes` are handed over. It rides on the contract, and a contract is shared with browser bundles, so it may import only what a browser bundles. Use `import type` for anything the server half owns; types are erased, values are not.
-- **Server**: the `./server` subpath, built with `implementPlugin` from `@ts-kizuna/core/adapter`. Only the server app imports it, so it may import anything, including Node built-ins and Node-only dependencies.
+- `slug` is the key it installs at and what handlers reach it under. Every plugin defaults its own; a factory taking `Slug` and returning `WithSlug<...>` is what lets an app rename one or install two.
+- `serve(props, api)` runs on the server and receives the assembled api, which is how a plugin reads the routes, tags and identities the app declared rather than being handed them.
+- It returns `router`, one handler per declared route, and optionally `exports`, which every handler reaches at `plugins.<slug>`.
+- A plugin route answers with `rawResponse` when its wire format is not a JSON body. Ordinary route handlers cannot.
 
-Every export subpath of every package under `packages/` declares its reach under `kizuna.entries` in its own `package.json`. `tests/client-safe.test.ts` enforces the boundary rather than documenting it: it bundles each `client` entry for a browser target and fails on any Node built-in, derives reach from the demo contract's own import graph so a mislabelled entry is caught, and requires every plugin to be installed on `apps/shared/src/contract.ts`. It reads `dist`, so run `pnpm build` before it.
+Every export subpath of every package under `packages/` declares its reach under `kizuna.entries` in its own `package.json`. `tests/client-safe.test.ts` enforces the boundary rather than documenting it: it generates a client from the demo config, bundles it for a browser target, fails on any Node built-in, and derives each entry's reach from that bundle's own import graph so a mislabelled entry is caught. It reads `dist`, so run `pnpm build` before it.
 
-Nothing else needs to know a plugin exists: its routes never join `contract.routes`, so the client and the generators do not see them.
+Nothing else needs to know a plugin exists: its routes never join `api.routes`, so the client and the generators do not see them.
 
 # Publishing
 

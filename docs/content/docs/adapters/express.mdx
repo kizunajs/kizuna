@@ -3,7 +3,7 @@ title: Express
 description: Mount a ts-kizuna API on an Express 5 application.
 ---
 
-`@ts-kizuna/express` connects a ts-kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by your contract.
+`@ts-kizuna/express` serves a ts-kizuna API from an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
 
 **Requires Express ≥ 5.**
 
@@ -11,62 +11,47 @@ description: Mount a ts-kizuna API on an Express 5 application.
 
 ## The adapter
 
-`expressAdapter` is the Express adapter as a value. Pass it to `new Kizuna()`, and every handler on this API receives Express's request objects:
-
-```ts title="contract/k.ts"
-import { Kizuna } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
-
-export const k = new Kizuna({
-    adapter: expressAdapter,
-});
-```
+`expressAdapter()` is what you name in `kizuna.config.ts`. Naming it is what gives every handler on this API Express's own `req` and `res`, typed.
 
 <Steps>
 
 <Step>
 
-## Create the server
+## Declare a route
 
-```ts title="server.ts"
-import { KizunaServer } from '@ts-kizuna/express';
-import { contract } from '@/contract';
+```ts title="src/routes/users.ts"
+import { k } from '../k';
 
-export const server = new KizunaServer(contract);
-```
-
-</Step>
-
-<Step>
-
-## Implement the router
-
-```ts title="router/index.ts"
-import { server } from './server';
-
-export const router = server.router({
-    users: {
-        listUsers: async ({ query }) => {
-            const found = await db.users.findMany({
-                skip: (query.page - 1) * query.limit,
-                take: query.limit,
-            });
-            return {
-                status: 200,
-                body: {
-                    users: found,
-                    total: await db.users.count(),
-                },
-            };
-        },
-        createUser: async ({ body }) => {
-            const user = await db.users.create(body);
-            return {
-                status: 201,
-                body: user,
-            };
-        },
-        getUser: async ({ params }) => {
+export const users = k.routes('users', {
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            query: ListUsersQuerySchema,
+            responses: {
+                200: UserListSchema,
+            },
+        })
+        .handler(async ({ query }) => ({
+            status: 200,
+            body: {
+                users: await db.users.findMany({
+                    skip: (query.page - 1) * query.limit,
+                    take: query.limit,
+                }),
+                total: await db.users.count(),
+            },
+        })),
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: UserSchema,
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(async ({ params }) => {
             const user = await db.users.findById(params.id);
             if (!user) {
                 return {
@@ -80,8 +65,7 @@ export const router = server.router({
                 status: 200,
                 body: user,
             };
-        },
-    },
+        }),
 });
 ```
 
@@ -89,14 +73,18 @@ export const router = server.router({
 
 <Step>
 
-## Build the api
+## Name Express in your config
 
-```ts title="api.ts"
-import { server } from './server';
-import { router } from './router';
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
+import { users } from './src/routes/users';
 
-export const api = server.api({
-    router,
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes: {
+        users,
+    },
 });
 ```
 
@@ -108,12 +96,12 @@ export const api = server.api({
 
 ```ts title="src/index.ts"
 import express from 'express';
-import { api } from './server/api';
+import kizuna from '../kizuna.config';
 
 const app = express();
 app.use(express.json());
 
-api.mount(app);
+kizuna.api.mount(app);
 
 app.listen(3000);
 ```
@@ -124,41 +112,46 @@ app.listen(3000);
 
 ## Handler context
 
-Each handler receives `{ params, query, body, headers, req, res }`. The `req` and `res` are the native Express objects, useful when you need to access cookies, set custom headers, or stream a response.
+Each handler receives `{ params, query, body, headers, req, res }`. The `req` and `res` are the native Express objects, useful when you need to read cookies, set custom headers, or stream a response.
 
-```ts title="users.ts"
-getUser: async ({ params, req, res }) => {
+```ts title="src/routes/users.ts"
+.handler(async ({ params, req, res }) => {
     console.log(req.ip);
     res.setHeader('x-custom', 'value');
-    const user = await db.users.findById(params.id);
     return {
         status: 200,
-        body: user,
+        body: await db.users.findById(params.id),
     };
-},
+});
 ```
 
 ## Guards
 
-A guard receives the credential extracted and typed, alongside the native `req`/`res`. See the [Authentication guide](/docs/authentication).
+A guard sits on the identity it authenticates, and receives the credential extracted and typed, alongside the native `req`/`res`. See the [Authentication guide](/docs/authentication).
 
-```ts title="guards.ts"
-import { server } from './server';
+```ts title="src/identities.ts"
+import { k } from './k';
 
-export const requireUser = server.guard('user', async ({ bearer, deny }) => {
-    const session = bearer ? await verifySession(bearer.token) : undefined;
-    if (!session) {
-        return deny({
-            status: 401,
-            body: {
-                detail: 'Unauthorized',
-            },
-        });
-    }
-    return {
-        userId: session.userId,
-    };
-});
+export const user = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    })
+    .guard(async ({ bearer, deny, req }) => {
+        const session = bearer ? await verifySession(bearer.token) : undefined;
+        if (!session) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        }
+        return {
+            userId: session.userId,
+        };
+    });
 ```
 
 ## Middleware
@@ -168,7 +161,7 @@ For request-scoped values handlers need, use [request context](/docs/request-con
 ## Options
 
 ```ts title="src/index.ts"
-api.mount(app, {
+kizuna.api.mount(app, {
     responseValidation: false,
 });
 ```
@@ -194,16 +187,16 @@ declare global {
 
 Both middleware and handlers are then typed:
 
-```ts title="users.ts"
-getUser: async ({ params, req }) => {
+```ts title="src/routes/users.ts"
+.handler(async ({ params, req }) => {
     console.log(req.requestId);
     // ...
-},
+});
 ```
 
 ## Method mismatches
 
-If a path is matched but the method is not defined in the contract, the adapter returns 405 with an `Allow` header listing the supported methods. This follows [RFC 9110 §15.5.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6).
+If a path is matched but the method is not declared, the adapter returns 405 with an `Allow` header listing the supported methods. This follows [RFC 9110 §15.5.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6).
 
 ## Multipart / file uploads
 
@@ -220,7 +213,7 @@ app.post('/avatar', upload.single('file'), (req, res, next) => {
     next();
 });
 
-api.mount(app);
+kizuna.api.mount(app);
 ```
 
 ## Streams
@@ -229,7 +222,6 @@ A [stream](/docs/streaming) response is piped to `res` after `flushHeaders()`, s
 
 ## Reference
 
-- [`new KizunaServer()`](/docs/reference/kizuna-server)
-- [`server.router`](/docs/reference/server-router)
-- [`server.api`](/docs/reference/server-api)
-- [`server.guard`](/docs/reference/server-guard)
+- [`defineConfig`](/docs/reference/define-config)
+- [a route's `handler`](/docs/reference/k-route)
+- [an identity's `guard`](/docs/reference/k-identity)

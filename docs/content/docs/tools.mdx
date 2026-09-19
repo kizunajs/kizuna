@@ -1,65 +1,117 @@
 ---
 title: Tools
-description: Declare the tools an AI assistant can call. Run them on the server, and read each call typed in your client.
+description: Publish a route as a tool a model can call, and read each call typed in your client.
 ---
 
 <AlphaNotice>
 
-Tools are new. How a tool is declared, how it runs, and how a client reads a call will likely change before v2, so pin your version if you depend on it.
+Tools are new. How a route publishes, how a call runs, and how a client reads one will likely change before v2, so pin your version if you depend on it.
 
 </AlphaNotice>
 
-A tool is usually written three times: a JSON Schema for the model, a typed event for the client, and a function that runs it. Declare it once and all three follow.
+A tool is usually written three times: a JSON Schema for the model, a typed event for the client, and a function that runs it. A route already carries all three, so say `tool: true` and it publishes.
 
 <Steps>
 
 <Step>
 
-## Declare the tools
+## Say which routes publish
 
-The fields mirror the [Model Context Protocol](https://modelcontextprotocol.io/specification/latest/server/tools) `Tool` object.
-
-```ts title="contract/tools.ts"
+```ts title="src/routes/weather.ts"
 import { z } from 'zod';
-import { k } from './k';
+import { k } from '../k';
 
-export const tools = k.tools({
-    weather: {
-        getForecast: {
-            title: 'Weather forecast',
-            description: 'Look up tomorrow forecast for one city',
-            input: z.object({
+export const weatherRoutes = k.routes('weather', {
+    getForecast: k
+        .route({
+            method: 'GET',
+            path: '/forecast/:city',
+            auth: false,
+            pathParams: z.object({
                 city: z.string().min(1),
+            }),
+            query: z.object({
                 unit: z.enum(['celsius', 'fahrenheit']).default('celsius'),
             }),
-            output: z.object({
-                temperature: z.number(),
-                unit: z.enum(['celsius', 'fahrenheit']),
-                summary: z.string(),
-            }),
+            responses: {
+                200: z.object({
+                    temperature: z.number(),
+                    unit: z.enum(['celsius', 'fahrenheit']),
+                    summary: z.string(),
+                }),
+            },
+            summary: 'Look up tomorrow forecast for one city',
+            tool: true,
+        })
+        .handler(({ params, query }) => ({
+            status: 200,
+            body: forecastFor(params.city, query.unit),
+        })),
+});
+```
+
+`tool: true` takes the route's `summary` as what a model reads before calling, so a route that publishes has to carry one. Its input is the `{ params, query, body }` the route already declares, and its output is the `200` response.
+
+</Step>
+
+<Step>
+
+## Say how it behaves
+
+`tool` also takes an object. `description`, `title` and the four hints are MCP's own, field for field:
+
+```ts title="src/routes/workspace.ts"
+deleteWorkspace: k
+    .route({
+        method: 'DELETE',
+        path: '/workspace',
+        auth: { identity: 'member', requires: { workspace: ['delete'] } },
+        summary: 'Delete the workspace, owner only',
+        tool: {
+            confirm: 'This deletes the workspace and everything in it. It cannot be undone.',
         },
-    },
-});
+        responses: {
+            200: z.object({ ok: z.boolean() }),
+        },
+    })
+    .handler(/* ... */),
 ```
 
-| Field         | Meaning                                                              |
-| ------------- | -------------------------------------------------------------------- |
-| `description` | What the model reads when it decides whether to call. Required       |
-| `input`       | Schema for the arguments the model sends                             |
-| `output`      | Schema for what the tool answers                                     |
-| `title`       | A human-readable name for display                                    |
-| `annotations` | `readOnlyHint`, `idempotentHint`, `destructiveHint`, `openWorldHint` |
+| Field             | Meaning                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------- |
+| `description`     | What the model reads when it decides whether to call. Defaults to `summary`        |
+| `title`           | A human-readable name for display. MCP's `ToolAnnotations.title`                   |
+| `readOnlyHint`    | The route only reads. Defaults to true for `GET` and `HEAD`                        |
+| `idempotentHint`  | Calling twice does what calling once did. Defaults to true for `PUT` and `DELETE`  |
+| `destructiveHint` | The route may remove or overwrite. Defaults to true for `DELETE`                   |
+| `openWorldHint`   | The route reaches something outside this API                                       |
+| `confirm`         | What the person is asked before it runs. Kizuna's own, sent over MCP's elicitation |
 
-Tools nest like routes, and a tool is addressed by its dotted key. Install them beside `routes`:
+The hints come from the method's RFC 9110 semantics, so a `GET` is already marked read only and a `DELETE` already destructive. Set one to say what the method cannot.
 
-```ts title="contract/index.ts"
-export const contract = k.contract({
+`confirm` is the one field MCP has no way to declare. A client reads the hints and decides for itself whether to ask; `confirm` asks, and declining leaves the handler uncalled. It sits on the declaration rather than in the handler because the handler also answers HTTP, where there is nobody to ask.
+
+</Step>
+
+<Step>
+
+## Publish them
+
+[`mcpPlugin`](/docs/reference/mcp-plugin) serves the endpoint. Which routes it offers is each route's own business, so it takes nothing but its name:
+
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
     routes,
-    tools,
+    plugins: [
+        mcpPlugin({
+            name: 'My API',
+        }),
+    ],
 });
 ```
 
-A tool declares no path and no method, so nothing that walks `contract.routes` sees one.
+A route that publishes is still an ordinary route. An HTTP caller reaches `GET /forecast/Oslo`, a model calls `weather_get_forecast`, and both run the same handler through the same validation, guards and Problem Details.
 
 </Step>
 
@@ -67,9 +119,9 @@ A tool declares no path and no method, so nothing that walks `contract.routes` s
 
 ## Put them on a stream
 
-Naming `tools` on a streamed response adds three events:
+Naming `tools` on a streamed response adds three events, typed against the routes you name:
 
-```ts title="contract/assistant.ts"
+```ts title="src/routes/assistant.ts"
 responses: {
     200: {
         stream: {
@@ -77,7 +129,7 @@ responses: {
                 text: z.string(),
             }),
         },
-        tools,
+        tools: weatherRoutes,
     },
 },
 ```
@@ -88,46 +140,7 @@ responses: {
 | `tool_result` | `{ id, name, output }`  |
 | `tool_error`  | `{ id, name, message }` |
 
-`id` ties a result back to its call.
-
-</Step>
-
-<Step>
-
-## Write the handlers
-
-A handler receives the validated `input` and `throwError`. Anything else it imports, the way a route handler does.
-
-```ts title="server/tools.ts"
-import { forecastFor } from '../weather';
-import { server } from './server';
-
-export const toolHandlers = server.tools({
-    weather: {
-        getForecast: ({ input, throwError }) => {
-            if (input.city.trim() === '') {
-                throwError('Name a city to look the forecast up for.');
-            }
-            return forecastFor(input.city, input.unit);
-        },
-    },
-});
-```
-
-`throwError` takes a message rather than a `{ status, body }` envelope, since a tool has no HTTP status. It reaches the client as a `tool_error`, and a model over MCP reads it as an execution error it can retry.
-
-</Step>
-
-<Step>
-
-## Register them on the api
-
-```ts title="server/api.ts"
-export const api = server.api({
-    router,
-    tools: toolHandlers,
-});
-```
+`id` ties a result back to its call, and `input` carries the `{ params, query, body }` the route takes.
 
 </Step>
 
@@ -135,58 +148,42 @@ export const api = server.api({
 
 ## Driving the model
 
-Every handler receives the contract's tools under `tools`:
+`buildToolDefinitions` turns the routes that publish into MCP's shape, so the same list that reaches a model over MCP reaches one you drive yourself:
 
-```ts title="server/router/assistant.ts"
+```ts title="src/routes/assistant.ts"
 import Anthropic from '@anthropic-ai/sdk';
+import { buildToolDefinitions } from '@ts-kizuna/mcp';
+import { weatherRoutes } from './weather';
 
 const anthropic = new Anthropic();
+const definitions = buildToolDefinitions(weatherRoutes);
 
-reply: ({ body, tools }) => ({
-    status: 200,
-    body: async function* () {
-        const stream = anthropic.messages.stream({
-            model: 'claude-opus-5',
-            max_tokens: 1024,
-            messages: [{ role: 'user', content: body.prompt }],
-            tools: tools.definitions.map((tool) => ({
-                name: tool.name,
-                description: tool.description,
-                input_schema: tool.inputSchema,
-            })),
-        });
+reply: k
+    .route({ /* ... */ })
+    .handler(({ body }) => ({
+        status: 200,
+        body: async function* () {
+            const stream = anthropic.messages.stream({
+                model: 'claude-opus-5',
+                max_tokens: 1024,
+                messages: [{ role: 'user', content: body.prompt }],
+                tools: definitions.map((tool) => ({
+                    name: tool.name,
+                    description: tool.description,
+                    input_schema: tool.inputSchema,
+                })),
+            });
 
-        for await (const event of stream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-                yield { event: 'delta', data: { text: event.delta.text } };
+            for await (const event of stream) {
+                if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                    yield { event: 'delta', data: { text: event.delta.text } };
+                }
             }
-
-            if (event.type === 'content_block_stop' && event.content_block.type === 'tool_use') {
-                const call = {
-                    id: event.content_block.id,
-                    name: tools.keyOf(event.content_block.name),
-                    input: event.content_block.input,
-                };
-
-                yield { event: 'tool_call', data: call };
-                yield { event: 'tool_result', data: await tools.call(call) };
-            }
-        }
-    },
-}),
+        },
+    })),
 ```
 
-- `tools.definitions` is every tool in MCP's shape, `inputSchema` as JSON Schema.
-- `tools.keyOf` turns `weather_get_forecast` into the dotted key.
-- `tools.call` validates the input, runs the handler, validates the output, and answers the `tool_result` payload.
-
-Reach one directly from a script or a test:
-
-```ts
-await tools.weather.getForecast.run({
-    city: 'Oslo',
-});
-```
+Each definition carries the `name` a model calls it by, the `description` it reads, and `inputSchema` as JSON Schema. Running one is an ordinary call to the route's own handler, which you import like any other function.
 
 ## Reading the calls
 
@@ -406,46 +403,24 @@ Rename a field in the contract and every one of these stops compiling.
 
 ## Publishing over MCP
 
-A declared tool already has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is. Every one is published, because a tool is a tool:
+A route that declares `tool` already has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is. [`mcpPlugin`](/docs/reference/mcp-plugin) serves them:
 
-```ts title="contract/index.ts"
+```ts title="kizuna.config.ts"
 import { mcpPlugin } from '@ts-kizuna/mcp';
-import { k } from './k';
-import { routes } from './routes';
-import { tools } from './tools';
+import { routes } from './src/routes';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
     routes,
-    tools,
-    plugins: ({ routes, tools }) => ({
-        mcp: mcpPlugin({
-            routes,
-            tools,
-            options: {
-                publishRoutes: {
-                    users: {
-                        '*': true,
-                        exportUsers: false,
-                    },
-                },
-                hideTools: ['countWords'],
-            },
+    plugins: [
+        mcpPlugin({
+            name: 'My API',
         }),
-    }),
+    ],
 });
 ```
 
-A route is an HTTP endpoint rather than a tool, so turning one into a tool is the opt in: name it under `publishRoutes`, with `'*'` to take a whole group. `hideTools` goes the other way, dropping a declared tool you would rather keep to yourself.
-
-A published tool answers with its own output, where a route published as a tool answers with the `{ status, body }` envelope its HTTP shape implies. Give the group an identity and its guard runs on every call:
-
-```ts
-export const tools = k.tools('user', {
-    weather: {
-        getForecast: { ... },
-    },
-});
-```
+A route names itself `users_get_user` over MCP, from its dotted key. If it needs an identity, the same guard runs on a tool call as on an HTTP request, and a refusal reaches the model as an execution error.
 
 See [MCP](/docs/mcp) for the rest of the endpoint, including OAuth.
 
@@ -453,20 +428,18 @@ See [MCP](/docs/mcp) for the rest of the endpoint, including OAuth.
 
 Nothing here is a new transport. Every piece reduces to something kizuna already had.
 
-**The events are folded into the stream at `k.routes` time.** `tools` on a response is authoring sugar. Before a route is validated, `expandStreamTools` turns each tool into three Zod schemas and merges them into the response's `stream` record, then deletes the `tools` field. From that point on the response is an ordinary named-event stream, which is why the four adapters, the OpenAPI generator, the fetch client, and the Swift and Kotlin generators needed no changes to carry tools.
+**The events are folded into the stream at `k.routes` time.** `tools` on a response is authoring sugar. Before a route is validated, `expandStreamTools` turns each route you named into three Zod schemas and merges them into the response's `stream` record, then deletes the `tools` field. From that point on the response is an ordinary named-event stream, which is why the four adapters, the OpenAPI generator, the fetch client, and the Swift and Kotlin generators needed no changes to carry tools.
 
-**Each event is a discriminated union on the tool's dotted key.** `tool_call` is `z.discriminatedUnion('name', [...])` with one arm per tool, each carrying that tool's own `input` schema. The type-level side walks the tool tree to the same dotted keys, so `message.data.input` narrows in TypeScript, the Swift generator emits an `enum` with one case per tool, and the Kotlin generator emits a `sealed interface`. The `id` and `name` accessors you read without switching are generated from the fields every arm shares.
+**Each event is a discriminated union on the route's dotted key.** `tool_call` is `z.discriminatedUnion('name', [...])` with one arm per route, each carrying that route's own input. The type-level side walks the same tree to the same dotted keys, so `message.data.input` narrows in TypeScript, the Swift generator emits an `enum` with one case per tool, and the Kotlin generator emits a `sealed interface`.
 
-**The dotted key is the discriminator, not the published name.** `weather.getForecast` on the wire, `weather_get_forecast` over MCP. Deriving the snake-case name at the type level would need a string algorithm that has to agree exactly with the runtime one, and disagreeing silently would be worse than the one `tools.keyOf` call it costs you.
+**The dotted key is the discriminator, not the published name.** `weather.getForecast` on the wire, `weather_get_forecast` over MCP. Deriving the snake-case name at the type level would need a string algorithm that has to agree exactly with the runtime one, and disagreeing silently would be worse than reading the name off a definition.
 
-**Execution is one runner.** `createToolRunner` pairs the contract's tools with their handlers and hands the result to every route handler as `tools`, the same way `jobs` is threaded. `tools.call`, `tools.<key>.run` and the MCP endpoint all go through it, so input validation, the handler, and output validation happen in one place whoever asked.
-
-**Publishing is a projection.** `publishedTools` resolves the MCP name and the declaration behind it. `tools.definitions` converts its schemas to JSON Schema for a model; the MCP plugin hands the Zod schemas to the MCP SDK, which converts them itself. Both read the same derivation, so a tool is named and described in one place.
+**Execution is the route's own pipeline.** A tool call runs the route handler through the same validation, guards and Problem Details an HTTP request does, so there is one place a route runs whoever asked.
 
 ## What kizuna leaves out
 
 - **Models.** kizuna never calls one, holds a conversation, or runs an agent loop. It validates input, runs a handler, validates output. The loop lives in your route handler, the way a job's transport lives outside kizuna.
-- **Provider wire shapes.** There is no `toAnthropicTools` or `toOpenAITools`, because those track a vendor changelog. `tools.definitions` hands you MCP's shape and the `.map` to a provider is a few lines you can read.
+- **Provider wire shapes.** There is no `toAnthropicTools` or `toOpenAITools`, because those track a vendor changelog. `buildToolDefinitions` hands you MCP's shape and the `.map` to a provider is a few lines you can read.
 - **Progressive tool input.** A model streams a tool's arguments as partial JSON, which has no schema until it is whole. A half-parsed `{ city: "Os" }` would type-check as a finished value while being wrong, so kizuna emits `tool_call` once the arguments are complete.
 
 ## A note on standards

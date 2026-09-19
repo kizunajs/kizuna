@@ -54,7 +54,7 @@ const stripTrailingSlash = (url: string): string => (url.endsWith('/') ? url.sli
  *
  * @example
  * if (process.env.NODE_ENV !== 'production') {
- *     startJobsDevRunner(contract, {
+ *     startJobsDevRunner(kizuna.api, {
  *         baseUrl: `http://localhost:${port}`,
  *         secret: process.env.CRON_SECRET,
  *     });

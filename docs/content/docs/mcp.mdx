@@ -5,11 +5,11 @@ description: Install the MCP plugin so AI assistants can call your API as tools,
 
 <BetaNotice>
 
-MCP support is new and still settling. The plugin options and the generated tool surface may change before v2, so pin your version if you depend on them.
+MCP support is new and still settling. The plugin options and the published tool surface may change before v2, so pin your version if you depend on them.
 
 </BetaNotice>
 
-`@ts-kizuna/mcp` adds an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint to your API. Each route becomes an MCP tool that AI assistants can discover and call.
+`@ts-kizuna/mcp` adds an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint to your API. Every route that declares [`tool`](/docs/tools) is one an AI assistant can discover and call.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
@@ -17,41 +17,47 @@ MCP support is new and still settling. The plugin options and the generated tool
 
 <Step>
 
-## Declare the plugin
+## Say which routes a model may call
 
-MCP is a [plugin](/docs/plugins), declared on `k.contract` and served by `api.mount`:
+A route publishes itself. `tool: true` takes the route's `summary` as what a model reads before calling:
 
-```ts title="contract.ts"
-import { mcpPlugin } from '@ts-kizuna/mcp';
-import { k } from './k';
-import { routes } from './routes';
-
-export const contract = k.contract({
-    routes,
-    plugins: {
-        mcp: mcpPlugin({
-            name: 'My API',
-        }),
-    },
-});
+```ts title="src/routes/weather.ts"
+getForecast: k
+    .route({
+        method: 'GET',
+        path: '/forecast/:city',
+        summary: 'Look up tomorrow forecast for one city',
+        tool: true,
+        responses: {
+            200: ForecastSchema,
+        },
+    })
+    .handler(/* ... */),
 ```
+
+See [Tools](/docs/tools) for the rest of what `tool` takes.
 
 </Step>
 
 <Step>
 
-## Register its server half
+## Install the plugin
 
-`server.api` is where the MCP SDK and the transport live:
+MCP is a [plugin](/docs/plugins), named on `defineConfig` and served by `api.mount`:
 
-```ts title="api.ts"
-import { mcpPluginServer } from '@ts-kizuna/mcp/server';
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { mcpPlugin } from '@ts-kizuna/mcp';
+import { routes } from './src/routes';
 
-export const api = server.api({
-    router,
-    plugins: {
-        mcp: mcpPluginServer(),
-    },
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    plugins: [
+        mcpPlugin({
+            name: 'My API',
+        }),
+    ],
 });
 ```
 
@@ -59,128 +65,35 @@ export const api = server.api({
 
 </Steps>
 
-The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-all route file that already serves your contract, so with `basePath: '/api'` it lands at `/api/mcp`.
+The endpoint answers at `/mcp` by default. On Next.js it is served by the catch-all route file that already serves your routes, so with `basePath: '/api'` it lands at `/api/mcp`.
 
-## Choosing which routes become tools
+## Which routes publish
 
-Every tool's name, description, and input schema sits in the model's context on every turn, called or not, and the more tools there are the more often the model picks the wrong one. So trim the list.
+Each route decides, so the plugin takes no list. A route with no `tool` is an HTTP endpoint and nothing more.
 
-Pass the routes to `mcpPlugin` and name the ones to leave out. Write `plugins` as a function and `k.contract` hands the routes over:
+Two shapes never publish, even when they say `tool`:
 
-```ts title="contract.ts"
-export const contract = k.contract({
-    routes,
-    plugins: ({ routes }) => ({
-        mcp: mcpPlugin({
-            name: 'My API',
-            routes,
-            options: {
-                publishRoutes: {
-                    users: true,
-                    health: true,
-                },
-            },
-        }),
-    }),
-});
-```
+- A route whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded`, because tool input is JSON.
+- A route whose response [streams](/docs/streaming), because a tool result is one value.
 
-A route the map never mentions is a tool, so the map only says what differs, and `false` on a group drops all of it.
+### What to leave unpublished
 
-Set a group's own default with `'*'` to turn that around and name what to keep:
+Every published tool's name, description, and input schema sits in the model's context on every turn, called or not, and the more tools there are the more often the model picks the wrong one. So publish deliberately:
 
-```ts title="contract.ts"
-mcp: mcpPlugin({
-    routes,
-    options: {
-        publishRoutes: {
-            users: {
-                '*': true,
-                deleteUser: false,
-            },
-        },
-    },
-}),
-```
-
-`onlyReadOnly` keeps only the safe methods, so nothing an assistant calls can change data:
-
-```ts title="contract.ts"
-mcp: mcpPlugin({
-    routes,
-    options: {
-        publishRoutes: {
-            '*': true,
-        },
-        onlyReadOnly: true,
-    },
-}),
-```
-
-Keys are checked against those routes, so a name that does not exist is a compile error naming the one you meant:
-
-```text
-Object literal may only specify known properties, but 'helth' does not
-exist in type ToolMap<...>. Did you mean to write 'health'?
-```
-
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, because MCP tool input is JSON. Routes whose response [streams](/docs/streaming) are never tools either, because a tool result is one value.
-
-### What to cut first
-
-- **Ones an assistant cannot use.** File uploads, CSV exports, anything returning bytes.
-- **Ones that exist for your own infrastructure.** Health checks, readiness probes, webhook receivers.
-- **Ones you do not want reached by inference.** Deleting a workspace is a person's decision, guard or no guard.
-
-## Publishing tools you declared
-
-Routes are not the only thing that can be a tool. A tool declared with [`k.tools`](/docs/tools) already has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is, and unlike a route it does not have to pretend to be an endpoint first.
-
-Pass the contract's tools alongside its routes, then name the ones to publish:
-
-```ts title="contract/index.ts"
-export const contract = k.contract({
-    routes,
-    tools,
-    plugins: ({ routes, tools }) => ({
-        mcp: mcpPlugin({
-            routes,
-            tools,
-            options: {
-                hideTools: ['countWords'],
-            },
-        }),
-    }),
-});
-```
-
-Every declared tool is published, because a tool is already a tool. `hideTools` drops one you would rather keep to yourself.
-
-Two differences from a route published as a tool:
-
-- It answers with its own `output`, where a route answers with the `{ status, body }` envelope its HTTP shape implies.
-- `onlyReadOnly` keeps it only when it declares `annotations.readOnlyHint`, since a tool has no method to read safety from.
-
-Give the group an identity and its guard runs on every call, the way a route's `security` does:
-
-```ts
-export const tools = k.tools('user', {
-    weather: {
-        getForecast: { ... },
-    },
-});
-```
+- **What an assistant cannot use.** File uploads, CSV exports, anything returning bytes.
+- **What exists for your own infrastructure.** Health checks, readiness probes, webhook receivers.
+- **What you do not want reached by inference.** Deleting a workspace is a person's decision, guard or no guard. If it does publish, give it a [`confirm`](/docs/tools#say-how-it-behaves).
 
 ## What each tool looks like
 
-| Part            | Where it comes from                                                                 |
-| --------------- | ----------------------------------------------------------------------------------- |
-| **Name**        | The route key in snake_case, so `users.getUser` becomes `users_get_user`            |
-| **Title**       | The route's `summary`                                                               |
-| **Description** | The route's `summary` and `description`, its method and path, and what it requires  |
-| **Input**       | `{ params, query, body }`, holding only the keys the route declares                 |
-| **Output**      | The success response's schema, so an assistant knows the shape before it calls      |
-| **Annotations** | The method's HTTP semantics, per [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) |
+| Part            | Where it comes from                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Name**        | The route key in snake_case, so `users.getUser` becomes `users_get_user`                                           |
+| **Title**       | `tool.title`                                                                                                       |
+| **Description** | `tool.description` or the route's `summary`, then its `description`, its method and path, and what it requires     |
+| **Input**       | `{ params, query, body }`, holding only the keys the route declares                                                |
+| **Output**      | The success response's schema, so an assistant knows the shape before it calls                                     |
+| **Annotations** | The method's HTTP semantics, per [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110), and anything `tool` overrides |
 
 The [specification](https://modelcontextprotocol.io/specification/latest/server/tools) allows the dot, but Claude Code and VS Code rewrite it before the name reaches the model, so publishing the rewritten form is what keeps your docs and the model's tool name the same. Names are capped at 128 characters. A key over that throws at startup, as do two keys that converge on one name.
 
@@ -193,7 +106,7 @@ The annotations tell a client how careful to be with a tool before calling it:
 | `DELETE`                 | `idempotentHint`, `destructiveHint` |
 | `POST`, `PATCH`          | none                                |
 
-An absent hint is not a neutral one. MCP defaults `destructiveHint` and `openWorldHint` to true and `readOnlyHint` to false, so a client already treats `POST` and `PATCH` as destructive calls against an open world. The hints worth setting are the ones that make a tool safer than that, which is why `GET` gets `readOnlyHint` and `POST` gets nothing.
+An absent hint is not a neutral one. MCP defaults `destructiveHint` and `openWorldHint` to true and `readOnlyHint` to false, so a client already treats `POST` and `PATCH` as destructive calls against an open world. The hints worth setting are the ones that make a tool safer than that, which is why `GET` gets `readOnlyHint` and `POST` gets nothing. Set one on the route's `tool` to say what the method cannot.
 
 Handlers receive the same framework context they do over HTTP, passed through from the transport request, so one reading `req` or `c` keeps working as a tool.
 
@@ -201,21 +114,24 @@ Handlers receive the same framework context they do over HTTP, passed through fr
 
 ### From each route
 
-A route's `summary` and `description` are the tool's title and description:
+A route's `summary` and `description` are what the tool carries:
 
-```ts title="routes/users.ts"
-searchUsers: {
-    method: 'GET',
-    path: '/users/search',
-    summary: 'Search users by name or email',
-    description: 'Matches a name or email substring, case insensitive. Returns at most 25 users, best match first.',
-    query: z.object({
-        term: z.string(),
-    }),
-    responses: {
-        200: z.array(UserSchema),
-    },
-},
+```ts title="src/routes/users.ts"
+searchUsers: k
+    .route({
+        method: 'GET',
+        path: '/users/search',
+        summary: 'Search users by name or email',
+        description: 'Matches a name or email substring, case insensitive. Returns at most 25 users, best match first.',
+        tool: true,
+        query: z.object({
+            term: z.string(),
+        }),
+        responses: {
+            200: z.array(UserSchema),
+        },
+    })
+    .handler(/* ... */),
 ```
 
 The tool that reaches the model carries both, followed by the request line and the identities the route requires:
@@ -228,39 +144,32 @@ HTTP: GET /users/search
 Requires: user
 ```
 
-These are the same two fields that become `operation.summary` and `operation.description` in your OpenAPI document, and the doc comment on your generated Swift and Kotlin methods, which uses the summary and falls back to the description. Write them once for every reader. OpenAPI wants a short summary and a verbose account of the behaviour, which is what a model wants too, so naming the limit, the ordering, and the matching rule costs nothing and serves all three:
+These are the same two fields that become `operation.summary` and `operation.description` in your OpenAPI document, and the doc comment on your generated Swift and Kotlin methods, which uses the summary and falls back to the description. Write them once for every reader. OpenAPI wants a short summary and a verbose account of the behaviour, which is what a model wants too, so naming the limit, the ordering, and the matching rule costs nothing and serves all three.
 
-```ts title="routes/notifications.ts"
-listEvents: {
-    method: 'GET',
-    path: '/events',
-    summary: 'List session events, newest first',
-    description: 'Returns one page of events, 50 per page. Timestamps are RFC 3339 in UTC.',
-    query: z.object({
-        page: z.int().min(1).default(1),
-    }),
-    responses: {
-        200: z.array(EventRecord),
-    },
+When the wording a model needs differs from the wording your API reference needs, `tool.description` overrides the summary for the model alone:
+
+```ts title="src/routes/users.ts"
+tool: {
+    description: 'Find a user before creating anything that belongs to one. Prefer this over listing every user.',
 },
 ```
 
 ### From the whole server
 
-`instructions` is a single string clients put in front of the model before it picks any tool. kizuna builds one from your [tags](/docs/reference/kizuna-tags), so the groups in your contract arrive with their titles and descriptions, and your own text is appended to it:
+`instructions` is a single string clients put in front of the model before it picks any tool. kizuna builds one from your [tags](/docs/reference/k-tags), so the groups in your API arrive with their titles and descriptions, and your own text is appended to it:
 
-```ts title="k.ts"
-mcp: mcpPlugin({
+```ts title="kizuna.config.ts"
+mcpPlugin({
     name: 'My API',
     instructions: 'Resolve a workspace before creating members. Every timestamp is UTC.',
 }),
 ```
 
-Use it for what belongs to no single route: the order operations happen in, the conventions every route shares, which tool to reach for when two look alike. That last one is worth keeping out of a route's own `description`, where it would read oddly in your API reference.
+Use it for what belongs to no single route: the order operations happen in, the conventions every route shares, which tool to reach for when two look alike.
 
 ## Authentication
 
-Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/authentication) registered on `server.api`, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, the route's [`roles` or `requires`](/docs/access-control) is checked, and the handler receives its typed identity context.
+Secured tools authenticate via the headers of the MCP transport request. The endpoint runs the [guards](/docs/authentication) that sit on your identities, exactly like the HTTP pipeline: the credential is extracted from the headers, the guard verifies it, the route's [`auth`](/docs/access-control) is checked, and the handler receives its typed identity context.
 
 A route's identities appear in its tool description, along with the roles and permissions that go with them, so an assistant can tell it will be refused without spending a call to find out:
 
@@ -291,21 +200,31 @@ When a guard denies the call, or the caller's role is not one the route accepts,
 }
 ```
 
-Public routes (`false` in the access control map) run without guards, credentials or not.
+Routes with `auth: false` run without guards, credentials or not.
+
+## Asking before it runs
+
+A route's [`confirm`](/docs/tools#say-how-it-behaves) puts the question to the person before the handler is reached, over MCP's elicitation:
+
+```ts title="src/routes/workspace.ts"
+tool: {
+    confirm: 'This deletes the workspace and everything in it. It cannot be undone.',
+},
+```
+
+The first call answers with the elicitation rather than a result. Agreeing runs the handler; declining leaves it uncalled and answers `isError: true`.
 
 ## OAuth
 
 Point `oauth` at your [oauth2 identity](/docs/authentication#oauth) and the endpoint serves the discovery and challenges the MCP authorization specification asks of an OAuth 2.1 resource server. MCP clients log in through your authorization server (better-auth, Auth0, Keycloak) on their own.
 
-```ts title="contract.ts"
-plugins: {
-    mcp: mcpPlugin({
-        oauth: {
-            resource: 'https://api.example.com/mcp',
-            scheme: 'user',
-        },
-    }),
-},
+```ts title="kizuna.config.ts"
+mcpPlugin({
+    oauth: {
+        resource: 'https://api.example.com/mcp',
+        scheme: 'user',
+    },
+}),
 ```
 
 `resource` is the canonical URI of the endpoint as clients reach it, and the audience your guard checks tokens against. `scheme` names the identity whose guard verifies the token on every request. The identity's `issuer` and flow scopes become the RFC 9728 metadata document, served at `/.well-known/oauth-protected-resource/mcp`.
@@ -320,18 +239,14 @@ The guard runs once per request, its context reaches handlers under `auth.<schem
 
 ## Options
 
-All of them go on `mcpPlugin`. `mcpPluginServer()` takes nothing.
-
-| Option         | Default              | Description                                                          |
-| -------------- | -------------------- | -------------------------------------------------------------------- |
-| `path`         | `'/mcp'`             | Path the endpoint is served from                                     |
-| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                           |
-| `version`      | `'1.0.0'`            | Semantic version string                                              |
-| `instructions` | built from your tags | Appended to the generated overview                                   |
-| `routes`       | none                 | The contract's routes, so `publishRoutes` is checked against them    |
-| `tools`        | none                 | The contract's tools, so `hideTools` is checked against them         |
-| `options`      | none                 | `publishRoutes`, `hideTools`, and `onlyReadOnly`                     |
-| `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth)) |
+| Option         | Default              | Description                                                           |
+| -------------- | -------------------- | --------------------------------------------------------------------- |
+| `slug`         | `'mcp'`              | What handlers reach this plugin under. Give a second endpoint its own |
+| `path`         | `'/mcp'`             | Path the endpoint is served from                                      |
+| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                            |
+| `version`      | `'1.0.0'`            | Semantic version string                                               |
+| `instructions` | built from your tags | Appended to the generated overview                                    |
+| `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth))  |
 
 ## Connecting clients
 
@@ -403,12 +318,12 @@ Responses with status >= 400 set `isError: true` on the MCP result so the AI kno
 
 If you want to drive the transport yourself, for stdio or SSE, [`createMcpServer`](/docs/reference/create-mcp-server) returns a raw `McpServer`:
 
-```ts title="src/index.ts"
+```ts title="src/mcp.ts"
 import { createMcpServer } from '@ts-kizuna/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { api } from './api';
+import kizuna from '../kizuna.config';
 
-const server = createMcpServer(api, {
+const server = createMcpServer(kizuna.api, {
     name: 'My API',
     version: '1.0.0',
 });
@@ -416,8 +331,11 @@ const server = createMcpServer(api, {
 await server.connect(new StdioServerTransport());
 ```
 
+It takes one option the plugin does not: `onlyReadOnly` keeps only the methods RFC 9110 calls safe, so nothing the assistant reaches can change data.
+
 ## Reference
 
 - [`mcpPlugin`](/docs/reference/mcp-plugin)
 - [`createMcpServer`](/docs/reference/create-mcp-server)
+- [Tools](/docs/tools) for what a route's `tool` declares
 - [Create a Plugin](/docs/extend/create-plugin) to write your own

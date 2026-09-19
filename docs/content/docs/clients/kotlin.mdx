@@ -37,20 +37,22 @@ dependencies {
 ## Generate the client
 
 ```sh title="Terminal"
-ts-kizuna-kotlin generate --contract src/contract/index.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
+ts-kizuna-kotlin generate --config kizuna.config.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
 ```
 
 | Flag                  | Description                                                                                         |
 | --------------------- | --------------------------------------------------------------------------------------------------- |
-| `--contract`          | Path to the TypeScript file that exports the contract                                               |
+| `--config`            | Path to your `kizuna.config.ts`. Suffix it with an export to read something other than the default  |
 | `--out`               | Output path for the generated `.kt` file                                                            |
 | `--namespace-name`    | Object wrapping all generated types (e.g. `API`)                                                    |
 | `--package`           | Optional package declaration for the generated file (e.g. `com.example.api`)                        |
 | `--camel-case`        | Convert wire field names to camelCase properties, mapped back via `@SerialName`                     |
 | `--unknown-enum-case` | Emit enums as a sealed interface with an `Unknown` member so new server values don't break decoding |
-| `--export`            | Export name to read when none is suffixed on `--contract`. Default: `contract`                      |
+| `--export`            | Export name to read when none is suffixed. Default: `api`                                           |
 
-The CLI reads the contract at runtime.
+The CLI loads the config at runtime.
+
+Most projects name the generator under `clients` in the config instead and run [`kizuna generate`](/docs/configuration), which writes every client in one command.
 
 </Step>
 
@@ -283,12 +285,12 @@ A stream of one schema yields that type directly, a `text/*` stream yields one `
 
 ## Tip: automate with a script
 
-You can add a script to your `package.json` to regenerate the client whenever the contract changes:
+You can add a script to your `package.json` to regenerate the client whenever your routes change:
 
 ```json title="package.json"
 {
     "scripts": {
-        "generate:kotlin": "ts-kizuna-kotlin generate --contract src/contract/index.ts --out ../android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example"
+        "generate:kotlin": "ts-kizuna-kotlin generate --config kizuna.config.ts --out ../android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example"
     }
 }
 ```

@@ -1,118 +1,65 @@
 ---
 title: Project Structure
-description: Where the contract, the server, and the clients live, and why the contract sits in its own package.
+description: Where your declarations, your config, and your clients live.
 ---
 
-ts-kizuna has no opinion about your file layout. A single file works. The one thing it needs is a contract that every side of your app can import.
+ts-kizuna has no opinion about your file layout. A single file works. The two fixed points are `kizuna.config.ts` at the root of your app, which is where the CLI looks, and the `k` you declare everything against.
 
-The layout below is the one we use ourselves. It goes from a handful of routes to a few hundred without anything moving. Two shapes cover almost everything:
-
-<Cards>
-    <Card title="Monorepo" href="#monorepo">
-        The API and its consumers are separate apps, and the contract is a package they both import.
-    </Card>
-    <Card title="Single app" href="#single-app">
-        The API and the website are the same app, so the contract is a folder inside it.
-    </Card>
-</Cards>
-
-## Monorepo
+The layout below is the one we use ourselves. It goes from a handful of routes to a few hundred without anything moving.
 
 ```
-my-repo/
-├── packages/
-│   └── contract/
-│       └── src/
-│           ├── k.ts            # new Kizuna(), exports k
-│           ├── tags.ts         # Kizuna.tags
-│           ├── identities.ts   # Kizuna.identity builders
-│           ├── routes/
-│           │   ├── users.ts    # k.routes('users', { ... })
-│           │   ├── events.ts
-│           │   ├── health.ts
-│           │   └── index.ts    # re-exports the groups
-│           ├── roles.ts        # Kizuna.roles
-│           ├── jobs.ts         # k.jobs
-│           └── contract.ts     # k.contract, the object everything reads
-├── apps/
-│   ├── api/
-│   │   └── src/
-│   │       ├── server/
-│   │       │   ├── server.ts   # new KizunaServer(contract)
-│   │       │   ├── guards.ts   # server.guard per identity
-│   │       │   ├── router/
-│   │       │   │   ├── users.ts    # Router<typeof contract.routes.users>
-│   │       │   │   ├── events.ts
-│   │       │   │   ├── health.ts
-│   │       │   │   └── index.ts    # server.router, composes the groups
-│   │       │   ├── jobs.ts     # server.jobs
-│   │       │   └── api.ts      # server.api, what you mount
-│   │       └── index.ts        # api.mount(app)
-│   └── website/
-│       └── src/lib/api-client.ts   # new KizunaClient(contract)
-└── package.json
-```
-
-## Why the contract is its own package
-
-Your server, your website, and anything else that talks to the API all import the contract. Inside the API app, every consumer has to reach into that app to get it.
-
-Its own package also keeps it browser-safe. The contract is plain data, and a separate package cannot accidentally pick up a database driver or a Node built-in.
-
-It also decides what the contract is allowed to hold. Everything it imports travels with it to every client, so it stays route shapes only. Server config, API keys, and `process.env` reads live in the API app, next to the handlers that read them.
-
-Publishing it is then a small step. Teams with API consumers outside the repo push the contract to npm, public or private, so anyone integrating installs one package and gets the routes, the types, and a client that knows both.
-
-## Splitting the pieces
-
-The split matters more as the API grows:
-
-- **`k.ts`** constructs the surface once. Everything else imports `k` from here.
-- **`routes/`** holds one file per group, each calling `k.routes`, with an `index.ts` re-exporting them so `contract.ts` has one import to make. See [organizing the contract](/docs/building/contract#splitting-routes-across-files).
-- **`router/`** mirrors it exactly. One file per group, each typed with the [`Router`](/docs/building/router#routehandler-and-router-types) type so inputs and responses stay inferred, and `index.ts` composes them with `server.router`.
-- **`roles.ts`** names who a caller can be, and **`access-control.ts`** says who may call each route, once, against the whole route tree, so one file answers the question. See [Access Control](/docs/access-control).
-- **`api.ts`** is where guards, jobs, plugins, and the router come together.
-
-## Single app
-
-With Next.js the API and the website are the same app, so the contract can be a folder instead of a package:
-
-```
-my-repo/
+my-api/
+├── kizuna.config.ts        # defineConfig, default-exported
+├── kizuna.types.ts         # written by kizuna generate
 └── src/
-    ├── contract/
-    │   ├── k.ts            # new Kizuna(), exports k
-    │   ├── tags.ts         # Kizuna.tags
-    │   ├── identities.ts   # Kizuna.identity builders
-    │   ├── routes/
-    │   │   ├── users.ts    # k.routes('users', { ... })
-    │   │   ├── events.ts
-    │   │   ├── health.ts
-    │   │   └── index.ts    # re-exports the groups
-    │   ├── roles.ts        # Kizuna.roles
-    │   ├── jobs.ts         # k.jobs
-    │   └── index.ts        # k.contract, the object everything reads
-    ├── server/
-    │   ├── server.ts       # new KizunaServer(contract)
-    │   ├── guards.ts       # server.guard per identity
-    │   ├── router/
-    │   │   ├── users.ts    # Router<typeof contract.routes.users>
-    │   │   ├── events.ts
-    │   │   ├── health.ts
-    │   │   └── index.ts    # server.router, composes the groups
-    │   ├── jobs.ts         # server.jobs
-    │   └── api.ts          # server.api, what you mount
-    ├── lib/
-    │   └── api-client.ts   # new KizunaClient(contract)
-    └── app/
-        └── api/[...ts-kizuna]/route.ts   # api.mount(), re-exports the handlers
+    ├── k.ts                # new Kizuna<Config>(), exports k
+    ├── tags.ts             # k.tags
+    ├── identities.ts       # k.identity.bearer(...).guard(...)
+    ├── request-context.ts  # k.requestContext(...).handler(...)
+    ├── permissions.ts      # Kizuna.permissions
+    ├── roles.ts            # Kizuna.roles
+    ├── jobs.ts             # k.jobs
+    ├── routes/
+    │   ├── users.ts        # k.routes('users', { ... })
+    │   ├── events.ts
+    │   ├── health.ts
+    │   └── index.ts        # re-exports the groups
+    └── index.ts            # kizuna.api.mount(app)
 ```
 
-The rule is the same at any size: one contract, imported by both sides, with no server-only code in it.
+Each route carries the handler that answers it, so there is no second tree to keep in step. The same holds for the rest: a guard sits on its identity, a resolver sits on its request context value, and a job's handler sits on the job.
 
-### The `@/` alias
+- **`k.ts`** constructs the surface once, typed by the `Config` in `kizuna.types.ts`. Everything else imports `k` from here.
+- **`routes/`** holds one file per group, each calling `k.routes`, with an `index.ts` re-exporting them so the config has one import to make. See [splitting routes across files](/docs/building/contract#splitting-routes-across-files).
+- **`identities.ts`** names who can call the API, and each identity's `guard` is what authenticates them. See [Authentication](/docs/authentication).
+- **`roles.ts`** names who a caller can be, and each route's `auth` says who may call it. See [Access Control](/docs/access-control).
+- **`kizuna.config.ts`** is where the adapter, the routes, the identities, the jobs and the plugins come together.
 
-Examples throughout these docs import from `@/contract` and `@/server/api`. That is `@/` pointing at `src/`, which `create-next-app` sets up for you. Anywhere else, declare it yourself:
+## What reaches the browser
+
+The config carries every handler, every guard, and everything they import, so it stays on the server. Your database driver and your `process.env` reads belong there, beside the handlers that use them.
+
+What a browser imports is the client `kizuna generate` writes from that config. It holds the route shapes and the schemas, and nothing a handler reached for.
+
+```ts title="kizuna.config.ts"
+import { fetchClient } from '@ts-kizuna/fetch';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    clients: [
+        fetchClient({
+            output: '../website/src/lib/api-client.ts',
+        }),
+    ],
+});
+```
+
+See [Clients](/docs/clients/fetch) for what each generator writes, and [Configuration](/docs/configuration) for the CLI that runs them.
+
+## The `@/` alias
+
+Examples throughout these docs import from `@/k` and `@/routes`. That is `@/` pointing at `src/`, which `create-next-app` sets up for you. Anywhere else, declare it yourself:
 
 ```json title="tsconfig.json"
 {
@@ -126,5 +73,5 @@ Examples throughout these docs import from `@/contract` and `@/server/api`. That
 
 ## Next steps
 
-- [Building an API](/docs/building/contract) covers the contract, router, and mounting in depth
+- [Building an API](/docs/building/contract) covers routes, handlers, and mounting in depth
 - [Adapters](/docs/adapters/express) covers the setup for each framework

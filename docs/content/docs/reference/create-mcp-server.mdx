@@ -16,7 +16,7 @@ To serve it from your app, install [`mcpPlugin`](/docs/reference/mcp-plugin) ins
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
 ```ts
-import { createMcpServer } from '@ts-kizuna/mcp/server';
+import { createMcpServer } from '@ts-kizuna/mcp';
 ```
 
 ## Parameters
@@ -25,10 +25,10 @@ import { createMcpServer } from '@ts-kizuna/mcp/server';
 createMcpServer(api: Api, options?: McpServerOptions): McpServer
 ```
 
-| Parameter | Type               | Required | Description                                                 |
-| --------- | ------------------ | -------- | ----------------------------------------------------------- |
-| `api`     | `Api`              | Yes      | API created with [`server.api`](/docs/reference/server-api) |
-| `options` | `McpServerOptions` | No       | Configuration options                                       |
+| Parameter | Type               | Required | Description                                                      |
+| --------- | ------------------ | -------- | ---------------------------------------------------------------- |
+| `api`     | `Api`              | Yes      | API created with [`defineConfig`](/docs/reference/define-config) |
+| `options` | `McpServerOptions` | No       | Configuration options                                            |
 
 ## Options
 
@@ -36,25 +36,22 @@ createMcpServer(api: Api, options?: McpServerOptions): McpServer
 | ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `name`              | `'MCP Server'`       | Human-readable name shown to AI assistants                                                                          |
 | `version`           | `'1.0.0'`            | Semantic version string                                                                                             |
-| `options`           | none                 | `publishRoutes`, `hideTools`, and `onlyReadOnly`, as on [`mcpPlugin`](/docs/reference/mcp-plugin)                   |
-| `onlyReadOnly`      | `false`              | Keep only `GET`, `HEAD`, and `OPTIONS`                                                                              |
+| `onlyReadOnly`      | `false`              | Keep only the methods RFC 9110 calls safe, so nothing an assistant calls can change data                            |
 | `instructions`      | built from your tags | Appended to the generated overview                                                                                  |
 | `handlerContext`    | none                 | Extra context spread into every handler call                                                                        |
 | `credentialHeaders` | none                 | Headers of the MCP transport request, used to run guards on secured tools                                           |
 | `transportAuth`     | none                 | A scheme the transport already verified: its guard is skipped, and `context` reaches handlers under `auth.<scheme>` |
 
-Every tool declared with `k.tools` is published unless `options.hideTools` lists it. No route is published until `options.publishRoutes` names it, keyed by the route tree, with `'*'` for a group default. See [Choosing which routes become tools](/docs/mcp#choosing-which-routes-become-tools).
-
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, because MCP tool input is JSON.
+Which routes it publishes is each route's own business: the ones declaring [`tool`](/docs/tools), less the ones whose shape a tool call cannot carry. A route whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` never publishes, because tool input is JSON, and neither does one whose response [streams](/docs/streaming), because a tool result is one value.
 
 ## Secured routes
 
-Each call to a secured tool runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, extracting the credential from `credentialHeaders`.
+Each call to a secured tool runs the same [guard](/docs/reference/k-identity) pipeline as an HTTP request, extracting the credential from `credentialHeaders`.
 
 Driving the transport yourself means passing those headers along. For stdio there is no HTTP request, so supply whatever the environment provides:
 
-```ts title="mcp.ts"
-const server = createMcpServer(api, {
+```ts title="src/mcp.ts"
+const server = createMcpServer(kizuna.api, {
     name: 'My API',
     credentialHeaders: {
         authorization: `Bearer ${process.env.API_TOKEN}`,
@@ -68,12 +65,12 @@ An `McpServer` instance from `@modelcontextprotocol/sdk`. Connect it to any tran
 
 ## Example
 
-```ts title="src/index.ts"
-import { createMcpServer } from '@ts-kizuna/mcp/server';
+```ts title="src/mcp.ts"
+import { createMcpServer } from '@ts-kizuna/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { api } from './api';
+import kizuna from '../kizuna.config';
 
-const server = createMcpServer(api, {
+const server = createMcpServer(kizuna.api, {
     name: 'My API',
     version: '1.0.0',
 });

@@ -119,17 +119,8 @@ const toolCallTarget = (
 };
 
 /**
- * Serve the `mcpPlugin` declared on the contract.
- *
- * @example
- * ```ts
- * export const api = server.api({
- *     router,
- *     plugins: {
- *         mcp: mcpPluginServer(),
- *     },
- * });
- * ```
+ * What answers the MCP endpoint: the tool list built from the routes that
+ * declared `tool`, and the calls a model makes against them.
  */
 export const mcpServe = (props: McpPluginProps<string>, api: unknown) => {
     const serverApi = api as ApiWithRouter;

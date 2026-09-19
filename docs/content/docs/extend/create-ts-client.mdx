@@ -15,11 +15,11 @@ Whether a client goes first-party comes down to demand, not age. If it is someth
 
 ## Pattern
 
-```ts title="api-client.ts"
+```ts title="src/lib/api-client.ts"
 import { KizunaClient, type Client } from '@ts-kizuna/fetch';
-import { contract } from '@/contract';
+import kizuna from '../kizuna.config';
 
-const baseClient = new KizunaClient(contract, {
+const baseClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
 });
 

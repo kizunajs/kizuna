@@ -69,21 +69,21 @@ A route with no handler does not compile once [`defineConfig`](/docs/reference/d
 
 Each handler receives an object with the validated inputs for that route:
 
-| Property           | Available when                                             |
-| ------------------ | ---------------------------------------------------------- |
-| `params`           | Route path has `:param` placeholders                       |
-| `query`            | Route has a `query` schema                                 |
-| `body`             | Route has a `body` schema                                  |
-| `headers`          | Route has a `headers` schema                               |
-| `throwError`       | Always                                                     |
-| `auth`             | Route's [`auth`](/docs/access-control) names an identity   |
-| `requestContext`   | Config declares [request context](/docs/request-context)   |
-| `plugins`          | Config declares [plugins](/docs/plugins)                   |
-| `jobs`             | Config declares [jobs](/docs/jobs)                         |
-| `req`, `res`       | Express adapter                                            |
-| `c`                | Hono adapter                                               |
-| `request`, `reply` | Fastify adapter                                            |
-| `request`          | Next.js adapter                                            |
+| Property           | Available when                                           |
+| ------------------ | -------------------------------------------------------- |
+| `params`           | Route path has `:param` placeholders                     |
+| `query`            | Route has a `query` schema                               |
+| `body`             | Route has a `body` schema                                |
+| `headers`          | Route has a `headers` schema                             |
+| `throwError`       | Always                                                   |
+| `auth`             | Route's [`auth`](/docs/access-control) names an identity |
+| `requestContext`   | Config declares [request context](/docs/request-context) |
+| `plugins`          | Config declares [plugins](/docs/plugins)                 |
+| `jobs`             | Config declares [jobs](/docs/jobs)                       |
+| `req`, `res`       | Express adapter                                          |
+| `c`                | Hono adapter                                             |
+| `request`, `reply` | Fastify adapter                                          |
+| `request`          | Next.js adapter                                          |
 
 Which framework object arrives is decided by the `adapter` your config names, so a handler reads `req` or `c` without importing either framework's types.
 

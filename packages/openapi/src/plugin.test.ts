@@ -164,7 +164,7 @@ describe('openApiPlugin', () => {
             }),
         }).api;
 
-        expect(() => generateOpenApi(bare)).toThrow(/Install `openApiPlugin`/);
+        expect(() => generateOpenApi(bare)).toThrow(/Name `openApiPlugin` under `plugins`/);
     });
 
     it('serves the document with no UI when only a document path is given', async () => {

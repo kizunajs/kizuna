@@ -13,7 +13,7 @@ import type { PathClaim } from './path-claims.js';
 export const DEFAULT_JOBS_PATH = '/jobs';
 
 /**
- * Settings shared by every job, passed to `new Kizuna()` under `jobs`. The jobs
+ * Settings shared by every job, named in `defineConfig` under `jobsConfig`. The jobs
  * themselves are declared with `k.jobs`.
  */
 export interface JobsConfig {
@@ -216,7 +216,7 @@ export type JobsArg<Jobs_ extends Jobs> = string extends keyof Jobs_
 export type NoJobs = Record<string, never>;
 
 /**
- * The handlers `server.jobs` accepts: one per declared job, keyed by name.
+ * The handler each declared job carries, keyed by name.
  */
 export type JobHandlers<Jobs_ extends Jobs, Root extends Jobs = Jobs_> = {
     [Name in keyof Jobs_]: Jobs_[Name] extends CompiledJob
@@ -381,7 +381,7 @@ export const isCompiledJob = (value: unknown): value is CompiledJob => {
 
 /**
  * Throws when either job endpoint lands on a path an API route already serves.
- * Called by `k.contract`, the one place that sees both.
+ * Called by `defineConfig`, the one place that sees both.
  */
 export const jobClaims = (jobs: Jobs | undefined, config: JobsConfig | undefined): PathClaim[] => {
     if (!jobs || flattenJobs(jobs).length === 0) return [];

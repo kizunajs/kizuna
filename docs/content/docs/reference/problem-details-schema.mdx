@@ -3,7 +3,7 @@ title: ProblemDetailsSchema
 description: RFC 9457 Problem Details error response schema (ProblemDetailsSchema) used across kizuna.
 ---
 
-The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/server-guard) in guards and all built-in error responses (404, 405, 415, etc.).
+The standard [RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457) error response shape used by kizuna. Matches the format produced by [`deny()`](/docs/reference/k-identity) in guards and all built-in error responses (404, 405, 415, etc.).
 
 ```ts
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
@@ -31,48 +31,55 @@ import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 
 Use `ProblemDetailsSchema` in your contract's `responses` to document error status codes:
 
-```ts title="routes/users.ts"
+```ts title="src/routes/users.ts"
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { k } from './k';
 
 const usersRoutes = k.routes('users', {
-    getUser: {
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: UserSchema,
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(/* ... */),
+});
+```
+
+A route whose [`auth`](/docs/access-control) names an identity gets `401` and `403` as Problem Details. See [what it drives](/docs/authentication#what-it-drives).
+
+## Usage in handlers
+
+Handlers supply `detail`; `type`, `title`, and `status` are filled in:
+
+```ts title="src/routes/users.ts"
+getUser: k
+    .route({
         method: 'GET',
         path: '/users/:id',
         responses: {
             200: UserSchema,
             404: ProblemDetailsSchema,
         },
-    },
-});
-```
-
-A route the [access control map](/docs/access-control) guards gets `401` and `403` as Problem Details. See [what it drives](/docs/authentication#what-it-drives).
-
-## Usage in handlers
-
-Handlers supply `detail`; `type`, `title`, and `status` are filled in:
-
-```ts title="router/index.ts"
-const router = server.router({
-    users: {
-        getUser: ({ params, throwError }) => {
-            const user = userStore.get(params.id);
-            if (!user) {
-                return throwError({
-                    status: 404,
-                    body: {
-                        detail: 'User not found',
-                    },
-                });
-            }
-            return {
-                status: 200,
-                body: user,
-            };
-        },
-    },
-});
+    })
+    .handler(({ params, throwError }) => {
+        const user = userStore.get(params.id);
+        if (!user) {
+            return throwError({
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            });
+        }
+        return {
+            status: 200,
+            body: user,
+        };
+    }),
 ```
 
 The client receives the full envelope shown under [Shape](#shape).
@@ -81,29 +88,31 @@ The client receives the full envelope shown under [Shape](#shape).
 
 RFC 9457 lets a problem carry extra fields, called **extension members**, alongside the standard envelope. `ProblemDetailsSchema` is a plain Zod object schema, so add them with `.extend()`:
 
-```ts title="routes/users.ts"
+```ts title="src/routes/users.ts"
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { k } from './k';
+import { k } from '../k';
 
-const usersRoutes = k.routes('users', {
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        body: CreateUserSchema,
-        responses: {
-            201: UserSchema,
-            409: ProblemDetailsSchema.extend({
-                conflictingId: z.string(),
-            }),
-        },
-    },
+const users = k.routes('users', {
+    createUser: k
+        .route({
+            method: 'POST',
+            path: '/users',
+            body: CreateUserSchema,
+            responses: {
+                201: UserSchema,
+                409: ProblemDetailsSchema.extend({
+                    conflictingId: z.string(),
+                }),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
 To reuse the extended schema across routes, and give it a name in the generated OpenAPI spec, wrap it in [`Kizuna.model`](/docs/reference/kizuna-model):
 
-```ts title="routes/users.ts"
+```ts title="src/routes/users.ts"
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
@@ -120,7 +129,7 @@ const ConflictError = Kizuna.model({
 
 The handler supplies `detail` plus the declared extensions:
 
-```ts title="router/users.ts"
+```ts title="src/routes/users.ts"
 return throwError({
     status: 409,
     body: {

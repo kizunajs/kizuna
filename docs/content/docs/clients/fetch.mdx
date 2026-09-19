@@ -18,9 +18,9 @@ You generate it from your contract. The generated file carries named types and a
 ```ts title="scripts/generate-client.ts"
 import { writeFileSync } from 'node:fs';
 import { generateFetchClient } from '@ts-kizuna/fetch/server';
-import { contract } from '@/contract';
+import kizuna from '../kizuna.config';
 
-writeFileSync('./src/api-client.ts', generateFetchClient(contract));
+writeFileSync('./src/api-client.ts', generateFetchClient(kizuna.api));
 ```
 
 Name it in [`kizuna.config.ts`](/docs/configuration) with `fetchClient({ output })` so the rest of your tooling knows where it goes.
@@ -171,7 +171,7 @@ Routes without a `headers` schema accept an optional `headers?: Record<string, s
 
 When the contract secures routes with [identities](/docs/authentication), send the credential in `baseHeaders`. The server's guards read it, and answer `401`/`403` when it's missing or insufficient:
 
-```ts title="api-client.ts"
+```ts title="src/lib/api-client.ts"
 const apiClient = createClient({
     baseUrl: 'https://api.example.com',
     baseHeaders: {
@@ -270,7 +270,7 @@ if (result.status === 400) {
 
 ## Refusals
 
-A route the contract's access control map guards carries `401` and `403` in its response type, as [Problem Details](/docs/reference/problem-details-schema). A public route carries neither. A route declaring its own `403` keeps that body alongside, the way a declared `400` sits beside the validation error.
+A route whose `auth` names an identity carries `401` and `403` in its response type, as [Problem Details](/docs/reference/problem-details-schema). A public route carries neither. A route declaring its own `403` keeps that body alongside, the way a declared `400` sits beside the validation error.
 
 ```ts title="workspace.ts"
 const result = await apiClient.workspace.deleteWorkspace();
@@ -288,7 +288,7 @@ The client works in Expo and in bare React Native, importing the [same contract]
 
 `baseHeaders` is fixed when the client is constructed, so a credential that lives in storage goes in `onRequest`. It runs before every request, and the `Headers` it receives are the ones sent:
 
-```ts title="api-client.ts"
+```ts title="src/lib/api-client.ts"
 import * as SecureStore from 'expo-secure-store';
 import { createClient } from './api-client';
 
@@ -305,7 +305,7 @@ export const apiClient = createClient({
 
 Expo SDK 54 and later ships a `File` class, and `expo/fetch` is the implementation that puts one inside a multipart body. Hand the client Expo's:
 
-```ts title="api-client.ts"
+```ts title="src/lib/api-client.ts"
 import { fetch } from 'expo/fetch';
 
 export const apiClient = createClient({

@@ -5,24 +5,22 @@ description: Install an MCP (Model Context Protocol) endpoint so AI assistants c
 
 <BetaNotice>
 
-MCP support is new and still settling. The plugin options and the generated tool surface may change before v2, so pin your version if you depend on them.
+MCP support is new and still settling. The plugin options and the published tool surface may change before v2, so pin your version if you depend on them.
 
 </BetaNotice>
 
-Serve an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint as part of your API. Declare it on [`k.contract`](/docs/reference/k-contract), pass `mcpPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves it, on every adapter.
+Serve an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint as part of your API. Name it under `plugins` on [`defineConfig`](/docs/reference/define-config) and `api.mount` serves it, on every adapter.
 
 <InstallTabs packageName="@ts-kizuna/mcp" />
 
 ```ts
 import { mcpPlugin } from '@ts-kizuna/mcp';
-import { mcpPluginServer } from '@ts-kizuna/mcp/server';
 ```
 
 ## Parameters
 
 ```ts
 mcpPlugin(props?: McpPluginProps): PluginDeclaration
-mcpPluginServer(): PluginImplementation
 ```
 
 | Parameter | Type             | Required | Description           |
@@ -33,87 +31,81 @@ mcpPluginServer(): PluginImplementation
 
 | Option         | Default              | Description                                                                   |
 | -------------- | -------------------- | ----------------------------------------------------------------------------- |
+| `slug`         | `'mcp'`              | What handlers reach this plugin under, and the key it installs at             |
 | `path`         | `'/mcp'`             | Path the endpoint is served from                                              |
 | `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                                    |
 | `version`      | `'1.0.0'`            | Semantic version string                                                       |
 | `instructions` | built from your tags | Appended to the generated overview                                            |
-| `routes`       | none                 | The contract's routes, so `options.publishRoutes` is checked against them     |
-| `tools`        | none                 | The contract's tools, so `options.hideTools` is checked against them          |
-| `options`      | none                 | `publishRoutes`, `hideTools`, and `onlyReadOnly`                              |
 | `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([guide](/docs/mcp#oauth)) |
 
-Routes whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` are never tools, whatever `publishRoutes` says, because tool input is JSON.
+## Which routes it publishes
 
-Props are pure data. `mcpPluginServer()` takes nothing: declaring the plugin is where it is configured.
+The plugin takes no list of routes. Each route decides for itself, by declaring [`tool`](/docs/tools):
 
-## Options
-
-`options` holds the choices; `routes` and `tools` beside it are what those choices are checked against. Write `plugins` as a function and `k.contract` hands both over:
-
-```ts title="contract.ts"
-export const contract = k.contract({
-    routes,
-    tools,
-    plugins: ({ routes, tools }) => ({
-        mcp: mcpPlugin({
-            routes,
-            tools,
-            options: {
-                publishRoutes: {
-                    users: {
-                        '*': true,
-                        exportUsers: false,
-                    },
-                },
-                hideTools: ['countWords'],
-            },
-        }),
-    }),
-});
+```ts title="src/routes/weather.ts"
+getForecast: k
+    .route({
+        method: 'GET',
+        path: '/forecast/:city',
+        summary: 'Look up tomorrow forecast for one city',
+        tool: true,
+        responses: {
+            200: ForecastSchema,
+        },
+    })
+    .handler(/* ... */),
 ```
 
-A route is an HTTP endpoint rather than a tool, so none are published until `publishRoutes` names them, and a group takes `'*'` for its own default. Every declared tool is published, and `hideTools` drops one by dotted key. Both are checked against the trees, so a name that does not exist is a compile error naming the one you meant.
+A route with no `tool` is an HTTP endpoint and nothing more. Two shapes never publish even with it: a route whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded`, because tool input is JSON, and a route whose response [streams](/docs/streaming), because a tool result is one value.
 
 ## Example
 
-```ts title="contract.ts"
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
 import { mcpPlugin } from '@ts-kizuna/mcp';
-import { k } from './k';
-import { routes } from './routes';
+import { routes } from './src/routes';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
     routes,
-    plugins: {
-        mcp: mcpPlugin({
+    plugins: [
+        mcpPlugin({
             name: 'My API',
         }),
-    },
-});
-```
-
-```ts title="api.ts"
-import { mcpPluginServer } from '@ts-kizuna/mcp/server';
-
-export const api = server.api({
-    router,
-    plugins: {
-        mcp: mcpPluginServer(),
-    },
+    ],
 });
 ```
 
 ```ts title="src/index.ts"
-api.mount(app);
+import kizuna from '../kizuna.config';
+
+kizuna.api.mount(app);
 ```
 
-Miss `mcpPluginServer()` and `server.api` throws, naming the module to import.
+## Two endpoints
+
+`slug` is what a plugin installs at, so give a second MCP endpoint its own:
+
+```ts title="kizuna.config.ts"
+plugins: [
+    mcpPlugin({
+        name: 'My API',
+    }),
+    mcpPlugin({
+        slug: 'internalMcp',
+        path: '/internal/mcp',
+        name: 'My API, internal',
+    }),
+],
+```
 
 ## Next.js
 
-The endpoint is served by the catch-all route file that already serves your contract, so `path` resolves under its `basePath`:
+The endpoint is served by the catch-all route file that already serves your routes, so `path` resolves under its `basePath`:
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
-export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
     basePath: '/api',
 });
 ```
@@ -122,12 +114,13 @@ With the default `path`, the endpoint is at `/api/mcp`.
 
 ## Secured routes
 
-Each tool call runs the same [guard](/docs/reference/server-guard) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. A `deny(...)` becomes a tool error result; with [`oauth`](/docs/mcp#oauth) configured, denials from that identity answer at the HTTP level instead. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
+Each tool call runs the same [guard](/docs/reference/k-identity) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. A `deny(...)` becomes a tool error result; with [`oauth`](/docs/mcp#oauth) configured, denials from that identity answer at the HTTP level instead. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
 
 ## Plugin route
 
-The endpoint is a [plugin route](/docs/plugins#plugin-routes): it lives outside `contract.routes`, so your fetch client, the OpenAPI document, and the generated Swift and Kotlin clients never list it.
+The endpoint is a [plugin route](/docs/plugins#plugin-routes): it lives outside `api.routes`, so your fetch client, the OpenAPI document, and the generated Swift and Kotlin clients never list it.
 
 ## See also
 
+- [Tools](/docs/tools) for what a route's `tool` declares
 - [`createMcpServer`](/docs/reference/create-mcp-server) to drive the transport yourself

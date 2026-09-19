@@ -57,7 +57,7 @@ export type StreamBodyOf<Def extends StreamResponseDefinition> =
  *
  * @example
  * ```ts
- * const cannedReply: StreamBody<typeof contract.routes.assistant.reply, 200> = async function* () {
+ * const cannedReply: StreamBody<typeof replyRoute, 200> = async function* () {
  *     yield {
  *         event: 'delta',
  *         data: {

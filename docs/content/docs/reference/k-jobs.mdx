@@ -9,7 +9,7 @@ Jobs are new and still settling. `k.jobs` may change before v2, so pin your vers
 
 </AlphaNotice>
 
-Declares the contract's scheduled jobs. The first argument is the identity every job requires, the credential your scheduler sends. Pass the result to `k.contract` under `jobs`, alongside `routes`.
+Declares the contract's scheduled jobs. The first argument is the identity every job requires, the credential your scheduler sends. Pass the result to `defineConfig` under `jobs`, alongside `routes`.
 
 ```ts title="jobs.ts"
 import { z } from 'zod';
@@ -34,7 +34,7 @@ export const jobs = k.jobs('scheduler', {
 });
 ```
 
-Jobs nest to any depth. Because a job carries its own identity, it never appears in the contract's access control map.
+Jobs nest to any depth. Because a job carries its own identity, it declares no `auth` of its own.
 
 Omitting the identity argument declares the jobs public, which leaves anyone who can reach `/jobs/run` able to trigger them. Pass an identity unless the endpoints are unreachable from outside your network.
 
@@ -84,7 +84,7 @@ Exported from `@ts-kizuna/core`. Each returns a plain cron string.
 
 Every handler receives a `jobs` runner shaped like the declaration, with two methods per job. `run` resolves to what the handler returned, as `{ status, body }`; `queue` resolves once the job is in line.
 
-```ts title="router/index.ts"
+```ts title="src/routes/users.ts"
 const result = await jobs.billing.reconcileInvoices.run({ since });
 
 await jobs.indexUser.queue({

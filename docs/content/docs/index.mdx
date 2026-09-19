@@ -1,17 +1,17 @@
 ---
 title: Quickstart
-description: Define a contract, implement a server, and call it from a typed client in 8 minutes.
+description: Declare your routes, serve them on your framework, and call them from a typed client in 8 minutes.
 ---
 
 A ts-kizuna project has three parts:
 
-1. **The contract** holds your routes and their Zod schemas, in a package both sides import.
-2. **The server** holds handlers that implement those routes, mounted on your framework.
-3. **The client** is built from the same contract, so it knows every route, input, and response.
+1. **The routes** you declare with `k`, each one a method and path, its Zod schemas, and the handler that answers it.
+2. **`kizuna.config.ts`** names the framework you serve them on and hands back the api you mount.
+3. **The client** is built from those same declarations, so it knows every route, input, and response.
 
 ## Installation
 
-Install `@ts-kizuna/core`, which defines routes and contracts, together with Zod 4 for the schemas.
+Install `@ts-kizuna/core`, together with Zod 4 for the schemas.
 
 <InstallTabs packageName="@ts-kizuna/core zod" />
 
@@ -29,24 +29,25 @@ Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
 <Step>
 
-## Define the routes
+## Declare the routes
 
-Declare your API surface once with `new Kizuna()` and export `k`, then group your routes with `k.routes`. Keep each piece in its own file (a package both your server and client import).
+Keep one `k` for the API and export it:
 
-```ts title="k.ts"
+```ts title="src/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
+import type { Config } from '../kizuna.types';
 
-export const k = new Kizuna();
+export const k = new Kizuna<Config>();
 ```
 
-`new Kizuna()` takes optional tags, identities, request contexts and validation settings. See [`new Kizuna()`](/docs/reference/kizuna) for the full options.
+`k` is typed by the `Config` that `kizuna generate` writes, so every name you use is checked against what your config declares. See [`new Kizuna()`](/docs/reference/kizuna).
 
-Each route pairs a method and path with Zod schemas:
+Each route pairs a method and path with Zod schemas, and carries the handler that answers it:
 
-```ts title="users.ts"
+```ts title="src/routes/users.ts"
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { k } from './k';
+import { k } from '../k';
 
 export const UserSchema = z.object({
     id: z.string(),
@@ -54,99 +55,46 @@ export const UserSchema = z.object({
     email: z.email(),
 });
 
-export const usersRoutes = k.routes({
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        query: z.object({
-            page: z.number().int().min(1).default(1),
-            limit: z.number().int().min(1).max(100).default(10),
-        }),
-        responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-                total: z.number(),
+export const users = k.routes({
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            query: z.object({
+                page: z.int().min(1).default(1),
+                limit: z.int().min(1).max(100).default(10),
             }),
-        },
-    },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string().min(1),
-            email: z.email(),
-        }),
-        responses: {
-            201: UserSchema,
-            400: ProblemDetailsSchema,
-        },
-    },
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: UserSchema,
-            404: ProblemDetailsSchema,
-        },
-    },
-});
-```
-
-</Step>
-
-<Step>
-
-## Bundle them into a contract
-
-```ts title="contract/index.ts"
-import { k } from './k';
-import { usersRoutes } from './routes';
-
-export const contract = k.contract({
-    routes: {
-        users: usersRoutes,
-    },
-});
-```
-
-</Step>
-
-<Step>
-
-## Implement the server
-
-Pick an adapter, here Next.js. `new KizunaServer()` turns the contract into a `server` handle.
-
-<InstallTabs packageName="@ts-kizuna/next" />
-
-`server.router` takes one function per route, with inputs validated and typed.
-
-```ts title="server.ts"
-import { KizunaServer } from '@ts-kizuna/next';
-import { contract } from '@/contract';
-
-export const server = new KizunaServer(contract);
-```
-
-```ts title="router/index.ts"
-import { server } from './server';
-
-export const router = server.router({
-    users: {
-        listUsers: async ({ query }) => {
-            const users = await db.users.findMany({
-                skip: (query.page - 1) * query.limit,
-                take: query.limit,
-            });
-            return {
-                status: 200,
-                body: {
-                    users,
-                    total: await db.users.count(),
-                },
-            };
-        },
-        createUser: async ({ body }) => {
+            responses: {
+                200: z.object({
+                    users: z.array(UserSchema),
+                    total: z.number(),
+                }),
+            },
+        })
+        .handler(async ({ query }) => ({
+            status: 200,
+            body: {
+                users: await db.users.findMany({
+                    skip: (query.page - 1) * query.limit,
+                    take: query.limit,
+                }),
+                total: await db.users.count(),
+            },
+        })),
+    createUser: k
+        .route({
+            method: 'POST',
+            path: '/users',
+            body: z.object({
+                name: z.string().min(1),
+                email: z.email(),
+            }),
+            responses: {
+                201: UserSchema,
+                400: ProblemDetailsSchema,
+            },
+        })
+        .handler(async ({ body }) => {
             const existing = await db.users.findByEmail(body.email);
             if (existing) {
                 return {
@@ -156,13 +104,21 @@ export const router = server.router({
                     },
                 };
             }
-            const user = await db.users.create(body);
             return {
                 status: 201,
-                body: user,
+                body: await db.users.create(body),
             };
-        },
-        getUser: async ({ params }) => {
+        }),
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: UserSchema,
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(async ({ params }) => {
             const user = await db.users.findById(params.id);
             if (!user) {
                 return {
@@ -176,28 +132,45 @@ export const router = server.router({
                 status: 200,
                 body: user,
             };
-        },
+        }),
+});
+```
+
+The handler's `query`, `body` and `params` are typed from the declaration right above it, and its return is checked against that route's `responses`.
+
+</Step>
+
+<Step>
+
+## Assemble it
+
+Pick an adapter, here Next.js. Naming it is what puts that framework's own request in every handler's args, typed.
+
+<InstallTabs packageName="@ts-kizuna/next" />
+
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { nextAdapter } from '@ts-kizuna/next';
+import { users } from './src/routes/users';
+
+export default defineConfig({
+    adapter: nextAdapter(),
+    routes: {
+        users,
     },
 });
 ```
 
-`server.api` puts the router into the API object the adapter mounts.
+</Step>
 
-```ts title="api.ts"
-import { server } from './server';
-import { router } from './router';
+<Step>
 
-export const api = server.api({
-    router,
-});
-```
-
-Mount it on a catch-all route.
+## Mount it
 
 ```ts title="src/app/api/[...ts-kizuna]/route.ts"
-import { api } from '@/server/api';
+import kizuna from '../../../../kizuna.config';
 
-export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
     basePath: '/api',
 });
 ```
@@ -208,18 +181,20 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
 
 ## Call it from a typed client
 
-The client is built from the same contract, so every route, input, and response is typed.
+The client is built from the same declarations, so every route, input, and response is typed.
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
-```ts title="api-client.ts"
+```ts title="src/lib/api-client.ts"
 import { KizunaClient } from '@ts-kizuna/fetch';
-import { contract } from '@/contract';
+import kizuna from '../../kizuna.config';
 
-export const apiClient = new KizunaClient(contract, {
+export const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000/api',
 });
 ```
+
+Your config carries the handlers, so it stays on the server. For a browser, point `clients` at a generated file and import that instead. See [Clients](/docs/clients/fetch).
 
 ```tsx title="page.tsx"
 import { apiClient } from '@/lib/api-client';
@@ -273,8 +248,8 @@ export async function createUser(name: string, email: string) {
 
 ## Next steps
 
-- [Building an API](/docs/building/contract) covers the contract, router, and mounting in depth
-- [Authentication](/docs/authentication) declares identities on the contract, [Access Control](/docs/access-control) says who may call each route, and guards, handler types, and OpenAPI security all follow
+- [Building an API](/docs/building/contract) covers routes, handlers, and mounting in depth
+- [Authentication](/docs/authentication) declares identities and the guards on them, [Access Control](/docs/access-control) says who may call each route, and handler types and OpenAPI security follow
 - [Adapters](/docs/adapters/express) covers Express, Fastify, Hono, and Next.js setup and options
 - [Fetch client](/docs/clients/fetch) covers headers, custom fetch, and error handling
 - [OpenAPI generation](/docs/openapi) serves a spec alongside your API

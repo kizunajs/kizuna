@@ -31,24 +31,26 @@ Pick one and the examples follow:
 
 <AccessStyle value="identity">
 
-An identity with a `context` and nothing else. The guard says who the caller is, and every route under it is open to every caller it accepts:
+An identity with a `context` and nothing else. Its guard, which you attach below, says who the caller is, and every route under it is open to every caller it accepts:
 
-```ts title="contract/identities.ts"
-export const member = Kizuna.identity.apiKey({
-    name: 'x-workspace-token',
-    in: 'header',
-    context: z.object({
-        userId: z.string(),
-        workspaceId: z.string(),
-    }),
-});
+```ts title="src/identities.ts"
+export const member = k.identity
+    .apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            userId: z.string(),
+            workspaceId: z.string(),
+        }),
+    })
+    .guard(/* below */);
 ```
 
 </AccessStyle>
 
 <AccessStyle value="roles">
 
-```ts title="contract/roles.ts"
+```ts title="src/roles.ts"
 export const roles = Kizuna.roles(['member', 'admin', 'owner']);
 ```
 
@@ -58,7 +60,7 @@ export const roles = Kizuna.roles(['member', 'admin', 'owner']);
 
 List every permission that exists, grouped by what it acts on, and build the roles from them. Anything not listed is denied, and `'all'` is every permission declared:
 
-```ts title="contract/permissions.ts"
+```ts title="src/permissions.ts"
 export const permissions = Kizuna.permissions({
     workspace: ['read', 'update', 'delete'],
     project: ['create', 'read', 'update', 'delete', 'share'],
@@ -66,7 +68,7 @@ export const permissions = Kizuna.permissions({
 });
 ```
 
-```ts title="contract/roles.ts"
+```ts title="src/roles.ts"
 export const roles = Kizuna.roles(permissions, {
     member: {
         workspace: ['read'],
@@ -87,16 +89,18 @@ export const roles = Kizuna.roles(permissions, {
 
 Put the roles on the identity whose callers hold them:
 
-```ts title="contract/identities.ts"
-export const member = Kizuna.identity.apiKey({
-    name: 'x-workspace-token',
-    in: 'header',
-    context: z.object({
-        userId: z.string(),
-        workspaceId: z.string(),
-    }),
-    roles,
-});
+```ts title="src/identities.ts"
+export const member = k.identity
+    .apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            userId: z.string(),
+            workspaceId: z.string(),
+        }),
+        roles,
+    })
+    .guard(/* below */);
 ```
 
 That adds `role` to what the guard returns and what handlers receive, typed as `'member' | 'admin' | 'owner'`.
@@ -107,16 +111,18 @@ That adds `role` to what the guard returns and what handlers receive, typed as `
 
 Put the roles on the identity whose callers hold them:
 
-```ts title="contract/identities.ts"
-export const member = Kizuna.identity.apiKey({
-    name: 'x-workspace-token',
-    in: 'header',
-    context: z.object({
-        userId: z.string(),
-        workspaceId: z.string(),
-    }),
-    roles,
-});
+```ts title="src/identities.ts"
+export const member = k.identity
+    .apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            userId: z.string(),
+            workspaceId: z.string(),
+        }),
+        roles,
+    })
+    .guard(/* below */);
 ```
 
 That adds `role` to what the guard returns and what handlers receive, typed as `'member' | 'admin' | 'owner'`.
@@ -135,24 +141,28 @@ Every route carries its own `auth`, so a route cannot be added without stating i
 
 A route names the identity it accepts:
 
-```ts title="contract/routes/projects.ts"
-export const projectRoutes = k.routes('projects', {
-    listProjects: {
-        method: 'GET',
-        path: '/projects',
-        auth: 'member',
-        responses: {
-            200: z.array(ProjectSchema),
-        },
-    },
-    deleteProject: {
-        method: 'DELETE',
-        path: '/projects/:id',
-        auth: 'member',
-        responses: {
-            204: z.void(),
-        },
-    },
+```ts title="src/routes/projects.ts"
+export const projects = k.routes('projects', {
+    listProjects: k
+        .route({
+            method: 'GET',
+            path: '/projects',
+            auth: 'member',
+            responses: {
+                200: z.array(ProjectSchema),
+            },
+        })
+        .handler(/* ... */),
+    deleteProject: k
+        .route({
+            method: 'DELETE',
+            path: '/projects/:id',
+            auth: 'member',
+            responses: {
+                204: z.void(),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -162,27 +172,31 @@ export const projectRoutes = k.routes('projects', {
 
 A route names the identity, and the roles it accepts:
 
-```ts title="contract/routes/projects.ts"
-export const projectRoutes = k.routes('projects', {
-    listProjects: {
-        method: 'GET',
-        path: '/projects',
-        auth: 'member',
-        responses: {
-            200: z.array(ProjectSchema),
-        },
-    },
-    deleteProject: {
-        method: 'DELETE',
-        path: '/projects/:id',
-        auth: {
-            identity: 'member',
-            roles: 'owner',
-        },
-        responses: {
-            204: z.void(),
-        },
-    },
+```ts title="src/routes/projects.ts"
+export const projects = k.routes('projects', {
+    listProjects: k
+        .route({
+            method: 'GET',
+            path: '/projects',
+            auth: 'member',
+            responses: {
+                200: z.array(ProjectSchema),
+            },
+        })
+        .handler(/* ... */),
+    deleteProject: k
+        .route({
+            method: 'DELETE',
+            path: '/projects/:id',
+            auth: {
+                identity: 'member',
+                roles: 'owner',
+            },
+            responses: {
+                204: z.void(),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -192,34 +206,38 @@ export const projectRoutes = k.routes('projects', {
 
 A route names the identity, and the permission it requires. Who may call it follows from what each role holds:
 
-```ts title="contract/routes/projects.ts"
-export const projectRoutes = k.routes('projects', {
-    listProjects: {
-        method: 'GET',
-        path: '/projects',
-        auth: {
-            identity: 'member',
-            requires: {
-                project: ['read'],
+```ts title="src/routes/projects.ts"
+export const projects = k.routes('projects', {
+    listProjects: k
+        .route({
+            method: 'GET',
+            path: '/projects',
+            auth: {
+                identity: 'member',
+                requires: {
+                    project: ['read'],
+                },
             },
-        },
-        responses: {
-            200: z.array(ProjectSchema),
-        },
-    },
-    deleteProject: {
-        method: 'DELETE',
-        path: '/projects/:id',
-        auth: {
-            identity: 'member',
-            requires: {
-                project: ['delete'],
+            responses: {
+                200: z.array(ProjectSchema),
             },
-        },
-        responses: {
-            204: z.void(),
-        },
-    },
+        })
+        .handler(/* ... */),
+    deleteProject: k
+        .route({
+            method: 'DELETE',
+            path: '/projects/:id',
+            auth: {
+                identity: 'member',
+                requires: {
+                    project: ['delete'],
+                },
+            },
+            responses: {
+                204: z.void(),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -229,18 +247,20 @@ Members read, admins create projects and cancel invites, and only the owner dele
 
 A public route says so:
 
-```ts title="contract/routes/health.ts"
-export const healthRoutes = k.routes('health', {
-    getHealth: {
-        method: 'GET',
-        path: '/health',
-        auth: false,
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    },
+```ts title="src/routes/health.ts"
+export const health = k.routes('health', {
+    getHealth: k
+        .route({
+            method: 'GET',
+            path: '/health',
+            auth: false,
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -256,24 +276,33 @@ A role or permission a route names must be one the identity declares, so a typo 
 
 The guard resolves the credential and returns the context:
 
-```ts title="server/guards.ts"
-export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
-    const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
+```ts title="src/identities.ts"
+export const member = k.identity
+    .apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            userId: z.string(),
+            workspaceId: z.string(),
+        }),
+    })
+    .guard(async ({ apiKey, params, deny }) => {
+        const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
 
-    if (!membership) {
-        return deny({
-            status: 403,
-            body: {
-                detail: 'Forbidden',
-            },
-        });
-    }
+        if (!membership) {
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'Forbidden',
+                },
+            });
+        }
 
-    return {
-        userId: membership.userId,
-        workspaceId: membership.workspaceId,
-    };
-});
+        return {
+            userId: membership.userId,
+            workspaceId: membership.workspaceId,
+        };
+    });
 ```
 
 The guard denies, here with `403`, before the handler. The handler reads the context under `auth.member`.
@@ -284,25 +313,35 @@ The guard denies, here with `403`, before the handler. The handler reads the con
 
 The role is a column on the membership row or a claim in the token. The guard reads it:
 
-```ts title="server/guards.ts"
-export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
-    const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
+```ts title="src/identities.ts"
+export const member = k.identity
+    .apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            userId: z.string(),
+            workspaceId: z.string(),
+        }),
+        roles,
+    })
+    .guard(async ({ apiKey, params, deny }) => {
+        const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
 
-    if (!membership) {
-        return deny({
-            status: 403,
-            body: {
-                detail: 'Forbidden',
-            },
-        });
-    }
+        if (!membership) {
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'Forbidden',
+                },
+            });
+        }
 
-    return {
-        userId: membership.userId,
-        workspaceId: membership.workspaceId,
-        role: membership.role,
-    };
-});
+        return {
+            userId: membership.userId,
+            workspaceId: membership.workspaceId,
+            role: membership.role,
+        };
+    });
 ```
 
 kizuna answers `403` before the handler when the role is not one the route accepts. The handler reads it under `auth.member.role`.
@@ -315,25 +354,35 @@ A caller with several roles returns them as an array, and passes when any of the
 
 The role is a column on the membership row or a claim in the token. The guard reads it:
 
-```ts title="server/guards.ts"
-export const requireMember = server.guard('member', async ({ apiKey, params, deny }) => {
-    const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
+```ts title="src/identities.ts"
+export const member = k.identity
+    .apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            userId: z.string(),
+            workspaceId: z.string(),
+        }),
+        roles,
+    })
+    .guard(async ({ apiKey, params, deny }) => {
+        const membership = apiKey ? await findMembership(apiKey.value, params.workspaceId) : undefined;
 
-    if (!membership) {
-        return deny({
-            status: 403,
-            body: {
-                detail: 'Forbidden',
-            },
-        });
-    }
+        if (!membership) {
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'Forbidden',
+                },
+            });
+        }
 
-    return {
-        userId: membership.userId,
-        workspaceId: membership.workspaceId,
-        role: membership.role,
-    };
-});
+        return {
+            userId: membership.userId,
+            workspaceId: membership.workspaceId,
+            role: membership.role,
+        };
+    });
 ```
 
 kizuna answers `403` before the handler when the role does not hold what the route requires. The handler reads the role under `auth.member.role` and everything it holds under `auth.member.permissions`, typed to the catalog.
@@ -367,7 +416,7 @@ The verbs are yours. Naming them after what the route does, `send` for an invite
 
 A role says what a member can be given. Which of them one member has is a row, and the guard returns it as `permissions`:
 
-```ts title="server/guards.ts"
+```ts title="src/identities.ts"
 return {
     userId: membership.userId,
     workspaceId: membership.workspaceId,
@@ -380,14 +429,23 @@ kizuna treats the list as what the caller holds, and fails the guard if it names
 
 The route that saves the list validates each entry against the catalog:
 
-```ts title="contract/routes/members.ts"
-setPermissions: {
-    method: 'PUT',
-    path: '/members/:userId/permissions',
-    body: z.object({
-        permissions: z.array(permissions.schema),
-    }),
-},
+```ts title="src/routes/members.ts"
+setPermissions: k
+    .route({
+        method: 'PUT',
+        path: '/members/:userId/permissions',
+        auth: {
+            identity: 'member',
+            roles: ['owner'],
+        },
+        body: z.object({
+            permissions: z.array(permissions.schema),
+        }),
+        responses: {
+            200: MemberSchema,
+        },
+    })
+    .handler(/* ... */),
 ```
 
 A permission outside the catalog is a `400` before the handler runs:
@@ -430,7 +488,7 @@ kizuna runs the first. You write the second, with the row and `auth` in hand. Th
 
 A member updates the projects they own. The map lets members in, and the handler settles whose project it is with the row in hand:
 
-```ts title="server/router/projects.ts"
+```ts title="src/routes/projects.ts"
 updateProject: async ({ params, body, auth }) => {
     const project = await db.query.projects.findFirst({
         where: eq(projects.id, params.projectId),
@@ -486,7 +544,7 @@ create policy "own workspace" on projects
 
 Set the workspace per request, inside a transaction, so it ends with the request:
 
-```ts title="server/db/with-workspace.ts"
+```ts title="src/db/with-workspace.ts"
 export const withWorkspace = <Result>(workspaceId: string, run: (tx: Transaction) => Promise<Result>) =>
     db.transaction(async (tx) => {
         await tx.execute(sql`select set_config('app.workspace_id', ${workspaceId}, true)`);
@@ -495,7 +553,7 @@ export const withWorkspace = <Result>(workspaceId: string, run: (tx: Transaction
     });
 ```
 
-```ts title="server/router/projects.ts"
+```ts title="src/routes/projects.ts"
 listProjects: async ({ auth }) => ({
     status: 200,
     body: {
@@ -510,7 +568,7 @@ An OAuth token's scopes are permissions. The guard returns them as `permissions`
 
 ## What it drives
 
-`k.contract` puts `401` and `403` on every route this map guards, as [Problem Details](/docs/reference/problem-details-schema), both `no-store`. A public route gets neither:
+`defineConfig` puts `401` and `403` on every route this map guards, as [Problem Details](/docs/reference/problem-details-schema), both `no-store`. A public route gets neither:
 
 ```ts title="delete-project.ts"
 const result = await apiClient.projects.deleteProject({
@@ -541,5 +599,5 @@ paths:
 - [`Kizuna.roles`](/docs/reference/kizuna-roles)
 - [`Kizuna.permissions`](/docs/reference/kizuna-permissions)
 - [`k.route`](/docs/reference/k-route)
-- [`server.api`](/docs/reference/server-api)
+- [`defineConfig`](/docs/reference/define-config)
 - [Authentication](/docs/authentication)

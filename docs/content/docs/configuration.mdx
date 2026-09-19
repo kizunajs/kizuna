@@ -1,21 +1,25 @@
 ---
 title: Configuration
-description: Name your APIs once in kizuna.config.ts, so the tooling knows what your repository contains.
+description: Assemble your API in kizuna.config.ts, and say where its generated clients go.
 ---
 
-`kizuna.config.ts` says what your repository contains: its APIs, their contracts, and where their generated clients go.
-
-You do not need it to define routes, serve them, or call them from a typed client. Reach for it to generate clients with one command, or when a repository holds more than one API.
+`kizuna.config.ts` sits at the root of your app, beside `package.json`. It assembles everything the API is made of, hands back the `api` you mount, and says where each generated client is written. The tooling looks for it by name.
 
 ## The file
 
 ```ts title="kizuna.config.ts"
-import { defineConfig, type ConfigOf } from '@ts-kizuna/core';
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
 import { swiftClient } from '@ts-kizuna/swift';
-import { contract } from './src/contract';
+import { routes } from './src/routes';
+import { user } from './src/identities';
 
-export const config = defineConfig({
-    contract,
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    identities: {
+        user,
+    },
     clients: [
         swiftClient({
             output: './ios/MyApp/Generated/APIClient.swift',
@@ -23,44 +27,53 @@ export const config = defineConfig({
         }),
     ],
 });
-
-declare module '@ts-kizuna/core' {
-    interface KizunaConfig extends ConfigOf<typeof config> {}
-}
 ```
 
-`defineConfig` is data the tooling reads. The `declare module` block hands the type system your routes, and is the same in every project.
+It default-exports two things: `api`, which you mount and which every generator reads, and `clients`, which the tooling writes.
+
+```ts title="src/index.ts"
+import kizuna from '../kizuna.config';
+
+kizuna.api.mount(app);
+```
+
+See [`defineConfig`](/docs/reference/define-config) for every field it takes.
+
+## Clients
 
 Each client comes from the package that generates it, so its options are typed there and a generator you have not installed cannot be configured by accident.
 
-| Client            | Import from                 |
-| ----------------- | --------------------------- |
-| `swiftClient`     | `@ts-kizuna/swift`          |
-| `kotlinClient`    | `@ts-kizuna/kotlin`         |
-| `openApiDocument` | `@ts-kizuna/openapi/server` |
-
-## Several APIs
+| Target            | Import from          | Writes                        |
+| ----------------- | -------------------- | ----------------------------- |
+| `fetchClient`     | `@ts-kizuna/fetch`   | A typed TypeScript client     |
+| `swiftClient`     | `@ts-kizuna/swift`   | A native Swift client         |
+| `kotlinClient`    | `@ts-kizuna/kotlin`  | A native Kotlin client        |
+| `openApiDocument` | `@ts-kizuna/openapi` | The OpenAPI document, to disk |
 
 ```ts title="kizuna.config.ts"
-export const config = defineConfig({
-    apis: {
-        app: {
-            contract: appContract,
-            clients: [
-                swiftClient({
-                    output: './ios/MyApp/Generated/APIClient.swift',
-                    namespace: 'API',
-                }),
-            ],
-        },
-        workspace: {
-            contract: workspaceContract,
-        },
-    },
-});
+clients: [
+    fetchClient({
+        output: './packages/api-client/src/generated.ts',
+    }),
+    openApiDocument({
+        output: './openapi.yaml',
+    }),
+],
 ```
 
-Each API keeps its own contract and its own generated clients, and never sees another's routes.
+Your config carries the handlers, so it stays on the server. A browser imports the generated client, which holds the route shapes and the schemas and nothing a handler reached for.
+
+## Client options
+
+| Option                | Applies to    | Description                                                               |
+| --------------------- | ------------- | ------------------------------------------------------------------------- |
+| `output`              | all           | Path the generated file is written to                                     |
+| `namespace`           | Swift, Kotlin | Name of the generated namespace, `API` by default                         |
+| `package`             | Kotlin        | Package the generated file declares                                       |
+| `camelCaseProperties` | Swift, Kotlin | Convert wire field names to camelCase, mapping the wire name back         |
+| `unknownEnumCase`     | Swift, Kotlin | Give every enum an `unknown` case, so an unrecognised value still decodes |
+
+`openApiDocument` takes the same overrides [`generateOpenApi`](/docs/reference/generate-openapi) does, and picks its format from the output extension: `.json` renders JSON, anything else renders YAML.
 
 ## Two clients of one language
 
@@ -80,22 +93,39 @@ clients: [
 ],
 ```
 
-## Client options
+## More than one API
 
-| Option                | Applies to    | Description                                                               |
-| --------------------- | ------------- | ------------------------------------------------------------------------- |
-| `output`              | all           | Path the generated file is written to                                     |
-| `namespace`           | Swift, Kotlin | Name of the generated namespace, `API` by default                         |
-| `package`             | Kotlin        | Package the generated file declares                                       |
-| `camelCaseProperties` | Swift, Kotlin | Convert wire field names to camelCase, mapping the wire name back         |
-| `unknownEnumCase`     | Swift, Kotlin | Give every enum an `unknown` case, so an unrecognised value still decodes |
+A repository serving several APIs writes a config file for each, and each keeps its own routes and its own generated clients:
 
-`openApiDocument` takes the same overrides `generateOpenApi` does, and picks its format from the output extension: `.json` renders JSON, anything else renders YAML.
+```
+my-repo/
+├── kizuna.config.ts
+└── kizuna.workspace.config.ts
+```
 
-The file goes at the root, beside `package.json`, and has to be in the TypeScript program that compiles the code reading it.
+Point a generator at the one you mean with its `--config` flag, suffixing an export when the file holds more than the default:
+
+```sh title="Terminal"
+ts-kizuna-swift generate --config kizuna.workspace.config.ts --output ... --namespace-name WorkspaceAPI
+```
+
+## Keeping generated clients honest
+
+A generated client that has fallen behind is a compile error waiting to happen in whatever imports it. `checkClients` from `@ts-kizuna/cli` reports every target that no longer matches, without writing anything, which is what a pipeline runs:
+
+```ts title="scripts/check-clients.ts"
+import { checkClients } from '@ts-kizuna/cli';
+import kizuna from '../kizuna.config';
+
+const stale = checkClients(kizuna.api, kizuna.clients);
+if (stale.length > 0) process.exit(1);
+```
+
+`writeClients` from the same package writes them, leaving a file alone when it already matches so watchers see no change. See [Breaking changes](/docs/breaking-changes) for the CI shape, and [Watching](/docs/watching) for regenerating as you edit.
 
 ## Reference
 
-- [`k.contract`](/docs/reference/k-contract)
+- [`defineConfig`](/docs/reference/define-config)
+- [Fetch client](/docs/clients/fetch)
 - [Swift client](/docs/clients/swift)
 - [Kotlin client](/docs/clients/kotlin)

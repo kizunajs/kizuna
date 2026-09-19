@@ -59,8 +59,8 @@ export type RouteHandler<R extends RouteDefinition> = CoreRouteHandler<R, Expres
 
 /**
  * The handler tree for a contract or route group, typed against it. Routes
- * secured by the contract's access control map additionally receive each required
- * identity's context in their handler args, under `auth`, keyed by the identity's name.
+ * whose `auth` names an identity additionally receive that identity's context
+ * in their handler args, under `auth`, keyed by the identity's name.
  */
 export type Router<C> = ContractRouter<C, ExpressHandlerContext>;
 

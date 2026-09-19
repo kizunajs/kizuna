@@ -8,7 +8,7 @@ import type { ContractPlugins } from './plugin.js';
 
 /**
  * A kizuna API definition: its routes plus tags, identities, and validation
- * settings. Produced by `k.contract` and consumed by the server adapters,
+ * settings. Produced by `defineConfig` and consumed by the server adapters,
  * fetch client, OpenAPI generator, and SDK generators.
  */
 export interface Contract<
@@ -26,13 +26,13 @@ export interface Contract<
      */
     routes: Routes_;
     /**
-     * The body every guard's `deny()` produces, passed to `new Kizuna()` under
+     * The body every guard's `deny()` produces, named in `defineConfig` under
      * `guardSchema`. Each guarded route's `401` and `403` carry it in place of
      * bare Problem Details.
      */
     guardSchema?: GuardSchema;
     /**
-     * The plugins installed on `k.contract`. Their routes are served by
+     * The plugins installed on `defineConfig`. Their routes are served by
      * `api.mount` but stay outside `routes`, so the client and the generators
      * do not see them.
      */
@@ -42,23 +42,23 @@ export interface Contract<
      */
     jobs?: Jobs_;
     /**
-     * The job settings passed to `new Kizuna()` under `jobs`.
+     * The job settings named in `defineConfig` under `jobsConfig`.
      */
     jobsConfig?: JobsConfig;
     /**
-     * The tag set declared with `Kizuna.tags`. Routes reference its keys; the
+     * The tag set declared with `k.tags`. Routes reference its keys; the
      * OpenAPI generator resolves each key to its title and description.
      */
     tags?: TagSet<Tags>;
     /**
-     * The identities passed to `new Kizuna()`. A route's `auth` names them,
-     * `k.contract` writes each route's `security` from it, and the
+     * The identities named in `defineConfig`. A route's `auth` names them,
+     * `defineConfig` writes each route's `security` from it, and the
      * OpenAPI generator emits them under `components.securitySchemes`.
      */
     securitySchemes?: Schemes;
     /**
-     * The request context schemas passed to `new Kizuna()`. Each key names a
-     * provider registered on `server.api`; every handler receives its value.
+     * The request context schemas named in `defineConfig`. Each key names a
+     * provider registered on `defineConfig`; every handler receives its value.
      * Never gates a request and never appears in the OpenAPI document.
      */
     requestContext?: RequestContext;
@@ -75,7 +75,7 @@ export interface Contract<
 
 /**
  * Internal helper that builds a {@link Contract} from routes, tags, identities,
- * and issue codes. Called by `k.contract`. Not part of the public surface;
+ * and issue codes. Called by `defineConfig`. Not part of the public surface;
  * author contracts through `k`.
  */
 export function assembleContract<

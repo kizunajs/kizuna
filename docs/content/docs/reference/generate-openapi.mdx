@@ -1,14 +1,14 @@
 ---
 title: generateOpenApi
-description: Generate an OpenAPI 3.1.0 document from a ts-kizuna contract.
+description: Generate an OpenAPI 3.1.0 document from a ts-kizuna api.
 ---
 
-Generate an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from a contract. Returns a renderer you call with `'json'` or `'yaml'`.
+Generate an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from your api. Returns a renderer you call with `'json'` or `'yaml'`.
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
 ```ts
-import { generateOpenApi } from '@ts-kizuna/openapi/server';
+import { generateOpenApi } from '@ts-kizuna/openapi';
 ```
 
 ## Parameters
@@ -17,16 +17,16 @@ import { generateOpenApi } from '@ts-kizuna/openapi/server';
 generateOpenApi(contract: Contract, overrides?: Partial<GenerateOpenApiOptions>): OpenApiRenderer
 ```
 
-| Parameter   | Type                              | Description                                                     |
-| ----------- | --------------------------------- | --------------------------------------------------------------- |
-| `contract`  | `Contract`                        | The contract from [`k.contract`](/docs/reference/k-contract)    |
-| `overrides` | `Partial<GenerateOpenApiOptions>` | Merged over the contract's options, for what only a build knows |
+| Parameter   | Type                              | Description                                                    |
+| ----------- | --------------------------------- | -------------------------------------------------------------- |
+| `contract`  | `Contract`                        | The `api` from [`defineConfig`](/docs/reference/define-config) |
+| `overrides` | `Partial<GenerateOpenApiOptions>` | Merged over the plugin's options, for what only a build knows  |
 
-It lives on `@ts-kizuna/openapi/server`, beside the plugin server. The contract-facing entry, `@ts-kizuna/openapi`, holds [`openApiPlugin`](/docs/reference/openapi-plugin) and the document types.
+It lives on `@ts-kizuna/openapi`, beside [`openApiPlugin`](/docs/reference/openapi-plugin) and the document types.
 
 ## Options
 
-Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin), and `generateOpenApi` reads them off the contract, so a build step cannot write a document that differs from the one your server serves. Pass `overrides` for what only a build step knows, such as the public `servers` list.
+Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin), and `generateOpenApi` reads them off the api, so a build step cannot write a document that differs from the one your server serves. Pass `overrides` for what only a build step knows, such as the public `servers` list.
 
 | Option            | Type                                  | Default   | Description                                                                             |
 | ----------------- | ------------------------------------- | --------- | --------------------------------------------------------------------------------------- |
@@ -38,7 +38,7 @@ Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin), and `
 | `operationMapper` | `(operation, route, id) => operation` | none      | Callback to transform each operation before it is added to the spec                     |
 | `derivedHead`     | `boolean`                             | `false`   | Document the derived `head` operation on every `GET` path without a declared one        |
 
-There are no security or tag options. Security is emitted from the [access control map](#security-emission) and the document's tag list from [`Kizuna.tags`](/docs/reference/kizuna-tags), so neither can disagree with the contract.
+There are no security or tag options. Security is emitted from [each route's `auth`](#security-emission) and the document's tag list from [`k.tags`](/docs/reference/k-tags), so neither can disagree with what the server enforces.
 
 ## Returns
 
@@ -51,14 +51,16 @@ renderer('yaml'); // YAML string
 
 ## Example
 
-```ts title="contract.ts"
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
 import { openApiPlugin } from '@ts-kizuna/openapi';
-import { k } from './k';
+import { routes } from './src/routes';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
     routes,
-    plugins: {
-        openApi: openApiPlugin({
+    plugins: [
+        openApiPlugin({
             info: {
                 title: 'My API',
                 version: '1.0.0',
@@ -71,15 +73,15 @@ export const contract = k.contract({
             ],
             setOperationId: true,
         }),
-    },
+    ],
 });
 ```
 
-```ts title="generate-openapi.ts"
-import { generateOpenApi } from '@ts-kizuna/openapi/server';
-import { contract } from './contract';
+```ts title="scripts/generate-openapi.ts"
+import { generateOpenApi } from '@ts-kizuna/openapi';
+import kizuna from '../kizuna.config';
 
-const spec = generateOpenApi(contract);
+const spec = generateOpenApi(kizuna.api);
 
 app.get('/openapi.json', (_req, res) => {
     res.json(spec('json'));
@@ -88,9 +90,9 @@ app.get('/openapi.json', (_req, res) => {
 
 ## Security emission
 
-Security is generated from the contract, not configured on the generator. Every [identity](/docs/reference/kizuna-identity) registered on [`new Kizuna()`](/docs/reference/kizuna) is emitted under `components.securitySchemes`, and every route with an [`auth`](/docs/reference/k-route) references those names in its `security`, with the permissions an OAuth route requires as its scopes. Public routes (`false`) get none.
+Security is generated from what you declared, not configured on the generator. Every [identity](/docs/reference/k-identity) named under `identities` on [`defineConfig`](/docs/reference/define-config) is emitted under `components.securitySchemes`, and every route with an [`auth`](/docs/reference/k-route) references those names in its `security`, with the permissions an OAuth route requires as its scopes. Public routes (`false`) get none.
 
-With the `user` (bearer) and `member` (API key) identities and `workspace: 'member'` in the access control map, the document contains:
+With the `user` (bearer) and `member` (API key) identities, and a workspace route declaring `auth: 'member'`, the document contains:
 
 ```yaml title="openapi.yaml"
 components:
@@ -109,10 +111,10 @@ paths:
                 - member: []
 ```
 
-A [`custom`](/docs/reference/kizuna-identity#custom-identities) identity is the exception: OpenAPI can't describe its credential, so it emits no `securityScheme` and no `security`. Its routes instead carry an `x-kizuna-guarded` extension, keeping a protected-out-of-band route distinct from a public one.
+A [`custom`](/docs/reference/k-identity#custom-identities) identity is the exception: OpenAPI can't describe its credential, so it emits no `securityScheme` and no `security`. Its routes instead carry an `x-kizuna-guarded` extension, keeping a protected-out-of-band route distinct from a public one.
 
 A route with `roles` carries them under `x-kizuna-roles`, `['owner']`, and one with `requires` carries the permissions under `x-kizuna-requires`, `{ workspace: ['delete'] }`, so a reader of the document sees who the caller has to be.
 
-The spec and the runtime [guards](/docs/reference/server-guard) both derive from the access control map, so documented security is enforced security.
+The spec and the runtime [guards](/docs/reference/k-identity) both derive from the same `auth`, so documented security is enforced security.
 
 See the [OpenAPI guide](/docs/openapi) for Scalar integration, writing specs to disk, and breaking change detection.

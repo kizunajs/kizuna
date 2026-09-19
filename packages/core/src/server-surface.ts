@@ -11,10 +11,9 @@ import type { GuardReturn, GuardSuccess, HandlersFromRoutes, RequestContextValue
 import { type GuardDeny, type GuardDenial, type GuardRun } from './adapter.js';
 
 /**
- * The handler tree for a contract or route group, typed against it. Routes
- * secured by the contract's access control map additionally receive each required
- * identity's context in their handler args, under `auth`, keyed by the
- * identity's name.
+ * The handler tree for a contract or route group, typed against it. A route
+ * whose `auth` names an identity additionally receives that identity's context
+ * in its handler args, under `auth`, keyed by the identity's name.
  */
 export type ContractRouter<C, HandlerContext> = C extends Contract
     ? HandlersFromRoutes<

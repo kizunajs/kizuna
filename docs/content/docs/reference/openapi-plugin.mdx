@@ -3,20 +3,18 @@ title: openApiPlugin
 description: Serve your OpenAPI document and an API reference UI for it, on any adapter.
 ---
 
-Serve a reference UI for the OpenAPI document generated from your contract, and the document itself if you want it public. Declare it on [`k.contract`](/docs/reference/k-contract), pass `openApiPluginServer()` to [`server.api`](/docs/reference/server-api), and `api.mount` serves the routes. See the [OpenAPI guide](/docs/openapi).
+Serve a reference UI for the OpenAPI document generated from your API, and the document itself if you want it public. Name it under `plugins` on [`defineConfig`](/docs/reference/define-config) and `api.mount` serves its routes. See the [OpenAPI guide](/docs/openapi).
 
 <InstallTabs packageName="@ts-kizuna/openapi" />
 
 ```ts
 import { openApiPlugin } from '@ts-kizuna/openapi';
-import { openApiPluginServer } from '@ts-kizuna/openapi/server';
 ```
 
 ## Parameters
 
 ```ts
 openApiPlugin(props: OpenApiPluginProps): PluginDeclaration
-openApiPluginServer(): PluginImplementation
 ```
 
 | Parameter | Type                 | Required | Description                                                                                    |
@@ -27,17 +25,16 @@ openApiPluginServer(): PluginImplementation
 
 `OpenApiPluginProps` extends `GenerateOpenApiOptions`, so `info`, `servers`, `setOperationId` and the rest work exactly as they do on `generateOpenApi`. On top of those:
 
-| Option          | Default            | Description                                             |
-| --------------- | ------------------ | ------------------------------------------------------- |
-| `docsPath`      | off                | The reference UI. Give it a path to serve it            |
-| `jsonPath`      | off                | The document. A path ending in `.json`                  |
-| `yamlPath`      | off                | The document as YAML. A path ending in `.yaml`          |
-| `provider`      | `'scalar'`         | Which reference UI to render, `'scalar'` or `'swagger'` |
-| `cdnUrl`        | the provider's CDN | Where to load the UI's assets from                      |
-| `pageTitle`     | the document title | The page's `<title>`                                    |
-| `configuration` | none               | Extra config merged into the UI's initializer           |
-
-Props are pure data. `openApiPluginServer()` takes nothing: declaring the plugin is where it is configured.
+| Option          | Default            | Description                                                       |
+| --------------- | ------------------ | ----------------------------------------------------------------- |
+| `slug`          | `'openApi'`        | What handlers reach this plugin under, and the key it installs at |
+| `docsPath`      | off                | The reference UI. Give it a path to serve it                      |
+| `jsonPath`      | off                | The document. A path ending in `.json`                            |
+| `yamlPath`      | off                | The document as YAML. A path ending in `.yaml`                    |
+| `provider`      | `'scalar'`         | Which reference UI to render, `'scalar'` or `'swagger'`           |
+| `cdnUrl`        | the provider's CDN | Where to load the UI's assets from                                |
+| `pageTitle`     | the document title | The page's `<title>`                                              |
+| `configuration` | none               | Extra config merged into the UI's initializer                     |
 
 They are also the options [`generateOpenApi`](/docs/reference/generate-openapi) uses when you call it without any, so a build step and the served document cannot disagree.
 
@@ -45,14 +42,17 @@ Each path prop is off until you give it a path. The document paths carry their e
 
 ## Example
 
-```ts title="contract.ts"
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
 import { openApiPlugin } from '@ts-kizuna/openapi';
-import { k } from './k';
+import { routes } from './src/routes';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
     routes,
-    plugins: {
-        openApi: openApiPlugin({
+    plugins: [
+        openApiPlugin({
             info: {
                 title: 'My API',
                 version: '1.0.0',
@@ -60,30 +60,43 @@ export const contract = k.contract({
             docsPath: '/docs',
             setOperationId: true,
         }),
-    },
-});
-```
-
-```ts title="api.ts"
-import { openApiPluginServer } from '@ts-kizuna/openapi/server';
-
-export const api = server.api({
-    router,
-    plugins: {
-        openApi: openApiPluginServer(),
-    },
+    ],
 });
 ```
 
 ```ts title="src/index.ts"
-api.mount(app);
+import kizuna from '../kizuna.config';
+
+kizuna.api.mount(app);
 ```
 
-Miss `openApiPluginServer()` and `server.api` throws, naming the module to import.
+## Two documents
+
+`slug` is what a plugin installs at, so a second document gets its own:
+
+```ts title="kizuna.config.ts"
+plugins: [
+    openApiPlugin({
+        info: {
+            title: 'My API',
+            version: '1.0.0',
+        },
+        docsPath: '/docs',
+    }),
+    openApiPlugin({
+        slug: 'internalDocs',
+        info: {
+            title: 'My API, internal',
+            version: '1.0.0',
+        },
+        docsPath: '/internal/docs',
+    }),
+],
+```
 
 ## Plugin routes
 
-These are [plugin routes](/docs/plugins#plugin-routes): they live outside `contract.routes`, so your fetch client, the generated Swift and Kotlin clients, and the document itself never list them.
+These are [plugin routes](/docs/plugins#plugin-routes): they live outside `api.routes`, so your fetch client, the generated Swift and Kotlin clients, and the document itself never list them.
 
 ## Public by default
 

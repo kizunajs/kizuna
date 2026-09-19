@@ -61,11 +61,11 @@ export interface OpenApiOperation {
      */
     'x-kizuna-guarded'?: string[];
     /**
-     * The roles the route accepts, from the access control map's `roles`.
+     * The roles the route accepts, from the route's `auth.roles`.
      */
     'x-kizuna-roles'?: string[];
     /**
-     * The permissions the caller has to hold, from the access control map's `requires`.
+     * The permissions the caller has to hold, from the route's `auth.requires`.
      */
     'x-kizuna-requires'?: Record<string, string[]>;
     externalDocs?: OpenApiExternalDocs;

@@ -5,154 +5,145 @@ description: Write a plugin once and it runs on every adapter, because it never 
 
 <AlphaNotice>
 
-The plugin API is new and still settling. `createPlugin`, `implementPlugin`, and the shape of what each half returns may change before v2, so pin your version if you depend on them.
+The plugin API is new and still settling. `createPlugin` and the shape of what it returns may change before v2, so pin your version if you depend on them.
 
 </AlphaNotice>
 
-A plugin declares routes and hands back handlers. The adapter mounts them exactly as it mounts yours, so a plugin imports no framework.
+A plugin declares routes and hands back the handlers that answer them. The adapter mounts them exactly as it mounts yours, so a plugin imports no framework and works on all four.
 
-A plugin ships as two modules:
+A plugin is one module. It is named on `kizuna.config.ts`, which stays on the server, so it may import anything your handlers may: Node built-ins, a database driver, a heavy SDK.
 
-| half            | module                    | imported by                | may import                 |
-| --------------- | ------------------------- | -------------------------- | -------------------------- |
-| the declaration | your package's main entry | the contract, so everybody | whatever a browser bundles |
-| the server      | `your-package/server`     | the server app only        | anything                   |
+## `createPlugin`
 
-A plugin is declared on `k.contract`, so whatever its declaration module imports lands in the contract's import graph, browser bundles included. Keep `node:fs`, a database driver, or a heavy SDK in the server half.
-
-## The declaration
-
-```ts title="@ts-kizuna/audit/src/index.ts"
-import { createPlugin } from '@ts-kizuna/core/plugin';
+```ts title="@ts-kizuna/audit/src/plugin.ts"
 import { z } from 'zod';
-import type { AuditExports } from './server.js';
+import { createPlugin, type RoutePath, type WithSlug } from '@ts-kizuna/core/plugin';
 
-export interface AuditPluginProps {
-    path?: `/${string}`;
+export interface AuditPluginProps<Slug extends string = 'audit'> {
+    /**
+     * What handlers reach this plugin under. Give a second one its own.
+     */
+    slug?: Slug;
+    path?: RoutePath;
+    store: AuditStore;
 }
 
-export const auditPlugin = (props: AuditPluginProps = {}) =>
-    createPlugin<AuditExports>()({
-        name: 'audit',
-        serverModule: '@ts-kizuna/audit/server',
-
+const declare = (slug: string, props: AuditPluginProps<string>) =>
+    createPlugin({
+        slug,
         routes: {
             recent: {
                 method: 'GET',
                 path: props.path ?? '/audit/recent',
+                summary: 'The most recent audit entries',
                 responses: {
                     200: z.array(EntrySchema),
                 },
             },
         },
-
         props,
+        serve: ({ store }) => ({
+            router: {
+                recent: async () => ({
+                    status: 200,
+                    body: await store.recent(),
+                }),
+            },
+            exports: {
+                record: (routeKey: string) => store.write(routeKey),
+            },
+        }),
     });
-```
 
-| key            | what it is                                                          |
-| -------------- | ------------------------------------------------------------------- |
-| `name`         | the plugin's own name, whatever key an app installs it under        |
-| `serverModule` | where the other half lives, named in the error if an app forgets it |
-| `routes`       | the routes it serves, in the contract, so pure data                 |
-| `props`        | how the caller configured it, in the contract, so pure data         |
-
-`import type` is erased, so the declaration can name types the server half owns without importing its code. `createPlugin<AuditExports>()` types what handlers get, which is what the extra `()` is for. A plugin that exports nothing to handlers writes `createPlugin({ ... })`.
-
-## The server
-
-```ts title="@ts-kizuna/audit/src/server.ts"
-import { implementPlugin } from '@ts-kizuna/core/adapter';
-import { auditPlugin } from './index.js';
-
-export interface AuditExports {
-    record: (routeKey: string) => void;
-}
-
-export const auditPluginServer = (config: { store: AuditStore }) =>
-    implementPlugin(auditPlugin, ({ props }) => ({
-        router: {
-            recent: async () => ({
-                status: 200 as const,
-                body: await config.store.recent(props.path),
-            }),
-        },
-        exports: {
-            record: (routeKey: string) => config.store.write(routeKey),
-        },
-    }));
-```
-
-| key       | what it is                                               |
-| --------- | -------------------------------------------------------- |
-| `router`  | handlers for the plugin's own routes, typed against them |
-| `exports` | what every handler reaches at `plugins.<name>`           |
-
-`implementPlugin` reads its first argument for the type only, never calling it: that types `router` against the declared routes and `exports` against what the declaration promised.
-
-`props` arrives from the contract; anything live is your factory's own argument, which is why `auditPluginServer` takes `store`.
-
-The callback also receives `api`, for plugins that read the contract's routes. MCP builds its tool list from it.
-
-## What the app writes
-
-```ts title="contract.ts"
-plugins: {
-    audit: auditPlugin({
-        path: '/internal/audit',
-    }),
+export function auditPlugin<const Slug extends string = 'audit'>(
+    props: AuditPluginProps<Slug>
+): WithSlug<ReturnType<typeof declare>, Slug> {
+    return declare(props.slug ?? 'audit', props as AuditPluginProps<string>) as never;
 }
 ```
 
-A plugin whose props name routes takes them from the `plugins` function instead, and `k.contract` types them:
+| key      | what it is                                                                        |
+| -------- | --------------------------------------------------------------------------------- |
+| `slug`   | the key it installs at, and what handlers reach it under                          |
+| `routes` | the routes it serves                                                              |
+| `props`  | how the caller configured it, handed back to `serve` so the app never restates it |
+| `serve`  | what answers those routes, and what it hands handlers                             |
 
-```ts title="contract.ts"
-plugins: ({ routes }) => ({
-    audit: auditPlugin(routes, {
-        skip: {
-            health: true,
-        },
+`serve` returns two things:
+
+| key       | what it is                                         |
+| --------- | -------------------------------------------------- |
+| `router`  | one handler per declared route, typed against them |
+| `exports` | what every handler reaches at `plugins.<slug>`     |
+
+A plugin that adds routes and nothing else returns `router` alone.
+
+## The slug wrapper
+
+`createPlugin` takes a concrete slug, so the factory around it is what lets an app rename the plugin or install two of them. `WithSlug` carries the caller's literal slug through to the declaration, which is what types `plugins.internalAudit` on the handler side.
+
+Default it to your plugin's own name and most apps never pass one:
+
+```ts title="kizuna.config.ts"
+plugins: [
+    auditPlugin({
+        store,
     }),
+    auditPlugin({
+        slug: 'securityAudit',
+        path: '/internal/security-audit',
+        store: securityStore,
+    }),
+],
+```
+
+## Reading the api
+
+`serve` receives the assembled api as its second argument, so a plugin can read every route, tag, identity and schema the app declared:
+
+```ts
+serve: (props, api) => ({
+    router: {
+        endpoint: async () => ({
+            status: 200,
+            body: summarize(api.routes),
+        }),
+    },
 }),
 ```
 
-```ts title="api.ts"
-export const api = server.api({
-    router,
-    plugins: {
-        audit: auditPluginServer({ store }),
-    },
-});
-```
-
-Use the same key both times. Leave the second one out and `server.api` throws, naming your `serverModule`. See [Plugins](/docs/plugins) for the caller's side.
+That is how [`mcpPlugin`](/docs/reference/mcp-plugin) finds the routes declaring `tool`, and how [`openApiPlugin`](/docs/reference/openapi-plugin) builds a document without being handed one.
 
 ## Answering with something that is not JSON
 
 A plugin route can return `rawResponse` when its wire format is not a JSON body, which is how MCP serves JSON-RPC over server-sent events:
 
-```ts title="plugin.ts"
+```ts
 import { rawResponse } from '@ts-kizuna/core/adapter';
 
-endpoint: async ({ body, headers }) => rawResponse(await transport.handleRequest(request)),
+endpoint: async ({ body, headers }) => rawResponse(await transport.handleRequest(body, headers)),
 ```
 
 Kizuna skips validation and rendering, and each adapter writes the response out in its own terms. Ordinary route handlers cannot reach `rawResponse`.
 
 ## Packaging
 
-Two export subpaths, one per half:
+One entry, and its own `package.json` says how far it reaches:
 
 ```json title="package.json"
 {
     "exports": {
-        ".": "./dist/index.mjs",
-        "./server": "./dist/server.mjs"
+        ".": "./dist/index.mjs"
+    },
+    "kizuna": {
+        "entries": {
+            ".": "server"
+        }
     }
 }
 ```
 
-Bundle the main entry for a browser target in CI to catch a server-only import crossing into the declaration half. Kizuna does that for core and every first-party plugin.
+`kizuna.entries` is what the repo's own boundary test reads. A `client` entry is bundled for a browser target and fails on any Node built-in; a plugin is `server`, because it is named on a config that never reaches a browser.
 
 ## Reference
 

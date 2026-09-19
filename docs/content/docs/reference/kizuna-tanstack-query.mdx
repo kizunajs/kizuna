@@ -25,7 +25,7 @@ new KizunaTanstackQuery(contract: Contract, client: Client): KizunaQueryProxy
 
 | Parameter  | Type       | Description                                                                                   |
 | ---------- | ---------- | --------------------------------------------------------------------------------------------- |
-| `contract` | `Contract` | The contract from [`k.contract`](/docs/reference/k-contract)                                  |
+| `contract` | `Contract` | The contract from [`defineConfig`](/docs/reference/define-config)                             |
 | `client`   | `Client`   | A client from [`new KizunaClient()`](/docs/reference/kizuna-client), built from that contract |
 
 The contract is needed as well as the client: each route's `method` decides which factories it gets, and its `responses` decide which statuses are data.
@@ -93,9 +93,9 @@ Declared statuses come back as data. Anything else throws [`UndeclaredResponseEr
 import { useQuery } from '@tanstack/react-query';
 import { KizunaClient } from '@ts-kizuna/fetch';
 import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
-import { contract } from '@/contract';
+import kizuna from '../kizuna.config';
 
-const apiClient = new KizunaClient(contract, {
+const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
 });
 

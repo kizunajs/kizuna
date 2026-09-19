@@ -11,23 +11,25 @@ Caching is new and still settling, so `cache` and `etag` may change before v2. A
 
 Declare a cache policy on the response it describes, and every adapter sends it:
 
-```ts title="contract/index.ts"
-export const usersRoutes = k.routes('users', {
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: {
-                body: UserSchema,
-                cache: {
-                    scope: 'private',
-                    maxAge: 300,
-                    vary: ['authorization'],
+```ts title="src/routes/users.ts"
+export const users = k.routes('users', {
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: {
+                    body: UserSchema,
+                    cache: {
+                        scope: 'private',
+                        maxAge: 300,
+                        vary: ['authorization'],
+                    },
                 },
+                404: ProblemDetailsSchema,
             },
-            404: ProblemDetailsSchema,
-        },
-    },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -171,11 +173,11 @@ Reach for this when a hot path is spending real work on misses, not as a habit.
 | `immutable`            | `true`                  | `immutable`              |
 | `vary`                 | `string[]`              | the `Vary` header        |
 
-`scope: 'private'` is the caller's own browser, `'public'` is every cache in between, including CDNs and corporate proxies. `k.contract` throws when a route behind `security` declares `'public'`, since that lets a shared cache hand Alice's response to Bob. It also rejects a policy that declares nothing, a number of seconds that is not a whole number of zero or more, and an empty `vary`.
+`scope: 'private'` is the caller's own browser, `'public'` is every cache in between, including CDNs and corporate proxies. `defineConfig` throws when a route behind `security` declares `'public'`, since that lets a shared cache hand Alice's response to Bob. It also rejects a policy that declares nothing, a number of seconds that is not a whole number of zero or more, and an empty `vary`.
 
 `'no-store'` replaces the object rather than sitting inside it, because it rules out every other directive.
 
-`k.contract` also rejects the combinations that cannot mean anything. `noCache` alongside a `maxAge`, since RFC 9111 lets `no-cache` override the lifetime and it never applies. `immutable` with no lifetime, since RFC 8246 applies it only while a response is fresh. `staleWhileRevalidate` or `staleIfError` with no lifetime, since there is nothing to go stale.
+`defineConfig` also rejects the combinations that cannot mean anything. `noCache` alongside a `maxAge`, since RFC 9111 lets `no-cache` override the lifetime and it never applies. `immutable` with no lifetime, since RFC 8246 applies it only while a response is fresh. `staleWhileRevalidate` or `staleIfError` with no lifetime, since there is nothing to go stale.
 
 The declaration is the only place a policy comes from. A `cache-control` header returned by a handler does not overrule it, so what the OpenAPI document publishes is what callers receive.
 

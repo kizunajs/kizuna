@@ -34,21 +34,21 @@ kizuna.api.mount(app);
 
 ## What it takes
 
-| Field | What it is |
-| --- | --- |
-| `adapter` | The framework this API is served on, as a call: `expressAdapter()`. Its request reaches every handler, typed. |
-| `routes` | The route groups [`k.routes`](/docs/reference/k-routes) returned. Each route carries its own handler. |
-| `identities` | The identities a route's `auth` names, each declared with [`k.identity`](/docs/reference/k-identity) and carrying its own guard. |
-| `requestContext` | What every route resolves before its guards run, declared with [`k.requestContext`](/docs/reference/k-request-context). |
-| `jobs` | Scheduled work, declared with [`k.jobs`](/docs/reference/k-jobs). |
-| `plugins` | What this API installs beside its own routes, as a list. |
-| `tags` | The OpenAPI tags routes are grouped under, from [`k.tags`](/docs/reference/k-tags). |
-| `guardSchema` | The body every guard's `deny()` produces. |
-| `issueCodes` | The `code` values [`k.issue`](/docs/reference/k-issue) may emit, beyond Zod's own. |
-| `clients` | What `kizuna generate` writes from this API. |
-| `jobsConfig` | Settings shared by every job, such as the path its endpoints are served from. |
-| `jobTransport` | Carries a queued job to whatever runs it. |
-| `onJobError` | Reached when a job fails after its response was sent. |
+| Field            | What it is                                                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `adapter`        | The framework this API is served on, as a call: `expressAdapter()`. Its request reaches every handler, typed.                    |
+| `routes`         | The route groups [`k.routes`](/docs/reference/k-routes) returned. Each route carries its own handler.                            |
+| `identities`     | The identities a route's `auth` names, each declared with [`k.identity`](/docs/reference/k-identity) and carrying its own guard. |
+| `requestContext` | What every route resolves before its guards run, declared with [`k.requestContext`](/docs/reference/k-request-context).          |
+| `jobs`           | Scheduled work, declared with [`k.jobs`](/docs/reference/k-jobs).                                                                |
+| `plugins`        | What this API installs beside its own routes, as a list.                                                                         |
+| `tags`           | The OpenAPI tags routes are grouped under, from [`k.tags`](/docs/reference/k-tags).                                              |
+| `guardSchema`    | The body every guard's `deny()` produces.                                                                                        |
+| `issueCodes`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit, beyond Zod's own.                                               |
+| `clients`        | What `kizuna generate` writes from this API.                                                                                     |
+| `jobsConfig`     | Settings shared by every job, such as the path its endpoints are served from.                                                    |
+| `jobTransport`   | Carries a queued job to whatever runs it.                                                                                        |
+| `onJobError`     | Reached when a job fails after its response was sent.                                                                            |
 
 ## What it hands back
 

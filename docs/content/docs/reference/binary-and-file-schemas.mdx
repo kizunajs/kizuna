@@ -27,22 +27,24 @@ import { BinarySchema } from '@ts-kizuna/core/schemas';
 import { k } from './k';
 
 export const reportsRoutes = k.routes('reports', {
-    downloadReport: {
-        method: 'GET',
-        path: '/reports/:id.pdf',
-        responses: {
-            200: {
-                body: BinarySchema,
-                contentType: 'application/pdf',
+    downloadReport: k
+        .route({
+            method: 'GET',
+            path: '/reports/:id.pdf',
+            responses: {
+                200: {
+                    body: BinarySchema,
+                    contentType: 'application/pdf',
+                },
             },
-        },
-    },
+        })
+        .handler(/* ... */),
 });
 ```
 
 The handler returns the bytes, as a `Buffer` or `Uint8Array`. Set `Content-Disposition` as a normal response header if you want a download:
 
-```ts title="router/reports.ts"
+```ts title="src/routes/reports.ts"
 downloadReport: async ({ params }) => {
     const pdf = await renderReport(params.id);
     return {

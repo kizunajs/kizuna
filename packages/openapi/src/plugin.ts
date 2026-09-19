@@ -62,16 +62,15 @@ export interface OpenApiPluginProps<Slug extends string = typeof OPENAPI_PLUGIN_
 }
 
 /**
- * Serve an API reference UI for the contract's OpenAPI document, and the
- * document itself if you publish it.
- *
+ * Serve an API reference UI for the OpenAPI document, and the document itself
+ * if you publish it.
  *
  * The routes are public. Gate them with your framework's own middleware if that
  * is not what you want.
  *
  * @example
  * ```ts
- * export const { api } = defineConfig({
+ * export default defineConfig({
  *     routes,
  *     plugins: [
  *         openApiPlugin({

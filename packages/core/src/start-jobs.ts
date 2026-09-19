@@ -54,7 +54,7 @@ export const startJobs = (api: unknown, options?: StartJobsOptions): JobSchedule
     const meta = (api as Record<symbol, unknown> | undefined)?.[JOBS_META] as JobsMeta | undefined;
     if (!meta) {
         throw new Error(
-            'startJobs was given an api with no jobs. Declare them with `k.jobs` and pass their handlers to `server.api({ jobs })`.'
+            'startJobs was given an api with no jobs. Declare them with `k.jobs` and name them under `jobs` in `defineConfig`.'
         );
     }
 

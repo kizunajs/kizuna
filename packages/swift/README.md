@@ -11,7 +11,7 @@ pnpm add -D @ts-kizuna/swift
 ## Usage
 
 ```sh
-ts-kizuna-swift generate --contract src/contract/index.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
+ts-kizuna-swift generate --config kizuna.config.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
 ```
 
 ## Documentation

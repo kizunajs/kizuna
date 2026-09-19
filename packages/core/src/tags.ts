@@ -17,7 +17,7 @@ export interface TagOptions {
 }
 
 /**
- * A set of OpenAPI tags created with `Kizuna.tags`. Passed to `new Kizuna()`,
+ * A set of OpenAPI tags created with `k.tags`. Named in `defineConfig` under `tags`,
  * where routes reference each tag by its key.
  */
 export interface TagSet<T extends Record<string, TagOptions> = Record<string, TagOptions>> {
@@ -59,7 +59,7 @@ export const createTags = <const T extends Record<string, TagOptions | string>>(
 };
 
 /**
- * Normalize a `Kizuna.tags` input, where each value is {@link TagOptions}
+ * Normalize a `k.tags` input, where each value is {@link TagOptions}
  * or a title string, into a uniform `Record<string, TagOptions>`.
  */
 export type NormalizeTags<T extends Record<string, TagOptions | string>> = {

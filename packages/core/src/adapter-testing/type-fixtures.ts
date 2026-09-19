@@ -1,6 +1,6 @@
 import { z } from 'zod';
-// Not `../kizuna.js`: an identity's credential is branded, so a contract built from `src` hands the adapters identities
-// their own `server.guard` cannot resolve.
+// Not `../kizuna.js`: an identity's credential is branded, so a config built from `src` hands the adapters identities
+// their own guards cannot resolve.
 import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';

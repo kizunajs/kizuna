@@ -7,7 +7,7 @@ description: Say who can call your API. An identity is a credential you accept, 
 
 <BetaNotice>
 
-Authentication is still settling. `Kizuna.identity` and `server.guard` may change before v2, so pin your version if you depend on them.
+Authentication is still settling. `k.identity` and an identity's `guard` may change before v2, so pin your version if you depend on them.
 
 </BetaNotice>
 
@@ -27,31 +27,29 @@ An identity and its guard go together:
 
 A token in the `Authorization` header.
 
-```ts title="identities.ts"
-export const user = Kizuna.identity.bearer({
-    context: z.object({
-        userId: z.string(),
-    }),
-});
-```
+```ts title="src/identities.ts"
+export const user = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    })
+    .guard(async ({ bearer, deny }) => {
+        const session = bearer ? await verifySession(bearer.token) : undefined;
 
-```ts title="guards.ts"
-export const requireUser = server.guard('user', async ({ bearer, deny }) => {
-    const session = bearer ? await verifySession(bearer.token) : undefined;
+        if (!session) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        }
 
-    if (!session) {
-        return deny({
-            status: 401,
-            body: {
-                detail: 'Unauthorized',
-            },
-        });
-    }
-
-    return {
-        userId: session.userId,
-    };
-});
+        return {
+            userId: session.userId,
+        };
+    });
 ```
 
 </Tab>
@@ -60,33 +58,31 @@ export const requireUser = server.guard('user', async ({ bearer, deny }) => {
 
 A value in a header, a query parameter or a cookie. A browser session is `in: 'cookie'`.
 
-```ts title="identities.ts"
-export const member = Kizuna.identity.apiKey({
-    name: 'x-workspace-token',
-    in: 'header',
-    context: z.object({
-        workspaceUserId: z.string(),
-    }),
-});
-```
+```ts title="src/identities.ts"
+export const member = k.identity
+    .apiKey({
+        name: 'x-workspace-token',
+        in: 'header',
+        context: z.object({
+            workspaceUserId: z.string(),
+        }),
+    })
+    .guard(async ({ apiKey, deny }) => {
+        const membership = apiKey ? await findMembership(apiKey.value) : undefined;
 
-```ts title="guards.ts"
-export const requireMember = server.guard('member', async ({ apiKey, deny }) => {
-    const membership = apiKey ? await findMembership(apiKey.value) : undefined;
+        if (!membership) {
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'Forbidden',
+                },
+            });
+        }
 
-    if (!membership) {
-        return deny({
-            status: 403,
-            body: {
-                detail: 'Forbidden',
-            },
-        });
-    }
-
-    return {
-        workspaceUserId: membership.userId,
-    };
-});
+        return {
+            workspaceUserId: membership.userId,
+        };
+    });
 ```
 
 <Callout type="warn" title="A cookie travels on its own">
@@ -100,31 +96,29 @@ export const requireMember = server.guard('member', async ({ apiKey, deny }) => 
 
 A username and password, decoded from the `Authorization` header.
 
-```ts title="identities.ts"
-export const operator = Kizuna.identity.basic({
-    context: z.object({
-        operatorId: z.string(),
-    }),
-});
-```
+```ts title="src/identities.ts"
+export const operator = k.identity
+    .basic({
+        context: z.object({
+            operatorId: z.string(),
+        }),
+    })
+    .guard(async ({ basic, deny }) => {
+        const operator = basic ? await verifyOperator(basic.username, basic.password) : undefined;
 
-```ts title="guards.ts"
-export const requireOperator = server.guard('operator', async ({ basic, deny }) => {
-    const operator = basic ? await verifyOperator(basic.username, basic.password) : undefined;
+        if (!operator) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        }
 
-    if (!operator) {
-        return deny({
-            status: 401,
-            body: {
-                detail: 'Unauthorized',
-            },
-        });
-    }
-
-    return {
-        operatorId: operator.id,
-    };
-});
+        return {
+            operatorId: operator.id,
+        };
+    });
 ```
 
 </Tab>
@@ -133,31 +127,32 @@ export const requireOperator = server.guard('operator', async ({ basic, deny }) 
 
 A credential no OpenAPI scheme describes, such as a token in a path segment. The guard reads it itself.
 
-```ts title="identities.ts"
-export const inviteToken = Kizuna.identity.custom({
-    context: z.object({
-        inviteId: z.string(),
-    }),
-});
-```
+```ts title="src/identities.ts"
+export const inviteToken = k.identity
+    .custom({
+        context: z.object({
+            inviteId: z.string(),
+        }),
+        params: z.object({
+            token: z.string(),
+        }),
+    })
+    .guard(async ({ params, deny }) => {
+        const invite = await findInvite(params.token);
 
-```ts title="guards.ts"
-export const requireInviteToken = server.guard('inviteToken', async ({ params, deny }) => {
-    const invite = params.token ? await findInvite(params.token) : undefined;
+        if (!invite) {
+            return deny({
+                status: 404,
+                body: {
+                    detail: 'Not found',
+                },
+            });
+        }
 
-    if (!invite) {
-        return deny({
-            status: 404,
-            body: {
-                detail: 'Not found',
-            },
-        });
-    }
-
-    return {
-        inviteId: invite.id,
-    };
-});
+        return {
+            inviteId: invite.id,
+        };
+    });
 ```
 
 </Tab>
@@ -172,26 +167,23 @@ An identity with no `context` only proves the caller is known. Its guard returns
 
 <Step>
 
-## Register both
+## Name it on your config
 
-The identity on `new Kizuna()`, the guard on `server.api`:
+The identity carries its own guard, so naming it is all there is:
 
-```ts title="k.ts"
-export const k = new Kizuna({
+```ts title="kizuna.config.ts"
+import { user } from './src/identities';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
     identities: {
         user,
     },
 });
 ```
 
-```ts title="api.ts"
-export const api = server.api({
-    router,
-    guards: {
-        user: requireUser,
-    },
-});
-```
+The key is the name everything else uses: a route's `auth`, and the handler's `auth.user`. An identity a route names has to carry a guard, or the config refuses to assemble.
 
 </Step>
 
@@ -201,22 +193,18 @@ export const api = server.api({
 
 Every route states its rule, so public is an explicit `false` and a forgotten route is a type error:
 
-```ts title="contract/routes/users.ts"
-export const usersRoutes = k.routes('users', {
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        auth: 'user',
-        responses: {
-            200: z.array(UserSchema),
-        },
-    },
-});
-```
-
-```ts title="contract/index.ts"
-export const contract = k.contract({
-    routes,
+```ts title="src/routes/users.ts"
+export const users = k.routes('users', {
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            auth: 'user',
+            responses: {
+                200: z.array(UserSchema),
+            },
+        })
+        .handler(/* ... */),
 });
 ```
 
@@ -230,18 +218,23 @@ The rest of what an `auth` can say is on [Access Control](/docs/access-control).
 
 Every guarded route hands its handler what the guard returned, typed, under `auth`:
 
-```ts title="router/users.ts"
-users: {
-    listUsers: async ({ auth }) => ({
+```ts title="src/routes/users.ts"
+listUsers: k
+    .route({
+        method: 'GET',
+        path: '/users',
+        auth: 'user',
+        responses: {
+            200: z.array(UserSchema),
+        },
+    })
+    .handler(async ({ auth }) => ({
         status: 200,
         body: {
             users: await findUsersExcept(auth.user.userId),
         },
-    }),
-},
+    })),
 ```
-
-A handler in its own file keeps the typed `auth` via [`RouteHandler`](/docs/reference/server-router)`<typeof contract.routes.users.listUsers>`.
 
 A guard returns the identity's `context`, field for field. Whether that caller may call the route is decided from it before the handler runs, in [Access Control](/docs/access-control). Which rows are theirs is the handler's question.
 
@@ -257,7 +250,7 @@ A guard returns the identity's `context`, field for field. Whether that caller m
 
 A refusal carries `detail` alone until `guardSchema` widens it:
 
-```ts title="k.ts"
+```ts title="kizuna.config.ts"
 export const GuardSchema = Kizuna.model({
     title: 'GuardDenial',
     schema: ProblemDetailsSchema.extend({
@@ -265,7 +258,9 @@ export const GuardSchema = Kizuna.model({
     }),
 });
 
-export const k = new Kizuna({
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
     identities: {
         user,
         member,
@@ -274,7 +269,7 @@ export const k = new Kizuna({
 });
 ```
 
-```ts title="guards.ts"
+```ts title="src/identities.ts"
 return deny({
     status: 401,
     body: {
@@ -284,15 +279,15 @@ return deny({
 });
 ```
 
-Every field you add must be optional or carry a `.default()`, since kizuna sends this body itself when [Access Control](/docs/access-control) refuses a caller. `new Kizuna()` throws when it cannot.
+Every field you add must be optional or carry a `.default()`, since kizuna sends this body itself when [Access Control](/docs/access-control) refuses a caller. `defineConfig` throws when it cannot.
 
 ## What else a guard gets
 
-The route's path `params`, the adapter's native request objects, and any [request context](/docs/request-context) the contract declares. A request-scoped value that gates nothing, such as a logger, is a [request context](/docs/request-context) rather than an identity.
+The route's path `params`, the adapter's native request objects, and any [request context](/docs/request-context) your config declares. A request-scoped value that gates nothing, such as a logger, is a [request context](/docs/request-context) rather than an identity.
 
 ## What it drives
 
-`k.contract` puts `401` on every guarded route, as [Problem Details](/docs/reference/problem-details-schema), with `WWW-Authenticate` required when every identity on the route has a challenge and optional when only some do. Declaring a `401` yourself is an error.
+`defineConfig` puts `401` on every guarded route, as [Problem Details](/docs/reference/problem-details-schema), with `WWW-Authenticate` required when every identity on the route has a challenge and optional when only some do. Declaring a `401` yourself is an error.
 
 [`generateOpenApi`](/docs/reference/generate-openapi) emits your identities as `components.securitySchemes`. A `custom` identity has no scheme, so its routes carry an `x-kizuna-guarded` extension instead.
 
@@ -300,8 +295,7 @@ The route's path `params`, the adapter's native request objects, and any [reques
 
 ## Reference
 
-- [`Kizuna.identity`](/docs/reference/kizuna-identity)
-- [`server.guard`](/docs/reference/server-guard)
-- [`server.api`](/docs/reference/server-api)
+- [`k.identity`](/docs/reference/k-identity)
+- [`defineConfig`](/docs/reference/define-config)
 - [Access Control](/docs/access-control)
 - [OAuth](/docs/oauth)

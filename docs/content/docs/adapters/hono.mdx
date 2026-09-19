@@ -3,7 +3,7 @@ title: Hono
 description: Mount a ts-kizuna API on a Hono application.
 ---
 
-`@ts-kizuna/hono` connects a ts-kizuna API to a [Hono](https://hono.dev) application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
+`@ts-kizuna/hono` serves a ts-kizuna API from a [Hono](https://hono.dev) application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
 
 **Requires Hono >= 4.**
 
@@ -11,62 +11,47 @@ description: Mount a ts-kizuna API on a Hono application.
 
 ## The adapter
 
-`honoAdapter` is the Hono adapter as a value. Pass it to `new Kizuna()`, and every handler on this API receives Hono's request objects:
-
-```ts title="contract/k.ts"
-import { Kizuna } from '@ts-kizuna/core';
-import { honoAdapter } from '@ts-kizuna/hono';
-
-export const k = new Kizuna({
-    adapter: honoAdapter,
-});
-```
+`honoAdapter()` is what you name in `kizuna.config.ts`. Naming it is what gives every handler on this API Hono's own `Context`, typed.
 
 <Steps>
 
 <Step>
 
-## Create the server
+## Declare a route
 
-```ts title="server.ts"
-import { KizunaServer } from '@ts-kizuna/hono';
-import { contract } from '@/contract';
+```ts title="src/routes/users.ts"
+import { k } from '../k';
 
-export const server = new KizunaServer(contract);
-```
-
-</Step>
-
-<Step>
-
-## Implement the router
-
-```ts title="router/index.ts"
-import { server } from './server';
-
-export const router = server.router({
-    users: {
-        listUsers: async ({ query }) => {
-            const found = await db.users.findMany({
-                skip: (query.page - 1) * query.limit,
-                take: query.limit,
-            });
-            return {
-                status: 200,
-                body: {
-                    users: found,
-                    total: await db.users.count(),
-                },
-            };
-        },
-        createUser: async ({ body }) => {
-            const user = await db.users.create(body);
-            return {
-                status: 201,
-                body: user,
-            };
-        },
-        getUser: async ({ params }) => {
+export const users = k.routes('users', {
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            query: ListUsersQuerySchema,
+            responses: {
+                200: UserListSchema,
+            },
+        })
+        .handler(async ({ query }) => ({
+            status: 200,
+            body: {
+                users: await db.users.findMany({
+                    skip: (query.page - 1) * query.limit,
+                    take: query.limit,
+                }),
+                total: await db.users.count(),
+            },
+        })),
+    getUser: k
+        .route({
+            method: 'GET',
+            path: '/users/:id',
+            responses: {
+                200: UserSchema,
+                404: ProblemDetailsSchema,
+            },
+        })
+        .handler(async ({ params }) => {
             const user = await db.users.findById(params.id);
             if (!user) {
                 return {
@@ -80,8 +65,7 @@ export const router = server.router({
                 status: 200,
                 body: user,
             };
-        },
-    },
+        }),
 });
 ```
 
@@ -89,14 +73,18 @@ export const router = server.router({
 
 <Step>
 
-## Build the api
+## Name Hono in your config
 
-```ts title="api.ts"
-import { server } from './server';
-import { router } from './router';
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { honoAdapter } from '@ts-kizuna/hono';
+import { users } from './src/routes/users';
 
-export const api = server.api({
-    router,
+export default defineConfig({
+    adapter: honoAdapter(),
+    routes: {
+        users,
+    },
 });
 ```
 
@@ -108,10 +96,11 @@ export const api = server.api({
 
 ```ts title="src/index.ts"
 import { Hono } from 'hono';
-import { api } from './server/api';
+import kizuna from '../kizuna.config';
 
 const app = new Hono();
-api.mount(app);
+
+kizuna.api.mount(app);
 
 export default app;
 ```
@@ -122,60 +111,64 @@ export default app;
 
 ## Handler context
 
-Each handler receives `{ params, query, body, headers, c }`. The `c` is the Hono `Context` object, useful when you need to access cookies, environment bindings, or other Hono-specific features.
+Each handler receives `{ params, query, body, headers, c }`. The `c` is Hono's `Context`, useful when you need to read cookies, reach environment bindings, or use anything else Hono exposes.
 
-```ts title="users.ts"
-getUser: async ({ params, c }) => {
-    const token = c.req.header('Authorization');
-    const user = await db.users.findById(params.id);
+```ts title="src/routes/users.ts"
+.handler(async ({ params, c }) => {
+    const locale = c.req.header('accept-language');
     return {
         status: 200,
-        body: user,
+        body: await db.users.findById(params.id),
     };
-},
+});
 ```
 
 ## Environment bindings
 
-On runtimes like Cloudflare Workers, environment bindings are available on the Hono context as `c.env`.
+On runtimes like Cloudflare Workers, bindings live on the Hono context as `c.env`.
 
-```ts title="router/index.ts"
-import { server } from './server';
-
-export const router = server.router({
-    users: {
-        getUser: async ({ params, c }) => {
-            const user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(params.id).first();
-            return {
-                status: 200,
-                body: user,
-            };
+```ts title="src/routes/users.ts"
+getUser: k
+    .route({
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
         },
-    },
-});
+    })
+    .handler(async ({ params, c }) => ({
+        status: 200,
+        body: await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(params.id).first(),
+    })),
 ```
 
 ## Guards
 
-A guard receives the credential extracted and typed, alongside the native context `c`. See the [Authentication guide](/docs/authentication).
+A guard sits on the identity it authenticates, and receives the credential extracted and typed, alongside the native `c`. See the [Authentication guide](/docs/authentication).
 
-```ts title="guards.ts"
-import { server } from './server';
+```ts title="src/identities.ts"
+import { k } from './k';
 
-export const requireUser = server.guard('user', async ({ bearer, deny }) => {
-    const session = bearer ? await verifySession(bearer.token) : undefined;
-    if (!session) {
-        return deny({
-            status: 401,
-            body: {
-                detail: 'Unauthorized',
-            },
-        });
-    }
-    return {
-        userId: session.userId,
-    };
-});
+export const user = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    })
+    .guard(async ({ bearer, deny, c }) => {
+        const session = bearer ? await verifySession(bearer.token, c.env) : undefined;
+        if (!session) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        }
+        return {
+            userId: session.userId,
+        };
+    });
 ```
 
 ## Middleware
@@ -185,7 +178,7 @@ For request-scoped values handlers need, use [request context](/docs/request-con
 ## Options
 
 ```ts title="src/index.ts"
-api.mount(app, {
+kizuna.api.mount(app, {
     responseValidation: false,
 });
 ```
@@ -195,16 +188,16 @@ api.mount(app, {
 | `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                                                           |
 | `formatError`        | none    | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
 
-## `RouteHandler` and `Router` types
+## Writing a handler in its own file
 
-Annotate handlers individually or as a whole tree:
+A handler passed to `.handler()` is typed where you write it. When you keep one in a separate file, `RouteHandler` gives it the same types:
 
-```ts title="users.ts"
-import type { RouteHandler, Router } from '@ts-kizuna/hono';
-import { contract } from '@/contract';
+```ts title="src/routes/get-user.handler.ts"
+import { getUserRoute } from './get-user';
 
-// Single route
-const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ params }) => {
+type GetUserHandler = Parameters<typeof getUserRoute.handler>[0];
+
+export const getUser: GetUserHandler = async ({ params }) => {
     const user = await db.users.findById(params.id);
     if (!user) {
         return {
@@ -219,12 +212,9 @@ const getUser: RouteHandler<typeof contract.routes.users.getUser> = async ({ par
         body: user,
     };
 };
-
-// Whole handler tree
-const router: Router<typeof contract> = { ... };
 ```
 
-`RouteHandler` carries the route's `auth` and request context, nested groups included.
+The route's own `handler` is what carries the types, so its parameter gives you the framework context, the route's `auth`, and the request context, with nothing to keep in step.
 
 ## Streams
 
@@ -232,7 +222,6 @@ A [stream](/docs/streaming) response is returned as a `ReadableStream` body. The
 
 ## Reference
 
-- [`new KizunaServer()`](/docs/reference/kizuna-server)
-- [`server.router`](/docs/reference/server-router)
-- [`server.api`](/docs/reference/server-api)
-- [`server.guard`](/docs/reference/server-guard)
+- [`defineConfig`](/docs/reference/define-config)
+- [a route's `handler`](/docs/reference/k-route)
+- [an identity's `guard`](/docs/reference/k-identity)

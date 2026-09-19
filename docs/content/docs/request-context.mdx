@@ -9,31 +9,47 @@ A **request context** is a value every handler receives, resolved once per reque
 
 <Step>
 
-## Declare the value
+## Declare the value and how it resolves
 
-`Kizuna.requestContext` takes the schema of what handlers receive. Add `headers` when the value comes off the request:
+`k.requestContext` takes the schema of what handlers receive, and `.handler()` takes the resolver that fills it. Add `headers` when the value comes off the request:
 
-```ts title="request-context.ts"
+```ts title="src/request-context.ts"
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
+import { getHeaderValue } from '@ts-kizuna/core';
+import { k } from './k';
 
-export const analytics = Kizuna.requestContext({
-    headers: z.object({
-        'x-posthog-session-id': z.string().optional(),
-    }),
-    context: z.object({
-        sessionId: z.string().nullable(),
-    }),
-});
+export const analytics = k
+    .requestContext({
+        headers: z.object({
+            'x-posthog-session-id': z.string().optional(),
+        }),
+        context: z.object({
+            sessionId: z.string().nullable(),
+        }),
+    })
+    .handler(({ headers }) => ({
+        sessionId: getHeaderValue(headers['x-posthog-session-id']) ?? null,
+    }));
 ```
 
-Register it on `new Kizuna()` under the name handlers will read it by:
+The resolver's `headers` are typed by the schema right above it, and its return is checked against `context`.
 
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
-import { analytics } from './request-context';
+</Step>
 
-export const k = new Kizuna({
+<Step>
+
+## Name it on your config
+
+Name it under what handlers will read it by:
+
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { analytics } from './src/request-context';
+import { routes } from './src/routes';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
     requestContext: {
         analytics,
     },
@@ -44,46 +60,20 @@ export const k = new Kizuna({
 
 <Step>
 
-## Resolve it per request
-
-One resolver per declaration. It receives the declared headers and returns the value:
-
-```ts title="request-context.ts"
-import { server } from './server';
-
-export const captureAnalytics = server.requestContext('analytics', ({ headers }) => ({
-    sessionId: headers['x-posthog-session-id'] ?? null,
-}));
-```
-
-Wire it on `server.api` under the name it was declared with:
-
-```ts title="api.ts"
-import { server } from './server';
-import { router } from './router';
-import { captureAnalytics } from './request-context';
-
-export const api = server.api({
-    router,
-    requestContext: {
-        analytics: captureAnalytics,
-    },
-});
-```
-
-`server.api` requires a resolver for every declared name, so a new declaration is a type error until it has one.
-
-</Step>
-
-<Step>
-
 ## Read it in the handler
 
 Every handler receives the resolved value under `requestContext`, keyed by the name:
 
-```ts title="notifications.ts"
-notifications: {
-    listEvents: ({ query, requestContext }) => {
+```ts title="src/routes/notifications.ts"
+listEvents: k
+    .route({
+        method: 'GET',
+        path: '/events',
+        responses: {
+            200: EventListSchema,
+        },
+    })
+    .handler(({ query, requestContext }) => {
         track(requestContext.analytics.sessionId, 'listEvents');
         return {
             status: 200,
@@ -91,11 +81,8 @@ notifications: {
                 events: findEvents(query),
             },
         };
-    },
-},
+    }),
 ```
-
-Split into its own file, a handler keeps the typed `requestContext` via [`RouteHandler`](/docs/building/router)`<typeof contract.routes.notifications.listEvents>`.
 
 </Step>
 
@@ -105,37 +92,33 @@ Split into its own file, a handler keeps the typed `requestContext` via [`RouteH
 
 A value the server derives on its own takes the context schema alone:
 
-```ts title="request-context.ts"
-export const logger = Kizuna.requestContext(
-    z.object({
-        requestId: z.string(),
-    })
-);
-```
-
-```ts title="request-context.ts"
-export const attachLogger = server.requestContext('logger', () => ({
-    requestId: randomUUID(),
-}));
+```ts title="src/request-context.ts"
+export const logger = k
+    .requestContext(
+        z.object({
+            requestId: z.string(),
+        })
+    )
+    .handler(() => ({
+        requestId: randomUUID(),
+    }));
 ```
 
 A value that comes from the caller declares the `headers` it reads. Every client types them, so a caller sets them once and the resolver reads them by name:
 
-```ts title="request-context.ts"
-export const locale = Kizuna.requestContext({
-    headers: z.object({
-        'accept-language': z.string().optional(),
-    }),
-    context: z.object({
-        language: z.enum(['en', 'nb']),
-    }),
-});
-```
-
-```ts title="request-context.ts"
-export const resolveLocale = server.requestContext('locale', ({ headers }) => ({
-    language: negotiateLanguage(headers['accept-language']) ?? 'en',
-}));
+```ts title="src/request-context.ts"
+export const locale = k
+    .requestContext({
+        headers: z.object({
+            'accept-language': z.string().optional(),
+        }),
+        context: z.object({
+            language: z.enum(['en', 'nb']),
+        }),
+    })
+    .handler(({ headers }) => ({
+        language: negotiateLanguage(headers['accept-language']) ?? 'en',
+    }));
 ```
 
 `headers` is what arrives on the wire, `context` is what handlers get, and the resolver is the step between them.
@@ -159,9 +142,9 @@ The native objects differ per adapter:
 | Hono    | `c`                |
 | Next.js | `request`          |
 
-```ts title="request-context.ts"
-export const captureAnalytics = server.requestContext('analytics', ({ headers, req }) => ({
-    sessionId: headers['x-posthog-session-id'] ?? req.cookies.posthogSessionId ?? null,
+```ts title="src/request-context.ts"
+.handler(({ headers, req }) => ({
+    sessionId: getHeaderValue(headers['x-posthog-session-id']) ?? req.cookies.posthogSessionId ?? null,
 }));
 ```
 
@@ -173,8 +156,8 @@ A throw inside a resolver fails the request the way a throw inside a handler doe
 
 The fetch client takes the declared headers under `requestContext` and sends them with every request:
 
-```ts title="api-client.ts"
-const apiClient = new KizunaClient(contract, {
+```ts title="src/lib/api-client.ts"
+const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'https://api.example.com',
     requestContext: {
         'x-posthog-session-id': sessionId,
@@ -206,7 +189,7 @@ The values are typed from the header schemas, so a required header is required h
 
 ## Where it runs
 
-Resolvers run on every route, public ones included, before the guards, so a [guard](/docs/reference/server-guard) reads the resolved values under `requestContext` the way a handler does. The [job](/docs/jobs) handlers take only their `input`, so they see none of it. [MCP](/docs/mcp) tool calls run the resolvers the same way the HTTP pipeline does, reading the headers of the transport request.
+Resolvers run on every route, public ones included, before the guards, so a [guard](/docs/reference/k-identity) reads the resolved values under `requestContext` the way a handler does. The [job](/docs/jobs) handlers take only their `input`, so they see none of it. [MCP](/docs/mcp) tool calls run the resolvers the same way the HTTP pipeline does, reading the headers of the transport request.
 
 ## Request context or a guard
 
@@ -214,7 +197,7 @@ Both run before the handler and both put a typed value in its args. They answer 
 
 |             | Request context         | Guard                              |
 | ----------- | ----------------------- | ---------------------------------- |
-| Runs on     | Every route             | The routes access control secures  |
+| Runs on     | Every route             | The routes whose `auth` names it   |
 | Runs        | Before the guards       | After every resolver has run       |
 | Can reject  | No                      | Yes, with `deny({ status, body })` |
 | Handler arg | `requestContext.<name>` | `auth.<identity>`                  |
@@ -223,7 +206,6 @@ If the answer decides whether the request may proceed, it belongs in a [guard](/
 
 ## Reference
 
-- [`Kizuna.requestContext`](/docs/reference/kizuna-request-context)
-- [`server.requestContext`](/docs/reference/server-request-context)
-- [`server.api`](/docs/reference/server-api)
+- [`k.requestContext`](/docs/reference/k-request-context)
+- [`defineConfig`](/docs/reference/define-config)
 - [`new KizunaClient()`](/docs/reference/kizuna-client)

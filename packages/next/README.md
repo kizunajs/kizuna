@@ -12,12 +12,25 @@ pnpm add @ts-kizuna/next
 
 ## Usage
 
+```ts
+// kizuna.config.ts
+import { defineConfig } from '@ts-kizuna/core';
+import { nextAdapter } from '@ts-kizuna/next';
+import { routes } from './src/routes';
+
+export default defineConfig({
+    adapter: nextAdapter(),
+    routes,
+});
+```
+
 Export the handlers from a catch-all route:
 
 ```ts
-import { api } from '@/server/api';
+// src/app/api/[...ts-kizuna]/route.ts
+import kizuna from '../../../../kizuna.config';
 
-export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
     basePath: '/api',
 });
 ```

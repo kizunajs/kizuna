@@ -20,18 +20,8 @@ const sent = (body: string, contentType: string): Response =>
     });
 
 /**
- * Serve the `openApiPlugin` declared on the contract: the reference UI, and the
+ * What answers the routes `openApiPlugin` declares: the reference UI, and the
  * document itself where the declaration published it.
- *
- * @example
- * ```ts
- * export const api = server.api({
- *     router,
- *     plugins: {
- *         openApi: openApiPluginServer(),
- *     },
- * });
- * ```
  */
 export const openApiServe = (props: OpenApiPluginProps<string>, api: unknown) => {
     const spec = renderOpenApi(contractOf<Contract>(api), props);

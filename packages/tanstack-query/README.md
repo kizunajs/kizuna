@@ -14,13 +14,13 @@ pnpm add @ts-kizuna/tanstack-query
 import { useQuery } from '@tanstack/react-query';
 import { KizunaClient } from '@ts-kizuna/fetch';
 import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
-import { contract } from './contract';
+import kizuna from '../kizuna.config';
 
-const apiClient = new KizunaClient(contract, {
+const apiClient = new KizunaClient(kizuna.api, {
     baseUrl: 'http://localhost:3000',
 });
 
-const api = new KizunaTanstackQuery(contract, apiClient);
+const api = new KizunaTanstackQuery(kizuna.api, apiClient);
 
 const { data } = useQuery(
     api.users.getUser.queryOptions({

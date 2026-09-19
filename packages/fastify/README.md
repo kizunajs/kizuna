@@ -13,19 +13,25 @@ pnpm add @ts-kizuna/fastify fastify
 ## Usage
 
 ```ts
-import Fastify from 'fastify';
-import { KizunaServer } from '@ts-kizuna/fastify';
-import { contract } from './contract';
-import { router } from './router';
+// kizuna.config.ts
+import { defineConfig } from '@ts-kizuna/core';
+import { fastifyAdapter } from '@ts-kizuna/fastify';
+import { routes } from './src/routes';
 
-const server = new KizunaServer(contract);
-
-const api = server.api({
-    router,
+export default defineConfig({
+    adapter: fastifyAdapter(),
+    routes,
 });
+```
+
+```ts
+// src/index.ts
+import Fastify from 'fastify';
+import kizuna from '../kizuna.config';
 
 const app = Fastify();
-await api.mount(app);
+
+await kizuna.api.mount(app);
 
 app.listen({
     port: 3000,

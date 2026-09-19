@@ -3,34 +3,39 @@ title: Contract
 description: Define your routes and bundle them into a contract, the source of truth shared by your server and clients.
 ---
 
-The contract is the source of truth for your API. You hand it to [`new KizunaServer()`](/docs/building/router) on the server and [`new KizunaClient()`](/docs/clients/fetch) on every client.
+What you declare with `k` is the source of truth for your API: the routes, what each one takes and answers, and who may call it. [`defineConfig`](/docs/reference/define-config) assembles it into the api you serve, and the generators read the same declarations to write your OpenAPI document and your clients.
 
 <ContractNotice />
 
-## Create the factory
+## Create the surface
 
-Construct it once, usually in a `k.ts` file, and export `k`. Pass a tag set so route groups have a tag to sit under, where the keys become the allowed group names.
+Construct it once, usually in `src/k.ts`, and export `k`. Its type parameter is the `Config` that `kizuna generate` writes from your `kizuna.config.ts`, and that is what types everything a handler receives and checks every name you write.
 
-```ts title="k.ts"
+```ts title="src/k.ts"
 import { Kizuna } from '@ts-kizuna/core';
+import type { Config } from '../kizuna.types';
 
-const tags = Kizuna.tags({
+export const k = new Kizuna<Config>();
+```
+
+Declare a tag set beside it, so route groups have a tag to sit under. Its keys become the group names `k.routes` accepts.
+
+```ts title="src/tags.ts"
+import { k } from './k';
+
+export const tags = k.tags({
     users: 'Users',
-});
-
-export const k = new Kizuna({
-    tags,
 });
 ```
 
-## Define your routes
+## Declare your routes
 
-Call `k.routes` with a tag and your routes.
+`k.route` takes what the route is, and `.handler()` takes what answers it. `k.routes` groups them under one of your tags:
 
-```ts title="users.ts"
+```ts title="src/routes/users.ts"
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { k } from './k';
+import { k } from '../k';
 
 export const UserSchema = z.object({
     id: z.string(),
@@ -38,74 +43,93 @@ export const UserSchema = z.object({
     email: z.email(),
 });
 
-export const usersRoutes = k.routes('users', {
-    listUsers: {
-        method: 'GET',
-        path: '/users',
-        query: z.object({
-            page: z.number().int().min(1).default(1),
-            limit: z.number().int().min(1).max(100).default(10),
-        }),
-        responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-                total: z.number(),
+export const users = k.routes('users', {
+    listUsers: k
+        .route({
+            method: 'GET',
+            path: '/users',
+            query: z.object({
+                page: z.int().min(1).default(1),
+                limit: z.int().min(1).max(100).default(10),
             }),
-        },
-    },
-    createUser: {
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string().min(1),
-            email: z.email(),
-        }),
-        responses: {
-            201: UserSchema,
-            400: ProblemDetailsSchema,
-        },
-    },
-    getUser: {
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: UserSchema,
-            404: ProblemDetailsSchema,
-        },
-    },
+            responses: {
+                200: z.object({
+                    users: z.array(UserSchema),
+                    total: z.number(),
+                }),
+            },
+        })
+        .handler(async ({ query }) => ({
+            status: 200,
+            body: {
+                users: await db.users.findMany({
+                    skip: (query.page - 1) * query.limit,
+                    take: query.limit,
+                }),
+                total: await db.users.count(),
+            },
+        })),
+    createUser: k
+        .route({
+            method: 'POST',
+            path: '/users',
+            body: z.object({
+                name: z.string().min(1),
+                email: z.email(),
+            }),
+            responses: {
+                201: UserSchema,
+                400: ProblemDetailsSchema,
+            },
+        })
+        .handler(async ({ body }) => ({
+            status: 201,
+            body: await db.users.create(body),
+        })),
 });
 ```
 
+The handler's `query` and `body` are typed from the declaration right above it, and its return is checked against that route's `responses`. See [Handlers](/docs/building/handlers) for everything a handler receives.
+
+A route only a generator or a client reads can skip `.handler()`. One your config serves cannot.
+
 ### Route fields
 
-| Field         | Required | Description                                                                                    |
-| ------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `method`      | Yes      | `GET` `POST` `PUT` `PATCH` `DELETE` `HEAD` `OPTIONS`                                           |
-| `path`        | Yes      | URL path. Use `:name` for path parameters                                                      |
-| `responses`   | Yes      | Response schemas keyed by status code                                                          |
-| `pathParams`  | No       | Path parameter schema, keyed by placeholder name                                               |
-| `body`        | No       | Request body schema                                                                            |
-| `query`       | No       | Query string schema                                                                            |
-| `headers`     | No       | Request headers schema                                                                         |
-| `contentType` | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'` |
-| `summary`     | No       | Short description shown in OpenAPI                                                             |
-| `tags`        | No       | OpenAPI tags                                                                                   |
+| Field         | Required | Description                                                                                                                                                                                                |
+| ------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `method`      | Yes      | `GET` `POST` `PUT` `PATCH` `DELETE` `HEAD` `OPTIONS`                                                                                                                                                       |
+| `path`        | Yes      | URL path. Use `:name` for path parameters                                                                                                                                                                  |
+| `responses`   | Yes      | Response schemas keyed by status code                                                                                                                                                                      |
+| `pathParams`  | No       | Path parameter schema, keyed by placeholder name                                                                                                                                                           |
+| `body`        | No       | Request body schema                                                                                                                                                                                        |
+| `query`       | No       | Query string schema                                                                                                                                                                                        |
+| `headers`     | No       | Request headers schema                                                                                                                                                                                     |
+| `contentType` | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'`                                                                                                             |
+| `summary`     | No       | Short description shown in OpenAPI, and what a model reads when the route publishes as a tool                                                                                                              |
+| `description` | No       | The longer account, for OpenAPI and for a model                                                                                                                                                            |
+| `tags`        | No       | OpenAPI tags                                                                                                                                                                                               |
+| `auth`        | No       | The identity this route requires, and the roles or permissions it accepts. Required once your config declares an identity, so public takes an explicit `false`. See [Access Control](/docs/access-control) |
+| `tool`        | No       | Publish this route as a [tool](/docs/tools) a model can call                                                                                                                                               |
+| `deprecated`  | No       | `true`, or the migration message. See [Deprecations](/docs/deprecations)                                                                                                                                   |
+| `cache`       | No       | The `Cache-Control` policy its responses send. See [Caching](/docs/caching)                                                                                                                                |
 
 ### Typing path parameters
 
 Path parameters are strings unless you say otherwise. Add `pathParams` to parse and validate them:
 
 ```ts
-getUser: {
-    method: 'GET',
-    path: '/users/:id',
-    pathParams: z.object({
-        id: z.uuid(),
-    }),
-    responses: {
-        200: UserSchema,
-    },
-},
+getUser: k
+    .route({
+        method: 'GET',
+        path: '/users/:id',
+        pathParams: z.object({
+            id: z.uuid(),
+        }),
+        responses: {
+            200: UserSchema,
+        },
+    })
+    .handler(/* ... */),
 ```
 
 Each value must be a scalar, since a path segment arrives as one string. Structured values belong in `query`. To parse one into something richer, use `z.string().transform(...)`:
@@ -180,15 +204,15 @@ responses: {
 
 The handler then yields messages instead of returning one body, and the fetch client reads them with `for await`. See [Streaming](/docs/streaming).
 
-## Put the handler on the route
+## One route per file
 
-`k.route` takes the route and hands back its handler. `body`, `params`, `query` and `headers` are typed from what the route declares, and the return is checked against its `responses`.
+A route and its handler travel together, so a route that outgrows its group moves to its own file and `k.routes` still groups it:
 
-```ts title="users/create-user.ts"
+```ts title="src/routes/users/create-user.ts"
 import { z } from 'zod';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { k } from '../k';
-import { UserSchema } from './schemas';
+import { k } from '../../k';
+import { UserSchema } from '../schemas';
 
 export const createUser = k
     .route({
@@ -209,14 +233,12 @@ export const createUser = k
     }));
 ```
 
-A route lives in its own file, and `k.routes` groups them:
-
-```ts title="users/index.ts"
-import { k } from '../k';
+```ts title="src/routes/users/index.ts"
+import { k } from '../../k';
 import { createUser } from './create-user';
 import { getUser } from './get-user';
 
-export const usersRoutes = k.routes('users', {
+export const users = k.routes('users', {
     createUser,
     getUser,
 });
@@ -226,22 +248,26 @@ export const usersRoutes = k.routes('users', {
 
 `kizuna generate` imports your route files to read the contract, so whatever a module does at the top level, it does on every generate. Importing a database client is fine. Opening a connection, reading a file, or throwing on a missing environment variable is not, so keep that inside the handler.
 
-## Bundle into a contract
+## Assemble it
 
-Assemble your route groups with `k.contract` and default-export the result. This is the object `client` and `server.api` consume.
+`defineConfig` takes your route groups and everything else the API is made of, and hands back the `api` you mount. It lives in `kizuna.config.ts` at the root of your app:
 
-```ts title="contract/index.ts"
-import { k } from './k';
-import { usersRoutes } from './routes';
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
+import { tags } from './src/tags';
+import { users } from './src/routes/users';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
+    tags,
     routes: {
-        users: usersRoutes,
+        users,
     },
 });
 ```
 
-API-wide settings are configured on `new Kizuna()` and carried onto every contract `k.contract` produces, so you set them once. That covers tags and [`validation.issueCodes`](/docs/reference/k-issue) for custom validation codes.
+API-wide settings go here too, so you set them once: `tags`, `guardSchema`, and [`issueCodes`](/docs/reference/k-issue) for custom validation codes. See [`defineConfig`](/docs/reference/define-config) for the full list, and [Mounting](/docs/building/mounting) for serving it.
 
 For non-JSON responses, set `contentType` to send the body as-is instead of JSON. Responses default to `application/json`, errors to `application/problem+json`, and a [stream](/docs/streaming) to `text/event-stream`. Declare a non-JSON body as `z.string()`:
 
@@ -256,7 +282,7 @@ responses: {
 
 For binary responses, use [`BinarySchema`](/docs/reference/binary-and-file-schemas) for a body of raw bytes (`Uint8Array`/`Buffer`), such as a PDF download:
 
-```ts title="reports.ts"
+```ts title="src/routes/reports.ts"
 import { BinarySchema } from '@ts-kizuna/core/schemas';
 
 responses: {
@@ -269,22 +295,23 @@ responses: {
 
 ## Authentication
 
-Authentication is part of the contract too: you declare identities with [`Kizuna.identity`](/docs/reference/kizuna-identity), register them on `new Kizuna()`, and give each route an [`auth`](/docs/reference/k-route) saying which identity, roles, or permissions it requires. That one declaration drives runtime enforcement, typed handler context, and the OpenAPI spec's security. The [Authentication](/docs/authentication) and [Access Control](/docs/access-control) guides walk the whole pipeline.
+Authentication is declared too: [`k.identity`](/docs/reference/k-identity) says how a credential travels and what a passing guard provides, the guard sits on that identity, you name them under `identities` on `defineConfig`, and each route's [`auth`](/docs/reference/k-route) says which identity, roles, or permissions it requires. That one declaration drives runtime enforcement, typed handler context, and the OpenAPI spec's security. The [Authentication](/docs/authentication) and [Access Control](/docs/access-control) guides walk the whole pipeline.
 
 ## Jobs
 
-Scheduled work is declared on the contract too. [`k.jobs`](/docs/reference/k-jobs) takes the identity every job requires and the jobs themselves, and the result goes under `jobs` on `k.contract`, beside `routes`:
+Scheduled work is declared too. [`k.jobs`](/docs/reference/k-jobs) takes the identity every job requires and the jobs themselves, each carrying its own handler, and the result goes under `jobs` on `defineConfig`, beside `routes`:
 
-```ts title="contract/index.ts"
-export const contract = k.contract({
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
     routes: {
-        users: usersRoutes,
+        users,
     },
     jobs,
 });
 ```
 
-A job carries its own identity, so it takes no entry in the access control map, and it stays out of `contract.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. The [Jobs guide](/docs/jobs) covers declaring, handling, and triggering them.
+A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin, and MCP surfaces. The [Jobs guide](/docs/jobs) covers declaring, handling, and triggering them.
 
 ## Going further
 
@@ -292,7 +319,7 @@ A job carries its own identity, so it takes no entry in the access control map, 
 
 By default the generators inline each schema wherever it appears. Use [`Kizuna.model`](/docs/reference/kizuna-model) to give a schema a name they can reuse:
 
-```ts title="users.ts"
+```ts title="src/routes/schemas.ts"
 import { Kizuna } from '@ts-kizuna/core';
 
 export const UserSchema = Kizuna.model({
@@ -312,12 +339,12 @@ export const UserSchema = Kizuna.model({
 
 ### Splitting routes across files
 
-Large contracts split into groups. Declare the tags once with [`Kizuna.tags`](/docs/reference/kizuna-tags), pass them to `new Kizuna()`, then define each group with `k.routes` in its own file:
+Large APIs split into groups. Declare the tags once with [`k.tags`](/docs/reference/k-tags), name them on `defineConfig`, then declare each group with `k.routes` in its own file:
 
-```ts title="tags.ts"
-import { Kizuna } from '@ts-kizuna/core';
+```ts title="src/tags.ts"
+import { k } from './k';
 
-export const tags = Kizuna.tags({
+export const tags = k.tags({
     users: {
         title: 'Users',
         description: 'User management endpoints',
@@ -326,41 +353,45 @@ export const tags = Kizuna.tags({
 });
 ```
 
-```ts title="k.ts"
-import { Kizuna } from '@ts-kizuna/core';
-import { tags } from './tags';
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { tags } from './src/tags';
+import { routes } from './src/routes';
 
-export const k = new Kizuna({
+export default defineConfig({
     tags,
+    routes,
 });
 ```
 
-```ts title="users.ts"
+```ts title="src/routes/users.ts"
 import { k } from '../k';
 
-export const usersRoutes = k.routes('users', {
-    listUsers: { ... },
-    createUser: { ... },
+export const users = k.routes('users', {
+    listUsers: k.route({ ... }).handler(...),
+    createUser: k.route({ ... }).handler(...),
 });
 ```
 
-An `index.ts` beside them collects the groups, so the contract has one import to make:
+An `index.ts` beside them collects the groups, so the config has one import to make:
 
-```ts title="routes/index.ts"
-import { usersRoutes } from './users';
-import { healthRoutes } from './health';
+```ts title="src/routes/index.ts"
+import { users } from './users';
+import { health } from './health';
 
 export const routes = {
-    users: usersRoutes,
-    health: healthRoutes,
+    users,
+    health,
 };
 ```
 
-```ts title="contract/index.ts"
-import { k } from './k';
-import { routes } from './routes';
+```ts title="kizuna.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { routes } from './src/routes';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
+    tags,
     routes,
 });
 ```
@@ -370,12 +401,14 @@ See [Project Structure](/docs/project-structure) for where the rest of the piece
 The group tag's `title` becomes the OpenAPI tag for every route in the group, and the `description` is included in the tag definition. A route can also cross-tag by listing tag keys directly:
 
 ```ts
-cancelAccount: {
-    method: 'POST',
-    path: '/account/cancel',
-    tags: ['users', 'health'],
-    // ...
-},
+cancelAccount: k
+    .route({
+        method: 'POST',
+        path: '/account/cancel',
+        tags: ['users', 'health'],
+        // ...
+    })
+    .handler(/* ... */),
 ```
 
 ### Deprecating routes and fields
@@ -383,34 +416,38 @@ cancelAccount: {
 Set `deprecated` on a route, either `true` or a migration message:
 
 ```ts
-deleteUser: {
-    method: 'DELETE',
-    path: '/users/:id',
-    deprecated: 'use `archiveUser` instead',
-    responses: {
-        200: z.object({
-            success: z.boolean(),
-        }),
-    },
-},
+deleteUser: k
+    .route({
+        method: 'DELETE',
+        path: '/users/:id',
+        deprecated: 'use `archiveUser` instead',
+        responses: {
+            200: z.object({
+                success: z.boolean(),
+            }),
+        },
+    })
+    .handler(/* ... */),
 ```
 
 Fields declare it in their [Zod metadata](https://zod.dev/metadata), with the same `true | string` shape:
 
 ```ts
-getUser: {
-    method: 'GET',
-    path: '/users/:id',
-    responses: {
-        200: z.object({
-            id: z.string(),
-            name: z.string(),
-            legacyUsername: z.string().optional().meta({
-                deprecated: 'use name instead',
+getUser: k
+    .route({
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: z.object({
+                id: z.string(),
+                name: z.string(),
+                legacyUsername: z.string().optional().meta({
+                    deprecated: 'use name instead',
+                }),
             }),
-        }),
-    },
-},
+        },
+    })
+    .handler(/* ... */),
 ```
 
 Your editor, the OpenAPI spec, and the Swift and Kotlin clients pick both up. A route also takes a deprecation `date` and a `sunset` timestamp, both ISO 8601, and every response from it then announces them in the `Deprecation` and `Sunset` headers. See [Deprecations](/docs/deprecations).
@@ -419,16 +456,16 @@ Your editor, the OpenAPI spec, and the Swift and Kotlin clients pick both up. A 
 
 Infer TypeScript types from your schemas in a separate `types.ts` so consumers can import them without pulling in runtime code:
 
-```ts title="types.ts"
+```ts title="src/types.ts"
 import type { z } from 'zod';
-import { UserSchema, CreateUserSchema } from './routes';
+import { UserSchema, CreateUserSchema } from './routes/schemas';
 
 export type User = z.infer<typeof UserSchema>;
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 ```
 
 ```tsx title="UserCard.tsx"
-import type { User } from '@/contract/types';
+import type { User } from '@/types';
 
 function UserCard({ user }: { user: User }) {
     return <div>{user.name}</div>;
@@ -438,10 +475,11 @@ function UserCard({ user }: { user: User }) {
 ## Reference
 
 - [`new Kizuna()`](/docs/reference/kizuna)
+- [`k.route`](/docs/reference/k-route)
 - [`Kizuna.model`](/docs/reference/kizuna-model)
-- [`Kizuna.tags`](/docs/reference/kizuna-tags)
+- [`k.tags`](/docs/reference/k-tags)
 
 ## Next steps
 
-- [Router](/docs/building/router) to implement a handler for each route
-- [Mounting](/docs/building/mounting) to connect the router to the contract and serve it
+- [Handlers](/docs/building/handlers) for everything a handler receives
+- [Mounting](/docs/building/mounting) to assemble it and serve it

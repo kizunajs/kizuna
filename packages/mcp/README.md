@@ -10,34 +10,40 @@ pnpm add @ts-kizuna/mcp
 
 ## Usage
 
-Declare the plugin on `k.contract`:
+Name the plugin under `plugins` in your config, and `api.mount` serves the endpoint:
 
 ```ts
+// kizuna.config.ts
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
 import { mcpPlugin } from '@ts-kizuna/mcp';
-import { k } from './k';
-import { routes } from './routes';
+import { routes } from './src/routes';
 
-export const contract = k.contract({
+export default defineConfig({
+    adapter: expressAdapter(),
     routes,
-    plugins: {
-        mcp: mcpPlugin({
+    plugins: [
+        mcpPlugin({
             name: 'My API',
         }),
-    },
+    ],
 });
 ```
 
-Then pass its server half to `server.api`, where the MCP SDK and the transport live:
+Which routes a model may call is each route's own business: declare `tool` on the ones worth publishing.
 
 ```ts
-import { mcpPluginServer } from '@ts-kizuna/mcp/server';
-
-export const api = server.api({
-    router,
-    plugins: {
-        mcp: mcpPluginServer(),
-    },
-});
+getForecast: k
+    .route({
+        method: 'GET',
+        path: '/forecast/:city',
+        summary: 'Look up tomorrow forecast for one city',
+        tool: true,
+        responses: {
+            200: ForecastSchema,
+        },
+    })
+    .handler(/* ... */),
 ```
 
 ## Documentation
