@@ -21,7 +21,7 @@ import { createPlugin, type RoutePath, type WithSlug } from '@ts-kizuna/core/plu
 
 export interface AuditPluginProps<Slug extends string = 'audit'> {
     /**
-     * What handlers reach this plugin under. Give a second one its own.
+     * The key this plugin installs at, and what handlers reach it under.
      */
     slug?: Slug;
     path?: RoutePath;
@@ -143,7 +143,7 @@ One entry, and its own `package.json` says how far it reaches:
 }
 ```
 
-`kizuna.entries` is what the repo's own boundary test reads. A `client` entry is bundled for a browser target and fails on any Node built-in; a plugin is `server`, because it is named on a config that never reaches a browser.
+A plugin is always `server`: it is named on a config, and a config carries handlers, so it never reaches a browser. `kizuna.entries` is what this repo's boundary test reads, and it holds every package to the reach it declares.
 
 ## Reference
 

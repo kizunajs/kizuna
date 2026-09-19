@@ -5,8 +5,6 @@ description: Define your routes and bundle them into a contract, the source of t
 
 What you declare with `k` is the source of truth for your API: the routes, what each one takes and answers, and who may call it. [`defineConfig`](/docs/reference/define-config) assembles it into the api you serve, and the generators read the same declarations to write your OpenAPI document and your clients.
 
-<ContractNotice />
-
 ## Create the surface
 
 Construct it once, usually in `src/k.ts`, and export `k`. Its type parameter is the `Config` that `kizuna generate` writes from your `kizuna.config.ts`, and that is what types everything a handler receives and checks every name you write.
@@ -115,7 +113,7 @@ A route only a generator or a client reads can skip `.handler()`. One your confi
 
 ### Typing path parameters
 
-Path parameters are strings unless you say otherwise. Add `pathParams` to parse and validate them:
+`params` is typed from the path itself, so `/users/:id` gives the handler `params.id` as a string with nothing else to declare. Add `pathParams` when you want it parsed or narrowed:
 
 ```ts
 getUser: k
@@ -130,6 +128,12 @@ getUser: k
         },
     })
     .handler(/* ... */),
+```
+
+Its keys are checked against the path, so a name the path does not carry is a compile error naming the path it looked in:
+
+```text
+pathParams declares "userId", which is not a parameter in path "/users/:id"
 ```
 
 Each value must be a scalar, since a path segment arrives as one string. Structured values belong in `query`. To parse one into something richer, use `z.string().transform(...)`:
