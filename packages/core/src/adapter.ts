@@ -28,7 +28,7 @@ import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
-import { resolvePluginServers, type PluginImplementation } from './plugin-server.js';
+import { resolvePluginServers } from './plugin-server.js';
 import {
     resolveResponseBody,
     resolveResponseContentType,
@@ -91,17 +91,8 @@ export {
     type JobWorker,
     type JobWorkerContext,
 } from './job-transport.js';
-export {
-    implementPlugin,
-    pluginRoutesOf,
-    pluginRouterOf,
-    pluginExportsOf,
-    resolvePluginServers,
-    type PluginImplementation,
-    type PluginImplementations,
-    type PluginServer,
-    type PluginRouter,
-} from './plugin-server.js';
+export { pluginRoutesOf, pluginRouterOf, pluginExportsOf, resolvePluginServers } from './plugin-server.js';
+export { type PluginRouter } from './plugin.js';
 
 export class ResponseValidationError extends Error {
     readonly routeKey: string;
@@ -275,7 +266,7 @@ export const adapterContextOf = (args: Record<string, unknown>): Record<string, 
     Object.fromEntries(Object.entries(args).filter(([key]) => !(HANDLER_ARG_KEYS as readonly string[]).includes(key)));
 
 /**
- * Request context resolvers keyed by the name they were declared under on `new Kizuna()`.
+ * Request context resolvers keyed by the name they were declared under in `defineConfig()`.
  */
 export type RequestContextMap<HandlerContext = unknown> = Record<string, RequestContextRun<HandlerContext>>;
 
@@ -290,7 +281,6 @@ export interface ApiParts {
     /**
      * Each plugin's server half, keyed by install name.
      */
-    plugins?: Record<string, PluginImplementation>;
 }
 
 /**
@@ -346,10 +336,6 @@ export const jobRouter = <HandlerContext>(meta: JobsMeta): Router<Routes, Handle
         [RUN_ROUTE_KEY]: runHandler<HandlerContext>(meta),
     }) as unknown as Router<Routes, HandlerContext>;
 
-/**
- * The job runner an adapter hands to every handler, built from what
- * `server.jobs` stamped on the api.
- */
 /**
  * Type-only key under which an {@link Adapter} carries the handler context its
  * framework hands to every handler. Never present at runtime.
