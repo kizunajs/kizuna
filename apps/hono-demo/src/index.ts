@@ -1,7 +1,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 
-import config from '../kizuna.config';
+import kizuna from '../kizuna.config';
 
 const app = new Hono();
 
@@ -31,7 +31,7 @@ app.get('/', (c) => {
 </html>`);
 });
 
-config.api.mount(app);
+kizuna.api.mount(app);
 
 const port = Number(process.env.PORT ?? 8001);
 serve(

@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { build, type Plugin } from 'esbuild';
 import { generateFetchClient } from '../packages/fetch/src/generator.js';
-import config from '../apps/express-demo/kizuna.config.js';
+import kizuna from '../apps/express-demo/kizuna.config.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const PACKAGES_DIR = path.join(ROOT, 'packages');
@@ -195,7 +195,7 @@ const DEMO_CONFIG = path.join(ROOT, 'apps/express-demo/kizuna.config.ts');
  */
 const generatedClient = (): string => {
     const file = path.join(ROOT, `tests/.generated-client-${process.pid}.ts`);
-    fs.writeFileSync(file, generateFetchClient(config.api as never));
+    fs.writeFileSync(file, generateFetchClient(kizuna.api as never));
     return file;
 };
 
