@@ -31,9 +31,9 @@ export const questions: Question[] = [
             <>
                 <p className={styles.body}>One config, a fully typed stack.</p>
                 <p className={styles.body}>
-                    Describe your API once. ts-kizuna infers a typed server and a client you call like a function straight from your routes,
-                    and generates OpenAPI docs, native Swift and Kotlin clients, and an MCP server from the same definition. No copying
-                    types between repos, no docs to keep up to date by hand.
+                    Describe your API once. ts-kizuna serves it as a typed REST API, an OpenAPI document and an MCP endpoint, and generates
+                    the TypeScript, Swift and Kotlin clients that call it. No copying types between repos, no docs to keep up to date by
+                    hand.
                 </p>
                 <p className={styles.body}>
                     Change the API and your editor shows you everything that breaks, right then. Deprecate a field and every caller sees it
@@ -106,8 +106,8 @@ export const questions: Question[] = [
         question: 'Can I use my API from non-TypeScript clients?',
         answer: (
             <p className={styles.body}>
-                Yes. ts-kizuna describes a real REST API, so anything that speaks HTTP can call it. The same routes also generate an OpenAPI
-                document, native Swift and Kotlin clients, and an MCP server.
+                Yes. ts-kizuna describes a real REST API, so anything that speaks HTTP can call it. The same routes generate native Swift
+                and Kotlin clients, and are served as an OpenAPI document and an MCP endpoint.
             </p>
         ),
     },

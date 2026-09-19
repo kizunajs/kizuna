@@ -202,8 +202,8 @@ try {
     },
     {
         icon: <McpLogo className={styles.icon} />,
-        label: 'MCP server',
-        description: 'Your routes as tools for AI agents',
+        label: 'MCP endpoint',
+        description: 'Routes declaring a tool, for AI agents',
         content: <ClaudeWindow />,
     },
     {
