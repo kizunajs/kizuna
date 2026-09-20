@@ -664,15 +664,6 @@ export namespace API {
             }; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
-
-    export namespace DiagnosticsWhoAmI {
-        export type Result =
-            | { status: 200; body: {
-                url: string;
-                method: string;
-                userAgent?: string | null;
-            }; headers: Record<string, string> };
-    }
 }
 
 export interface Client {
@@ -1179,18 +1170,6 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.ToolsCountWords.Result>;
     };
-    diagnostics: {
-        /**
-         * Report the caller as Hono sees it
-         *
-         * @example
-         * const result = await client.diagnostics.whoAmI();
-         */
-        whoAmI: ClientMethod<'GET', false, {
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.DiagnosticsWhoAmI.Result>;
-    };
 }
 
 const routes: GeneratedRoutes = {
@@ -1484,15 +1463,6 @@ const routes: GeneratedRoutes = {
         countWords: {
             method: 'POST',
             path: '/text/word-count',
-            responses: {
-                200: {},
-            },
-        },
-    },
-    diagnostics: {
-        whoAmI: {
-            method: 'GET',
-            path: '/diagnostics/caller',
             responses: {
                 200: {},
             },

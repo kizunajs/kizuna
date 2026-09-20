@@ -1,5 +1,6 @@
 import type { z } from 'zod';
-import type { Contract, RouteDefinition, Routes } from '@ts-kizuna/core';
+import type { ApiDefinition, RouteDefinition, Routes } from '@ts-kizuna/core';
+import { ValidationErrorSchema } from '@ts-kizuna/core/schemas';
 import {
     isStreamResponse,
     readObjectShape,
@@ -173,6 +174,11 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
 
     args.push('fetchOptions?: RequestInit');
 
+    // The route tree never carries the automatic 400, so the union adds it here.
+    const validates = route.body !== undefined || route.query !== undefined;
+    const declaredBadRequest = Object.keys(route.responses).includes('400');
+    const validationBody = validates ? typeOf(ValidationErrorSchema, collector, 'ValidationError') : undefined;
+
     const results = Object.entries(route.responses).map(([status, response]) => {
         const headers = resolveResponseHeaders(response);
         const headerType = headers ? typeOf(headers, collector, `${namespace}${status}Headers`) : 'Record<string, string>';
@@ -188,13 +194,17 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
 
         const schema = resolveResponseBody(response);
         const body = schema ? typeOf(schema, collector, `${namespace}${status}`) : 'undefined';
-        return `{ status: ${status}; body: ${body}; headers: ${headerType} }`;
+        const widened = status === '400' && validationBody ? `${body} | ${validationBody}` : body;
+        return `{ status: ${status}; body: ${widened}; headers: ${headerType} }`;
     });
+
+    if (validationBody && !declaredBadRequest) {
+        results.push(`{ status: 400; body: ${validationBody}; headers: Record<string, string> }`);
+    }
 
     members.push(`export type Result =\n${indent(results.map((result) => `| ${result}`).join('\n'))};`);
 
     const argsType = `{\n${indent(args.map((arg) => `${arg};`).join('\n'))}\n}`;
-    const optional = args.every((arg) => arg.includes('?:'));
 
     const tableEntries = [`method: '${route.method}'`, `path: '${route.path}'`];
     if (route.contentType) tableEntries.push(`contentType: '${route.contentType}'`);
@@ -203,9 +213,11 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
     );
     tableEntries.push(`responses: {\n${indent(responses.map((entry) => `${entry},`).join('\n'))}\n}`);
 
+    const streams = Object.values(route.responses).some((response) => isStreamResponse(response));
+
     return {
         namespace,
-        signature: `${routeDoc(routeKey, route)}${key}(args${optional ? '?' : ''}: ${argsType}): Promise<API.${namespace}.Result>;`,
+        signature: `${routeDoc(routeKey, route)}${key}: ClientMethod<'${route.method}', ${streams}, ${argsType}, API.${namespace}.Result>;`,
         declaration: `export namespace ${namespace} {\n${indent(members.join('\n\n'))}\n}`,
         table: `${key}: {\n${indent(tableEntries.map((entry) => `${entry},`).join('\n'))}\n},`,
     };
@@ -260,7 +272,7 @@ const emitTree = (routes: Routes, prefix: string, collector: TypeCollector): Tre
  * The headers a request context declares, as one interface the caller fills
  * once. Absent when the API declares no request context that reads headers.
  */
-const emitRequestContext = (contract: Contract, collector: TypeCollector): string | undefined => {
+const emitRequestContext = (contract: ApiDefinition, collector: TypeCollector): string | undefined => {
     const declarations = Object.values(contract.requestContext ?? {});
     const fields: string[] = [];
     for (const declaration of declarations) {
@@ -280,7 +292,7 @@ const emitRequestContext = (contract: Contract, collector: TypeCollector): strin
     return fields.length > 0 ? `export interface RequestContext {\n${indent(fields.join('\n'))}\n}` : undefined;
 };
 
-export const generateFetchClient = (contract: Contract, options: FetchClientOptions = {}): string => {
+export const generateFetchClient = (contract: ApiDefinition, options: FetchClientOptions = {}): string => {
     const { runtimeModule = '@ts-kizuna/fetch', regenerateCommand = 'kizuna generate', source } = options;
     const collector = new TypeCollector();
     const tree = emitTree(contract.routes, '', collector);
@@ -304,7 +316,7 @@ export const generateFetchClient = (contract: Contract, options: FetchClientOpti
 /**
 ${header}
  */
-import { createGeneratedClient, type ClientConfig, type GeneratedRoutes } from '${runtimeModule}';
+import { createGeneratedClient, type ClientConfig, type ClientMethod, type GeneratedRoutes } from '${runtimeModule}';
 
 export namespace API {
 ${indent(api)}

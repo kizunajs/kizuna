@@ -4,7 +4,7 @@
  *
  * Regenerate: kizuna generate
  */
-import { createGeneratedClient, type ClientConfig, type GeneratedRoutes } from '@ts-kizuna/fetch';
+import { createGeneratedClient, type ClientConfig, type ClientMethod, type GeneratedRoutes } from '@ts-kizuna/fetch';
 
 export namespace API {
     export type CreateUserInput = {
@@ -129,6 +129,21 @@ export namespace API {
         }>;
     };
 
+    /**
+     * RFC 9457 Problem Details error response for validation failures.
+     */
+    export type ValidationError = {
+        type: string;
+        title: string;
+        status: number;
+        detail: string;
+        errors: Array<{
+            code: "invalid_type" | "too_small" | "too_big" | "invalid_string_format" | "not_multiple_of" | "unrecognized_keys" | "invalid_union" | "invalid_key" | "invalid_element" | "invalid_value" | "custom" | string;
+            path: Array<string>;
+            message: string;
+        }>;
+    };
+
     export namespace UsersListUsers {
         export type Query = {
             /**
@@ -151,7 +166,8 @@ export namespace API {
             | { status: 200; body: {
                 users: Array<User>;
                 total: number;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersExportUsers {
@@ -199,7 +215,8 @@ export namespace API {
             | { status: 200; body: {
                 users: Array<User>;
                 nextCursor?: number | null;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersGetUser {
@@ -248,7 +265,7 @@ export namespace API {
 
         export type Result =
             | { status: 201; body: User; headers: Record<string, string> }
-            | { status: 400; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersDeleteUser {
@@ -289,7 +306,8 @@ export namespace API {
             | { status: 200; body: {
                 size: number;
                 userId: string;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersPingUser {
@@ -300,7 +318,8 @@ export namespace API {
         export type Body = undefined;
 
         export type Result =
-            | { status: 204; body: undefined; headers: Record<string, string> };
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersGetMyWork {
@@ -359,7 +378,8 @@ export namespace API {
         export type Result =
             | { status: 202; body: {
                 accepted: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace NotificationsListEvents {
@@ -394,7 +414,8 @@ export namespace API {
                     tagIds?: Array<string> | null;
                     sessionId?: string | null;
                 };
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace NotificationsValidateConfig {
@@ -407,7 +428,7 @@ export namespace API {
             | { status: 200; body: {
                 status: string;
             }; headers: Record<string, string> }
-            | { status: 400; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
             | { status: 401; body: undefined; headers: Record<string, string> };
     }
 
@@ -417,7 +438,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 received: boolean;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace MembersListMembers {
@@ -442,7 +464,8 @@ export namespace API {
                 "www-authenticate"?: string;
             } }
             | { status: 403; body: GuardDenial; headers: Record<string, string> }
-            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace MembersCancelInvite {
@@ -490,7 +513,8 @@ export namespace API {
                 ok: boolean;
             }; headers: Record<string, string> }
             | { status: 401; body: GuardDenial; headers: Record<string, string> }
-            | { status: 403; body: GuardDenial; headers: Record<string, string> };
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace InvitesGetInvite {
@@ -523,7 +547,8 @@ export namespace API {
             }; headers: Record<string, string> }
             | { status: 401; body: GuardDenial; headers: Record<string, string> }
             | { status: 403; body: GuardDenial; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace AssistantReply {
@@ -592,7 +617,7 @@ export namespace API {
                 name: "getForecast" | "plotSignups" | "countWords";
                 message: string;
             }; id?: string; retry?: number }>; headers: Record<string, string> }
-            | { status: 400; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> };
     }
 
     export namespace ToolsGetForecast {
@@ -609,7 +634,8 @@ export namespace API {
                 temperature: number;
                 unit: "celsius" | "fahrenheit";
                 summary: string;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace ToolsPlotSignups {
@@ -623,7 +649,8 @@ export namespace API {
                     date: string;
                     signups: number;
                 }>;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace ToolsCountWords {
@@ -634,7 +661,8 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 words: number;
-            }; headers: Record<string, string> };
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace DiagnosticsWhoAmI {
@@ -655,21 +683,21 @@ export interface Client {
          * @example
          * const result = await client.users.listUsers();
          */
-        listUsers(args?: {
+        listUsers: ClientMethod<'GET', false, {
             query?: API.UsersListUsers.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersListUsers.Result>;
+        }, API.UsersListUsers.Result>;
         /**
          * Export users as CSV, exercises a non-JSON (text/csv) raw response body
          *
          * @example
          * const result = await client.users.exportUsers();
          */
-        exportUsers(args?: {
+        exportUsers: ClientMethod<'GET', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersExportUsers.Result>;
+        }, API.UsersExportUsers.Result>;
         /**
          * Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag
          *
@@ -680,11 +708,11 @@ export interface Client {
          *     },
          * });
          */
-        userBadge(args: {
+        userBadge: ClientMethod<'GET', false, {
             params: API.UsersUserBadge.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersUserBadge.Result>;
+        }, API.UsersUserBadge.Result>;
         /**
          * A user's most recent login or logout, inline union variants nest under the User model in native clients
          *
@@ -695,11 +723,11 @@ export interface Client {
          *     },
          * });
          */
-        lastSessionEvent(args: {
+        lastSessionEvent: ClientMethod<'GET', false, {
             params: API.UsersLastSessionEvent.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersLastSessionEvent.Result>;
+        }, API.UsersLastSessionEvent.Result>;
         /**
          * Search users, required coerced limit and cursor
          *
@@ -712,11 +740,11 @@ export interface Client {
          *     },
          * });
          */
-        searchUsers(args?: {
+        searchUsers: ClientMethod<'GET', false, {
             query?: API.UsersSearchUsers.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersSearchUsers.Result>;
+        }, API.UsersSearchUsers.Result>;
         /**
          * Get a user by id
          *
@@ -727,11 +755,11 @@ export interface Client {
          *     },
          * });
          */
-        getUser(args: {
+        getUser: ClientMethod<'GET', false, {
             params: API.UsersGetUser.Params;
             headers?: API.UsersGetUser.Headers;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersGetUser.Result>;
+        }, API.UsersGetUser.Result>;
         /**
          * Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response
          *
@@ -743,11 +771,11 @@ export interface Client {
          *     },
          * });
          */
-        userActivity(args: {
+        userActivity: ClientMethod<'GET', false, {
             params: API.UsersUserActivity.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersUserActivity.Result>;
+        }, API.UsersUserActivity.Result>;
         /**
          * Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with
          *
@@ -758,11 +786,11 @@ export interface Client {
          *     },
          * });
          */
-        userProfile(args: {
+        userProfile: ClientMethod<'GET', false, {
             params: API.UsersUserProfile.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersUserProfile.Result>;
+        }, API.UsersUserProfile.Result>;
         /**
          * Create a user
          *
@@ -774,11 +802,11 @@ export interface Client {
          *     },
          * });
          */
-        createUser(args: {
+        createUser: ClientMethod<'POST', false, {
             body: API.UsersCreateUser.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersCreateUser.Result>;
+        }, API.UsersCreateUser.Result>;
         /**
          * Delete a user
          *
@@ -791,11 +819,11 @@ export interface Client {
          *     },
          * });
          */
-        deleteUser(args: {
+        deleteUser: ClientMethod<'DELETE', false, {
             params: API.UsersDeleteUser.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersDeleteUser.Result>;
+        }, API.UsersDeleteUser.Result>;
         /**
          * Archive a user, first call returns 201, subsequent calls 200
          *
@@ -806,11 +834,11 @@ export interface Client {
          *     },
          * });
          */
-        archiveUser(args: {
+        archiveUser: ClientMethod<'POST', false, {
             params: API.UsersArchiveUser.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersArchiveUser.Result>;
+        }, API.UsersArchiveUser.Result>;
         /**
          * Upload an avatar image
          *
@@ -822,11 +850,11 @@ export interface Client {
          *     },
          * });
          */
-        uploadAvatar(args: {
+        uploadAvatar: ClientMethod<'POST', false, {
             body: API.UsersUploadAvatar.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersUploadAvatar.Result>;
+        }, API.UsersUploadAvatar.Result>;
         /**
          * Ping a user, exercises z.void() body and response
          *
@@ -838,22 +866,22 @@ export interface Client {
          *     body: undefined,
          * });
          */
-        pingUser(args: {
+        pingUser: ClientMethod<'POST', false, {
             params: API.UsersPingUser.Params;
             body: API.UsersPingUser.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersPingUser.Result>;
+        }, API.UsersPingUser.Result>;
         /**
          * List work items, exercises a z.void() arm in a multi-status success union and enum values that are not valid Swift identifiers
          *
          * @example
          * const result = await client.users.getMyWork();
          */
-        getMyWork(args?: {
+        getMyWork: ClientMethod<'GET', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersGetMyWork.Result>;
+        }, API.UsersGetMyWork.Result>;
         /**
          * Check user existence, exercises HEAD body stripping
          *
@@ -864,21 +892,21 @@ export interface Client {
          *     },
          * });
          */
-        checkUser(args: {
+        checkUser: ClientMethod<'HEAD', false, {
             params: API.UsersCheckUser.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersCheckUser.Result>;
+        }, API.UsersCheckUser.Result>;
         /**
          * Describe allowed operations, exercises OPTIONS routing
          *
          * @example
          * const result = await client.users.describeUsers();
          */
-        describeUsers(args?: {
+        describeUsers: ClientMethod<'OPTIONS', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.UsersDescribeUsers.Result>;
+        }, API.UsersDescribeUsers.Result>;
     };
     health: {
         /**
@@ -887,30 +915,30 @@ export interface Client {
          * @example
          * const result = await client.health.check();
          */
-        check(args?: {
+        check: ClientMethod<'GET', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.HealthCheck.Result>;
+        }, API.HealthCheck.Result>;
         /**
          * Version, exercises second method in a sub-client group
          *
          * @example
          * const result = await client.health.version();
          */
-        version(args?: {
+        version: ClientMethod<'GET', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.HealthVersion.Result>;
+        }, API.HealthVersion.Result>;
         /**
          * Health history, exercises array return type qualification
          *
          * @example
          * const result = await client.health.history();
          */
-        history(args?: {
+        history: ClientMethod<'GET', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.HealthHistory.Result>;
+        }, API.HealthHistory.Result>;
     };
     notifications: {
         /**
@@ -925,22 +953,22 @@ export interface Client {
          *     },
          * });
          */
-        sendNotification(args: {
+        sendNotification: ClientMethod<'POST', false, {
             body: API.NotificationsSendNotification.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.NotificationsSendNotification.Result>;
+        }, API.NotificationsSendNotification.Result>;
         /**
          * List events, exercises Date / enum / array query params
          *
          * @example
          * const result = await client.notifications.listEvents();
          */
-        listEvents(args?: {
+        listEvents: ClientMethod<'GET', false, {
             query?: API.NotificationsListEvents.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.NotificationsListEvents.Result>;
+        }, API.NotificationsListEvents.Result>;
         /**
          * Validate schemas, exercises generator bug coverage
          *
@@ -952,11 +980,11 @@ export interface Client {
          *     },
          * });
          */
-        validateConfig(args: {
+        validateConfig: ClientMethod<'POST', false, {
             body: API.NotificationsValidateConfig.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.NotificationsValidateConfig.Result>;
+        }, API.NotificationsValidateConfig.Result>;
         /**
          * Receive arbitrary webhook payload, exercises z.any() / AnyCodable codegen
          *
@@ -965,11 +993,11 @@ export interface Client {
          *     body: undefined,
          * });
          */
-        webhook(args: {
+        webhook: ClientMethod<'POST', false, {
             body: API.NotificationsWebhook.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.NotificationsWebhook.Result>;
+        }, API.NotificationsWebhook.Result>;
     };
     members: {
         /**
@@ -978,10 +1006,10 @@ export interface Client {
          * @example
          * const result = await client.members.listMembers();
          */
-        listMembers(args?: {
+        listMembers: ClientMethod<'GET', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.MembersListMembers.Result>;
+        }, API.MembersListMembers.Result>;
         /**
          * Invite a member to the workspace
          *
@@ -992,11 +1020,11 @@ export interface Client {
          *     },
          * });
          */
-        inviteMember(args: {
+        inviteMember: ClientMethod<'POST', false, {
             body: API.MembersInviteMember.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.MembersInviteMember.Result>;
+        }, API.MembersInviteMember.Result>;
         /**
          * Cancel an invite, an admin only their own
          *
@@ -1007,11 +1035,11 @@ export interface Client {
          *     },
          * });
          */
-        cancelInvite(args: {
+        cancelInvite: ClientMethod<'DELETE', false, {
             params: API.MembersCancelInvite.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.MembersCancelInvite.Result>;
+        }, API.MembersCancelInvite.Result>;
     };
     workspace: {
         /**
@@ -1020,20 +1048,20 @@ export interface Client {
          * @example
          * const result = await client.workspace.getWorkspace();
          */
-        getWorkspace(args?: {
+        getWorkspace: ClientMethod<'GET', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.WorkspaceGetWorkspace.Result>;
+        }, API.WorkspaceGetWorkspace.Result>;
         /**
          * Delete the workspace, owner only
          *
          * @example
          * const result = await client.workspace.deleteWorkspace();
          */
-        deleteWorkspace(args?: {
+        deleteWorkspace: ClientMethod<'DELETE', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.WorkspaceDeleteWorkspace.Result>;
+        }, API.WorkspaceDeleteWorkspace.Result>;
         /**
          * Transfer ownership, owner only
          *
@@ -1044,11 +1072,11 @@ export interface Client {
          *     },
          * });
          */
-        transfer(args: {
+        transfer: ClientMethod<'POST', false, {
             body: API.WorkspaceTransfer.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.WorkspaceTransfer.Result>;
+        }, API.WorkspaceTransfer.Result>;
     };
     invites: {
         /**
@@ -1061,11 +1089,11 @@ export interface Client {
          *     },
          * });
          */
-        getInvite(args: {
+        getInvite: ClientMethod<'GET', false, {
             params: API.InvitesGetInvite.Params;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.InvitesGetInvite.Result>;
+        }, API.InvitesGetInvite.Result>;
         /**
          * Accept an invite via the capability URL
          *
@@ -1079,12 +1107,12 @@ export interface Client {
          *     },
          * });
          */
-        acceptInvite(args: {
+        acceptInvite: ClientMethod<'POST', false, {
             params: API.InvitesAcceptInvite.Params;
             body: API.InvitesAcceptInvite.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.InvitesAcceptInvite.Result>;
+        }, API.InvitesAcceptInvite.Result>;
     };
     assistant: {
         /**
@@ -1097,11 +1125,11 @@ export interface Client {
          *     },
          * });
          */
-        reply(args: {
+        reply: ClientMethod<'POST', true, {
             body: API.AssistantReply.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.AssistantReply.Result>;
+        }, API.AssistantReply.Result>;
     };
     tools: {
         /**
@@ -1114,12 +1142,12 @@ export interface Client {
          *     },
          * });
          */
-        getForecast(args: {
+        getForecast: ClientMethod<'GET', false, {
             params: API.ToolsGetForecast.Params;
             query?: API.ToolsGetForecast.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.ToolsGetForecast.Result>;
+        }, API.ToolsGetForecast.Result>;
         /**
          * Plot signups per day over the last N days, for the client to draw as a chart
          *
@@ -1130,11 +1158,11 @@ export interface Client {
          *     },
          * });
          */
-        plotSignups(args?: {
+        plotSignups: ClientMethod<'GET', false, {
             query?: API.ToolsPlotSignups.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.ToolsPlotSignups.Result>;
+        }, API.ToolsPlotSignups.Result>;
         /**
          * Count the words in a piece of text
          *
@@ -1145,11 +1173,11 @@ export interface Client {
          *     },
          * });
          */
-        countWords(args: {
+        countWords: ClientMethod<'POST', false, {
             body: API.ToolsCountWords.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.ToolsCountWords.Result>;
+        }, API.ToolsCountWords.Result>;
     };
     diagnostics: {
         /**
@@ -1158,10 +1186,10 @@ export interface Client {
          * @example
          * const result = await client.diagnostics.whoAmI();
          */
-        whoAmI(args?: {
+        whoAmI: ClientMethod<'GET', false, {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
-        }): Promise<API.DiagnosticsWhoAmI.Result>;
+        }, API.DiagnosticsWhoAmI.Result>;
     };
 }
 

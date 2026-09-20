@@ -93,9 +93,9 @@ describe('generateFetchClient', () => {
         expect(source).toContain("200: { stream: { contentType: 'text/event-stream' } }");
     });
 
-    it('requires args only when the route does', () => {
-        expect(source).toContain('listUsers(args?: {');
-        expect(source).toContain('getUser(args: {');
+    it('carries the method and whether the response streams into each method type', () => {
+        expect(source).toContain("listUsers: ClientMethod<'GET', false, {");
+        expect(source).toContain("getUser: ClientMethod<'GET', false, {");
     });
 
     it('types each response as a member of a discriminated union', () => {
