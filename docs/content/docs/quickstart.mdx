@@ -5,9 +5,9 @@ description: Declare your routes, serve them on your framework, and call them fr
 
 ## Installation
 
-Install `@ts-kizuna/core` with Zod 4 for the schemas, and the CLI that writes your types and your clients.
+Install `@ts-kizuna/core`, Zod 4 for the schemas, your framework's adapter, and the CLI.
 
-<InstallTabs packageName="@ts-kizuna/core zod" devPackageName="@ts-kizuna/cli" />
+<InstallTabs packageName="@ts-kizuna/core zod @ts-kizuna/next" devPackageName="@ts-kizuna/cli" />
 
 Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
@@ -25,7 +25,7 @@ Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
 ## Start with the config
 
-`kizuna.config.ts` sits at the root of your app. Start by naming the framework you serve on:
+`kizuna.config.ts` sits at the root of your app. Start with your framework's adapter:
 
 ```ts title="kizuna.config.ts"
 import { defineConfig } from '@ts-kizuna/core';
@@ -39,7 +39,7 @@ export default defineConfig({
 });
 ```
 
-Naming an adapter is what puts that framework's own request in every handler's args, typed.
+The adapter puts that framework's own request in every handler's args, typed.
 
 </Step>
 
@@ -207,6 +207,8 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount
     basePath: '/api',
 });
 ```
+
+This is the one step that differs per framework. [Express, Fastify and Hono](/docs/adapters/express) each mount their own way.
 
 </Step>
 

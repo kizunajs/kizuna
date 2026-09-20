@@ -39,20 +39,20 @@ import kizuna from '../kizuna.config';
 kizuna.api.mount(app);
 ```
 
-`adapter` decides what every handler receives beside its validated inputs, so naming Express here is what puts `req` and `res` in scope for all of them, typed.
+`adapter` decides what every handler receives beside its validated inputs. Express here puts `req` and `res` in scope for all of them, typed.
 
 See [`defineConfig`](/docs/reference/define-config) for every field it takes.
 
 ## What each key brings
 
-| Key              | What naming it does                                                                                                                                                                                               |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth`           | The identities a route's `auth` can name. Each carries its own guard, so this is all the config names. An identity a route names without a guard refuses to assemble. See [Authentication](/docs/authentication). |
-| `requestContext` | Values every handler receives, resolved once per request. Resolvers run on every route, before the guards, and never deny. See [Request Context](/docs/request-context).                                          |
-| `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.                                 |
-| `plugins`        | Routes and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                                |
-| `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                                 |
-| `tags`           | The OpenAPI tags route groups sit under. See [`k.tags`](/docs/reference/k-tags).                                                                                                                                  |
+| Key              | What it brings                                                                                                                                                                                              |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`           | The identities a route's `auth` can require. Each carries its own guard, so this is all the config needs. An identity used without a guard refuses to assemble. See [Authentication](/docs/authentication). |
+| `requestContext` | Values every handler receives, resolved once per request. Resolvers run on every route, before the guards, and never deny. See [Request Context](/docs/request-context).                                    |
+| `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.                           |
+| `plugins`        | Routes and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                          |
+| `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                           |
+| `tags`           | The OpenAPI tags route groups sit under. See [`k.tags`](/docs/reference/k-tags).                                                                                                                            |
 
 ## Using what a plugin offers
 
@@ -209,7 +209,7 @@ One config is one API. A second config is a second API, with its own routes, its
 
 Split when the two have different callers. A public API versioned for outside integrators and an internal admin API answer to different people, change on different schedules, and want different clients, so one OpenAPI document describing both serves neither.
 
-Split when they are deployed apart. A config names one `adapter`, so an API on Express and an API on Next.js are already two configs.
+Split when they are deployed apart. A config has one `adapter`, so an API on Express and an API on Next.js are already two configs.
 
 Split when the surfaces should not mix. Everything in one config shares a namespace: every route reaches every plugin's exports, one `guardSchema` shapes every refusal, and every route lands in the same generated client. Two configs keep those apart.
 
@@ -267,7 +267,7 @@ import type { Config } from './kizuna.types';
 export const k = new Kizuna<Config>();
 ```
 
-A route declared against the admin `k` names the admin identities and nothing else, so naming a public identity on an admin route is a type error rather than a runtime surprise.
+A route declared against the admin `k` sees the admin identities and nothing else, so a public identity on an admin route is a type error rather than a runtime surprise.
 
 ### Running them
 
