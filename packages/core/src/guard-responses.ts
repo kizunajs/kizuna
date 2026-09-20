@@ -10,8 +10,8 @@ import { isZodSchema, resolveResponseBody } from './generator-utils.js';
  * Every hand-written error response points at the one shared
  * `ProblemDetailsSchema`, so identity cannot say who wrote a response.
  */
-const INJECTED: unique symbol = Symbol.for('ts-kizuna.guardResponse') as symbol as typeof INJECTED;
-const WIDENED: unique symbol = Symbol.for('ts-kizuna.guardResponse.declared') as symbol as typeof WIDENED;
+const INJECTED: unique symbol = Symbol.for('kizuna.guardResponse') as symbol as typeof INJECTED;
+const WIDENED: unique symbol = Symbol.for('kizuna.guardResponse.declared') as symbol as typeof WIDENED;
 
 const carries = (response: ResponseDefinition, mark: symbol): boolean =>
     typeof response === 'object' && response !== null && mark in (response as Record<symbol, unknown>);

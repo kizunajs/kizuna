@@ -1,9 +1,9 @@
 {
-  "name": "@ts-kizuna/mcp",
+  "name": "@kizunajs/mcp",
   "version": "1.64.1",
-  "description": "MCP endpoint for ts-kizuna, so AI assistants can call your routes",
+  "description": "MCP endpoint for Kizuna.js, so AI assistants can call your routes",
   "keywords": [
-    "ts-kizuna",
+    "kizunajs",
     "typescript",
     "zod",
     "openapi",
@@ -18,13 +18,13 @@
     "tools"
   ],
   "license": "MIT",
-  "homepage": "https://ts-kizuna.com/docs/mcp",
+  "homepage": "https://kizunajs.com/docs/mcp",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
     "directory": "packages/mcp"
   },
-  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
   "type": "module",
   "sideEffects": false,
   "engines": {
@@ -57,20 +57,20 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod --external @modelcontextprotocol/sdk",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external kizunajs --external zod --external @modelcontextprotocol/sdk",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0"
   },
   "peerDependencies": {
-    "@ts-kizuna/core": "workspace:*",
+    "kizunajs": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/express": "workspace:*",
+    "kizunajs": "workspace:*",
+    "@kizunajs/express": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",
     "tsdown": "catalog:",

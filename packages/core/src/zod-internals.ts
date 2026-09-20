@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Shape of a schema's internal `_zod.def`, narrowed to the fields ts-kizuna reads.
+ * Shape of a schema's internal `_zod.def`, narrowed to the fields Kizuna reads.
  */
 export interface ZodDef {
     type?: string;

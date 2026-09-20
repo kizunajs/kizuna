@@ -1,9 +1,9 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
-import { createGeneratedClient, type Client, type ClientConfig, type GeneratedRoutes } from '@ts-kizuna/fetch';
-import type { Routes } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
+import { createGeneratedClient, type Client, type ClientConfig, type GeneratedRoutes } from '@kizunajs/fetch';
+import type { Routes } from 'kizunajs';
 
 /**
  * A client over an assembled api's routes, the same runtime the generated

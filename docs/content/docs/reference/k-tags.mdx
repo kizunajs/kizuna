@@ -5,10 +5,10 @@ description: Declare the set of tags used to group routes across nested route tr
 
 Declare the tags routes are grouped under. Name the result under `tags` on [`defineConfig`](/docs/reference/define-config).
 
-<InstallTabs packageName="@ts-kizuna/core" />
+<InstallTabs packageName="kizunajs" />
 
 ```ts
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
 ```
 
 ## Parameters
@@ -32,7 +32,7 @@ A `TagSet`. Once your `Config` carries it, `k.routes` completes the group tag an
 ## Example
 
 ```ts title="tags.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
 
 export const tags = k.tags({
     users: {
@@ -44,7 +44,7 @@ export const tags = k.tags({
 ```
 
 ```ts title="k.ts"
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 import { tags } from './src/tags';
 import { routes } from './src/routes';
 

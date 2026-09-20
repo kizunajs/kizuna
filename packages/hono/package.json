@@ -1,9 +1,9 @@
 {
-  "name": "@ts-kizuna/hono",
+  "name": "@kizunajs/hono",
   "version": "1.64.1",
-  "description": "Hono adapter for ts-kizuna",
+  "description": "Hono adapter for Kizuna.js",
   "keywords": [
-    "ts-kizuna",
+    "kizunajs",
     "typescript",
     "zod",
     "openapi",
@@ -16,13 +16,13 @@
     "server"
   ],
   "license": "MIT",
-  "homepage": "https://ts-kizuna.com/docs/adapters/hono",
+  "homepage": "https://kizunajs.com/docs/adapters/hono",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
     "directory": "packages/hono"
   },
-  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
   "type": "module",
   "sideEffects": false,
   "engines": {
@@ -55,16 +55,16 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external hono --external zod",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external kizunajs --external hono --external zod",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@ts-kizuna/core": "workspace:*",
+    "kizunajs": "workspace:*",
     "hono": "^4.0.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@ts-kizuna/core": "workspace:*",
+    "kizunajs": "workspace:*",
     "hono": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

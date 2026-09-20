@@ -1,6 +1,6 @@
 import { experimental_streamedQuery as streamedQuery, skipToken } from '@tanstack/query-core';
-import { routeStreams, streamStatuses, type RouteDefinition } from '@ts-kizuna/core';
-import { routeOf } from '@ts-kizuna/fetch';
+import { routeStreams, streamStatuses, type RouteDefinition } from 'kizunajs';
+import { routeOf } from '@kizunajs/fetch';
 import { NonStreamResponseError, UndeclaredResponseError } from './errors.js';
 import { buildPathKey, buildQueryKey } from './keys.js';
 import type { KizunaTanstackQueryConstructor } from './types.js';
@@ -165,7 +165,7 @@ function buildQueryProxy(client: Record<string, unknown>): unknown {
  *
  * ```ts
  * import { useQuery } from '@tanstack/react-query';
- * import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
+ * import { KizunaTanstackQuery } from '@kizunajs/tanstack-query';
  * import { apiClient } from './api-client.js';
  *
  * const api = new KizunaTanstackQuery(apiClient);

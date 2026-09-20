@@ -28,8 +28,8 @@ import {
     jobRouter,
     jobRunnerFrom,
     type Adapter,
-} from '@ts-kizuna/core/adapter';
-import type { SecurityScheme } from '@ts-kizuna/core';
+} from 'kizunajs/adapter';
+import type { SecurityScheme } from 'kizunajs';
 
 export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
@@ -158,7 +158,7 @@ export interface KizunaPluginOptions extends FastifyOptions {
 }
 
 /**
- * Fastify plugin that mounts a ts-kizuna API.
+ * Fastify plugin that mounts a Kizuna API.
  *
  * @example
  * const app = Fastify();
@@ -255,7 +255,7 @@ export const fastifyKizuna = fastifyPlugin(
         }
     },
     {
-        name: '@ts-kizuna/fastify',
+        name: '@kizunajs/fastify',
     }
 );
 

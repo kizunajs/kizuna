@@ -1,5 +1,5 @@
 {
-  "name": "@ts-kizuna-demo/fastify",
+  "name": "@kizunajs-demo/fastify",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,17 +14,17 @@
     "kizuna:check": "kizuna generate --check"
   },
   "dependencies": {
-    "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/fastify": "workspace:*",
-    "@ts-kizuna/fetch": "workspace:*",
-    "@ts-kizuna/mcp": "workspace:*",
-    "@ts-kizuna/openapi": "workspace:*",
+    "@kizunajs-demo/shared": "workspace:*",
+    "kizunajs": "workspace:*",
+    "@kizunajs/fastify": "workspace:*",
+    "@kizunajs/fetch": "workspace:*",
+    "@kizunajs/mcp": "workspace:*",
+    "@kizunajs/openapi": "workspace:*",
     "fastify": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ts-kizuna/cli": "workspace:*",
+    "@kizunajs/cli": "workspace:*",
     "@types/node": "catalog:",
     "concurrently": "catalog:",
     "tsx": "catalog:",

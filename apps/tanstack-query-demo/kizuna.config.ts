@@ -1,6 +1,6 @@
-import { defineConfig } from '@ts-kizuna/core';
-import { fetchClient } from '@ts-kizuna/fetch/server';
-import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
+import { defineConfig } from 'kizunajs';
+import { fetchClient } from '@kizunajs/fetch/server';
+import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
 
 export default defineConfig({
     typescript: {

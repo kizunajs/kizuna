@@ -14,9 +14,9 @@ import {
     type StreamResponseDefinition,
     type Method,
     type RoutePath,
-} from '@ts-kizuna/core';
-import type { ExtractPathParams, HasPathParams } from '@ts-kizuna/core';
-import { buildPath, isRouteDefinition } from '@ts-kizuna/core';
+} from 'kizunajs';
+import type { ExtractPathParams, HasPathParams } from 'kizunajs';
+import { buildPath, isRouteDefinition } from 'kizunajs';
 import { parseServerSentEvents, readByteChunks, readTextChunks } from './sse.js';
 
 type ResponseUnion<R extends RouteDefinition> = {
@@ -219,7 +219,7 @@ export type ClientMethod<Method extends string, Streams extends boolean, Args, R
     };
 };
 
-export const CLIENT_ROUTE: unique symbol = Symbol.for('ts-kizuna.client-route') as symbol as typeof CLIENT_ROUTE;
+export const CLIENT_ROUTE: unique symbol = Symbol.for('kizuna.client-route') as symbol as typeof CLIENT_ROUTE;
 
 /**
  * The route a client method answers, or `undefined` for anything that is not

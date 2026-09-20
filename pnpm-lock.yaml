@@ -92,15 +92,15 @@ importers:
       '@eslint/js':
         specifier: ^9.39.4
         version: 9.39.4
+      '@kizunajs/eslint-plugin':
+        specifier: workspace:*
+        version: link:packages/eslint-plugin
+      '@kizunajs/fetch':
+        specifier: workspace:*
+        version: link:packages/fetch
       '@release-it/conventional-changelog':
         specifier: ^11.0.0
         version: 11.0.0(conventional-commits-filter@5.0.0)(conventional-commits-parser@6.4.0)(release-it@20.0.1(@types/node@24.12.2)(supports-color@8.1.1))
-      '@ts-kizuna/eslint-plugin':
-        specifier: workspace:*
-        version: link:packages/eslint-plugin
-      '@ts-kizuna/fetch':
-        specifier: workspace:*
-        version: link:packages/fetch
       '@types/supertest':
         specifier: ^6.0.2
         version: 6.0.3
@@ -158,32 +158,32 @@ importers:
 
   apps/express-demo:
     dependencies:
-      '@ts-kizuna-demo/shared':
+      '@kizunajs-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@ts-kizuna/express':
+      '@kizunajs/express':
         specifier: workspace:*
         version: link:../../packages/express
-      '@ts-kizuna/fetch':
+      '@kizunajs/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
-      '@ts-kizuna/mcp':
+      '@kizunajs/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
-      '@ts-kizuna/openapi':
+      '@kizunajs/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
       express:
         specifier: 'catalog:'
         version: 5.2.1(supports-color@8.1.1)
+      kizunajs:
+        specifier: workspace:*
+        version: link:../../packages/core
       zod:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
-      '@ts-kizuna/cli':
+      '@kizunajs/cli':
         specifier: workspace:*
         version: link:../../packages/cli
       '@types/express':
@@ -204,32 +204,32 @@ importers:
 
   apps/fastify-demo:
     dependencies:
-      '@ts-kizuna-demo/shared':
+      '@kizunajs-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@ts-kizuna/fastify':
+      '@kizunajs/fastify':
         specifier: workspace:*
         version: link:../../packages/fastify
-      '@ts-kizuna/fetch':
+      '@kizunajs/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
-      '@ts-kizuna/mcp':
+      '@kizunajs/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
-      '@ts-kizuna/openapi':
+      '@kizunajs/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
       fastify:
         specifier: 'catalog:'
         version: 5.8.5
+      kizunajs:
+        specifier: workspace:*
+        version: link:../../packages/core
       zod:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
-      '@ts-kizuna/cli':
+      '@kizunajs/cli':
         specifier: workspace:*
         version: link:../../packages/cli
       '@types/node':
@@ -250,32 +250,32 @@ importers:
       '@hono/node-server':
         specifier: 'catalog:'
         version: 1.19.14(hono@4.12.19)
-      '@ts-kizuna-demo/shared':
+      '@kizunajs-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@ts-kizuna/fetch':
+      '@kizunajs/fetch':
         specifier: workspace:*
         version: link:../../packages/fetch
-      '@ts-kizuna/hono':
+      '@kizunajs/hono':
         specifier: workspace:*
         version: link:../../packages/hono
-      '@ts-kizuna/mcp':
+      '@kizunajs/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
-      '@ts-kizuna/openapi':
+      '@kizunajs/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
       hono:
         specifier: 'catalog:'
         version: 4.12.19
+      kizunajs:
+        specifier: workspace:*
+        version: link:../../packages/core
       zod:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
-      '@ts-kizuna/cli':
+      '@kizunajs/cli':
         specifier: workspace:*
         version: link:../../packages/cli
       '@types/node':
@@ -293,10 +293,10 @@ importers:
 
   apps/kotlin-demo:
     dependencies:
-      '@ts-kizuna-demo/shared':
+      '@kizunajs-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@ts-kizuna/kotlin':
+      '@kizunajs/kotlin':
         specifier: workspace:*
         version: link:../../packages/kotlin
     devDependencies:
@@ -312,27 +312,27 @@ importers:
 
   apps/next-demo:
     dependencies:
+      '@kizunajs-demo/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@kizunajs/fetch':
+        specifier: workspace:*
+        version: link:../../packages/fetch
+      '@kizunajs/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
+      '@kizunajs/next':
+        specifier: workspace:*
+        version: link:../../packages/next
+      '@kizunajs/openapi':
+        specifier: workspace:*
+        version: link:../../packages/openapi
       '@scalar/nextjs-api-reference':
         specifier: ^0.10.11
         version: 0.10.11(next@16.3.3(@babel/core@7.29.7(supports-color@8.1.1))(@types/node@24.12.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
-      '@ts-kizuna-demo/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@ts-kizuna/core':
+      kizunajs:
         specifier: workspace:*
         version: link:../../packages/core
-      '@ts-kizuna/fetch':
-        specifier: workspace:*
-        version: link:../../packages/fetch
-      '@ts-kizuna/mcp':
-        specifier: workspace:*
-        version: link:../../packages/mcp
-      '@ts-kizuna/next':
-        specifier: workspace:*
-        version: link:../../packages/next
-      '@ts-kizuna/openapi':
-        specifier: workspace:*
-        version: link:../../packages/openapi
       next:
         specifier: 'catalog:'
         version: 16.3.3(@babel/core@7.29.7(supports-color@8.1.1))(@types/node@24.12.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -346,7 +346,7 @@ importers:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
-      '@ts-kizuna/cli':
+      '@kizunajs/cli':
         specifier: workspace:*
         version: link:../../packages/cli
       '@types/node':
@@ -367,15 +367,15 @@ importers:
 
   apps/shared:
     dependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@ts-kizuna/mcp':
+      '@kizunajs/mcp':
         specifier: workspace:*
         version: link:../../packages/mcp
-      '@ts-kizuna/openapi':
+      '@kizunajs/openapi':
         specifier: workspace:*
         version: link:../../packages/openapi
+      kizunajs:
+        specifier: workspace:*
+        version: link:../../packages/core
       zod:
         specifier: 'catalog:'
         version: 4.3.6
@@ -386,10 +386,10 @@ importers:
 
   apps/swift-demo:
     dependencies:
-      '@ts-kizuna-demo/shared':
+      '@kizunajs-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@ts-kizuna/swift':
+      '@kizunajs/swift':
         specifier: workspace:*
         version: link:../../packages/swift
     devDependencies:
@@ -405,21 +405,21 @@ importers:
 
   apps/tanstack-query-demo:
     dependencies:
+      '@kizunajs-demo/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@kizunajs/fetch':
+        specifier: workspace:*
+        version: link:../../packages/fetch
+      '@kizunajs/tanstack-query':
+        specifier: workspace:*
+        version: link:../../packages/tanstack-query
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
-      '@ts-kizuna-demo/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@ts-kizuna/core':
+      kizunajs:
         specifier: workspace:*
         version: link:../../packages/core
-      '@ts-kizuna/fetch':
-        specifier: workspace:*
-        version: link:../../packages/fetch
-      '@ts-kizuna/tanstack-query':
-        specifier: workspace:*
-        version: link:../../packages/tanstack-query
       react:
         specifier: 'catalog:'
         version: 19.2.8
@@ -430,7 +430,7 @@ importers:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
-      '@ts-kizuna/cli':
+      '@kizunajs/cli':
         specifier: workspace:*
         version: link:../../packages/cli
       '@types/react':
@@ -531,12 +531,12 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -571,12 +571,12 @@ importers:
         specifier: ^8.0.0
         version: 8.59.1(eslint@9.39.4(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
       eslint:
         specifier: 'catalog:'
         version: 9.39.4(jiti@2.7.0)(supports-color@8.1.1)
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -589,15 +589,15 @@ importers:
 
   packages/express:
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.6
       express:
         specifier: 'catalog:'
         version: 5.2.1(supports-color@8.1.1)
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -614,12 +614,12 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
       fastify:
         specifier: 'catalog:'
         version: 5.8.5
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -632,10 +632,7 @@ importers:
 
   packages/fetch:
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
-      '@ts-kizuna/express':
+      '@kizunajs/express':
         specifier: workspace:*
         version: link:../express
       '@types/express':
@@ -644,6 +641,9 @@ importers:
       express:
         specifier: 'catalog:'
         version: 5.2.1(supports-color@8.1.1)
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -656,12 +656,12 @@ importers:
 
   packages/hono:
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
       hono:
         specifier: 'catalog:'
         version: 4.12.19
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -674,16 +674,16 @@ importers:
 
   packages/kotlin:
     dependencies:
-      '@ts-kizuna/cli':
+      '@kizunajs/cli':
         specifier: workspace:*
         version: link:../cli
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
       '@types/node':
         specifier: ^22.9.0
         version: 22.20.0
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: ^0.21.0
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -700,21 +700,21 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0
     devDependencies:
+      '@kizunajs/express':
+        specifier: workspace:*
+        version: link:../express
       '@modelcontextprotocol/client':
         specifier: ^2.0.0
         version: 2.0.0
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
-      '@ts-kizuna/express':
-        specifier: workspace:*
-        version: link:../express
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.6
       express:
         specifier: 'catalog:'
         version: 5.2.1(supports-color@8.1.1)
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -727,7 +727,7 @@ importers:
 
   packages/next:
     devDependencies:
-      '@ts-kizuna/core':
+      kizunajs:
         specifier: workspace:*
         version: link:../core
       next:
@@ -749,10 +749,7 @@ importers:
         specifier: ^2.8.4
         version: 2.8.4
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
-      '@ts-kizuna/express':
+      '@kizunajs/express':
         specifier: workspace:*
         version: link:../express
       '@types/express':
@@ -761,6 +758,9 @@ importers:
       express:
         specifier: 'catalog:'
         version: 5.2.1(supports-color@8.1.1)
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -773,16 +773,16 @@ importers:
 
   packages/swift:
     dependencies:
-      '@ts-kizuna/cli':
+      '@kizunajs/cli':
         specifier: workspace:*
         version: link:../cli
     devDependencies:
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       tsdown:
         specifier: 'catalog:'
         version: 0.21.10(@arethetypeswrong/core@0.18.4)(publint@0.3.21)(synckit@0.11.12)(typescript@6.0.3)
@@ -795,6 +795,9 @@ importers:
 
   packages/tanstack-query:
     devDependencies:
+      '@kizunajs/fetch':
+        specifier: workspace:*
+        version: link:../fetch
       '@tanstack/query-core':
         specifier: 'catalog:'
         version: 5.101.4
@@ -807,15 +810,12 @@ importers:
       '@tanstack/vue-query':
         specifier: 'catalog:'
         version: 5.101.4(vue@3.5.41(typescript@6.0.3))
-      '@ts-kizuna/core':
-        specifier: workspace:*
-        version: link:../core
-      '@ts-kizuna/fetch':
-        specifier: workspace:*
-        version: link:../fetch
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
+      kizunajs:
+        specifier: workspace:*
+        version: link:../core
       react:
         specifier: 'catalog:'
         version: 19.2.8

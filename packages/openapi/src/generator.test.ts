@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
-import { Kizuna, type ApiDefinition } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { Kizuna, type ApiDefinition } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { renderOpenApi } from './generator.js';
 import type { GenerateOpenApiOptions } from './types.js';
 

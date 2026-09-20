@@ -11,10 +11,10 @@ MCP support is new and still settling. The plugin options and the published tool
 
 Serve an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint as part of your API. Name it under `plugins` on [`defineConfig`](/docs/reference/define-config) and `api.mount` serves it, on every adapter.
 
-<InstallTabs packageName="@ts-kizuna/mcp" />
+<InstallTabs packageName="@kizunajs/mcp" />
 
 ```ts
-import { mcpPlugin } from '@ts-kizuna/mcp';
+import { mcpPlugin } from '@kizunajs/mcp';
 ```
 
 ## Parameters
@@ -61,9 +61,9 @@ A route with no `tool` is an HTTP endpoint and nothing more. Two shapes never pu
 ## Example
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
-import { mcpPlugin } from '@ts-kizuna/mcp';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
+import { mcpPlugin } from '@kizunajs/mcp';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -104,7 +104,7 @@ plugins: [
 
 The endpoint is served by the catch-all route file that already serves your routes, so `path` resolves under its `basePath`:
 
-```ts title="src/app/api/[...ts-kizuna]/route.ts"
+```ts title="src/app/api/[...kizuna]/route.ts"
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
     basePath: '/api',
 });

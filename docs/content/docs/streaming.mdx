@@ -21,7 +21,7 @@ A `stream` takes the place of a `body` on the response:
 
 ```ts title="src/routes/assistant.ts"
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { k } from '../k';
 
 export const replyRoute = k.route({
@@ -324,7 +324,7 @@ The client iterates strings for a text stream and `Uint8Array` chunks for a bina
 An inline generator function sits inside the route's return type, so its event names infer as literals. One declared on its own has nothing to infer from, and TypeScript widens `event` to `string`. Annotate it with `StreamBody`, naming the route and the status:
 
 ```ts title="src/routes/canned-reply.ts"
-import type { StreamBody } from '@ts-kizuna/core';
+import type { StreamBody } from 'kizunajs';
 import { replyRoute } from './assistant';
 
 const cannedReply: StreamBody<typeof replyRoute, 200> = async function* () {

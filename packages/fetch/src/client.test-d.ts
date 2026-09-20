@@ -1,10 +1,10 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type ProblemDetails, type ValidationError } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { Kizuna, type ProblemDetails, type ValidationError } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { createGeneratedClient, type Client, type ClientConfig, type ContextHeaderInputs, type GeneratedRoutes } from './client.js';
-import type { ApiDefinition, RequestContextSchema, Routes, SecurityScheme, TagOptions } from '@ts-kizuna/core';
+import type { ApiDefinition, RequestContextSchema, Routes, SecurityScheme, TagOptions } from 'kizunajs';
 
 /**
  * A client over an assembled api's routes, the same runtime the generated
@@ -656,7 +656,7 @@ const pathParamsContractRoutes = k.routes('api', {
         method: 'GET',
         path: '/events/:year',
         pathParams: z.object({
-            // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- this test checks how a coerced path param is typed
+            // eslint-disable-next-line @kizunajs/no-unsupported-schema -- this test checks how a coerced path param is typed
             year: z.coerce.number(),
         }),
         responses: {

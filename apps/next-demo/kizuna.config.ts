@@ -1,9 +1,9 @@
-import { defineConfig } from '@ts-kizuna/core';
-import { fetchClient } from '@ts-kizuna/fetch/server';
-import { nextAdapter } from '@ts-kizuna/next';
-import { mcpPlugin } from '@ts-kizuna/mcp';
-import { openApiPlugin } from '@ts-kizuna/openapi';
-import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
+import { defineConfig } from 'kizunajs';
+import { fetchClient } from '@kizunajs/fetch/server';
+import { nextAdapter } from '@kizunajs/next';
+import { mcpPlugin } from '@kizunajs/mcp';
+import { openApiPlugin } from '@kizunajs/openapi';
+import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
 import { diagnostics } from './src/routes/diagnostics';
 
 /**
@@ -44,11 +44,11 @@ export default defineConfig({
     ],
     plugins: [
         mcpPlugin({
-            name: 'ts-kizuna demo',
+            name: 'Kizuna demo',
         }),
         openApiPlugin({
             info: {
-                title: 'ts-kizuna demo',
+                title: 'Kizuna demo',
                 version: '1.0.0',
             },
             setOperationId: true,

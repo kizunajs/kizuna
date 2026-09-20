@@ -8,8 +8,8 @@ description: Assemble everything one API is made of, and get back the api you mo
 It lives in `kizuna.config.ts` at the root of your app, which is where the CLI looks for it.
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
 import { routes } from './src/routes';
 import { user } from './src/identities';
 
@@ -57,7 +57,7 @@ kizuna.api.mount(app);
 The `api`: everything you declared, plus the ability to serve it. It carries `routes`, `securitySchemes`, `tags` and the rest, so anything that reads a declaration takes it directly:
 
 ```ts title="scripts/generate-openapi.ts"
-import { generateOpenApi } from '@ts-kizuna/openapi';
+import { generateOpenApi } from '@kizunajs/openapi';
 import kizuna from '../kizuna.config';
 
 const document = generateOpenApi(kizuna.api);

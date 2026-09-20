@@ -5,7 +5,7 @@ import { Section } from '@/components/landing-page/section';
 
 export const metadata: Metadata = {
     title: 'About',
-    description: 'The idea behind ts-kizuna.',
+    description: 'The idea behind Kizuna.js.',
     robots: {
         index: false,
         follow: false,

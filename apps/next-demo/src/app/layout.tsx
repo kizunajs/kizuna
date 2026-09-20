@@ -1,5 +1,5 @@
 export const metadata = {
-    title: 'ts-kizuna Next.js Demo',
+    title: 'Kizuna Next.js Demo',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

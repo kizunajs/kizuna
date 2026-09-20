@@ -28,7 +28,7 @@ const main = async (): Promise<void> => {
     console.log(`Starting express-demo server on port ${PORT}...`);
     // detached: true puts the child in its own process group so process.kill(-pid)
     // kills the entire tree (pnpm → tsx → node), not just the pnpm wrapper.
-    const server = spawn('pnpm', ['--filter', '@ts-kizuna-demo/express', 'server:once'], {
+    const server = spawn('pnpm', ['--filter', '@kizunajs-demo/express', 'server:once'], {
         env: {
             ...process.env,
             PORT: String(PORT),

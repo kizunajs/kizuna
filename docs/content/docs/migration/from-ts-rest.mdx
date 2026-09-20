@@ -7,12 +7,12 @@ Kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered.
 
 ## Package mapping
 
-| ts-rest             | Kizuna                                 | Notes                              |
-| ------------------- | -------------------------------------- | ---------------------------------- |
-| `@ts-rest/core`     | `@ts-kizuna/core` + `@ts-kizuna/fetch` | Client lives in a separate package |
-| `@ts-rest/express`  | `@ts-kizuna/express`                   |                                    |
-| `@ts-rest/next`     | `@ts-kizuna/next`                      |                                    |
-| `@ts-rest/open-api` | `@ts-kizuna/openapi`                   |                                    |
+| ts-rest             | Kizuna                         | Notes                              |
+| ------------------- | ------------------------------ | ---------------------------------- |
+| `@ts-rest/core`     | `kizunajs` + `@kizunajs/fetch` | Client lives in a separate package |
+| `@ts-rest/express`  | `@kizunajs/express`            |                                    |
+| `@ts-rest/next`     | `@kizunajs/next`               |                                    |
+| `@ts-rest/open-api` | `@kizunajs/openapi`            |                                    |
 
 ## The biggest difference
 
@@ -52,7 +52,7 @@ export const contract = c.router({ ... });
 ```
 
 ```ts title="Kizuna"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
 import type { Config } from '../kizuna.types';
 
 export const k = new Kizuna<Config>();
@@ -118,8 +118,8 @@ export const users = k.routes('users', {
 ts-rest passes its router straight to the client and the server. Kizuna assembles everything in one `kizuna.config.ts` at the root of your app, which is also where the CLI looks:
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
 import { users } from './src/routes/users';
 
 export default defineConfig({

@@ -1,4 +1,4 @@
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
 import { CoercedQuery, NestedCoerced } from './shared-schemas.js';
 
 const k = new Kizuna();

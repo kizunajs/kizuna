@@ -245,7 +245,7 @@ export type ResponseHeaders = Record<string, string>;
  * tell a route from a job from any other export. A symbol, so nothing that
  * walks a declaration's own entries sees it.
  */
-export const DECLARATION: unique symbol = Symbol.for('ts-kizuna.declaration') as symbol as typeof DECLARATION;
+export const DECLARATION: unique symbol = Symbol.for('kizuna.declaration') as symbol as typeof DECLARATION;
 
 export type DeclarationKind = 'route' | 'job' | 'tool' | 'identity' | 'requestContext';
 
@@ -254,7 +254,7 @@ export type DeclarationKind = 'route' | 'job' | 'tool' | 'identity' | 'requestCo
  * can carry both the declaration and the `handler` that attaches one.
  */
 // Registry-global: a dual ESM/CJS install would otherwise hold two different symbols.
-export const HANDLER: unique symbol = Symbol.for('ts-kizuna.handler') as symbol as typeof HANDLER;
+export const HANDLER: unique symbol = Symbol.for('kizuna.handler') as symbol as typeof HANDLER;
 
 /**
  * A handler as the route type carries it. Each route narrows its own arguments
@@ -472,13 +472,13 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
  * `flattenRoutes` and the generator use to apply the group's tag to every route
  * in it. Stamped by `k.routes`.
  */
-export const ROUTES_TAG: unique symbol = Symbol.for('ts-kizuna.routes.tag') as symbol as typeof ROUTES_TAG;
+export const ROUTES_TAG: unique symbol = Symbol.for('kizuna.routes.tag') as symbol as typeof ROUTES_TAG;
 
 /**
  * Type-only key under which `defineConfig` brands each route with its resolved
  * handler context. Never written at runtime.
  */
-export const HANDLER_CONTEXT_BRAND: unique symbol = Symbol.for('ts-kizuna.route.handlerContext') as symbol as typeof HANDLER_CONTEXT_BRAND;
+export const HANDLER_CONTEXT_BRAND: unique symbol = Symbol.for('kizuna.route.handlerContext') as symbol as typeof HANDLER_CONTEXT_BRAND;
 
 export interface HandlerContextBrand<Context> {
     readonly [HANDLER_CONTEXT_BRAND]?: Context;
@@ -488,11 +488,11 @@ export interface HandlerContextBrand<Context> {
  * Type-only key under which `defineConfig` brands a guarded route with the
  * statuses its guard answers for it. Never written at runtime.
  */
-export const AUTO_RESPONSES_BRAND: unique symbol = Symbol.for('ts-kizuna.route.autoResponses') as symbol as typeof AUTO_RESPONSES_BRAND;
+export const AUTO_RESPONSES_BRAND: unique symbol = Symbol.for('kizuna.route.autoResponses') as symbol as typeof AUTO_RESPONSES_BRAND;
 
-export const AUTO_GUARD_BRAND: unique symbol = Symbol.for('ts-kizuna.route.guardBody') as symbol as typeof AUTO_GUARD_BRAND;
+export const AUTO_GUARD_BRAND: unique symbol = Symbol.for('kizuna.route.guardBody') as symbol as typeof AUTO_GUARD_BRAND;
 export const AUTO_GUARD_WRITTEN_BRAND: unique symbol = Symbol.for(
-    'ts-kizuna.route.guardBodyWritten'
+    'kizuna.route.guardBodyWritten'
 ) as symbol as typeof AUTO_GUARD_WRITTEN_BRAND;
 
 export interface AutoResponsesBrand<Statuses extends number, Body = ProblemDetails, Written = { detail: string }> {

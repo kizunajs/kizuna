@@ -21,7 +21,7 @@ const lastSessionEvents = new Map<string, SessionEvent>([
     ['2', { kind: 'logout', at: '2026-08-03T18:42:11.000Z', reason: 'session_expired' }],
 ]);
 
-const workspaces = new Map<string, { id: string; name: string }>([['ws_1', { id: 'ws_1', name: 'ts-kizuna demo workspace' }]]);
+const workspaces = new Map<string, { id: string; name: string }>([['ws_1', { id: 'ws_1', name: 'Kizuna demo workspace' }]]);
 
 const memberships = new Map<string, { workspaceUserId: string; workspaceId: string; role: 'owner' | 'admin' }>([
     ['wst_owner', { workspaceUserId: '1', workspaceId: 'ws_1', role: 'owner' }],

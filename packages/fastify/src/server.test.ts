@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 import type { AddressInfo } from 'node:net';
 import { fastifyAdapter, type FastifyApi } from './server.js';
 import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';

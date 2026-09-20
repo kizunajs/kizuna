@@ -80,8 +80,8 @@ type PathParamsMismatch<Path extends string, Schema> =
         : [UnmatchedParam<Path, Schema>] extends [never]
           ? [UndeclaredParam<Path, Schema>] extends [never]
               ? never
-              : `ts-kizuna: path "${Path}" has parameter ":${UndeclaredParam<Path, Schema>}", which pathParams does not declare`
-          : `ts-kizuna: pathParams declares "${UnmatchedParam<Path, Schema>}", which is not a parameter in path "${Path}"`;
+              : `kizuna: path "${Path}" has parameter ":${UndeclaredParam<Path, Schema>}", which pathParams does not declare`
+          : `kizuna: pathParams declares "${UnmatchedParam<Path, Schema>}", which is not a parameter in path "${Path}"`;
 
 /**
  * Every mismatch in a route tree, as a union. The `string extends keyof Node`

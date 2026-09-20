@@ -10,7 +10,7 @@ app.get('/', (c) => {
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <title>ts-kizuna Hono demo</title>
+        <title>Kizuna Hono demo</title>
         <style>
             body { font-family: system-ui; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
             h1 { margin-bottom: 0.25rem; }
@@ -19,8 +19,8 @@ app.get('/', (c) => {
         </style>
     </head>
     <body>
-        <h1>ts-kizuna Hono demo</h1>
-        <p>This demo shares the same routes from <code>@ts-kizuna-demo/shared</code>.</p>
+        <h1>Kizuna Hono demo</h1>
+        <p>This demo shares the same routes from <code>@kizunajs-demo/shared</code>.</p>
         <ul>
             <li><a href="http://localhost:8001/users">Hono API</a>, <code>:8001/users</code></li>
             <li><a href="http://localhost:8001/docs">Hono API docs (Scalar)</a>, <code>:8001/docs</code></li>
@@ -40,6 +40,6 @@ serve(
         port,
     },
     () => {
-        console.log(`ts-kizuna hono demo on http://localhost:${port}`);
+        console.log(`Kizuna hono demo on http://localhost:${port}`);
     }
 );

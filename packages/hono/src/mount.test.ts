@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { honoAdapter } from './server.js';
 import { userInput, resetUsers } from '../../core/src/adapter-testing/fixtures.js';
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 
 describe('api.mount', () => {
     it('serves routes', async () => {

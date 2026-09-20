@@ -15,7 +15,7 @@ A **request context** is a value every handler receives, resolved once per reque
 
 ```ts title="src/request-context.ts"
 import { z } from 'zod';
-import { getHeaderValue } from '@ts-kizuna/core';
+import { getHeaderValue } from 'kizunajs';
 import { k } from './k';
 
 export const analytics = k
@@ -43,7 +43,7 @@ The resolver's `headers` are typed by the schema right above it, and its return 
 Name it under what handlers will read it by:
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 import { analytics } from './src/request-context';
 import { routes } from './src/routes';
 

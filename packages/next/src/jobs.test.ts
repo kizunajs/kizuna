@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { nextAdapter } from './server.js';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 
 interface Config {
     adapter: ReturnType<typeof nextAdapter>;

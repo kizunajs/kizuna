@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { db } from '../db';
 import { toCsv } from '../csv';
-import { Kizuna } from '@ts-kizuna/core';
-import { ProblemDetailsSchema, BinarySchema } from '@ts-kizuna/core/schemas';
+import { Kizuna } from 'kizunajs';
+import { ProblemDetailsSchema, BinarySchema } from 'kizunajs/schemas';
 import { z } from 'zod';
 import { k } from '../k';
 import { PaginationQuery } from '../pagination';

@@ -15,9 +15,9 @@ A plugin is one module. It is named on `kizuna.config.ts`, which stays on the se
 
 ## `createPlugin`
 
-```ts title="@ts-kizuna/audit/src/plugin.ts"
+```ts title="@kizunajs/audit/src/plugin.ts"
 import { z } from 'zod';
-import { createPlugin, type RoutePath, type WithSlug } from '@ts-kizuna/core/plugin';
+import { createPlugin, type RoutePath, type WithSlug } from 'kizunajs/plugin';
 
 export interface AuditPluginProps<Slug extends string = 'audit'> {
     /**
@@ -133,7 +133,7 @@ If a plugin claims a path your routes already use, `defineConfig` throws and nam
 A plugin route can return `rawResponse` when its wire format is not a JSON body, which is how MCP serves JSON-RPC over server-sent events:
 
 ```ts
-import { rawResponse } from '@ts-kizuna/core/adapter';
+import { rawResponse } from 'kizunajs/adapter';
 
 endpoint: async ({ body, headers }) => rawResponse(await transport.handleRequest(body, headers)),
 ```

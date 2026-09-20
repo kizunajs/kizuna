@@ -1,13 +1,13 @@
 import express from 'express';
-import { expressAdapter } from '@ts-kizuna/express';
+import { expressAdapter } from '@kizunajs/express';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
-import type { ApiDefinition } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
+import type { ApiDefinition } from 'kizunajs';
 import { createServer as createHttpServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { startJobsDevRunner, type JobsDevRunner } from '@ts-kizuna/core/jobs';
+import { startJobsDevRunner, type JobsDevRunner } from 'kizunajs/jobs';
 
 interface Config {
     adapter: ReturnType<typeof expressAdapter>;

@@ -43,7 +43,7 @@ const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
         if (coercedPath === undefined) continue;
         const location = coercedPath ? `${field}.${coercedPath}` : field;
         throw new Error(
-            `Route "${routeKey}" uses z.coerce at "${location}". z.coerce is not allowed in a ts-kizuna route.\n` +
+            `Route "${routeKey}" uses z.coerce at "${location}". z.coerce is not allowed in a kizuna route.\n` +
                 `kizuna automatically coerces query, path, and header params to their declared types for you, ` +
                 `so use z.number(), z.date(), or z.bigint() instead.`
         );

@@ -1,4 +1,4 @@
-import type { ClientTarget, ApiDefinition } from '@ts-kizuna/core';
+import type { ClientTarget, ApiDefinition } from 'kizunajs';
 import { generateOpenApi } from './generator.js';
 import type { GenerateOpenApiOptions } from './types.js';
 

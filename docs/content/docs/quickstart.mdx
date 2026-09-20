@@ -5,9 +5,9 @@ description: Declare your routes, serve them on your framework, and call them fr
 
 ## Installation
 
-Install `@ts-kizuna/core`, Zod 4 for the schemas, your framework's adapter, and the CLI.
+Install `kizunajs`, Zod 4 for the schemas, your framework's adapter, and the CLI.
 
-<InstallTabs packageName="@ts-kizuna/core zod @ts-kizuna/next" devPackageName="@ts-kizuna/cli" />
+<InstallTabs packageName="kizunajs zod @kizunajs/next" devPackageName="@kizunajs/cli" />
 
 Enable `strict` in your `tsconfig.json`. Kizuna's inference depends on it.
 
@@ -28,8 +28,8 @@ Enable `strict` in your `tsconfig.json`. Kizuna's inference depends on it.
 `kizuna.config.ts` sits at the root of your app. Start with your framework's adapter:
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { nextAdapter } from '@ts-kizuna/next'; // or express, fastify, hono
+import { defineConfig } from 'kizunajs';
+import { nextAdapter } from '@kizunajs/next'; // or express, fastify, hono
 
 export default defineConfig({
     adapter: nextAdapter(),
@@ -77,7 +77,7 @@ After changing a route, run `pnpm kizuna:generate`.
 Keep one `k` for the API and export it:
 
 ```ts title="src/k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
 import type { Config } from '../kizuna.types';
 
 export const k = new Kizuna<Config>();
@@ -89,7 +89,7 @@ Each route pairs a method and path with Zod schemas, and carries the handler tha
 
 ```ts title="src/routes/users.ts"
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { k } from '../k';
 
 export const UserSchema = z.object({
@@ -200,7 +200,7 @@ export default defineConfig({
 
 ## Mount it
 
-```ts title="src/app/api/[...ts-kizuna]/route.ts"
+```ts title="src/app/api/[...kizuna]/route.ts"
 import kizuna from '../../../../kizuna.config';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
@@ -218,10 +218,10 @@ This is the one step that differs per framework. [Express, Fastify and Hono](/do
 
 Add `fetchClient` to the config, pointed at the file you want written:
 
-<InstallTabs packageName="@ts-kizuna/fetch" />
+<InstallTabs packageName="@kizunajs/fetch" />
 
 ```ts title="kizuna.config.ts"
-import { fetchClient } from '@ts-kizuna/fetch/server';
+import { fetchClient } from '@kizunajs/fetch/server';
 
 export default defineConfig({
     adapter: nextAdapter(),

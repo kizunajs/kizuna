@@ -6,7 +6,7 @@ description: RFC 9728 Protected Resource Metadata schema, builder, and challenge
 The [RFC 9728 Protected Resource Metadata](https://www.rfc-editor.org/rfc/rfc9728) document an OAuth 2.0 protected resource serves at `/.well-known/oauth-protected-resource`. It tells clients which authorization servers issue tokens for the resource.
 
 ```ts
-import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
+import { ProtectedResourceMetadataSchema } from 'kizunajs/schemas';
 ```
 
 ## Shape
@@ -34,7 +34,7 @@ It is a plain Zod object schema. To name it in a generated OpenAPI spec, wrap it
 Builds the document from the resource's canonical URI and the identity whose authorization server it advertises. The `authorization_servers` entry is the identity's issuer (`issuer` on an `oauth2` identity, derived from `openIdConnectUrl` on an `openIdConnect` one) and `scopes_supported` is the flows' scope catalogue. Throws when the identity names no authorization server.
 
 ```ts
-import { buildProtectedResourceMetadata } from '@ts-kizuna/core';
+import { buildProtectedResourceMetadata } from 'kizunajs';
 import { user } from './identities';
 
 const metadata = buildProtectedResourceMetadata({
@@ -48,7 +48,7 @@ const metadata = buildProtectedResourceMetadata({
 Throws unless the value is a canonical resource URI per RFC 8707 section 2: absolute, no fragment. A query component is allowed.
 
 ```ts
-import { assertCanonicalResourceUri } from '@ts-kizuna/core';
+import { assertCanonicalResourceUri } from 'kizunajs';
 
 assertCanonicalResourceUri('https://api.example.com');
 assertCanonicalResourceUri('/v1'); // throws
@@ -59,7 +59,7 @@ assertCanonicalResourceUri('/v1'); // throws
 The derivations behind the builder, exported for reading the identity directly. `authorizationServerIssuer` returns an `oauth2` identity's `issuer`, or derives it from an `openIdConnect` identity's `openIdConnectUrl`; `declaredScopes` collects the scopes an `oauth2` identity's flows declare. Both return `undefined` when the identity has nothing to say.
 
 ```ts
-import { authorizationServerIssuer, declaredScopes } from '@ts-kizuna/core';
+import { authorizationServerIssuer, declaredScopes } from 'kizunajs';
 
 authorizationServerIssuer(user); // 'https://auth.example.com'
 declaredScopes(user); // ['users:read', 'users:write']
@@ -70,7 +70,7 @@ declaredScopes(user); // ['users:read', 'users:write']
 Formats the `WWW-Authenticate` header a resource server answers `401` and `403` with. Parameter values become RFC 9110 quoted strings, `undefined` parameters are omitted, and with none left the bare scheme remains.
 
 ```ts
-import { bearerChallenge } from '@ts-kizuna/core/adapter';
+import { bearerChallenge } from 'kizunajs/adapter';
 
 bearerChallenge({
     error: 'insufficient_scope',

@@ -7,7 +7,7 @@ const ROOT_README = path.join(ROOT, 'README.md');
 const CORE_README = path.join(ROOT, 'packages', 'core', 'README.md');
 
 /**
- * `@ts-kizuna/core` is the package consumers install first, so npm renders the
+ * `kizunajs` is the package consumers install first, so npm renders the
  * project's own front door on its page. That means the file is duplicated, and a
  * copy is only useful while it still matches.
  */

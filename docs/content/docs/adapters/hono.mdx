@@ -3,11 +3,11 @@ title: Hono
 description: Mount a Kizuna API on a Hono application.
 ---
 
-`@ts-kizuna/hono` serves a Kizuna API from a [Hono](https://hono.dev) application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
+`@kizunajs/hono` serves a Kizuna API from a [Hono](https://hono.dev) application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
 
 **Requires Hono >= 4.**
 
-<InstallTabs packageName="@ts-kizuna/hono hono" />
+<InstallTabs packageName="@kizunajs/hono hono" />
 
 ## The adapter
 
@@ -76,8 +76,8 @@ export const users = k.routes('users', {
 ## Name Hono in your config
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { honoAdapter } from '@ts-kizuna/hono';
+import { defineConfig } from 'kizunajs';
+import { honoAdapter } from '@kizunajs/hono';
 import { users } from './src/routes/users';
 
 export default defineConfig({

@@ -1,5 +1,5 @@
 import express from 'express';
-import { startJobsDevRunner } from '@ts-kizuna/core/jobs';
+import { startJobsDevRunner } from 'kizunajs/jobs';
 
 import kizuna from '../kizuna.config';
 
@@ -11,7 +11,7 @@ app.get('/', (_req, res) => {
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <title>ts-kizuna demos</title>
+        <title>Kizuna demos</title>
         <style>
             body { font-family: system-ui; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
             h1 { margin-bottom: 0.25rem; }
@@ -20,8 +20,8 @@ app.get('/', (_req, res) => {
         </style>
     </head>
     <body>
-        <h1>ts-kizuna demos</h1>
-        <p>Both demos share the same routes from <code>@ts-kizuna-demo/shared</code>.</p>
+        <h1>Kizuna demos</h1>
+        <p>Both demos share the same routes from <code>@kizunajs-demo/shared</code>.</p>
         <ul>
             <li><a href="http://localhost:8000/users">Express API</a>, <code>:8000/users</code> (this server)</li>
             <li><a href="http://localhost:8000/docs">Express API docs (Scalar)</a>, <code>:8000/docs</code></li>
@@ -43,7 +43,7 @@ kizuna.api.mount(app);
 
 const port = Number(process.env.PORT ?? 8000);
 app.listen(port, () => {
-    console.log(`ts-kizuna express demo on http://localhost:${port}`);
+    console.log(`Kizuna express demo on http://localhost:${port}`);
 
     if (process.env.NODE_ENV !== 'production') {
         startJobsDevRunner(kizuna.api, {

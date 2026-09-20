@@ -1,5 +1,5 @@
 {
-  "name": "@ts-kizuna-demo/tanstack-query",
+  "name": "@kizunajs-demo/tanstack-query",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,16 +12,16 @@
   },
   "dependencies": {
     "@tanstack/react-query": "catalog:",
-    "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/fetch": "workspace:*",
-    "@ts-kizuna/tanstack-query": "workspace:*",
+    "@kizunajs-demo/shared": "workspace:*",
+    "kizunajs": "workspace:*",
+    "@kizunajs/fetch": "workspace:*",
+    "@kizunajs/tanstack-query": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ts-kizuna/cli": "workspace:*",
+    "@kizunajs/cli": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",

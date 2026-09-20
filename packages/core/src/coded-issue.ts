@@ -4,7 +4,7 @@ import type { BuiltinIssueCode, ValidationIssueCode } from './validation-error.j
 /**
  * A validation issue carrying a custom machine-readable {@link code}.
  *
- * The `code` may be any string. ts-kizuna surfaces it verbatim in the
+ * The `code` may be any string. Kizuna surfaces it verbatim in the
  * `errors[].code` field of its RFC 9457 validation error response.
  */
 export interface CodedIssue<Input> {

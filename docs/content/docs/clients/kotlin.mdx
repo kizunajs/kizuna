@@ -9,9 +9,9 @@ The Kotlin client is new and still settling. The generated API surface may chang
 
 </BetaNotice>
 
-`@ts-kizuna/kotlin` generates a native Kotlin client from your ts-kizuna routes. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
+`@kizunajs/kotlin` generates a native Kotlin client from your Kizuna routes. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
 
-<InstallTabs packageName="@ts-kizuna/kotlin" />
+<InstallTabs packageName="@kizunajs/kotlin" />
 
 <Steps>
 
@@ -39,7 +39,7 @@ dependencies {
 Point `kotlinClient` at the file you want written:
 
 ```ts title="kizuna.config.ts"
-import { kotlinClient } from '@ts-kizuna/kotlin';
+import { kotlinClient } from '@kizunajs/kotlin';
 
 export default defineConfig({
     adapter: expressAdapter(),
@@ -68,10 +68,10 @@ kizuna generate
 
 ### Without the config
 
-`ts-kizuna-kotlin` generates one client on its own, for a repository that does not run `kizuna generate`:
+`kizuna-kotlin` generates one client on its own, for a repository that does not run `kizuna generate`:
 
 ```sh title="Terminal"
-ts-kizuna-kotlin generate --config kizuna.config.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
+kizuna-kotlin generate --config kizuna.config.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
 ```
 
 `--config` takes the path to your `kizuna.config.ts`, suffixed with an export to read something other than the default. `--camel-case` and `--unknown-enum-case` are the flag forms of the options above, and `--export` names the export to read when none is suffixed, `api` by default. The CLI loads the config at runtime.
@@ -312,7 +312,7 @@ You can add a script to your `package.json` to regenerate the client whenever yo
 ```json title="package.json"
 {
     "scripts": {
-        "generate:kotlin": "ts-kizuna-kotlin generate --config kizuna.config.ts --out ../android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example"
+        "generate:kotlin": "kizuna-kotlin generate --config kizuna.config.ts --out ../android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example"
     }
 }
 ```

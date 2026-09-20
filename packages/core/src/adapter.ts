@@ -108,15 +108,15 @@ export class ResponseValidationError extends Error {
     }
 }
 
-export const API_META: unique symbol = Symbol.for('ts-kizuna.api.meta') as symbol as typeof API_META;
-export const ROUTER_META: unique symbol = Symbol.for('ts-kizuna.router') as symbol as typeof ROUTER_META;
-export const GUARDS_META: unique symbol = Symbol.for('ts-kizuna.guards') as symbol as typeof GUARDS_META;
-export const SCHEMES_META: unique symbol = Symbol.for('ts-kizuna.schemes') as symbol as typeof SCHEMES_META;
+export const API_META: unique symbol = Symbol.for('kizuna.api.meta') as symbol as typeof API_META;
+export const ROUTER_META: unique symbol = Symbol.for('kizuna.router') as symbol as typeof ROUTER_META;
+export const GUARDS_META: unique symbol = Symbol.for('kizuna.guards') as symbol as typeof GUARDS_META;
+export const SCHEMES_META: unique symbol = Symbol.for('kizuna.schemes') as symbol as typeof SCHEMES_META;
 
-export const GUARD_SCHEMA_META: unique symbol = Symbol.for('ts-kizuna.guardSchema') as symbol as typeof GUARD_SCHEMA_META;
-export const REQUEST_CONTEXT_META: unique symbol = Symbol.for('ts-kizuna.request-context') as symbol as typeof REQUEST_CONTEXT_META;
-const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
-export const JOBS_META: unique symbol = Symbol.for('ts-kizuna.jobs') as symbol as typeof JOBS_META;
+export const GUARD_SCHEMA_META: unique symbol = Symbol.for('kizuna.guardSchema') as symbol as typeof GUARD_SCHEMA_META;
+export const REQUEST_CONTEXT_META: unique symbol = Symbol.for('kizuna.request-context') as symbol as typeof REQUEST_CONTEXT_META;
+const CONTRACT_META: unique symbol = Symbol.for('kizuna.contract');
+export const JOBS_META: unique symbol = Symbol.for('kizuna.jobs') as symbol as typeof JOBS_META;
 
 export type ApiBrand = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiBrand & {
@@ -132,7 +132,7 @@ export type ApiWithRouter<R extends Routes = Routes> = ApiBrand & {
  * The marker a guard's `deny` returns. Distinguishes a denial
  * from the context object a passing guard returns.
  */
-const GUARD_DENY: unique symbol = Symbol.for('ts-kizuna.guard.deny') as symbol as typeof GUARD_DENY;
+const GUARD_DENY: unique symbol = Symbol.for('kizuna.guard.deny') as symbol as typeof GUARD_DENY;
 
 /**
  * The result of `deny` inside a guard, short-circuits the
@@ -418,15 +418,13 @@ export const warnUnsupportedJobOptions = (
     const named = retrying.map((jobKey) => `"${jobKey}"`).join(', ');
     if (!transport) {
         logger.warn(
-            `[ts-kizuna] ${named} declare \`retry\`, but no transport is configured, so a failed run is not retried. ` +
+            `[kizuna] ${named} declare \`retry\`, but no transport is configured, so a failed run is not retried. ` +
                 'Pass one as `jobRunner.transport` in `kizuna.config.ts` to make retrying real.'
         );
         return;
     }
     if (!transport.supports.retry) {
-        logger.warn(
-            `[ts-kizuna] ${named} declare \`retry\`, but the "${transport.name}" transport does not retry, so the count is ignored.`
-        );
+        logger.warn(`[kizuna] ${named} declare \`retry\`, but the "${transport.name}" transport does not retry, so the count is ignored.`);
     }
 };
 
@@ -1342,7 +1340,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 const override = await definition.onError(error, request);
                 if (override) return override;
             } catch (hookError) {
-                console.error('[ts-kizuna] onError hook threw:', hookError);
+                console.error('[kizuna] onError hook threw:', hookError);
             }
         }
         return {
@@ -1401,7 +1399,7 @@ export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, Res
         }
         if (sorted.length > 0 && mounted === 0) {
             throw new Error(
-                `ts-kizuna mounted 0 of ${sorted.length} routes: no handler resolved for any route key (first was '${sorted[0]!.routeKey}'). ` +
+                `Kizuna mounted 0 of ${sorted.length} routes: no handler resolved for any route key (first was '${sorted[0]!.routeKey}'). ` +
                     `The router's shape does not match the contract's route keys.`
             );
         }
@@ -1454,7 +1452,7 @@ const contentByteLength = (body: unknown, raw: boolean | undefined): number => {
 };
 
 /**
- * Maps an `AdapterResult` to `{ status, headers, body }` using ts-kizuna's default
+ * Maps an `AdapterResult` to `{ status, headers, body }` using Kizuna's default
  * JSON conventions (e.g. 405 with an `Allow` header, 400 with `{ detail, errors }`
  * for validation failures). Adapters that speak JSON delegate `respond` to this
  * instead of writing the switch by hand.

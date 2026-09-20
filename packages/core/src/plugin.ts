@@ -6,8 +6,8 @@ export type { RoutePath } from './types.js';
 
 // Registry-global: adapters read these off the api, and a dual ESM/CJS install
 // would otherwise hold two different symbols.
-export const PLUGIN_ROUTES_META_KEY: unique symbol = Symbol.for('ts-kizuna.plugin-routes') as symbol as typeof PLUGIN_ROUTES_META_KEY;
-export const PLUGIN_SERVERS_META_KEY: unique symbol = Symbol.for('ts-kizuna.plugin-servers') as symbol as typeof PLUGIN_SERVERS_META_KEY;
+export const PLUGIN_ROUTES_META_KEY: unique symbol = Symbol.for('kizuna.plugin-routes') as symbol as typeof PLUGIN_ROUTES_META_KEY;
+export const PLUGIN_SERVERS_META_KEY: unique symbol = Symbol.for('kizuna.plugin-servers') as symbol as typeof PLUGIN_SERVERS_META_KEY;
 
 /**
  * The routes a plugin serves. `api.mount` serves them through the same pipeline

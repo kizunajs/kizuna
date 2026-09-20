@@ -1,9 +1,9 @@
 {
-  "name": "@ts-kizuna/swift",
+  "name": "@kizunajs/swift",
   "version": "1.64.1",
-  "description": "Swift client generation for ts-kizuna APIs",
+  "description": "Swift client generation for Kizuna.js APIs",
   "keywords": [
-    "ts-kizuna",
+    "kizunajs",
     "typescript",
     "zod",
     "openapi",
@@ -17,13 +17,13 @@
     "client-generation"
   ],
   "license": "MIT",
-  "homepage": "https://ts-kizuna.com/docs/clients/swift",
+  "homepage": "https://kizunajs.com/docs/clients/swift",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
     "directory": "packages/swift"
   },
-  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
   "type": "module",
   "sideEffects": false,
   "engines": {
@@ -45,7 +45,7 @@
     }
   },
   "bin": {
-    "ts-kizuna-swift": "./dist/cli.mjs"
+    "kizuna-swift": "./dist/cli.mjs"
   },
   "kizuna": {
     "entries": {
@@ -59,18 +59,18 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external @ts-kizuna/cli --external zod",
+    "build": "tsdown src/index.ts src/cli.ts --format esm,cjs --dts --clean --external kizunajs --external @kizunajs/cli --external zod",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ts-kizuna/cli": "workspace:*"
+    "@kizunajs/cli": "workspace:*"
   },
   "peerDependencies": {
-    "@ts-kizuna/core": "workspace:*",
+    "kizunajs": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@ts-kizuna/core": "workspace:*",
+    "kizunajs": "workspace:*",
     "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

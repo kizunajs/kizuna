@@ -5,10 +5,10 @@ description: Generate a native Swift client from a Kizuna API with URLSession an
 
 Generate a native Swift client from your routes, built on `URLSession` and `Codable`.
 
-<InstallTabs packageName="@ts-kizuna/swift" />
+<InstallTabs packageName="@kizunajs/swift" />
 
 ```ts
-import { generateSwiftClient } from '@ts-kizuna/swift';
+import { generateSwiftClient } from '@kizunajs/swift';
 ```
 
 ## Parameters
@@ -34,7 +34,7 @@ generateSwiftClient(api: ApiDefinition, config: SwiftConfig): string
 
 ```ts title="generate-swift-client.ts"
 import { writeFileSync } from 'node:fs';
-import { generateSwiftClient } from '@ts-kizuna/swift';
+import { generateSwiftClient } from '@kizunajs/swift';
 import kizuna from '../kizuna.config';
 
 const source = generateSwiftClient(kizuna.api, {

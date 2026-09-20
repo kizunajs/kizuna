@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { nextAdapter, NextRequest, NextResponse, type NextApi } from './server.js';
 import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 

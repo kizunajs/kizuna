@@ -15,6 +15,24 @@ interface InstallTabsProps {
     dev?: boolean;
 }
 
+/**
+ * The dist-tag Kizuna packages install from while 2.0 is in prerelease. Set it
+ * to an empty string once 2.0.0 is on `latest`.
+ */
+const DIST_TAG: string = 'beta';
+
+const isKizuna = (name: string) => name === 'kizunajs' || name.startsWith('@kizunajs/');
+
+/**
+ * Tags the Kizuna packages in a command and leaves the rest alone, so `express`
+ * beside `@kizunajs/express` is still installed from `latest`.
+ */
+const tagged = (packages: string) =>
+    packages
+        .split(' ')
+        .map((name) => (DIST_TAG !== '' && isKizuna(name) ? `${name}@${DIST_TAG}` : name))
+        .join(' ');
+
 const MANAGERS = [
     {
         id: 'pnpm',
@@ -38,8 +56,8 @@ export function InstallTabs({ packageName, devPackageName, dev = false }: Instal
         <Tabs groupId="package-manager" items={MANAGERS.map((manager) => manager.id)}>
             {MANAGERS.map((manager) => {
                 const commands = [
-                    packageName === undefined ? undefined : `${manager.add} ${dev ? manager.devFlag : ''}${packageName}`,
-                    devPackageName === undefined ? undefined : `${manager.add} ${manager.devFlag}${devPackageName}`,
+                    packageName === undefined ? undefined : `${manager.add} ${dev ? manager.devFlag : ''}${tagged(packageName)}`,
+                    devPackageName === undefined ? undefined : `${manager.add} ${manager.devFlag}${tagged(devPackageName)}`,
                 ].filter((command) => command !== undefined);
 
                 return (

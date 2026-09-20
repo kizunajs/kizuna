@@ -16,7 +16,7 @@ import {
     toCamelCase,
     sanitizeFieldName,
     sanitizeIdentifier,
-} from '@ts-kizuna/core/generator';
+} from 'kizunajs/generator';
 
 export interface SwiftField {
     name: string;
@@ -151,7 +151,7 @@ const objectFields = (schema: z.core.$ZodType, registry: TypeRegistry, hint: str
         const previousWireName = seen.get(swiftName);
         if (previousWireName !== undefined && previousWireName !== key) {
             throw new Error(
-                `@ts-kizuna/swift: field key collision in ${hint}, ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(swiftName)}.`
+                `@kizunajs/swift: field key collision in ${hint}, ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(swiftName)}.`
             );
         }
         seen.set(swiftName, key);

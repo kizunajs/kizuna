@@ -1,6 +1,6 @@
 # Philosophy
 
-ts-kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RFCs and OpenAPI best practices strictly, not for convenience, not for ergonomics. When in doubt, follow the spec.
+Kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RFCs and OpenAPI best practices strictly, not for convenience, not for ergonomics. When in doubt, follow the spec.
 
 ## Specs
 
@@ -137,7 +137,7 @@ First-party adapters (in `packages/`) always ship with:
 
 # Plugins
 
-A plugin is one module, built with `createPlugin` from `@ts-kizuna/core/plugin`. It is named under `plugins` on `defineConfig`, as a list, and a config never reaches a browser, so a plugin may import anything a handler may.
+A plugin is one module, built with `createPlugin` from `kizunajs/plugin`. It is named under `plugins` on `defineConfig`, as a list, and a config never reaches a browser, so a plugin may import anything a handler may.
 
 - `slug` is the key it installs at and what handlers reach it under. Every plugin defaults its own; a factory taking `Slug` and returning `WithSlug<...>` is what lets an app rename one or install two.
 - `serve(props, api)` runs on the server and receives the assembled api, which is how a plugin reads the routes, tags and identities the app declared rather than being handed them.
@@ -150,7 +150,7 @@ Nothing else needs to know a plugin exists: its routes never join `api.routes`, 
 
 # Publishing
 
-Every package under `packages/` publishes to npmjs as `@ts-kizuna/*`. The release workflow authenticates with GitHub's OIDC token, not a stored secret: each package has a trusted publisher on npm naming this repository and `release.yaml`. There is no `NPM_TOKEN`, and nothing needs one.
+Every package under `packages/` publishes to npmjs. Core publishes unscoped as `kizunajs`, the rest as `@kizunajs/*`. The release workflow authenticates with GitHub's OIDC token, not a stored secret: each package has a trusted publisher on npm naming this repository and `release.yaml`. There is no `NPM_TOKEN`, and nothing needs one.
 
 `private: true` is what keeps a workspace package unpublished, which is why nothing in `apps/` or `docs` reaches the registry.
 
@@ -169,13 +169,13 @@ npm cannot configure a trusted publisher for a package that does not exist yet, 
 3. Publish it once by hand, from a clean checkout of the release tag, with the `private: true` line deleted in the working tree. pnpm and npm both refuse to publish a package marked private, and pnpm says so as `There are no new packages that should be published`. A tag checkout leaves HEAD detached, which pnpm's branch check rejects, so pass `--no-git-checks`:
 
     ```
-    pnpm --filter @ts-kizuna/<name> build
-    pnpm --filter @ts-kizuna/<name> publish --access public --no-git-checks
+    pnpm --filter @kizunajs/<name> build
+    pnpm --filter @kizunajs/<name> publish --access public --no-git-checks
     ```
 
     Answer the 2FA prompt. This has to be interactive, as the registry asks for a one-time password.
 
-4. Add the trusted publisher at `https://www.npmjs.com/package/@ts-kizuna/<name>/access`: GitHub Actions, `ts-kizuna`, `kizuna`, workflow `release.yaml`, no environment, both `publish` and `stage publish` allowed.
+4. Add the trusted publisher at `https://www.npmjs.com/package/@kizunajs/<name>/access`: GitHub Actions, `kizunajs`, `kizuna`, workflow `release.yaml`, no environment, both `publish` and `stage publish` allowed.
 5. Commit the removal of `private: true`, once the trusted publisher is in place. A release that runs with the flag off and no trusted publisher fails on the package.
 
 Every release after that publishes it with the rest, and the one hand-published version is the only one without a provenance attestation.
@@ -189,11 +189,11 @@ When changing any exported function, type, or option in `packages/*/src/`, check
 - `pnpm -r typecheck` runs `tsc --noEmit` across all packages. Always pair with `pnpm test` before declaring something done.
 - `pnpm typecheck:tests` typechecks every package's `src`, test files included. Each package's own tsconfig excludes them, so this is the only check that sees a type error in a test.
 - `pnpm build` rebuilds all packages. Required before typechecking after changing cross-package exports.
-- `pnpm --filter @ts-kizuna-demo/kotlin test` runs Kotlin end-to-end (starts express-demo, compiles the generated client, runs `./gradlew test`). Not part of `pnpm test`.
+- `pnpm --filter @kizunajs-demo/kotlin test` runs Kotlin end-to-end (starts express-demo, compiles the generated client, runs `./gradlew test`). Not part of `pnpm test`.
 
 ## Compiling the Kotlin demo
 
-The Kotlin demo (`apps/kotlin-demo/kotlin`) verifies that generated `@ts-kizuna/kotlin` output actually compiles. Its Gradle (8.10.2, `jvmToolchain(17)`) **rejects JDK 26** with a cryptic `What went wrong: 26.0.1` error, so run it with JDK 17:
+The Kotlin demo (`apps/kotlin-demo/kotlin`) verifies that generated `@kizunajs/kotlin` output actually compiles. Its Gradle (8.10.2, `jvmToolchain(17)`) **rejects JDK 26** with a cryptic `What went wrong: 26.0.1` error, so run it with JDK 17:
 
 ```
 JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home" ./gradlew compileKotlin

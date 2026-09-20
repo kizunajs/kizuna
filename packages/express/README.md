@@ -1,21 +1,21 @@
-# @ts-kizuna/express
+# @kizunajs/express
 
-`@ts-kizuna/express` connects a Kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
+`@kizunajs/express` connects a Kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
 
 **Requires Express >= 5.**
 
 ## Installation
 
 ```sh
-pnpm add @ts-kizuna/express express
+pnpm add @kizunajs/express express
 ```
 
 ## Usage
 
 ```ts
 // kizuna.config.ts
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -39,4 +39,4 @@ app.listen(3000);
 
 ## Documentation
 
-[Express adapter](https://ts-kizuna.com/docs/adapters/express)
+[Express adapter](https://kizunajs.com/docs/adapters/express)

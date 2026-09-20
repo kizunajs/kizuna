@@ -23,11 +23,11 @@ import {
     streamMode,
     streamContentType,
     cacheHeaders,
-} from '@ts-kizuna/core/generator';
-import { getStatusText } from '@ts-kizuna/core';
-import type { ApiDefinition, RequiredPermissions, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
+} from 'kizunajs/generator';
+import { getStatusText } from 'kizunajs';
+import type { ApiDefinition, RequiredPermissions, SecurityRequirement, TagOptions } from 'kizunajs';
 import { OPENAPI_PLUGIN_SLUG } from './plugin.js';
-import type { StreamResponseDefinition } from '@ts-kizuna/core';
+import type { StreamResponseDefinition } from 'kizunajs';
 import type {
     GenerateOpenApiOptions,
     OpenApiDocument,

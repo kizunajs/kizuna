@@ -1,5 +1,5 @@
 {
-  "name": "@ts-kizuna-demo/hono",
+  "name": "@kizunajs-demo/hono",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -15,17 +15,17 @@
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
-    "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/fetch": "workspace:*",
-    "@ts-kizuna/hono": "workspace:*",
-    "@ts-kizuna/mcp": "workspace:*",
-    "@ts-kizuna/openapi": "workspace:*",
+    "@kizunajs-demo/shared": "workspace:*",
+    "kizunajs": "workspace:*",
+    "@kizunajs/fetch": "workspace:*",
+    "@kizunajs/hono": "workspace:*",
+    "@kizunajs/mcp": "workspace:*",
+    "@kizunajs/openapi": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ts-kizuna/cli": "workspace:*",
+    "@kizunajs/cli": "workspace:*",
     "@types/node": "catalog:",
     "concurrently": "catalog:",
     "tsx": "catalog:",

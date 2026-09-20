@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, defineConfig } from '@ts-kizuna/core';
+import { Kizuna, defineConfig } from 'kizunajs';
 import { formatRoutes, routeMap } from './route-map.js';
 
 interface Config {

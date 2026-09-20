@@ -11,7 +11,7 @@ import {
     readObjectShape,
     toPascalCase,
     unwrapOptionalWrappers,
-} from '@ts-kizuna/core/generator';
+} from 'kizunajs/generator';
 
 /**
  * A named type collected while walking a schema, emitted once and referenced by

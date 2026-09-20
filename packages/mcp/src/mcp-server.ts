@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { problemDetails } from '@ts-kizuna/core';
+import { problemDetails } from 'kizunajs';
 import { McpServer, acceptedContent, inputRequired, type CallToolResult, type InputRequiredResult } from '@modelcontextprotocol/server';
-import { flattenRoutes, validateRequest } from '@ts-kizuna/core/adapter';
+import { flattenRoutes, validateRequest } from 'kizunajs/adapter';
 import {
     ResponseError,
     type AdapterRequest,
@@ -20,11 +20,11 @@ import {
     resolveSecurityRequirements,
     guardDenyFor,
     isGuardDenial,
-} from '@ts-kizuna/core/adapter';
-import { contractOf } from '@ts-kizuna/core/adapter';
-import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
+} from 'kizunajs/adapter';
+import { contractOf } from 'kizunajs/adapter';
+import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from 'kizunajs';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
-import { deriveToolNames } from '@ts-kizuna/core/generator';
+import { deriveToolNames } from 'kizunajs/generator';
 import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
 import { selectToolRoutes, toolOptionsOf } from './tool-selection.js';
 
@@ -573,7 +573,7 @@ const executeToolCall = async (
  * a tool, the corresponding handler is invoked directly.
  *
  * ```ts
- * import { createMcpServer } from '@ts-kizuna/mcp';
+ * import { createMcpServer } from '@kizunajs/mcp';
  * import { api } from './api';
  *
  * const server = createMcpServer(api);

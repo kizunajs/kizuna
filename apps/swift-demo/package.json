@@ -1,5 +1,5 @@
 {
-  "name": "@ts-kizuna-demo/swift",
+  "name": "@kizunajs-demo/swift",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/swift": "workspace:*"
+    "@kizunajs-demo/shared": "workspace:*",
+    "@kizunajs/swift": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

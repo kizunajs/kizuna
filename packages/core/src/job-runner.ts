@@ -191,7 +191,7 @@ export const createJobRunner = <Jobs_ extends Jobs>(
                     options.onError(jobKey, error);
                     return;
                 }
-                console.error(`[ts-kizuna] Queued job "${jobKey}" failed:`, error);
+                console.error(`[kizuna] Queued job "${jobKey}" failed:`, error);
             });
         };
         const delay = runAt ? runAt.getTime() - Date.now() : 0;
@@ -210,7 +210,7 @@ export const createJobRunner = <Jobs_ extends Jobs>(
         if (warned.has(`${jobKey}:${option}`)) return;
         warned.add(`${jobKey}:${option}`);
         console.warn(
-            `[ts-kizuna] Job "${jobKey}" was queued with \`${option}\`, but the "${transportName}" transport does not honour it, so it ${consequence}.`
+            `[kizuna] Job "${jobKey}" was queued with \`${option}\`, but the "${transportName}" transport does not honour it, so it ${consequence}.`
         );
     };
 

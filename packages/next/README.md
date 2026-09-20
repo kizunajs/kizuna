@@ -1,21 +1,21 @@
-# @ts-kizuna/next
+# @kizunajs/next
 
-`@ts-kizuna/next` connects a Kizuna API to the Next.js App Router, as a catch-all route handler.
+`@kizunajs/next` connects a Kizuna API to the Next.js App Router, as a catch-all route handler.
 
 **Requires Next.js >= 16.**
 
 ## Installation
 
 ```sh
-pnpm add @ts-kizuna/next
+pnpm add @kizunajs/next
 ```
 
 ## Usage
 
 ```ts
 // kizuna.config.ts
-import { defineConfig } from '@ts-kizuna/core';
-import { nextAdapter } from '@ts-kizuna/next';
+import { defineConfig } from 'kizunajs';
+import { nextAdapter } from '@kizunajs/next';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -27,7 +27,7 @@ export default defineConfig({
 Export the handlers from a catch-all route:
 
 ```ts
-// src/app/api/[...ts-kizuna]/route.ts
+// src/app/api/[...kizuna]/route.ts
 import kizuna from '../../../../kizuna.config';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
@@ -37,4 +37,4 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount
 
 ## Documentation
 
-[Next.js adapter](https://ts-kizuna.com/docs/adapters/next)
+[Next.js adapter](https://kizunajs.com/docs/adapters/next)

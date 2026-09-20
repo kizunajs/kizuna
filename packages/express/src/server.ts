@@ -27,8 +27,8 @@ import {
     jobRouter,
     jobRunnerFrom,
     type Adapter,
-} from '@ts-kizuna/core/adapter';
-import type { SecurityScheme } from '@ts-kizuna/core';
+} from 'kizunajs/adapter';
+import type { SecurityScheme } from 'kizunajs';
 
 export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
@@ -158,7 +158,7 @@ const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressRespo
 });
 
 /**
- * Mount a ts-kizuna API onto an Express app.
+ * Mount a Kizuna API onto an Express app.
  *
  * @example
  * api.mount(app);

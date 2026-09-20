@@ -9,8 +9,8 @@ import type {
     QueryObserverOptions,
     SkipToken,
 } from '@tanstack/query-core';
-import type { RouteDefinition, Routes, StreamResponseDefinition } from '@ts-kizuna/core';
-import type { Client, ClientArgs, ClientMethod, ClientResponse } from '@ts-kizuna/fetch';
+import type { RouteDefinition, Routes, StreamResponseDefinition } from 'kizunajs';
+import type { Client, ClientArgs, ClientMethod, ClientResponse } from '@kizunajs/fetch';
 
 export type KizunaQueryKeyType = 'query' | 'infinite' | 'stream';
 

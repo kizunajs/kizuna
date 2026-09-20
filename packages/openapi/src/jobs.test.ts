@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type ApiDefinition } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna, type ApiDefinition } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 import { renderOpenApi } from './generator.js';
 
 interface Config {

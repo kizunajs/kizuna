@@ -1,4 +1,4 @@
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
 
 /**
  * Every permission the demo has, grouped by what it acts on. Roles bundle

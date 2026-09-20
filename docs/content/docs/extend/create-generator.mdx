@@ -9,7 +9,7 @@ The generator API is new and still settling. `createGenerator` and the walked ro
 
 </BetaNotice>
 
-`createGenerator` from `@ts-kizuna/core/generator` lets you walk your api and produce any output, such as a typed client for another language, documentation, or a route manifest.
+`createGenerator` from `kizunajs/generator` lets you walk your api and produce any output, such as a typed client for another language, documentation, or a route manifest.
 
 The Swift and Kotlin clients, the OpenAPI document, and `kizuna routes` are all written with it.
 
@@ -27,7 +27,7 @@ You provide a factory function that receives your options and returns two method
 ## `createGenerator`
 
 ```ts title="generator.ts"
-import { createGenerator, type GeneratorRouteContext } from '@ts-kizuna/core/generator';
+import { createGenerator, type GeneratorRouteContext } from 'kizunajs/generator';
 
 interface MyOptions {
     prefix?: string;
@@ -72,10 +72,10 @@ Each `processRoute` call receives:
 
 ## Deprecation
 
-Route deprecation arrives on the context, read from the route's `deprecated` declaration. Fields declare theirs in Zod metadata; read it off any schema you walk with `readDeprecation` from `@ts-kizuna/core/generator`:
+Route deprecation arrives on the context, read from the route's `deprecated` declaration. Fields declare theirs in Zod metadata; read it off any schema you walk with `readDeprecation` from `kizunajs/generator`:
 
 ```ts
-import { readDeprecation } from '@ts-kizuna/core/generator';
+import { readDeprecation } from 'kizunajs/generator';
 
 const deprecation = readDeprecation(fieldSchema);
 if (deprecation) {
@@ -90,7 +90,7 @@ See [Deprecations](/docs/deprecations) for the authoring side.
 A schema's declared example values read off the same surface, with `readMetaExamples`. It takes `example` first and then `examples`, each of which holds one value or a list, and answers with them in order:
 
 ```ts
-import { readMetaExamples } from '@ts-kizuna/core/generator';
+import { readMetaExamples } from 'kizunajs/generator';
 
 const [example] = readMetaExamples(fieldSchema);
 ```

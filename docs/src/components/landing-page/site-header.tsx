@@ -43,11 +43,11 @@ export function SiteHeader() {
 
                 <div className={styles.right}>
                     <a
-                        href="https://github.com/ts-kizuna/kizuna"
+                        href="https://github.com/kizunajs/kizuna"
                         className={styles.github}
                         target="_blank"
                         rel="noreferrer"
-                        aria-label="ts-kizuna on GitHub">
+                        aria-label="Kizuna on GitHub">
                         <GithubIcon className={styles.githubIcon} />
                     </a>
 

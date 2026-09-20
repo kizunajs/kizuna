@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type ClientTarget } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna, type ClientTarget } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 import { checkClients, formatStale, writeClients } from './generate-clients.js';
 
 const k = new Kizuna();

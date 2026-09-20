@@ -2,10 +2,10 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { loadConfig } from '@ts-kizuna/cli';
+import { loadConfig } from '@kizunajs/cli';
 import { generateKotlinClient } from './generator.js';
 
-const usage = `Usage: ts-kizuna-kotlin generate --config <path> --out <path> --namespace-name <name>
+const usage = `Usage: kizuna-kotlin generate --config <path> --out <path> --namespace-name <name>
 
 Required:
   --config <path>          Path to a kizuna.config.ts. Suffix with an export to read

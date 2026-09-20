@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 import { generateFetchClient } from './generator.js';
 import { createGeneratedClient, type GeneratedRoutes } from './client.js';
 

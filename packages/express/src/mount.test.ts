@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { expressAdapter } from './server.js';
 import { userInput, resetUsers } from '../../core/src/adapter-testing/fixtures.js';
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 
 describe('api.mount', () => {
     it('serves routes', async () => {

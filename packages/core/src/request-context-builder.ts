@@ -13,7 +13,7 @@ export type RequestContextHandlerFor<Declaration extends RequestContextSchema, H
 ) => z.output<Declaration['context']> | Promise<z.output<Declaration['context']>>;
 
 // Registry-global: a dual ESM/CJS install would otherwise hold two different symbols.
-export const RESOLVER: unique symbol = Symbol.for('ts-kizuna.resolver') as symbol as typeof RESOLVER;
+export const RESOLVER: unique symbol = Symbol.for('kizuna.resolver') as symbol as typeof RESOLVER;
 
 /**
  * A request context and the resolver that fills it. The resolver is stored

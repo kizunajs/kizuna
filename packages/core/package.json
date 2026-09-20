@@ -1,9 +1,9 @@
 {
-  "name": "@ts-kizuna/core",
+  "name": "kizunajs",
   "version": "1.64.1",
-  "description": "Route declaration, validation, and the adapter API for ts-kizuna",
+  "description": "Route declaration, validation, and the adapter API for Kizuna.js",
   "keywords": [
-    "ts-kizuna",
+    "kizunajs",
     "typescript",
     "zod",
     "openapi",
@@ -16,13 +16,13 @@
     "http"
   ],
   "license": "MIT",
-  "homepage": "https://ts-kizuna.com",
+  "homepage": "https://kizunajs.com",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
     "directory": "packages/core"
   },
-  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
   "type": "module",
   "sideEffects": false,
   "engines": {

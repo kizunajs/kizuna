@@ -12,10 +12,10 @@ interface AdapterTabsProps {
 }
 
 const adapterPackages: Record<string, string> = {
-    Express: '@ts-kizuna/express',
-    Fastify: '@ts-kizuna/fastify',
-    Hono: '@ts-kizuna/hono',
-    'Next.js': '@ts-kizuna/next',
+    Express: '@kizunajs/express',
+    Fastify: '@kizunajs/fastify',
+    Hono: '@kizunajs/hono',
+    'Next.js': '@kizunajs/next',
 };
 
 function resolveAdapter(adapter: string | { label: string; package: string }) {

@@ -1,5 +1,5 @@
 {
-  "name": "@ts-kizuna-demo/kotlin",
+  "name": "@kizunajs-demo/kotlin",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/kotlin": "workspace:*"
+    "@kizunajs-demo/shared": "workspace:*",
+    "@kizunajs/kotlin": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

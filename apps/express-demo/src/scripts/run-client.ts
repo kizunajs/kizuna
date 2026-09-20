@@ -1,4 +1,4 @@
-import { isValidationError } from '@ts-kizuna/fetch';
+import { isValidationError } from '@kizunajs/fetch';
 import { apiClient } from '../lib/api-client';
 
 const main = async () => {

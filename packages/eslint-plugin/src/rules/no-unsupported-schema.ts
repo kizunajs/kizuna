@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
 import ts from 'typescript';
-import { AUTHORING_NAMES } from '@ts-kizuna/core/authoring-names';
+import { AUTHORING_NAMES } from 'kizunajs/authoring-names';
 import { collectSchemaIssues, type SchemaIssue, type SchemaResolver } from '../schema-violations.js';
 
 const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'pathParams', 'headers']);
@@ -129,12 +129,12 @@ export const noUnsupportedSchema = ESLintUtils.RuleCreator.withoutDocs({
     meta: {
         type: 'problem',
         docs: {
-            description: 'Disallow constructs unsupported by ts-kizuna (z.coerce) in contract and model schemas, including imported ones.',
+            description: 'Disallow constructs unsupported by Kizuna (z.coerce) in contract and model schemas, including imported ones.',
         },
         messages: {
-            coerce: 'z.coerce is not supported in a ts-kizuna schema. kizuna coerces query, path, and header params automatically, use z.number(), z.date(), or z.bigint() instead.',
+            coerce: 'z.coerce is not supported in a Kizuna schema. kizuna coerces query, path, and header params automatically, use z.number(), z.date(), or z.bigint() instead.',
             coerceReference:
-                'This schema uses z.coerce, which ts-kizuna does not support. kizuna coerces query, path, and header params automatically, use z.number(), z.date(), or z.bigint() instead.',
+                'This schema uses z.coerce, which Kizuna does not support. kizuna coerces query, path, and header params automatically, use z.number(), z.date(), or z.bigint() instead.',
         },
         schema: [],
     },

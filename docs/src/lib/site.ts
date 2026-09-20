@@ -1,1 +1,1 @@
-export const siteUrl = 'https://ts-kizuna.com';
+export const siteUrl = 'https://kizunajs.com';

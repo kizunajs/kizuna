@@ -11,7 +11,7 @@ export function ClosingCta() {
                 <Link href="/docs" className={styles.primary}>
                     Get started
                 </Link>
-                <a href="https://github.com/ts-kizuna/kizuna" className={styles.secondary} target="_blank" rel="noreferrer">
+                <a href="https://github.com/kizunajs/kizuna" className={styles.secondary} target="_blank" rel="noreferrer">
                     <GithubIcon className={styles.secondaryIcon} />
                     Star on GitHub
                 </a>

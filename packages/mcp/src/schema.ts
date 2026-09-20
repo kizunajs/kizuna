@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { parsePath } from '@ts-kizuna/core/adapter';
+import { parsePath } from 'kizunajs/adapter';
 import {
     isJsonMediaType,
     isStreamResponse,
@@ -8,8 +8,8 @@ import {
     readObjectShape,
     resolveResponseBody,
     resolveResponseContentType,
-} from '@ts-kizuna/core/generator';
-import type { RouteDefinition } from '@ts-kizuna/core';
+} from 'kizunajs/generator';
+import type { RouteDefinition } from 'kizunajs';
 
 export interface ToolInputSchema {
     shape: Record<string, z.ZodType> | undefined;

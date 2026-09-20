@@ -1,5 +1,5 @@
-import type { FlattenedRoute } from '@ts-kizuna/core/adapter';
-import { routeStreams, type RouteDefinition, type RouteToolOptions } from '@ts-kizuna/core';
+import type { FlattenedRoute } from 'kizunajs/adapter';
+import { routeStreams, type RouteDefinition, type RouteToolOptions } from 'kizunajs';
 
 /**
  * Tool input is JSON, so a route that reads a form body has nothing to receive

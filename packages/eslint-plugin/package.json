@@ -1,9 +1,9 @@
 {
-  "name": "@ts-kizuna/eslint-plugin",
+  "name": "@kizunajs/eslint-plugin",
   "version": "1.64.1",
-  "description": "ESLint rules for ts-kizuna",
+  "description": "ESLint rules for Kizuna.js",
   "keywords": [
-    "ts-kizuna",
+    "kizunajs",
     "typescript",
     "zod",
     "openapi",
@@ -17,13 +17,13 @@
     "lint"
   ],
   "license": "MIT",
-  "homepage": "https://ts-kizuna.com/docs/eslint",
+  "homepage": "https://kizunajs.com/docs/eslint",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
     "directory": "packages/eslint-plugin"
   },
-  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
   "type": "module",
   "sideEffects": false,
   "engines": {
@@ -56,7 +56,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external eslint --external typescript --external @typescript-eslint/utils --external @typescript-eslint/parser --external @ts-kizuna/core",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external eslint --external typescript --external @typescript-eslint/utils --external @typescript-eslint/parser --external kizunajs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -66,10 +66,10 @@
   "peerDependencies": {
     "eslint": ">=9.0.0",
     "typescript": ">=5.0.0",
-    "@ts-kizuna/core": "workspace:*"
+    "kizunajs": "workspace:*"
   },
   "devDependencies": {
-    "@ts-kizuna/core": "workspace:*",
+    "kizunajs": "workspace:*",
     "eslint": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",

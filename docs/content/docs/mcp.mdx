@@ -9,9 +9,9 @@ MCP support is new and still settling. The plugin options and the published tool
 
 </BetaNotice>
 
-`@ts-kizuna/mcp` adds an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint to your API. Every route that declares [`tool`](/docs/tools) is one an AI assistant can discover and call.
+`@kizunajs/mcp` adds an [MCP (Model Context Protocol)](https://modelcontextprotocol.io) endpoint to your API. Every route that declares [`tool`](/docs/tools) is one an AI assistant can discover and call.
 
-<InstallTabs packageName="@ts-kizuna/mcp" />
+<InstallTabs packageName="@kizunajs/mcp" />
 
 <Steps>
 
@@ -46,8 +46,8 @@ See [Tools](/docs/tools) for the rest of what `tool` takes.
 MCP is a [plugin](/docs/extend/create-plugin), named on `defineConfig` and served by `api.mount`:
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { mcpPlugin } from '@ts-kizuna/mcp';
+import { defineConfig } from 'kizunajs';
+import { mcpPlugin } from '@kizunajs/mcp';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -319,7 +319,7 @@ Responses with status >= 400 set `isError: true` on the MCP result so the AI kno
 If you want to drive the transport yourself, for stdio or SSE, [`createMcpServer`](/docs/reference/create-mcp-server) returns a raw `McpServer`:
 
 ```ts title="src/mcp.ts"
-import { createMcpServer } from '@ts-kizuna/mcp';
+import { createMcpServer } from '@kizunajs/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import kizuna from '../kizuna.config';
 

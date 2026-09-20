@@ -5,7 +5,7 @@ import type { ApiDefinition } from './api-definition.js';
  * the options are typed where the generator lives.
  *
  * @example
- * import { swiftClient } from '@ts-kizuna/swift';
+ * import { swiftClient } from '@kizunajs/swift';
  */
 export interface ClientTarget {
     /**

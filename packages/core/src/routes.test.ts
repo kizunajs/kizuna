@@ -126,7 +126,7 @@ describe('k.routes z.coerce ban', () => {
                 listItems: k.route({
                     method: 'GET',
                     path: '/items',
-                    // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- intentional, asserts k.routes throws on z.coerce
+                    // eslint-disable-next-line @kizunajs/no-unsupported-schema -- intentional, asserts k.routes throws on z.coerce
                     query: z.coerce.number(),
                     responses: {
                         200: z.object({
@@ -135,7 +135,7 @@ describe('k.routes z.coerce ban', () => {
                     },
                 }),
             })
-        ).toThrowError('Route "listItems" uses z.coerce at "query". z.coerce is not allowed in a ts-kizuna route.');
+        ).toThrowError('Route "listItems" uses z.coerce at "query". z.coerce is not allowed in a kizuna route.');
     });
 
     it('throws and points at the nested field path that uses z.coerce', () => {
@@ -145,7 +145,7 @@ describe('k.routes z.coerce ban', () => {
                     method: 'GET',
                     path: '/items',
                     query: z.object({
-                        // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- intentional, asserts k.routes throws on z.coerce
+                        // eslint-disable-next-line @kizunajs/no-unsupported-schema -- intentional, asserts k.routes throws on z.coerce
                         page: z.coerce.number(),
                     }),
                     responses: {
@@ -155,7 +155,7 @@ describe('k.routes z.coerce ban', () => {
                     },
                 }),
             })
-        ).toThrowError('Route "listItems" uses z.coerce at "query.page". z.coerce is not allowed in a ts-kizuna route.');
+        ).toThrowError('Route "listItems" uses z.coerce at "query.page". z.coerce is not allowed in a kizuna route.');
     });
 
     it('finds z.coerce hidden inside arrays, wrappers, and unions', () => {
@@ -165,7 +165,7 @@ describe('k.routes z.coerce ban', () => {
                     method: 'POST',
                     path: '/items',
                     body: z.object({
-                        // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- intentional, asserts k.routes throws on z.coerce
+                        // eslint-disable-next-line @kizunajs/no-unsupported-schema -- intentional, asserts k.routes throws on z.coerce
                         prices: z.array(z.coerce.number()).optional(),
                     }),
                     responses: {
@@ -175,7 +175,7 @@ describe('k.routes z.coerce ban', () => {
                     },
                 }),
             })
-        ).toThrowError('Route "createItem" uses z.coerce at "body.prices". z.coerce is not allowed in a ts-kizuna route.');
+        ).toThrowError('Route "createItem" uses z.coerce at "body.prices". z.coerce is not allowed in a kizuna route.');
     });
 
     it('rejects z.coerce in a response schema', () => {
@@ -186,13 +186,13 @@ describe('k.routes z.coerce ban', () => {
                     path: '/items/:id',
                     responses: {
                         200: z.object({
-                            // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- intentional, asserts k.routes throws on z.coerce
+                            // eslint-disable-next-line @kizunajs/no-unsupported-schema -- intentional, asserts k.routes throws on z.coerce
                             count: z.coerce.number(),
                         }),
                     },
                 }),
             })
-        ).toThrowError('Route "getItem" uses z.coerce at "responses.200.count". z.coerce is not allowed in a ts-kizuna route.');
+        ).toThrowError('Route "getItem" uses z.coerce at "responses.200.count". z.coerce is not allowed in a kizuna route.');
     });
 
     it('accepts plain z.number()/z.date()/z.bigint() and z.any()/z.unknown()', () => {

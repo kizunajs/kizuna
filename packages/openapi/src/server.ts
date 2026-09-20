@@ -1,5 +1,5 @@
-import type { ApiDefinition } from '@ts-kizuna/core';
-import { contractOf, rawResponse } from '@ts-kizuna/core/adapter';
+import type { ApiDefinition } from 'kizunajs';
+import { contractOf, rawResponse } from 'kizunajs/adapter';
 import type { OpenApiPluginProps } from './plugin.js';
 import { renderOpenApi } from './generator.js';
 import { renderDocsHtml } from './docs-html.js';

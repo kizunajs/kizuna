@@ -59,7 +59,7 @@ export const startJobWorker = async (api: unknown, options?: StartJobWorkerOptio
         if (options?.only && !options.only.includes(jobKey)) continue;
         if (options?.exclude?.includes(jobKey)) continue;
         if (!bound.has(jobKey)) {
-            logger.warn(`[ts-kizuna] No handler was bound for job "${jobKey}", so the worker does not subscribe to it.`);
+            logger.warn(`[kizuna] No handler was bound for job "${jobKey}", so the worker does not subscribe to it.`);
             continue;
         }
         jobs.push({
@@ -67,7 +67,7 @@ export const startJobWorker = async (api: unknown, options?: StartJobWorkerOptio
         });
     }
 
-    logger.log(`[ts-kizuna] Draining ${jobs.length} job(s) from the "${transport.name}" transport.`);
+    logger.log(`[kizuna] Draining ${jobs.length} job(s) from the "${transport.name}" transport.`);
 
     return transport.start({
         jobs,

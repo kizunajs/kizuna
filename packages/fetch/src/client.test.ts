@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 import { createGeneratedClient, type Client, type ClientConfig, type ContextHeaderInputs, type GeneratedRoutes } from './client.js';
-import type { ApiDefinition, RequestContextSchema, Routes, SecurityScheme, TagOptions } from '@ts-kizuna/core';
+import type { ApiDefinition, RequestContextSchema, Routes, SecurityScheme, TagOptions } from 'kizunajs';
 
 /**
  * A client over an assembled api's routes. The generated client hands the same

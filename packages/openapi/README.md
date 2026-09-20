@@ -1,11 +1,11 @@
-# @ts-kizuna/openapi
+# @kizunajs/openapi
 
-`@ts-kizuna/openapi` generates an OpenAPI 3.1.0 document from your routes, and serves it with a reference UI on any adapter.
+`@kizunajs/openapi` generates an OpenAPI 3.1.0 document from your routes, and serves it with a reference UI on any adapter.
 
 ## Installation
 
 ```sh
-pnpm add @ts-kizuna/openapi
+pnpm add @kizunajs/openapi
 ```
 
 ## Usage
@@ -14,9 +14,9 @@ Name the plugin under `plugins` in your config, and `api.mount` serves the docum
 
 ```ts
 // kizuna.config.ts
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
-import { openApiPlugin } from '@ts-kizuna/openapi';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
+import { openApiPlugin } from '@kizunajs/openapi';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -36,4 +36,4 @@ export default defineConfig({
 
 ## Documentation
 
-[OpenAPI generation](https://ts-kizuna.com/docs/openapi)
+[OpenAPI generation](https://kizunajs.com/docs/openapi)

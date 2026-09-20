@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { expressAdapter } from '@ts-kizuna/express';
+import { expressAdapter } from '@kizunajs/express';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 import express from 'express';
 import request from 'supertest';
 import { generateOpenApi } from './generator.js';

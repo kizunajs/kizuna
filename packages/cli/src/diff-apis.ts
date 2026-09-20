@@ -1,7 +1,7 @@
-import type { ApiDefinition, RouteDefinition } from '@ts-kizuna/core';
-import { createGenerator, flattenJobs, toToolName } from '@ts-kizuna/core/generator';
-import { flattenRoutes } from '@ts-kizuna/core/adapter';
-import { resolveResponseBody } from '@ts-kizuna/core/generator';
+import type { ApiDefinition, RouteDefinition } from 'kizunajs';
+import { createGenerator, flattenJobs, toToolName } from 'kizunajs/generator';
+import { flattenRoutes } from 'kizunajs/adapter';
+import { resolveResponseBody } from 'kizunajs/generator';
 import { diffSchemas, type Direction } from './diff-schemas.js';
 import type { z } from 'zod';
 

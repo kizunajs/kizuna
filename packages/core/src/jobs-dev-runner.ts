@@ -64,7 +64,7 @@ export const startJobsDevRunner = (contract: ApiDefinition, options: JobsDevRunn
     const logger = options.logger ?? console;
     if (process.env.NODE_ENV === 'production') {
         logger.warn(
-            '[ts-kizuna/schedule] startJobsDevRunner is running with NODE_ENV=production. ' +
+            '[kizuna/schedule] startJobsDevRunner is running with NODE_ENV=production. ' +
                 'It ticks on an interval held in memory, so any tick during a restart or deploy is missed silently. ' +
                 'Use your platform scheduler in production.'
         );
@@ -88,11 +88,11 @@ export const startJobsDevRunner = (contract: ApiDefinition, options: JobsDevRunn
     const timer = setInterval(() => {
         void trigger()
             .then((outcome) => {
-                logger.log(`[ts-kizuna/schedule] ${method} ${path} -> ${outcome.status}`);
+                logger.log(`[kizuna/schedule] ${method} ${path} -> ${outcome.status}`);
                 options.onTick?.(outcome);
             })
             .catch((error: unknown) => {
-                logger.error(`[ts-kizuna/schedule] ${method} ${path} failed:`, error);
+                logger.error(`[kizuna/schedule] ${method} ${path} failed:`, error);
                 options.onTick?.({ error });
             });
     }, intervalMs);
@@ -100,7 +100,7 @@ export const startJobsDevRunner = (contract: ApiDefinition, options: JobsDevRunn
 
     const scheduled = flattenJobs(contract.jobs ?? {}).filter(({ job }) => job.schedule !== undefined).length;
     logger.warn(
-        `[ts-kizuna/schedule] Dev runner ticking ${method} ${path} every ${intervalMs}ms for ${scheduled} scheduled job(s). ` +
+        `[kizuna/schedule] Dev runner ticking ${method} ${path} every ${intervalMs}ms for ${scheduled} scheduled job(s). ` +
             'Ticks are missed while the process is down.'
     );
 

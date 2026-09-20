@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type AuthoredRoutes } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna, type AuthoredRoutes } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 import { diffApis, formatChange, hasBreakingChange, type Change } from './diff-apis.js';
 
 const k = new Kizuna();

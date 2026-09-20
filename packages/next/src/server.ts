@@ -27,8 +27,8 @@ import {
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
-} from '@ts-kizuna/core/adapter';
-import type { SecurityScheme } from '@ts-kizuna/core';
+} from 'kizunajs/adapter';
+import type { SecurityScheme } from 'kizunajs';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export { NextRequest, NextResponse } from 'next/server';
@@ -129,7 +129,7 @@ export const handleNextRequest = async <T extends Routes>(
         },
         onError: async (error): Promise<AdapterResult | void> => {
             if (!options?.onError) {
-                console.error('[ts-kizuna/next] handler error:', error);
+                console.error('[kizuna/next] handler error:', error);
                 return;
             }
             const override = await options.onError(error, request);
@@ -280,7 +280,7 @@ export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
  * Create endpoints for a Next.js App Router catch-all route.
  *
  * @example
- * // app/api/[...ts-kizuna]/route.ts
+ * // app/api/[...kizuna]/route.ts
  * export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = api.mount({
  *     basePath: '/api',
  * });
@@ -364,7 +364,7 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
  *     routes,
  * });
  *
- * // src/app/api/[...ts-kizuna]/route.ts
+ * // src/app/api/[...kizuna]/route.ts
  * export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
  *     basePath: '/api',
  * });

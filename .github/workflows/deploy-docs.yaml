@@ -24,7 +24,7 @@ jobs:
                       "name": "${{ vars.VERCEL_PROJECT_NAME }}",
                       "gitSource": {
                         "type": "github",
-                        "org": "ts-kizuna",
+                        "org": "kizunajs",
                         "repo": "kizuna",
                         "ref": "main"
                       },

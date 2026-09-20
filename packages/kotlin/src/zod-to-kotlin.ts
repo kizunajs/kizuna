@@ -15,7 +15,7 @@ import {
     toCamelCase,
     sanitizeFieldName,
     sanitizeIdentifier,
-} from '@ts-kizuna/core/generator';
+} from 'kizunajs/generator';
 
 export interface KotlinField {
     name: string;
@@ -172,7 +172,7 @@ const objectFields = (schema: z.core.$ZodType, registry: TypeRegistry, hint: str
         const previousWireName = seen.get(kotlinName);
         if (previousWireName !== undefined && previousWireName !== key) {
             throw new Error(
-                `@ts-kizuna/kotlin: field key collision in ${hint}, ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(kotlinName)}.`
+                `@kizunajs/kotlin: field key collision in ${hint}, ${stringify(previousWireName)} and ${stringify(key)} both sanitize to ${stringify(kotlinName)}.`
             );
         }
         seen.set(kotlinName, key);

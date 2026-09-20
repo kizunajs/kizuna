@@ -7,7 +7,7 @@ const plugin: ESLint.Plugin = {
     meta: {
         name: packageJson.name,
         version: packageJson.version,
-        namespace: '@ts-kizuna',
+        namespace: '@kizunajs',
     },
     rules: {
         'no-unsupported-schema': noUnsupportedSchema as unknown as Rule.RuleModule,
@@ -15,19 +15,19 @@ const plugin: ESLint.Plugin = {
 };
 
 /**
- * Flat config enabling every ts-kizuna rule.
+ * Flat config enabling every Kizuna rule.
  *
  * ```js
- * import kizuna from '@ts-kizuna/eslint-plugin';
+ * import kizuna from '@kizunajs/eslint-plugin';
  *
  * export default [kizuna.configs.recommended];
  * ```
  */
 const recommended: Linter.Config = {
-    name: '@ts-kizuna/recommended',
+    name: '@kizunajs/recommended',
     files: ['**/*.ts', '**/*.cts', '**/*.mts', '**/*.tsx'],
     plugins: {
-        '@ts-kizuna': plugin,
+        '@kizunajs': plugin,
     },
     languageOptions: {
         parser: parser as Linter.Parser,
@@ -36,7 +36,7 @@ const recommended: Linter.Config = {
         },
     },
     rules: {
-        '@ts-kizuna/no-unsupported-schema': 'error',
+        '@kizunajs/no-unsupported-schema': 'error',
     },
 };
 

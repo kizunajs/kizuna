@@ -126,7 +126,7 @@ BREAKING GET /users 200.items[].id is number instead of string
 A generated client that has fallen behind is a compile error waiting to happen in whatever imports it. [`kizuna generate --check`](/docs/config#kizuna-generate---check) catches it, and `checkClients` does the same inside a script of your own:
 
 ```ts title="scripts/check-clients.ts"
-import { checkClients, formatStale } from '@ts-kizuna/cli';
+import { checkClients, formatStale } from '@kizunajs/cli';
 import kizuna from '../kizuna.config';
 
 const stale = checkClients(kizuna.api, kizuna.clients);

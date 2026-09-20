@@ -118,7 +118,7 @@ jobs:
                                       .map((commit) => `- \`${commit.sha.slice(0, 7)}\` ${commit.subject} (${commit.authors.join(', ')})`)
                                       .join('\n'),
                                   '',
-                                  `ts-kizuna does not credit AI agents as authors (see [CONTRIBUTING](${contributing})). AI is a tool, not an author. Please remove the \`Co-Authored-By\` trailer and force-push.`,
+                                  `Kizuna does not credit AI agents as authors (see [CONTRIBUTING](${contributing})). AI is a tool, not an author. Please remove the \`Co-Authored-By\` trailer and force-push.`,
                               ].join('\n'),
                       );
 

@@ -1,21 +1,21 @@
-# @ts-kizuna/hono
+# @kizunajs/hono
 
-`@ts-kizuna/hono` connects a Kizuna API to a Hono application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
+`@kizunajs/hono` connects a Kizuna API to a Hono application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
 
 **Requires Hono >= 4.**
 
 ## Installation
 
 ```sh
-pnpm add @ts-kizuna/hono hono
+pnpm add @kizunajs/hono hono
 ```
 
 ## Usage
 
 ```ts
 // kizuna.config.ts
-import { defineConfig } from '@ts-kizuna/core';
-import { honoAdapter } from '@ts-kizuna/hono';
+import { defineConfig } from 'kizunajs';
+import { honoAdapter } from '@kizunajs/hono';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -38,4 +38,4 @@ export default app;
 
 ## Documentation
 
-[Hono adapter](https://ts-kizuna.com/docs/adapters/hono)
+[Hono adapter](https://kizunajs.com/docs/adapters/hono)

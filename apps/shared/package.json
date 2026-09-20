@@ -1,5 +1,5 @@
 {
-  "name": "@ts-kizuna-demo/shared",
+  "name": "@kizunajs-demo/shared",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -20,9 +20,9 @@
     "@types/node": "catalog:"
   },
   "dependencies": {
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/mcp": "workspace:*",
-    "@ts-kizuna/openapi": "workspace:*",
+    "kizunajs": "workspace:*",
+    "@kizunajs/mcp": "workspace:*",
+    "@kizunajs/openapi": "workspace:*",
     "zod": "catalog:"
   }
 }

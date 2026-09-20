@@ -38,7 +38,7 @@ export type GuardFor<Id, HandlerContext, RequestContext, GuardSchema> = (
     : GuardReturn<Id> | GuardDenial | Promise<GuardReturn<Id> | GuardDenial>;
 
 // Registry-global: a dual ESM/CJS install would otherwise hold two different symbols.
-export const GUARD: unique symbol = Symbol.for('ts-kizuna.guard') as symbol as typeof GUARD;
+export const GUARD: unique symbol = Symbol.for('kizuna.guard') as symbol as typeof GUARD;
 
 /**
  * An identity and the guard that authenticates it. The guard is stored without

@@ -11,7 +11,7 @@ Authentication is still settling. `k.identity` may change while v2 is in beta, s
 
 An identity describes one kind of authenticated caller: an OpenAPI security scheme (how the credential travels), an optional `context` schema (what a passing guard provides to handlers), and optionally the `roles` its callers hold, which a route's [`auth`](/docs/reference/k-route) is checked against. See [Authentication](/docs/authentication) and [Access Control](/docs/access-control) for the walkthroughs.
 
-<InstallTabs packageName="@ts-kizuna/core" />
+<InstallTabs packageName="kizunajs" />
 
 ```ts
 import { k } from './k';
@@ -165,7 +165,7 @@ Reach for `custom` only when the credential is truly inexpressible. A token belo
 Name identities in [`defineConfig`](/docs/reference/define-config) under `identities`. Their keys become the names everything else uses: a route's `auth`, and the handler context keys:
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 import { user, member } from './src/identities';
 import { routes } from './src/routes';
 

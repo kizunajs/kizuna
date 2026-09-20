@@ -3,11 +3,11 @@ title: Fastify
 description: Mount a Kizuna API on a Fastify application.
 ---
 
-`@ts-kizuna/fastify` serves a Kizuna API from a [Fastify](https://fastify.dev) application.
+`@kizunajs/fastify` serves a Kizuna API from a [Fastify](https://fastify.dev) application.
 
 **Requires Fastify >= 5.**
 
-<InstallTabs packageName="@ts-kizuna/fastify fastify" />
+<InstallTabs packageName="@kizunajs/fastify fastify" />
 
 ## The adapter
 
@@ -76,8 +76,8 @@ export const users = k.routes('users', {
 ## Name Fastify in your config
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { fastifyAdapter } from '@ts-kizuna/fastify';
+import { defineConfig } from 'kizunajs';
+import { fastifyAdapter } from '@kizunajs/fastify';
 import { users } from './src/routes/users';
 
 export default defineConfig({
@@ -176,7 +176,7 @@ await kizuna.api.mount(app, {
 The same options go on `fastifyKizuna` when you register the plugin yourself:
 
 ```ts title="src/index.ts"
-import { fastifyKizuna } from '@ts-kizuna/fastify';
+import { fastifyKizuna } from '@kizunajs/fastify';
 import kizuna from '../kizuna.config';
 
 await app.register(fastifyKizuna, {

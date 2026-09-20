@@ -1,6 +1,6 @@
 import { countWords, replyWords } from '../assistant';
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { k } from '../k';
 import { assistantTools } from './assistant-tools';
 

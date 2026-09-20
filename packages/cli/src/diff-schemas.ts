@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { readDef, readObjectShape, unwrapOptionalWrappers } from '@ts-kizuna/core/generator';
+import { readDef, readObjectShape, unwrapOptionalWrappers } from 'kizunajs/generator';
 
 /**
  * Which way a schema travels, which decides what a change costs.

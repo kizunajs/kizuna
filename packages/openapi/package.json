@@ -1,9 +1,9 @@
 {
-  "name": "@ts-kizuna/openapi",
+  "name": "@kizunajs/openapi",
   "version": "1.64.1",
-  "description": "OpenAPI 3.1 generation for ts-kizuna APIs",
+  "description": "OpenAPI 3.1 generation for Kizuna.js APIs",
   "keywords": [
-    "ts-kizuna",
+    "kizunajs",
     "typescript",
     "zod",
     "openapi",
@@ -17,13 +17,13 @@
     "openapi-generator"
   ],
   "license": "MIT",
-  "homepage": "https://ts-kizuna.com/docs/openapi",
+  "homepage": "https://kizunajs.com/docs/openapi",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
     "directory": "packages/openapi"
   },
-  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
   "type": "module",
   "sideEffects": false,
   "engines": {
@@ -56,19 +56,19 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external zod",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external kizunajs --external zod",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "yaml": "^2.8.4"
   },
   "peerDependencies": {
-    "@ts-kizuna/core": "workspace:*",
+    "kizunajs": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/express": "workspace:*",
+    "kizunajs": "workspace:*",
+    "@kizunajs/express": "workspace:*",
     "@types/express": "catalog:",
     "express": "catalog:",
     "tsdown": "catalog:",

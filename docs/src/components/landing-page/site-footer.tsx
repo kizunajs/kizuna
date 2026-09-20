@@ -26,7 +26,7 @@ export function SiteFooter() {
                         </Link>
                     </li>
                     <li>
-                        <a href="https://github.com/ts-kizuna/kizuna" className={styles.link} target="_blank" rel="noreferrer">
+                        <a href="https://github.com/kizunajs/kizuna" className={styles.link} target="_blank" rel="noreferrer">
                             GitHub
                         </a>
                     </li>

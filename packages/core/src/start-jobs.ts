@@ -78,9 +78,9 @@ export const startJobs = (api: unknown, options?: StartJobsOptions): JobSchedule
             timezone: scheduleTimezone(schedule),
         }));
         void Promise.resolve(transport.register(schedules)).catch((error: unknown) => {
-            logger.error(`[ts-kizuna] The "${transport.name}" transport could not take the schedules over:`, error);
+            logger.error(`[kizuna] The "${transport.name}" transport could not take the schedules over:`, error);
         });
-        logger.log(`[ts-kizuna] ${schedules.length} schedule(s) handed to the "${transport.name}" transport.`);
+        logger.log(`[kizuna] ${schedules.length} schedule(s) handed to the "${transport.name}" transport.`);
         return {
             stop: () => {},
         };
@@ -94,14 +94,14 @@ export const startJobs = (api: unknown, options?: StartJobsOptions): JobSchedule
         if (stopped) return;
         const occurrence = nextRun(schedule, from);
         if (occurrence === undefined) {
-            logger.warn(`[ts-kizuna] Job "${jobKey}" has a schedule that never fires: ${scheduleExpression(schedule)}`);
+            logger.warn(`[kizuna] Job "${jobKey}" has a schedule that never fires: ${scheduleExpression(schedule)}`);
             return;
         }
         const timer = setTimeout(
             () => {
                 const jobFn = jobFnAt(runner, jobKey);
                 if (!jobFn) {
-                    logger.warn(`[ts-kizuna] No handler was bound for job "${jobKey}", so its schedule does nothing.`);
+                    logger.warn(`[kizuna] No handler was bound for job "${jobKey}", so its schedule does nothing.`);
                     return;
                 }
                 void jobFn
@@ -114,7 +114,7 @@ export const startJobs = (api: unknown, options?: StartJobsOptions): JobSchedule
                         });
                     })
                     .catch((error: unknown) => {
-                        logger.error(`[ts-kizuna] Queueing "${jobKey}" for ${occurrence.toISOString()} failed:`, error);
+                        logger.error(`[kizuna] Queueing "${jobKey}" for ${occurrence.toISOString()} failed:`, error);
                         options?.onTick?.(jobKey, { error });
                     })
                     .finally(() => {
@@ -131,7 +131,7 @@ export const startJobs = (api: unknown, options?: StartJobsOptions): JobSchedule
     for (const { jobKey, schedule } of scheduled) {
         const occurrence = nextRun(schedule, now);
         logger.log(
-            `[ts-kizuna] ${jobKey} on "${scheduleExpression(schedule)}"` +
+            `[kizuna] ${jobKey} on "${scheduleExpression(schedule)}"` +
                 (occurrence ? `, next at ${occurrence.toISOString()}` : ', which never fires')
         );
         scheduleNext(jobKey, schedule, now);

@@ -5,7 +5,7 @@ import {
     type ProtectedResourceMetadata,
     type RequiredPermissions,
     type SecurityScheme,
-} from '@ts-kizuna/core';
+} from 'kizunajs';
 import {
     adapterContextOf,
     rawResponse,
@@ -15,7 +15,7 @@ import {
     type ApiWithRouter,
     type GuardMap,
     type GuardRun,
-} from '@ts-kizuna/core/adapter';
+} from 'kizunajs/adapter';
 import { buildToolDefinitions, createMcpServer, type ToolDefinition } from './mcp-server.js';
 import type { McpPluginProps } from './plugin.js';
 import { assertCanonicalResource, protectedResourceMetadataUrl, type McpOAuthProps } from './oauth.js';

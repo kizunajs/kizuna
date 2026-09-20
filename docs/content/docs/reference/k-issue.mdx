@@ -74,7 +74,7 @@ By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/i
 To make the client suggest your custom codes, declare them under `validation.issueCodes` on `defineConfig` and regenerate the [fetch client](/docs/clients/fetch):
 
 ```ts title="k.ts"
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 import { tags } from './src/tags';
 import { routes } from './src/routes';
 

@@ -1,19 +1,19 @@
-# @ts-kizuna/swift
+# @kizunajs/swift
 
-`@ts-kizuna/swift` generates a native Swift client from your ts-kizuna routes. The generated client uses `URLSession` and `Codable`, with no third-party Swift dependencies.
+`@kizunajs/swift` generates a native Swift client from your Kizuna routes. The generated client uses `URLSession` and `Codable`, with no third-party Swift dependencies.
 
 ## Installation
 
 ```sh
-pnpm add -D @ts-kizuna/swift
+pnpm add -D @kizunajs/swift
 ```
 
 ## Usage
 
 ```sh
-ts-kizuna-swift generate --config kizuna.config.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
+kizuna-swift generate --config kizuna.config.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
 ```
 
 ## Documentation
 
-[Swift client generation](https://ts-kizuna.com/docs/clients/swift)
+[Swift client generation](https://kizunajs.com/docs/clients/swift)

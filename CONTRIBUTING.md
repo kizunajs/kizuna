@@ -1,4 +1,4 @@
-# Contributing to ts-kizuna
+# Contributing to Kizuna
 
 Thanks for helping out. Here's what we take and how to get set up.
 
@@ -10,16 +10,16 @@ Bug reports, small reproductions, and documentation fixes are always welcome, as
 
 Anything we merge into the core, we maintain, so we keep it to the packages we actually use. Whether an adapter or client goes first-party comes down to adoption, not age: if a framework picks up real usage, we will very likely add it. What we will not take on is a framework a handful of people use. The APIs are public, so you can build exactly what you need and own it today:
 
-- [Adapter](https://ts-kizuna.com/docs/extend/create-adapter)
-- [Plugin](https://ts-kizuna.com/docs/extend/create-plugin)
-- [Client](https://ts-kizuna.com/docs/extend/create-ts-client)
-- [Generator](https://ts-kizuna.com/docs/extend/create-generator)
+- [Adapter](https://kizunajs.com/docs/extend/create-adapter)
+- [Plugin](https://kizunajs.com/docs/extend/create-plugin)
+- [Client](https://kizunajs.com/docs/extend/create-ts-client)
+- [Generator](https://kizunajs.com/docs/extend/create-generator)
 
 For anything bigger than a fix or docs, open an issue first. What lands comes down to fit and what we want to maintain, not how polished the PR is.
 
 ## Support
 
-ts-kizuna is provided as-is. Most answers are in the docs or the source. For anything else, [open an issue](https://github.com/ts-kizuna/kizuna/issues).
+Kizuna is provided as-is. Most answers are in the docs or the source. For anything else, [open an issue](https://github.com/kizunajs/kizuna/issues).
 
 ## Development
 

@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { problemDetails, problemFromBody, type RequiredPermissions, type SecurityScheme } from '@ts-kizuna/core';
+import { problemDetails, problemFromBody, type RequiredPermissions, type SecurityScheme } from 'kizunajs';
 import {
     bearerChallenge,
     extractCredential,
@@ -12,7 +12,7 @@ import {
     type AdapterRequest,
     type GuardDenialBody,
     type GuardRun,
-} from '@ts-kizuna/core/adapter';
+} from 'kizunajs/adapter';
 
 const forbiddenBody = (guardSchema: z.ZodType | undefined, detail: string): GuardDenialBody => {
     const filled = guardSchema?.safeParse(problemDetails(403, detail));

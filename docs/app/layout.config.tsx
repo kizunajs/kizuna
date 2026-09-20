@@ -17,5 +17,5 @@ export const baseOptions: BaseLayoutProps = {
         title: navTitles[navTitleVariant],
         url: '/',
     },
-    githubUrl: 'https://github.com/ts-kizuna/kizuna',
+    githubUrl: 'https://github.com/kizunajs/kizuna',
 };

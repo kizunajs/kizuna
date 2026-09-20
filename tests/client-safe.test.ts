@@ -69,7 +69,7 @@ const collectEntries = (): Entry[] => {
     for (const packageDir of packageDirs()) {
         const manifest = readManifest(packageDir);
         // Workspace packages stay in the graph: a leak crosses their boundaries.
-        const external = Object.keys(manifest.peerDependencies ?? {}).filter((name) => !name.startsWith('@ts-kizuna/'));
+        const external = Object.keys(manifest.peerDependencies ?? {}).filter((name) => !name.startsWith('@kizunajs/'));
         for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
             const resolved = resolveImportTarget(target);
             if (resolved === undefined) continue;
@@ -190,7 +190,7 @@ describe('the client-safe boundary', () => {
 const DEMO_CONFIG = path.join(ROOT, 'apps/express-demo/kizuna.config.ts');
 
 /**
- * Written inside the repository, so `@ts-kizuna/fetch` resolves the way it
+ * Written inside the repository, so `@kizunajs/fetch` resolves the way it
  * would in a consumer rather than from a temp directory.
  */
 const generatedClient = (): string => {
@@ -246,7 +246,7 @@ const pluginPackages = (): string[] => {
     const declaring: string[] = [];
     for (const packageDir of packageDirs()) {
         const manifest = readManifest(packageDir);
-        if (manifest.name === '@ts-kizuna/core') continue;
+        if (manifest.name === 'kizunajs') continue;
         const sourceDir = path.join(packageDir, 'src');
         if (!fs.existsSync(sourceDir)) continue;
         const declaresPlugin = fs

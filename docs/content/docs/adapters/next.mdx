@@ -3,11 +3,11 @@ title: Next.js
 description: Mount a Kizuna API on a Next.js App Router catch-all route.
 ---
 
-`@ts-kizuna/next` serves a Kizuna API from a Next.js App Router application, through a single catch-all route file.
+`@kizunajs/next` serves a Kizuna API from a Next.js App Router application, through a single catch-all route file.
 
 **Requires Next.js ≥ 16** (App Router).
 
-<InstallTabs packageName="@ts-kizuna/next" />
+<InstallTabs packageName="@kizunajs/next" />
 
 ## The adapter
 
@@ -76,8 +76,8 @@ export const users = k.routes('users', {
 ## Name Next in your config
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { nextAdapter } from '@ts-kizuna/next';
+import { defineConfig } from 'kizunajs';
+import { nextAdapter } from '@kizunajs/next';
 import { users } from './src/routes/users';
 
 export default defineConfig({
@@ -96,7 +96,7 @@ export default defineConfig({
 
 `mount` hands back a handler per HTTP method, which Next dispatches for you:
 
-```ts title="src/app/api/[...ts-kizuna]/route.ts"
+```ts title="src/app/api/[...kizuna]/route.ts"
 import kizuna from '../../../../kizuna.config';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
@@ -157,7 +157,7 @@ For request-scoped values handlers need, use [request context](/docs/request-con
 
 ## Options
 
-```ts title="src/app/api/[...ts-kizuna]/route.ts"
+```ts title="src/app/api/[...kizuna]/route.ts"
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
     basePath: '/api',
     responseValidation: false,

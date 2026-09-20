@@ -2,18 +2,18 @@
 
 ## Supported versions
 
-ts-kizuna is on the 1.x line (beta, heading to v2). Only the latest release gets security fixes, and older versions aren't backported.
+Kizuna is on the 2.x line, published as `kizunajs` and `@kizunajs/*`. Only the latest release gets security fixes, and older versions aren't backported.
 
 | Version        | Supported |
 | -------------- | --------- |
-| Latest 1.x     | ✅        |
+| Latest 2.x     | ✅        |
 | Older releases | ❌        |
 
 Pin a version and stay current to keep receiving fixes.
 
 ## Reporting a vulnerability
 
-Please don't open a public issue. Send an email to **[security@ts-kizuna.com](mailto:security@ts-kizuna.com)** with:
+Please don't open a public issue. Send an email to **[security@kizunajs.com](mailto:security@kizunajs.com)** with:
 
 - The affected package and version
 - The impact

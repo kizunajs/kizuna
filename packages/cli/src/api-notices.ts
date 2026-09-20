@@ -1,5 +1,5 @@
-import type { RouteDefinition } from '@ts-kizuna/core';
-import { createGenerator } from '@ts-kizuna/core/generator';
+import type { RouteDefinition } from 'kizunajs';
+import { createGenerator } from 'kizunajs/generator';
 
 /**
  * A route that announces its own retirement.

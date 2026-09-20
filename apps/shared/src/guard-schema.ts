@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { Kizuna } from 'kizunajs';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 
 /**
  * What every guard refuses with. `code` carries a default, because kizuna sends

@@ -1,11 +1,11 @@
-# @ts-kizuna/mcp
+# @kizunajs/mcp
 
-`@ts-kizuna/mcp` adds an MCP (Model Context Protocol) endpoint to your API. The tools you declare, and the routes you choose to publish, become tools that AI assistants can discover and call.
+`@kizunajs/mcp` adds an MCP (Model Context Protocol) endpoint to your API. The tools you declare, and the routes you choose to publish, become tools that AI assistants can discover and call.
 
 ## Installation
 
 ```sh
-pnpm add @ts-kizuna/mcp
+pnpm add @kizunajs/mcp
 ```
 
 ## Usage
@@ -14,9 +14,9 @@ Name the plugin under `plugins` in your config, and `api.mount` serves the endpo
 
 ```ts
 // kizuna.config.ts
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
-import { mcpPlugin } from '@ts-kizuna/mcp';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
+import { mcpPlugin } from '@kizunajs/mcp';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -48,4 +48,4 @@ getForecast: k
 
 ## Documentation
 
-[MCP](https://ts-kizuna.com/docs/mcp)
+[MCP](https://kizunajs.com/docs/mcp)

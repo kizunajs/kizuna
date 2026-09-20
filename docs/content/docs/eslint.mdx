@@ -3,9 +3,9 @@ title: ESLint
 description: Catch Kizuna mistakes in your editor with the official ESLint plugin.
 ---
 
-`@ts-kizuna/eslint-plugin` catches Kizuna mistakes in your editor, as you type. These are things the type system can't express on its own.
+`@kizunajs/eslint-plugin` catches Kizuna mistakes in your editor, as you type. These are things the type system can't express on its own.
 
-<InstallTabs packageName="@ts-kizuna/eslint-plugin" />
+<InstallTabs packageName="@kizunajs/eslint-plugin" />
 
 ## Setup
 
@@ -14,7 +14,7 @@ Add the recommended config to your `eslint.config.js`, alongside whatever else y
 ```js title="eslint.config.js"
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import kizuna from '@ts-kizuna/eslint-plugin';
+import kizuna from '@kizunajs/eslint-plugin';
 
 export default [js.configs.recommended, ...tseslint.configs.recommended, kizuna.configs.recommended];
 ```
@@ -24,13 +24,13 @@ export default [js.configs.recommended, ...tseslint.configs.recommended, kizuna.
 Override it after the recommended config:
 
 ```js title="eslint.config.js"
-import kizuna from '@ts-kizuna/eslint-plugin';
+import kizuna from '@kizunajs/eslint-plugin';
 
 export default [
     kizuna.configs.recommended,
     {
         rules: {
-            '@ts-kizuna/no-unsupported-schema': 'off',
+            '@kizunajs/no-unsupported-schema': 'off',
         },
     },
 ];
@@ -40,7 +40,7 @@ Or silence a single line inline:
 
 ```ts
 query: z.object({
-    // eslint-disable-next-line @ts-kizuna/no-unsupported-schema
+    // eslint-disable-next-line @kizunajs/no-unsupported-schema
     page: z.coerce.number(),
 }),
 ```

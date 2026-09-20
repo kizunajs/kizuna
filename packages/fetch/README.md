@@ -1,11 +1,11 @@
-# @ts-kizuna/fetch
+# @kizunajs/fetch
 
-`@ts-kizuna/fetch` is the typed client for your routes, a wrapper around the native `fetch` API. It runs anywhere `fetch` does, React Native included.
+`@kizunajs/fetch` is the typed client for your routes, a wrapper around the native `fetch` API. It runs anywhere `fetch` does, React Native included.
 
 ## Installation
 
 ```sh
-pnpm add @ts-kizuna/fetch
+pnpm add @kizunajs/fetch
 ```
 
 ## Usage
@@ -13,7 +13,7 @@ pnpm add @ts-kizuna/fetch
 Add `fetchClient` to your config and run `kizuna generate`:
 
 ```ts
-import { fetchClient } from '@ts-kizuna/fetch/server';
+import { fetchClient } from '@kizunajs/fetch/server';
 
 export default defineConfig({
     adapter: expressAdapter(),
@@ -46,4 +46,4 @@ const result = await apiClient.users.getUser({
 
 ## Documentation
 
-[Fetch client](https://ts-kizuna.com/docs/clients/fetch)
+[Fetch client](https://kizunajs.com/docs/clients/fetch)

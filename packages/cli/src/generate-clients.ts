@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative } from 'node:path';
-import type { ClientTarget, ApiDefinition } from '@ts-kizuna/core';
+import type { ClientTarget, ApiDefinition } from 'kizunajs';
 
 /**
  * A client that was written, and whether it had to be.

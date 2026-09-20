@@ -1,5 +1,5 @@
-import type { ApiDefinition, RouteAuth, RouteDefinition } from '@ts-kizuna/core';
-import { createGenerator, deriveToolNames, toToolName } from '@ts-kizuna/core/generator';
+import type { ApiDefinition, RouteAuth, RouteDefinition } from 'kizunajs';
+import { createGenerator, deriveToolNames, toToolName } from 'kizunajs/generator';
 
 /**
  * One route, flattened to what someone reading a terminal wants to know.

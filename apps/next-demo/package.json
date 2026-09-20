@@ -1,5 +1,5 @@
 {
-  "name": "@ts-kizuna-demo/next",
+  "name": "@kizunajs-demo/next",
   "private": true,
   "version": "0.0.0",
   "scripts": {
@@ -13,19 +13,19 @@
   },
   "dependencies": {
     "@scalar/nextjs-api-reference": "^0.10.11",
-    "@ts-kizuna-demo/shared": "workspace:*",
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/fetch": "workspace:*",
-    "@ts-kizuna/next": "workspace:*",
-    "@ts-kizuna/mcp": "workspace:*",
-    "@ts-kizuna/openapi": "workspace:*",
+    "@kizunajs-demo/shared": "workspace:*",
+    "kizunajs": "workspace:*",
+    "@kizunajs/fetch": "workspace:*",
+    "@kizunajs/next": "workspace:*",
+    "@kizunajs/mcp": "workspace:*",
+    "@kizunajs/openapi": "workspace:*",
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@ts-kizuna/cli": "workspace:*",
+    "@kizunajs/cli": "workspace:*",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

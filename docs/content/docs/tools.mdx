@@ -152,7 +152,7 @@ responses: {
 
 ```ts title="src/routes/assistant.ts"
 import Anthropic from '@anthropic-ai/sdk';
-import { buildToolDefinitions } from '@ts-kizuna/mcp';
+import { buildToolDefinitions } from '@kizunajs/mcp';
 import { weatherRoutes } from './weather';
 
 const anthropic = new Anthropic();
@@ -189,17 +189,17 @@ Each definition carries the `name` a model calls it by, the `description` it rea
 
 A call arrives as one event and its answer as another. `readToolCalls` folds them back into one row per call, carrying the tool's `name`, a `state` of `running`, `done` or `failed`, and the payloads narrowed to that tool.
 
-TypeScript imports it from `@ts-kizuna/core`; the Swift and Kotlin generators emit it beside the route's `Event` type.
+TypeScript imports it from `kizunajs`; the Swift and Kotlin generators emit it beside the route's `Event` type.
 
 <Tabs items={['React', 'SwiftUI', 'Compose']}>
 
 <Tab value="React">
 
-`streamOptions` from [`@ts-kizuna/tanstack-query`](/docs/clients/tanstack-query) already holds the messages received so far, so there is no state to keep at all.
+`streamOptions` from [`@kizunajs/tanstack-query`](/docs/clients/tanstack-query) already holds the messages received so far, so there is no state to keep at all.
 
 ```tsx title="components/Chat.tsx"
 import { useQuery } from '@tanstack/react-query';
-import { readToolCalls } from '@ts-kizuna/core';
+import { readToolCalls } from 'kizunajs';
 import { api } from '../api';
 
 export function Chat({ prompt }: { prompt: string }) {
@@ -227,7 +227,7 @@ export function Chat({ prompt }: { prompt: string }) {
 ```
 
 ```tsx title="components/ToolCallView.tsx"
-import type { ToolCallRecord } from '@ts-kizuna/core';
+import type { ToolCallRecord } from 'kizunajs';
 
 type Call = ToolCallRecord<AssistantMessage>;
 
@@ -406,7 +406,7 @@ Rename a field on the route and every one of these stops compiling.
 A route that declares `tool` already has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is. [`mcpPlugin`](/docs/reference/mcp-plugin) serves them:
 
 ```ts title="kizuna.config.ts"
-import { mcpPlugin } from '@ts-kizuna/mcp';
+import { mcpPlugin } from '@kizunajs/mcp';
 import { routes } from './src/routes';
 
 export default defineConfig({

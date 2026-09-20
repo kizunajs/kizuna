@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { createPlugin, type RoutePath, type WithSlug } from '@ts-kizuna/core/plugin';
-import { ProtectedResourceMetadataSchema } from '@ts-kizuna/core/schemas';
+import { createPlugin, type RoutePath, type WithSlug } from 'kizunajs/plugin';
+import { ProtectedResourceMetadataSchema } from 'kizunajs/schemas';
 import { protectedResourceMetadataPath, type McpOAuthProps } from './oauth.js';
 import { mcpServe } from './server.js';
 

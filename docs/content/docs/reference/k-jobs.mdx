@@ -13,7 +13,7 @@ Declares your API's scheduled jobs. The first argument is the identity every job
 
 ```ts title="jobs.ts"
 import { z } from 'zod';
-import { cron } from '@ts-kizuna/core';
+import { cron } from 'kizunajs';
 
 export const jobs = k.jobs('scheduler', {
     sendDigests: {
@@ -67,7 +67,7 @@ Every job answers with the same set. A scheduler reads the status code to decide
 
 ## Schedule helpers
 
-Exported from `@ts-kizuna/core`. Each returns a plain cron string.
+Exported from `kizunajs`. Each returns a plain cron string.
 
 | Helper                        | Expression     |
 | ----------------------------- | -------------- |

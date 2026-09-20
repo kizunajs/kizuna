@@ -20,19 +20,19 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
     metadataBase: new URL(siteUrl),
     title: {
-        default: 'ts-kizuna',
-        template: '%s | ts-kizuna',
+        default: 'Kizuna.js',
+        template: '%s | Kizuna.js',
     },
     openGraph: {
         type: 'website',
-        siteName: 'ts-kizuna',
+        siteName: 'Kizuna.js',
         url: '/',
         images: [
             {
                 url: '/open-graph.jpg',
                 width: 1200,
                 height: 630,
-                alt: 'ts-kizuna',
+                alt: 'Kizuna.js',
             },
         ],
     },

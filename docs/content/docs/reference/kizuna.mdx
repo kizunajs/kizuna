@@ -7,10 +7,10 @@ description: The authoring surface for one API, typed by the Config that kizuna 
 
 Keep the instance as `k`, usually in `src/k.ts`, and import it wherever you declare.
 
-<InstallTabs packageName="@ts-kizuna/core" />
+<InstallTabs packageName="kizunajs" />
 
 ```ts title="src/k.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
 import type { Config } from '../kizuna.types';
 
 export const k = new Kizuna<Config>();

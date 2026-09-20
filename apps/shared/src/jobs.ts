@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { cron } from '@ts-kizuna/core';
+import { cron } from 'kizunajs';
 import { db } from './db';
 import { k } from './k';
 

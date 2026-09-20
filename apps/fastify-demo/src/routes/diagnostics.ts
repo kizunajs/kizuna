@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { getHeaderValue } from '@ts-kizuna/core';
+import { getHeaderValue } from 'kizunajs';
 import { k } from '../k';
 
 /**

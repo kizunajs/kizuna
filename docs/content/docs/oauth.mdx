@@ -163,7 +163,7 @@ WWW-Authenticate: Bearer error="insufficient_scope", scope="users:write", resour
 Clients that do not know your authorization server find it through [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) Protected Resource Metadata at `/.well-known/oauth-protected-resource`. Serve it on the framework, next to `api.mount`:
 
 ```ts title="src/metadata.ts"
-import { buildProtectedResourceMetadata } from '@ts-kizuna/core';
+import { buildProtectedResourceMetadata } from 'kizunajs';
 import { user } from './identities';
 
 export const metadata = buildProtectedResourceMetadata({

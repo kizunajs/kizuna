@@ -5,10 +5,10 @@ description: Serve your OpenAPI document and an API reference UI for it, on any 
 
 Serve a reference UI for the OpenAPI document generated from your API, and the document itself if you want it public. Name it under `plugins` on [`defineConfig`](/docs/reference/define-config) and `api.mount` serves its routes. See the [OpenAPI guide](/docs/openapi).
 
-<InstallTabs packageName="@ts-kizuna/openapi" />
+<InstallTabs packageName="@kizunajs/openapi" />
 
 ```ts
-import { openApiPlugin } from '@ts-kizuna/openapi';
+import { openApiPlugin } from '@kizunajs/openapi';
 ```
 
 ## Parameters
@@ -43,9 +43,9 @@ Each path prop is off until you give it a path. The document paths carry their e
 ## Example
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
-import { openApiPlugin } from '@ts-kizuna/openapi';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
+import { openApiPlugin } from '@kizunajs/openapi';
 import { routes } from './src/routes';
 
 export default defineConfig({

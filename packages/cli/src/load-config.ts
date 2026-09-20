@@ -1,5 +1,5 @@
 import { createJiti } from 'jiti';
-import { apiEntries, type ApiDefinition, type ClientTarget } from '@ts-kizuna/core';
+import { apiEntries, type ApiDefinition, type ClientTarget } from 'kizunajs';
 
 /**
  * One api a config declares, with everything generated from it. A config that

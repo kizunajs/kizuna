@@ -165,7 +165,7 @@ export type KizunaConfigInput<
      * framework's app.
      *
      * @example
-     * import { expressAdapter } from '@ts-kizuna/express';
+     * import { expressAdapter } from '@kizunajs/express';
      */
     adapter?: AdapterValue;
     /**

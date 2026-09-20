@@ -5,7 +5,7 @@ import tseslint from 'typescript-eslint';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import prettier from 'eslint-plugin-prettier/recommended';
 import jsdoc from 'eslint-plugin-jsdoc';
-import kizuna from '@ts-kizuna/eslint-plugin';
+import kizuna from '@kizunajs/eslint-plugin';
 
 export default [
     ...tseslint.config(

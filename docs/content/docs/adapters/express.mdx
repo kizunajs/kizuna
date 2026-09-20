@@ -3,11 +3,11 @@ title: Express
 description: Mount a Kizuna API on an Express 5 application.
 ---
 
-`@ts-kizuna/express` serves a Kizuna API from an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
+`@kizunajs/express` serves a Kizuna API from an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
 
 **Requires Express ≥ 5.**
 
-<InstallTabs packageName="@ts-kizuna/express express" />
+<InstallTabs packageName="@kizunajs/express express" />
 
 ## The adapter
 
@@ -76,8 +76,8 @@ export const users = k.routes('users', {
 ## Name Express in your config
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
 import { users } from './src/routes/users';
 
 export default defineConfig({

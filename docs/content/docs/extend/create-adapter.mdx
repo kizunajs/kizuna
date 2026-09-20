@@ -1,6 +1,6 @@
 ---
 title: Create an Adapter
-description: Build and ship your own Kizuna adapter for any HTTP runtime using createAdapter from @ts-kizuna/core/adapter.
+description: Build and ship your own Kizuna adapter for any HTTP runtime using createAdapter from kizunajs/adapter.
 ---
 
 <BetaNotice>
@@ -9,7 +9,7 @@ The adapter API is new and still settling. `createAdapter` and the `AdapterResul
 
 </BetaNotice>
 
-`@ts-kizuna/core/adapter` exposes `createAdapter` so third parties can build and ship their own adapters independently. Kizuna ships Express, Fastify, Hono, and Next.js.
+`kizunajs/adapter` exposes `createAdapter` so third parties can build and ship their own adapters independently. Kizuna ships Express, Fastify, Hono, and Next.js.
 
 Whether an adapter goes first-party comes down to adoption, not age. If a framework picks up real usage, we will very likely add it. What we will not take on is a framework a handful of people use, since we maintain everything we merge. The adapter API is public, so you can build and publish your own today.
 
@@ -24,7 +24,7 @@ An adapter translates between a native HTTP runtime (Bun, Cloudflare Workers, De
 ## `createAdapter`
 
 ```ts title="adapter.ts"
-import { createAdapter, renderJsonResult, parseFetchBody, headersToObject, type AdapterRequest } from '@ts-kizuna/core/adapter';
+import { createAdapter, renderJsonResult, parseFetchBody, headersToObject, type AdapterRequest } from 'kizunajs/adapter';
 ```
 
 ## Minimal example (fetch-based runtime)
@@ -38,7 +38,7 @@ import {
     type AdapterRequest,
     type Routes,
     type Router,
-} from '@ts-kizuna/core/adapter';
+} from 'kizunajs/adapter';
 
 export interface HandlerContext {
     request: Request;

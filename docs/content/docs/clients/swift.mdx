@@ -3,9 +3,9 @@ title: Swift
 description: Generate a native Swift client from your routes, using URLSession and Codable.
 ---
 
-`@ts-kizuna/swift` generates a native Swift client from your ts-kizuna routes. The generated client uses `URLSession` and `Codable`, with no third-party Swift dependencies required.
+`@kizunajs/swift` generates a native Swift client from your Kizuna routes. The generated client uses `URLSession` and `Codable`, with no third-party Swift dependencies required.
 
-<InstallTabs packageName="@ts-kizuna/swift" />
+<InstallTabs packageName="@kizunajs/swift" />
 
 <Steps>
 
@@ -16,7 +16,7 @@ description: Generate a native Swift client from your routes, using URLSession a
 Point `swiftClient` at the file you want written:
 
 ```ts title="kizuna.config.ts"
-import { swiftClient } from '@ts-kizuna/swift';
+import { swiftClient } from '@kizunajs/swift';
 
 export default defineConfig({
     adapter: expressAdapter(),
@@ -43,10 +43,10 @@ kizuna generate
 
 ### Without the config
 
-`ts-kizuna-swift` generates one client on its own, for a repository that does not run `kizuna generate`:
+`kizuna-swift` generates one client on its own, for a repository that does not run `kizuna generate`:
 
 ```sh title="Terminal"
-ts-kizuna-swift generate --config kizuna.config.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
+kizuna-swift generate --config kizuna.config.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
 ```
 
 `--config` takes the path to your `kizuna.config.ts`, suffixed with an export to read something other than the default, as in `src/apis.ts:workspace`. `--camel-case` and `--unknown-enum-case` are the flag forms of the options above, and `--export` names the export to read when none is suffixed, `api` by default. The CLI loads the config at runtime using `jiti`.
@@ -235,7 +235,7 @@ You can add a script to your `package.json` to regenerate the client whenever yo
 ```json title="package.json"
 {
     "scripts": {
-        "generate:swift": "ts-kizuna-swift generate --config kizuna.config.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name API"
+        "generate:swift": "kizuna-swift generate --config kizuna.config.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name API"
     }
 }
 ```

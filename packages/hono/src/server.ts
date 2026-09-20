@@ -26,8 +26,8 @@ import {
     renderJsonResult,
     parseFetchBody,
     headersToObject,
-} from '@ts-kizuna/core/adapter';
-import type { SecurityScheme } from '@ts-kizuna/core';
+} from 'kizunajs/adapter';
+import type { SecurityScheme } from 'kizunajs';
 
 export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [GUARDS_META]?: unknown;
@@ -97,7 +97,7 @@ const pipeline = createAdapter<
 });
 
 /**
- * Mount a ts-kizuna API onto a Hono app.
+ * Mount a Kizuna API onto a Hono app.
  *
  * @example
  * const app = new Hono();

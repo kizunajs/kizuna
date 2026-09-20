@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isUndeclaredResponseError } from '@ts-kizuna/tanstack-query';
+import { isUndeclaredResponseError } from '@kizunajs/tanstack-query';
 import { api } from './api.js';
 import styles from './App.module.css';
 
@@ -180,7 +180,7 @@ function MissingUser() {
 export function App() {
     return (
         <main className={styles.page}>
-            <h1 className={styles.title}>ts-kizuna + TanStack Query</h1>
+            <h1 className={styles.title}>Kizuna + TanStack Query</h1>
             <p className={styles.lede}>Every query and mutation below is built from the same routes as the express demo it talks to.</p>
 
             <section className={styles.section}>

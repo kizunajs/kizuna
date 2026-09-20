@@ -5,11 +5,11 @@ description: Type guard to distinguish Kizuna validation errors from custom 400 
 
 Distinguish a Kizuna validation error from a route's own `400` body.
 
-<InstallTabs packageName="@ts-kizuna/core" />
+<InstallTabs packageName="kizunajs" />
 
 ```ts
-import { isValidationError } from '@ts-kizuna/core';
-// also re-exported from @ts-kizuna/fetch
+import { isValidationError } from 'kizunajs';
+// also re-exported from @kizunajs/fetch
 ```
 
 ## Parameters
@@ -45,7 +45,7 @@ Common error codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_form
 When a route declares its own `400` response, the client sees a union of your type and `ValidationError`. Use `isValidationError` to distinguish them:
 
 ```ts title="users.ts"
-import { isValidationError } from '@ts-kizuna/fetch';
+import { isValidationError } from '@kizunajs/fetch';
 
 const result = await client.users.createUser({
     body: {

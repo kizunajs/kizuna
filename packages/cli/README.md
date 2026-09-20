@@ -1,11 +1,11 @@
-# @ts-kizuna/cli
+# @kizunajs/cli
 
 The `kizuna` command, which writes the `Config` your `kizuna.config.ts` implies and every client it declares. The package also exports the config loader the Swift and Kotlin generators share.
 
 ## Installation
 
 ```sh
-pnpm add -D @ts-kizuna/cli
+pnpm add -D @kizunajs/cli
 ```
 
 ## Usage
@@ -24,4 +24,4 @@ The same work without writing. Names whatever has fallen behind and exits `1`, f
 
 ## Documentation
 
-[Configuration](https://ts-kizuna.com/docs/configuration)
+[Configuration](https://kizunajs.com/docs/configuration)

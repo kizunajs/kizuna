@@ -2,10 +2,10 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { loadConfig } from '@ts-kizuna/cli';
+import { loadConfig } from '@kizunajs/cli';
 import { generateSwiftClient } from './generator.js';
 
-const usage = `Usage: ts-kizuna-swift generate --config <path> --output <path> --namespace-name <name>
+const usage = `Usage: kizuna-swift generate --config <path> --output <path> --namespace-name <name>
 
 Required:
   --config <path>          Path to a kizuna.config.ts. Suffix with an export to read

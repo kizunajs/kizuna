@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type ApiDefinition } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna, type ApiDefinition } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 import { generateKotlinClient } from './generator.js';
 
 const k = new Kizuna();

@@ -1,18 +1,18 @@
 # Kizuna
 
-![Kizuna](https://raw.githubusercontent.com/ts-kizuna/kizuna/main/docs/public/readme-beta.png)
+![Kizuna](https://raw.githubusercontent.com/kizunajs/kizuna/main/docs/public/readme-beta.png)
 
 Build fully typed REST APIs with TypeScript. Declare a route once. Get a typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
 
-[![npm](https://img.shields.io/npm/v/@ts-kizuna/core?color=blue&label=npm)](https://www.npmjs.com/package/@ts-kizuna/core)
+[![npm](https://img.shields.io/npm/v/kizunajs?color=blue&label=npm)](https://www.npmjs.com/package/kizunajs)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-[Documentation](https://ts-kizuna.com)
+[Documentation](https://kizunajs.com)
 
 > [!NOTE]
 > v2 is in beta while the way you declare routes and call them settles, so a minor version can carry a breaking change. Every release names them under **⚠ BREAKING CHANGES**, so pin your version and upgrade when it suits you.
 >
-> [See the release notes](https://github.com/ts-kizuna/kizuna/releases)
+> [See the release notes](https://github.com/kizunajs/kizuna/releases)
 
 ## Features
 
@@ -42,7 +42,7 @@ Export a `k` instance once, typed by the `Config` generated from your config.
 
 ```ts
 // src/k.ts
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
 import type { Config } from '../kizuna.types';
 
 export const k = new Kizuna<Config>();
@@ -53,7 +53,7 @@ Then declare each route: a method, a path, Zod schemas, and the handler that ans
 ```ts
 // src/routes/users.ts
 import { z } from 'zod';
-import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
+import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { k } from '../k';
 
 export const users = k.routes({
@@ -93,8 +93,8 @@ Name your framework and your routes. The adapter decides what handlers get along
 
 ```ts
 // kizuna.config.ts
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express'; // or any other adapter
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express'; // or any other adapter
 import { users } from './src/routes/users';
 
 export default defineConfig({
@@ -142,25 +142,25 @@ if (result.status === 200) {
 }
 ```
 
-[Read the full docs](https://ts-kizuna.com/docs)
+[Read the full docs](https://kizunajs.com/docs)
 
 ## Packages
 
-| Package                     | Description                                        |
-| --------------------------- | -------------------------------------------------- |
-| `@ts-kizuna/core`           | Route declaration, validation, and the adapter API |
-| `@ts-kizuna/fetch`          | Typed fetch-based client                           |
-| `@ts-kizuna/tanstack-query` | TanStack Query client                              |
-| `@ts-kizuna/express`        | Express adapter                                    |
-| `@ts-kizuna/fastify`        | Fastify adapter                                    |
-| `@ts-kizuna/hono`           | Hono adapter                                       |
-| `@ts-kizuna/next`           | Next.js App Router adapter                         |
-| `@ts-kizuna/openapi`        | OpenAPI generation                                 |
-| `@ts-kizuna/swift`          | Swift client generation                            |
-| `@ts-kizuna/kotlin`         | Kotlin client generation                           |
-| `@ts-kizuna/mcp`            | MCP endpoint for AI assistants                     |
-| `@ts-kizuna/eslint-plugin`  | ESLint rules                                       |
-| `@ts-kizuna/cli`            | Command line tooling                               |
+| Package                    | Description                                        |
+| -------------------------- | -------------------------------------------------- |
+| `kizunajs`                 | Route declaration, validation, and the adapter API |
+| `@kizunajs/fetch`          | Typed fetch-based client                           |
+| `@kizunajs/tanstack-query` | TanStack Query client                              |
+| `@kizunajs/express`        | Express adapter                                    |
+| `@kizunajs/fastify`        | Fastify adapter                                    |
+| `@kizunajs/hono`           | Hono adapter                                       |
+| `@kizunajs/next`           | Next.js App Router adapter                         |
+| `@kizunajs/openapi`        | OpenAPI generation                                 |
+| `@kizunajs/swift`          | Swift client generation                            |
+| `@kizunajs/kotlin`         | Kotlin client generation                           |
+| `@kizunajs/mcp`            | MCP endpoint for AI assistants                     |
+| `@kizunajs/eslint-plugin`  | ESLint rules                                       |
+| `@kizunajs/cli`            | Command line tooling                               |
 
 ## License
 

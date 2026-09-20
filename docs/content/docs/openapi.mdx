@@ -3,9 +3,9 @@ title: OpenAPI
 description: Generate an OpenAPI 3.1.0 document from your routes, and serve it with a reference UI.
 ---
 
-`@ts-kizuna/openapi` generates an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from your routes.
+`@kizunajs/openapi` generates an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from your routes.
 
-<InstallTabs packageName="@ts-kizuna/openapi" />
+<InstallTabs packageName="@kizunajs/openapi" />
 
 ## Install it
 
@@ -18,9 +18,9 @@ description: Generate an OpenAPI 3.1.0 document from your routes, and serve it w
 ## Declare the plugin
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
-import { openApiPlugin } from '@ts-kizuna/openapi';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
+import { openApiPlugin } from '@kizunajs/openapi';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -66,7 +66,7 @@ The routes are public. Gate them with your framework's own middleware if that is
 
 ```ts title="scripts/generate-openapi.ts"
 import { writeFileSync } from 'node:fs';
-import { generateOpenApi } from '@ts-kizuna/openapi';
+import { generateOpenApi } from '@kizunajs/openapi';
 import kizuna from '../kizuna.config';
 
 const spec = generateOpenApi(kizuna.api);
@@ -110,7 +110,7 @@ Point `cdnUrl` at a self-hosted copy for air-gapped deployments or a strict CSP.
 `generateOpenApi` returns a renderer. Call it with `'json'` for the document object or `'yaml'` for a YAML string. Everything it needs, `info` included, comes off the api, declared once on [`openApiPlugin`](#declare-the-plugin).
 
 ```ts title="scripts/generate-openapi.ts"
-import { generateOpenApi } from '@ts-kizuna/openapi';
+import { generateOpenApi } from '@kizunajs/openapi';
 import kizuna from '../kizuna.config';
 
 const spec = generateOpenApi(kizuna.api);

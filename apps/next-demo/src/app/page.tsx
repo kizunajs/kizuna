@@ -19,7 +19,7 @@ export default async function Home() {
                 maxWidth: '40rem',
                 margin: '0 auto',
             }}>
-            <h1>ts-kizuna demos</h1>
+            <h1>Kizuna demos</h1>
             <p>The same shared routes power both demos. This page is a server component fetching via the typed client.</p>
             <nav
                 style={{

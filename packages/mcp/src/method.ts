@@ -1,4 +1,4 @@
-import type { Method } from '@ts-kizuna/core';
+import type { Method } from 'kizunajs';
 
 /**
  * Safe per RFC 9110: they request no change to the server's state.

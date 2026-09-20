@@ -148,7 +148,7 @@ export const questions: Question[] = [
                 </p>
                 <p className={styles.body}>
                     For anything beyond a bug fix or docs, like a new feature or an API change,{' '}
-                    <a className={styles.link} href="https://github.com/ts-kizuna/kizuna/issues/new" target="_blank" rel="noreferrer">
+                    <a className={styles.link} href="https://github.com/kizunajs/kizuna/issues/new" target="_blank" rel="noreferrer">
                         open an issue
                     </a>{' '}
                     first so we can check it fits before you build it.
@@ -163,7 +163,7 @@ export const questions: Question[] = [
                 <p className={styles.body}>
                     Kizuna is open source and provided as-is. Most answers are in the docs or the source. For anything else, open an issue
                     on{' '}
-                    <a className={styles.link} href="https://github.com/ts-kizuna/kizuna/issues" target="_blank" rel="noreferrer">
+                    <a className={styles.link} href="https://github.com/kizunajs/kizuna/issues" target="_blank" rel="noreferrer">
                         GitHub
                     </a>
                     .

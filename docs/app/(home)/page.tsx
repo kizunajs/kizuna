@@ -12,7 +12,7 @@ import styles from './page.module.css';
 
 export const metadata: Metadata = {
     title: {
-        absolute: 'ts-kizuna | Build fully typed REST APIs with TypeScript',
+        absolute: 'Kizuna.js | Build fully typed REST APIs with TypeScript',
     },
     description:
         'Write one config. Get a fully typed server, typed auth, scheduled jobs, an OpenAPI spec, Swift and Kotlin clients, an MCP endpoint, and more.',

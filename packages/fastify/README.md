@@ -1,21 +1,21 @@
-# @ts-kizuna/fastify
+# @kizunajs/fastify
 
-`@ts-kizuna/fastify` connects a Kizuna API to a Fastify application.
+`@kizunajs/fastify` connects a Kizuna API to a Fastify application.
 
 **Requires Fastify >= 5.**
 
 ## Installation
 
 ```sh
-pnpm add @ts-kizuna/fastify fastify
+pnpm add @kizunajs/fastify fastify
 ```
 
 ## Usage
 
 ```ts
 // kizuna.config.ts
-import { defineConfig } from '@ts-kizuna/core';
-import { fastifyAdapter } from '@ts-kizuna/fastify';
+import { defineConfig } from 'kizunajs';
+import { fastifyAdapter } from '@kizunajs/fastify';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -40,4 +40,4 @@ app.listen({
 
 ## Documentation
 
-[Fastify adapter](https://ts-kizuna.com/docs/adapters/fastify)
+[Fastify adapter](https://kizunajs.com/docs/adapters/fastify)

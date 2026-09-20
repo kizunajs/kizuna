@@ -12,7 +12,7 @@ The least settled part of kizuna. `Kizuna.permissions` may change shape, move el
 `Kizuna.permissions(catalog)` declares every permission that exists, grouped by what it acts on. [Roles](/docs/reference/kizuna-roles) are built from it, routes name what they require from it, and nothing outside it can be required or held.
 
 ```ts title="permissions.ts"
-import { Kizuna } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
 
 export const permissions = Kizuna.permissions({
     workspace: ['read', 'update', 'delete'],

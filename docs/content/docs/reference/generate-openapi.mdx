@@ -5,10 +5,10 @@ description: Generate an OpenAPI 3.1.0 document from a Kizuna api.
 
 Generate an [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) document from your api. Returns a renderer you call with `'json'` or `'yaml'`.
 
-<InstallTabs packageName="@ts-kizuna/openapi" />
+<InstallTabs packageName="@kizunajs/openapi" />
 
 ```ts
-import { generateOpenApi } from '@ts-kizuna/openapi';
+import { generateOpenApi } from '@kizunajs/openapi';
 ```
 
 ## Parameters
@@ -22,7 +22,7 @@ generateOpenApi(api: ApiDefinition, overrides?: Partial<GenerateOpenApiOptions>)
 | `api`       | `ApiDefinition`                   | The `api` from [`defineConfig`](/docs/reference/define-config) |
 | `overrides` | `Partial<GenerateOpenApiOptions>` | Merged over the plugin's options, for what only a build knows  |
 
-It lives on `@ts-kizuna/openapi`, beside [`openApiPlugin`](/docs/reference/openapi-plugin) and the document types.
+It lives on `@kizunajs/openapi`, beside [`openApiPlugin`](/docs/reference/openapi-plugin) and the document types.
 
 ## Options
 
@@ -52,8 +52,8 @@ renderer('yaml'); // YAML string
 ## Example
 
 ```ts title="kizuna.config.ts"
-import { defineConfig } from '@ts-kizuna/core';
-import { openApiPlugin } from '@ts-kizuna/openapi';
+import { defineConfig } from 'kizunajs';
+import { openApiPlugin } from '@kizunajs/openapi';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -78,7 +78,7 @@ export default defineConfig({
 ```
 
 ```ts title="scripts/generate-openapi.ts"
-import { generateOpenApi } from '@ts-kizuna/openapi';
+import { generateOpenApi } from '@kizunajs/openapi';
 import kizuna from '../kizuna.config';
 
 const spec = generateOpenApi(kizuna.api);

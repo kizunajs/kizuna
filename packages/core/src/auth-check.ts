@@ -62,9 +62,9 @@ type AuthMismatch<Route, Identities> = Route extends { auth: infer Value }
     ? [RoleMismatch<Value, Identities>] extends [never]
         ? [RequiresMismatch<Value, Identities>] extends [never]
             ? never
-            : `ts-kizuna: auth requires "${RequiresMismatch<Value, Identities>}", which no identity on the route declares`
-        : `ts-kizuna: auth accepts the role "${RoleMismatch<Value, Identities>}", which no identity on the route declares`
-    : 'ts-kizuna: this route needs an `auth`. Name the identity it requires, or `false` for a public route';
+            : `kizuna: auth requires "${RequiresMismatch<Value, Identities>}", which no identity on the route declares`
+        : `kizuna: auth accepts the role "${RoleMismatch<Value, Identities>}", which no identity on the route declares`
+    : 'kizuna: this route needs an `auth`. Name the identity it requires, or `false` for a public route';
 
 type TreeAuthMismatch<Node, Identities> = Node extends RouteDefinition
     ? AuthMismatch<Node, Identities>

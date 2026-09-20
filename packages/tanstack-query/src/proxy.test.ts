@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { QueryClient, skipToken } from '@tanstack/query-core';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
-import { CLIENT_ROUTE } from '@ts-kizuna/fetch';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
+import { CLIENT_ROUTE } from '@kizunajs/fetch';
 import { KizunaTanstackQuery } from './proxy.js';
 import { NonStreamResponseError, UndeclaredResponseError, isNonStreamResponseError, isUndeclaredResponseError } from './errors.js';
 

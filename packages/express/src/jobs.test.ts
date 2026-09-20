@@ -1,10 +1,10 @@
 import express from 'express';
-import { expressAdapter } from '@ts-kizuna/express';
+import { expressAdapter } from '@kizunajs/express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import { defineConfig } from '@ts-kizuna/core';
+import { Kizuna } from 'kizunajs';
+import { defineConfig } from 'kizunajs';
 
 const sendDigestsRan = vi.fn();
 const reconcileRan = vi.fn();

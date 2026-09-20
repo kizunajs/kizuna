@@ -8,8 +8,8 @@ const ROOT = path.resolve(import.meta.dirname, '../../..');
 describe('generateConfigTypes', () => {
     it('writes the adapter as the return of its factory', () => {
         const types = generateConfigTypes(`
-import { defineConfig } from '@ts-kizuna/core';
-import { expressAdapter } from '@ts-kizuna/express';
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -17,7 +17,7 @@ export default defineConfig({
     routes,
 });
 `);
-        expect(types).toContain("import type { expressAdapter } from '@ts-kizuna/express';");
+        expect(types).toContain("import type { expressAdapter } from '@kizunajs/express';");
         expect(types).toContain('adapter: ReturnType<typeof expressAdapter>;');
     });
 
@@ -27,8 +27,8 @@ export default defineConfig({
      */
     it('leaves routes and clients out, and imports nothing for them', () => {
         const types = generateConfigTypes(`
-import { defineConfig } from '@ts-kizuna/core';
-import { swiftClient } from '@ts-kizuna/swift';
+import { defineConfig } from 'kizunajs';
+import { swiftClient } from '@kizunajs/swift';
 import { routes } from './src/routes';
 
 export default defineConfig({
@@ -38,12 +38,12 @@ export default defineConfig({
 `);
         expect(types).not.toContain('routes');
         expect(types).not.toContain('clients');
-        expect(types).not.toContain('@ts-kizuna/swift');
+        expect(types).not.toContain('@kizunajs/swift');
     });
 
     it('nests the identities under auth, and expands each one', () => {
         const types = generateConfigTypes(`
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 import { user, member } from './src/identities';
 import { analytics } from './src/request-context';
 import { GuardSchema } from './src/guard-schema';
@@ -64,7 +64,7 @@ export default defineConfig({
 
     it('writes issue codes as a union of the literals', () => {
         const types = generateConfigTypes(`
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 
 export default defineConfig({
     validation: {
@@ -81,9 +81,9 @@ export default defineConfig({
      */
     it('writes plugins as a tuple in the order they are installed', () => {
         const types = generateConfigTypes(`
-import { defineConfig } from '@ts-kizuna/core';
-import { mcpPlugin } from '@ts-kizuna/mcp';
-import { openApiPlugin } from '@ts-kizuna/openapi';
+import { defineConfig } from 'kizunajs';
+import { mcpPlugin } from '@kizunajs/mcp';
+import { openApiPlugin } from '@kizunajs/openapi';
 
 export default defineConfig({
     plugins: [mcpPlugin({ name: 'My API' }), openApiPlugin({ info: { title: 'My API', version: '1.0.0' } })],
@@ -94,7 +94,7 @@ export default defineConfig({
 
     it('keeps an aliased import pointing at the name its module exports', () => {
         const types = generateConfigTypes(`
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 import { tags as apiTags } from './src/tags';
 
 export default defineConfig({
@@ -107,7 +107,7 @@ export default defineConfig({
 
     it('follows a default export through the const it was named as', () => {
         const types = generateConfigTypes(`
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 import { tags } from './src/tags';
 
 const config = defineConfig({ tags });
@@ -124,7 +124,7 @@ export default config;
     it('refuses an issue code that is not a literal', () => {
         expect(() =>
             generateConfigTypes(`
-import { defineConfig } from '@ts-kizuna/core';
+import { defineConfig } from 'kizunajs';
 import { codes } from './codes';
 
 export default defineConfig({ validation: { issueCodes: codes } });

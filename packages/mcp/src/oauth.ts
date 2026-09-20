@@ -1,5 +1,5 @@
-import { assertCanonicalResourceUri } from '@ts-kizuna/core';
-import type { RoutePath } from '@ts-kizuna/core/plugin';
+import { assertCanonicalResourceUri } from 'kizunajs';
+import type { RoutePath } from 'kizunajs/plugin';
 
 export interface McpOAuthProps {
     /**

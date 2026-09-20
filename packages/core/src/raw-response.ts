@@ -1,6 +1,6 @@
 // Registry-global: a dual ESM/CJS install would otherwise hold two different
 // symbols and the marker would silently stop matching.
-const RAW_RESPONSE: unique symbol = Symbol.for('ts-kizuna.raw-response') as symbol as typeof RAW_RESPONSE;
+const RAW_RESPONSE: unique symbol = Symbol.for('kizuna.raw-response') as symbol as typeof RAW_RESPONSE;
 
 export interface RawResponse {
     readonly [RAW_RESPONSE]: true;

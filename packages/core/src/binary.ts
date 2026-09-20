@@ -10,7 +10,7 @@ import { z } from 'zod';
  *
  * @example
  * ```ts
- * import { BinarySchema } from '@ts-kizuna/core/schemas';
+ * import { BinarySchema } from 'kizunajs/schemas';
  *
  * downloadReport: {
  *     method: 'GET',
@@ -34,7 +34,7 @@ export const BinarySchema = z.instanceof(Uint8Array);
  *
  * @example
  * ```ts
- * import { FileSchema } from '@ts-kizuna/core/schemas';
+ * import { FileSchema } from 'kizunajs/schemas';
  *
  * uploadAvatar: {
  *     method: 'POST',

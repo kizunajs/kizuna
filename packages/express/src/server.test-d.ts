@@ -1,10 +1,10 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { Kizuna } from '@ts-kizuna/core';
-import type { HandlerContextOf, ApiRouter } from '@ts-kizuna/core/adapter';
+import { Kizuna } from 'kizunajs';
+import type { HandlerContextOf, ApiRouter } from 'kizunajs/adapter';
 import type { Request } from 'express';
-import type { RouteDefinition } from '@ts-kizuna/core';
-import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
+import type { RouteDefinition } from 'kizunajs';
+import type { GuardRun, RequestContextRun } from 'kizunajs/adapter';
 import {
     checkAdapterTypeFeatures,
     gateContract,

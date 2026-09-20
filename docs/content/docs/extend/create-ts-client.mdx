@@ -1,15 +1,15 @@
 ---
 title: Create a TypeScript Client Wrapper
-description: Build and ship your own TypeScript client wrapper using the types and the route metadata @ts-kizuna/fetch carries.
+description: Build and ship your own TypeScript client wrapper using the types and the route metadata @kizunajs/fetch carries.
 ---
 
 <BetaNotice>
 
-The wrapper surface is new and still settling. The types `@ts-kizuna/fetch` exports may change while v2 is in beta, so pin your version if you depend on it.
+The wrapper surface is new and still settling. The types `@kizunajs/fetch` exports may change while v2 is in beta, so pin your version if you depend on it.
 
 </BetaNotice>
 
-A wrapper builds on the [fetch client](/docs/clients/fetch) your app already has, the one `kizuna generate` writes. Wrap it to build hooks, an SDK layer, or any other integration. `@ts-kizuna/tanstack-query` is one of these, and it takes the client and nothing else.
+A wrapper builds on the [fetch client](/docs/clients/fetch) your app already has, the one `kizuna generate` writes. Wrap it to build hooks, an SDK layer, or any other integration. `@kizunajs/tanstack-query` is one of these, and it takes the client and nothing else.
 
 Whether a client goes first-party comes down to demand, not age. If it is something most teams on Kizuna would reach for, we will add it. What we will not take on is one a handful of people need, since we maintain everything we merge. The client API is public, so you can build and publish your own today.
 
@@ -39,7 +39,7 @@ export function createMyClient() {
 A wrapper that treats routes generically, rather than naming each one, needs to know what each method answers: its method, its path, which statuses it declares. Every client method carries its own route, and `routeOf` reads it:
 
 ```ts
-import { routeOf } from '@ts-kizuna/fetch';
+import { routeOf } from '@kizunajs/fetch';
 
 const route = routeOf(apiClient.users.getUser);
 
@@ -51,7 +51,7 @@ This is what lets a wrapper take the client alone. A `GET` gets query semantics,
 
 ## Types
 
-The types from `@ts-kizuna/fetch`:
+The types from `@kizunajs/fetch`:
 
 | Type                           | Description                                                           |
 | ------------------------------ | --------------------------------------------------------------------- |

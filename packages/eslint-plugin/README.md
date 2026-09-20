@@ -1,11 +1,11 @@
-# @ts-kizuna/eslint-plugin
+# @kizunajs/eslint-plugin
 
-`@ts-kizuna/eslint-plugin` catches Kizuna mistakes in your editor, as you type. These are things the type system cannot express on its own.
+`@kizunajs/eslint-plugin` catches Kizuna mistakes in your editor, as you type. These are things the type system cannot express on its own.
 
 ## Installation
 
 ```sh
-pnpm add -D @ts-kizuna/eslint-plugin
+pnpm add -D @kizunajs/eslint-plugin
 ```
 
 ## Usage
@@ -13,11 +13,11 @@ pnpm add -D @ts-kizuna/eslint-plugin
 Add the recommended config to your `eslint.config.js`:
 
 ```js
-import kizuna from '@ts-kizuna/eslint-plugin';
+import kizuna from '@kizunajs/eslint-plugin';
 
 export default [kizuna.configs.recommended];
 ```
 
 ## Documentation
 
-[ESLint plugin](https://ts-kizuna.com/docs/eslint)
+[ESLint plugin](https://kizunajs.com/docs/eslint)

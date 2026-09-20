@@ -58,7 +58,7 @@ const ValidationIssueCodeSchema = z.union([
  * listing each field-level validation failure.
  *
  * ```ts
- * import { ValidationErrorSchema } from '@ts-kizuna/core/schemas';
+ * import { ValidationErrorSchema } from 'kizunajs/schemas';
  *
  * const routes = k.routes({
  *     createUser: {
@@ -119,7 +119,7 @@ export type ValidationErrorFor<Codes extends string = never> = Omit<ValidationEr
 };
 
 /**
- * Type guard for ts-kizuna's validation error response body (400).
+ * Type guard for Kizuna's validation error response body (400).
  */
 export function isValidationError(body: unknown): body is ValidationError {
     return body !== null && typeof body === 'object' && 'errors' in body && Array.isArray((body as Record<string, unknown>).errors);

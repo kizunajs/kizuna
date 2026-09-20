@@ -1,9 +1,9 @@
 {
-  "name": "@ts-kizuna/tanstack-query",
+  "name": "@kizunajs/tanstack-query",
   "version": "1.64.1",
-  "description": "TanStack Query client for ts-kizuna",
+  "description": "TanStack Query client for Kizuna.js",
   "keywords": [
-    "ts-kizuna",
+    "kizunajs",
     "typescript",
     "zod",
     "openapi",
@@ -17,13 +17,13 @@
     "typed-client"
   ],
   "license": "MIT",
-  "homepage": "https://ts-kizuna.com/docs/clients/tanstack-query",
+  "homepage": "https://kizunajs.com/docs/clients/tanstack-query",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ts-kizuna/kizuna.git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
     "directory": "packages/tanstack-query"
   },
-  "bugs": "https://github.com/ts-kizuna/kizuna/issues",
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
   "type": "module",
   "sideEffects": false,
   "engines": {
@@ -56,13 +56,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @ts-kizuna/core --external @ts-kizuna/fetch --external @tanstack/query-core --external zod",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external kizunajs --external @kizunajs/fetch --external @tanstack/query-core --external zod",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "@tanstack/query-core": "^5.69.0",
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/fetch": "workspace:*",
+    "kizunajs": "workspace:*",
+    "@kizunajs/fetch": "workspace:*",
     "zod": "^4.0.0"
   },
   "devDependencies": {
@@ -70,8 +70,8 @@
     "@tanstack/react-query": "catalog:",
     "@tanstack/svelte-query": "catalog:",
     "@tanstack/vue-query": "catalog:",
-    "@ts-kizuna/core": "workspace:*",
-    "@ts-kizuna/fetch": "workspace:*",
+    "kizunajs": "workspace:*",
+    "@kizunajs/fetch": "workspace:*",
     "@types/react": "catalog:",
     "react": "catalog:",
     "svelte": "catalog:",

@@ -1,4 +1,4 @@
-import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
+import { KizunaTanstackQuery } from '@kizunajs/tanstack-query';
 import { createClient } from './api-client.generated';
 
 export const apiClient = createClient({

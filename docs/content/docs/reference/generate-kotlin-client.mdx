@@ -11,10 +11,10 @@ The Kotlin client is new and still settling. The generated API surface may chang
 
 Generate a native Kotlin client from your routes. The generated client uses OkHttp for HTTP, kotlinx.serialization for JSON, and Kotlin coroutines for async.
 
-<InstallTabs packageName="@ts-kizuna/kotlin" />
+<InstallTabs packageName="@kizunajs/kotlin" />
 
 ```ts
-import { generateKotlinClient } from '@ts-kizuna/kotlin';
+import { generateKotlinClient } from '@kizunajs/kotlin';
 ```
 
 ## Parameters
@@ -42,7 +42,7 @@ generateKotlinClient(api: ApiDefinition, config: KotlinConfig): string
 ```ts title="generate-kotlin.ts"
 import path from 'path';
 import { writeFileSync } from 'fs';
-import { generateKotlinClient } from '@ts-kizuna/kotlin';
+import { generateKotlinClient } from '@kizunajs/kotlin';
 import kizuna from '../kizuna.config';
 
 const kotlin = generateKotlinClient(kizuna.api, {
