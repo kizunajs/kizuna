@@ -419,7 +419,10 @@ class APIClientTest {
                     APIClient.AssistantReply.ToolCallCountWords(
                         id = "toolu_01",
                         name = "countWords",
-                        input = APIClient.AssistantReply.ToolCallCountWordsInput(text = "one two three"),
+                        input =
+                            APIClient.AssistantReply.ToolCallCountWordsInput(
+                                body = APIClient.AssistantReply.ToolCallCountWordsInputBody(text = "one two three")
+                            ),
                     )
                 )
             ),

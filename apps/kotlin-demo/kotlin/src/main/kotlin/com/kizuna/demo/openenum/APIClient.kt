@@ -216,7 +216,7 @@ object OpenEnumAPI {
 
 class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
 
-    /** Values sent as headers on every request, from the contract's request context. */
+    /** Values sent as headers on every request, from the api's request context. */
     data class RequestContext(
         val xPosthogSessionId: String? = null,
         val xPosthogDistinctId: String? = null
@@ -1114,15 +1114,15 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             val id: String
             val name: String
 
-            @SerialName("weather.getForecast")
+            @SerialName("getForecast")
             @Serializable
-            data class Weather_getForecast(val value: ToolCallWeatherGetForecast) : ToolCall {
+            data class GetForecast(val value: ToolCallGetForecast) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
             }
-            @SerialName("charts.plotSignups")
+            @SerialName("plotSignups")
             @Serializable
-            data class Charts_plotSignups(val value: ToolCallChartsPlotSignups) : ToolCall {
+            data class PlotSignups(val value: ToolCallPlotSignups) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
             }
@@ -1135,54 +1135,63 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
 
         @Serializable
-        data class ToolCallWeatherGetForecast(
+        data class ToolCallGetForecast(
             val id: String,
             val name: String,
-            val input: ToolCallWeatherGetForecastInput
+            val input: ToolCallGetForecastInput
         )
 
         @Serializable
-        data class ToolCallWeatherGetForecastInput(
-            val city: String,
-            val unit: ToolCallWeatherGetForecastInputUnit? = null
+        data class ToolCallGetForecastInput(
+            val params: ToolCallGetForecastInputParams,
+            val query: ToolCallGetForecastInputQuery
         )
 
-        @Serializable(with = ToolCallWeatherGetForecastInputUnit.Serializer::class)
-        sealed interface ToolCallWeatherGetForecastInputUnit : KizunaQueryValue {
-            data object CELSIUS : ToolCallWeatherGetForecastInputUnit {
+        @Serializable
+        data class ToolCallGetForecastInputParams(val city: String)
+
+        @Serializable
+        data class ToolCallGetForecastInputQuery(val unit: ToolCallGetForecastInputQueryUnit? = null)
+
+        @Serializable(with = ToolCallGetForecastInputQueryUnit.Serializer::class)
+        sealed interface ToolCallGetForecastInputQueryUnit : KizunaQueryValue {
+            data object CELSIUS : ToolCallGetForecastInputQueryUnit {
                 override val wireValue: String = "celsius"
             }
-            data object FAHRENHEIT : ToolCallWeatherGetForecastInputUnit {
+            data object FAHRENHEIT : ToolCallGetForecastInputQueryUnit {
                 override val wireValue: String = "fahrenheit"
             }
-            data class Unknown(override val wireValue: String) : ToolCallWeatherGetForecastInputUnit
+            data class Unknown(override val wireValue: String) : ToolCallGetForecastInputQueryUnit
 
             companion object {
-                fun fromWireValue(wireValue: String): ToolCallWeatherGetForecastInputUnit = when (wireValue) {
+                fun fromWireValue(wireValue: String): ToolCallGetForecastInputQueryUnit = when (wireValue) {
                     "celsius" -> CELSIUS
                     "fahrenheit" -> FAHRENHEIT
                     else -> Unknown(wireValue)
                 }
             }
 
-            object Serializer : KSerializer<ToolCallWeatherGetForecastInputUnit> {
-                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ToolCallWeatherGetForecastInputUnit", PrimitiveKind.STRING)
-                override fun deserialize(decoder: Decoder): ToolCallWeatherGetForecastInputUnit = ToolCallWeatherGetForecastInputUnit.fromWireValue(decoder.decodeString())
-                override fun serialize(encoder: Encoder, value: ToolCallWeatherGetForecastInputUnit) {
+            object Serializer : KSerializer<ToolCallGetForecastInputQueryUnit> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ToolCallGetForecastInputQueryUnit", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): ToolCallGetForecastInputQueryUnit = ToolCallGetForecastInputQueryUnit.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: ToolCallGetForecastInputQueryUnit) {
                     encoder.encodeString(value.wireValue)
                 }
             }
         }
 
         @Serializable
-        data class ToolCallChartsPlotSignups(
+        data class ToolCallPlotSignups(
             val id: String,
             val name: String,
-            val input: ToolCallChartsPlotSignupsInput
+            val input: ToolCallPlotSignupsInput
         )
 
         @Serializable
-        data class ToolCallChartsPlotSignupsInput(val days: Int)
+        data class ToolCallPlotSignupsInput(val query: ToolCallPlotSignupsInputQuery)
+
+        @Serializable
+        data class ToolCallPlotSignupsInputQuery(val days: Int)
 
         @Serializable
         data class ToolCallCountWords(
@@ -1192,7 +1201,10 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         )
 
         @Serializable
-        data class ToolCallCountWordsInput(val text: String)
+        data class ToolCallCountWordsInput(val body: ToolCallCountWordsInputBody)
+
+        @Serializable
+        data class ToolCallCountWordsInputBody(val text: String)
 
         @OptIn(ExperimentalSerializationApi::class)
         @JsonClassDiscriminator("name")
@@ -1201,15 +1213,15 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             val id: String
             val name: String
 
-            @SerialName("weather.getForecast")
+            @SerialName("getForecast")
             @Serializable
-            data class Weather_getForecast(val value: ToolResultWeatherGetForecast) : ToolResult {
+            data class GetForecast(val value: ToolResultGetForecast) : ToolResult {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
             }
-            @SerialName("charts.plotSignups")
+            @SerialName("plotSignups")
             @Serializable
-            data class Charts_plotSignups(val value: ToolResultChartsPlotSignups) : ToolResult {
+            data class PlotSignups(val value: ToolResultPlotSignups) : ToolResult {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
             }
@@ -1222,58 +1234,58 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
 
         @Serializable
-        data class ToolResultWeatherGetForecast(
+        data class ToolResultGetForecast(
             val id: String,
             val name: String,
-            val output: ToolResultWeatherGetForecastOutput
+            val output: ToolResultGetForecastOutput
         )
 
         @Serializable
-        data class ToolResultWeatherGetForecastOutput(
+        data class ToolResultGetForecastOutput(
             val temperature: Double,
-            val unit: ToolResultWeatherGetForecastOutputUnit,
+            val unit: ToolResultGetForecastOutputUnit,
             val summary: String
         )
 
-        @Serializable(with = ToolResultWeatherGetForecastOutputUnit.Serializer::class)
-        sealed interface ToolResultWeatherGetForecastOutputUnit : KizunaQueryValue {
-            data object CELSIUS : ToolResultWeatherGetForecastOutputUnit {
+        @Serializable(with = ToolResultGetForecastOutputUnit.Serializer::class)
+        sealed interface ToolResultGetForecastOutputUnit : KizunaQueryValue {
+            data object CELSIUS : ToolResultGetForecastOutputUnit {
                 override val wireValue: String = "celsius"
             }
-            data object FAHRENHEIT : ToolResultWeatherGetForecastOutputUnit {
+            data object FAHRENHEIT : ToolResultGetForecastOutputUnit {
                 override val wireValue: String = "fahrenheit"
             }
-            data class Unknown(override val wireValue: String) : ToolResultWeatherGetForecastOutputUnit
+            data class Unknown(override val wireValue: String) : ToolResultGetForecastOutputUnit
 
             companion object {
-                fun fromWireValue(wireValue: String): ToolResultWeatherGetForecastOutputUnit = when (wireValue) {
+                fun fromWireValue(wireValue: String): ToolResultGetForecastOutputUnit = when (wireValue) {
                     "celsius" -> CELSIUS
                     "fahrenheit" -> FAHRENHEIT
                     else -> Unknown(wireValue)
                 }
             }
 
-            object Serializer : KSerializer<ToolResultWeatherGetForecastOutputUnit> {
-                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ToolResultWeatherGetForecastOutputUnit", PrimitiveKind.STRING)
-                override fun deserialize(decoder: Decoder): ToolResultWeatherGetForecastOutputUnit = ToolResultWeatherGetForecastOutputUnit.fromWireValue(decoder.decodeString())
-                override fun serialize(encoder: Encoder, value: ToolResultWeatherGetForecastOutputUnit) {
+            object Serializer : KSerializer<ToolResultGetForecastOutputUnit> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ToolResultGetForecastOutputUnit", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): ToolResultGetForecastOutputUnit = ToolResultGetForecastOutputUnit.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: ToolResultGetForecastOutputUnit) {
                     encoder.encodeString(value.wireValue)
                 }
             }
         }
 
         @Serializable
-        data class ToolResultChartsPlotSignups(
+        data class ToolResultPlotSignups(
             val id: String,
             val name: String,
-            val output: ToolResultChartsPlotSignupsOutput
+            val output: ToolResultPlotSignupsOutput
         )
 
         @Serializable
-        data class ToolResultChartsPlotSignupsOutput(val points: List<ToolResultChartsPlotSignupsOutputPointsItem>)
+        data class ToolResultPlotSignupsOutput(val points: List<ToolResultPlotSignupsOutputPointsItem>)
 
         @Serializable
-        data class ToolResultChartsPlotSignupsOutputPointsItem(
+        data class ToolResultPlotSignupsOutputPointsItem(
             val date: String,
             val signups: Int
         )
@@ -1297,11 +1309,11 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         @Serializable(with = ToolErrorName.Serializer::class)
         sealed interface ToolErrorName : KizunaQueryValue {
-            data object WEATHER_GETFORECAST : ToolErrorName {
-                override val wireValue: String = "weather.getForecast"
+            data object GETFORECAST : ToolErrorName {
+                override val wireValue: String = "getForecast"
             }
-            data object CHARTS_PLOTSIGNUPS : ToolErrorName {
-                override val wireValue: String = "charts.plotSignups"
+            data object PLOTSIGNUPS : ToolErrorName {
+                override val wireValue: String = "plotSignups"
             }
             data object COUNTWORDS : ToolErrorName {
                 override val wireValue: String = "countWords"
@@ -1310,8 +1322,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
             companion object {
                 fun fromWireValue(wireValue: String): ToolErrorName = when (wireValue) {
-                    "weather.getForecast" -> WEATHER_GETFORECAST
-                    "charts.plotSignups" -> CHARTS_PLOTSIGNUPS
+                    "getForecast" -> GETFORECAST
+                    "plotSignups" -> PLOTSIGNUPS
                     "countWords" -> COUNTWORDS
                     else -> Unknown(wireValue)
                 }
@@ -1386,6 +1398,176 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
+    object ToolsGetForecast {
+
+        @Serializable(with = QueryUnit.Serializer::class)
+        sealed interface QueryUnit : KizunaQueryValue {
+            data object CELSIUS : QueryUnit {
+                override val wireValue: String = "celsius"
+            }
+            data object FAHRENHEIT : QueryUnit {
+                override val wireValue: String = "fahrenheit"
+            }
+            data class Unknown(override val wireValue: String) : QueryUnit
+
+            companion object {
+                fun fromWireValue(wireValue: String): QueryUnit = when (wireValue) {
+                    "celsius" -> CELSIUS
+                    "fahrenheit" -> FAHRENHEIT
+                    else -> Unknown(wireValue)
+                }
+            }
+
+            object Serializer : KSerializer<QueryUnit> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("QueryUnit", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): QueryUnit = QueryUnit.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: QueryUnit) {
+                    encoder.encodeString(value.wireValue)
+                }
+            }
+        }
+
+        @Serializable
+        data class Response(
+            val temperature: Double,
+            val unit: ResponseUnit,
+            val summary: String
+        )
+
+        @Serializable(with = ResponseUnit.Serializer::class)
+        sealed interface ResponseUnit : KizunaQueryValue {
+            data object CELSIUS : ResponseUnit {
+                override val wireValue: String = "celsius"
+            }
+            data object FAHRENHEIT : ResponseUnit {
+                override val wireValue: String = "fahrenheit"
+            }
+            data class Unknown(override val wireValue: String) : ResponseUnit
+
+            companion object {
+                fun fromWireValue(wireValue: String): ResponseUnit = when (wireValue) {
+                    "celsius" -> CELSIUS
+                    "fahrenheit" -> FAHRENHEIT
+                    else -> Unknown(wireValue)
+                }
+            }
+
+            object Serializer : KSerializer<ResponseUnit> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ResponseUnit", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): ResponseUnit = ResponseUnit.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: ResponseUnit) {
+                    encoder.encodeString(value.wireValue)
+                }
+            }
+        }
+
+        data class Params(val city: String)
+
+        data class Query(val unit: QueryUnit? = null)
+
+        sealed interface Args {
+            val params: Params
+            val query: Query?
+        }
+
+        object Scope {
+            fun params(city: String): AfterParams = AfterParams(params = Params(city = city))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args {
+            override val query: Query? get() = null
+            fun query(unit: QueryUnit? = null): AfterQuery = AfterQuery(params = params, query = Query(unit = unit))
+        }
+
+        class AfterQuery internal constructor(override val params: Params, override val query: Query?) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object ToolsPlotSignups {
+
+        @Serializable
+        data class Response(val points: List<ResponsePointsItem>)
+
+        @Serializable
+        data class ResponsePointsItem(
+            val date: String,
+            val signups: Int
+        )
+
+        data class Query(val days: Int)
+
+        sealed interface Args {
+            val query: Query
+        }
+
+        object Scope {
+            fun query(days: Int): AfterQuery = AfterQuery(query = Query(days = days))
+        }
+
+        class AfterQuery internal constructor(override val query: Query) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object ToolsCountWords {
+
+        @Serializable
+        data class Input(val text: String)
+
+        @Serializable
+        data class Response(val words: Int)
+
+        data class Body(val text: String)
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(text: String): AfterBody = AfterBody(body = Body(text = text))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object DiagnosticsWhoAmI {
+
+        @Serializable
+        data class Response(
+            val ip: String,
+            val protocol: String,
+            val userAgent: String? = null
+        )
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     val users = OpenEnumAPIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val health = OpenEnumAPIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
@@ -1399,6 +1581,10 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
     val invites = OpenEnumAPIInvitesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val assistant = OpenEnumAPIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val tools = OpenEnumAPIToolsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val diagnostics = OpenEnumAPIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 }
 
 class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -2165,12 +2351,12 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
         }
     }
 
-    /** Validate contract, exercises generator bug coverage */
+    /** Validate schemas, exercises generator bug coverage */
     @Throws(OpenEnumAPIClient.NotificationsValidateConfig.Failure::class)
     suspend fun validateConfig(build: OpenEnumAPIClient.NotificationsValidateConfig.Scope.() -> OpenEnumAPIClient.NotificationsValidateConfig.Args): OpenEnumAPIClient.NotificationsValidateConfig.Result {
         val args = OpenEnumAPIClient.NotificationsValidateConfig.Scope.build()
         val body = args.body
-        val path = "/contract/validate"
+        val path = "/schemas/validate"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
         val payload = OpenEnumAPIClient.NotificationsValidateConfig.Input(default = body.default, interval = body.interval)
@@ -2682,6 +2868,157 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
                     throw OpenEnumAPIClient.AssistantReply.Failure.Unexpected(statusCode = statusCode, data = data)
                 }
                 else -> throw OpenEnumAPIClient.AssistantReply.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
+class OpenEnumAPIToolsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** Look up tomorrow forecast for one city */
+    @Throws(OpenEnumAPIClient.ToolsGetForecast.Failure::class)
+    suspend fun getForecast(build: OpenEnumAPIClient.ToolsGetForecast.Scope.() -> OpenEnumAPIClient.ToolsGetForecast.Args): OpenEnumAPIClient.ToolsGetForecast.Result {
+        val args = OpenEnumAPIClient.ToolsGetForecast.Scope.build()
+        val params = args.params
+        val query = args.query ?: OpenEnumAPIClient.ToolsGetForecast.Query()
+        var path = "/forecast/:city"
+        path = path.replace(":city", Kizuna.encodePathSegment(params.city))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        if (query.unit != null) {
+            for (stringValue in Kizuna.stringifyQueryValue(query.unit)) {
+                urlBuilder.addQueryParameter("unit", stringValue)
+            }
+        }
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.ToolsGetForecast.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.ToolsGetForecast.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.ToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.ToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.ToolsGetForecast.Failure.BadRequest(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.ToolsGetForecast.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Plot signups per day over the last N days, for the client to draw as a chart */
+    @Throws(OpenEnumAPIClient.ToolsPlotSignups.Failure::class)
+    suspend fun plotSignups(build: OpenEnumAPIClient.ToolsPlotSignups.Scope.() -> OpenEnumAPIClient.ToolsPlotSignups.Args): OpenEnumAPIClient.ToolsPlotSignups.Result {
+        val args = OpenEnumAPIClient.ToolsPlotSignups.Scope.build()
+        val query = args.query
+        val path = "/signups"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        for (stringValue in Kizuna.stringifyQueryValue(query.days)) {
+            urlBuilder.addQueryParameter("days", stringValue)
+        }
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.ToolsPlotSignups.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.ToolsPlotSignups.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.ToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.ToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.ToolsPlotSignups.Failure.BadRequest(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.ToolsPlotSignups.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Count the words in a piece of text */
+    @Throws(OpenEnumAPIClient.ToolsCountWords.Failure::class)
+    suspend fun countWords(build: OpenEnumAPIClient.ToolsCountWords.Scope.() -> OpenEnumAPIClient.ToolsCountWords.Args): OpenEnumAPIClient.ToolsCountWords.Result {
+        val args = OpenEnumAPIClient.ToolsCountWords.Scope.build()
+        val body = args.body
+        val path = "/text/word-count"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = OpenEnumAPIClient.ToolsCountWords.Input(text = body.text)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.ToolsCountWords.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.ToolsCountWords.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.ToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.ToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.ToolsCountWords.Failure.BadRequest(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.ToolsCountWords.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
+class OpenEnumAPIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** Report the caller as Express sees it */
+    @Throws(OpenEnumAPIClient.DiagnosticsWhoAmI.Failure::class)
+    suspend fun whoAmI(): OpenEnumAPIClient.DiagnosticsWhoAmI.Result {
+        val path = "/diagnostics/caller"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.DiagnosticsWhoAmI.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.DiagnosticsWhoAmI.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.Decoding(error, statusCode, data) }
+                }
+                else -> throw OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

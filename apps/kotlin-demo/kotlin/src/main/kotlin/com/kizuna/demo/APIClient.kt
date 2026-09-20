@@ -142,7 +142,7 @@ object API {
 
 class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
 
-    /** Values sent as headers on every request, from the contract's request context. */
+    /** Values sent as headers on every request, from the api's request context. */
     data class RequestContext(
         val xPosthogSessionId: String? = null,
         val xPosthogDistinctId: String? = null
@@ -1013,15 +1013,15 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             val id: String
             val name: String
 
-            @SerialName("weather.getForecast")
+            @SerialName("getForecast")
             @Serializable
-            data class Weather_getForecast(val value: ToolCallWeatherGetForecast) : ToolCall {
+            data class GetForecast(val value: ToolCallGetForecast) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
             }
-            @SerialName("charts.plotSignups")
+            @SerialName("plotSignups")
             @Serializable
-            data class Charts_plotSignups(val value: ToolCallChartsPlotSignups) : ToolCall {
+            data class PlotSignups(val value: ToolCallPlotSignups) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
             }
@@ -1034,33 +1034,42 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         @Serializable
-        data class ToolCallWeatherGetForecast(
+        data class ToolCallGetForecast(
             val id: String,
             val name: String,
-            val input: ToolCallWeatherGetForecastInput
+            val input: ToolCallGetForecastInput
         )
 
         @Serializable
-        data class ToolCallWeatherGetForecastInput(
-            val city: String,
-            val unit: ToolCallWeatherGetForecastInputUnit? = null
+        data class ToolCallGetForecastInput(
+            val params: ToolCallGetForecastInputParams,
+            val query: ToolCallGetForecastInputQuery
         )
 
         @Serializable
-        enum class ToolCallWeatherGetForecastInputUnit(override val wireValue: String) : KizunaQueryValue {
+        data class ToolCallGetForecastInputParams(val city: String)
+
+        @Serializable
+        data class ToolCallGetForecastInputQuery(val unit: ToolCallGetForecastInputQueryUnit? = null)
+
+        @Serializable
+        enum class ToolCallGetForecastInputQueryUnit(override val wireValue: String) : KizunaQueryValue {
             @SerialName("celsius") CELSIUS("celsius"),
             @SerialName("fahrenheit") FAHRENHEIT("fahrenheit")
         }
 
         @Serializable
-        data class ToolCallChartsPlotSignups(
+        data class ToolCallPlotSignups(
             val id: String,
             val name: String,
-            val input: ToolCallChartsPlotSignupsInput
+            val input: ToolCallPlotSignupsInput
         )
 
         @Serializable
-        data class ToolCallChartsPlotSignupsInput(val days: Int)
+        data class ToolCallPlotSignupsInput(val query: ToolCallPlotSignupsInputQuery)
+
+        @Serializable
+        data class ToolCallPlotSignupsInputQuery(val days: Int)
 
         @Serializable
         data class ToolCallCountWords(
@@ -1070,7 +1079,10 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         )
 
         @Serializable
-        data class ToolCallCountWordsInput(val text: String)
+        data class ToolCallCountWordsInput(val body: ToolCallCountWordsInputBody)
+
+        @Serializable
+        data class ToolCallCountWordsInputBody(val text: String)
 
         @OptIn(ExperimentalSerializationApi::class)
         @JsonClassDiscriminator("name")
@@ -1079,15 +1091,15 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             val id: String
             val name: String
 
-            @SerialName("weather.getForecast")
+            @SerialName("getForecast")
             @Serializable
-            data class Weather_getForecast(val value: ToolResultWeatherGetForecast) : ToolResult {
+            data class GetForecast(val value: ToolResultGetForecast) : ToolResult {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
             }
-            @SerialName("charts.plotSignups")
+            @SerialName("plotSignups")
             @Serializable
-            data class Charts_plotSignups(val value: ToolResultChartsPlotSignups) : ToolResult {
+            data class PlotSignups(val value: ToolResultPlotSignups) : ToolResult {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
             }
@@ -1100,37 +1112,37 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         @Serializable
-        data class ToolResultWeatherGetForecast(
+        data class ToolResultGetForecast(
             val id: String,
             val name: String,
-            val output: ToolResultWeatherGetForecastOutput
+            val output: ToolResultGetForecastOutput
         )
 
         @Serializable
-        data class ToolResultWeatherGetForecastOutput(
+        data class ToolResultGetForecastOutput(
             val temperature: Double,
-            val unit: ToolResultWeatherGetForecastOutputUnit,
+            val unit: ToolResultGetForecastOutputUnit,
             val summary: String
         )
 
         @Serializable
-        enum class ToolResultWeatherGetForecastOutputUnit(override val wireValue: String) : KizunaQueryValue {
+        enum class ToolResultGetForecastOutputUnit(override val wireValue: String) : KizunaQueryValue {
             @SerialName("celsius") CELSIUS("celsius"),
             @SerialName("fahrenheit") FAHRENHEIT("fahrenheit")
         }
 
         @Serializable
-        data class ToolResultChartsPlotSignups(
+        data class ToolResultPlotSignups(
             val id: String,
             val name: String,
-            val output: ToolResultChartsPlotSignupsOutput
+            val output: ToolResultPlotSignupsOutput
         )
 
         @Serializable
-        data class ToolResultChartsPlotSignupsOutput(val points: List<ToolResultChartsPlotSignupsOutputPointsItem>)
+        data class ToolResultPlotSignupsOutput(val points: List<ToolResultPlotSignupsOutputPointsItem>)
 
         @Serializable
-        data class ToolResultChartsPlotSignupsOutputPointsItem(
+        data class ToolResultPlotSignupsOutputPointsItem(
             val date: String,
             val signups: Int
         )
@@ -1154,8 +1166,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         @Serializable
         enum class ToolErrorName(override val wireValue: String) : KizunaQueryValue {
-            @SerialName("weather.getForecast") WEATHER_GETFORECAST("weather.getForecast"),
-            @SerialName("charts.plotSignups") CHARTS_PLOTSIGNUPS("charts.plotSignups"),
+            @SerialName("getForecast") GETFORECAST("getForecast"),
+            @SerialName("plotSignups") PLOTSIGNUPS("plotSignups"),
             @SerialName("countWords") COUNTWORDS("countWords")
         }
 
@@ -1219,6 +1231,134 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object ToolsGetForecast {
+
+        @Serializable
+        enum class QueryUnit(override val wireValue: String) : KizunaQueryValue {
+            @SerialName("celsius") CELSIUS("celsius"),
+            @SerialName("fahrenheit") FAHRENHEIT("fahrenheit")
+        }
+
+        @Serializable
+        data class Response(
+            val temperature: Double,
+            val unit: ResponseUnit,
+            val summary: String
+        )
+
+        @Serializable
+        enum class ResponseUnit(override val wireValue: String) : KizunaQueryValue {
+            @SerialName("celsius") CELSIUS("celsius"),
+            @SerialName("fahrenheit") FAHRENHEIT("fahrenheit")
+        }
+
+        data class Params(val city: String)
+
+        data class Query(val unit: QueryUnit? = null)
+
+        sealed interface Args {
+            val params: Params
+            val query: Query?
+        }
+
+        object Scope {
+            fun params(city: String): AfterParams = AfterParams(params = Params(city = city))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args {
+            override val query: Query? get() = null
+            fun query(unit: QueryUnit? = null): AfterQuery = AfterQuery(params = params, query = Query(unit = unit))
+        }
+
+        class AfterQuery internal constructor(override val params: Params, override val query: Query?) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object ToolsPlotSignups {
+
+        @Serializable
+        data class Response(val points: List<ResponsePointsItem>)
+
+        @Serializable
+        data class ResponsePointsItem(
+            val date: String,
+            val signups: Int
+        )
+
+        data class Query(val days: Int)
+
+        sealed interface Args {
+            val query: Query
+        }
+
+        object Scope {
+            fun query(days: Int): AfterQuery = AfterQuery(query = Query(days = days))
+        }
+
+        class AfterQuery internal constructor(override val query: Query) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object ToolsCountWords {
+
+        @Serializable
+        data class Input(val text: String)
+
+        @Serializable
+        data class Response(val words: Int)
+
+        data class Body(val text: String)
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(text: String): AfterBody = AfterBody(body = Body(text = text))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object DiagnosticsWhoAmI {
+
+        @Serializable
+        data class Response(
+            val ip: String,
+            val protocol: String,
+            val userAgent: String? = null
+        )
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
@@ -1232,6 +1372,10 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     val invites = APIInvitesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val assistant = APIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val tools = APIToolsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 }
 
 class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -1998,12 +2142,12 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Validate contract, exercises generator bug coverage */
+    /** Validate schemas, exercises generator bug coverage */
     @Throws(APIClient.NotificationsValidateConfig.Failure::class)
     suspend fun validateConfig(build: APIClient.NotificationsValidateConfig.Scope.() -> APIClient.NotificationsValidateConfig.Args): APIClient.NotificationsValidateConfig.Result {
         val args = APIClient.NotificationsValidateConfig.Scope.build()
         val body = args.body
-        val path = "/contract/validate"
+        val path = "/schemas/validate"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
         val payload = APIClient.NotificationsValidateConfig.Input(default = body.default, interval = body.interval)
@@ -2515,6 +2659,157 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
                     throw APIClient.AssistantReply.Failure.Unexpected(statusCode = statusCode, data = data)
                 }
                 else -> throw APIClient.AssistantReply.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
+class APIToolsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** Look up tomorrow forecast for one city */
+    @Throws(APIClient.ToolsGetForecast.Failure::class)
+    suspend fun getForecast(build: APIClient.ToolsGetForecast.Scope.() -> APIClient.ToolsGetForecast.Args): APIClient.ToolsGetForecast.Result {
+        val args = APIClient.ToolsGetForecast.Scope.build()
+        val params = args.params
+        val query = args.query ?: APIClient.ToolsGetForecast.Query()
+        var path = "/forecast/:city"
+        path = path.replace(":city", Kizuna.encodePathSegment(params.city))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        if (query.unit != null) {
+            for (stringValue in Kizuna.stringifyQueryValue(query.unit)) {
+                urlBuilder.addQueryParameter("unit", stringValue)
+            }
+        }
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.ToolsGetForecast.Response>(data.decodeToString())
+                        return@use APIClient.ToolsGetForecast.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.ToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.ToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.ToolsGetForecast.Failure.BadRequest(body = payload)
+                }
+                else -> throw APIClient.ToolsGetForecast.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Plot signups per day over the last N days, for the client to draw as a chart */
+    @Throws(APIClient.ToolsPlotSignups.Failure::class)
+    suspend fun plotSignups(build: APIClient.ToolsPlotSignups.Scope.() -> APIClient.ToolsPlotSignups.Args): APIClient.ToolsPlotSignups.Result {
+        val args = APIClient.ToolsPlotSignups.Scope.build()
+        val query = args.query
+        val path = "/signups"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        for (stringValue in Kizuna.stringifyQueryValue(query.days)) {
+            urlBuilder.addQueryParameter("days", stringValue)
+        }
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.ToolsPlotSignups.Response>(data.decodeToString())
+                        return@use APIClient.ToolsPlotSignups.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.ToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.ToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.ToolsPlotSignups.Failure.BadRequest(body = payload)
+                }
+                else -> throw APIClient.ToolsPlotSignups.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Count the words in a piece of text */
+    @Throws(APIClient.ToolsCountWords.Failure::class)
+    suspend fun countWords(build: APIClient.ToolsCountWords.Scope.() -> APIClient.ToolsCountWords.Args): APIClient.ToolsCountWords.Result {
+        val args = APIClient.ToolsCountWords.Scope.build()
+        val body = args.body
+        val path = "/text/word-count"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = APIClient.ToolsCountWords.Input(text = body.text)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.ToolsCountWords.Response>(data.decodeToString())
+                        return@use APIClient.ToolsCountWords.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.ToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.ToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.ToolsCountWords.Failure.BadRequest(body = payload)
+                }
+                else -> throw APIClient.ToolsCountWords.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
+class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** Report the caller as Express sees it */
+    @Throws(APIClient.DiagnosticsWhoAmI.Failure::class)
+    suspend fun whoAmI(): APIClient.DiagnosticsWhoAmI.Result {
+        val path = "/diagnostics/caller"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.DiagnosticsWhoAmI.Response>(data.decodeToString())
+                        return@use APIClient.DiagnosticsWhoAmI.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.DiagnosticsWhoAmI.Failure.Decoding(error, statusCode, data) }
+                }
+                else -> throw APIClient.DiagnosticsWhoAmI.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
