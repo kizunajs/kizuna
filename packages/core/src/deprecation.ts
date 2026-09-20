@@ -43,7 +43,7 @@ export const deprecationHeaders = (route: RouteDefinition): ResponseHeaders => {
 
 /**
  * Rejects a `deprecated.date` or `sunset` that does not parse as ISO 8601.
- * Called by `defineConfig`, so a bad date fails at contract assembly rather than
+ * Called by `defineConfig`, so a bad date fails when the api is assembled rather than
  * on the first response.
  */
 export const assertValidDeprecationDates = (routes: Routes): void => {

@@ -253,7 +253,7 @@ export type KizunaConfigInput<
 };
 
 /**
- * The api `defineConfig` assembles: the contract it declares, and the `mount`
+ * The api `defineConfig` assembles: the routes it declares, and the `mount`
  * that serves it.
  */
 export type ConfiguredApi<

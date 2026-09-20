@@ -12,7 +12,7 @@ export interface WrittenClient {
 }
 
 /**
- * A generated client that does not match its contract.
+ * A generated client that does not match its api.
  */
 export interface StaleClient {
     kind: string;
@@ -32,7 +32,7 @@ const currentContents = (output: string): string | undefined => {
 };
 
 /**
- * Writes every client a contract declares, leaving a file alone when it already
+ * Writes every client an api declares, leaving a file alone when it already
  * matches so watchers and build tools see no change.
  */
 export const writeClients = (contract: Contract, clients: readonly ClientTarget[]): WrittenClient[] =>
@@ -49,7 +49,7 @@ export const writeClients = (contract: Contract, clients: readonly ClientTarget[
     });
 
 /**
- * Every client that no longer matches its contract, without writing anything.
+ * Every client that no longer matches its api, without writing anything.
  *
  * This is what a pipeline runs: a generated client that has fallen behind is a
  * compile error waiting to happen in whatever imports it.
@@ -69,7 +69,7 @@ export const checkClients = (contract: Contract, clients: readonly ClientTarget[
 export const formatStale = (stale: readonly StaleClient[], command = 'kizuna generate'): string => {
     const lines = stale.map((client) => {
         const where = relative(process.cwd(), client.output);
-        return client.reason === 'missing' ? `  ${where} has not been generated` : `  ${where} is behind the contract`;
+        return client.reason === 'missing' ? `  ${where} has not been generated` : `  ${where} is behind the config`;
     });
 
     return [

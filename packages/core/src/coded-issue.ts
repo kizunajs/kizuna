@@ -27,7 +27,8 @@ export interface CodedIssue<Input> {
 
 /**
  * A validation issue whose `code` is checked against the issue codes declared on
- * `defineConfig` under `issueCodes`, plus Zod's built-ins. This is what `k.issue` accepts.
+ * `defineConfig` under `validation.issueCodes`, plus Zod's built-ins. This is what
+ * `k.issue` accepts.
  */
 export interface RegisteredIssue<Codes extends string, Input> {
     /**

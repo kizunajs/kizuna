@@ -36,7 +36,7 @@ export interface JobScheduler {
 export const occurrenceKey = (jobKey: string, occurrence: Date): string => `${jobKey}@${occurrence.toISOString()}`;
 
 /**
- * Tick a contract's scheduled jobs in this process, queueing each occurrence.
+ * Tick an api's scheduled jobs in this process, queueing each occurrence.
  *
  * A transport implementing `register` takes scheduling over instead, and nothing
  * is ticked here.

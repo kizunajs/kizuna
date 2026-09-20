@@ -218,7 +218,7 @@ const buildComponentSchemas = (): Record<string, unknown> | undefined => {
 
 /**
  * Internal generator options: the public options plus a `key → TagOptions`
- * lookup built from the contract's tag set, used to resolve tag keys to titles.
+ * lookup built from the api's tag set, used to resolve tag keys to titles.
  */
 type GeneratorContext = GenerateOpenApiOptions & {
     tagLookup?: ReadonlyMap<string, TagOptions>;
@@ -578,7 +578,7 @@ const customGuardsFor = (security: readonly SecurityRequirement[], contract: Con
 
 /**
  * Build the `components.securitySchemes` object from the identities registered
- * on the contract. Each contributes its OpenAPI definition under its name.
+ * on the api. Each contributes its OpenAPI definition under its name.
  */
 const buildSecuritySchemes = (contract: Contract): Record<string, unknown> | undefined => {
     const schemes = contract.securitySchemes;
@@ -595,7 +595,7 @@ const buildSecuritySchemes = (contract: Contract): Record<string, unknown> | und
 const buildTagLookup = (contract: Contract): ReadonlyMap<string, TagOptions> => new Map(Object.entries(contract.tags?.tags ?? {}));
 
 /**
- * Document-level tag definitions from the contract's declared tag set, one
+ * Document-level tag definitions from the api's declared tag set, one
  * entry per declared tag, in declaration order, named by its `title`.
  */
 const tagsFromContract = (contract: Contract): OpenApiTag[] => {
@@ -637,9 +637,9 @@ export function renderOpenApi(contract: Contract, options: GenerateOpenApiOption
 }
 
 /**
- * Generate an OpenAPI 3.1.0 document from a contract. Returns a renderer: call
+ * Generate an OpenAPI 3.1.0 document from an api. Returns a renderer: call
  * it with `'json'` or `'yaml'`. Options come from the `openApiPlugin` installed
- * on the contract, so the document matches the one the server serves.
+ * on the api, so the document matches the one the server serves.
  *
  * Pass `overrides` for what only a build step knows, such as the public
  * `servers` list.

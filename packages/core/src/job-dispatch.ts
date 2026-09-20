@@ -48,7 +48,7 @@ export interface DispatchResult {
 }
 
 /**
- * The jobs a contract has due as of a tick.
+ * The jobs an api has due as of a tick.
  */
 export const dueJobs = (contract: Contract, options?: DispatchOptions): string[] => {
     const schedules: Record<string, JobSchedule> = {};
@@ -65,13 +65,13 @@ export const dueJobs = (contract: Contract, options?: DispatchOptions): string[]
 };
 
 /**
- * Run every job a contract has due, and report what happened.
+ * Run every job an api has due, and report what happened.
  *
  * Stateless: the clock comes from the tick, so a minute the platform fails to
  * deliver is a minute missed. A failing job is reported, not thrown.
  *
  * @example
- * const result = await dispatchDueJobs(contract, {
+ * const result = await dispatchDueJobs(kizuna.api, {
  *     sendDigests: async () => { await sendPendingDigests(); },
  * });
  */

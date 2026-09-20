@@ -36,7 +36,7 @@ export type ExpressApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
     /**
-     * Register every contract route on an Express app or router.
+     * Register every route on an Express app or router.
      */
     mount: (app: AppLike, options?: ExpressOptions) => ExpressRouter;
 };
@@ -251,12 +251,14 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
  * Serve an API on Express. What it takes is what every route is served with.
  *
  * @example
- * export const { api } = defineConfig({
+ * // kizuna.config.ts
+ * export default defineConfig({
  *     adapter: expressAdapter(),
  *     routes,
  * });
  *
- * api.mount(app);
+ * // src/index.ts
+ * kizuna.api.mount(app);
  */
 export const expressAdapter = (
     defaults?: ExpressOptions

@@ -52,7 +52,7 @@ const declaresNothing = (cache: ObjectPolicy): boolean =>
 
 /**
  * Rejects a cache policy that cannot mean what it says. Called by `defineConfig`,
- * so a bad policy fails at contract assembly rather than on the first response.
+ * so a bad policy fails when the api is assembled rather than on the first response.
  */
 export const assertValidCache = (routes: Routes): void => {
     for (const { routeKey, route } of flattenRoutes(routes)) {

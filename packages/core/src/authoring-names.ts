@@ -19,6 +19,6 @@ export const AUTHORING_NAMES = {
 };
 
 /**
- * Export names the deprecation parser treats as a contract entry point.
+ * Export names the deprecation parser treats as an api entry point.
  */
 export const CONTRACT_EXPORT_NAMES = ['api'] as const;

@@ -135,7 +135,7 @@ describe('k.routes z.coerce ban', () => {
                     },
                 }),
             })
-        ).toThrowError('Route "listItems" uses z.coerce at "query". z.coerce is not allowed in ts-kizuna contracts.');
+        ).toThrowError('Route "listItems" uses z.coerce at "query". z.coerce is not allowed in a ts-kizuna route.');
     });
 
     it('throws and points at the nested field path that uses z.coerce', () => {
@@ -155,7 +155,7 @@ describe('k.routes z.coerce ban', () => {
                     },
                 }),
             })
-        ).toThrowError('Route "listItems" uses z.coerce at "query.page". z.coerce is not allowed in ts-kizuna contracts.');
+        ).toThrowError('Route "listItems" uses z.coerce at "query.page". z.coerce is not allowed in a ts-kizuna route.');
     });
 
     it('finds z.coerce hidden inside arrays, wrappers, and unions', () => {
@@ -175,7 +175,7 @@ describe('k.routes z.coerce ban', () => {
                     },
                 }),
             })
-        ).toThrowError('Route "createItem" uses z.coerce at "body.prices". z.coerce is not allowed in ts-kizuna contracts.');
+        ).toThrowError('Route "createItem" uses z.coerce at "body.prices". z.coerce is not allowed in a ts-kizuna route.');
     });
 
     it('rejects z.coerce in a response schema', () => {
@@ -192,7 +192,7 @@ describe('k.routes z.coerce ban', () => {
                     },
                 }),
             })
-        ).toThrowError('Route "getItem" uses z.coerce at "responses.200.count". z.coerce is not allowed in ts-kizuna contracts.');
+        ).toThrowError('Route "getItem" uses z.coerce at "responses.200.count". z.coerce is not allowed in a ts-kizuna route.');
     });
 
     it('accepts plain z.number()/z.date()/z.bigint() and z.any()/z.unknown()', () => {

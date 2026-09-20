@@ -26,7 +26,7 @@ import {
 import { collectStreamText, readStreamUntil, toMountedApi, type MountedApi, type Transport, type TestResponse } from './transport.js';
 
 /**
- * One adapter, described by its parts. The `never` parameters are what let a contract known only at runtime reach a
+ * One adapter, described by its parts. The `never` parameters are what let an api known only at runtime reach a
  * fully typed builder, so those casts stay here instead of in every adapter's test file.
  */
 export interface AdapterUnderTest<Api> {

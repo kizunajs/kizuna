@@ -189,7 +189,7 @@ export const userInput = {
 export const userContract = defineConfig(userInput).api;
 
 /**
- * A route whose handler returns a body the contract does not allow, for `responses.validation`.
+ * A route whose handler returns a body the api does not allow, for `responses.validation`.
  */
 export const brokenRoutes = k.routes('api', {
     getBroken: k

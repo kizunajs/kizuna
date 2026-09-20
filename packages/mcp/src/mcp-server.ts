@@ -326,7 +326,7 @@ const toolError = (status: number, body: GuardDenialBody): ToolCallResult => ({
 });
 
 /**
- * Resolve every request context declared on the contract, the way the HTTP
+ * Resolve every request context declared on the api, the way the HTTP
  * pipeline does, reading the headers of the transport request. Guards and
  * handlers both read the result.
  */

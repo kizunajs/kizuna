@@ -3,13 +3,13 @@ import type { Contract } from '@ts-kizuna/core';
 
 export interface LoadConfigOptions {
     /**
-     * Named export to read the contract from.
+     * Named export to read the api from.
      *
      * @default 'api'
      */
     exportName?: string;
     /**
-     * Collects the source files the contract was built from, its own import
+     * Collects the source files the api was built from, its own import
      * graph with dependencies left out.
      */
     files?: string[];
@@ -27,7 +27,7 @@ const isContract = (value: unknown): value is Contract =>
 const cacheOf = (jiti: unknown): Record<string, unknown> => (jiti as { cache?: Record<string, unknown> }).cache ?? {};
 
 /**
- * Imports a contract module with jiti (so a `.ts` entry works without a build
+ * Imports a config module with jiti (so a `.ts` entry works without a build
  * step) and returns the named export (default `contract`) or the default export.
  * Returns undefined when neither is present.
  */
@@ -47,7 +47,7 @@ export const loadConfig = async (
     for (const file of evicted) delete cache[file];
 
     // The cache is shared across instances and outlives this call, so only what
-    // this load put there counts as the contract's own graph.
+    // this load put there counts as the api's own graph.
     const before = new Set(Object.keys(cache));
     const loaded = (await jiti.import(contractPath)) as Record<string, Contract | undefined> | undefined;
 

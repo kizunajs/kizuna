@@ -204,7 +204,7 @@ export const parseCron = (schedule: JobSchedule): ParsedCron => {
 
 /**
  * Throws when a job's schedule is not a valid cron expression, naming the job.
- * Called by `k.jobs` so a bad schedule fails when the contract is built rather
+ * Called by `k.jobs` so a bad schedule fails when the api is built rather
  * than when the scheduler first fires.
  */
 export const assertValidSchedule = (schedule: JobSchedule, jobName: string): void => {
@@ -390,7 +390,7 @@ const DEFAULT_DISPATCH_WINDOW_MS = 60_000;
  *
  * @example
  * const due = dueSchedules(
- *     Object.fromEntries(Object.entries(contract.jobs ?? {}).map(([name, job]) => [name, job.schedule]))
+ *     Object.fromEntries(Object.entries(kizuna.api.jobs ?? {}).map(([name, job]) => [name, job.schedule]))
  * );
  */
 export const dueSchedules = (

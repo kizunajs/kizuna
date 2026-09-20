@@ -56,7 +56,7 @@ export interface JobFn<Job extends CompiledJob> {
 }
 
 /**
- * A contract's jobs, shaped exactly like the declaration.
+ * An api's jobs, shaped exactly like the declaration.
  *
  * @example
  * await jobs.billing.reconcileInvoices.run({ since });
@@ -156,7 +156,7 @@ export const createJobRunner = <Jobs_ extends Jobs>(
 
     const jobFor = (jobKey: string): CompiledJob => {
         const job = jobAt(jobs, jobKey);
-        if (!job) throw new Error(`No job named "${jobKey}" on this contract.`);
+        if (!job) throw new Error(`No job named "${jobKey}" on this api.`);
         return job;
     };
 

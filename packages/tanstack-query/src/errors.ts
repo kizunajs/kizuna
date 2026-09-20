@@ -1,5 +1,5 @@
 /**
- * Thrown when a route returns a status its contract does not declare. Declared
+ * Thrown when a route returns a status the api does not declare. Declared
  * statuses come back as `data` instead.
  */
 export class UndeclaredResponseError extends Error {

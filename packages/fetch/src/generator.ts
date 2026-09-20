@@ -29,7 +29,7 @@ export interface FetchClientOptions {
      */
     regenerateCommand?: string;
     /**
-     * Path to the contract this was generated from, relative to the generated
+     * Path to the api this was generated from, relative to the generated
      * file. Named in the header so tooling can tell when the client has fallen
      * behind, and so a reader knows where the API is declared.
      */
@@ -253,7 +253,7 @@ const emitTree = (routes: Routes, prefix: string, collector: TypeCollector): Tre
 };
 
 /**
- * Renders a TypeScript client from a contract: its named types, the route table
+ * Renders a TypeScript client from an api: its named types, the route table
  * the runtime reads, and a `createClient` typed against both.
  */
 /**

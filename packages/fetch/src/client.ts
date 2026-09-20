@@ -88,7 +88,7 @@ type ValidationErrorResult<Codes extends string> = {
 type HasValidation<R extends RouteDefinition> = R extends { body: z.ZodType } ? true : R extends { query: z.ZodType } ? true : false;
 
 /**
- * The statuses the contract's auth map put on a guarded route. A declared `403`
+ * The statuses the api's auth map put on a guarded route. A declared `403`
  * sits alongside, as a declared `400` does beside the validation error.
  */
 type AutoStatuses<R extends RouteDefinition> = Extract<
@@ -97,7 +97,7 @@ type AutoStatuses<R extends RouteDefinition> = Extract<
 >;
 
 /**
- * The contract's `guardSchema`, or plain Problem Details when it declares none.
+ * The api's `guardSchema`, or plain Problem Details when it declares none.
  */
 type AutoBody<R extends RouteDefinition> = typeof AUTO_GUARD_BRAND extends keyof R
     ? NonNullable<R[typeof AUTO_GUARD_BRAND]>
@@ -136,8 +136,8 @@ type UnionToIntersection<Union> = (Union extends unknown ? (distributed: Union) 
     : never;
 
 /**
- * Every header input the contract's request context declares, flattened. Set
- * once on `new KizunaClient()` under `requestContext` and sent with every request.
+ * Every header input the api's request context declares, flattened. Set
+ * once on the client under `requestContext` and sent with every request.
  */
 type ContextHeaderInputs<Declarations> = string extends keyof Declarations
     ? {}
@@ -332,11 +332,11 @@ function buildClient(contract: Contract, config: ClientConfig): unknown {
 }
 
 /**
- * A typed fetch client built from a contract. Each route becomes a method that
- * validates its arguments and returns the typed response. The contract's custom
+ * A typed fetch client built from an api. Each route becomes a method that
+ * validates its arguments and returns the typed response. The api's custom
  * issue codes are carried through to `errors[].code` on `400` responses.
  *
- * When the contract declares a request context that reads headers, pass their
+ * When the api declares a request context that reads headers, pass their
  * values under `requestContext`; the client sends them with every request.
  *
  * @example

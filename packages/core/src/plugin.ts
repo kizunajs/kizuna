@@ -11,7 +11,7 @@ export const PLUGIN_SERVERS_META_KEY: unique symbol = Symbol.for('ts-kizuna.plug
 
 /**
  * The routes a plugin serves. `api.mount` serves them through the same pipeline
- * as the contract's own, but they never join `contract.routes`, so the client
+ * as the api's own, but they never join `api.routes`, so the client
  * and the generators do not see them.
  */
 export type PluginRoutes = Record<string, RouteDefinition>;
@@ -187,7 +187,7 @@ export type PluginArgs<Plugins extends ContractPlugins> = string extends keyof P
 
 /**
  * Every plugin's routes as one tree, keyed by install name, for the adapter to
- * walk as it walks the contract's own.
+ * walk as it walks the api's own.
  */
 export const pluginRouteTree = (plugins: ContractPlugins | undefined): Routes => {
     const tree: Record<string, unknown> = {};

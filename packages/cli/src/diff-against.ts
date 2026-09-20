@@ -7,9 +7,9 @@ import { diffApis, type Change } from './diff-apis.js';
 
 export interface DiffAgainstOptions {
     /**
-     * Named export to read the contract from.
+     * Named export to read the api from.
      *
-     * @default 'contract'
+     * @default 'api'
      */
     exportName?: string;
     /**
@@ -23,7 +23,7 @@ export interface DiffAgainstOptions {
 const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 
 /**
- * Compares the contract on disk against the same contract at a git ref.
+ * Compares the config on disk against the same config at a git ref.
  *
  * The ref is checked out into a worktree inside the repository, which costs a
  * few files rather than a clone. Nothing is installed there: module resolution
@@ -33,14 +33,14 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
  * @example
  * const changes = await diffAgainst('main', './src/contract.ts');
  */
-export const diffAgainst = async (ref: string, contractPath: string, options: DiffAgainstOptions = {}): Promise<Change[]> => {
+export const diffAgainst = async (ref: string, configPath: string, options: DiffAgainstOptions = {}): Promise<Change[]> => {
     const { exportName = 'api', cwd = process.cwd() } = options;
 
     const root = git(cwd, 'rev-parse', '--show-toplevel');
-    const absolute = isAbsolute(contractPath) ? contractPath : resolve(cwd, contractPath);
+    const absolute = isAbsolute(configPath) ? configPath : resolve(cwd, configPath);
     const fromRoot = relative(root, absolute);
 
-    if (fromRoot.startsWith('..')) throw new Error(`${contractPath} is outside the repository at ${root}`);
+    if (fromRoot.startsWith('..')) throw new Error(`${configPath} is outside the repository at ${root}`);
 
     // Inside the repository, so Node resolves dependencies by walking up to the
     // root's `node_modules` instead of needing an install of its own.
@@ -53,7 +53,7 @@ export const diffAgainst = async (ref: string, contractPath: string, options: Di
         if (before === undefined) throw new Error(`No \`${exportName}\` export in ${fromRoot} at ${ref}`);
 
         const after = await loadConfig(absolute, { exportName });
-        if (after === undefined) throw new Error(`No \`${exportName}\` export in ${contractPath}`);
+        if (after === undefined) throw new Error(`No \`${exportName}\` export in ${configPath}`);
 
         return diffApis(before as Contract, after as Contract);
     } finally {

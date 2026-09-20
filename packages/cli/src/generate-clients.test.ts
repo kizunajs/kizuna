@@ -103,7 +103,7 @@ describe('formatStale', () => {
         const output = join(workspace(), 'client.ts');
         const message = formatStale([{ kind: 'fetch', output, reason: 'outdated' }]);
 
-        expect(message).toContain('is behind the contract');
+        expect(message).toContain('is behind the config');
         expect(message).toContain('Run `kizuna generate` and commit the result.');
     });
 

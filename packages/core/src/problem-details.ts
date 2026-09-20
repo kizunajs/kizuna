@@ -41,7 +41,7 @@ export type StripProblemEnvelope<T extends ProblemDetails> = Omit<T, 'type' | 't
     Partial<Pick<T, 'type'>> & { title?: never; status?: never };
 
 /**
- * The body `deny` takes. A contract declaring no `guardSchema` leaves it at `detail`.
+ * The body `deny` takes. An api declaring no `guardSchema` leaves it at `detail`.
  */
 export type GuardBody<Schema> = [Schema] extends [never]
     ? { detail: string }

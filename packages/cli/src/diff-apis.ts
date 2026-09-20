@@ -80,7 +80,7 @@ const toolNames = (contract: Contract): Map<string, string> =>
     );
 
 /**
- * What changed between two contracts, worst first.
+ * What changed between two apis, worst first.
  *
  * Compares the declarations rather than an OpenAPI document, so it sees route
  * keys, MCP tool names and job keys, none of which a document carries.
@@ -252,7 +252,8 @@ export const diffApis = (before: Contract, after: Contract): Change[] => {
 };
 
 /**
- * One block per change, the shape `kizuna diff` prints.
+ * One block per change, ready to print: the level, the summary, and the
+ * detail indented beneath it.
  */
 export const formatChange = (change: Change): string => {
     const label = change.level.toUpperCase().padEnd(8);

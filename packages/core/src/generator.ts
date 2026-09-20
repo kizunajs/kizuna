@@ -106,7 +106,7 @@ export interface GeneratorRouteContext {
  *     };
  * });
  *
- * const list = generateRouteList(contract, {});
+ * const list = generateRouteList(kizuna.api, {});
  * ```
  */
 export const createGenerator =

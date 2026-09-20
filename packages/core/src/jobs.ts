@@ -151,7 +151,7 @@ export interface CompiledJob<
 }
 
 /**
- * A contract's jobs. Nestable, like routes, so a large codebase can group them ,
+ * An api's jobs. Nestable, like routes, so a large codebase can group them ,
  * `jobs.billing.reconcileInvoices`.
  */
 export interface Jobs {
@@ -220,8 +220,8 @@ export type JobHandler<Job extends CompiledJob, Jobs_ extends Jobs = Jobs> = (
     | JobVoidReturn<Job['definition']>;
 
 /**
- * The `jobs` argument every handler receives: the contract's jobs bound to their
- * handlers, so one can be run in process. Absent when the contract declares none.
+ * The `jobs` argument every handler receives: the api's jobs bound to their
+ * handlers, so one can be run in process. Absent when the api declares none.
  */
 export type JobsArg<Jobs_ extends Jobs> = string extends keyof Jobs_
     ? {}
@@ -230,7 +230,7 @@ export type JobsArg<Jobs_ extends Jobs> = string extends keyof Jobs_
       };
 
 /**
- * A job tree with no jobs in it, for a contract that declares none.
+ * A job tree with no jobs in it, for an api that declares none.
  */
 export type NoJobs = Record<string, never>;
 

@@ -80,7 +80,7 @@ export const coercionPlanFor = (schema: z.ZodType): CoercionPlan => {
 
 /**
  * Resolves the plans for a route's coerced schemas ahead of any request. Called
- * when a contract is defined and when an API is assembled.
+ * when a config is defined and when an API is assembled.
  */
 export const resolveCoercionPlans = (route: RouteDefinition): void => {
     if (route.pathParams) coercionPlanFor(route.pathParams);

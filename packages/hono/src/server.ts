@@ -35,7 +35,7 @@ export type HonoApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
     /**
-     * Register every contract route on a Hono app.
+     * Register every route on a Hono app.
      */
     mount: <E extends Env = Env>(app: Hono<E>, options?: HonoOptions) => void;
 };
@@ -181,12 +181,14 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
  * Serve an API on Hono. What it takes is what every route is served with.
  *
  * @example
- * export const { api } = defineConfig({
+ * // kizuna.config.ts
+ * export default defineConfig({
  *     adapter: honoAdapter(),
  *     routes,
  * });
  *
- * api.mount(app);
+ * // src/index.ts
+ * kizuna.api.mount(app);
  */
 export const honoAdapter = (defaults?: HonoOptions): Adapter<HonoHandlerContext<Env>, [app: Hono, options?: HonoOptions], void> => ({
     name: 'hono',

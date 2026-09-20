@@ -8,13 +8,13 @@ import { apiNotices, type Notice } from './api-notices.js';
  * What a watcher reports each time it reloads.
  */
 export interface ConfigChange {
-    contract: Contract;
+    api: Contract;
     /**
      * The file whose change triggered this reload, absent on the first load.
      */
     changed?: string;
     /**
-     * Every file the contract was built from, the set being watched.
+     * Every file the api was built from, the set being watched.
      */
     files: string[];
     /**
@@ -25,9 +25,9 @@ export interface ConfigChange {
 
 export interface WatchConfigOptions {
     /**
-     * Named export to read the contract from.
+     * Named export to read the api from.
      *
-     * @default 'contract'
+     * @default 'api'
      */
     exportName?: string;
     /**
@@ -39,7 +39,7 @@ export interface WatchConfigOptions {
     debounce?: number;
     /**
      * Called when a reload throws, which a half-typed file will. The watcher
-     * keeps going and the last good contract stays current.
+     * keeps going and the last good api stays current.
      *
      * Reports to stderr when you pass nothing, so a broken edit is never
      * silent.
@@ -48,14 +48,14 @@ export interface WatchConfigOptions {
 }
 
 /**
- * Watches a contract and its imports, reloading on change.
+ * Watches a config and its imports, reloading on change.
  *
- * The watch set is the contract's own import graph, taken from what the loader
+ * The watch set is the config's own import graph, taken from what the loader
  * reported reading, so nothing has to name a directory. Returns a function that
  * stops watching.
  */
 export const watchConfig = async (
-    contractPath: string,
+    configPath: string,
     onChange: (change: ConfigChange) => void | Promise<void>,
     options: WatchConfigOptions = {}
 ): Promise<() => void> => {
@@ -64,8 +64,8 @@ export const watchConfig = async (
     const report =
         options.onError ??
         ((error: unknown, changed: string | undefined) => {
-            const where = changed === undefined ? contractPath : changed;
-            console.error(`Could not load the contract after ${where} changed.`);
+            const where = changed === undefined ? configPath : changed;
+            console.error(`Could not load the config after ${where} changed.`);
             console.error(error instanceof Error ? error.message : String(error));
         });
 
@@ -77,12 +77,12 @@ export const watchConfig = async (
 
     const reload = async (changed?: string): Promise<void> => {
         const files: string[] = [];
-        const contract = await loadConfig(contractPath, { exportName, files, reread: known });
-        if (contract === undefined) throw new Error(`No \`${exportName}\` export in ${contractPath}`);
+        const api = await loadConfig(configPath, { exportName, files, reread: known });
+        if (api === undefined) throw new Error(`No \`${exportName}\` export in ${configPath}`);
 
         known = files;
         watchDirectories(files);
-        await onChange({ contract, changed, files, notices: apiNotices(contract, {}) });
+        await onChange({ api, changed, files, notices: apiNotices(api, {}) });
     };
 
     const watchDirectories = (files: string[]): void => {

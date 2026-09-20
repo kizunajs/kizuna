@@ -17,8 +17,8 @@ export interface RequestContextSchema<
     readonly context: ContextSchema;
     /**
      * Schema for the request headers the value derives from. Clients type
-     * against it, `new KizunaClient()` takes the values once under `requestContext`,
-     * and the generated Swift and Kotlin clients take them in their
+     * against it: the generated fetch client takes the values once under
+     * `requestContext`, and the Swift and Kotlin clients take them in their
      * initializers. Routes and the OpenAPI document are untouched.
      */
     readonly headers?: HeadersSchema;

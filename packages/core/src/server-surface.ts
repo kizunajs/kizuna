@@ -11,7 +11,7 @@ import type { GuardReturn, GuardSuccess, HandlersFromRoutes, RequestContextValue
 import { type GuardDeny, type GuardDenial, type GuardRun } from './adapter.js';
 
 /**
- * The handler tree for a contract or route group, typed against it, with an
+ * The handler tree for an api or route group, typed against it, with an
  * adapter's handler context substituted in. Adapter packages check their own
  * surface against this; an app types a handler by writing it on the route.
  */
@@ -27,7 +27,7 @@ export type ContractRouter<C, HandlerContext> = C extends Contract
 
 /**
  * A guard per identity, keyed by name. Each receives the handler context, the
- * credential its method extracted, a `deny` helper, and the contract's
+ * credential its method extracted, a `deny` helper, and the api's
  * request context, and returns that
  * identity's {@link GuardReturn} or a `deny(...)` result. Keying by name lets
  * each guard's return be typed against its own identity, so a literal role
@@ -53,7 +53,7 @@ export type GuardFnsFor<
 };
 
 /**
- * One guard per identity declared on the contract.
+ * One guard per identity declared on the api.
  */
 export type GuardsFor<Schemes extends Record<string, SecurityScheme>, HandlerContext> = {
     [Name in keyof Schemes]: GuardRun<HandlerContext>;

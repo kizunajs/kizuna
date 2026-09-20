@@ -60,7 +60,7 @@ export interface JobWorker {
 
 export interface JobWorkerContext {
     /**
-     * Every job the contract declares, to subscribe by name.
+     * Every job the api declares, to subscribe by name.
      */
     jobs: readonly JobDescriptor[];
     /**

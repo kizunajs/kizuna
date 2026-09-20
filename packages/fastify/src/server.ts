@@ -37,7 +37,7 @@ export type FastifyApi<R extends Routes = Routes> = ApiWithRouter<R> & {
     readonly [REQUEST_CONTEXT_META]?: unknown;
     readonly [JOBS_META]?: unknown;
     /**
-     * Register every contract route on a Fastify instance. Calls
+     * Register every route on a Fastify instance. Calls
      * `app.register` internally, so encapsulation behaves as Fastify expects.
      */
     mount: (app: FastifyInstance, options?: FastifyOptions) => Promise<void>;
@@ -263,12 +263,14 @@ export const fastifyKizuna = fastifyPlugin(
  * Serve an API on Fastify. What it takes is what every route is served with.
  *
  * @example
- * export const { api } = defineConfig({
+ * // kizuna.config.ts
+ * export default defineConfig({
  *     adapter: fastifyAdapter(),
  *     routes,
  * });
  *
- * await api.mount(app);
+ * // src/index.ts
+ * await kizuna.api.mount(app);
  */
 export const fastifyAdapter = (
     defaults?: FastifyOptions

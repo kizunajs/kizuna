@@ -13,7 +13,7 @@ import type { TagSet, TagOptions } from './tags.js';
 import type { RequestContextSchema } from './request-context.js';
 
 /**
- * What an api answers on, and how it reaches a framework: the contract it was
+ * What an api answers on, and how it reaches a framework: the definition it was
  * assembled from, plus `mount`.
  */
 export type Api<C extends Contract, AdapterValue> = C &
@@ -73,7 +73,7 @@ const handlersFrom = (declarations: Record<string, unknown>): Record<string, unk
 };
 
 /**
- * Assemble a contract and its implementations into the object a framework
+ * Assemble an api and its implementations into the object a framework
  * mounts. The handlers come from the routes, jobs and tools themselves.
  */
 export const buildApi = (

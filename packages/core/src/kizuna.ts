@@ -1,7 +1,5 @@
 import type { z } from 'zod';
 import { tagRoutes } from './routes.js';
-import { type Contract, type RoutesOf, type SchemesOf, type RequestContextOf, type GuardSchemaOf } from './contract.js';
-
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { buildJobs, type AuthoredJobs, type AuthoredJobDefinition, type CompiledJobs } from './jobs.js';
 import { createTags, type TagOptions } from './tags.js';
@@ -20,8 +18,7 @@ import type { AuthCheck, RouteAuthCheck } from './auth-check.js';
 import { createRoute, type RouteBuilder } from './route.js';
 import { createJob, type JobBuilder } from './job.js';
 import type { AnyAdapter } from './adapter.js';
-import type { GuardFnsFor, RequestResolverFnsFor } from './server-surface.js';
-import type { AuthContextOf, GuardParams, RouteGuardBrandOf } from './handler-pipeline.js';
+import type { AuthContextOf, RouteGuardBrandOf } from './handler-pipeline.js';
 import type {
     ConfiguredAdapterContext,
     ConfiguredAdapterValue,
@@ -179,7 +176,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *
      * Jobs are their own concept, not routes. Each is reachable over HTTP so a
      * scheduler can trigger it, and runs through the same validation, guards, and
-     * Problem Details as a route; but jobs never appear in `contract.routes`, the
+     * Problem Details as a route; but jobs never appear in `api.routes`, the
      * OpenAPI document, or the generated Swift, Kotlin, and MCP surfaces.
      *
      * @example
@@ -272,46 +269,6 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      */
     issue<Input>(ctx: z.core.$RefinementCtx<Input>, issue: RegisteredIssue<Spec['codes'], Input>): void;
 }
-
-/**
- * One identity's guard, typed against the contract, for defining it in its own
- * file. `params` carries the path parameters of every route whose `auth` names
- * the identity.
- *
- * @example
- * export const requireUser: Guard<typeof contract, 'user'> = async ({ bearer, deny }) => {
- *     const session = bearer ? await db.sessions.findByToken(bearer.token) : null;
- *     if (!session) {
- *         return deny({
- *             status: 401,
- *             body: {
- *                 detail: 'Unauthorized',
- *             },
- *         });
- *     }
- *     return {
- *         userId: session.userId,
- *     };
- * };
- */
-export type Guard<C extends Contract, Name extends Extract<keyof SchemesOf<C>, string>, HandlerContext = {}> = GuardFnsFor<
-    SchemesOf<C>,
-    GuardParams<RoutesOf<C>, Name>,
-    HandlerContext,
-    RequestContextOf<C>,
-    GuardSchemaOf<C>
->[Name];
-
-/**
- * One request context resolver, typed against the contract, for defining it in
- * its own file. It runs on every route, public ones included, before the
- * guards, and never denies.
- */
-export type RequestResolver<
-    C extends Contract,
-    Name extends Extract<keyof RequestContextOf<C>, string>,
-    HandlerContext = {},
-> = RequestResolverFnsFor<RequestContextOf<C>, HandlerContext>[Name];
 
 /**
  * The spec a config assembles into, which is what every authoring call on `k`

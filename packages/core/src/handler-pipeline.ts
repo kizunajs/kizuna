@@ -218,7 +218,7 @@ export type GuardParams<R extends Routes, Name extends string> = [GuardedParamNa
     : { [Param in GuardedParamNames<R, Name>]?: string };
 
 /**
- * The handler tree for a contract or route group: every route typed with its
+ * The handler tree for an api or route group: every route typed with its
  * inputs, the adapter's handler context, and the scheme-keyed security context
  * its `auth` resolves to. The identities a route requires appear in the handler
  * args under `auth`, keyed by each identity's name, each carrying its context
@@ -260,7 +260,7 @@ type HandlerContextOverlay<R extends Routes, Identities, Context, GuardBody_, Gu
 };
 
 /**
- * A contract's routes, each branded with what the contract adds to a handler's
+ * An api's routes, each branded with what the api adds to a handler's
  * args: `auth`, `requestContext`, plugins, and jobs. Read back by
  * {@link RouteHandler}.
  */

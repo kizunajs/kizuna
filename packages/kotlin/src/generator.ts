@@ -129,7 +129,7 @@ interface EmitContext {
     operationTypeMap: Map<string, string>;
     fileLevelTypeNames: Set<string>;
     ownedTypeMap: Map<string, string>;
-    // Header fields from the contract's request context declarations; empty when none.
+    // Header fields from the api's request context declarations; empty when none.
     requestContextFields: KotlinField[];
 }
 
@@ -1837,7 +1837,7 @@ const emitClient = (
 };
 
 /**
- * Generate a Kotlin API client from a ts-kizuna contract.
+ * Generate a Kotlin API client from a ts-kizunan api.
  *
  * @param contract - What `defineConfig` assembled.
  * @param config - Override the generated names:

@@ -73,7 +73,7 @@ export const startJobWorker = async (api: unknown, options?: StartJobWorkerOptio
         jobs,
         run: async (message) => {
             const jobFn = jobFnAt(runner, message.job);
-            if (!jobFn) throw new Error(`No handler is bound for job "${message.job}" on this contract.`);
+            if (!jobFn) throw new Error(`No handler is bound for job "${message.job}" on this api.`);
             await jobFn.run(message.input);
         },
     });

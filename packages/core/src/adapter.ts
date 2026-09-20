@@ -121,7 +121,7 @@ export const JOBS_META: unique symbol = Symbol.for('ts-kizuna.jobs') as symbol a
 export type ApiDefinition = { readonly [API_META]: true };
 export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
     /**
-     * The contract's route tree. Read it here rather than off the api object: the
+     * The api's route tree. Read it here rather than off the api object: the
      * api carries the parts that serve the routes, it is not the routes itself.
      */
     readonly routes: R;
@@ -217,7 +217,7 @@ export const isGuardDenial = (value: unknown): value is GuardDenial => typeof va
  * context (e.g. `req`/`res`) plus the credential the identity's method extracted
  * from the request (or `null` if absent), a `deny` helper, and the request
  * context resolved for this request, absent
- * when the contract declares none. It returns the context the scheme provides
+ * when the api declares none. It returns the context the scheme provides
  * (nested under `auth`, keyed by the identity's name in the handler args) or
  * `deny(...)` to reject.
  */
@@ -250,7 +250,7 @@ export type RequestContextRun<HandlerContext = unknown> = (
 ) => Promise<unknown> | unknown;
 
 /**
- * The contract the api was assembled from, for plugins needing more than the routes.
+ * The api's own definition, for plugins needing more than the routes.
  */
 export const contractOf = <C = unknown>(api: unknown): C => (api as Record<symbol, unknown>)[CONTRACT_META] as C;
 
@@ -284,7 +284,7 @@ export interface ApiParts {
 }
 
 /**
- * Brand a contract's routes with the parts that serve them, for the adapter to read back when mounting.
+ * Brand an api's routes with the parts that serve them, for the adapter to read back when mounting.
  */
 export const assembleApi = <const R extends Routes>(
     contract: {
@@ -348,12 +348,14 @@ export declare const ADAPTER_CONTEXT: unique symbol;
  * hands every handler that framework's own request, and types both.
  *
  * @example
- * export const { api } = defineConfig({
+ * // kizuna.config.ts
+ * export default defineConfig({
  *     adapter: expressAdapter(),
  *     routes,
  * });
  *
- * api.mount(app);
+ * // src/index.ts
+ * kizuna.api.mount(app);
  */
 export interface Adapter<HandlerContext = unknown, MountArgs extends readonly unknown[] = readonly unknown[], Mounted = unknown> {
     /**
@@ -429,7 +431,7 @@ export const warnUnsupportedJobOptions = (
 };
 
 /**
- * What `JOBS_META` carries: the contract's jobs, the handler for each, and how
+ * What `JOBS_META` carries: the api's jobs, the handler for each, and how
  * this deployment runs them.
  */
 export interface JobsMeta extends JobRunnerOptions {
@@ -723,7 +725,7 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
      */
     guards?: GuardMap<HandlerContext>;
     /**
-     * The contract's identities keyed by name. The runtime extracts each required
+     * The api's identities keyed by name. The runtime extracts each required
      * scheme's credential from the request (per its declared location) and passes
      * it to that scheme's guard.
      */
@@ -738,7 +740,7 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
      */
     requestContext?: RequestContextMap<HandlerContext>;
     /**
-     * The contract's jobs bound to their handlers. Every handler receives it as
+     * The api's jobs bound to their handlers. Every handler receives it as
      * `jobs`, so a route can run a job in process without an HTTP hop.
      */
     jobs?: JobRunner<Jobs>;

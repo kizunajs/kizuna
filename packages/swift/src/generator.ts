@@ -131,7 +131,7 @@ interface EmitContext {
     ownedTypeMap: Map<string, string>; // typeName → owningStructName
     // Lets the tuple-based call surface recurse into nested object / union payload fields.
     registry: TypeRegistry;
-    // Header fields from the contract's request context declarations; empty when none.
+    // Header fields from the api's request context declarations; empty when none.
     requestContextFields: SwiftField[];
 }
 

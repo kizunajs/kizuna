@@ -160,12 +160,12 @@ function buildQueryProxy(client: Record<string, unknown>): unknown {
 }
 
 /**
- * Builds TanStack Query options from a contract and a client made from it.
+ * Builds TanStack Query options from a fetch client. Every client method
+ * carries the route it answers, so the client is the only argument.
  *
  * ```ts
  * import { useQuery } from '@tanstack/react-query';
  * import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
- * import { contract } from './contract.js';
  * import { apiClient } from './api-client.js';
  *
  * const api = new KizunaTanstackQuery(apiClient);

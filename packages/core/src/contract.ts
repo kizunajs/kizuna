@@ -117,32 +117,32 @@ export function assembleContract<
 }
 
 /**
- * A contract's route groups.
+ * An api's route groups.
  */
 export type RoutesOf<C extends Contract> = C['routes'];
 
 /**
- * A contract's identities, or an empty map when it declares none.
+ * An api's identities, or an empty map when it declares none.
  */
 export type SchemesOf<C extends Contract> = Exclude<C['securitySchemes'], undefined>;
 
 /**
- * A contract's request context schemas, or an empty map when it declares none.
+ * An api's request context schemas, or an empty map when it declares none.
  */
 export type RequestContextOf<C extends Contract> = Exclude<C['requestContext'], undefined>;
 
 /**
- * A contract's plugins, or an empty map when it declares none.
+ * An api's plugins, or an empty map when it declares none.
  */
 export type ContractPluginsOf<C extends Contract> = Exclude<C['plugins'], undefined>;
 
 /**
- * A contract's jobs, or an empty map when it declares none.
+ * An api's jobs, or an empty map when it declares none.
  */
 export type JobsOf<C extends Contract> = Exclude<C['jobs'], undefined>;
 
 export type GuardSchemaOf<C extends Contract> = Extract<C['guardSchema'], z.ZodType>;
 
 /**
- * A contract's tools, or an empty map when it declares none.
+ * An api's tools, or an empty map when it declares none.
  */

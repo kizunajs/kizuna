@@ -102,7 +102,7 @@ describe('watchConfig', () => {
 
         expect(changes).toHaveLength(1);
         expect(changes[0]?.changed).toBeUndefined();
-        expect(routePath(changes[0]?.contract, 'users', 'getUser')).toBe('/users/:id');
+        expect(routePath(changes[0]?.api, 'users', 'getUser')).toBe('/users/:id');
     });
 
     it('watches every file the contract was built from, not just the entry', async () => {
@@ -154,7 +154,7 @@ export const routes = k.routes('users', {
         );
 
         expect(changes.length).toBeGreaterThan(1);
-        expect(routePath(changes.at(-1)?.contract, 'users', 'getUser')).toBe('/people/:id');
+        expect(routePath(changes.at(-1)?.api, 'users', 'getUser')).toBe('/people/:id');
         expect(changes.at(-1)?.changed).toContain('routes.ts');
     }, 20_000);
 
@@ -182,7 +182,7 @@ export const routes = k.routes('users', {
 
         expect(errors).toHaveLength(1);
         expect(changes).toHaveLength(1);
-        expect(routePath(changes[0]?.contract, 'users', 'getUser')).toBe('/users/:id');
+        expect(routePath(changes[0]?.api, 'users', 'getUser')).toBe('/users/:id');
     }, 20_000);
 
     it('reports a broken edit to stderr when nothing else is listening', async () => {
@@ -203,7 +203,7 @@ export const routes = k.routes('users', {
             () => writeFileSync(join(directory, 'routes.ts'), 'export const routes = {')
         );
 
-        expect(reported.join('\n')).toContain('Could not load the contract after');
+        expect(reported.join('\n')).toContain('Could not load the config after');
         expect(reported.join('\n')).toContain('routes.ts');
     }, 20_000);
 
