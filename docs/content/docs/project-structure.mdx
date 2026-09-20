@@ -42,14 +42,14 @@ The config carries every handler, every guard, and everything they import, so it
 What a browser imports is the client `kizuna generate` writes from that config. It holds the route shapes and the schemas, and nothing a handler reached for.
 
 ```ts title="kizuna.config.ts"
-import { fetchClient } from '@ts-kizuna/fetch';
+import { fetchClient } from '@ts-kizuna/fetch/server';
 
 export default defineConfig({
     adapter: expressAdapter(),
     routes,
     clients: [
         fetchClient({
-            output: '../website/src/lib/api-client.ts',
+            output: './src/lib/api-client.generated.ts',
         }),
     ],
 });

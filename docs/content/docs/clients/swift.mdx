@@ -1,6 +1,6 @@
 ---
 title: Swift
-description: Generate a native Swift client from your routes with the ts-kizuna-swift CLI.
+description: Generate a native Swift client from your routes, using URLSession and Codable.
 ---
 
 `@ts-kizuna/swift` generates a native Swift client from your ts-kizuna routes. The generated client uses `URLSession` and `Codable`, with no third-party Swift dependencies required.
@@ -11,24 +11,45 @@ description: Generate a native Swift client from your routes with the ts-kizuna-
 
 <Step>
 
-## Generate the client
+## Name it in your config
+
+A client is something your config declares. Point it at the file you want written:
+
+```ts title="kizuna.config.ts"
+import { swiftClient } from '@ts-kizuna/swift';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    clients: [
+        swiftClient({
+            output: './ios/MyApp/Generated/APIClient.swift',
+            namespace: 'API',
+        }),
+    ],
+});
+```
+
+```bash
+kizuna generate
+```
+
+| Option                | Description                                                                             |
+| --------------------- | --------------------------------------------------------------------------------------- |
+| `output`              | Where the generated `.swift` file goes                                                  |
+| `namespace`           | Public enum wrapping all generated types, `API` by default                              |
+| `camelCaseProperties` | Convert wire field names to camelCase properties with CodingKeys                        |
+| `unknownEnumCase`     | Emit enums with an `unknown(String)` fallback so new server values don't break decoding |
+
+### Without the config
+
+`ts-kizuna-swift` generates one client on its own, for a repository that does not run `kizuna generate`:
 
 ```sh title="Terminal"
 ts-kizuna-swift generate --config kizuna.config.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
 ```
 
-| Flag                  | Description                                                                                                                       |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `--config`            | Path to your `kizuna.config.ts`. Suffix it with an export to read something other than the default, as in `src/apis.ts:workspace` |
-| `--output`            | Output path for the generated `.swift` file                                                                                       |
-| `--namespace-name`    | Public enum wrapping all generated types (e.g. `API`)                                                                             |
-| `--camel-case`        | Convert wire field names to camelCase properties with CodingKeys                                                                  |
-| `--unknown-enum-case` | Emit enums with an `unknown(String)` fallback so new server values don't break decoding                                           |
-| `--export`            | Export name to read when none is suffixed. Default: `api`                                                                         |
-
-The CLI loads the config at runtime using `jiti`.
-
-Most projects name the generator under `clients` in the config instead and run [`kizuna generate`](/docs/config), which writes every client in one command.
+`--config` takes the path to your `kizuna.config.ts`, suffixed with an export to read something other than the default, as in `src/apis.ts:workspace`. `--camel-case` and `--unknown-enum-case` are the flag forms of the options above, and `--export` names the export to read when none is suffixed, `api` by default. The CLI loads the config at runtime using `jiti`.
 
 </Step>
 

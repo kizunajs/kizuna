@@ -1,6 +1,6 @@
 ---
 title: Kotlin
-description: Generate a native Kotlin client from your routes with the ts-kizuna-kotlin CLI.
+description: Generate a native Kotlin client from your routes, using OkHttp and kotlinx.serialization.
 ---
 
 <BetaNotice>
@@ -34,25 +34,47 @@ dependencies {
 
 <Step>
 
-## Generate the client
+## Name it in your config
+
+A client is something your config declares. Point it at the file you want written:
+
+```ts title="kizuna.config.ts"
+import { kotlinClient } from '@ts-kizuna/kotlin';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    clients: [
+        kotlinClient({
+            output: './android/app/src/main/kotlin/com/example/APIClient.kt',
+            namespace: 'API',
+            package: 'com.example',
+        }),
+    ],
+});
+```
+
+```bash
+kizuna generate
+```
+
+| Option                | Description                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------- |
+| `output`              | Where the generated `.kt` file goes                                                                 |
+| `namespace`           | Object wrapping all generated types, `API` by default                                               |
+| `package`             | Package declaration for the generated file, such as `com.example.api`                               |
+| `camelCaseProperties` | Convert wire field names to camelCase properties, mapped back via `@SerialName`                     |
+| `unknownEnumCase`     | Emit enums as a sealed interface with an `Unknown` member so new server values don't break decoding |
+
+### Without the config
+
+`ts-kizuna-kotlin` generates one client on its own, for a repository that does not run `kizuna generate`:
 
 ```sh title="Terminal"
 ts-kizuna-kotlin generate --config kizuna.config.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
 ```
 
-| Flag                  | Description                                                                                         |
-| --------------------- | --------------------------------------------------------------------------------------------------- |
-| `--config`            | Path to your `kizuna.config.ts`. Suffix it with an export to read something other than the default  |
-| `--out`               | Output path for the generated `.kt` file                                                            |
-| `--namespace-name`    | Object wrapping all generated types (e.g. `API`)                                                    |
-| `--package`           | Optional package declaration for the generated file (e.g. `com.example.api`)                        |
-| `--camel-case`        | Convert wire field names to camelCase properties, mapped back via `@SerialName`                     |
-| `--unknown-enum-case` | Emit enums as a sealed interface with an `Unknown` member so new server values don't break decoding |
-| `--export`            | Export name to read when none is suffixed. Default: `api`                                           |
-
-The CLI loads the config at runtime.
-
-Most projects name the generator under `clients` in the config instead and run [`kizuna generate`](/docs/config), which writes every client in one command.
+`--config` takes the path to your `kizuna.config.ts`, suffixed with an export to read something other than the default. `--camel-case` and `--unknown-enum-case` are the flag forms of the options above, and `--export` names the export to read when none is suffixed, `api` by default. The CLI loads the config at runtime.
 
 </Step>
 
@@ -60,7 +82,7 @@ Most projects name the generator under `clients` in the config instead and run [
 
 ## Add it to your project
 
-Add the generated file to your Kotlin project as a regular source file. Pass `--package` so the file declares a package matching its directory (Android/JVM projects expect this).
+Add the generated file to your Kotlin project as a regular source file. Set `package` so the file declares a package matching its directory, which Android and JVM projects expect.
 
 </Step>
 

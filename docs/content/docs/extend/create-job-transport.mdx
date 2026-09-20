@@ -109,7 +109,7 @@ register: async (schedules) => {
 
 ## `supports`
 
-`runAt`, `dedupeKey`, and `retry` are honoured only where the transport declares support. Say which you honour and kizuna warns at startup when a job asks for one you drop.
+A message's `runAt`, `dedupeKey` and `retry` are honoured only where the transport declares support, under `runAt`, `dedupe` and `retry`. Say which you honour and kizuna warns when a job asks for one you drop.
 
 `dedupe` is what makes `startJobs` safe on more than one instance: every replica ticking 05:00 produces the same `dedupeKey`.
 

@@ -1,6 +1,6 @@
 ---
 title: k.issue
-description: Emit a validation issue with a machine-readable code, checked against your declared issueCodes.
+description: Emit a validation issue with a machine-readable code, checked against the codes your config declares.
 ---
 
 <BetaNotice>
@@ -71,7 +71,7 @@ A request whose body fails this refinement returns `400` with the custom code in
 
 By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/is-validation-error), so the built-in Zod codes are suggested in autocomplete and any custom string is accepted, but your `invalid_phone_number` is not _suggested_ (it lives only inside the refinement callback, where TypeScript can't see it).
 
-To make the client suggest your custom codes, declare them under `validation.issueCodes` on `defineConfig` and pass the api to [`new KizunaClient()`](/docs/reference/kizuna-client):
+To make the client suggest your custom codes, declare them under `validation.issueCodes` on `defineConfig` and regenerate the [fetch client](/docs/clients/fetch):
 
 ```ts title="k.ts"
 import { defineConfig } from '@ts-kizuna/core';
@@ -87,11 +87,10 @@ export default defineConfig({
 });
 ```
 
-```ts title="api-client.ts"
-import { KizunaClient } from '@ts-kizuna/fetch';
-import kizuna from '../kizuna.config';
+```ts title="src/lib/api-client.ts"
+import { createClient } from './api-client.generated';
 
-export const apiClient = new KizunaClient(kizuna.api, {
+export const apiClient = createClient({
     baseUrl: 'http://localhost:3000',
 });
 ```
@@ -99,7 +98,11 @@ export const apiClient = new KizunaClient(kizuna.api, {
 Now `errors[].code` on a `400` response is widened to `ValidationIssueCode | 'invalid_phone_number'`, so `invalid_phone_number` shows up in autocomplete when you read or compare it:
 
 ```ts title="lib/contacts.ts"
-const result = await apiClient.contacts.createContact({ body: { phone: 'nope' } });
+const result = await apiClient.contacts.createContact({
+    body: {
+        phone: 'nope',
+    },
+});
 if (result.status === 400 && isValidationError(result.body)) {
     for (const issue of result.body.errors) {
         if (issue.code === 'invalid_phone_number') {

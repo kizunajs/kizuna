@@ -121,10 +121,10 @@ interface AdapterRequest<NativeRequest> {
     method: string;
     resolution:
         | { kind: 'core-match'; path: string } // Next-style: core matches the path
-        | { kind: 'pre-resolved'; routeKey: string; route: Route; params: Record<string, string> }; // Express-style: adapter already routed
+        | { kind: 'pre-resolved'; routeKey: string; route: RouteDefinition; params: Record<string, string> }; // Express-style: adapter already routed
     query: unknown;
     headers: unknown;
-    readBody: (route: Route) => Promise<unknown> | unknown;
+    readBody: (route: RouteDefinition) => Promise<unknown> | unknown;
 }
 ```
 

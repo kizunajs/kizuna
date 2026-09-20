@@ -36,14 +36,16 @@ It extends `Error`, so `retry`, `throwOnError`, and error boundaries treat it as
 A route's declared statuses are the keys of its `responses`, plus `400` when the route has a `body` or `query` schema. Those arrive as `data`. Every other status throws.
 
 ```ts
-getUser: {
-    method: 'GET',
-    path: '/users/:id',
-    responses: {
-        200: UserSchema,
-        404: ProblemDetailsSchema,
-    },
-},
+getUser: k
+    .route({
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+            404: ProblemDetailsSchema,
+        },
+    })
+    .handler(/* ... */),
 ```
 
 A `200` or `404` is data. A `500` throws.

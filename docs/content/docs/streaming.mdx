@@ -197,28 +197,26 @@ On the server the generator's `signal` fires, so an upstream call that took it s
 Give `stream` one schema when every message has the same shape. The handler yields `{ data }`, the wire carries `data:` lines alone, and the client reads `message.data`:
 
 ```ts title="src/routes/notifications.ts"
-watchEvents: {
-    method: 'GET',
-    path: '/events/watch',
-    responses: {
-        200: {
-            stream: EventRecord,
+watchEvents: k
+    .route({
+        method: 'GET',
+        path: '/events/watch',
+        responses: {
+            200: {
+                stream: EventRecord,
+            },
         },
-    },
-},
-```
-
-```ts title="src/routes/notifications.ts"
-watchEvents: async () => ({
-    status: 200,
-    body: async function* ({ signal }) {
-        for await (const record of db.events.watch(signal)) {
-            yield {
-                data: record,
-            };
-        }
-    },
-}),
+    })
+    .handler(async () => ({
+        status: 200,
+        body: async function* ({ signal }) {
+            for await (const record of db.events.watch(signal)) {
+                yield {
+                    data: record,
+                };
+            }
+        },
+    })),
 ```
 
 ## Ids, retry, and comments
@@ -251,18 +249,20 @@ The client hands `id` and `retry` back on each message and drops comments.
 A client that reconnects sends the last `id` it saw as `Last-Event-ID`. Declare the header and the handler reads it like any other:
 
 ```ts title="src/routes/notifications.ts"
-watchEvents: {
-    method: 'GET',
-    path: '/events/watch',
-    headers: z.object({
-        'last-event-id': z.string().optional(),
-    }),
-    responses: {
-        200: {
-            stream: EventRecord,
+watchEvents: k
+    .route({
+        method: 'GET',
+        path: '/events/watch',
+        headers: z.object({
+            'last-event-id': z.string().optional(),
+        }),
+        responses: {
+            200: {
+                stream: EventRecord,
+            },
         },
-    },
-},
+    })
+    .handler(/* ... */),
 ```
 
 The fetch client reads one connection and leaves reconnecting to you. The browser's `EventSource` reconnects on its own and can open a `GET` route like this one directly, with the limits it has always had: `GET` only, no request body, and no headers of your own, so it reaches the `POST` assistant route above through the fetch client alone.
@@ -272,53 +272,49 @@ The fetch client reads one connection and leaves reconnecting to you. The browse
 A `z.string()` schema with a `text/*` content type, or `BinarySchema` with any other, writes each yield as it is, with no framing around it:
 
 ```ts title="src/routes/reports.ts"
-exportEvents: {
-    method: 'GET',
-    path: '/events/export.csv',
-    responses: {
-        200: {
-            stream: z.string(),
-            contentType: 'text/csv',
+exportEvents: k
+    .route({
+        method: 'GET',
+        path: '/events/export.csv',
+        responses: {
+            200: {
+                stream: z.string(),
+                contentType: 'text/csv',
+            },
         },
-    },
-},
-```
-
-```ts title="src/routes/reports.ts"
-exportEvents: async () => ({
-    status: 200,
-    body: async function* () {
-        yield 'id,kind,occurredAt\n';
-        for await (const record of db.events.all()) {
-            yield `${record.id},${record.kind},${record.occurredAt}\n`;
-        }
-    },
-}),
+    })
+    .handler(async () => ({
+        status: 200,
+        body: async function* () {
+            yield 'id,kind,occurredAt\n';
+            for await (const record of db.events.all()) {
+                yield `${record.id},${record.kind},${record.occurredAt}\n`;
+            }
+        },
+    })),
 ```
 
 For bytes, hand over a `ReadableStream` in place of the generator. That is how a route passes a file from storage through without holding it in memory:
 
 ```ts title="src/routes/reports.ts"
-downloadArchive: {
-    method: 'GET',
-    path: '/reports/:id/archive',
-    responses: {
-        200: {
-            stream: BinarySchema,
-            contentType: 'application/zip',
+downloadArchive: k
+    .route({
+        method: 'GET',
+        path: '/reports/:id/archive',
+        responses: {
+            200: {
+                stream: BinarySchema,
+                contentType: 'application/zip',
+            },
         },
-    },
-},
-```
-
-```ts title="src/routes/reports.ts"
-downloadArchive: async ({ params }) => {
-    const upstream = await fetch(storage.archiveUrl(params.id));
-    return {
-        status: 200,
-        body: upstream.body,
-    };
-},
+    })
+    .handler(async ({ params }) => {
+        const upstream = await fetch(storage.archiveUrl(params.id));
+        return {
+            status: 200,
+            body: upstream.body,
+        };
+    }),
 ```
 
 The client iterates strings for a text stream and `Uint8Array` chunks for a binary one.
@@ -390,4 +386,4 @@ Each is discriminated on the tool's dotted key. See [tools](/docs/tools).
 
 - [`k.routes`](/docs/reference/k-routes)
 - [a route's `handler`](/docs/reference/k-route)
-- [`new KizunaClient()`](/docs/reference/kizuna-client)
+- [Fetch client](/docs/clients/fetch)

@@ -47,19 +47,16 @@ The examples here use React.
 
 ## Create the client
 
-```ts title="src/api.ts"
-import { KizunaClient } from '@ts-kizuna/fetch';
-import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
-import kizuna from '../kizuna.config';
+It takes the [fetch client](/docs/clients/fetch) you already have:
 
-export const apiClient = new KizunaClient(kizuna.api, {
-    baseUrl: 'http://localhost:3000',
-});
+```ts title="src/lib/api.ts"
+import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
+import { apiClient } from './api-client';
 
 export const api = new KizunaTanstackQuery(apiClient);
 ```
 
-Every client method carries the route it answers, so the client is the only argument. That holds for a generated client too.
+Every client method carries the route it answers, so the client is the only argument.
 
 </Step>
 

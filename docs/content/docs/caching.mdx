@@ -40,21 +40,23 @@ The 200 goes out with `Cache-Control: private, max-age=300` and `Vary: Authoriza
 **An avatar, a badge, a generated chart.** Large, changes rarely, and the browser fetches it through `<img src>` where the HTTP cache actually applies. Put the version in the path and cache it forever:
 
 ```ts
-userBadge: {
-    method: 'GET',
-    path: '/users/:id/badge/:version',
-    responses: {
-        200: {
-            body: BinarySchema,
-            contentType: 'image/png',
-            cache: {
-                scope: 'public',
-                maxAge: 31536000,
-                immutable: true,
+userBadge: k
+    .route({
+        method: 'GET',
+        path: '/users/:id/badge/:version',
+        responses: {
+            200: {
+                body: BinarySchema,
+                contentType: 'image/png',
+                cache: {
+                    scope: 'public',
+                    maxAge: 31536000,
+                    immutable: true,
+                },
             },
         },
-    },
-},
+    })
+    .handler(/* ... */),
 ```
 
 Give `:version` whatever changes when the image does, an upload timestamp or a content hash, and hand callers the URL alongside the user. A new image is a new URL, so nothing is ever stale and nothing needs invalidating.

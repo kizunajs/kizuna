@@ -60,13 +60,13 @@ const list = generateRouteList(kizuna.api, {
 
 Each `processRoute` call receives:
 
-| Property             | Type                  | Description                                   |
-| -------------------- | --------------------- | --------------------------------------------- |
-| `routeKey`           | `string`              | Dot-separated key path, e.g. `users.getUser`  |
-| `route`              | `RouteDefinition`     | The full route definition                     |
-| `routeTags`          | `string[]`            | OpenAPI tags inherited from the sub-routes    |
-| `deprecated`         | `boolean`             | `true` when the route is deprecated           |
-| `deprecationMessage` | `string \| undefined` | The route's `deprecated` string, if it is one |
+| Property             | Type                  | Description                                                               |
+| -------------------- | --------------------- | ------------------------------------------------------------------------- |
+| `routeKey`           | `string`              | Dot-separated key path, e.g. `users.getUser`                              |
+| `route`              | `RouteDefinition`     | The full route definition                                                 |
+| `routeTags`          | `string[]`            | The tags of every `k.routes` group the route sits inside, outermost first |
+| `deprecated`         | `boolean`             | `true` when the route is deprecated                                       |
+| `deprecationMessage` | `string \| undefined` | The route's `deprecated` string, or the object form's `message`           |
 
 ## Deprecation
 

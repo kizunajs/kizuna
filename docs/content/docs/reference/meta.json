@@ -13,7 +13,7 @@
         "k-jobs",
         "k-issue",
         "define-config",
-        "kizuna-client",
+        "create-client",
         "kizuna-tanstack-query",
         "problem-details-schema",
         "binary-and-file-schemas",

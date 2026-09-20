@@ -157,7 +157,9 @@ A throw inside a resolver fails the request the way a throw inside a handler doe
 The fetch client takes the declared headers under `requestContext` and sends them with every request:
 
 ```ts title="src/lib/api-client.ts"
-const apiClient = new KizunaClient(kizuna.api, {
+import { createClient } from './api-client.generated';
+
+export const apiClient = createClient({
     baseUrl: 'https://api.example.com',
     requestContext: {
         'x-posthog-session-id': sessionId,
@@ -208,4 +210,4 @@ If the answer decides whether the request may proceed, it belongs in a [guard](/
 
 - [`k.requestContext`](/docs/reference/k-request-context)
 - [`defineConfig`](/docs/reference/define-config)
-- [`new KizunaClient()`](/docs/reference/kizuna-client)
+- [Fetch client](/docs/clients/fetch)

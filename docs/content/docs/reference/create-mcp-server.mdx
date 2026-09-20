@@ -22,13 +22,13 @@ import { createMcpServer } from '@ts-kizuna/mcp';
 ## Parameters
 
 ```ts
-createMcpServer(api: Api, options?: McpServerOptions): McpServer
+createMcpServer(api: ApiWithRouter, options?: McpServerOptions): McpServer
 ```
 
-| Parameter | Type               | Required | Description                                                      |
-| --------- | ------------------ | -------- | ---------------------------------------------------------------- |
-| `api`     | `Api`              | Yes      | API created with [`defineConfig`](/docs/reference/define-config) |
-| `options` | `McpServerOptions` | No       | Configuration options                                            |
+| Parameter | Type               | Required | Description                                                    |
+| --------- | ------------------ | -------- | -------------------------------------------------------------- |
+| `api`     | `ApiWithRouter`    | Yes      | The `api` from [`defineConfig`](/docs/reference/define-config) |
+| `options` | `McpServerOptions` | No       | Configuration options                                          |
 
 ## Options
 

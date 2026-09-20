@@ -178,7 +178,7 @@ openApiPlugin({
 
 ## Security
 
-Security comes from what you declared. The [identities](/docs/authentication) you name under `identities` on `defineConfig` are emitted as `components.securitySchemes`, and each route's `auth` becomes that operation's `security`, with the permissions an OAuth route requires as its scopes, the roles a route accepts under `x-kizuna-roles`, and the permissions it requires under `x-kizuna-requires`. There are no generator options for it, so the spec cannot disagree with what the server enforces.
+Security comes from what you declared. The [identities](/docs/authentication) you name under `auth.identities` on `defineConfig` are emitted as `components.securitySchemes`, and each route's `auth` becomes that operation's `security`, with the permissions an OAuth route requires as its scopes, the roles a route accepts under `x-kizuna-roles`, and the permissions it requires under `x-kizuna-requires`. There are no generator options for it, so the spec cannot disagree with what the server enforces.
 
 ```ts title="src/identities.ts"
 export const user = k.identity
@@ -225,7 +225,7 @@ A response declared with [`stream`](/docs/streaming) is documented under `text/e
 
 ## Breaking changes
 
-`kizuna diff` compares your API against a git ref and reports what each change costs a caller. See [Breaking Changes](/docs/breaking-changes).
+[`diffAgainst`](/docs/breaking-changes) compares your API against a git ref and reports what each change costs a caller.
 
 ## Scheduled jobs
 

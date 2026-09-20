@@ -90,7 +90,7 @@ app.get('/openapi.json', (_req, res) => {
 
 ## Security emission
 
-Security is generated from what you declared, not configured on the generator. Every [identity](/docs/reference/k-identity) named under `identities` on [`defineConfig`](/docs/reference/define-config) is emitted under `components.securitySchemes`, and every route with an [`auth`](/docs/reference/k-route) references those names in its `security`, with the permissions an OAuth route requires as its scopes. Public routes (`false`) get none.
+Security is generated from what you declared, not configured on the generator. Every [identity](/docs/reference/k-identity) named under `auth.identities` on [`defineConfig`](/docs/reference/define-config) is emitted under `components.securitySchemes`, and every route with an [`auth`](/docs/reference/k-route) references those names in its `security`, with the permissions an OAuth route requires as its scopes. Public routes (`false`) get none.
 
 With the `user` (bearer) and `member` (API key) identities, and a workspace route declaring `auth: 'member'`, the document contains:
 

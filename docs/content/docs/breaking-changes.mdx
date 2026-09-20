@@ -3,7 +3,7 @@ title: Breaking Changes
 description: Catch a change that breaks callers before it ships.
 ---
 
-`kizuna diff` compares two versions of your API and reports what each change costs the people already calling your API.
+`diffAgainst` compares two versions of your API and reports what each change costs the people already calling it.
 
 It reads the declarations, so route keys, MCP tool names and job keys are all in view, and every Zod schema is compared field by field.
 
@@ -77,14 +77,13 @@ BREAKING users.listUsers 200.items[].id is number instead of string
 
 ## Keeping generated clients current
 
-A generated client that has fallen behind is a compile error waiting to happen in whatever imports it. Check it in the same pipeline:
+A generated client that has fallen behind is a compile error waiting to happen in whatever imports it. [`kizuna generate --check`](/docs/config#kizuna-generate---check) catches it, and `checkClients` does the same inside a script of your own:
 
 ```ts title="scripts/check-clients.ts"
-import { checkClients, formatStale, loadConfig } from '@ts-kizuna/cli';
-import { config } from '../kizuna.config';
+import { checkClients, formatStale } from '@ts-kizuna/cli';
+import kizuna from '../kizuna.config';
 
-const api = await loadConfig('./kizuna.config.ts');
-const stale = checkClients(api!, config.clients ?? []);
+const stale = checkClients(kizuna.api, kizuna.clients);
 
 if (stale.length > 0) {
     console.error(formatStale(stale));
@@ -94,7 +93,7 @@ if (stale.length > 0) {
 
 ```
 A generated client is out of date:
-  src/api-client.ts is behind the config
+  src/lib/api-client.generated.ts is behind the config
 
 Run `kizuna generate` and commit the result.
 ```

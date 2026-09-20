@@ -1,28 +1,23 @@
 ---
-title: new KizunaClient()
-description: Build a fully typed HTTP client from a ts-kizuna API using the native fetch API.
+title: createClient()
+description: Create a fully typed HTTP client from the file kizuna generate writes, using the native fetch API.
 ---
 
-Create a fully typed HTTP client from your routes. See the [fetch client guide](/docs/clients/fetch) for usage.
+Every generated fetch client exports `createClient`. See the [fetch client guide](/docs/clients/fetch) for usage.
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
 ```ts
-import { KizunaClient } from '@ts-kizuna/fetch';
+import { createClient } from './api-client.generated';
 ```
+
+The file comes from naming `fetchClient({ output })` under `clients` on [`defineConfig`](/docs/reference/define-config) and running `kizuna generate`.
 
 ## Parameters
 
 ```ts
-new KizunaClient(contract: Contract, config: ClientConfig): Client
+createClient(config: ClientConfig): Client
 ```
-
-| Parameter  | Type           | Description                                                    |
-| ---------- | -------------- | -------------------------------------------------------------- |
-| `contract` | `Contract`     | The `api` from [`defineConfig`](/docs/reference/define-config) |
-| `config`   | `ClientConfig` | Client configuration                                           |
-
-## `ClientConfig`
 
 | Option           | Type                                 | Required | Description                                                                                                                                                         |
 | ---------------- | ------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -31,27 +26,28 @@ new KizunaClient(contract: Contract, config: ClientConfig): Client
 | `credentials`    | `RequestCredentials`                 | No       | Passed as `credentials` to every `fetch` call                                                                                                                       |
 | `fetch`          | `typeof fetch`                       | No       | Custom fetch implementation (e.g. for testing or a polyfill)                                                                                                        |
 | `onRequest`      | `(context) => void \| Promise<void>` | No       | Callback before each request, receiving `{ url, method, headers, route }`. May be async.                                                                            |
-| `requestContext` | `ContextHeaderInputs`                | \*       | Header values for your API's [request context](/docs/reference/k-request-context). Present only when your API declares one, and required when any of its headers is |
+| `requestContext` | `RequestContext`                     | \*       | Header values for your API's [request context](/docs/reference/k-request-context). Present only when your API declares one, and required when any of its headers is |
 
-`requestContext` values are typed from the declared header schemas, so an optional header stays optional and a coerced one takes the schema's input type.
+`requestContext` values are typed from the declared header schemas, so an optional header stays optional and a coerced one takes the schema's input type. The generated file exports that type as `RequestContext`.
 
 ## Returns
 
-`new KizunaClient()` returns the `Client`, mirroring your route groups. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
+`createClient` returns the `Client`, mirroring your route groups. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
 
-`params` is typed from the route's `pathParams` schema output when one is declared (matching the server-side handler), otherwise from the `:param` placeholders in the path.
+`params` is typed from the route's `pathParams` schema output when one is declared, matching the server-side handler, otherwise from the `:param` placeholders in the path.
 
-The response is a discriminated union over the route's declared status codes. Narrow on `status` to access the correctly typed `body`.
+The response is a discriminated union over the route's declared status codes. Narrow on `status` to reach the correctly typed `body`.
+
+Each method carries the route's `summary`, `description`, `@deprecated` and an `@example` as JSDoc, so an editor shows them at the call site.
 
 ## Example
 
 When your routes name an identity with [identities](/docs/authentication), send the credential in `baseHeaders`:
 
-```ts title="api-client.ts"
-import { KizunaClient } from '@ts-kizuna/fetch';
-import kizuna from '../kizuna.config';
+```ts title="src/lib/api-client.ts"
+import { createClient } from './api-client.generated';
 
-const apiClient = new KizunaClient(kizuna.api, {
+export const apiClient = createClient({
     baseUrl: 'http://localhost:3000',
     baseHeaders: {
         Authorization: `Bearer ${token}`,
@@ -77,7 +73,7 @@ if (result.status === 201) {
 Pass `fetchOptions` to customize individual requests:
 
 ```ts title="users.ts"
-const { body } = await client.users.listUsers({
+const { body } = await apiClient.users.listUsers({
     query: {
         page: 1,
     },
@@ -85,6 +81,18 @@ const { body } = await client.users.listUsers({
         signal: AbortSignal.timeout(5000),
     },
 });
+```
+
+## Named types
+
+The generated file also exports `API`, the namespace holding every model and every route's `Params`, `Query`, `Body` and `Result`:
+
+```tsx
+import type { API } from './api-client.generated';
+
+export function UserCard({ user }: { user: API.User }) {
+    return <article>{user.name}</article>;
+}
 ```
 
 See the [Fetch client guide](/docs/clients/fetch) for per-request headers, validation errors, refusals, and response type narrowing.

@@ -1,6 +1,6 @@
 # @ts-kizuna/fetch
 
-`@ts-kizuna/fetch` provides `new KizunaClient()`, a typed wrapper around the native `fetch` API. It runs anywhere `fetch` does, React Native included.
+`@ts-kizuna/fetch` is the typed client for your routes, a wrapper around the native `fetch` API. It runs anywhere `fetch` does, React Native included.
 
 ## Installation
 
@@ -10,15 +10,34 @@ pnpm add @ts-kizuna/fetch
 
 ## Usage
 
-```ts
-import { KizunaClient } from '@ts-kizuna/fetch';
-import kizuna from '../kizuna.config';
+Name the client on your config and run `kizuna generate`:
 
-const apiClient = new KizunaClient(kizuna.api, {
+```ts
+import { fetchClient } from '@ts-kizuna/fetch/server';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes: {
+        users,
+    },
+    clients: [
+        fetchClient({
+            output: './src/lib/api-client.generated.ts',
+        }),
+    ],
+});
+```
+
+The generated file exports `createClient`:
+
+```ts
+import { createClient } from './api-client.generated';
+
+const apiClient = createClient({
     baseUrl: 'http://localhost:3000',
 });
 
-const { status, body } = await apiClient.users.getUser({
+const result = await apiClient.users.getUser({
     params: {
         id: '1',
     },

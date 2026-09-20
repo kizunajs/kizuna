@@ -1,50 +1,63 @@
 ---
 title: Create a TypeScript Client Wrapper
-description: Build and ship your own TypeScript client wrapper using the types and client from @ts-kizuna/fetch.
+description: Build and ship your own TypeScript client wrapper using the types and the route metadata @ts-kizuna/fetch carries.
 ---
 
 <BetaNotice>
 
-The wrapper surface is new and still settling. The routes type system `@ts-kizuna/fetch` exports may change before v2, so pin your version if you depend on it.
+The wrapper surface is new and still settling. The types `@ts-kizuna/fetch` exports may change before v2, so pin your version if you depend on it.
 
 </BetaNotice>
 
-`@ts-kizuna/fetch` exports `new KizunaClient()` and the full routes type system. Wrap them to build hooks, an SDK layer, or any other integration.
+A wrapper builds on the [fetch client](/docs/clients/fetch) your app already has, the one `kizuna generate` writes. Wrap it to build hooks, an SDK layer, or any other integration. `@ts-kizuna/tanstack-query` is one of these, and it takes the client and nothing else.
 
 Whether a client goes first-party comes down to demand, not age. If it is something most teams on ts-kizuna would reach for, we will add it. What we will not take on is one a handful of people need, since we maintain everything we merge. The client API is public, so you can build and publish your own today.
 
 ## Pattern
 
-```ts title="src/lib/api-client.ts"
-import { KizunaClient, type Client } from '@ts-kizuna/fetch';
-import kizuna from '../kizuna.config';
-
-const baseClient = new KizunaClient(kizuna.api, {
-    baseUrl: 'http://localhost:3000',
-});
+```ts title="src/lib/my-client.ts"
+import { apiClient } from './api-client';
 
 export function createMyClient() {
     return {
         getUser: (id: string) =>
-            baseClient.users.getUser({
+            apiClient.users.getUser({
                 params: {
                     id,
                 },
             }),
-        createUser: (data: Parameters<typeof baseClient.users.createUser>[0]['body']) =>
-            baseClient.users.createUser({
+        createUser: (data: Parameters<typeof apiClient.users.createUser>[0]['body']) =>
+            apiClient.users.createUser({
                 body: data,
             }),
     };
 }
 ```
 
+## Reading the route off a method
+
+A wrapper that treats routes generically, rather than naming each one, needs to know what each method answers: its method, its path, which statuses it declares. Every client method carries its own route, and `routeOf` reads it:
+
+```ts
+import { routeOf } from '@ts-kizuna/fetch';
+
+const route = routeOf(apiClient.users.getUser);
+
+route?.method; // 'GET'
+route?.path; // '/users/:id'
+```
+
+This is what lets a wrapper take the client alone. A `GET` gets query semantics, anything else gets mutation semantics, and the declared statuses say which responses are data. `routeOf` answers `undefined` for anything that is not a client method, so a group or a stray value is easy to skip while walking the client.
+
 ## Types
 
-The key types from `@ts-kizuna/fetch`:
+The types from `@ts-kizuna/fetch`:
 
-| Type        | Description                                 |
-| ----------- | ------------------------------------------- |
-| `Client<T>` | The full typed client shape for your routes |
+| Type                           | Description                                                           |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `Client<T, Codes>`             | The full typed client shape for a set of routes                       |
+| `ClientArgs<Route>`            | What one route's method accepts: `params`, `query`, `body`, `headers` |
+| `ClientResponse<Route, Codes>` | The discriminated union one route's method resolves to                |
+| `ClientConfig`                 | What `createClient` takes                                             |
 
-These are fully generic, so pass `typeof routes` or `typeof routes.someRoute` to get typed arguments and responses for your wrapper.
+These are generic over a route or a set of routes, so pass `typeof route` to type a single wrapper method and `typeof routes` to type a whole surface.

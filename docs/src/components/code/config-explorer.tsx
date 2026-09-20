@@ -116,7 +116,7 @@ Content-Type: application/problem+json
         file: 'api-client.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `const apiClient = new KizunaClient(kizuna.api, {
+        code: `const apiClient = createClient({
   baseUrl: 'http://localhost:3000',
 });
 

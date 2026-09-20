@@ -123,14 +123,13 @@ app.listen(3000);
 
 ### Use the API on the client
 
-The client is generated from the same declarations, so it already knows every route.
+Name a client under `clients` on your config, run `kizuna generate`, and the file it writes already knows every route.
 
 ```ts
 // src/lib/api-client.ts
-import { KizunaClient } from '@ts-kizuna/fetch';
-import kizuna from '../../kizuna.config';
+import { createClient } from './api-client.generated';
 
-const client = new KizunaClient(kizuna.api, {
+const client = createClient({
     baseUrl: 'http://localhost:3000',
 });
 

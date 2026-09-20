@@ -5,10 +5,9 @@ import type { CodeCompletion } from '@/components/code/code-completion';
 import TsLogo from '@/icons/TypeScript.svg';
 import styles from './faq.module.css';
 
-const TRPC_EXAMPLE = `import { KizunaClient } from '@ts-kizuna/fetch';
-import kizuna from '../kizuna.config';
+const TRPC_EXAMPLE = `import { createClient } from './api-client.generated';
 
-const client = new KizunaClient(kizuna.api, {
+const client = createClient({
     baseUrl: 'https://api.example.com',
 });
 

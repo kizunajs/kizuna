@@ -181,20 +181,39 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount
 
 ## Call it from a typed client
 
-The client is built from the same declarations, so every route, input, and response is typed.
+Your config carries the handlers, so it never reaches a browser. Name a client on it instead, and `kizuna generate` writes a file that holds the route shapes alone:
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
-```ts title="src/lib/api-client.ts"
-import { KizunaClient } from '@ts-kizuna/fetch';
-import kizuna from '../../kizuna.config';
+```ts title="kizuna.config.ts"
+import { fetchClient } from '@ts-kizuna/fetch/server';
 
-export const apiClient = new KizunaClient(kizuna.api, {
-    baseUrl: 'http://localhost:3000/api',
+export default defineConfig({
+    adapter: nextAdapter(),
+    routes: {
+        users,
+    },
+    clients: [
+        fetchClient({
+            output: './src/lib/api-client.generated.ts',
+        }),
+    ],
 });
 ```
 
-Your config carries the handlers, so it stays on the server. For a browser, point `clients` at a generated file and import that instead. See [Clients](/docs/clients/fetch).
+```bash
+kizuna generate
+```
+
+Wrap it once with the base URL you serve on:
+
+```ts title="src/lib/api-client.ts"
+import { createClient } from './api-client.generated';
+
+export const apiClient = createClient({
+    baseUrl: 'http://localhost:3000/api',
+});
+```
 
 ```tsx title="page.tsx"
 import { apiClient } from '@/lib/api-client';

@@ -64,18 +64,20 @@ Use it inside a `multipart/form-data` request body for uploaded files:
 ```ts title="users.ts"
 import { FileSchema } from '@ts-kizuna/core/schemas';
 
-uploadAvatar: {
-    method: 'POST',
-    path: '/avatar',
-    contentType: 'multipart/form-data',
-    body: z.object({
-        file: FileSchema,
-        userId: z.string(),
-    }),
-    responses: {
-        200: z.object({
-            size: z.number(),
+uploadAvatar: k
+    .route({
+        method: 'POST',
+        path: '/avatar',
+        contentType: 'multipart/form-data',
+        body: z.object({
+            file: FileSchema,
+            userId: z.string(),
         }),
-    },
-},
+        responses: {
+            200: z.object({
+                size: z.number(),
+            }),
+        },
+    })
+    .handler(/* ... */),
 ```

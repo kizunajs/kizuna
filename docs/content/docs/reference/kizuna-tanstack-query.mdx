@@ -1,6 +1,6 @@
 ---
 title: new KizunaTanstackQuery()
-description: Build TanStack Query options from a ts-kizuna API and a fetch client.
+description: Build TanStack Query options from a ts-kizuna fetch client.
 ---
 
 <BetaNotice>
@@ -23,9 +23,9 @@ import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
 new KizunaTanstackQuery(client: Client): KizunaQueryProxy
 ```
 
-| Parameter | Type     | Description                                                                             |
-| --------- | -------- | --------------------------------------------------------------------------------------- |
-| `client`  | `Client` | A client from [`new KizunaClient()`](/docs/reference/kizuna-client), or a generated one |
+| Parameter | Type     | Description                                                              |
+| --------- | -------- | ------------------------------------------------------------------------ |
+| `client`  | `Client` | A [fetch client](/docs/clients/fetch), from the generated `createClient` |
 
 Every client method carries the route it answers, so nothing else is needed: each route's `method` decides which factories it gets, and its `responses` decide which statuses are data.
 
@@ -90,13 +90,8 @@ Declared statuses come back as data. Anything else throws [`UndeclaredResponseEr
 
 ```ts
 import { useQuery } from '@tanstack/react-query';
-import { KizunaClient } from '@ts-kizuna/fetch';
 import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
-import kizuna from '../kizuna.config';
-
-const apiClient = new KizunaClient(kizuna.api, {
-    baseUrl: 'http://localhost:3000',
-});
+import { apiClient } from './api-client';
 
 const api = new KizunaTanstackQuery(apiClient);
 
@@ -116,5 +111,5 @@ const { data } = useQuery(
 ## See also
 
 - [TanStack Query client](/docs/clients/tanstack-query)
-- [`new KizunaClient()`](/docs/reference/kizuna-client)
+- [`createClient()`](/docs/reference/create-client)
 - [`isUndeclaredResponseError`](/docs/reference/is-undeclared-response-error)

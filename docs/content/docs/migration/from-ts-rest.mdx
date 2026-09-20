@@ -145,20 +145,19 @@ const client = initClient(contract, {
 ```
 
 ```ts title="ts-kizuna"
-import { KizunaClient } from '@ts-kizuna/fetch';
-import kizuna from '../kizuna.config';
+import { createClient } from './api-client.generated';
 
-const client = new KizunaClient(kizuna.api, {
+const client = createClient({
     baseUrl: '...',
 });
 ```
 
-Your config holds the handlers, so it stays on the server. For a browser, point `clients` at a generated file instead and import that:
+Where ts-rest hands the contract to the client at runtime, kizuna writes the client out ahead of time. Your config holds the handlers, so it never reaches a browser; name the file you want under `clients` and run `kizuna generate`:
 
 ```ts title="kizuna.config.ts"
 clients: [
     fetchClient({
-        output: '../website/src/lib/api-client.ts',
+        output: './src/lib/api-client.generated.ts',
     }),
 ],
 ```

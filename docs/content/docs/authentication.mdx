@@ -295,7 +295,7 @@ The route's path `params`, the adapter's native request objects, and any [reques
 
 [`generateOpenApi`](/docs/reference/generate-openapi) emits your identities as `components.securitySchemes`. A `custom` identity has no scheme, so its routes carry an `x-kizuna-guarded` extension instead.
 
-[`new KizunaClient()`](/docs/reference/kizuna-client) sends the credential in `baseHeaders`, and [MCP endpoints](/docs/mcp) run the same guards per tool call.
+The [fetch client](/docs/clients/fetch) sends the credential in `baseHeaders`, and [MCP endpoints](/docs/mcp) run the same guards per tool call.
 
 ## Reference
 

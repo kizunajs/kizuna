@@ -13,7 +13,7 @@ import { watchConfig } from '@ts-kizuna/cli';
 import { generateFetchClient } from '@ts-kizuna/fetch/server';
 
 await watchConfig('./kizuna.config.ts', ({ api }) => {
-    writeFileSync('./src/api-client.ts', generateFetchClient(api));
+    writeFileSync('./src/lib/api-client.generated.ts', generateFetchClient(api));
 });
 ```
 
@@ -33,16 +33,14 @@ await watchConfig('./kizuna.config.ts', ({ files }) => {
 
 ## Every reload
 
-```ts
-interface ConfigChange {
-    contract: Contract;
-    changed?: string;
-    files: string[];
-    notices: Notice[];
-}
-```
+Every reload hands the callback one object:
 
-`changed` is the file whose edit triggered the reload, absent on the first load. `files` is the current watch set, which grows and shrinks as your imports do.
+| Field     | What it is                                                                               |
+| --------- | ---------------------------------------------------------------------------------------- |
+| `api`     | The reloaded api, the same value [`defineConfig`](/docs/reference/define-config) returns |
+| `changed` | The file whose edit triggered the reload, absent on the first load                       |
+| `files`   | The current watch set, which grows and shrinks as your imports do                        |
+| `notices` | Routes that announce their own retirement, soonest sunset first                          |
 
 ## A broken edit
 
@@ -114,4 +112,4 @@ Editors save in bursts, and a compiler writing a directory is a burst of its own
 
 - [Configuration](/docs/config)
 - [Deprecations](/docs/deprecations)
-- [Generated TypeScript client](/docs/clients/fetch#generating-the-client)
+- [Fetch client](/docs/clients/fetch)

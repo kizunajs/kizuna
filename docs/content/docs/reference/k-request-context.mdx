@@ -52,18 +52,20 @@ export default defineConfig({
 ```
 
 ```ts title="users.ts"
-listUsers: ({ query, requestContext }) => {
+listUsers: k.route({ ... }).handler(({ query, requestContext }) => {
     track(requestContext.analytics.sessionId, 'listUsers');
     // ...
-},
+}),
 ```
 
 ## Sending values from a client
 
 The fetch client takes the declared headers under `requestContext` and sends them with every request:
 
-```ts title="api-client.ts"
-const apiClient = new KizunaClient(kizuna.api, {
+```ts title="src/lib/api-client.ts"
+import { createClient } from './api-client.generated';
+
+export const apiClient = createClient({
     baseUrl: 'https://api.example.com',
     requestContext: {
         'x-posthog-session-id': sessionId,

@@ -77,12 +77,14 @@ export const usersRoutes = k.routes('users', {
 Routes reference tags by key, with completion. A route can list more than one tag, which is useful for tagging it across groups:
 
 ```ts title="users.ts"
-cancelAccount: {
-    method: 'POST',
-    path: '/account/cancel',
-    tags: ['users', 'health'],
-    // ...
-},
+cancelAccount: k
+    .route({
+        method: 'POST',
+        path: '/account/cancel',
+        tags: ['users', 'health'],
+        // ...
+    })
+    .handler(/* ... */),
 ```
 
 See the [Routes guide](/docs/routes#splitting-routes-across-files) for the full nesting pattern.

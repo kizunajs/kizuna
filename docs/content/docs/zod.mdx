@@ -12,16 +12,18 @@ A kizuna route is written in [Zod](https://zod.dev). Validation is the smaller j
 kizuna does not support [Standard Schema](https://standardschema.dev). We looked into it, and the clients are why we ultimately chose not to.
 
 ```ts
-listEvents: {
-    method: 'GET',
-    path: '/events',
-    query: z.object({
-        from: z.date(),
-    }),
-    responses: {
-        200: z.array(EventSchema),
-    },
-},
+listEvents: k
+    .route({
+        method: 'GET',
+        path: '/events',
+        query: z.object({
+            from: z.date(),
+        }),
+        responses: {
+            200: z.array(EventSchema),
+        },
+    })
+    .handler(/* ... */),
 ```
 
 One `z.date()`, and every surface gets the real type:

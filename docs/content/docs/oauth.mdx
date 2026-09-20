@@ -144,7 +144,7 @@ const jwks = createRemoteJWKSet(new URL('https://auth.example.com/oauth2/jwks'))
 });
 ```
 
-Name it under `identities` on your config and a route's `auth: 'user'` runs it.
+Name it under `auth.identities` on your config and a route's `auth: 'user'` runs it.
 
 The caller holds what both the role and the token allow. When a route requires a permission the role holds but the token lacks, kizuna answers `403` with the `insufficient_scope` challenge ([RFC 6750](https://www.rfc-editor.org/rfc/rfc6750)), so the client knows a new token would pass. When the role lacks it, the `403` has no challenge, since no token could help.
 

@@ -12,13 +12,8 @@ pnpm add @ts-kizuna/tanstack-query
 
 ```ts
 import { useQuery } from '@tanstack/react-query';
-import { KizunaClient } from '@ts-kizuna/fetch';
 import { KizunaTanstackQuery } from '@ts-kizuna/tanstack-query';
-import kizuna from '../kizuna.config';
-
-const apiClient = new KizunaClient(kizuna.api, {
-    baseUrl: 'http://localhost:3000',
-});
+import { apiClient } from './api-client';
 
 const api = new KizunaTanstackQuery(apiClient);
 
