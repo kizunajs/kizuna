@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 /* eslint-disable no-undef */
-const { getTypes, ignoreReleaseCommits, whatBump } = require('./tools/release-shared.cjs');
+const { capBumpAtMinor, getTypes, ignoreReleaseCommits } = require('./tools/release-shared.cjs');
+
+const allowsMajor = process.env.RELEASE_MAJOR === '1';
 
 const commitUrl = '{{~@root.host}}/{{@root.owner}}/{{@root.repository}}/commit/{{commit.hash}}';
 
@@ -48,7 +50,7 @@ module.exports = {
     },
     hooks: {
         'after:bump': 'node tools/sync-versions.cjs && git add package.json packages/*/package.json',
-        'after:release': 'pnpm -r publish --no-git-checks --provenance',
+        'after:release': 'node tools/publish.cjs',
     },
     plugins: {
         '@release-it/conventional-changelog': {
@@ -56,7 +58,7 @@ module.exports = {
                 name: 'conventionalcommits',
                 types: getTypes(),
             },
-            whatBump,
+            ...(allowsMajor ? {} : { whatBump: capBumpAtMinor }),
             gitRawCommitsOpts: {
                 ignore: ignoreReleaseCommits,
             },

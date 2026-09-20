@@ -15,8 +15,12 @@ const types = [
 
 const ignoreReleaseCommits = /^chore(\([^)]*\))?:\s*release\s/;
 
-// TODO(v2): drop this.
-function whatBump(commits) {
+/**
+ * Caps a release at a minor bump, so the breaking changes that ship in an
+ * ordinary release never move the major on their own. The release workflow's
+ * `major` input is what lifts the cap.
+ */
+function capBumpAtMinor(commits) {
     let breakingChanges = 0;
     let features = 0;
 
@@ -42,4 +46,4 @@ function getStrictTypes() {
     return types.map((entry) => (HIDDEN_IN_STRICT.has(entry.type) ? { ...entry, hidden: true } : entry));
 }
 
-module.exports = { getTypes, getStrictTypes, ignoreReleaseCommits, whatBump };
+module.exports = { capBumpAtMinor, getTypes, getStrictTypes, ignoreReleaseCommits };
