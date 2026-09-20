@@ -1,6 +1,6 @@
 {
   "name": "@kizunajs/openapi",
-  "version": "1.64.1",
+  "version": "2.0.0-beta.0",
   "description": "OpenAPI 3.1 generation for Kizuna.js APIs",
   "keywords": [
     "kizunajs",

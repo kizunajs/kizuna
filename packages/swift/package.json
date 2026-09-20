@@ -1,6 +1,6 @@
 {
   "name": "@kizunajs/swift",
-  "version": "1.64.1",
+  "version": "2.0.0-beta.0",
   "description": "Swift client generation for Kizuna.js APIs",
   "keywords": [
     "kizunajs",

@@ -1,6 +1,6 @@
 {
   "name": "@kizunajs/next",
-  "version": "1.64.1",
+  "version": "2.0.0-beta.0",
   "description": "Next.js App Router adapter for Kizuna.js",
   "keywords": [
     "kizunajs",
