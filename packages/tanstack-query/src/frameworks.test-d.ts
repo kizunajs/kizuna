@@ -5,7 +5,16 @@ import { useInfiniteQuery as useVueInfiniteQuery, useMutation as useVueMutation,
 import { createInfiniteQuery, createMutation, createQuery } from '@tanstack/svelte-query';
 import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
-import { KizunaClient } from '@ts-kizuna/fetch';
+import { createGeneratedClient, type Client, type ClientConfig, type GeneratedRoutes } from '@ts-kizuna/fetch';
+import type { Routes } from '@ts-kizuna/core';
+
+/**
+ * A client over an assembled api's routes, the same runtime the generated
+ * client uses.
+ */
+const apiClientFor = <T extends Routes>(api: { routes: T }, config: ClientConfig): Client<T> =>
+    createGeneratedClient(api.routes as unknown as GeneratedRoutes, config) as unknown as Client<T>;
+
 import { KizunaTanstackQuery } from './proxy.js';
 
 interface Config {
@@ -79,7 +88,7 @@ const contract = defineConfig({
     },
 }).api;
 
-const apiClient = new KizunaClient(contract, {
+const apiClient = apiClientFor(contract, {
     baseUrl: 'http://localhost:8000',
 });
 

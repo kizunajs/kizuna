@@ -9,8 +9,8 @@ import type {
     QueryObserverOptions,
     SkipToken,
 } from '@tanstack/query-core';
-import type { RouteDefinition, Routes, StreamMessageOf, StreamResponseDefinition } from '@ts-kizuna/core';
-import type { Client, ClientArgs, ClientResponse } from '@ts-kizuna/fetch';
+import type { RouteDefinition, Routes, StreamResponseDefinition } from '@ts-kizuna/core';
+import type { Client, ClientArgs, ClientMethod, ClientResponse } from '@ts-kizuna/fetch';
 
 export type KizunaQueryKeyType = 'query' | 'infinite' | 'stream';
 
@@ -25,12 +25,9 @@ export type KizunaQueryKey = readonly [readonly string[], { readonly input?: unk
  */
 export type KizunaPathKey = readonly [readonly string[]];
 
-type HasOptionalArgs<R extends RouteDefinition> = {} extends ClientArgs<R> ? true : false;
+type HasOptionalArgs<Args> = {} extends Args ? true : false;
 
-type CallFn<R extends RouteDefinition, Codes extends string> =
-    HasOptionalArgs<R> extends true
-        ? (args?: ClientArgs<R>) => Promise<ClientResponse<R, Codes>>
-        : (args: ClientArgs<R>) => Promise<ClientResponse<R, Codes>>;
+type CallFn<Args, Result> = HasOptionalArgs<Args> extends true ? (args?: Args) => Promise<Result> : (args: Args) => Promise<Result>;
 
 // From `query-core`, so no framework's option type is named. `TData` stays
 // `unknown` because the framework re-infers the selected type from `U`.
@@ -39,8 +36,7 @@ type QueryExtras<TQueryFnData, TError> = Omit<
     'queryKey' | 'queryFn'
 >;
 
-type QueryInput<R extends RouteDefinition> =
-    HasOptionalArgs<R> extends true ? { input?: ClientArgs<R> | SkipToken } : { input: ClientArgs<R> | SkipToken };
+type QueryInput<Args> = HasOptionalArgs<Args> extends true ? { input?: Args | SkipToken } : { input: Args | SkipToken };
 
 // `U` passing through is what preserves `initialData` narrowing: a given
 // `initialData` stays required, which is all the defined-data overload keys on.
@@ -49,11 +45,9 @@ type QueryOptionsOut<U, TQueryFnData, TError> = Omit<NoInfer<U>, 'input'> & {
     queryFn: U extends { input: SkipToken } ? SkipToken : (context: QueryFunctionContext<KizunaQueryKey>) => Promise<TQueryFnData>;
 };
 
-type QueryOptionsFn<R extends RouteDefinition, Codes extends string> = <
-    U extends QueryInput<R> & QueryExtras<ClientResponse<R, Codes>, DefaultError>,
->(
+type QueryOptionsFn<Args, Result> = <U extends QueryInput<Args> & QueryExtras<Result, DefaultError>>(
     options: U
-) => QueryOptionsOut<U, ClientResponse<R, Codes>, DefaultError>;
+) => QueryOptionsOut<U, Result, DefaultError>;
 
 type InfiniteExtras<TQueryFnData, TError, TPageParam> = Omit<
     InfiniteQueryObserverOptions<TQueryFnData, TError, unknown, KizunaQueryKey, TPageParam>,
@@ -67,38 +61,38 @@ type InfiniteOptionsOut<U, TQueryFnData, TError, TPageParam, Skipped extends boo
 
 // `input` sits outside `U`, and skipToken gets its own signature, because
 // `TPageParam` only infers from a real parameter position.
-interface InfiniteOptionsFn<R extends RouteDefinition, Codes extends string> {
-    <TPageParam, U extends InfiniteExtras<ClientResponse<R, Codes>, DefaultError, TPageParam>>(
-        options: { input: (pageParam: TPageParam) => ClientArgs<R> } & U
-    ): InfiniteOptionsOut<U, ClientResponse<R, Codes>, DefaultError, TPageParam, false>;
-    <TPageParam, U extends InfiniteExtras<ClientResponse<R, Codes>, DefaultError, TPageParam>>(
+interface InfiniteOptionsFn<Args, Result> {
+    <TPageParam, U extends InfiniteExtras<Result, DefaultError, TPageParam>>(
+        options: { input: (pageParam: TPageParam) => Args } & U
+    ): InfiniteOptionsOut<U, Result, DefaultError, TPageParam, false>;
+    <TPageParam, U extends InfiniteExtras<Result, DefaultError, TPageParam>>(
         options: { input: SkipToken } & U
-    ): InfiniteOptionsOut<U, ClientResponse<R, Codes>, DefaultError, TPageParam, true>;
+    ): InfiniteOptionsOut<U, Result, DefaultError, TPageParam, true>;
 }
 
-type KeyFn<R extends RouteDefinition> = (options?: { input?: ClientArgs<R> }) => KizunaQueryKey;
+type KeyFn<Args> = (options?: { input?: Args }) => KizunaQueryKey;
 
 /**
  * A route whose method is `GET` or `HEAD`.
  */
-export interface QueryProcedure<R extends RouteDefinition, Codes extends string> {
+export interface QueryProcedure<Args, Result> {
     /**
      * Options for `useQuery`. `data` is the route's declared response union; an
      * undeclared status throws.
      */
-    queryOptions: QueryOptionsFn<R, Codes>;
+    queryOptions: QueryOptionsFn<Args, Result>;
     /**
      * Options for `useInfiniteQuery`. `input` is a function of the page parameter.
      */
-    infiniteOptions: InfiniteOptionsFn<R, Codes>;
+    infiniteOptions: InfiniteOptionsFn<Args, Result>;
     /**
      * The query's full key.
      */
-    queryKey: KeyFn<R>;
+    queryKey: KeyFn<Args>;
     /**
      * The infinite query's full key.
      */
-    infiniteKey: KeyFn<R>;
+    infiniteKey: KeyFn<Args>;
     /**
      * The partial key matching every operation on this route.
      */
@@ -106,34 +100,32 @@ export interface QueryProcedure<R extends RouteDefinition, Codes extends string>
     /**
      * Calls the route, bypassing the cache.
      */
-    call: CallFn<R, Codes>;
+    call: CallFn<Args, Result>;
 }
 
-type MutationVariables<R extends RouteDefinition> = HasOptionalArgs<R> extends true ? void : ClientArgs<R>;
+type MutationVariables<Args> = HasOptionalArgs<Args> extends true ? void : Args;
 
-type MutationExtras<R extends RouteDefinition, Codes extends string, TError> = Omit<
-    MutationObserverOptions<ClientResponse<R, Codes>, TError, MutationVariables<R>>,
+type MutationExtras<Args, Result, TError> = Omit<
+    MutationObserverOptions<Result, TError, MutationVariables<Args>>,
     'mutationKey' | 'mutationFn'
 >;
 
-type MutationOptionsFn<R extends RouteDefinition, Codes extends string> = <
-    U extends MutationExtras<R, Codes, DefaultError> = MutationExtras<R, Codes, DefaultError>,
->(
+type MutationOptionsFn<Args, Result> = <U extends MutationExtras<Args, Result, DefaultError> = MutationExtras<Args, Result, DefaultError>>(
     options?: U
 ) => NoInfer<U> & {
     mutationKey: KizunaPathKey;
-    mutationFn: (variables: MutationVariables<R>) => Promise<ClientResponse<R, Codes>>;
+    mutationFn: (variables: MutationVariables<Args>) => Promise<Result>;
 };
 
 /**
  * A route whose method is anything other than `GET` or `HEAD`.
  */
-export interface MutationProcedure<R extends RouteDefinition, Codes extends string> {
+export interface MutationProcedure<Args, Result> {
     /**
      * Options for `useMutation`. `mutate` takes the route's call arguments, or
      * nothing when every argument is optional.
      */
-    mutationOptions: MutationOptionsFn<R, Codes>;
+    mutationOptions: MutationOptionsFn<Args, Result>;
     /**
      * The mutation's full key.
      */
@@ -145,7 +137,7 @@ export interface MutationProcedure<R extends RouteDefinition, Codes extends stri
     /**
      * Calls the route, outside a mutation.
      */
-    call: CallFn<R, Codes>;
+    call: CallFn<Args, Result>;
 }
 
 /**
@@ -155,11 +147,11 @@ export interface PathProcedures {
     key: () => KizunaPathKey;
 }
 
-type StreamMessageOfRoute<R extends RouteDefinition> = {
-    [Status in keyof R['responses']]: R['responses'][Status] extends StreamResponseDefinition
-        ? StreamMessageOf<R['responses'][Status]>
-        : never;
-}[keyof R['responses']];
+/**
+ * The messages a streamed result yields, read off the `AsyncIterable` body the
+ * client hands back rather than off the route's declaration.
+ */
+type StreamMessageOfResult<Result> = Result extends { body: AsyncIterable<infer Message> } ? Message : never;
 
 type StreamExtras<TData, TError> = Omit<QueryObserverOptions<TData, TError, unknown, TData, KizunaQueryKey>, 'queryKey' | 'queryFn'> & {
     /**
@@ -176,26 +168,26 @@ type StreamOptionsOut<U, TData, TError> = Omit<NoInfer<U>, 'input' | 'refetchMod
     queryFn: U extends { input: SkipToken } ? SkipToken : QueryFunction<TData, KizunaQueryKey>;
 };
 
-type StreamOptionsFn<R extends RouteDefinition> = <U extends QueryInput<R> & StreamExtras<StreamMessageOfRoute<R>[], DefaultError>>(
+type StreamOptionsFn<Args, Result> = <U extends QueryInput<Args> & StreamExtras<StreamMessageOfResult<Result>[], DefaultError>>(
     options: U
-) => StreamOptionsOut<U, StreamMessageOfRoute<R>[], DefaultError>;
+) => StreamOptionsOut<U, StreamMessageOfResult<Result>[], DefaultError>;
 
 /**
  * A route whose response streams. `data` is the list of messages received so
  * far, growing as they arrive.
  */
-export interface StreamProcedure<R extends RouteDefinition, Codes extends string> {
+export interface StreamProcedure<Args, Result> {
     /**
      * Options for `useQuery`, over TanStack's `streamedQuery`. A status other than
      * the streamed one throws `NonStreamResponseError`.
      */
-    streamOptions: StreamOptionsFn<R>;
+    streamOptions: StreamOptionsFn<Args, Result>;
     /**
      * The stream query's full key.
      */
-    streamKey: KeyFn<R>;
+    streamKey: KeyFn<Args>;
     key: () => KizunaPathKey;
-    call: CallFn<R, Codes>;
+    call: CallFn<Args, Result>;
 }
 
 type HasStream<R extends RouteDefinition> = {
@@ -204,12 +196,22 @@ type HasStream<R extends RouteDefinition> = {
     ? false
     : true;
 
-type Procedure<R extends RouteDefinition, Codes extends string> =
-    HasStream<R> extends true
-        ? StreamProcedure<R, Codes>
-        : R['method'] extends 'GET' | 'HEAD'
-          ? QueryProcedure<R, Codes>
-          : MutationProcedure<R, Codes>;
+/**
+ * Which factories a route gets: a streamed response takes `streamOptions`, a
+ * `GET` or `HEAD` takes the query factories, and everything else mutates.
+ */
+type ProcedureFor<Method, Streams, Args, Result> = Streams extends true
+    ? StreamProcedure<Args, Result>
+    : Method extends 'GET' | 'HEAD'
+      ? QueryProcedure<Args, Result>
+      : MutationProcedure<Args, Result>;
+
+type Procedure<R extends RouteDefinition, Codes extends string> = ProcedureFor<
+    R['method'],
+    HasStream<R>,
+    ClientArgs<R>,
+    ClientResponse<R, Codes>
+>;
 
 /**
  * The route tree, each route carrying its query or mutation factories.
@@ -222,10 +224,24 @@ export type KizunaQueryProxy<T extends Routes, Codes extends string = never> = {
           : never;
 };
 
+/**
+ * The same tree, read off a generated client instead of off the routes. Each of
+ * its methods carries the method it calls and whether that response streams, so
+ * the client alone says which factories every route gets.
+ */
+export type GeneratedQueryProxy<C> = {
+    [K in keyof C as K extends string ? K : never]: C[K] extends ClientMethod<infer Method, infer Streams, infer Args, infer Result>
+        ? ProcedureFor<Method, Streams, Args, Result>
+        : C[K] extends object
+          ? GeneratedQueryProxy<C[K]> & PathProcedures
+          : never;
+};
+
 export interface KizunaTanstackQueryConstructor {
     /**
      * The client is the only argument: each of its methods carries the route it
      * answers, so nothing has to hand over the api a second time.
      */
     new <T extends Routes, Codes extends string = never>(client: Client<T, Codes>): KizunaQueryProxy<T, Codes> & PathProcedures;
+    new <C extends object>(client: C): GeneratedQueryProxy<C> & PathProcedures;
 }

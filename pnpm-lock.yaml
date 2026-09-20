@@ -430,6 +430,9 @@ importers:
         specifier: 'catalog:'
         version: 4.3.6
     devDependencies:
+      '@ts-kizuna/cli':
+        specifier: workspace:*
+        version: link:../../packages/cli
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
