@@ -4,20 +4,20 @@ import type { TagSet, TagOptions } from './tags.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { Jobs, JobsConfig } from './jobs.js';
-import type { ContractPlugins } from './plugin.js';
+import type { ApiPlugins } from './plugin.js';
 
 /**
  * A kizuna API definition: its routes plus tags, identities, and validation
  * settings. Produced by `defineConfig` and consumed by the server adapters,
  * fetch client, OpenAPI generator, and SDK generators.
  */
-export interface Contract<
+export interface ApiDefinition<
     Routes_ extends Routes = Routes,
     Tags extends Record<string, TagOptions> = Record<string, TagOptions>,
     Codes extends string = string,
     Schemes extends Record<string, SecurityScheme> = Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema> = Record<string, RequestContextSchema>,
-    Plugins extends ContractPlugins = ContractPlugins,
+    Plugins extends ApiPlugins = ApiPlugins,
     Jobs_ extends Jobs = Jobs,
     GuardSchema extends z.ZodType | undefined = z.ZodType | undefined,
 > {
@@ -74,11 +74,11 @@ export interface Contract<
 }
 
 /**
- * Internal helper that builds a {@link Contract} from routes, tags, identities,
+ * Internal helper that builds a {@link ApiDefinition} from routes, tags, identities,
  * and issue codes. Called by `defineConfig`. Not part of the public surface;
  * author contracts through `k`.
  */
-export function assembleContract<
+export function buildApiDefinition<
     const Tags extends Record<string, TagOptions> = Record<string, never>,
     const Codes extends string = never,
     const Schemes extends Record<string, SecurityScheme> = Record<string, never>,
@@ -87,7 +87,7 @@ export function assembleContract<
         Extract<keyof Schemes, string>
     >,
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
-    const Plugins extends ContractPlugins = Record<string, never>,
+    const Plugins extends ApiPlugins = Record<string, never>,
     const Jobs_ extends Jobs = Record<string, never>,
     GuardSchema extends z.ZodType | undefined = undefined,
 >(config: {
@@ -102,7 +102,7 @@ export function assembleContract<
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): Contract<R, Tags, Codes, Schemes, RequestContext, Plugins, Jobs_, GuardSchema> {
+}): ApiDefinition<R, Tags, Codes, Schemes, RequestContext, Plugins, Jobs_, GuardSchema> {
     return {
         routes: config.routes,
         guardSchema: config.guardSchema,
@@ -119,29 +119,29 @@ export function assembleContract<
 /**
  * An api's route groups.
  */
-export type RoutesOf<C extends Contract> = C['routes'];
+export type RoutesOf<C extends ApiDefinition> = C['routes'];
 
 /**
  * An api's identities, or an empty map when it declares none.
  */
-export type SchemesOf<C extends Contract> = Exclude<C['securitySchemes'], undefined>;
+export type SchemesOf<C extends ApiDefinition> = Exclude<C['securitySchemes'], undefined>;
 
 /**
  * An api's request context schemas, or an empty map when it declares none.
  */
-export type RequestContextOf<C extends Contract> = Exclude<C['requestContext'], undefined>;
+export type RequestContextOf<C extends ApiDefinition> = Exclude<C['requestContext'], undefined>;
 
 /**
  * An api's plugins, or an empty map when it declares none.
  */
-export type ContractPluginsOf<C extends Contract> = Exclude<C['plugins'], undefined>;
+export type ApiPluginsOf<C extends ApiDefinition> = Exclude<C['plugins'], undefined>;
 
 /**
  * An api's jobs, or an empty map when it declares none.
  */
-export type JobsOf<C extends Contract> = Exclude<C['jobs'], undefined>;
+export type JobsOf<C extends ApiDefinition> = Exclude<C['jobs'], undefined>;
 
-export type GuardSchemaOf<C extends Contract> = Extract<C['guardSchema'], z.ZodType>;
+export type GuardSchemaOf<C extends ApiDefinition> = Extract<C['guardSchema'], z.ZodType>;
 
 /**
  * An api's tools, or an empty map when it declares none.

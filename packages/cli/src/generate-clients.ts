@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative } from 'node:path';
-import type { ClientTarget, Contract } from '@ts-kizuna/core';
+import type { ClientTarget, ApiDefinition } from '@ts-kizuna/core';
 
 /**
  * A client that was written, and whether it had to be.
@@ -35,7 +35,7 @@ const currentContents = (output: string): string | undefined => {
  * Writes every client an api declares, leaving a file alone when it already
  * matches so watchers and build tools see no change.
  */
-export const writeClients = (contract: Contract, clients: readonly ClientTarget[]): WrittenClient[] =>
+export const writeClients = (contract: ApiDefinition, clients: readonly ClientTarget[]): WrittenClient[] =>
     clients.map((client) => {
         const rendered = client.generate(contract);
         const changed = currentContents(client.output) !== rendered;
@@ -54,7 +54,7 @@ export const writeClients = (contract: Contract, clients: readonly ClientTarget[
  * This is what a pipeline runs: a generated client that has fallen behind is a
  * compile error waiting to happen in whatever imports it.
  */
-export const checkClients = (contract: Contract, clients: readonly ClientTarget[]): StaleClient[] =>
+export const checkClients = (contract: ApiDefinition, clients: readonly ClientTarget[]): StaleClient[] =>
     clients.flatMap((client): StaleClient[] => {
         const current = currentContents(client.output);
         if (current === undefined) return [{ kind: client.kind, output: client.output, reason: 'missing' }];

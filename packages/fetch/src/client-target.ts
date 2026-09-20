@@ -1,4 +1,4 @@
-import type { ClientTarget, Contract } from '@ts-kizuna/core';
+import type { ClientTarget, ApiDefinition } from '@ts-kizuna/core';
 import { generateFetchClient, type FetchClientOptions } from './generator.js';
 
 /**
@@ -20,5 +20,5 @@ export interface FetchClientTargetOptions extends FetchClientOptions {
 export const fetchClient = ({ output, ...options }: FetchClientTargetOptions): ClientTarget => ({
     kind: 'fetch',
     output,
-    generate: (contract: Contract) => generateFetchClient(contract, options),
+    generate: (contract: ApiDefinition) => generateFetchClient(contract, options),
 });

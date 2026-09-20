@@ -27,7 +27,7 @@ import { problemDetails, problemFromBody, type ProblemDetails } from './problem-
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
-import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
+import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ApiPlugins } from './plugin.js';
 import { resolvePluginServers } from './plugin-server.js';
 import {
     resolveResponseBody,
@@ -50,7 +50,7 @@ import {
     failedJobs,
 } from './job-dispatch.js';
 import { ProblemDetailsSchema } from './schemas.js';
-import type { Contract } from './contract.js';
+import type { ApiDefinition } from './api-definition.js';
 import type { JobTransport } from './job-transport.js';
 
 export type { ResponseHeaders, RouteDefinition, RoutePath, Routes, Method } from './types.js';
@@ -63,7 +63,7 @@ export {
     type PluginDeclaration,
     type PluginDefinition,
     type PluginRoutes,
-    type ContractPlugins,
+    type ApiPlugins,
     type PluginExportValues,
     type PluginArgs,
     type PluginRoutesOf,
@@ -118,8 +118,8 @@ export const REQUEST_CONTEXT_META: unique symbol = Symbol.for('ts-kizuna.request
 const CONTRACT_META: unique symbol = Symbol.for('ts-kizuna.contract');
 export const JOBS_META: unique symbol = Symbol.for('ts-kizuna.jobs') as symbol as typeof JOBS_META;
 
-export type ApiDefinition = { readonly [API_META]: true };
-export type ApiWithRouter<R extends Routes = Routes> = ApiDefinition & {
+export type ApiBrand = { readonly [API_META]: true };
+export type ApiWithRouter<R extends Routes = Routes> = ApiBrand & {
     /**
      * The api's route tree. Read it here rather than off the api object: the
      * api carries the parts that serve the routes, it is not the routes itself.
@@ -291,7 +291,7 @@ export const assembleApi = <const R extends Routes>(
         routes: R;
         securitySchemes?: Record<string, SecurityScheme>;
         guardSchema?: z.ZodType;
-        plugins?: ContractPlugins;
+        plugins?: ApiPlugins;
     },
     parts: ApiParts
 ): ApiWithRouter<R> => {
@@ -475,7 +475,7 @@ export const dispatchHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<Ro
         thunks[jobKey] = () => jobFn.run();
     }
     return (async () => {
-        const result = await dispatchDueJobs({ jobs: meta.jobs } as unknown as Contract, thunks, {
+        const result = await dispatchDueJobs({ jobs: meta.jobs } as unknown as ApiDefinition, thunks, {
             windowMs: meta.config?.windowMs,
             only: meta.config?.only,
             exclude: meta.config?.exclude,
@@ -537,7 +537,7 @@ export const runHandler = <HandlerContext>(meta: JobsMeta): RouteHandler<RouteDe
             return {
                 status: 404,
                 body: {
-                    detail: `No job named "${job}" on this contract.`,
+                    detail: `No job named "${job}" on this api.`,
                 },
             };
         }
@@ -605,7 +605,7 @@ export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';
 export { matchRoute } from './route-matcher.js';
-export { type ContractRouter } from './server-surface.js';
+export { type ApiRouter } from './server-surface.js';
 
 export type RouteMatcher = (method: string, path: string, routes: Routes, basePath?: string) => MatchResult;
 

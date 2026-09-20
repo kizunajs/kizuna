@@ -26,7 +26,7 @@ import {
     routeStreams,
     soleStreamResponse,
 } from '@ts-kizuna/core/generator';
-import type { Contract } from '@ts-kizuna/core';
+import type { ApiDefinition } from '@ts-kizuna/core';
 import { SwiftWriter, stringLiteral } from './emit.js';
 import {
     TypeRegistry,
@@ -349,7 +349,7 @@ const buildRouteMethod = (
     };
 };
 
-const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, _api: Contract) => {
+const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, _api: ApiDefinition) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
 
@@ -2216,7 +2216,7 @@ const emitClient = (
  *
  *   - `namespaceName`: the actor class. Defaults to `APIClient`.
  */
-export const generateSwiftClient = (api: Contract, options: SwiftConfig): string => {
+export const generateSwiftClient = (api: ApiDefinition, options: SwiftConfig): string => {
     const { namespaceName, camelCaseProperties = false, unknownEnumCase = false } = options;
 
     const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);

@@ -21,7 +21,7 @@ import {
     routeStreams,
     soleStreamResponse,
 } from '@ts-kizuna/core/generator';
-import type { Contract } from '@ts-kizuna/core';
+import type { ApiDefinition } from '@ts-kizuna/core';
 import { KotlinWriter, stringLiteral } from './emit.js';
 import {
     TypeRegistry,
@@ -337,7 +337,7 @@ const buildRouteMethod = (
     };
 };
 
-const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, _api: Contract) => {
+const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, _api: ApiDefinition) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
 
@@ -1844,7 +1844,7 @@ const emitClient = (
  *   - `namespaceName`: the object wrapping shared types.
  *   - `packageName`: optional package declaration for the generated file.
  */
-export const generateKotlinClient = (api: Contract, config: KotlinConfig): string => {
+export const generateKotlinClient = (api: ApiDefinition, config: KotlinConfig): string => {
     const { namespaceName, packageName, camelCaseProperties = false, unknownEnumCase = false } = config;
 
     const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);

@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { Contract, RoutesOf, SchemesOf, RequestContextOf, ContractPluginsOf, JobsOf } from './contract.js';
+import type { ApiDefinition, RoutesOf, SchemesOf, RequestContextOf, ApiPluginsOf, JobsOf } from './api-definition.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { CredentialOf } from './identity.js';
@@ -15,10 +15,10 @@ import { type GuardDeny, type GuardDenial, type GuardRun } from './adapter.js';
  * adapter's handler context substituted in. Adapter packages check their own
  * surface against this; an app types a handler by writing it on the route.
  */
-export type ContractRouter<C, HandlerContext> = C extends Contract
+export type ApiRouter<C, HandlerContext> = C extends ApiDefinition
     ? HandlersFromRoutes<
           RoutesOf<C>,
-          HandlerContext & RequestContextValues<RequestContextOf<C>> & PluginArgs<ContractPluginsOf<C>> & JobsArg<JobsOf<C>>,
+          HandlerContext & RequestContextValues<RequestContextOf<C>> & PluginArgs<ApiPluginsOf<C>> & JobsArg<JobsOf<C>>,
           SchemesOf<C>
       >
     : C extends Routes

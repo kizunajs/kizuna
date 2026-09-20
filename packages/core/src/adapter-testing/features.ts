@@ -10,7 +10,7 @@ export const ADAPTER_FEATURES = {
         summary: 'Methods sharing a path dispatch to their own handler.',
     },
     'routing.methodMismatch': {
-        summary: 'A method the contract does not declare on a known path is refused.',
+        summary: 'A method the api does not declare on a known path is refused.',
     },
     'routing.notFound': {
         summary: 'An undeclared path is refused.',

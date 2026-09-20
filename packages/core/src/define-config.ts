@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { assembleContract, type Contract } from './contract.js';
+import { buildApiDefinition, type ApiDefinition } from './api-definition.js';
 import { pluginRouteTree, pluginsBySlug, type PluginArgs, type PluginList, type PluginsBySlug } from './plugin.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { assertValidDeprecationDates } from './deprecation.js';
@@ -267,7 +267,7 @@ export type ConfiguredApi<
     GuardSchema extends z.ZodType | undefined,
     AdapterValue extends AnyAdapter | undefined,
 > = Api<
-    Contract<
+    ApiDefinition<
         RoutesWithHandlerContext<
             R,
             Identities,
@@ -355,7 +355,7 @@ export const defineConfig = <
     assertValidCache(routes);
     assertValidCache(pluginRouteTree(plugins));
 
-    const contract = assembleContract({
+    const contract = buildApiDefinition({
         routes,
         jobs,
         tags: options.tags as TagSet<Record<string, TagOptions>> | undefined,
@@ -365,7 +365,7 @@ export const defineConfig = <
         validation: options.validation?.issueCodes ? { issueCodes: options.validation.issueCodes } : undefined,
         plugins,
         jobsConfig: options.jobRunner,
-    }) as Contract;
+    }) as ApiDefinition;
 
     const guards = handlersOf(identities, GUARD);
     if (options.adapter !== undefined) {

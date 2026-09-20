@@ -22,7 +22,7 @@ import {
     isGuardDenial,
 } from '@ts-kizuna/core/adapter';
 import { contractOf } from '@ts-kizuna/core/adapter';
-import type { Contract, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
+import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from '@ts-kizuna/core';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from '@ts-kizuna/core/generator';
 import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
@@ -245,7 +245,7 @@ export const buildToolDefinitions = (routes: Routes): ToolDefinition[] => {
  * What a client puts in front of the model before it picks a tool.
  */
 export const buildInstructions = (
-    contract: Contract | undefined,
+    contract: ApiDefinition | undefined,
     definitions: readonly ToolDefinition[],
     authored: string | undefined
 ): string => {
@@ -586,7 +586,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     const guardSchema = (api as unknown as Record<typeof GUARD_SCHEMA_META, z.ZodType | undefined>)[GUARD_SCHEMA_META];
     const contextResolvers = (api as unknown as Record<typeof REQUEST_CONTEXT_META, RequestContextMap | undefined>)[REQUEST_CONTEXT_META];
 
-    const contract = contractOf<Contract | undefined>(api);
+    const contract = contractOf<ApiDefinition | undefined>(api);
 
     const definitions = buildToolDefinitions(api.routes);
 

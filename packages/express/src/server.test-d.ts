@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import type { HandlerContextOf, ContractRouter } from '@ts-kizuna/core/adapter';
+import type { HandlerContextOf, ApiRouter } from '@ts-kizuna/core/adapter';
 import type { Request } from 'express';
 import type { RouteDefinition } from '@ts-kizuna/core';
 import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
@@ -75,7 +75,7 @@ const localAnalytics = k.requestContext({
  * The handler tree for a contract, with this adapter's handler context, which is
  * what every `handler.*` and `guards.*` feature below is checked against.
  */
-type Handlers<C> = ContractRouter<C, ExpressHandlerContext>;
+type Handlers<C> = ApiRouter<C, ExpressHandlerContext>;
 
 test('conforms to the shared adapter type catalogue', () => {
     checkAdapterTypeFeatures('express', {

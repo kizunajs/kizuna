@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
-import type { Contract } from '@ts-kizuna/core';
+import type { ApiDefinition } from '@ts-kizuna/core';
 import { loadConfig } from './load-config.js';
 import { diffApis, type Change } from './diff-apis.js';
 
@@ -55,7 +55,7 @@ export const diffAgainst = async (ref: string, configPath: string, options: Diff
         const after = await loadConfig(absolute, { exportName });
         if (after === undefined) throw new Error(`No \`${exportName}\` export in ${configPath}`);
 
-        return diffApis(before as Contract, after as Contract);
+        return diffApis(before as ApiDefinition, after as ApiDefinition);
     } finally {
         try {
             git(root, 'worktree', 'remove', '--force', worktree);

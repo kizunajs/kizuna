@@ -123,7 +123,7 @@ export const createPlugin = <Props, const R extends PluginRoutes, const Slug ext
  * Plugins keyed by their slug, which is what `plugins.*` in handler args
  * resolves against.
  */
-export type ContractPlugins = Record<string, AnyPlugin>;
+export type ApiPlugins = Record<string, AnyPlugin>;
 
 /**
  * Any plugin, whatever it declares. `serve` reads its own props, so a concrete
@@ -169,7 +169,7 @@ export type PluginPropsOf<Declaration> =
 export type PluginExportsOf<Declaration> =
     Declaration extends PluginDeclaration<infer _R, infer _P, infer Exports, string, infer _H> ? Exports : never;
 
-export type PluginExportValues<Plugins extends ContractPlugins> = {
+export type PluginExportValues<Plugins extends ApiPlugins> = {
     [Key in keyof Plugins]: PluginExportsOf<Plugins[Key]>;
 };
 
@@ -177,7 +177,7 @@ export type PluginExportValues<Plugins extends ContractPlugins> = {
  * The `plugins` handler argument, or nothing when no plugins are installed, so
  * handler args are unchanged without them.
  */
-export type PluginArgs<Plugins extends ContractPlugins> = string extends keyof Plugins
+export type PluginArgs<Plugins extends ApiPlugins> = string extends keyof Plugins
     ? unknown
     : [keyof Plugins] extends [never]
       ? unknown
@@ -189,7 +189,7 @@ export type PluginArgs<Plugins extends ContractPlugins> = string extends keyof P
  * Every plugin's routes as one tree, keyed by install name, for the adapter to
  * walk as it walks the api's own.
  */
-export const pluginRouteTree = (plugins: ContractPlugins | undefined): Routes => {
+export const pluginRouteTree = (plugins: ApiPlugins | undefined): Routes => {
     const tree: Record<string, unknown> = {};
     for (const [pluginKey, plugin] of Object.entries(plugins ?? {})) {
         tree[pluginKey] = plugin.routes;
@@ -210,8 +210,8 @@ export type PluginRouter<R extends PluginRoutes, HandlerContext> = {
 /**
  * Every plugin in a list, keyed by its own slug.
  */
-export const pluginsBySlug = (plugins: PluginList | undefined): ContractPlugins => {
+export const pluginsBySlug = (plugins: PluginList | undefined): ApiPlugins => {
     const bySlug: Record<string, unknown> = {};
     for (const plugin of plugins ?? []) bySlug[plugin.slug] = plugin;
-    return bySlug as ContractPlugins;
+    return bySlug as ApiPlugins;
 };

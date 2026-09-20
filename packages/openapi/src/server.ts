@@ -1,4 +1,4 @@
-import type { Contract } from '@ts-kizuna/core';
+import type { ApiDefinition } from '@ts-kizuna/core';
 import { contractOf, rawResponse } from '@ts-kizuna/core/adapter';
 import type { OpenApiPluginProps } from './plugin.js';
 import { renderOpenApi } from './generator.js';
@@ -24,7 +24,7 @@ const sent = (body: string, contentType: string): Response =>
  * document itself where the declaration published it.
  */
 export const openApiServe = (props: OpenApiPluginProps<string>, api: unknown) => {
-    const spec = renderOpenApi(contractOf<Contract>(api), props);
+    const spec = renderOpenApi(contractOf<ApiDefinition>(api), props);
 
     return {
         router: {

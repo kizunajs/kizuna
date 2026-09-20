@@ -14,13 +14,13 @@ import { generateSwiftClient } from '@ts-kizuna/swift';
 ## Parameters
 
 ```ts
-generateSwiftClient(api: Contract, config: SwiftConfig): string
+generateSwiftClient(api: ApiDefinition, config: SwiftConfig): string
 ```
 
-| Parameter | Type          | Description                                                    |
-| --------- | ------------- | -------------------------------------------------------------- |
-| `api`     | `Contract`    | The `api` from [`defineConfig`](/docs/reference/define-config) |
-| `config`  | `SwiftConfig` | Generation configuration                                       |
+| Parameter | Type            | Description                                                    |
+| --------- | --------------- | -------------------------------------------------------------- |
+| `api`     | `ApiDefinition` | The `api` from [`defineConfig`](/docs/reference/define-config) |
+| `config`  | `SwiftConfig`   | Generation configuration                                       |
 
 ## `SwiftConfig`
 

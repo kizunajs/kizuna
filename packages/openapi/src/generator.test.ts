@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
-import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { Kizuna, type ApiDefinition } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
 import { renderOpenApi } from './generator.js';
@@ -20,7 +20,7 @@ const config = {
     tags: kTags,
 };
 
-const generateJson = (contract: Contract, options: GenerateOpenApiOptions) => renderOpenApi(contract, options)('json');
+const generateJson = (contract: ApiDefinition, options: GenerateOpenApiOptions) => renderOpenApi(contract, options)('json');
 
 expect.extend({
     toBeAValidOpenAPIDefinition,

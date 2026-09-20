@@ -1,4 +1,4 @@
-import type { ClientTarget, Contract } from '@ts-kizuna/core';
+import type { ClientTarget, ApiDefinition } from '@ts-kizuna/core';
 import { generateOpenApi } from './generator.js';
 import type { GenerateOpenApiOptions } from './types.js';
 
@@ -22,7 +22,7 @@ export interface OpenApiDocumentOptions extends Partial<GenerateOpenApiOptions> 
 export const openApiDocument = ({ output, ...overrides }: OpenApiDocumentOptions): ClientTarget => ({
     kind: 'openapi',
     output,
-    generate: (contract: Contract) => {
+    generate: (contract: ApiDefinition) => {
         const render = generateOpenApi(contract, overrides);
         return output.endsWith('.json') ? `${JSON.stringify(render('json'), null, 4)}\n` : render('yaml');
     },

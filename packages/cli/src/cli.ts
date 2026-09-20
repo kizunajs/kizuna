@@ -2,7 +2,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { apiEntries, type ClientTarget, type Contract } from '@ts-kizuna/core';
+import { apiEntries, type ClientTarget, type ApiDefinition } from '@ts-kizuna/core';
 import { createJiti } from 'jiti';
 import { ConfigSyntaxError, generateConfigTypes } from './generate-types.js';
 import { checkClients, formatStale, writeClients } from './generate-clients.js';
@@ -40,7 +40,7 @@ const die: (message: string, code?: number) => never = (message, code = 1) => {
  */
 const loadConfig = async (
     configPath: string
-): Promise<{ api: Contract; clients: readonly ClientTarget[]; typesOutput: string | undefined }> => {
+): Promise<{ api: ApiDefinition; clients: readonly ClientTarget[]; typesOutput: string | undefined }> => {
     const jiti = createJiti(import.meta.url, {
         interopDefault: true,
     });

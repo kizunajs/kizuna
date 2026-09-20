@@ -2,7 +2,7 @@ import { flattenRoutes } from './handler-pipeline.js';
 import { flattenJobs, isCompiledJob, jobAt, type CompiledJob, type FlattenedJob, type Jobs } from './jobs.js';
 import { parsePath } from './path-params.js';
 import type { Routes, RouteDefinition } from './types.js';
-import type { Contract } from './contract.js';
+import type { ApiDefinition } from './api-definition.js';
 
 export type { Routes, RouteDefinition };
 export { flattenJobs, isCompiledJob, jobAt };
@@ -113,12 +113,12 @@ export const createGenerator =
     <Options, Output>(
         factory: (
             options: Options,
-            contract: Contract
+            contract: ApiDefinition
         ) => {
             processRoute: (context: GeneratorRouteContext) => void;
             finalize: () => Output;
         }
-    ): ((contract: Contract, options: Options) => Output) =>
+    ): ((contract: ApiDefinition, options: Options) => Output) =>
     (contract, options) => {
         const { processRoute, finalize } = factory(options, contract);
         for (const { routeKey, route, routeTags } of flattenRoutes(contract.routes)) {

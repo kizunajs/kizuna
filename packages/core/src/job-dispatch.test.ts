@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
-import type { Contract } from './contract.js';
+import type { ApiDefinition } from './api-definition.js';
 import { dispatchDueJobs, dispatchSucceeded, dueJobs } from './job-dispatch.js';
 
 interface Config {
@@ -53,7 +53,7 @@ const contract = defineConfig({
         }),
     }),
     jobs,
-}).api as unknown as Contract;
+}).api as unknown as ApiDefinition;
 
 const at = (iso: string): Date => new Date(iso);
 
@@ -84,7 +84,7 @@ describe('dueJobs', () => {
         const bare = defineConfig({
             ...config,
             routes: k.routes({}),
-        }).api as unknown as Contract;
+        }).api as unknown as ApiDefinition;
         expect(dueJobs(bare, { at: at('2026-08-05T05:00:00Z') })).toEqual([]);
     });
 });
@@ -167,7 +167,7 @@ describe('dispatchDueJobs', () => {
         const bare = defineConfig({
             ...config,
             routes: k.routes({}),
-        }).api as unknown as Contract;
+        }).api as unknown as ApiDefinition;
         const result = await dispatchDueJobs(bare, {}, { at: at('2026-08-05T05:00:00Z') });
         expect(result.due).toEqual([]);
         expect(dispatchSucceeded(result)).toBe(true);

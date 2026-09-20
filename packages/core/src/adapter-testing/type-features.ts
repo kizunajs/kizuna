@@ -50,7 +50,7 @@ export const ADAPTER_TYPE_FEATURES = {
         summary: 'A resolver’s return is checked against its schema.',
     },
     'requestContext.unknownKey': {
-        summary: 'A context key the contract does not declare is refused.',
+        summary: 'A context key the api does not declare is refused.',
     },
     'plugins.exportsTyped': {
         summary: 'A handler’s `plugins` carries each installed plugin’s exports, typed and keyed by install name.',

@@ -25,7 +25,7 @@ import {
     cacheHeaders,
 } from '@ts-kizuna/core/generator';
 import { getStatusText } from '@ts-kizuna/core';
-import type { Contract, RequiredPermissions, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
+import type { ApiDefinition, RequiredPermissions, SecurityRequirement, TagOptions } from '@ts-kizuna/core';
 import { OPENAPI_PLUGIN_SLUG } from './plugin.js';
 import type { StreamResponseDefinition } from '@ts-kizuna/core';
 import type {
@@ -233,7 +233,7 @@ const deriveHeadOperation = (getOperation: OpenApiOperation): OpenApiOperation =
     return operation;
 };
 
-const openApiGenerator = createGenerator((options: GeneratorContext, api: Contract) => {
+const openApiGenerator = createGenerator((options: GeneratorContext, api: ApiDefinition) => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
 
     return {
@@ -534,7 +534,7 @@ const requiresExtension = (requires: RequiredPermissions): Record<string, string
  * Whether a scheme is a `custom` identity: registered, but with no OpenAPI scheme
  * to emit. Dropped from `security`, surfaced under `x-kizuna-guarded`.
  */
-const isCustomScheme = (name: string, api: Contract): boolean => {
+const isCustomScheme = (name: string, api: ApiDefinition): boolean => {
     const scheme = api.securitySchemes?.[name];
     return scheme !== undefined && scheme.openapi === undefined;
 };
@@ -544,7 +544,7 @@ const isCustomScheme = (name: string, api: Contract): boolean => {
  * to the OpenAPI `operation.security` shape. Any `custom` scheme is dropped (see
  * {@link isCustomScheme}); a requirement object left empty is omitted.
  */
-const toOpenApiSecurity = (security: readonly SecurityRequirement[], api: Contract): Array<Record<string, string[]>> => {
+const toOpenApiSecurity = (security: readonly SecurityRequirement[], api: ApiDefinition): Array<Record<string, string[]>> => {
     const emittedName = (name: string): string => api.securitySchemes?.[name]?.scheme ?? name;
     const result: Array<Record<string, string[]>> = [];
     for (const entry of security) {
@@ -564,7 +564,7 @@ const toOpenApiSecurity = (security: readonly SecurityRequirement[], api: Contra
  * The `custom` schemes guarding a route, in their registered names, for the
  * `x-kizuna-guarded` extension.
  */
-const customGuardsFor = (security: readonly SecurityRequirement[], api: Contract): string[] => {
+const customGuardsFor = (security: readonly SecurityRequirement[], api: ApiDefinition): string[] => {
     const emittedName = (name: string): string => api.securitySchemes?.[name]?.scheme ?? name;
     const names: string[] = [];
     for (const entry of security) {
@@ -580,7 +580,7 @@ const customGuardsFor = (security: readonly SecurityRequirement[], api: Contract
  * Build the `components.securitySchemes` object from the identities registered
  * on the api. Each contributes its OpenAPI definition under its name.
  */
-const buildSecuritySchemes = (api: Contract): Record<string, unknown> | undefined => {
+const buildSecuritySchemes = (api: ApiDefinition): Record<string, unknown> | undefined => {
     const schemes = api.securitySchemes;
     if (!schemes || Object.keys(schemes).length === 0) return undefined;
     const result: Record<string, unknown> = {};
@@ -592,13 +592,13 @@ const buildSecuritySchemes = (api: Contract): Record<string, unknown> | undefine
     return Object.keys(result).length > 0 ? result : undefined;
 };
 
-const buildTagLookup = (api: Contract): ReadonlyMap<string, TagOptions> => new Map(Object.entries(api.tags?.tags ?? {}));
+const buildTagLookup = (api: ApiDefinition): ReadonlyMap<string, TagOptions> => new Map(Object.entries(api.tags?.tags ?? {}));
 
 /**
  * Document-level tag definitions from the api's declared tag set, one
  * entry per declared tag, in declaration order, named by its `title`.
  */
-const tagsFromApi = (api: Contract): OpenApiTag[] => {
+const tagsFromApi = (api: ApiDefinition): OpenApiTag[] => {
     const declared = api.tags?.tags;
     if (!declared) return [];
     const tags: OpenApiTag[] = [];
@@ -614,7 +614,7 @@ const tagsFromApi = (api: Contract): OpenApiTag[] => {
 /**
  * So a build step does not restate the options and drift from what is served.
  */
-const optionsFromInstalledPlugin = (api: Contract): GenerateOpenApiOptions => {
+const optionsFromInstalledPlugin = (api: ApiDefinition): GenerateOpenApiOptions => {
     for (const declaration of Object.values(api.plugins ?? {})) {
         if (declaration.slug === OPENAPI_PLUGIN_SLUG) return declaration.props as unknown as GenerateOpenApiOptions;
     }
@@ -624,7 +624,7 @@ const optionsFromInstalledPlugin = (api: Contract): GenerateOpenApiOptions => {
 /**
  * Render from options held directly, for the plugin's own routes.
  */
-export function renderOpenApi(api: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
+export function renderOpenApi(api: ApiDefinition, options: GenerateOpenApiOptions): OpenApiRenderer {
     const renderer = openApiGenerator(api, {
         ...options,
         tagLookup: buildTagLookup(api),
@@ -644,7 +644,7 @@ export function renderOpenApi(api: Contract, options: GenerateOpenApiOptions): O
  * Pass `overrides` for what only a build step knows, such as the public
  * `servers` list.
  */
-export function generateOpenApi(api: Contract, overrides?: Partial<GenerateOpenApiOptions>): OpenApiRenderer {
+export function generateOpenApi(api: ApiDefinition, overrides?: Partial<GenerateOpenApiOptions>): OpenApiRenderer {
     const options = optionsFromInstalledPlugin(api);
     return renderOpenApi(api, overrides ? { ...options, ...overrides } : options);
 }

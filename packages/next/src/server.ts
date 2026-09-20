@@ -312,9 +312,9 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
     const handler = async (request: NextRequest) => {
         if (hasPluginRoutes) {
             const pathname = new URL(request.url).pathname;
-            const claimedByContract = matchRoute(request.method, pathname, api.routes, options?.basePath).kind === 'matched';
+            const claimedByApi = matchRoute(request.method, pathname, api.routes, options?.basePath).kind === 'matched';
 
-            if (!claimedByContract && matchRoute(request.method, pathname, pluginRoutes, options?.basePath).kind === 'matched') {
+            if (!claimedByApi && matchRoute(request.method, pathname, pluginRoutes, options?.basePath).kind === 'matched') {
                 return handleNextRequest(
                     request,
                     pluginRoutes,

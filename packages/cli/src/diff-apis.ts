@@ -1,4 +1,4 @@
-import type { Contract, RouteDefinition } from '@ts-kizuna/core';
+import type { ApiDefinition, RouteDefinition } from '@ts-kizuna/core';
 import { createGenerator, flattenJobs, toToolName } from '@ts-kizuna/core/generator';
 import { flattenRoutes } from '@ts-kizuna/core/adapter';
 import { resolveResponseBody } from '@ts-kizuna/core/generator';
@@ -63,7 +63,7 @@ const sunsetOf = (route: RouteDefinition): string | undefined => {
     return typeof declared === 'string' ? declared : declared.date;
 };
 
-const jobKeys = (contract: Contract): Set<string> => {
+const jobKeys = (contract: ApiDefinition): Set<string> => {
     const jobs = (contract as { jobs?: unknown }).jobs;
     if (!jobs) return new Set();
     return new Set(flattenJobs(jobs as never).map((job) => job.jobKey));
@@ -72,7 +72,7 @@ const jobKeys = (contract: Contract): Set<string> => {
 /**
  * The MCP name of every route that publishes as a tool, keyed by route key.
  */
-const toolNames = (contract: Contract): Map<string, string> =>
+const toolNames = (contract: ApiDefinition): Map<string, string> =>
     new Map(
         flattenRoutes(contract.routes)
             .filter(({ route }) => route.tool !== undefined && route.tool !== false)
@@ -85,7 +85,7 @@ const toolNames = (contract: Contract): Map<string, string> =>
  * Compares the declarations rather than an OpenAPI document, so it sees route
  * keys, MCP tool names and job keys, none of which a document carries.
  */
-export const diffApis = (before: Contract, after: Contract): Change[] => {
+export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] => {
     const changes: Change[] = [];
 
     const beforeRoutes = routeFacts(before, {});

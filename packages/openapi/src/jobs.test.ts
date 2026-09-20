@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { Kizuna, type ApiDefinition } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 import { renderOpenApi } from './generator.js';
 
@@ -56,7 +56,7 @@ const contract = defineConfig({
     ...config,
     routes,
     jobs,
-}).api as unknown as Contract;
+}).api as unknown as ApiDefinition;
 
 const generate = () =>
     renderOpenApi(contract, {

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
-import type { Contract } from '@ts-kizuna/core';
+import type { ApiDefinition } from '@ts-kizuna/core';
 import { createServer as createHttpServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { startJobsDevRunner, type JobsDevRunner } from '@ts-kizuna/core/jobs';
@@ -124,7 +124,7 @@ describe('startJobsDevRunner', () => {
     it('ticks the dispatch endpoint against the running server', async () => {
         const started = await startServer();
         httpServer = started.httpServer;
-        runner = startJobsDevRunner(contract as unknown as Contract, {
+        runner = startJobsDevRunner(contract as unknown as ApiDefinition, {
             baseUrl: started.baseUrl,
             secret: 'cron-secret',
             logger: silentLogger,
@@ -138,7 +138,7 @@ describe('startJobsDevRunner', () => {
     it('surfaces the guard rejection when the secret is wrong', async () => {
         const started = await startServer();
         httpServer = started.httpServer;
-        runner = startJobsDevRunner(contract as unknown as Contract, {
+        runner = startJobsDevRunner(contract as unknown as ApiDefinition, {
             baseUrl: started.baseUrl,
             secret: 'wrong',
             logger: silentLogger,
@@ -157,7 +157,7 @@ describe('startJobsDevRunner', () => {
             warn: vi.fn(),
             error: vi.fn(),
         };
-        runner = startJobsDevRunner(contract as unknown as Contract, {
+        runner = startJobsDevRunner(contract as unknown as ApiDefinition, {
             baseUrl: started.baseUrl,
             logger,
         });
@@ -175,7 +175,7 @@ describe('startJobsDevRunner', () => {
             error: vi.fn(),
         };
         try {
-            runner = startJobsDevRunner(contract as unknown as Contract, {
+            runner = startJobsDevRunner(contract as unknown as ApiDefinition, {
                 baseUrl: started.baseUrl,
                 logger,
             });
@@ -189,7 +189,7 @@ describe('startJobsDevRunner', () => {
         const started = await startServer();
         httpServer = started.httpServer;
         const onTick = vi.fn();
-        runner = startJobsDevRunner(contract as unknown as Contract, {
+        runner = startJobsDevRunner(contract as unknown as ApiDefinition, {
             baseUrl: started.baseUrl,
             secret: 'cron-secret',
             intervalMs: 20,

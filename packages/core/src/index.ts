@@ -10,20 +10,20 @@ export {
     type RouteAuthRule,
 } from './kizuna.js';
 export {
-    type Contract,
+    type ApiDefinition,
     type RoutesOf,
     type SchemesOf,
     type RequestContextOf,
-    type ContractPluginsOf,
+    type ApiPluginsOf,
     type JobsOf,
     type GuardSchemaOf,
-} from './contract.js';
+} from './api-definition.js';
 export {
     createPlugin,
     type PluginDeclaration,
     type PluginDefinition,
     type PluginRoutes,
-    type ContractPlugins,
+    type ApiPlugins,
     type PluginExportValues,
     type PluginArgs,
     type PluginRoutesOf,

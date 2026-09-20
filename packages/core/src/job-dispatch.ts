@@ -1,6 +1,6 @@
 import { dueSchedules, type JobSchedule } from './schedule.js';
 import { flattenJobs } from './jobs.js';
-import type { Contract } from './contract.js';
+import type { ApiDefinition } from './api-definition.js';
 import { ProblemDetailsSchema } from './schemas.js';
 import { z } from 'zod';
 
@@ -50,7 +50,7 @@ export interface DispatchResult {
 /**
  * The jobs an api has due as of a tick.
  */
-export const dueJobs = (contract: Contract, options?: DispatchOptions): string[] => {
+export const dueJobs = (contract: ApiDefinition, options?: DispatchOptions): string[] => {
     const schedules: Record<string, JobSchedule> = {};
     for (const { jobKey, job } of flattenJobs(contract.jobs ?? {})) {
         if (options?.only && !options.only.includes(jobKey)) continue;
@@ -76,7 +76,7 @@ export const dueJobs = (contract: Contract, options?: DispatchOptions): string[]
  * });
  */
 export const dispatchDueJobs = async (
-    contract: Contract,
+    contract: ApiDefinition,
     handlers: Record<string, () => Promise<unknown> | unknown>,
     options?: DispatchOptions
 ): Promise<DispatchResult> => {

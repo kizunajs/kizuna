@@ -8,7 +8,7 @@ export class UndeclaredResponseError extends Error {
     readonly headers: Record<string, string>;
 
     constructor(routeKey: string, status: number, body: unknown, headers: Record<string, string>) {
-        super(`${routeKey} responded ${status}, which its contract does not declare.`);
+        super(`${routeKey} responded ${status}, which its api does not declare.`);
         this.name = 'UndeclaredResponseError';
         this.status = status;
         this.body = body;

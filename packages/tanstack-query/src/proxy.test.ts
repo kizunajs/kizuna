@@ -209,7 +209,7 @@ describe('declared statuses', () => {
         expect(result).toEqual({ status: 404, body: { title: 'Not found' }, headers: {} });
     });
 
-    it('throws on a status the contract does not declare', async () => {
+    it('throws on a status the api does not declare', async () => {
         const api = buildApi(buildClient({ status: 500, body: { message: 'boom' }, headers: { 'x-trace': 'abc' } }));
 
         const promise = runQueryFn(api.users.getUser.queryOptions({ input: { params: { id: '1' } } }));
@@ -226,7 +226,7 @@ describe('declared statuses', () => {
         const api = buildApi(buildClient({ status: 503, body: undefined, headers: {} }));
 
         await expect(runQueryFn(api.users.getUser.queryOptions({ input: { params: { id: '1' } } }))).rejects.toThrow(
-            'users.getUser responded 503, which its contract does not declare.'
+            'users.getUser responded 503, which its api does not declare.'
         );
     });
 

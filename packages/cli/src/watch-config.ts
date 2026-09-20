@@ -1,6 +1,6 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { Contract } from '@ts-kizuna/core';
+import type { ApiDefinition } from '@ts-kizuna/core';
 import { loadConfig } from './load-config.js';
 import { apiNotices, type Notice } from './api-notices.js';
 
@@ -8,7 +8,7 @@ import { apiNotices, type Notice } from './api-notices.js';
  * What a watcher reports each time it reloads.
  */
 export interface ConfigChange {
-    api: Contract;
+    api: ApiDefinition;
     /**
      * The file whose change triggered this reload, absent on the first load.
      */

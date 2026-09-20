@@ -138,7 +138,7 @@ describe('plugin lane', () => {
         const collidingKConfig = {
             tags: collidingKTags,
         };
-        // Contract time, because the plugins are on the kizuna instance that built it.
+        // ApiDefinition time, because the plugins are on the kizuna instance that built it.
         expect(
             () =>
                 defineConfig({

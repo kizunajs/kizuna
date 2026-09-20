@@ -1,4 +1,4 @@
-import type { Contract } from './contract.js';
+import type { ApiDefinition } from './api-definition.js';
 
 /**
  * A client generated from a config, created by its generator's own factory so
@@ -19,7 +19,7 @@ export interface ClientTarget {
     /**
      * Renders the file this target writes.
      */
-    readonly generate: (contract: Contract) => string;
+    readonly generate: (contract: ApiDefinition) => string;
 }
 
 /**
@@ -27,7 +27,7 @@ export interface ClientTarget {
  * what is generated from it.
  */
 export interface ApiEntry {
-    api: Contract;
+    api: ApiDefinition;
     clients?: readonly ClientTarget[];
     /**
      * Where `kizuna generate` writes the `Config`. Absent when the config says

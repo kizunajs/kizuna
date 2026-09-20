@@ -268,10 +268,10 @@ export type RoutesWithHandlerContext<
     R extends Routes,
     Identities,
     RequestContext,
-    ContractContext = unknown,
+    ApiContext = unknown,
     GuardBody_ = ProblemDetails,
     GuardWritten_ = { detail: string },
-> = R & HandlerContextOverlay<R, Identities, RequestContextValues<RequestContext> & ContractContext, GuardBody_, GuardWritten_>;
+> = R & HandlerContextOverlay<R, Identities, RequestContextValues<RequestContext> & ApiContext, GuardBody_, GuardWritten_>;
 
 export type BrandedHandlerContext<R> = typeof HANDLER_CONTEXT_BRAND extends keyof R ? NonNullable<R[typeof HANDLER_CONTEXT_BRAND]> : {};
 

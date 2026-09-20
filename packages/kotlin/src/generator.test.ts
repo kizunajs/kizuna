@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { Kizuna, type ApiDefinition } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 import { generateKotlinClient } from './generator.js';
 
@@ -744,7 +744,7 @@ describe('Kotlin generator: @Deprecated', () => {
         routes: deprecationRoutes,
     }).api;
 
-    const generate = (routes: Contract['routes']): string => generateKotlinClient({ routes } as Contract, baseConfig);
+    const generate = (routes: ApiDefinition['routes']): string => generateKotlinClient({ routes } as ApiDefinition, baseConfig);
 
     it('emits @Deprecated on a deprecated route method', () => {
         const output = generate({ getUserById: deprecatedContract.routes.getUserById });
@@ -1778,7 +1778,7 @@ describe('Kotlin generator: unknownEnumCase', () => {
         unknownEnumCase: true,
     };
 
-    const enumContract = (values: [string, ...string[]]): Contract =>
+    const enumContract = (values: [string, ...string[]]): ApiDefinition =>
         defineConfig({
             routes: {
                 getOrder: {

@@ -1,4 +1,4 @@
-import { PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ContractPlugins } from './plugin.js';
+import { PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ApiPlugins } from './plugin.js';
 import type { Routes } from './types.js';
 
 /**
@@ -38,7 +38,7 @@ export const pluginExportsOf = (api: unknown): Record<string, unknown> => {
  * `serve` receives it.
  */
 export const resolvePluginServers = (
-    plugins: ContractPlugins | undefined,
+    plugins: ApiPlugins | undefined,
     api: unknown
 ): Record<string, { router: Record<string, unknown>; exports?: unknown }> => {
     const resolved: Record<string, { router: Record<string, unknown>; exports?: unknown }> = {};

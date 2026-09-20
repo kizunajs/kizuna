@@ -1,4 +1,4 @@
-import type { ClientTarget, Contract } from '@ts-kizuna/core';
+import type { ClientTarget, ApiDefinition } from '@ts-kizuna/core';
 import { generateKotlinClient } from './generator.js';
 
 /**
@@ -44,7 +44,7 @@ export interface KotlinClientOptions {
 export const kotlinClient = (options: KotlinClientOptions): ClientTarget => ({
     kind: 'kotlin',
     output: options.output,
-    generate: (contract: Contract) =>
+    generate: (contract: ApiDefinition) =>
         generateKotlinClient(contract, {
             namespaceName: options.namespace ?? 'API',
             packageName: options.package,

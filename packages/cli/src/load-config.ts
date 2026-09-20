@@ -1,5 +1,5 @@
 import { createJiti } from 'jiti';
-import type { Contract } from '@ts-kizuna/core';
+import type { ApiDefinition } from '@ts-kizuna/core';
 
 export interface LoadConfigOptions {
     /**
@@ -21,8 +21,8 @@ export interface LoadConfigOptions {
     reread?: readonly string[];
 }
 
-const isContract = (value: unknown): value is Contract =>
-    typeof value === 'object' && value !== null && typeof (value as Contract).routes === 'object';
+const isApiDefinition = (value: unknown): value is ApiDefinition =>
+    typeof value === 'object' && value !== null && typeof (value as ApiDefinition).routes === 'object';
 
 const cacheOf = (jiti: unknown): Record<string, unknown> => (jiti as { cache?: Record<string, unknown> }).cache ?? {};
 
@@ -34,7 +34,7 @@ const cacheOf = (jiti: unknown): Record<string, unknown> => (jiti as { cache?: R
 export const loadConfig = async (
     contractPath: string,
     exportNameOrOptions: string | LoadConfigOptions = 'api'
-): Promise<Contract | undefined> => {
+): Promise<ApiDefinition | undefined> => {
     const options = typeof exportNameOrOptions === 'string' ? { exportName: exportNameOrOptions } : exportNameOrOptions;
     const { exportName = 'api', files, reread } = options;
 
@@ -49,7 +49,7 @@ export const loadConfig = async (
     // The cache is shared across instances and outlives this call, so only what
     // this load put there counts as the api's own graph.
     const before = new Set(Object.keys(cache));
-    const loaded = (await jiti.import(contractPath)) as Record<string, Contract | undefined> | undefined;
+    const loaded = (await jiti.import(contractPath)) as Record<string, ApiDefinition | undefined> | undefined;
 
     if (files) {
         files.push(...Object.keys(cache).filter((file) => !file.includes('node_modules') && (!before.has(file) || evicted.has(file))));
@@ -61,5 +61,5 @@ export const loadConfig = async (
 
     // `interopDefault` hands back the namespace when a module has no default,
     // so a module without a config would otherwise look like one.
-    return isContract(candidate) ? candidate : undefined;
+    return isApiDefinition(candidate) ? candidate : undefined;
 };

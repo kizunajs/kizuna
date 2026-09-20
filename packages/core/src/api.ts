@@ -1,12 +1,12 @@
 import { HANDLER } from './types.js';
 import type { z } from 'zod';
-import { assembleContract, type Contract } from './contract.js';
+import type { ApiDefinition } from './api-definition.js';
 import { assembleApi, routerFromRoutes, warnUnsupportedJobOptions, JOBS_META, type ApiParts, type ApiWithRouter } from './adapter.js';
 import type { AnyAdapter, MountArgsOf, MountedOf } from './adapter.js';
 import type { Jobs, JobsConfig } from './jobs.js';
 import type { JobTransport } from './job-transport.js';
 import type { JobErrorHandler } from './job-runner.js';
-import type { ContractPlugins } from './plugin.js';
+import type { ApiPlugins } from './plugin.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { TagSet, TagOptions } from './tags.js';
@@ -16,7 +16,7 @@ import type { RequestContextSchema } from './request-context.js';
  * What an api answers on, and how it reaches a framework: the definition it was
  * assembled from, plus `mount`.
  */
-export type Api<C extends Contract, AdapterValue> = C &
+export type Api<C extends ApiDefinition, AdapterValue> = C &
     ApiWithRouter<C['routes']> & {
         /**
          * Register every route on the framework the adapter serves.
@@ -77,7 +77,7 @@ const handlersFrom = (declarations: Record<string, unknown>): Record<string, unk
  * mounts. The handlers come from the routes, jobs and tools themselves.
  */
 export const buildApi = (
-    contract: Contract,
+    contract: ApiDefinition,
     implementations: ApiImplementations,
     adapter: AnyAdapter | undefined
 ): Record<string, unknown> => {
@@ -114,10 +114,10 @@ export const buildApi = (
 /**
  * What a config declares, before anything serves it.
  */
-export interface ApiDeclaration<R extends Routes, J extends Jobs, P extends ContractPlugins> {
+export interface ApiDeclaration<R extends Routes, J extends Jobs, P extends ApiPlugins> {
     routes: R;
     jobs?: J;
     plugins?: P;
 }
 
-export { assembleContract };
+export { assembleApi };

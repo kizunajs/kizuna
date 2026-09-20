@@ -255,14 +255,14 @@ describe('the run endpoint', () => {
         expect(reconcileRan).not.toHaveBeenCalled();
     });
 
-    it('answers 404 for a job the contract does not declare', async () => {
+    it('answers 404 for a job the api does not declare', async () => {
         const response = await run({
             job: 'nope',
         });
         expect(response.status).toBe(404);
         expect(response.body).toMatchObject({
             status: 404,
-            detail: 'No job named "nope" on this contract.',
+            detail: 'No job named "nope" on this api.',
         });
     });
 

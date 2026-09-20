@@ -3,13 +3,13 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { watchConfig, type ConfigChange } from './watch-config.js';
-import type { Contract, RouteDefinition, Routes } from '@ts-kizuna/core';
+import type { ApiDefinition, RouteDefinition, Routes } from '@ts-kizuna/core';
 
 /**
- * `Contract['routes']` is a tree, so a group reads as `Routes | RouteDefinition`.
+ * `ApiDefinition['routes']` is a tree, so a group reads as `Routes | RouteDefinition`.
  * The fixture knows its own shape.
  */
-const routePath = (contract: Contract | undefined, group: string, route: string): string | undefined => {
+const routePath = (contract: ApiDefinition | undefined, group: string, route: string): string | undefined => {
     const groupRoutes = contract?.routes[group] as Routes | undefined;
     return (groupRoutes?.[route] as RouteDefinition | undefined)?.path;
 };

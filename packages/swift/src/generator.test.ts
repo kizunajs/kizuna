@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, type Contract } from '@ts-kizuna/core';
+import { Kizuna, type ApiDefinition } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 import { generateSwiftClient } from './generator.js';
 
@@ -1139,7 +1139,7 @@ describe('Swift generator: @available(*, deprecated)', () => {
         routes: deprecationRoutes,
     }).api;
 
-    const generate = (routes: Contract['routes']): string => generateSwiftClient({ routes } as Contract, baseConfig);
+    const generate = (routes: ApiDefinition['routes']): string => generateSwiftClient({ routes } as ApiDefinition, baseConfig);
 
     it('emits @available(*, deprecated) on a deprecated route method', () => {
         const output = generate({ getUserById: deprecatedContract.routes.getUserById });
@@ -1843,7 +1843,7 @@ describe('Swift generator: unknownEnumCase', () => {
         unknownEnumCase: true,
     };
 
-    const enumContract = (values: [string, ...string[]]): Contract => {
+    const enumContract = (values: [string, ...string[]]): ApiDefinition => {
         const contractRoutes = k.routes('api', {
             getOrder: k.route({
                 method: 'GET',
@@ -1887,7 +1887,7 @@ describe('Swift generator: unknownEnumCase', () => {
 });
 
 describe('Swift generator: union variants nest under their union', () => {
-    const collidingContract = (): Contract => {
+    const collidingContract = (): ApiDefinition => {
         const contractRoutes = k.routes('api', {
             getUser: k.route({
                 method: 'GET',

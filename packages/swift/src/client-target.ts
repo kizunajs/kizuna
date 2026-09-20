@@ -1,4 +1,4 @@
-import type { ClientTarget, Contract } from '@ts-kizuna/core';
+import type { ClientTarget, ApiDefinition } from '@ts-kizuna/core';
 import { generateSwiftClient } from './generator.js';
 
 /**
@@ -40,7 +40,7 @@ export interface SwiftClientOptions {
 export const swiftClient = (options: SwiftClientOptions): ClientTarget => ({
     kind: 'swift',
     output: options.output,
-    generate: (contract: Contract) =>
+    generate: (contract: ApiDefinition) =>
         generateSwiftClient(contract, {
             namespaceName: options.namespace ?? 'API',
             camelCaseProperties: options.camelCaseProperties,

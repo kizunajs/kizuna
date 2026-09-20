@@ -1,7 +1,7 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
-import type { HandlerContextOf, ContractRouter } from '@ts-kizuna/core/adapter';
+import type { HandlerContextOf, ApiRouter } from '@ts-kizuna/core/adapter';
 import type { Env } from 'hono';
 import type { GuardRun, RequestContextRun } from '@ts-kizuna/core/adapter';
 import {
@@ -80,7 +80,7 @@ const localAnalytics = k.requestContext({
  * The handler tree for a contract, with this adapter's handler context, which is
  * what every `handler.*` and `guards.*` feature below is checked against.
  */
-type Handlers<C> = ContractRouter<C, HonoHandlerContext>;
+type Handlers<C> = ApiRouter<C, HonoHandlerContext>;
 
 test('conforms to the shared adapter type catalogue', () => {
     checkAdapterTypeFeatures('hono', {
@@ -322,7 +322,7 @@ test('a request context resolver reads the Hono context', () => {
 
 test('the Env generic threads through the handler context', () => {
     expectTypeOf<HonoHandlerContext<SessionEnv>['c']['var']['sessionId']>().toEqualTypeOf<string>();
-    expectTypeOf<ContractRouter<typeof inferenceContract, HonoHandlerContext<SessionEnv>>['getUser']>()
+    expectTypeOf<ApiRouter<typeof inferenceContract, HonoHandlerContext<SessionEnv>>['getUser']>()
         .parameter(0)
         .toMatchTypeOf<HonoHandlerContext<SessionEnv>>();
 });

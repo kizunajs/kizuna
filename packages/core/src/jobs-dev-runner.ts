@@ -1,5 +1,5 @@
 import { DEFAULT_JOBS_PATH, flattenJobs } from './jobs.js';
-import type { Contract } from './contract.js';
+import type { ApiDefinition } from './api-definition.js';
 
 export interface JobsDevRunnerOptions {
     /**
@@ -60,7 +60,7 @@ const stripTrailingSlash = (url: string): string => (url.endsWith('/') ? url.sli
  *     });
  * }
  */
-export const startJobsDevRunner = (contract: Contract, options: JobsDevRunnerOptions): JobsDevRunner => {
+export const startJobsDevRunner = (contract: ApiDefinition, options: JobsDevRunnerOptions): JobsDevRunner => {
     const logger = options.logger ?? console;
     if (process.env.NODE_ENV === 'production') {
         logger.warn(
