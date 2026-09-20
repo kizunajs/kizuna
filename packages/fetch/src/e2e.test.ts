@@ -6,7 +6,15 @@ import type { Server, AddressInfo } from 'node:net';
 import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { KizunaClient, type Client } from '@ts-kizuna/fetch';
+import { createGeneratedClient, type Client, type ClientConfig, type GeneratedRoutes } from '@ts-kizuna/fetch';
+import type { Routes } from '@ts-kizuna/core';
+
+/**
+ * A client over an assembled api's routes, the same runtime the generated
+ * client uses.
+ */
+const apiClientFor = <T extends Routes>(api: { routes: T }, config: ClientConfig): Client<T> =>
+    createGeneratedClient(api.routes as unknown as GeneratedRoutes, config) as unknown as Client<T>;
 
 interface Config {
     adapter: ReturnType<typeof expressAdapter>;
@@ -117,7 +125,7 @@ describe('end-to-end: typed client → Express server', () => {
         });
 
         const address = server.address() as AddressInfo;
-        client = new KizunaClient(contract, {
+        client = apiClientFor(contract, {
             baseUrl: `http://localhost:${address.port}`,
         });
     });
@@ -218,7 +226,7 @@ describe('end-to-end: response headers', () => {
         });
 
         const address = server.address() as AddressInfo;
-        client = new KizunaClient(contractWithResponseHeaders, {
+        client = apiClientFor(contractWithResponseHeaders, {
             baseUrl: `http://localhost:${address.port}`,
         });
     });
@@ -325,7 +333,7 @@ describe('end-to-end: typed client → secured Express route', () => {
     });
 
     it('round-trips with the credential in baseHeaders', async () => {
-        const client = new KizunaClient(securedContract, {
+        const client = apiClientFor(securedContract, {
             baseUrl,
             baseHeaders: {
                 authorization: 'Bearer tok_ada',
@@ -339,7 +347,7 @@ describe('end-to-end: typed client → secured Express route', () => {
     });
 
     it('surfaces the 401 the auth map put on the route, which it never declared', async () => {
-        const client = new KizunaClient(securedContract, {
+        const client = apiClientFor(securedContract, {
             baseUrl,
         });
         const response = await client.api.whoAmI();

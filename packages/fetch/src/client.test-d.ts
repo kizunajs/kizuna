@@ -3,7 +3,25 @@ import { z } from 'zod';
 import { Kizuna, type ProblemDetails, type ValidationError } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
 import { ProblemDetailsSchema } from '@ts-kizuna/core/schemas';
-import { KizunaClient } from './client.js';
+import { createGeneratedClient, type Client, type ClientConfig, type ContextHeaderInputs, type GeneratedRoutes } from './client.js';
+import type { ApiDefinition, RequestContextSchema, Routes, SecurityScheme, TagOptions } from '@ts-kizuna/core';
+
+/**
+ * A client over an assembled api's routes, the same runtime the generated
+ * client uses.
+ */
+const apiClientFor = <
+    T extends Routes,
+    Codes extends string = never,
+    Schemes extends Record<string, SecurityScheme> = Record<string, never>,
+    RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+>(
+    api: ApiDefinition<T, Record<string, TagOptions>, Codes, Schemes, RequestContext>,
+    config: ClientConfig &
+        ({} extends ContextHeaderInputs<RequestContext>
+            ? { requestContext?: ContextHeaderInputs<RequestContext> }
+            : { requestContext: ContextHeaderInputs<RequestContext> })
+): Client<T, Codes> => createGeneratedClient(api.routes as unknown as GeneratedRoutes, config) as unknown as Client<T, Codes>;
 
 interface Config {
     tags: typeof kTags;
@@ -252,7 +270,7 @@ const voidBodyContract = defineConfig({
     routes: voidBodyContractRoutes,
 }).api;
 
-const voidBodyClient = new KizunaClient(voidBodyContract, {
+const voidBodyClient = apiClientFor(voidBodyContract, {
     baseUrl: 'http://localhost:3000',
 });
 
@@ -313,11 +331,11 @@ const nestedContract = defineConfig({
     routes: nestedContractRoutes,
 }).api;
 
-const nestedClient = new KizunaClient(nestedContract, {
+const nestedClient = apiClientFor(nestedContract, {
     baseUrl: 'http://localhost:3000',
 });
 
-const client = new KizunaClient(contract, {
+const client = apiClientFor(contract, {
     baseUrl: 'http://localhost:3000',
 });
 
@@ -654,7 +672,7 @@ const pathParamsContract = defineConfig({
     routes: pathParamsContractRoutes,
 }).api;
 
-const pathParamsClient = new KizunaClient(pathParamsContract, {
+const pathParamsClient = apiClientFor(pathParamsContract, {
     baseUrl: 'http://localhost:3000',
 });
 
@@ -760,16 +778,16 @@ const requiredCtxContract = defineConfig({
 }).api;
 
 test('requestContext config is optional when every declared header is optional', () => {
-    new KizunaClient(optionalCtxContract, {
+    apiClientFor(optionalCtxContract, {
         baseUrl: 'https://api.example.com',
     });
-    new KizunaClient(optionalCtxContract, {
+    apiClientFor(optionalCtxContract, {
         baseUrl: 'https://api.example.com',
         requestContext: {
             'x-session-id': 's1',
         },
     });
-    new KizunaClient(optionalCtxContract, {
+    apiClientFor(optionalCtxContract, {
         baseUrl: 'https://api.example.com',
         requestContext: {
             // @ts-expect-error unknown context header
@@ -779,7 +797,7 @@ test('requestContext config is optional when every declared header is optional',
 });
 
 test('requestContext config is required when a declared header is required', () => {
-    new KizunaClient(requiredCtxContract, {
+    apiClientFor(requiredCtxContract, {
         baseUrl: 'https://api.example.com',
         requestContext: {
             'x-tenant': 't1',
@@ -787,10 +805,10 @@ test('requestContext config is required when a declared header is required', () 
         },
     });
     // @ts-expect-error requestContext is required: x-tenant must be sent
-    new KizunaClient(requiredCtxContract, {
+    apiClientFor(requiredCtxContract, {
         baseUrl: 'https://api.example.com',
     });
-    new KizunaClient(requiredCtxContract, {
+    apiClientFor(requiredCtxContract, {
         baseUrl: 'https://api.example.com',
         // @ts-expect-error x-tenant is required
         requestContext: {
@@ -827,7 +845,7 @@ const activityRoutes = k.routes('api', {
     }),
 });
 
-const activityClient = new KizunaClient(
+const activityClient = apiClientFor(
     defineConfig({
         ...config,
         routes: activityRoutes,
@@ -877,7 +895,7 @@ test('a streamed status hands back an async iterable of typed messages', () => {
             },
         }),
     });
-    const streamClient = new KizunaClient(
+    const streamClient = apiClientFor(
         defineConfig({
             ...config,
             routes: streamRoutes,
@@ -965,7 +983,7 @@ const guardedContract = defineConfig({
     },
 }).api;
 
-const guardedClient = new KizunaClient(guardedContract, {
+const guardedClient = apiClientFor(guardedContract, {
     baseUrl: 'http://localhost',
 });
 
@@ -1030,7 +1048,7 @@ const codedContract = defineConfig({
     },
 }).api;
 
-const codedClient = new KizunaClient(codedContract, {
+const codedClient = apiClientFor(codedContract, {
     baseUrl: 'http://localhost',
 });
 

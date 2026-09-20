@@ -9,11 +9,7 @@ import {
     type Routes,
     type ValidationError,
     type ValidationErrorFor,
-    type Contract,
-    type TagOptions,
-    type RequestContextSchema,
     type RequestContextHeaderInputs,
-    type SecurityScheme,
     type StreamMessageOf,
     type StreamResponseDefinition,
     type Method,
@@ -139,7 +135,7 @@ type UnionToIntersection<Union> = (Union extends unknown ? (distributed: Union) 
  * Every header input the api's request context declares, flattened. Set
  * once on the client under `requestContext` and sent with every request.
  */
-type ContextHeaderInputs<Declarations> = string extends keyof Declarations
+export type ContextHeaderInputs<Declarations> = string extends keyof Declarations
     ? {}
     : [keyof Declarations] extends [never]
       ? {}
@@ -209,6 +205,20 @@ const buildQueryString = (query: Record<string, unknown>): string => {
  * Registry-global: what a client method was built from. Anything wrapping a
  * client reads the route here rather than being handed the api a second time.
  */
+/**
+ * One method on a generated client: the call itself, carrying the method it
+ * sends and whether that response streams. A wrapper reads those off the client
+ * rather than being handed the routes a second time.
+ */
+export type ClientMethod<Method extends string, Streams extends boolean, Args, Result> = ({} extends Args
+    ? (args?: Args) => Promise<Result>
+    : (args: Args) => Promise<Result>) & {
+    readonly [CLIENT_ROUTE]?: {
+        readonly method: Method;
+        readonly streams: Streams;
+    };
+};
+
 export const CLIENT_ROUTE: unique symbol = Symbol.for('ts-kizuna.client-route') as symbol as typeof CLIENT_ROUTE;
 
 /**
@@ -330,46 +340,6 @@ const withContextHeaders = (config: ClientConfig): ClientConfig => {
         } as Record<string, string>,
     };
 };
-
-function buildClient(contract: Contract, config: ClientConfig): unknown {
-    return buildClientTree(contract.routes, withContextHeaders(config));
-}
-
-/**
- * A typed fetch client built from an api. Each route becomes a method that
- * validates its arguments and returns the typed response. The api's custom
- * issue codes are carried through to `errors[].code` on `400` responses.
- *
- * When the api declares a request context that reads headers, pass their
- * values under `requestContext`; the client sends them with every request.
- *
- * @example
- * export const apiClient = new KizunaClient(kizuna.api, {
- *     baseUrl: 'https://api.example.com',
- * });
- *
- * const { status, body } = await apiClient.orders.pay({
- *     params: {
- *         id: '1',
- *     },
- * });
- */
-export interface KizunaClientConstructor {
-    new <
-        T extends Routes,
-        Codes extends string = never,
-        Schemes extends Record<string, SecurityScheme> = Record<string, never>,
-        RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
-    >(
-        contract: Contract<T, Record<string, TagOptions>, Codes, Schemes, RequestContext>,
-        config: ClientConfig &
-            ({} extends ContextHeaderInputs<RequestContext>
-                ? { requestContext?: ContextHeaderInputs<RequestContext> }
-                : { requestContext: ContextHeaderInputs<RequestContext> })
-    ): Client<T, Codes>;
-}
-
-export const KizunaClient = buildClient as unknown as KizunaClientConstructor;
 
 /**
  * What a generated client knows about one response: nothing for a body it

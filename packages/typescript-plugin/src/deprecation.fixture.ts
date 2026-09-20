@@ -1,7 +1,15 @@
 import { z } from 'zod';
 import { Kizuna } from '../../core/src/index.js';
 import { defineConfig } from '../../core/src/index.js';
-import { KizunaClient } from '../../fetch/src/client.js';
+import { createGeneratedClient, type Client, type ClientConfig, type GeneratedRoutes } from '../../fetch/src/client.js';
+import type { Routes } from '../../core/src/types.js';
+
+/**
+ * A client over an assembled api's routes, the same runtime the generated
+ * client uses.
+ */
+const apiClientFor = <T extends Routes>(api: { routes: T }, config: ClientConfig): Client<T> =>
+    createGeneratedClient(api.routes as unknown as GeneratedRoutes, config) as unknown as Client<T>;
 
 interface Config {
     tags: typeof tags;
@@ -99,7 +107,7 @@ export const contract = defineConfig({
     routes,
 }).api;
 
-export const client = new KizunaClient(contract, {
+export const client = apiClientFor(contract, {
     baseUrl: 'http://localhost:3000',
 });
 

@@ -2,7 +2,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from '@ts-kizuna/core';
 import { defineConfig } from '@ts-kizuna/core';
-import { KizunaClient } from './client.js';
+import { createGeneratedClient, type Client, type ClientConfig, type ContextHeaderInputs, type GeneratedRoutes } from './client.js';
+import type { ApiDefinition, RequestContextSchema, Routes, SecurityScheme, TagOptions } from '@ts-kizuna/core';
+
+/**
+ * A client over an assembled api's routes. The generated client hands the same
+ * runtime its own table; the fields that runtime reads are the same either way.
+ */
+const apiClientFor = <
+    T extends Routes,
+    Codes extends string = never,
+    Schemes extends Record<string, SecurityScheme> = Record<string, never>,
+    RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
+>(
+    api: ApiDefinition<T, Record<string, TagOptions>, Codes, Schemes, RequestContext>,
+    config: ClientConfig &
+        ({} extends ContextHeaderInputs<RequestContext>
+            ? { requestContext?: ContextHeaderInputs<RequestContext> }
+            : { requestContext: ContextHeaderInputs<RequestContext> })
+): Client<T, Codes> => createGeneratedClient(api.routes as unknown as GeneratedRoutes, config) as unknown as Client<T, Codes>;
 
 interface Config {
     tags: typeof kTags;
@@ -157,7 +175,7 @@ describe('KizunaClient', () => {
             id: '123',
             name: 'Alice',
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -178,7 +196,7 @@ describe('KizunaClient', () => {
         const fetchMock = stubFetch(200, {
             users: [],
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000/api/v1',
             fetch: fetchMock,
         });
@@ -196,7 +214,7 @@ describe('KizunaClient', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -219,7 +237,7 @@ describe('KizunaClient', () => {
         const fetchMock = stubFetch(200, {
             users: [],
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -239,7 +257,7 @@ describe('KizunaClient', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -259,7 +277,7 @@ describe('KizunaClient', () => {
 
     it('returns response headers from the fetch response', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' }, { 'x-request-id': 'trace-123' });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -278,7 +296,7 @@ describe('KizunaClient', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             baseHeaders: {
                 Authorization: 'Bearer token123',
@@ -300,7 +318,7 @@ describe('KizunaClient', () => {
         const fetchMock = stubFetch(200, {
             ok: true,
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -330,7 +348,7 @@ describe('KizunaClient', () => {
         const fetchMock = stubFetch(200, {
             ok: true,
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -352,7 +370,7 @@ describe('KizunaClient', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -376,7 +394,7 @@ describe('KizunaClient: onRequest', () => {
 
     it('adds headers via onRequest before the fetch call', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
             onRequest: ({ headers }) => {
@@ -392,7 +410,7 @@ describe('KizunaClient: onRequest', () => {
 
     it('supports async onRequest', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
             onRequest: async ({ headers }) => {
@@ -410,7 +428,7 @@ describe('KizunaClient: onRequest', () => {
     it('receives route metadata in onRequest', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' });
         const receivedRoutes: string[] = [];
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
             onRequest: ({ route, method }) => {
@@ -425,7 +443,7 @@ describe('KizunaClient: onRequest', () => {
 
     it('merges onRequest headers with baseHeaders', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: 'http://localhost:3000',
             baseHeaders: { 'X-App': 'test' },
             fetch: fetchMock,
@@ -452,7 +470,7 @@ describe('KizunaClient: nested routers', () => {
             id: '42',
             name: 'Bob',
         });
-        const client = new KizunaClient(nestedContract, {
+        const client = apiClientFor(nestedContract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -473,7 +491,7 @@ describe('KizunaClient: nested routers', () => {
             id: '1',
             name: 'Carol',
         });
-        const client = new KizunaClient(nestedContract, {
+        const client = apiClientFor(nestedContract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -496,7 +514,7 @@ describe('KizunaClient: nested routers', () => {
         const fetchMock = stubFetch(200, {
             posts: ['hello', 'world'],
         });
-        const client = new KizunaClient(nestedContract, {
+        const client = apiClientFor(nestedContract, {
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -523,7 +541,7 @@ describe('KizunaClient: relative baseUrl', () => {
             id: '123',
             name: 'Alice',
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: '/api',
             fetch: fetchMock,
         });
@@ -542,7 +560,7 @@ describe('KizunaClient: relative baseUrl', () => {
         const fetchMock = stubFetch(200, {
             users: [],
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: '/api',
             fetch: fetchMock,
         });
@@ -562,7 +580,7 @@ describe('KizunaClient: relative baseUrl', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: '',
             fetch: fetchMock,
         });
@@ -582,7 +600,7 @@ describe('KizunaClient: relative baseUrl', () => {
             id: '42',
             name: 'Bob',
         });
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: '/api/v1',
             fetch: fetchMock,
         });
@@ -603,7 +621,7 @@ describe('KizunaClient: relative baseUrl', () => {
             name: 'Alice',
         });
         let receivedUrl = '';
-        const client = new KizunaClient(contract, {
+        const client = apiClientFor(contract, {
             baseUrl: '/api',
             fetch: fetchMock,
             onRequest: ({ url }) => {
@@ -661,7 +679,7 @@ describe('requestContext on the client initializer', () => {
 
     it('sends requestContext values as headers on every request', async () => {
         const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
-        const ctxClient = new KizunaClient(ctxContract, {
+        const ctxClient = apiClientFor(ctxContract, {
             baseUrl: 'https://api.example.com',
             fetch: fetchMock as unknown as typeof fetch,
             requestContext: {
@@ -675,7 +693,7 @@ describe('requestContext on the client initializer', () => {
 
     it('omits undefined values', async () => {
         const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
-        const ctxClient = new KizunaClient(ctxContract, {
+        const ctxClient = apiClientFor(ctxContract, {
             baseUrl: 'https://api.example.com',
             fetch: fetchMock as unknown as typeof fetch,
             requestContext: {
@@ -723,7 +741,7 @@ const activityContract = defineConfig({
 
 describe('discriminated union response built from named models', () => {
     it('switches over the response body and narrows the started branch', async () => {
-        const client = new KizunaClient(activityContract, {
+        const client = apiClientFor(activityContract, {
             baseUrl: 'http://localhost:3000',
             fetch: stubFetch(200, {
                 kind: 'started',
@@ -753,7 +771,7 @@ describe('discriminated union response built from named models', () => {
     });
 
     it('switches over the response body and narrows the done branch', async () => {
-        const client = new KizunaClient(activityContract, {
+        const client = apiClientFor(activityContract, {
             baseUrl: 'http://localhost:3000',
             fetch: stubFetch(200, {
                 kind: 'done',
@@ -782,7 +800,7 @@ describe('discriminated union response built from named models', () => {
     });
 
     it('types the discriminator as a closed literal union, not string', async () => {
-        const client = new KizunaClient(activityContract, {
+        const client = apiClientFor(activityContract, {
             baseUrl: 'http://localhost:3000',
             fetch: stubFetch(200, {
                 kind: 'done',
@@ -868,7 +886,7 @@ describe('streams', () => {
     };
 
     const clientFor = (chunks: string[], status = 200, contentType = 'text/event-stream') =>
-        new KizunaClient(streamContract, {
+        apiClientFor(streamContract, {
             baseUrl: 'http://api',
             fetch: async () =>
                 new Response(streamOf(chunks), {
@@ -954,7 +972,7 @@ describe('streams', () => {
                 controller.error(new Error('terminated'));
             },
         });
-        const client = new KizunaClient(streamContract, {
+        const client = apiClientFor(streamContract, {
             baseUrl: 'http://api',
             fetch: async () =>
                 new Response(failing, {
