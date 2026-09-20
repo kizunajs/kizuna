@@ -31,22 +31,24 @@ Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
 ## Start with the config
 
-`kizuna.config.ts` sits at the root of your app. Name the framework you serve on, and the routes you serve:
+`kizuna.config.ts` sits at the root of your app. Start by naming the framework you serve on:
 
 ```ts title="kizuna.config.ts"
 import { defineConfig } from '@ts-kizuna/core';
 import { nextAdapter } from '@ts-kizuna/next'; // or express, fastify, hono
-import { users } from './src/routes/users';
 
 export default defineConfig({
     adapter: nextAdapter(),
-    routes: {
-        users,
-    },
 });
 ```
 
-Naming an adapter is what puts that framework's own request in every handler's args, typed. Run `kizuna generate` and the `Config` in `kizuna.types.ts` follows from it.
+Naming an adapter is what puts that framework's own request in every handler's args, typed.
+
+```bash
+kizuna generate
+```
+
+That writes the `Config` in `kizuna.types.ts`, which is what types everything you declare next. The routes go on the config once you have some.
 
 </Step>
 
@@ -161,6 +163,19 @@ export const users = k.routes({
 
 The handler's `query`, `body` and `params` are typed from the declaration right above it, and its return is checked against that route's `responses`.
 
+Add them to the config:
+
+```ts title="kizuna.config.ts"
+import { users } from './src/routes/users';
+
+export default defineConfig({
+    adapter: nextAdapter(),
+    routes: {
+        users,
+    },
+});
+```
+
 </Step>
 
 <Step>
@@ -181,7 +196,7 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount
 
 ## Call it from a typed client
 
-Your config carries the handlers, so it never reaches a browser. Name a client on it instead, and `kizuna generate` writes a file that holds the route shapes alone:
+Add `fetchClient` to the config, pointed at the file you want written:
 
 <InstallTabs packageName="@ts-kizuna/fetch" />
 
@@ -237,7 +252,7 @@ export default async function UsersPage() {
 }
 ```
 
-Writing is the same:
+A route with more than one status narrows on `status`:
 
 ```tsx title="actions.ts"
 'use server';

@@ -39,7 +39,7 @@ kizuna.api.mount(app);
 | Field            | What it is                                                                                                                                                                    |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `adapter`        | The framework this API is served on, as a call: `expressAdapter()`. Its request reaches every handler, typed.                                                                 |
-| `routes`         | The route groups [`k.routes`](/docs/reference/k-routes) returned. Each route carries its own handler.                                                                         |
+| `routes`         | The route groups [`k.routes`](/docs/reference/k-routes) returned. Each route carries its own handler. Omit it while setting up, before there is a route to name.              |
 | `auth`           | Who may call this API: `identities`, each declared with [`k.identity`](/docs/reference/k-identity) and carrying its own guard, and the `guardSchema` their `deny()` produces. |
 | `requestContext` | What every route resolves before its guards run, declared with [`k.requestContext`](/docs/reference/k-request-context).                                                       |
 | `validation`     | How a request is checked: `issueCodes`, the `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                     |

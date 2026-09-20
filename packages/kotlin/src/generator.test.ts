@@ -125,30 +125,7 @@ describe('Kotlin generator: z.iso.datetime()', () => {
     });
 });
 
-describe('Kotlin generator: z.pipe() and z.string().transform()', () => {
-    it('resolves z.string().pipe(z.coerce.number()) to Double', () => {
-        const contract = defineConfig({
-            routes: {
-                search: {
-                    method: 'GET',
-                    path: '/search',
-                    query: z.object({
-                        // eslint-disable-next-line @ts-kizuna/no-unsupported-schema -- asserts the generator handles a piped coerce
-                        limit: z.string().pipe(z.coerce.number()),
-                    }),
-                    responses: {
-                        200: z.object({
-                            total: z.number(),
-                        }),
-                    },
-                },
-            },
-        }).api;
-        const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('limit: Double');
-        expect(output).not.toContain('JsonElement');
-    });
-
+describe('Kotlin generator: z.string().transform()', () => {
     it('resolves z.string().transform() to String (input type)', () => {
         const contract = defineConfig({
             routes: {

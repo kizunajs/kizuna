@@ -169,9 +169,10 @@ export type KizunaConfigInput<
      */
     adapter?: AdapterValue;
     /**
-     * The route groups this API answers, as `k.routes` returned them.
+     * The route groups this API answers, as `k.routes` returned them. Omit it
+     * while setting up, before there is a route to name.
      */
-    routes: R;
+    routes?: R;
     jobs?: J;
     /**
      * What this API installs beside its own routes. Each plugin carries its own
@@ -305,7 +306,7 @@ export type ConfiguredApi<
  * });
  */
 export const defineConfig = <
-    const R extends Routes,
+    const R extends Routes = Record<string, never>,
     const J extends Jobs = Record<string, never>,
     const P extends PluginList = readonly [],
     const Tags extends Record<string, TagOptions> = Record<string, never>,
@@ -324,7 +325,7 @@ export const defineConfig = <
     const guardSchema = options.auth?.guardSchema;
     if (guardSchema) assertFillableGuardSchema(guardSchema);
 
-    const routes = options.routes as Routes;
+    const routes = (options.routes ?? {}) as Routes;
     const jobs = options.jobs as Jobs | undefined;
     const identities = options.auth?.identities as Record<string, SecurityScheme> | undefined;
     const plugins = pluginsBySlug(options.plugins);
