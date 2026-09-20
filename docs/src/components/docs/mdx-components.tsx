@@ -11,7 +11,6 @@ import { HandlerExplorer } from '@/components/code/handler-explorer';
 import { AlphaNotice } from './alpha-notice';
 import { BetaNotice } from './beta-notice';
 import { InstallTabs } from './install-tabs';
-import { ExtensionCard } from './extension-card';
 import { FeatureList } from './feature-list';
 import { GeneratedSurfaces } from './generated-surfaces';
 import { Supports } from './supports';
@@ -38,7 +37,6 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         AlphaNotice,
         BetaNotice,
         InstallTabs,
-        ExtensionCard,
         FeatureList,
         GeneratedSurfaces,
         Supports,

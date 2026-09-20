@@ -38,7 +38,7 @@ const daysBetween = (from: Date, to: Date): number => Math.ceil((to.getTime() - 
  * Every route that is deprecated or has a sunset date, soonest first, with
  * undated deprecations last.
  *
- * Reads the same `deprecated` field `@ts-kizuna/typescript-plugin` reports in an
+ * Reads the same `deprecated` field the generated clients carry in an
  * editor, so a watcher and a hover agree.
  */
 export const apiNotices = createGenerator<{ now?: Date }, Notice[]>((options) => {

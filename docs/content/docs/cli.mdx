@@ -1,0 +1,94 @@
+---
+title: CLI
+description: Write your types and clients, print the routes your config serves, and compare an API against a git ref.
+---
+
+`@ts-kizuna/cli` is the `kizuna` command. It reads your [config](/docs/config) and answers three questions: what should be generated, what does this API serve, and what did this change cost a caller.
+
+<InstallTabs packageName="-D @ts-kizuna/cli" />
+
+| Command           | What it does                                                  |
+| ----------------- | ------------------------------------------------------------- |
+| `kizuna generate` | Writes `kizuna.types.ts` and every client the config declares |
+| `kizuna routes`   | Prints every route the config serves                          |
+| `kizuna diff`     | Compares the config against the same config at a git ref      |
+
+`--config <path>` points any of them at a config other than `kizuna.config.ts`.
+
+## `kizuna generate`
+
+See [Configuration](/docs/config#kizuna-generate) for what it writes and where.
+
+## `kizuna routes`
+
+Every route, with what it asks of a caller and what it publishes:
+
+```sh title="Terminal"
+kizuna routes
+```
+
+```text
+GET      /users                users.listUsers          auth: public
+POST     /users                users.createUser         auth: user
+DELETE   /users/:id            users.deleteUser         auth: member, requires workspace:delete  deprecated, use `archiveUser` instead  sunset 2027-01-01
+GET      /forecast/:city       weather.getForecast      auth: public  tool: weather_get_forecast
+```
+
+The path is the one the server matches, so a route in a group shows the path a caller reaches rather than the one the route declares. A route's `auth` reads as `public`, an identity name, or the identity with the roles and permissions it requires. A route publishing a [tool](/docs/tools) shows the name a model calls it by, resolved the same way the MCP endpoint resolves it.
+
+`--json` prints the same map as an array, for something other than a person to read:
+
+```sh title="Terminal"
+kizuna routes --json
+```
+
+```json
+[
+    {
+        "key": "weather.getForecast",
+        "method": "GET",
+        "path": "/forecast/:city",
+        "auth": "public",
+        "tags": ["weather"],
+        "tool": "weather_get_forecast"
+    }
+]
+```
+
+## `kizuna diff`
+
+What a change costs the people already calling your API, against a git ref:
+
+```sh title="Terminal"
+kizuna diff --against main
+```
+
+```text
+BREAKING users.patchUser renamed to users.updateUser
+         client method and generated client names change, HTTP surface unaffected
+
+BREAKING users.createUser body.organisationId is now required
+
+CHANGED  users.getUser can now answer 410
+ADDED    users.archiveUser
+```
+
+It exits `1` when a change breaks callers, so a pipeline fails on one. `--against` defaults to `main`, and `--json` prints the changes as an array. See [Breaking changes](/docs/breaking-changes) for what counts as breaking and how to gate a pull request on it.
+
+The ref is checked out into a git worktree inside the repository, so nothing is installed for the base tree: it resolves its dependencies by walking up to the `node_modules` you already have. In a workspace where each package has its own `node_modules`, that walk does not find them, so run `diff` from a repository whose dependencies sit at the root.
+
+## Scripts
+
+```json title="package.json"
+{
+    "scripts": {
+        "kizuna:generate": "kizuna generate",
+        "kizuna:check": "kizuna generate --check"
+    }
+}
+```
+
+## Reference
+
+- [Configuration](/docs/config)
+- [Breaking changes](/docs/breaking-changes)

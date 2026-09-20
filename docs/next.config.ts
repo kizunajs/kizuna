@@ -20,6 +20,7 @@ const movedDocs: Array<[string, string]> = [
     ['/docs/reference/server-jobs', '/docs/reference/k-jobs'],
     ['/docs/reference/server-request-context', '/docs/reference/k-request-context'],
     ['/docs/reference/server-router', '/docs/routes'],
+    ['/docs/vscode', '/docs/deprecations'],
 ];
 
 const config: NextConfig = {

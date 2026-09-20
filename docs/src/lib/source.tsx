@@ -22,7 +22,6 @@ const badges: Record<string, string> = {
     '/docs/extend/create-ts-client': 'Beta',
     '/docs/clients/kotlin': 'Beta',
     '/docs/clients/tanstack-query': 'Beta',
-    '/docs/vscode': 'Beta',
     '/docs/reference/k-identity': 'Beta',
     '/docs/reference/kizuna-roles': 'Alpha',
     '/docs/reference/kizuna-permissions': 'Alpha',

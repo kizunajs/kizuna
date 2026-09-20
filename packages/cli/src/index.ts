@@ -5,3 +5,4 @@ export { writeClients, checkClients, formatStale, type WrittenClient, type Stale
 export { generateConfigTypes, ConfigSyntaxError } from './generate-types.js';
 export { diffSchemas, type Direction, type SchemaChange } from './diff-schemas.js';
 export { diffAgainst, type DiffAgainstOptions } from './diff-against.js';
+export { routeMap, formatRoutes, type RouteEntry } from './route-map.js';

@@ -3,34 +3,16 @@ title: Breaking Changes
 description: Catch a change that breaks callers before it ships.
 ---
 
-`diffAgainst` compares two versions of your API and reports what each change costs the people already calling it. It reads the declarations, so route keys, MCP tool names and job keys are all in view, and every Zod schema is compared field by field.
+[`kizuna diff`](/docs/cli#kizuna-diff) compares two versions of your API and reports what each change costs the people already calling it. It reads the declarations, so route keys, MCP tool names and job keys are all in view, and every Zod schema is compared field by field.
 
 <Steps>
-
-<Step>
-
-## Add the diff script
-
-```ts title="scripts/diff.ts"
-import { diffAgainst, formatChange, hasBreakingChange } from '@ts-kizuna/cli';
-
-const changes = await diffAgainst(process.argv[2] ?? 'main', './kizuna.config.ts');
-
-for (const change of changes) console.log(formatChange(change));
-
-if (hasBreakingChange(changes)) process.exit(1);
-```
-
-`diffAgainst` checks the ref out into a git worktree inside the repository, loads the config from there, and removes it afterwards. **Nothing is installed for the base tree**: it sits inside your repository, so Node resolves dependencies by walking up to the `node_modules` you already have.
-
-</Step>
 
 <Step>
 
 ## Run it against a ref
 
 ```bash
-pnpm tsx scripts/diff.ts main
+kizuna diff --against main
 ```
 
 ```
@@ -79,7 +61,7 @@ jobs:
 
             - name: Compare against main
               id: diff
-              run: pnpm tsx scripts/diff.ts ${{ github.event.pull_request.base.sha }}
+              run: pnpm kizuna diff --against ${{ github.event.pull_request.base.sha }}
 
             - name: Require a label for breaking changes
               if: steps.diff.outcome == 'failure'

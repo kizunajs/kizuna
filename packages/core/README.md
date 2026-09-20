@@ -148,22 +148,21 @@ if (result.status === 200) {
 
 ## Packages
 
-| Package                        | Description                                        |
-| ------------------------------ | -------------------------------------------------- |
-| `@ts-kizuna/core`              | Route declaration, validation, and the adapter API |
-| `@ts-kizuna/fetch`             | Typed fetch-based client                           |
-| `@ts-kizuna/tanstack-query`    | TanStack Query client                              |
-| `@ts-kizuna/express`           | Express adapter                                    |
-| `@ts-kizuna/fastify`           | Fastify adapter                                    |
-| `@ts-kizuna/hono`              | Hono adapter                                       |
-| `@ts-kizuna/next`              | Next.js App Router adapter                         |
-| `@ts-kizuna/openapi`           | OpenAPI generation                                 |
-| `@ts-kizuna/swift`             | Swift client generation                            |
-| `@ts-kizuna/kotlin`            | Kotlin client generation                           |
-| `@ts-kizuna/mcp`               | MCP endpoint for AI assistants                     |
-| `@ts-kizuna/eslint-plugin`     | ESLint rules                                       |
-| `@ts-kizuna/typescript-plugin` | Deprecation highlighting in the editor             |
-| `@ts-kizuna/cli`               | Command line tooling                               |
+| Package                     | Description                                        |
+| --------------------------- | -------------------------------------------------- |
+| `@ts-kizuna/core`           | Route declaration, validation, and the adapter API |
+| `@ts-kizuna/fetch`          | Typed fetch-based client                           |
+| `@ts-kizuna/tanstack-query` | TanStack Query client                              |
+| `@ts-kizuna/express`        | Express adapter                                    |
+| `@ts-kizuna/fastify`        | Fastify adapter                                    |
+| `@ts-kizuna/hono`           | Hono adapter                                       |
+| `@ts-kizuna/next`           | Next.js App Router adapter                         |
+| `@ts-kizuna/openapi`        | OpenAPI generation                                 |
+| `@ts-kizuna/swift`          | Swift client generation                            |
+| `@ts-kizuna/kotlin`         | Kotlin client generation                           |
+| `@ts-kizuna/mcp`            | MCP endpoint for AI assistants                     |
+| `@ts-kizuna/eslint-plugin`  | ESLint rules                                       |
+| `@ts-kizuna/cli`            | Command line tooling                               |
 
 ## License
 
