@@ -1,4 +1,4 @@
 {
     "title": "Migration",
-    "pages": ["existing-api", "from-ts-rest", "package-names"]
+    "pages": ["existing-api", "from-ts-rest"]
 }

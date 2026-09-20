@@ -5,9 +5,14 @@ description: Declare your routes, serve them on your framework, and call them fr
 
 ## Installation
 
-Install `kizunajs`, Zod 4 for the schemas, your framework's adapter, and the CLI.
+Install `kizunajs`, your framework's adapter, Zod 4 for the schemas, and the CLI.
 
-<InstallTabs packageName="kizunajs zod @kizunajs/next" devPackageName="@kizunajs/cli" />
+<InstallTabs packageName="kizunajs @kizunajs/next zod" devPackageName="@kizunajs/cli" />
+
+<Callout title="2.0 is in pre-release">
+    Kizuna installs from the `beta` tag until 2.0.0 ships. The 1.x line published under a different name and is no longer maintained, so it
+    gets no fixes and no security backports.
+</Callout>
 
 Enable `strict` in your `tsconfig.json`. Kizuna's inference depends on it.
 

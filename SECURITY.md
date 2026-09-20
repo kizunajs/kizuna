@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Kizuna is on the 2.x line, published as `kizunajs` and `@kizunajs/*`. Only the latest release gets security fixes, and older versions aren't backported.
+Kizuna is on the 2.x line, published as `kizunajs` and `@kizunajs/*`. Only the latest release gets security fixes. The 1.x line is no longer maintained, and older versions aren't backported.
 
 | Version        | Supported |
 | -------------- | --------- |

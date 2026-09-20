@@ -10,7 +10,7 @@ A spec-driven framework for building fully typed REST APIs in TypeScript, where 
 [Documentation](https://kizunajs.com)
 
 > [!NOTE]
-> v2 is in beta while the way you declare routes and call them settles, so a minor version can carry a breaking change. Every release names them under **⚠ BREAKING CHANGES**, so pin your version and upgrade when it suits you.
+> v2 is in beta, so a minor version can carry a breaking change. Every release names them under **⚠ BREAKING CHANGES**, so pin your version and upgrade when it suits you.
 >
 > [See the release notes](https://github.com/kizunajs/kizuna/releases)
 
