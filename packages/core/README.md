@@ -1,8 +1,8 @@
-# Kizuna
+# Kizuna.js
 
-![Kizuna](https://raw.githubusercontent.com/kizunajs/kizuna/main/docs/public/readme-beta.png)
+![Kizuna.js](https://raw.githubusercontent.com/kizunajs/kizuna/main/docs/public/readme-beta.png)
 
-Build fully typed REST APIs with TypeScript. Declare a route once. Get a typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
+A spec-driven framework for building fully typed REST APIs in TypeScript, where your route declarations produce the validation, the documentation, the clients, and the AI tools.
 
 [![npm](https://img.shields.io/npm/v/kizunajs?color=blue&label=npm)](https://www.npmjs.com/package/kizunajs)
 ![license](https://img.shields.io/badge/license-MIT-blue)
@@ -36,113 +36,17 @@ Build fully typed REST APIs with TypeScript. Declare a route once. Get a typed s
 
 ## Getting started
 
-### Declare your routes
+Follow the [quickstart](https://kizunajs.com/docs/quickstart), which goes from an empty project to a running route.
 
-Export a `k` instance once, typed by the `Config` generated from your config.
+## Documentation
 
-```ts
-// src/k.ts
-import { Kizuna } from 'kizunajs';
-import type { Config } from '../kizuna.types';
-
-export const k = new Kizuna<Config>();
-```
-
-Then declare each route: a method, a path, Zod schemas, and the handler that answers it.
-
-```ts
-// src/routes/users.ts
-import { z } from 'zod';
-import { ProblemDetailsSchema } from 'kizunajs/schemas';
-import { k } from '../k';
-
-export const users = k.routes({
-    getUser: k
-        .route({
-            method: 'GET',
-            path: '/users/:id',
-            responses: {
-                200: z.object({
-                    id: z.string(),
-                    name: z.string(),
-                }),
-                404: ProblemDetailsSchema,
-            },
-        })
-        .handler(async ({ params }) => {
-            const user = await db.users.findById(params.id);
-            if (!user) {
-                return {
-                    status: 404,
-                    body: {
-                        detail: 'Not found',
-                    },
-                };
-            }
-            return {
-                status: 200,
-                body: user,
-            };
-        }),
-});
-```
-
-### Assemble it
-
-Name your framework and your routes. The adapter decides what handlers get alongside their inputs.
-
-```ts
-// kizuna.config.ts
-import { defineConfig } from 'kizunajs';
-import { expressAdapter } from '@kizunajs/express'; // or any other adapter
-import { users } from './src/routes/users';
-
-export default defineConfig({
-    adapter: expressAdapter(),
-    routes: {
-        users,
-    },
-});
-```
-
-### Mount it on your app
-
-```ts
-// src/index.ts
-import express from 'express';
-import kizuna from '../kizuna.config';
-
-const app = express();
-app.use(express.json());
-
-kizuna.api.mount(app);
-app.listen(3000);
-```
-
-### Use the API on the client
-
-Add `fetchClient` to your config, run `kizuna generate`, and import the file it writes.
-
-```ts
-// src/lib/api-client.ts
-import { createClient } from './api-client.generated';
-
-const client = createClient({
-    baseUrl: 'http://localhost:3000',
-});
-
-const result = await client.users.getUser({
-    params: {
-        id: '1',
-    },
-});
-
-if (result.status === 200) {
-    result.body; // { id: string; name: string }
-}
-```
-
-[Read the full docs](https://kizunajs.com/docs)
+- [What is Kizuna](https://kizunajs.com/docs), what you write and what you get
+- [Quickstart](https://kizunajs.com/docs/quickstart), install to first route
+- [Routes](https://kizunajs.com/docs/routes), methods, paths, schemas and handlers
+- [Adapters](https://kizunajs.com/docs/adapters/express), Express, Fastify, Hono and Next.js
+- [Clients](https://kizunajs.com/docs/clients/fetch), TypeScript, Swift, Kotlin and TanStack Query
+- [CLI](https://kizunajs.com/docs/cli), generate clients and catch breaking changes before they ship
+- [Standards](https://kizunajs.com/docs/standards), every RFC it follows
 
 ## Packages
 

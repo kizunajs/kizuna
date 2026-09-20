@@ -237,14 +237,20 @@ Content-Type: application/problem+json
         file: 'routes.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `searchUsers: {
-  deprecated: {
-    message: 'use listUsers instead',
-    date: '2026-03-01',
-  },
-  sunset: '2027-01-01',
-  ...
-}
+        code: `searchUsers: k
+  .route({
+    method: 'GET',
+    path: '/users/search',
+    deprecated: {
+      message: 'use listUsers instead',
+      date: '2026-03-01',
+    },
+    sunset: '2027-01-01',
+    responses: {
+      200: z.array(UserSchema),
+    },
+  })
+  .handler(/* ... */),
 
 // Editor strikethrough
 // OpenAPI deprecated: true
@@ -257,10 +263,10 @@ Content-Type: application/problem+json
         icon: icons.radio,
         label: 'Streaming',
         description: 'Typed events sent as they happen',
-        file: 'router.ts',
+        file: 'routes.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `reply: async ({ body }) => ({
+        code: `.handler(async ({ body }) => ({
   status: 200,
   body: async function* ({ signal }) {
     const stream = anthropic.messages.stream(
@@ -282,7 +288,7 @@ Content-Type: application/problem+json
     const { usage } = await stream.finalMessage();
     yield { event: 'done', data: { outputTokens: usage.output_tokens } };
   },
-}),`,
+})),`,
     },
     {
         icon: icons.timer,
@@ -291,27 +297,22 @@ Content-Type: application/problem+json
         file: 'routes.ts',
         fileIcon: brandIcons.typescript,
         lang: 'ts',
-        code: `listEvents: {
-  method: 'GET',
-  path: '/events',
-  responses: {
-    200: {
-      body: z.array(EventSchema),
-      cache: {
-        scope: 'public',
-        sharedMaxAge: 600, // ten minutes on the CDN
-        staleWhileRevalidate: 60,
+        code: `listEvents: k
+  .route({
+    method: 'GET',
+    path: '/events',
+    responses: {
+      200: {
+        body: z.array(EventSchema),
+        cache: {
+          scope: 'public',
+          sharedMaxAge: 600, // ten minutes on the CDN
+          staleWhileRevalidate: 60,
+        },
       },
     },
-    404: {
-      body: ProblemDetailsSchema,
-      cache: {
-        scope: 'public',
-        maxAge: 60, // misses are cached too
-      },
-    },
-  },
-}
+  })
+  .handler(/* ... */),
 
 // Cache-Control: public, s-maxage=600, stale-while-revalidate=60`,
     },

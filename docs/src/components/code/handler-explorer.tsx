@@ -25,9 +25,9 @@ interface Feature {
 const FEATURES: Feature[] = [
     {
         id: 'params',
-        file: 'reports.router.ts',
+        file: 'routes/reports.ts',
         note: 'Typed from the path string itself. Rename a param and every handler that reads it fails to compile.',
-        code: `getReport: async ({ params }) => {
+        code: `.handler(async ({ params }) => {
     const report = await db.reports.findFirst({
         where: {
             month: params.month,
@@ -40,9 +40,9 @@ const FEATURES: Feature[] = [
     },
     {
         id: 'query',
-        file: 'users.router.ts',
+        file: 'routes/users.ts',
         note: 'Numbers arrive as numbers and enums as enums, so you never reach for z.coerce.',
-        code: `listUsers: async ({ query }) => {
+        code: `.handler(async ({ query }) => {
     const users = await db.users.findMany({
         take: query.perPage,
         orderBy: {
@@ -55,9 +55,9 @@ const FEATURES: Feature[] = [
     },
     {
         id: 'body',
-        file: 'users.router.ts',
+        file: 'routes/users.ts',
         note: 'Validated against your schema before the handler runs, so invalid requests never reach your code.',
-        code: `createUser: async ({ body }) => {
+        code: `.handler(async ({ body }) => {
     const user = await db.users.create({
         data: {
             name: body.name,
@@ -71,9 +71,9 @@ const FEATURES: Feature[] = [
     },
     {
         id: 'headers',
-        file: 'users.router.ts',
+        file: 'routes/users.ts',
         note: 'Declared headers become literal keys, spelled exactly the way the spec spells them.',
-        code: `updateUser: async ({ params, body, headers }) => {
+        code: `.handler(async ({ params, body, headers }) => {
     const updated = await db.users.update({
         data: body,
         where: {
@@ -87,9 +87,9 @@ const FEATURES: Feature[] = [
     },
     {
         id: 'auth',
-        file: 'users.router.ts',
+        file: 'routes/users.ts',
         note: 'The guard has already verified the caller, so the handler receives a plain typed value.',
-        code: `getMe: async ({ auth }) => {
+        code: `.handler(async ({ auth }) => {
     const user = await db.users.findById(auth.member.workspaceUserId);
 
     return {
@@ -103,9 +103,9 @@ const FEATURES: Feature[] = [
     },
     {
         id: 'requestContext',
-        file: 'users.router.ts',
+        file: 'routes/users.ts',
         note: 'Declared once, resolved per request, available in every handler without touching a signature.',
-        code: `createInvite: async ({ requestContext }) => {
+        code: `.handler(async ({ requestContext }) => {
     await posthog.capture({
         distinctId: requestContext.analytics.distinctId,
         event: 'invite_sent',
@@ -119,9 +119,9 @@ const FEATURES: Feature[] = [
     },
     {
         id: 'jobs',
-        file: 'users.router.ts',
+        file: 'routes/users.ts',
         note: 'Every job your config declares. Queue it and answer now, or run it and wait for the result.',
-        code: `createUser: async ({ body, jobs }) => {
+        code: `.handler(async ({ body, jobs }) => {
     await db.users.create({
         data: body,
     });
@@ -135,9 +135,9 @@ const FEATURES: Feature[] = [
     },
     {
         id: 'plugins',
-        file: 'users.router.ts',
+        file: 'routes/users.ts',
         note: 'Plugins are named on your config, so their features arrive typed under their own names.',
-        code: `updateUser: async ({ params, body, plugins }) => {
+        code: `.handler(async ({ params, body, plugins }) => {
     const user = await db.users.update(params.userId, body);
 
     await plugins.email.send({
@@ -151,9 +151,9 @@ const FEATURES: Feature[] = [
     },
     {
         id: 'throwError',
-        file: 'users.router.ts',
+        file: 'routes/users.ts',
         note: 'Failure responses live on the route, so a handler can only throw what it declares.',
-        code: `deleteUser: async ({ params, throwError }) => {
+        code: `.handler(async ({ params, throwError }) => {
     const user = await db.users.findById(params.userId);
     if (!user) throwError({
         status: 404,
