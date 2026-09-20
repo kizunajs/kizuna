@@ -205,19 +205,122 @@ clients: [
 
 ## More than one API
 
-A repository serving several APIs writes a config file for each, and each keeps its own routes and its own generated clients:
+One config is one API. A second config is a second API, with its own routes, its own identities and its own generated clients.
+
+### When to split
+
+Split when the two have different callers. A public API versioned for outside integrators and an internal admin API answer to different people, change on different schedules, and want different clients, so one OpenAPI document describing both serves neither.
+
+Split when they are deployed apart. A config names one `adapter`, so an API on Express and an API on Next.js are already two configs.
+
+Split when the surfaces should not mix. Everything in one config shares a namespace: every route reaches every plugin's exports, one `guardSchema` shapes every refusal, and every route lands in the same generated client. Two configs keep those apart.
+
+Stay with one config when the routes differ only by prefix. A `/admin` group under the same identities is a [route group](/docs/routes), not a second API, and splitting it costs you the shared types.
+
+### Two configs
+
+Give each one a file, and each its own clients:
 
 ```
 my-repo/
-├── kizuna.config.ts
-└── kizuna.workspace.config.ts
+├── kizuna.config.ts              # the public API
+├── kizuna.admin.config.ts        # the admin API
+└── src/
+    ├── k.ts                      # typed by the public Config
+    ├── admin/
+    │   └── k.ts                  # typed by the admin Config
+    └── routes/
 ```
 
-Point a generator at the one you mean with its `--config` flag, suffixing an export when the file holds more than the default:
+```ts title="kizuna.admin.config.ts"
+import { defineConfig } from '@ts-kizuna/core';
+import { expressAdapter } from '@ts-kizuna/express';
+import { fetchClient } from '@ts-kizuna/fetch/server';
+import { operator } from './src/admin/identities';
+import { admin } from './src/admin/routes';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes: {
+        admin,
+    },
+    auth: {
+        identities: {
+            operator,
+        },
+    },
+    typescript: {
+        outputFile: './src/admin/kizuna.types.ts',
+    },
+    clients: [
+        fetchClient({
+            output: './src/admin/api-client.generated.ts',
+        }),
+    ],
+});
+```
+
+Each config writes its own `Config`, so each gets its own `k`:
+
+```ts title="src/admin/k.ts"
+import { Kizuna } from '@ts-kizuna/core';
+import type { Config } from './kizuna.types';
+
+export const k = new Kizuna<Config>();
+```
+
+A route declared against the admin `k` names the admin identities and nothing else, so naming a public identity on an admin route is a type error rather than a runtime surprise.
+
+### Running them
+
+`kizuna generate` reads one config, so point it at each in turn:
+
+```json title="package.json"
+{
+    "scripts": {
+        "kizuna:generate": "kizuna generate && kizuna generate --config kizuna.admin.config.ts"
+    }
+}
+```
+
+The native generators take `--config` the same way, suffixing an export when a file holds more than the default:
 
 ```sh title="Terminal"
-ts-kizuna-swift generate --config kizuna.workspace.config.ts --output ... --namespace-name WorkspaceAPI
+ts-kizuna-swift generate --config kizuna.admin.config.ts --output ... --namespace-name AdminAPI
 ```
+
+### Sharing between them
+
+What both APIs need lives in a module they both import: schemas, [models](/docs/reference/kizuna-model), an identity, or a whole route group. `Kizuna.model` keeps a shared schema's name, so `User` is one named type in both generated clients rather than two shapes that happen to match.
+
+```ts title="src/schemas.ts"
+export const UserSchema = Kizuna.model({
+    title: 'User',
+    schema: z.object({
+        id: z.string(),
+        name: z.string(),
+    }),
+});
+```
+
+Serving both from one process is ordinary mounting. On Express, `mount` takes anything with a `use`, so a router mounted under a path keeps the admin API off the public one:
+
+```ts title="src/index.ts"
+import express from 'express';
+import publicApi from '../kizuna.config';
+import adminApi from '../kizuna.admin.config';
+
+const app = express();
+app.use(express.json());
+
+publicApi.api.mount(app);
+
+const adminRouter = express.Router();
+adminApi.api.mount(adminRouter);
+app.use('/admin', adminRouter);
+```
+
+On Next.js each API is its own catch-all route file, and `mount({ basePath })` is what tells it which prefix it answers on.
 
 ## `kizuna generate`
 
