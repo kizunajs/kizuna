@@ -151,7 +151,11 @@ type ContextHeaderInputs<Declarations> = string extends keyof Declarations
         ? { [Key in keyof Merged]: Merged[Key] }
         : never;
 
-export interface RequestContext {
+/**
+ * The request `onRequest` is handed, on its way out. Setting a header on
+ * `headers` sets it on the request that is sent.
+ */
+export interface OutgoingRequest {
     url: string;
     method: string;
     headers: Headers;
@@ -163,7 +167,7 @@ export interface ClientConfig {
     baseHeaders?: Record<string, string>;
     credentials?: RequestCredentials;
     fetch?: typeof fetch;
-    onRequest?: (context: RequestContext) => void | Promise<void>;
+    onRequest?: (request: OutgoingRequest) => void | Promise<void>;
 }
 
 const buildFormData = (body: Record<string, unknown>): FormData => {

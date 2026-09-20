@@ -163,21 +163,23 @@ export interface ClientConfig {
     baseHeaders?: Record<string, string>;
     credentials?: RequestCredentials;
     fetch?: typeof fetch;
-    onRequest?: (context: RequestContext) => void | Promise<void>;
+    onRequest?: (request: OutgoingRequest) => void | Promise<void>;
 }
 ```
 
-| Option        | Description                                                               |
-| ------------- | ------------------------------------------------------------------------- |
-| `baseUrl`     | Base URL prepended to every route path                                    |
-| `baseHeaders` | Headers merged into every request                                         |
-| `credentials` | Passed as `credentials` to every `fetch` call                             |
-| `fetch`       | Custom fetch implementation (e.g. for testing or a polyfill)              |
-| `onRequest`   | Callback before each request, receiving `{ url, method, headers, route }` |
+| Option        | Description                                                                       |
+| ------------- | --------------------------------------------------------------------------------- |
+| `baseUrl`     | Base URL prepended to every route path                                            |
+| `baseHeaders` | Headers merged into every request                                                 |
+| `credentials` | Passed as `credentials` to every `fetch` call                                     |
+| `fetch`       | Custom fetch implementation (e.g. for testing or a polyfill)                      |
+| `onRequest`   | Callback before each request, receiving the `OutgoingRequest` it is about to send |
+
+Setting a header on the `headers` of an `OutgoingRequest` sets it on the request that goes out, which is how a credential that lives in storage is read per request rather than fixed at construction. See [React Native](#reading-a-token-from-storage).
 
 ## Request context
 
-When your config declares [request context](/docs/request-context) headers, `createClient` takes them too, typed by what the API asked for, and sends them on every request:
+When your config declares [request context](/docs/request-context) headers, `createClient` takes them too, typed by what the API asked for, and sends them on every request. This is a different thing from the `OutgoingRequest` above: these are the headers your API declared with [`k.requestContext`](/docs/reference/k-request-context), and the generated file exports their type as `RequestContext`:
 
 ```ts title="src/lib/api-client.ts"
 import { createClient } from './api-client.generated';

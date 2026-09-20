@@ -19,14 +19,14 @@ The file comes from naming `fetchClient({ output })` under `clients` on [`define
 createClient(config: ClientConfig): Client
 ```
 
-| Option           | Type                                 | Required | Description                                                                                                                                                         |
-| ---------------- | ------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `baseUrl`        | `string`                             | Yes      | Base URL prepended to every route path                                                                                                                              |
-| `baseHeaders`    | `Record<string, string>`             | No       | Headers merged into every request                                                                                                                                   |
-| `credentials`    | `RequestCredentials`                 | No       | Passed as `credentials` to every `fetch` call                                                                                                                       |
-| `fetch`          | `typeof fetch`                       | No       | Custom fetch implementation (e.g. for testing or a polyfill)                                                                                                        |
-| `onRequest`      | `(context) => void \| Promise<void>` | No       | Callback before each request, receiving `{ url, method, headers, route }`. May be async.                                                                            |
-| `requestContext` | `RequestContext`                     | \*       | Header values for your API's [request context](/docs/reference/k-request-context). Present only when your API declares one, and required when any of its headers is |
+| Option           | Type                                                  | Required | Description                                                                                                                                                         |
+| ---------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseUrl`        | `string`                                              | Yes      | Base URL prepended to every route path                                                                                                                              |
+| `baseHeaders`    | `Record<string, string>`                              | No       | Headers merged into every request                                                                                                                                   |
+| `credentials`    | `RequestCredentials`                                  | No       | Passed as `credentials` to every `fetch` call                                                                                                                       |
+| `fetch`          | `typeof fetch`                                        | No       | Custom fetch implementation (e.g. for testing or a polyfill)                                                                                                        |
+| `onRequest`      | `(request: OutgoingRequest) => void \| Promise<void>` | No       | Callback before each request, receiving the request about to be sent as `{ url, method, headers, route }`. May be async.                                            |
+| `requestContext` | `RequestContext`                                      | \*       | Header values for your API's [request context](/docs/reference/k-request-context). Present only when your API declares one, and required when any of its headers is |
 
 `requestContext` values are typed from the declared header schemas, so an optional header stays optional and a coerced one takes the schema's input type. The generated file exports that type as `RequestContext`.
 
