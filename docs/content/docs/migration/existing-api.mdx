@@ -149,22 +149,24 @@ Doing a coordinated cutover instead? Skip the branch, always return the legacy s
 
 If your handlers throw domain errors (or you rely on framework error middleware), map them into Problem Details at the boundary instead of rewriting each handler. On Next.js that's the `onError` option; on Express, Fastify, and Hono, build the response with [`problemDetails()`](/docs/reference/problem-details-schema) in the framework's error handler.
 
-```ts title="api.ts"
+```ts title="kizuna.config.ts"
 import { problemDetails } from '@ts-kizuna/core';
 
-export const api = defineConfig({
-    router,
-    onError: (caught) => {
-        if (caught instanceof NotFoundError) {
-            return NextResponse.json(problemDetails(404, caught.message), {
-                status: 404,
-                headers: {
-                    'content-type': 'application/problem+json',
-                },
-            });
-        }
-        // return nothing to fall through to the default 500
-    },
+export default defineConfig({
+    adapter: nextAdapter({
+        onError: (caught) => {
+            if (caught instanceof NotFoundError) {
+                return NextResponse.json(problemDetails(404, caught.message), {
+                    status: 404,
+                    headers: {
+                        'content-type': 'application/problem+json',
+                    },
+                });
+            }
+            // return nothing to fall through to the default 500
+        },
+    }),
+    routes,
 });
 ```
 

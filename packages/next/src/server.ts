@@ -38,7 +38,7 @@ export interface NextHandlerContext {
 }
 
 /**
- * A contract's jobs paired with their handlers, both in the shape the request
+ * An api's jobs paired with their handlers, both in the shape the request
  * pipeline takes.
  */
 export interface MountedJobs {
@@ -261,10 +261,7 @@ type HttpHandlers = {
 };
 type HttpHandler = (request: NextRequest) => Promise<NextResponse>;
 
-const _ON_ERROR: unique symbol = Symbol('ts-kizuna.next.onError');
-
 export type NextApiWithRouter = ApiWithRouter & {
-    readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
     readonly [GUARDS_META]?: unknown;
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
@@ -272,7 +269,6 @@ export type NextApiWithRouter = ApiWithRouter & {
 };
 
 export type NextApi<R extends Routes = Routes> = ApiWithRouter<R> & {
-    readonly [_ON_ERROR]?: NextHandlerOptions['onError'];
     readonly [GUARDS_META]?: unknown;
     readonly [SCHEMES_META]?: unknown;
     readonly [REQUEST_CONTEXT_META]?: unknown;
@@ -303,7 +299,7 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
         : undefined;
     const handlerOptions = {
         basePath: options?.basePath,
-        onError: options?.onError ?? api[_ON_ERROR],
+        onError: options?.onError,
         requestMiddleware: options?.requestMiddleware,
         responseValidation: options?.responseValidation,
     };
@@ -362,12 +358,16 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
  * than registering them on an app.
  *
  * @example
- * export const { api } = defineConfig({
+ * // kizuna.config.ts
+ * export default defineConfig({
  *     adapter: nextAdapter(),
  *     routes,
  * });
  *
- * export const { GET, POST } = api.mount({ basePath: '/api' });
+ * // src/app/api/[...ts-kizuna]/route.ts
+ * export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
+ *     basePath: '/api',
+ * });
  */
 export const nextAdapter = (defaults?: NextHandlerOptions): Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> => ({
     name: 'next',

@@ -164,39 +164,40 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount
 });
 ```
 
-| Option               | Default | Description                                                                                                                                                     |
-| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `basePath`           | `''`    | Path prefix to strip when matching incoming paths                                                                                                               |
-| `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler. See [`requestMiddleware`](#requestmiddleware)                                                          |
-| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                                 |
-| `onError`            | none    | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. Also settable on `defineConfig`. |
+| Option               | Default | Description                                                                                                                    |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `basePath`           | `''`    | Path prefix to strip when matching incoming paths                                                                              |
+| `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler. See [`requestMiddleware`](#requestmiddleware)                         |
+| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                |
+| `onError`            | none    | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. |
 
 ## `onError`
 
-Set `onError` on `defineConfig`, or pass it to `mount`, to send your own response:
+Pass `onError` to `nextAdapter()`, or to `mount`, to send your own response:
 
 ```ts title="kizuna.config.ts"
 export default defineConfig({
-    adapter: nextAdapter(),
+    adapter: nextAdapter({
+        onError: (error) => {
+            if (error instanceof AuthError) {
+                return {
+                    kind: 'raw-response',
+                    response: new Response(
+                        JSON.stringify({
+                            message: 'Unauthorized',
+                        }),
+                        {
+                            status: 401,
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                        }
+                    ),
+                };
+            }
+        },
+    }),
     routes,
-    onError: (error) => {
-        if (error instanceof AuthError) {
-            return {
-                kind: 'raw-response',
-                response: new Response(
-                    JSON.stringify({
-                        message: 'Unauthorized',
-                    }),
-                    {
-                        status: 401,
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                    }
-                ),
-            };
-        }
-    },
 });
 ```
 
