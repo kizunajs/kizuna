@@ -62,9 +62,13 @@ const main = async (): Promise<void> => {
     const outArg = values.output ?? die('Missing --output\n\n' + usage);
     const namespaceName = values['namespace-name'] ?? die('Missing --namespace-name\n\n' + usage);
 
-    const [pathPart, exportName = values.export ?? 'api'] = configArg.split(':');
+    const [pathPart, apiName = values.export] = configArg.split(':');
     const configPath = resolve(process.cwd(), pathPart!);
-    const contract = (await loadConfig(configPath, exportName)) ?? die(`No \`${exportName}\` (or default) export found at ${configPath}`);
+    const apis = await loadConfig(configPath);
+    const loaded =
+        (apiName === undefined ? apis[0] : apis.find((entry) => entry.name === apiName)) ??
+        die(apiName === undefined ? `No config found at ${configPath}` : `No api named \`${apiName}\` at ${configPath}`);
+    const contract = loaded.api;
     const swiftSource = generateSwiftClient(contract, {
         namespaceName,
         camelCaseProperties: values['camel-case'],

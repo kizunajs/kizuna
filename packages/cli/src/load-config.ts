@@ -1,65 +1,39 @@
 import { createJiti } from 'jiti';
-import type { ApiDefinition } from '@ts-kizuna/core';
-
-export interface LoadConfigOptions {
-    /**
-     * Named export to read the api from.
-     *
-     * @default 'api'
-     */
-    exportName?: string;
-    /**
-     * Collects the source files the api was built from, its own import
-     * graph with dependencies left out.
-     */
-    files?: string[];
-    /**
-     * Files to read from disk rather than from jiti's module cache, which is
-     * shared across instances and would otherwise serve the version it first
-     * saw. Pass what a previous load reported to pick up edits.
-     */
-    reread?: readonly string[];
-}
-
-const isApiDefinition = (value: unknown): value is ApiDefinition =>
-    typeof value === 'object' && value !== null && typeof (value as ApiDefinition).routes === 'object';
-
-const cacheOf = (jiti: unknown): Record<string, unknown> => (jiti as { cache?: Record<string, unknown> }).cache ?? {};
+import { apiEntries, type ApiDefinition, type ClientTarget } from '@ts-kizuna/core';
 
 /**
- * Imports a config module with jiti (so a `.ts` entry works without a build
- * step) and returns the named export (default `contract`) or the default export.
- * Returns undefined when neither is present.
+ * One api a config declares, with everything generated from it. A config that
+ * declares a single api reports it under `default`.
  */
-export const loadConfig = async (
-    contractPath: string,
-    exportNameOrOptions: string | LoadConfigOptions = 'api'
-): Promise<ApiDefinition | undefined> => {
-    const options = typeof exportNameOrOptions === 'string' ? { exportName: exportNameOrOptions } : exportNameOrOptions;
-    const { exportName = 'api', files, reread } = options;
+export interface LoadedApi {
+    name: string;
+    api: ApiDefinition;
+    clients: readonly ClientTarget[];
+    /**
+     * Where `kizuna generate` writes the `Config`, when the config says.
+     */
+    typesOutput: string | undefined;
+}
 
+/**
+ * Imports a config module with jiti, so a `.ts` config works without a build
+ * step, and returns every api it declares along with the clients and the types
+ * output each one asks for.
+ *
+ * Returns an empty list when the module default-exports nothing that looks like
+ * a config.
+ */
+export const loadConfig = async (configPath: string): Promise<LoadedApi[]> => {
     const jiti = createJiti(import.meta.url, {
         interopDefault: true,
     });
 
-    const cache = cacheOf(jiti);
-    const evicted = new Set(reread ?? []);
-    for (const file of evicted) delete cache[file];
+    const loaded = (await jiti.import(configPath)) as Record<string, unknown>;
 
-    // The cache is shared across instances and outlives this call, so only what
-    // this load put there counts as the api's own graph.
-    const before = new Set(Object.keys(cache));
-    const loaded = (await jiti.import(contractPath)) as Record<string, ApiDefinition | undefined> | undefined;
-
-    if (files) {
-        files.push(...Object.keys(cache).filter((file) => !file.includes('node_modules') && (!before.has(file) || evicted.has(file))));
-    }
-
-    // A `kizuna.config.ts` default-exports its config, so the api is one step in.
-    const config = loaded?.default as Record<string, unknown> | undefined;
-    const candidate = loaded?.[exportName] ?? config?.[exportName] ?? config;
-
-    // `interopDefault` hands back the namespace when a module has no default,
-    // so a module without a config would otherwise look like one.
-    return isApiDefinition(candidate) ? candidate : undefined;
+    return apiEntries(loaded).map(([name, entry]) => ({
+        name,
+        api: entry.api,
+        clients: entry.clients ?? [],
+        typesOutput: entry.typescript?.outputFile,
+    }));
 };

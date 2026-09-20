@@ -1,5 +1,4 @@
-export { loadConfig, type LoadConfigOptions } from './load-config.js';
-export { watchConfig, type ConfigChange, type WatchConfigOptions } from './watch-config.js';
+export { loadConfig, type LoadedApi } from './load-config.js';
 export { apiNotices, formatNotice, type Notice } from './api-notices.js';
 export { diffApis, formatChange, hasBreakingChange, type Change, type ChangeLevel } from './diff-apis.js';
 export { writeClients, checkClients, formatStale, type WrittenClient, type StaleClient } from './generate-clients.js';

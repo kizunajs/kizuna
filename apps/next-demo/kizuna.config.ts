@@ -16,6 +16,9 @@ const served = {
 
 export default defineConfig({
     adapter: nextAdapter(),
+    typescript: {
+        outputFile: './kizuna.types.ts',
+    },
     tags,
     auth: {
         identities: {

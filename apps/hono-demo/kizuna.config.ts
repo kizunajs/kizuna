@@ -16,6 +16,9 @@ const served = {
 
 export default defineConfig({
     adapter: honoAdapter(),
+    typescript: {
+        outputFile: './kizuna.types.ts',
+    },
     tags,
     auth: {
         identities: {

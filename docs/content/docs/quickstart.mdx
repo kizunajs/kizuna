@@ -3,17 +3,11 @@ title: Quickstart
 description: Declare your routes, serve them on your framework, and call them from a typed client in 8 minutes.
 ---
 
-A ts-kizuna project has three parts:
-
-1. **`kizuna.config.ts`** names the framework you serve on and everything the API is made of.
-2. **The routes** you declare with `k`: a method, a path, its Zod schemas, and the handler that answers it.
-3. **The client**, generated from those same declarations, so it knows every route, input and response.
-
 ## Installation
 
-Install `@ts-kizuna/core`, together with Zod 4 for the schemas.
+Install `@ts-kizuna/core` with Zod 4 for the schemas, and the CLI that writes your types and your clients.
 
-<InstallTabs packageName="@ts-kizuna/core zod" />
+<InstallTabs packageName="@ts-kizuna/core zod" devPackageName="@ts-kizuna/cli" />
 
 Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
 
@@ -39,16 +33,40 @@ import { nextAdapter } from '@ts-kizuna/next'; // or express, fastify, hono
 
 export default defineConfig({
     adapter: nextAdapter(),
+    typescript: {
+        outputFile: './kizuna.types.ts',
+    },
 });
 ```
 
 Naming an adapter is what puts that framework's own request in every handler's args, typed.
 
-```bash
-kizuna generate
+</Step>
+
+<Step>
+
+## Add the generate script
+
+```json title="package.json"
+{
+    "scripts": {
+        "kizuna:generate": "kizuna generate",
+        "kizuna:check": "kizuna generate --check"
+    }
+}
 ```
 
-That writes the `Config` in `kizuna.types.ts`, which is what types everything you declare next. The routes go on the config once you have some.
+```bash
+pnpm kizuna:generate
+```
+
+That writes the `Config` that types everything you declare next. Run it after every change, and `kizuna:check` in CI.
+
+Say so where it gets read:
+
+```md title="AGENTS.md"
+After changing a route, run `pnpm kizuna:generate`.
+```
 
 </Step>
 
@@ -65,7 +83,7 @@ import type { Config } from '../kizuna.types';
 export const k = new Kizuna<Config>();
 ```
 
-`k` is typed by the `Config` that `kizuna generate` writes, so every name you use is checked against what your config declares. See [`new Kizuna()`](/docs/reference/kizuna).
+`k` is typed by the `Config` that `kizuna:generate` writes, so every name you use is checked against what your config declares. See [`new Kizuna()`](/docs/reference/kizuna).
 
 Each route pairs a method and path with Zod schemas, and carries the handler that answers it:
 
@@ -217,7 +235,7 @@ export default defineConfig({
 ```
 
 ```bash
-kizuna generate
+pnpm kizuna:generate
 ```
 
 Wrap it once with the base URL you serve on:

@@ -2,10 +2,9 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
-import { apiEntries, type ClientTarget, type ApiDefinition } from '@ts-kizuna/core';
-import { createJiti } from 'jiti';
 import { ConfigSyntaxError, generateConfigTypes } from './generate-types.js';
 import { checkClients, formatStale, writeClients } from './generate-clients.js';
+import { loadConfig } from './load-config.js';
 
 const usage = `Usage: kizuna generate [options]
 
@@ -16,8 +15,8 @@ Options:
   --check           Report what would be rewritten and write nothing. Exits 1
                     when anything is behind, for a pipeline to fail on.
   --config <path>   Path to the config. Default: kizuna.config.ts
-  --types <path>    Where kizuna.types.ts is written. Beats the config's
-                    typescript.outputFile. Default: beside the config.
+  --types <path>    Where the Config is written, overriding the config's
+                    typescript.outputFile.
 `;
 
 /**
@@ -32,22 +31,6 @@ const displayPath = (file: string): string => {
 const die: (message: string, code?: number) => never = (message, code = 1) => {
     process.stderr.write(`${message}\n`);
     process.exit(code);
-};
-
-/**
- * The config's own default export, loaded with jiti so a `.ts` config needs no
- * build step.
- */
-const loadConfig = async (
-    configPath: string
-): Promise<{ api: ApiDefinition; clients: readonly ClientTarget[]; typesOutput: string | undefined }> => {
-    const jiti = createJiti(import.meta.url, {
-        interopDefault: true,
-    });
-    const loaded = (await jiti.import(configPath)) as Record<string, unknown>;
-    const [entry] = apiEntries(loaded);
-    if (!entry) die(`No config found at ${configPath}. A kizuna config default-exports its \`defineConfig(...)\` call.`);
-    return { api: entry[1].api, clients: entry[1].clients ?? [], typesOutput: entry[1].typescript?.outputFile };
 };
 
 const main = async (): Promise<void> => {
@@ -85,9 +68,17 @@ const main = async (): Promise<void> => {
         throw error;
     }
 
-    const config = await loadConfig(configPath);
+    const [config] = await loadConfig(configPath);
+    if (!config) die(`No config found at ${displayPath(configPath)}. A kizuna config default-exports its \`defineConfig(...)\` call.`);
     // `--types` beats the config, which beats the file beside the config.
-    const typesPath = resolve(dirname(configPath), values.types ?? config.typesOutput ?? 'kizuna.types.ts');
+    const typesOutput = values.types ?? config.typesOutput;
+    if (typesOutput === undefined) {
+        die(
+            `${displayPath(configPath)} declares no \`typescript.outputFile\`, which is where the \`Config\` is written. ` +
+                'Add one, or pass --types.'
+        );
+    }
+    const typesPath = resolve(dirname(configPath), typesOutput);
     const typesCurrent = existsSync(typesPath) ? readFileSync(typesPath, 'utf8') : undefined;
     const typesBehind = typesCurrent !== types;
 

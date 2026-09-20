@@ -3,36 +3,53 @@
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 
 interface InstallTabsProps {
-    packageName: string;
+    packageName?: string;
     /**
-     * Render the commands as dev-dependency installs (`-D` / `--save-dev`).
+     * Packages that belong in `devDependencies`, chained onto the same command
+     * so one tab covers both halves of an install.
+     */
+    devPackageName?: string;
+    /**
+     * Render `packageName` as a dev-dependency install too.
      */
     dev?: boolean;
 }
 
-export function InstallTabs({ packageName, dev = false }: InstallTabsProps) {
-    const flags = {
-        pnpm: dev ? '-D ' : '',
-        bun: dev ? '-d ' : '',
-        npm: dev ? '--save-dev ' : '',
-    };
+const MANAGERS = [
+    {
+        id: 'pnpm',
+        add: 'pnpm add',
+        devFlag: '-D ',
+    },
+    {
+        id: 'bun',
+        add: 'bun add',
+        devFlag: '-d ',
+    },
+    {
+        id: 'npm',
+        add: 'npm install',
+        devFlag: '--save-dev ',
+    },
+];
+
+export function InstallTabs({ packageName, devPackageName, dev = false }: InstallTabsProps) {
     return (
-        <Tabs groupId="package-manager" items={['pnpm', 'bun', 'npm']}>
-            <Tab value="pnpm">
-                <pre>
-                    <code>{`pnpm add ${flags.pnpm}${packageName}`}</code>
-                </pre>
-            </Tab>
-            <Tab value="bun">
-                <pre>
-                    <code>{`bun add ${flags.bun}${packageName}`}</code>
-                </pre>
-            </Tab>
-            <Tab value="npm">
-                <pre>
-                    <code>{`npm install ${flags.npm}${packageName}`}</code>
-                </pre>
-            </Tab>
+        <Tabs groupId="package-manager" items={MANAGERS.map((manager) => manager.id)}>
+            {MANAGERS.map((manager) => {
+                const commands = [
+                    packageName === undefined ? undefined : `${manager.add} ${dev ? manager.devFlag : ''}${packageName}`,
+                    devPackageName === undefined ? undefined : `${manager.add} ${manager.devFlag}${devPackageName}`,
+                ].filter((command) => command !== undefined);
+
+                return (
+                    <Tab key={manager.id} value={manager.id}>
+                        <pre>
+                            <code>{commands.join(' && ')}</code>
+                        </pre>
+                    </Tab>
+                );
+            })}
         </Tabs>
     );
 }

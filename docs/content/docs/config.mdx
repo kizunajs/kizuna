@@ -322,7 +322,7 @@ On Next.js each API is its own catch-all route file, and `mount({ basePath })` i
 
 ## `kizuna generate`
 
-<InstallTabs packageName="-D @ts-kizuna/cli" />
+<InstallTabs packageName="@ts-kizuna/cli" dev />
 
 ```sh title="Terminal"
 kizuna generate
@@ -348,7 +348,9 @@ export default defineConfig({
 });
 ```
 
-Add it to your `package.json` and run it after changing the config:
+### Wire it into your scripts
+
+Two scripts cover everywhere it needs to run:
 
 ```json title="package.json"
 {
@@ -357,6 +359,14 @@ Add it to your `package.json` and run it after changing the config:
         "kizuna:check": "kizuna generate --check"
     }
 }
+```
+
+Run `kizuna:generate` after changing a route, an identity, or the config. Run `kizuna:check` in CI, where it fails on anything nobody regenerated.
+
+Whoever changes your routes needs to know about that first script, and a coding agent working in the repository reads the same files your team does. Say it where they look:
+
+```md title="AGENTS.md"
+After changing a route, run `pnpm kizuna:generate`.
 ```
 
 ### `kizuna.types.ts`
@@ -409,7 +419,7 @@ The same work without writing. It names whatever has fallen behind and exits `1`
 
 Commit what `kizuna generate` writes. The check compares the files on disk against the config, so a generated client that is gitignored reads as missing on every clean checkout and the pipeline fails on it.
 
-Run it in CI beside your typecheck. See [Breaking changes](/docs/breaking-changes) for the rest of the pipeline, and [Watching](/docs/watching) for regenerating as you edit.
+Run it in CI beside your typecheck. See [Breaking changes](/docs/breaking-changes) for the rest of the pipeline.
 
 `writeClients` and `checkClients` from `@ts-kizuna/cli` are the same two steps as functions, for a script that does more than the command does.
 

@@ -1,17 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
-import type { ApiDefinition } from '@ts-kizuna/core';
 import { loadConfig } from './load-config.js';
 import { diffApis, type Change } from './diff-apis.js';
 
 export interface DiffAgainstOptions {
-    /**
-     * Named export to read the api from.
-     *
-     * @default 'api'
-     */
-    exportName?: string;
     /**
      * Repository the ref lives in.
      *
@@ -34,7 +27,7 @@ const git = (cwd: string, ...args: string[]): string => execFileSync('git', args
  * const changes = await diffAgainst('main', './src/contract.ts');
  */
 export const diffAgainst = async (ref: string, configPath: string, options: DiffAgainstOptions = {}): Promise<Change[]> => {
-    const { exportName = 'api', cwd = process.cwd() } = options;
+    const { cwd = process.cwd() } = options;
 
     const root = git(cwd, 'rev-parse', '--show-toplevel');
     const absolute = isAbsolute(configPath) ? configPath : resolve(cwd, configPath);
@@ -49,13 +42,13 @@ export const diffAgainst = async (ref: string, configPath: string, options: Diff
     try {
         git(root, 'worktree', 'add', '--detach', '--force', worktree, ref);
 
-        const before = await loadConfig(join(worktree, fromRoot), { exportName });
-        if (before === undefined) throw new Error(`No \`${exportName}\` export in ${fromRoot} at ${ref}`);
+        const [before] = await loadConfig(join(worktree, fromRoot));
+        if (before === undefined) throw new Error(`No config found in ${fromRoot} at ${ref}`);
 
-        const after = await loadConfig(absolute, { exportName });
-        if (after === undefined) throw new Error(`No \`${exportName}\` export in ${configPath}`);
+        const [after] = await loadConfig(absolute);
+        if (after === undefined) throw new Error(`No config found in ${configPath}`);
 
-        return diffApis(before as ApiDefinition, after as ApiDefinition);
+        return diffApis(before.api, after.api);
     } finally {
         try {
             git(root, 'worktree', 'remove', '--force', worktree);

@@ -3,6 +3,9 @@ import { fetchClient } from '@ts-kizuna/fetch/server';
 import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@ts-kizuna-demo/shared';
 
 export default defineConfig({
+    typescript: {
+        outputFile: './kizuna.types.ts',
+    },
     tags,
     auth: {
         identities: {

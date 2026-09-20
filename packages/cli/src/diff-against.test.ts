@@ -86,7 +86,7 @@ describe('diffAgainst', () => {
         writeFileSync(join(directory, 'contract.ts'), 'export const nothing = true;\n');
         git(directory, 'commit', '--quiet', '-am', 'no contract');
 
-        await expect(diffAgainst('HEAD', 'contract.ts', { cwd: directory })).rejects.toThrow('No `api` export');
+        await expect(diffAgainst('HEAD', 'contract.ts', { cwd: directory })).rejects.toThrow('No config found');
         expect(git(directory, 'worktree', 'list').trim().split('\n')).toHaveLength(1);
     });
 

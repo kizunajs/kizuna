@@ -30,8 +30,7 @@ export interface ApiEntry {
     api: ApiDefinition;
     clients?: readonly ClientTarget[];
     /**
-     * Where `kizuna generate` writes the `Config`. Absent when the config says
-     * nothing, and the command falls back to `kizuna.types.ts` beside it.
+     * Where `kizuna generate` writes the `Config`.
      */
     typescript?: {
         outputFile?: string;
