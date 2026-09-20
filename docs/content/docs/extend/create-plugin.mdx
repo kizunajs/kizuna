@@ -5,7 +5,7 @@ description: Write a plugin once and it runs on every adapter, because it never 
 
 <AlphaNotice>
 
-The plugin API is new and still settling. `createPlugin` and the shape of what it returns may change before v2, so pin your version if you depend on them.
+The plugin API is new and still settling. `createPlugin` and the shape of what it returns may change while v2 is in beta, so pin your version if you depend on them.
 
 </AlphaNotice>
 
@@ -157,7 +157,7 @@ One entry, and its own `package.json` says how far it reaches:
 }
 ```
 
-A plugin is always `server`: it is named on a config, and a config carries handlers, so it never reaches a browser. `kizuna.entries` is what this repo's boundary test reads, and it holds every package to the reach it declares.
+A plugin is always `server`, since it runs where the config does. `kizuna.entries` is what this repo's boundary test reads, and it holds every package to the reach it declares.
 
 ## Reference
 

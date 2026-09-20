@@ -10,7 +10,7 @@ pnpm add @ts-kizuna/fetch
 
 ## Usage
 
-Name the client on your config and run `kizuna generate`:
+Add `fetchClient` to your config and run `kizuna generate`:
 
 ```ts
 import { fetchClient } from '@ts-kizuna/fetch/server';

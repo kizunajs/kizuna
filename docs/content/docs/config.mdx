@@ -79,13 +79,11 @@ updateUser: k
     }),
 ```
 
-Plugin slugs come from other people, so they are namespaced under `plugins` rather than spread into the handler args, where one called `body` would shadow your request body. Destructure it for the short form:
+Destructure it for the short form:
 
 ```ts
 .handler(async ({ params, body, plugins: { audit } }) => {
 ```
-
-A config with no plugins gets no `plugins` argument at all.
 
 ## Mounting
 
@@ -171,7 +169,7 @@ clients: [
 ],
 ```
 
-Your config carries the handlers, so it stays on the server. A browser imports the generated client, which holds the route shapes and the schemas and nothing a handler reached for.
+The generated client holds the route shapes and the schemas, and is what a browser imports.
 
 ## Client options
 
@@ -409,6 +407,8 @@ The same work without writing. It names whatever has fallen behind and exits `1`
   src/lib/api-client.generated.ts is behind the config
 ```
 
+Commit what `kizuna generate` writes. The check compares the files on disk against the config, so a generated client that is gitignored reads as missing on every clean checkout and the pipeline fails on it.
+
 Run it in CI beside your typecheck. See [Breaking changes](/docs/breaking-changes) for the rest of the pipeline, and [Watching](/docs/watching) for regenerating as you edit.
 
 `writeClients` and `checkClients` from `@ts-kizuna/cli` are the same two steps as functions, for a script that does more than the command does.
@@ -417,5 +417,4 @@ Run it in CI beside your typecheck. See [Breaking changes](/docs/breaking-change
 
 - [`defineConfig`](/docs/reference/define-config)
 - [Routes](/docs/routes) for what you put under `routes`
-- [Routes](/docs/routes) for what a handler receives
 - [Fetch client](/docs/clients/fetch), [Swift](/docs/clients/swift), [Kotlin](/docs/clients/kotlin)

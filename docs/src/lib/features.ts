@@ -35,7 +35,7 @@ export const features: Feature[] = [
         icons: [McpLogo],
         title: 'MCP endpoint',
         href: '/docs/mcp',
-        description: 'Serve the routes declaring a tool so AI assistants can call them, behind the same guards.',
+        description: 'Serve the routes declaring a tool so AI assistants can call them.',
     },
     {
         icons: [TanstackLogo],

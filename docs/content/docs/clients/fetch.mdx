@@ -13,9 +13,9 @@ You generate it from your routes. The generated file carries named types and a t
 
 <Step>
 
-## Name it in your config
+## Add it to your config
 
-A client is something your config declares, next to the adapter and the routes. Point it at the file you want written:
+Point `fetchClient` at the file you want written:
 
 ```ts title="kizuna.config.ts"
 import { fetchClient } from '@ts-kizuna/fetch/server';
@@ -443,7 +443,7 @@ That is all the runtime reads. The types above it are erased at build time.
 
 ## Keeping it current
 
-The file can fall behind your routes, and it fails loudly when it does: add a route and the client has no method for it, which is a compile error in your own repository rather than a broken deploy. Regenerate it as part of your build and have CI fail on a dirty tree afterwards.
+The file can fall behind your routes, and it fails loudly when it does: add a route and the client has no method for it, which your compiler catches. Regenerate it as part of your build and have CI fail on a dirty tree afterwards.
 
 ## Reference
 

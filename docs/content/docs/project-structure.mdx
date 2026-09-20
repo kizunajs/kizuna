@@ -27,35 +27,13 @@ my-api/
     └── index.ts            # kizuna.api.mount(app)
 ```
 
-Each route carries the handler that answers it, so there is no second tree to keep in step. The same holds for the rest: a guard sits on its identity, a resolver sits on its request context value, and a job's handler sits on the job.
+Each route carries the handler that answers it. The same holds for the rest: a guard sits on its identity, a resolver sits on its request context value, and a job's handler sits on the job.
 
 - **`k.ts`** constructs the surface once, typed by the `Config` in `kizuna.types.ts`. Everything else imports `k` from here.
 - **`routes/`** holds one file per group, each calling `k.routes`, with an `index.ts` re-exporting them so the config has one import to make. See [splitting routes across files](/docs/routes#splitting-routes-across-files).
 - **`identities.ts`** names who can call the API, and each identity's `guard` is what authenticates them. See [Authentication](/docs/authentication).
 - **`roles.ts`** names who a caller can be, and each route's `auth` says who may call it. See [Access Control](/docs/access-control).
-- **`kizuna.config.ts`** is where the adapter, the routes, the identities, the jobs and the plugins come together.
-
-## What reaches the browser
-
-The config carries every handler, every guard, and everything they import, so it stays on the server. Your database driver and your `process.env` reads belong there, beside the handlers that use them.
-
-What a browser imports is the client `kizuna generate` writes from that config. It holds the route shapes and the schemas, and nothing a handler reached for.
-
-```ts title="kizuna.config.ts"
-import { fetchClient } from '@ts-kizuna/fetch/server';
-
-export default defineConfig({
-    adapter: expressAdapter(),
-    routes,
-    clients: [
-        fetchClient({
-            output: './src/lib/api-client.generated.ts',
-        }),
-    ],
-});
-```
-
-See [Clients](/docs/clients/fetch) for what each generator writes, and [Configuration](/docs/config) for the CLI that runs them.
+- **`kizuna.config.ts`** is where the adapter, the routes, the identities, the jobs and the plugins come together. A browser imports the [generated client](/docs/clients/fetch) written from it.
 
 ## The `@/` alias
 

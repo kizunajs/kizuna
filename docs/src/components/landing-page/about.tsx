@@ -25,6 +25,11 @@ export function About() {
                 and <code className={styles.code}>@Deprecated</code> in Android Studio.
             </p>
             <p className={styles.body}>
+                Since then, more of the code calling an API is written by agents, and an agent is only as good as what it can read. A route
+                declares its inputs, its statuses and its errors in one place, so there is one exact thing to work from and a compiler to
+                check what comes back.
+            </p>
+            <p className={styles.body}>
                 The name comes from 絆 (kizuna), a Japanese word for a deep, enduring bond between people. The hard part is keeping
                 everything you built standing as the API underneath it changes. One declaration, bound to everything that depends on it, is
                 what keeps it standing.

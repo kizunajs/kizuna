@@ -5,7 +5,7 @@ description: Generate a native Kotlin client from your routes, using OkHttp and 
 
 <BetaNotice>
 
-The Kotlin client is new and still settling. The generated API surface may change before v2, so pin your version if you depend on it.
+The Kotlin client is new and still settling. The generated API surface may change while v2 is in beta, so pin your version if you depend on it.
 
 </BetaNotice>
 
@@ -34,9 +34,9 @@ dependencies {
 
 <Step>
 
-## Name it in your config
+## Add it to your config
 
-A client is something your config declares. Point it at the file you want written:
+Point `kotlinClient` at the file you want written:
 
 ```ts title="kizuna.config.ts"
 import { kotlinClient } from '@ts-kizuna/kotlin';

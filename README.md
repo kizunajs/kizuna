@@ -123,7 +123,7 @@ app.listen(3000);
 
 ### Use the API on the client
 
-Name a client under `clients` on your config, run `kizuna generate`, and the file it writes already knows every route.
+Add `fetchClient` to your config, run `kizuna generate`, and import the file it writes.
 
 ```ts
 // src/lib/api-client.ts

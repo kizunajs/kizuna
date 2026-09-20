@@ -35,9 +35,13 @@ export const questions: Question[] = [
                     hand.
                 </p>
                 <p className={styles.body}>
-                    Change the API and your editor shows you everything that breaks, right then. Deprecate a field and every caller sees it
-                    before it&rsquo;s gone. Frontend, backend, and mobile all come from one source, so a client cannot quietly drift from
-                    the server.
+                    Change the API and your editor shows you everything that breaks. Deprecate a field and every caller sees it before
+                    it&rsquo;s gone. Frontend, backend, and mobile all come from one source, so a client cannot quietly drift from the
+                    server.
+                </p>
+                <p className={styles.body}>
+                    Agents work well against it. A route declares what it takes and what it answers, so an agent writing a caller reads the
+                    same source your compiler checks it against.
                 </p>
                 <p className={styles.body}>
                     And it&rsquo;s real HTTP underneath: proper REST routes, correct status codes, RFC 9457 errors. More on the{' '}
@@ -50,41 +54,11 @@ export const questions: Question[] = [
         ),
     },
     {
-        question: 'Is it ready to use?',
-        answer: (
-            <>
-                <p className={styles.body}>
-                    It runs in production in our own apps. What is still settling is the way you define and call your API, which is why
-                    ts-kizuna is in beta and moving toward a stable v2. Pin a version for production and follow the{' '}
-                    <a className={styles.link} href="https://github.com/ts-kizuna/kizuna/releases" target="_blank" rel="noreferrer">
-                        release notes
-                    </a>{' '}
-                    when you upgrade.
-                </p>
-                <p className={styles.body}>
-                    <strong className={styles.strong}>Why is it already 1.0 if it&rsquo;s in beta?</strong> We used it internally for a
-                    while before open-sourcing it, and we kept the version history rather than resetting the number. The beta label is about
-                    the API surface, not about stability.
-                </p>
-                <p className={styles.body}>
-                    Read that number as 0.x. While ts-kizuna is in beta a minor version can carry a breaking change, and every release names
-                    them under <strong className={styles.strong}>&#9888; BREAKING CHANGES</strong>.
-                </p>
-                <p className={styles.body}>
-                    The docs mark the newest surfaces with a <strong className={styles.strong}>Beta</strong> badge. Those are the most
-                    likely to change before v2.
-                </p>
-            </>
-        ),
-    },
-    {
         question: "What's on the roadmap?",
         answer: (
             <>
                 <p className={styles.body}>Where ts-kizuna is headed:</p>
                 <ul className={styles.bullets}>
-                    <li>A stable v2 syntax, with the way you define and call your API locked in</li>
-                    <li>Webhooks, declared like routes</li>
                     <li>OpenAPI 3.2.0 output</li>
                     <li>A TanStack Start adapter</li>
                     <li>Whatever the future brings</li>

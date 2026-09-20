@@ -8,7 +8,7 @@ export function Beta({ className }: { className?: string }) {
             <span className={styles.pill}>Beta</span>
             <p className={styles.body}>
                 <span className={styles.bodyLong}>
-                    Battle-tested in production. The syntax may still change before v2, so pin your version.
+                    Battle-tested in production. The syntax may still change while v2 is in beta, so pin your version.
                 </span>
                 <span className={styles.bodyShort}>Battle-tested in prod.</span>
             </p>
