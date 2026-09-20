@@ -25,14 +25,13 @@ interface Question {
 
 export const questions: Question[] = [
     {
-        question: 'Why ts-kizuna?',
+        question: 'Why Kizuna?',
         answer: (
             <>
                 <p className={styles.body}>One config, a fully typed stack.</p>
                 <p className={styles.body}>
-                    Describe your API once. ts-kizuna serves it as a typed REST API, an OpenAPI document and an MCP endpoint, and generates
-                    the TypeScript, Swift and Kotlin clients that call it. No copying types between repos, no docs to keep up to date by
-                    hand.
+                    Describe your API once. Kizuna serves it as a typed REST API, an OpenAPI document and an MCP endpoint, and generates the
+                    TypeScript, Swift and Kotlin clients that call it. No copying types between repos, no docs to keep up to date by hand.
                 </p>
                 <p className={styles.body}>
                     Change the API and your editor shows you everything that breaks. Deprecate a field and every caller sees it before
@@ -57,7 +56,7 @@ export const questions: Question[] = [
         question: "What's on the roadmap?",
         answer: (
             <>
-                <p className={styles.body}>Where ts-kizuna is headed:</p>
+                <p className={styles.body}>Where Kizuna is headed:</p>
                 <ul className={styles.bullets}>
                     <li>OpenAPI 3.2.0 output</li>
                     <li>A TanStack Start adapter</li>
@@ -70,7 +69,7 @@ export const questions: Question[] = [
         question: 'Why Zod only?',
         answer: (
             <p className={styles.body}>
-                ts-kizuna won&rsquo;t support Standard Schema or other validators. It leans on Zod features directly for its inference and
+                Kizuna won&rsquo;t support Standard Schema or other validators. It leans on Zod features directly for its inference and
                 coercion, and committing to one validator is what keeps the types this precise.
             </p>
         ),
@@ -79,8 +78,8 @@ export const questions: Question[] = [
         question: 'Can I use my API from non-TypeScript clients?',
         answer: (
             <p className={styles.body}>
-                Yes. ts-kizuna describes a real REST API, so anything that speaks HTTP can call it. The same routes generate native Swift
-                and Kotlin clients, and are served as an OpenAPI document and an MCP endpoint.
+                Yes. Kizuna describes a real REST API, so anything that speaks HTTP can call it. The same routes generate native Swift and
+                Kotlin clients, and are served as an OpenAPI document and an MCP endpoint.
             </p>
         ),
     },
@@ -88,7 +87,7 @@ export const questions: Question[] = [
         question: 'Coming from ts-rest?',
         answer: (
             <p className={styles.body}>
-                ts-kizuna is inspired by{' '}
+                Kizuna is inspired by{' '}
                 <a className={styles.link} href="https://ts-rest.com" target="_blank" rel="noreferrer">
                     ts-rest
                 </a>{' '}
@@ -96,7 +95,7 @@ export const questions: Question[] = [
                 <Link className={styles.link} href="/docs/migration/from-ts-rest">
                     migration guide
                 </Link>{' '}
-                maps each API to its ts-kizuna equivalent.
+                maps each API to its Kizuna equivalent.
             </p>
         ),
     },
@@ -108,7 +107,7 @@ export const questions: Question[] = [
                     <a className={styles.link} href="https://trpc.io" target="_blank" rel="noreferrer">
                         tRPC
                     </a>{' '}
-                    is a great choice for a pure TypeScript stack, and ts-kizuna does not ask you to give up the RPC-like client. You still
+                    is a great choice for a pure TypeScript stack, and Kizuna does not ask you to give up the RPC-like client. You still
                     call your endpoints like functions and get fully typed results back:
                 </p>
                 <div className={styles.code}>
@@ -122,9 +121,9 @@ export const questions: Question[] = [
                     />
                 </div>
                 <p className={styles.body}>
-                    ts-kizuna fits better when your API has consumers outside that client: another language, a public integration, or
-                    anything reading the OpenAPI spec. The same routes also generate native Swift and Kotlin clients, so your iOS and
-                    Android apps are typed against the API too.
+                    Kizuna fits better when your API has consumers outside that client: another language, a public integration, or anything
+                    reading the OpenAPI spec. The same routes also generate native Swift and Kotlin clients, so your iOS and Android apps
+                    are typed against the API too.
                 </p>
             </>
         ),
@@ -162,8 +161,8 @@ export const questions: Question[] = [
         answer: (
             <>
                 <p className={styles.body}>
-                    ts-kizuna is open source and provided as-is. Most answers are in the docs or the source. For anything else, open an
-                    issue on{' '}
+                    Kizuna is open source and provided as-is. Most answers are in the docs or the source. For anything else, open an issue
+                    on{' '}
                     <a className={styles.link} href="https://github.com/ts-kizuna/kizuna/issues" target="_blank" rel="noreferrer">
                         GitHub
                     </a>

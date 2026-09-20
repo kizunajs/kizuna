@@ -6,7 +6,7 @@ export function NavTitle() {
         <>
             <img src="/favicon-dark.png" alt="" className={clsx(styles.icon, styles.light)} />
             <img src="/favicon-light.png" alt="" className={clsx(styles.icon, styles.dark)} />
-            ts-kizuna
+            Kizuna
         </>
     );
 }

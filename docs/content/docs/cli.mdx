@@ -67,10 +67,10 @@ kizuna diff --against main
 BREAKING users.patchUser renamed to users.updateUser
          client method and generated client names change, HTTP surface unaffected
 
-BREAKING users.createUser body.organisationId is now required
+BREAKING POST /users body.organisationId is now required
 
-CHANGED  users.getUser can now answer 410
-ADDED    users.archiveUser
+CHANGED  GET /users/:id can now answer 410
+ADDED    POST /users/:id/archive added
 ```
 
 It exits `1` when a change breaks callers, so a pipeline fails on one. `--against` defaults to `main`, and `--json` prints the changes as an array. See [Breaking changes](/docs/breaking-changes) for what counts as breaking and how to gate a pull request on it.

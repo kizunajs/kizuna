@@ -1,11 +1,145 @@
 ---
-title: What is ts-kizuna?
+title: What is Kizuna?
 description: A spec-driven REST framework for TypeScript, where your route declarations produce the validation, the documentation, the clients, and the AI tools.
 ---
 
+You write routes, each a method, a path, the Zod schemas it takes and returns, and the handler that serves it:
+
+```ts title="src/routes/users.ts"
+export const getUser = k
+    .route({
+        method: 'GET',
+        path: '/users/:id',
+        auth: 'user',
+        responses: {
+            200: UserSchema,
+            404: ProblemDetailsSchema,
+        },
+    })
+    .handler(async ({ params, throwError }) => {
+        const user = await db.users.find(params.id); // the `:id` in the path above
+
+        if (!user) {
+            return throwError({
+                status: 404,
+                body: {
+                    detail: 'User not found',
+                },
+            });
+        }
+
+        return {
+            status: 200,
+            body: user, // { id: string; name: string }
+        };
+    });
+```
+
+That route answers exactly what it declared:
+
+```http title="GET /users/1"
+HTTP/1.1 200 OK
+content-type: application/json
+
+{
+    "id": "1",
+    "name": "Ada"
+}
+```
+
+```http title="GET /users/999"
+HTTP/1.1 404 Not Found
+content-type: application/problem+json
+
+{
+    "type": "about:blank",
+    "title": "Not Found",
+    "status": 404,
+    "detail": "User not found"
+}
+```
+
+`kizuna.config.ts` collects your routes into the API you mount on your adapter. It validates every request against those schemas and answers failures as [Problem Details](/docs/reference/problem-details-schema).
+
+The same declaration is what everything else is written from:
+
 <GeneratedSurfaces />
 
-It mounts onto the HTTP framework you already use, so Express, Fastify, Hono and Next.js keep serving your app exactly as they do now.
+## Runs on your framework
+
+The adapter is one line of your config. Handlers get that framework's own typed request and response.
+
+<Cards>
+    <Card title="Express" href="/docs/adapters/express">
+        `req` and `res` in every handler.
+    </Card>
+    <Card title="Fastify" href="/docs/adapters/fastify">
+        `request` and `reply` in every handler.
+    </Card>
+    <Card title="Hono" href="/docs/adapters/hono">
+        `c` in every handler.
+    </Card>
+    <Card title="Next.js" href="/docs/adapters/next">
+        `request` in every handler.
+    </Card>
+</Cards>
+
+Running somewhere else? [Write your own adapter](/docs/extend/create-adapter).
+
+## Spec-driven
+
+Kizuna follows the RFCs instead of inventing conventions, so your API behaves the way the web already expects. [See every spec it follows](/docs/standards).
+
+<Cards>
+    <Card title="Problem Details" href="/docs/reference/problem-details-schema">
+        Every error body is RFC 9457, sent as `application/problem+json`.
+    </Card>
+    <Card title="Refusals" href="/docs/authentication">
+        `401` carries the `WWW-Authenticate` challenge the identity declares.
+    </Card>
+    <Card title="Caching" href="/docs/caching">
+        `Cache-Control`, `Vary` and `ETag` from what the response declares.
+    </Card>
+    <Card title="Deprecation" href="/docs/deprecations">
+        `Deprecation` and `Sunset` headers from the route that announces them.
+    </Card>
+</Cards>
+
+Errors are hard to get right, so Kizuna starts from Problem Details. Add your own fields and anything that speaks the standard still reads it:
+
+```ts title="src/routes/users.ts"
+responses: {
+    200: UserSchema,
+    429: ProblemDetailsSchema.extend({
+        retryAfter: z.int(),
+    }),
+},
+```
+
+## Iterate without breaking your apps
+
+Kizuna treats a breaking change as a decision you make, not one you discover in production. `kizuna diff` compares your routes against a git ref and reports what a change costs, from a renamed route down to a single field that became required. Breaking ones exit 1, so CI fails until someone labels the pull request.
+
+<ChangeCost />
+
+## Easy to extend
+
+Anything Kizuna ships, you can extend yourself with the same tools we used.
+
+<Cards>
+    <Card title="createAdapter" href="/docs/extend/create-adapter">
+        Serve on a runtime Kizuna has never heard of.
+    </Card>
+    <Card title="createGenerator" href="/docs/extend/create-generator">
+        Walk your routes and write anything from them.
+    </Card>
+    <Card title="createPlugin" href="/docs/extend/create-plugin">
+        Add endpoints and helpers that reach every handler.
+    </Card>
+    <Card title="createJobTransport" href="/docs/extend/create-job-transport">
+        Put your jobs on any queue or scheduler.
+    </Card>
+</Cards>
 
 ## Start here
 
@@ -24,5 +158,8 @@ It mounts onto the HTTP framework you already use, so Express, Fastify, Hono and
     </Card>
     <Card title="Authentication" href="/docs/authentication">
         A credential you accept, and the guard that turns it into the caller.
+    </Card>
+    <Card title="CLI" href="/docs/cli">
+        Write your types and clients, print your routes, and diff an API against a git ref.
     </Card>
 </Cards>

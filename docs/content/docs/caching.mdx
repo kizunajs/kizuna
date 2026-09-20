@@ -1,6 +1,6 @@
 ---
 title: Caching
-description: Declare on a response how it may be cached, and have kizuna send the Cache-Control and Vary headers and document them in OpenAPI.
+description: Declare on a response how it may be cached, and have Kizuna send the Cache-Control and Vary headers and document them in OpenAPI.
 ---
 
 <BetaNotice>
@@ -198,7 +198,7 @@ The declaration is the only place a policy comes from. A `cache-control` header 
 },
 ```
 
-kizuna hashes the response body and sends it as `ETag`. The caller's cache stores that, and `no-cache` tells it to check before every reuse. On the next request it sends `If-None-Match`, and when the body still hashes the same kizuna answers `304 Not Modified` with the headers and no body.
+Kizuna hashes the response body and sends it as `ETag`. The caller's cache stores that, and `no-cache` tells it to check before every reuse. On the next request it sends `If-None-Match`, and when the body still hashes the same Kizuna answers `304 Not Modified` with the headers and no body.
 
 The saving is the body, not the work: your handler still runs, because the tag comes from what it returned. Reach for it when responses are large and change rarely.
 

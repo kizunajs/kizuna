@@ -1,6 +1,6 @@
 ---
 title: Access Control
-description: Declare the roles callers hold and say who may call each route. kizuna checks the caller's role before the handler runs.
+description: Declare the roles callers hold and say who may call each route. Kizuna checks the caller's role before the handler runs.
 ---
 
 <AlphaNotice>
@@ -344,7 +344,7 @@ export const member = k.identity
     });
 ```
 
-kizuna answers `403` before the handler when the role is not one the route accepts. The handler reads it under `auth.member.role`.
+Kizuna answers `403` before the handler when the role is not one the route accepts. The handler reads it under `auth.member.role`.
 
 A caller with several roles returns them as an array, and passes when any of them is accepted.
 
@@ -385,7 +385,7 @@ export const member = k.identity
     });
 ```
 
-kizuna answers `403` before the handler when the role does not hold what the route requires. The handler reads the role under `auth.member.role` and everything it holds under `auth.member.permissions`, typed to the catalog.
+Kizuna answers `403` before the handler when the role does not hold what the route requires. The handler reads the role under `auth.member.role` and everything it holds under `auth.member.permissions`, typed to the catalog.
 
 A caller with several roles returns them as an array, and holds all of them.
 
@@ -425,7 +425,7 @@ return {
 };
 ```
 
-kizuna treats the list as what the caller holds, and fails the guard if it names something the role cannot hold. A guard that returns no list hands over the whole role, which is what an `'all'` role wants.
+Kizuna treats the list as what the caller holds, and fails the guard if it names something the role cannot hold. A guard that returns no list hands over the whole role, which is what an `'all'` role wants.
 
 The route that saves the list validates each entry against the catalog:
 
@@ -482,7 +482,7 @@ The map says whether the caller may call the route. Which rows are theirs is a s
 | The handler        | With the row it loaded            | Is this row the caller's               |
 | Row-level security | In the database, inside the query | Which rows this request may see at all |
 
-kizuna runs the first. You write the second, with the row and `auth` in hand. The third is the database's.
+Kizuna runs the first. You write the second, with the row and `auth` in hand. The third is the database's.
 
 ### One row
 
@@ -528,7 +528,7 @@ The `403` is the one every guarded route already declares, so the handler answer
 
 ### Every row
 
-<Callout type="warn" title="kizuna cannot filter a list">
+<Callout type="warn" title="Kizuna cannot filter a list">
     It runs before the query, never inside it. A list that forgets its `where` returns every tenant's rows.
 </Callout>
 

@@ -1,6 +1,6 @@
 # @ts-kizuna/express
 
-`@ts-kizuna/express` connects a ts-kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
+`@ts-kizuna/express` connects a Kizuna API to an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
 
 **Requires Express >= 5.**
 

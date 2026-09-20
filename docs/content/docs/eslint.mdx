@@ -1,9 +1,9 @@
 ---
 title: ESLint
-description: Catch ts-kizuna mistakes in your editor with the official ESLint plugin.
+description: Catch Kizuna mistakes in your editor with the official ESLint plugin.
 ---
 
-`@ts-kizuna/eslint-plugin` catches ts-kizuna mistakes in your editor, as you type. These are things the type system can't express on its own.
+`@ts-kizuna/eslint-plugin` catches Kizuna mistakes in your editor, as you type. These are things the type system can't express on its own.
 
 <InstallTabs packageName="@ts-kizuna/eslint-plugin" />
 
@@ -47,11 +47,11 @@ query: z.object({
 
 ## `no-unsupported-schema`
 
-Flags anything using something ts-kizuna can't support: `body`, `query`, `pathParams`, `headers`, and response schemas in your routes, plus `Kizuna.model` schemas, inline or imported. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
+Flags anything using something Kizuna can't support: `body`, `query`, `pathParams`, `headers`, and response schemas in your routes, plus `Kizuna.model` schemas, inline or imported. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
 
 ### `z.coerce`
 
-kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/routes#query-path-and-header-coercion)), so `z.coerce` is redundant, and `k.routes` throws on it. Use the plain schema:
+Kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/routes#query-path-and-header-coercion)), so `z.coerce` is redundant, and `k.routes` throws on it. Use the plain schema:
 
 ```ts
 // flagged

@@ -28,7 +28,7 @@ describe('routes that come and go', () => {
         const changes = diffApis(base, after);
 
         expect(changes[0]).toMatchObject({ level: 'breaking', key: 'users.getUser' });
-        expect(summaries(changes)).toContain('users.getUser is gone');
+        expect(summaries(changes)).toContain('GET /users/:id is gone');
     });
 
     it('reports a new route as added, not breaking', () => {
@@ -69,7 +69,7 @@ describe('the shape of a route', () => {
             listUsers: { method: 'GET', path: '/users', responses: ok },
         });
 
-        expect(summaries(diffApis(base, after))).toContain('users.getUser moved from /users/:id to /people/:id');
+        expect(summaries(diffApis(base, after))).toContain('GET /users/:id moved to /people/:id');
     });
 
     it('reports a changed method as breaking', () => {
@@ -78,7 +78,7 @@ describe('the shape of a route', () => {
             listUsers: { method: 'GET', path: '/users', responses: ok },
         });
 
-        expect(summaries(diffApis(base, after))).toContain('users.getUser answers POST instead of GET');
+        expect(summaries(diffApis(base, after))).toContain('/users/:id answers POST instead of GET');
     });
 
     it('reports a dropped status as breaking and a new one as changed', () => {
@@ -88,8 +88,8 @@ describe('the shape of a route', () => {
         });
         const changes = diffApis(base, after);
 
-        expect(summaries(changes)).toContain('users.getUser no longer answers 404');
-        expect(summaries(changes)).toContain('users.getUser can now answer 410');
+        expect(summaries(changes)).toContain('GET /users/:id no longer answers 404');
+        expect(summaries(changes)).toContain('GET /users/:id can now answer 410');
         expect(changes.find((change) => change.summary.includes('no longer'))?.level).toBe('breaking');
         expect(changes.find((change) => change.summary.includes('can now'))?.level).toBe('changed');
     });
@@ -107,8 +107,8 @@ describe('the shape of a route', () => {
         });
         const changes = diffApis(base, after);
 
-        expect(summaries(changes)).toContain('users.getUser is now deprecated');
-        expect(summaries(changes)).toContain('users.getUser sunsets on 2027-01-01');
+        expect(summaries(changes)).toContain('GET /users/:id is now deprecated');
+        expect(summaries(changes)).toContain('GET /users/:id sunsets on 2027-01-01');
         expect(hasBreakingChange(changes)).toBe(false);
     });
 });
@@ -133,7 +133,7 @@ describe('schemas, compared field by field', () => {
             },
         });
 
-        expect(summaries(diffApis(withBody, after))).toContain('users.createUser body.organisationId is now required');
+        expect(summaries(diffApis(withBody, after))).toContain('POST /users body.organisationId is now required');
         expect(hasBreakingChange(diffApis(withBody, after))).toBe(true);
     });
 
@@ -160,7 +160,7 @@ describe('schemas, compared field by field', () => {
             },
         });
 
-        expect(summaries(diffApis(withBody, after))).toContain('users.createUser 201.nickname is gone');
+        expect(summaries(diffApis(withBody, after))).toContain('POST /users 201.nickname is gone');
     });
 
     it('reports a narrowed query param as breaking', () => {
@@ -176,7 +176,7 @@ describe('schemas, compared field by field', () => {
             },
         });
 
-        expect(summaries(diffApis(before, after))).toContain('users.listUsers query.sort is enum instead of string');
+        expect(summaries(diffApis(before, after))).toContain('GET /users query.sort is enum instead of string');
     });
 });
 
@@ -217,7 +217,7 @@ describe('reporting', () => {
     it('reads as a block with the cost underneath', () => {
         const after = contractOf({ listUsers: { method: 'GET', path: '/users', responses: ok } });
 
-        expect(formatChange(diffApis(base, after)[0]!)).toBe('BREAKING users.getUser is gone\n         GET /users/:id no longer exists');
+        expect(formatChange(diffApis(base, after)[0]!)).toBe('BREAKING GET /users/:id is gone\n         GET /users/:id no longer exists');
     });
 
     it('says nothing when nothing changed', () => {

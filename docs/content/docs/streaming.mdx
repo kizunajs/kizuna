@@ -57,7 +57,7 @@ Two `body`s meet on a route like this. The route's own `body` is the request bod
 
 ## Write the handler
 
-The handler returns the status, and for `body` an async generator function. kizuna sends the status and headers, calls the function, and writes each `yield` the moment it happens:
+The handler returns the status, and for `body` an async generator function. Kizuna sends the status and headers, calls the function, and writes each `yield` the moment it happens:
 
 ```ts title="src/routes/assistant.ts"
 import Anthropic from '@anthropic-ai/sdk';
@@ -186,7 +186,7 @@ const result = await apiClient.assistant.reply({
 stopButton.onclick = () => controller.abort();
 ```
 
-On the server the generator's `signal` fires, so an upstream call that took it stops too, and kizuna returns the generator so a `finally` block runs. The handler above hands `signal` to the Anthropic SDK for this reason.
+On the server the generator's `signal` fires, so an upstream call that took it stops too, and Kizuna returns the generator so a `finally` block runs. The handler above hands `signal` to the Anthropic SDK for this reason.
 
 </Step>
 
@@ -355,13 +355,13 @@ export const assistant = k.routes('assistant', {
 
 Before the first message, everything works as on any route: validation answers `400`, a guard `401` or `403`, and `throwError` any status the route declares, all as Problem Details. `throwError` takes no streamed status. A stream is a body to produce, and bailing out is what `throwError` is for.
 
-Once the handler has returned, the status and headers are on the wire. A throw inside the generator after that cannot become a `500`, so kizuna ends the connection. The client's loop rejects instead of finishing quietly, and the adapter's error callback is told. Declare a terminal event like `done` when the reader must know the reply is whole, and an `error` event of your own when it must know why it stopped short.
+Once the handler has returned, the status and headers are on the wire. A throw inside the generator after that cannot become a `500`, so Kizuna ends the connection. The client's loop rejects instead of finishing quietly, and the adapter's error callback is told. Declare a terminal event like `done` when the reader must know the reply is whole, and an `error` event of your own when it must know why it stopped short.
 
-With `responseValidation` on, kizuna validates each message against its schema before writing it, and a message that fails ends the stream the same way.
+With `responseValidation` on, Kizuna validates each message against its schema before writing it, and a message that fails ends the stream the same way.
 
 ## Headers
 
-A streamed response goes out with `Content-Type: text/event-stream` and `Cache-Control: no-store`, since a cache stores a complete representation and a stream has none. Return your own `headers` to add to what kizuna sends, the way you would on any response. `X-Accel-Buffering: no` tells nginx to pass each message through rather than collect them.
+A streamed response goes out with `Content-Type: text/event-stream` and `Cache-Control: no-store`, since a cache stores a complete representation and a stream has none. Return your own `headers` to add to what Kizuna sends, the way you would on any response. `X-Accel-Buffering: no` tells nginx to pass each message through rather than collect them.
 
 Every `GET` route answers `HEAD`, a stream route included: the status and headers, no body, and no `Content-Length`, since the length is unknown. The handler runs, and the generator is never called.
 

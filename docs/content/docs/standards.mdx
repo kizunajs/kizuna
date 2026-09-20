@@ -1,9 +1,9 @@
 ---
 title: Standards
-description: The specifications ts-kizuna follows, what each one governs, and what it deliberately leaves out.
+description: The specifications Kizuna follows, what each one governs, and what it deliberately leaves out.
 ---
 
-ts-kizuna is spec-driven. It tries to follow these specifications as closely as it can.
+Kizuna is spec-driven. It tries to follow these specifications as closely as it can.
 
 ## HTTP
 
@@ -21,7 +21,7 @@ ts-kizuna is spec-driven. It tries to follow these specifications as closely as 
 | [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) Conditional Requests                          | The `ETag` a response's `etag` sends, the `If-None-Match` it is compared against, and the `304 Not Modified` a match answers with                  |
 | [Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html) WHATWG HTML | The `text/event-stream` framing of a route's `stream` response: `event`, `data`, `id`, `retry`, and comment lines                                  |
 
-Every `GET` route answers `HEAD` too. [RFC 9110 §9.3.2](https://www.rfc-editor.org/rfc/rfc9110#section-9.3.2) defines `HEAD` as `GET` without the content, so kizuna serves it from the path's `GET` route: same status and headers, a `Content-Length`, no body. A declared `HEAD` route takes the path instead, and `HEAD` joins `GET` in every `Allow` header. The derived route stays out of the OpenAPI document and the clients; the generator's `derivedHead` option opts it in.
+Every `GET` route answers `HEAD` too. [RFC 9110 §9.3.2](https://www.rfc-editor.org/rfc/rfc9110#section-9.3.2) defines `HEAD` as `GET` without the content, so Kizuna serves it from the path's `GET` route: same status and headers, a `Content-Length`, no body. A declared `HEAD` route takes the path instead, and `HEAD` joins `GET` in every `Allow` header. The derived route stays out of the OpenAPI document and the clients; the generator's `derivedHead` option opts it in.
 
 ## OpenAPI
 
@@ -33,11 +33,11 @@ See [OpenAPI](/docs/openapi) for the generator and the reference UI it serves.
 
 ## Authentication
 
-An API that verifies tokens rather than issuing them is a resource server, and kizuna serves the documents and challenges one owes its clients.
+An API that verifies tokens rather than issuing them is a resource server, and Kizuna serves the documents and challenges one owes its clients.
 
 | Standard                                                                         | What it governs                                                               |
 | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [OAuth 2.1](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)         | The resource server model kizuna implements                                   |
+| [OAuth 2.1](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)         | The resource server model Kizuna implements                                   |
 | [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) Protected Resource Metadata   | The discovery document served at `/.well-known/oauth-protected-resource`      |
 | [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) Authorization Server Metadata | An identity's `issuer`                                                        |
 | [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707) Resource Indicators           | The canonical `resource` URI, and the audience a guard checks a token against |
@@ -54,11 +54,11 @@ See [authentication](/docs/authentication) for identities and guards, and [acces
 
 See [MCP](/docs/mcp) for the endpoint, and [tools](/docs/tools) for declaring your own.
 
-No standard covers streamed tool calls. MCP deliberately has none, having replaced interactive tool flows with multi round-trip requests in its `2026-07-28` revision, so the `tool_call`, `tool_result` and `tool_error` events a streamed response carries are kizuna's own vocabulary. Their framing follows the WHATWG server-sent events specification like any other stream.
+No standard covers streamed tool calls. MCP deliberately has none, having replaced interactive tool flows with multi round-trip requests in its `2026-07-28` revision, so the `tool_call`, `tool_result` and `tool_error` events a streamed response carries are Kizuna's own vocabulary. Their framing follows the WHATWG server-sent events specification like any other stream.
 
 ## Deliberate omissions
 
 | Omission                                                  | Why                                                                                   |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `TRACE` is absent from `Method`                           | Disabled in production everywhere, and unsupported by the frameworks kizuna mounts on |
+| `TRACE` is absent from `Method`                           | Disabled in production everywhere, and unsupported by the frameworks Kizuna mounts on |
 | Support for [Standard Schema](https://standardschema.dev) | Routes take Zod alone, see [Zod](/docs/zod)                                           |

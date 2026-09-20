@@ -9,7 +9,7 @@ Custom issue codes are new and still settling. `k.issue` and the `validation.iss
 
 </BetaNotice>
 
-Emit a single Zod validation issue carrying a custom machine-readable `code`. The code is surfaced verbatim in the `errors[].code` field of kizuna's [`ValidationErrorSchema`](/docs/reference/is-validation-error).
+Emit a single Zod validation issue carrying a custom machine-readable `code`. The code is surfaced verbatim in the `errors[].code` field of Kizuna's [`ValidationErrorSchema`](/docs/reference/is-validation-error).
 
 The code is checked against the `validation.issueCodes` you declared on [`defineConfig`](/docs/reference/define-config), so a typo is a compile error.
 

@@ -9,7 +9,7 @@ Install `@ts-kizuna/core`, Zod 4 for the schemas, your framework's adapter, and 
 
 <InstallTabs packageName="@ts-kizuna/core zod @ts-kizuna/next" devPackageName="@ts-kizuna/cli" />
 
-Enable `strict` in your `tsconfig.json`. ts-kizuna's inference depends on it.
+Enable `strict` in your `tsconfig.json`. Kizuna's inference depends on it.
 
 ```json title="tsconfig.json"
 {
@@ -83,7 +83,7 @@ import type { Config } from '../kizuna.types';
 export const k = new Kizuna<Config>();
 ```
 
-`k` is typed by the `Config` that `kizuna:generate` writes, so every name you use is checked against what your config declares. See [`new Kizuna()`](/docs/reference/kizuna).
+`k` is typed by the `Config` that `kizuna:generate` writes, so every name you use is checked against what your config declares. See [`new Kizuna()`](/docs/reference/Kizuna).
 
 Each route pairs a method and path with Zod schemas, and carries the handler that answers it:
 

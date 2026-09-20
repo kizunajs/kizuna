@@ -53,7 +53,7 @@ describe('diffAgainst', () => {
 
         const changes = await diffAgainst('HEAD', 'contract.ts', { cwd: directory });
 
-        expect(changes.map((change) => change.summary)).toEqual(['users.getUser is gone', 'users.listUsers added']);
+        expect(changes.map((change) => change.summary)).toEqual(['GET /users/:id is gone', 'GET /users added']);
     });
 
     it('reads a ref that is several commits back', async () => {
@@ -69,7 +69,7 @@ describe('diffAgainst', () => {
 
         expect((await diffAgainst('HEAD~1', 'contract.ts', { cwd: directory })).map((change) => change.summary)).toEqual([]);
         expect((await diffAgainst('HEAD', 'contract.ts', { cwd: directory })).map((change) => change.summary)).toEqual([
-            'users.archiveUser is gone',
+            'POST /users/:id/archive is gone',
         ]);
     });
 

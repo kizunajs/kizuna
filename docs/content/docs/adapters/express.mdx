@@ -1,9 +1,9 @@
 ---
 title: Express
-description: Mount a ts-kizuna API on an Express 5 application.
+description: Mount a Kizuna API on an Express 5 application.
 ---
 
-`@ts-kizuna/express` serves a ts-kizuna API from an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
+`@ts-kizuna/express` serves a Kizuna API from an Express 5 application. It handles routing, request validation, body parsing, and error formatting, all driven by what you declared.
 
 **Requires Express ≥ 5.**
 
@@ -200,7 +200,7 @@ If a path is matched but the method is not declared, the adapter returns 405 wit
 
 ## Multipart / file uploads
 
-For routes with `contentType: 'multipart/form-data'`, add a multipart middleware such as `multer` or `busboy` before the ts-kizuna handler. The adapter reads `req.body` as-is.
+For routes with `contentType: 'multipart/form-data'`, add a multipart middleware such as `multer` or `busboy` before the Kizuna handler. The adapter reads `req.body` as-is.
 
 ```ts title="src/index.ts"
 import multer from 'multer';

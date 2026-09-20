@@ -1,6 +1,6 @@
 # @ts-kizuna/fastify
 
-`@ts-kizuna/fastify` connects a ts-kizuna API to a Fastify application.
+`@ts-kizuna/fastify` connects a Kizuna API to a Fastify application.
 
 **Requires Fastify >= 5.**
 

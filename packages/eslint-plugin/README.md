@@ -1,6 +1,6 @@
 # @ts-kizuna/eslint-plugin
 
-`@ts-kizuna/eslint-plugin` catches ts-kizuna mistakes in your editor, as you type. These are things the type system cannot express on its own.
+`@ts-kizuna/eslint-plugin` catches Kizuna mistakes in your editor, as you type. These are things the type system cannot express on its own.
 
 ## Installation
 

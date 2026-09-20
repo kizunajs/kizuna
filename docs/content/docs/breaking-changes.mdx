@@ -19,13 +19,13 @@ kizuna diff --against main
 BREAKING users.patchUser renamed to users.updateUser
          client method and generated client names change, HTTP surface unaffected
 
-BREAKING users.createUser body.organisationId is now required
+BREAKING POST /users body.organisationId is now required
 
 BREAKING the job reconcileInvoices is gone
          whatever calls POST /jobs/run with that key stops working
 
-CHANGED  users.getUser can now answer 410
-ADDED    users.archiveUser
+CHANGED  GET /users/:id can now answer 410
+ADDED    POST /users/:id/archive added
 ```
 
 </Step>
@@ -115,8 +115,8 @@ That last row catches people out. Adding a value to a response enum breaks any c
 Bodies, query parameters, headers and every response body are compared, reported by path and followed into arrays:
 
 ```
-BREAKING users.createUser body.address.postcode is now required
-BREAKING users.listUsers 200.items[].id is number instead of string
+BREAKING POST /users body.address.postcode is now required
+BREAKING GET /users 200.items[].id is number instead of string
 ```
 
 **What it cannot see** is a rule inside `.refine()` or `.superRefine()`, because those are functions rather than declarations. A tightened refinement passes quietly.

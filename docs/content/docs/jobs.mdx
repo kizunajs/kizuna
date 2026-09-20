@@ -343,7 +343,7 @@ export default defineConfig({
 });
 ```
 
-kizuna ships no transports. QStash, BullMQ, pg-boss, Cloud Tasks, SQS, or a table in your own database all fit the same interface: see [Create a job transport](/docs/extend/create-job-transport).
+Kizuna ships no transports. QStash, BullMQ, pg-boss, Cloud Tasks, SQS, or a table in your own database all fit the same interface: see [Create a job transport](/docs/extend/create-job-transport).
 
 A job is addressed by its dotted key, so a transport carries the name and the input. Queues come in two shapes, and the shape decides whether you run anything extra:
 
@@ -354,7 +354,7 @@ A job is addressed by its dotted key, so a transport carries the name and the in
 
 `startJobWorker` returns `undefined` against a queue that needs no worker. Run it in the API's process or its own.
 
-`retry: 3` on a job says how many attempts a failure deserves; your transport does the retrying. kizuna warns when a job asks for something its transport will drop, at startup for `retry` and at the `queue` call for `runAt` and `dedupeKey`.
+`retry: 3` on a job says how many attempts a failure deserves; your transport does the retrying. Kizuna warns when a job asks for something its transport will drop, at startup for `retry` and at the `queue` call for `runAt` and `dedupeKey`.
 
 ## The two job endpoints
 
@@ -438,9 +438,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 <Callout type="warn">The dev runner ticks on an interval held in memory, so a tick while the process is down is missed silently.</Callout>
 
-## What kizuna does not do
+## What Kizuna does not do
 
-kizuna owns no database and no queue, so it does not:
+Kizuna owns no database and no queue, so it does not:
 
 - **Store your jobs.** Durability, dead-lettering, and a dashboard come from your transport.
 - **Retry.** Your transport does. Without one, nothing retries.

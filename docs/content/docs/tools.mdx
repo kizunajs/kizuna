@@ -426,7 +426,7 @@ See [MCP](/docs/mcp) for the rest of the endpoint, including OAuth.
 
 ## How it works underneath
 
-Nothing here is a new transport. Every piece reduces to something kizuna already had.
+Nothing here is a new transport. Every piece reduces to something Kizuna already had.
 
 **The events are folded into the stream at `k.routes` time.** `tools` on a response is authoring sugar. Before a route is validated, `expandStreamTools` turns each route you named into three Zod schemas and merges them into the response's `stream` record, then deletes the `tools` field. From that point on the response is an ordinary named-event stream, which is why the four adapters, the OpenAPI generator, the fetch client, and the Swift and Kotlin generators needed no changes to carry tools.
 
@@ -436,12 +436,12 @@ Nothing here is a new transport. Every piece reduces to something kizuna already
 
 **Execution is the route's own pipeline.** A tool call runs the route handler through the same validation, guards and Problem Details an HTTP request does, so there is one place a route runs whoever asked.
 
-## What kizuna leaves out
+## What Kizuna leaves out
 
-- **Models.** kizuna never calls one, holds a conversation, or runs an agent loop. It validates input, runs a handler, validates output. The loop lives in your route handler, the way a job's transport lives outside kizuna.
+- **Models.** Kizuna never calls one, holds a conversation, or runs an agent loop. It validates input, runs a handler, validates output. The loop lives in your route handler, the way a job's transport lives outside kizuna.
 - **Provider wire shapes.** There is no `toAnthropicTools` or `toOpenAITools`, because those track a vendor changelog. `buildToolDefinitions` hands you MCP's shape and the `.map` to a provider is a few lines you can read.
-- **Progressive tool input.** A model streams a tool's arguments as partial JSON, which has no schema until it is whole. A half-parsed `{ city: "Os" }` would type-check as a finished value while being wrong, so kizuna emits `tool_call` once the arguments are complete.
+- **Progressive tool input.** A model streams a tool's arguments as partial JSON, which has no schema until it is whole. A half-parsed `{ city: "Os" }` would type-check as a finished value while being wrong, so Kizuna emits `tool_call` once the arguments are complete.
 
 ## A note on standards
 
-The declaration follows the Model Context Protocol `Tool` object, and its schemas follow JSON Schema 2020-12. The three event names are kizuna's own, since no standard covers streamed tool calls. See [standards](/docs/standards).
+The declaration follows the Model Context Protocol `Tool` object, and its schemas follow JSON Schema 2020-12. The three event names are Kizuna's own, since no standard covers streamed tool calls. See [standards](/docs/standards).

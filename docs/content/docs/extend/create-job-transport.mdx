@@ -1,6 +1,6 @@
 ---
 title: Create a Job Transport
-description: Connect any queue or scheduler to your kizuna jobs by implementing one function.
+description: Connect any queue or scheduler to your Kizuna jobs by implementing one function.
 ---
 
 <AlphaNotice>
@@ -11,7 +11,7 @@ The transport API is new and still settling. The message shape and what a transp
 
 A transport carries a job from `jobs.indexUser.queue(...)` to the process that runs it.
 
-kizuna ships none, so you write one against the queue you run.
+Kizuna ships none, so you write one against the queue you run.
 
 ```ts title="job-transport.ts"
 import { createJobTransport } from '@ts-kizuna/core';
@@ -43,7 +43,7 @@ export default defineConfig({
 
 ## Two shapes
 
-**Push** systems deliver by calling a URL: QStash, Cloud Tasks, SQS to Lambda. Point them at the run endpoint, `POST /jobs/run`, with `{ job, input }` as the body. kizuna already guards and validates it, so these need only `dispatch`.
+**Push** systems deliver by calling a URL: QStash, Cloud Tasks, SQS to Lambda. Point them at the run endpoint, `POST /jobs/run`, with `{ job, input }` as the body. Kizuna already guards and validates it, so these need only `dispatch`.
 
 **Pull** systems store work and a worker drains it: BullMQ, pg-boss, a table in your own database. These also implement `start`.
 
@@ -109,7 +109,7 @@ register: async (schedules) => {
 
 ## `supports`
 
-A message's `runAt`, `dedupeKey` and `retry` are honoured only where the transport declares support, under `runAt`, `dedupe` and `retry`. Say which you honour and kizuna warns when a job asks for one you drop.
+A message's `runAt`, `dedupeKey` and `retry` are honoured only where the transport declares support, under `runAt`, `dedupe` and `retry`. Say which you honour and Kizuna warns when a job asks for one you drop.
 
 `dedupe` is what makes `startJobs` safe on more than one instance: every replica ticking 05:00 produces the same `dedupeKey`.
 
@@ -205,7 +205,7 @@ export default defineConfig({
 
 Two things that are easy to get wrong here, and both look like a delivered job that never ran:
 
-- **`upstash-retries` is off by one.** kizuna's `retry` is a number of attempts; QStash's header is retries _after_ the first.
+- **`upstash-retries` is off by one.** Kizuna's `retry` is a number of attempts; QStash's header is retries _after_ the first.
 - **The body is the message, not the input.** QStash delivers what you publish verbatim, and the run endpoint reads `job` from it. Publishing the bare input leaves it with nothing to run.
 
 `register` is worth implementing for QStash in particular: `CRON_TZ=` expresses a time zone, which platform cron cannot, since Vercel and GitHub read every expression as UTC. Note that a job you delete leaves its schedule behind, so prune what your config no longer declares.
@@ -231,7 +231,7 @@ export const scheduler = k.identity.bearer({}).guard(({ bearer, deny }) =>
 
 <Callout type="warn">
     A guard cannot verify QStash's `Upstash-Signature`. The signature covers the raw body, and the request pipeline reads the body before
-    guards run, so by then it is parsed on Express and the stream is consumed on Hono and Next. Verify it ahead of kizuna instead: framework
+    guards run, so by then it is parsed on Express and the stream is consumed on Hono and Next. Verify it ahead of Kizuna instead: framework
     middleware on the run endpoint, or `express.json({verify})` to keep the raw buffer for a guard to read.
 </Callout>
 
@@ -312,4 +312,4 @@ process.on('SIGTERM', () => void worker?.stop());
 ## What you cannot
 
 - `input` survives only as JSON. A `Date` does not come back a `Date`.
-- Delivery is at least once. kizuna does not try to make it exactly once.
+- Delivery is at least once. Kizuna does not try to make it exactly once.

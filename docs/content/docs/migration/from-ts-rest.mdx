@@ -1,13 +1,13 @@
 ---
 title: Migrating from ts-rest
-description: Side-by-side comparison of ts-rest and ts-kizuna, for anyone weighing a ts-rest alternative, with notes on deliberate differences.
+description: Side-by-side comparison of ts-rest and Kizuna, for anyone weighing a ts-rest alternative, with notes on deliberate differences.
 ---
 
-ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest showed that routes-first TypeScript APIs work, and a lot of people built real things with it, ourselves included. ts-kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its ts-kizuna equivalent.
+Kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest showed that routes-first TypeScript APIs work, and a lot of people built real things with it, ourselves included. Kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its Kizuna equivalent.
 
 ## Package mapping
 
-| ts-rest             | ts-kizuna                              | Notes                              |
+| ts-rest             | Kizuna                                 | Notes                              |
 | ------------------- | -------------------------------------- | ---------------------------------- |
 | `@ts-rest/core`     | `@ts-kizuna/core` + `@ts-kizuna/fetch` | Client lives in a separate package |
 | `@ts-rest/express`  | `@ts-kizuna/express`                   |                                    |
@@ -16,9 +16,9 @@ ts-kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneer
 
 ## The biggest difference
 
-In ts-rest a route is a shape, and its implementation lives in a parallel tree you keep in step by hand. In ts-kizuna a route carries the handler that answers it:
+In ts-rest a route is a shape, and its implementation lives in a parallel tree you keep in step by hand. In Kizuna a route carries the handler that answers it:
 
-```ts title="ts-kizuna"
+```ts title="Kizuna"
 export const users = k.routes('users', {
     getUser: k
         .route({
@@ -51,7 +51,7 @@ const c = initContract();
 export const contract = c.router({ ... });
 ```
 
-```ts title="ts-kizuna"
+```ts title="Kizuna"
 import { Kizuna } from '@ts-kizuna/core';
 import type { Config } from '../kizuna.types';
 
@@ -60,7 +60,7 @@ export const k = new Kizuna<Config>();
 export const users = k.routes('users', { ... });
 ```
 
-`Config` is written by `kizuna generate` from your `kizuna.config.ts`. It is what types every handler and checks every name you write. See [`new Kizuna()`](/docs/reference/kizuna).
+`Config` is written by `kizuna generate` from your `kizuna.config.ts`. It is what types every handler and checks every name you write. See [`new Kizuna()`](/docs/reference/Kizuna).
 
 ### Nested routes
 
@@ -70,7 +70,7 @@ export const contract = c.router({
 });
 ```
 
-```ts title="ts-kizuna"
+```ts title="Kizuna"
 export const users = k.routes('users', { ... });
 export const health = k.routes('health', { ... });
 ```
@@ -79,7 +79,7 @@ The tag passed to `k.routes` (a key of your `k.tags` set) sets the OpenAPI tag f
 
 ### `c.noBody()` → `z.void()`
 
-ts-rest uses `c.noBody()` to mark a route as having no request body, or a response as having no body. In ts-kizuna, use `z.void()` for the response and omit `body` entirely.
+ts-rest uses `c.noBody()` to mark a route as having no request body, or a response as having no body. In Kizuna, use `z.void()` for the response and omit `body` entirely.
 
 ```ts title="ts-rest"
 export const contract = c.router({
@@ -94,7 +94,7 @@ export const contract = c.router({
 });
 ```
 
-```ts title="ts-kizuna"
+```ts title="Kizuna"
 export const users = k.routes('users', {
     deleteUser: k
         .route({
@@ -115,7 +115,7 @@ export const users = k.routes('users', {
 
 ## Assembling it
 
-ts-rest passes its router straight to the client and the server. ts-kizuna assembles everything in one `kizuna.config.ts` at the root of your app, which is also where the CLI looks:
+ts-rest passes its router straight to the client and the server. Kizuna assembles everything in one `kizuna.config.ts` at the root of your app, which is also where the CLI looks:
 
 ```ts title="kizuna.config.ts"
 import { defineConfig } from '@ts-kizuna/core';
@@ -144,7 +144,7 @@ const client = initClient(contract, {
 });
 ```
 
-```ts title="ts-kizuna"
+```ts title="Kizuna"
 import { createClient } from './api-client.generated';
 
 const client = createClient({
@@ -152,7 +152,7 @@ const client = createClient({
 });
 ```
 
-Where ts-rest hands the contract to the client at runtime, kizuna writes the client out ahead of time. Your config holds the handlers, so it never reaches a browser; name the file you want under `clients` and run `kizuna generate`:
+Where ts-rest hands the contract to the client at runtime, Kizuna writes the client out ahead of time. Your config holds the handlers, so it never reaches a browser; name the file you want under `clients` and run `kizuna generate`:
 
 ```ts title="kizuna.config.ts"
 clients: [
@@ -182,7 +182,7 @@ const router = s.router(contract, {
 });
 ```
 
-```ts title="ts-kizuna"
+```ts title="Kizuna"
 export const users = k.routes('users', {
     getUser: k
         .route({
@@ -201,7 +201,7 @@ export const users = k.routes('users', {
 
 ### `RouterImpl` has no counterpart
 
-ts-rest types a handler tree because the tree is where handlers live. In ts-kizuna the handler sits on the route, typed from the declaration above it, so there is nothing to annotate and no second tree to keep in step.
+ts-rest types a handler tree because the tree is where handlers live. In Kizuna the handler sits on the route, typed from the declaration above it, so there is nothing to annotate and no second tree to keep in step.
 
 ```ts title="ts-rest"
 import type { RouterImpl } from '@ts-rest/express';
@@ -209,7 +209,7 @@ import type { RouterImpl } from '@ts-rest/express';
 const router: RouterImpl<typeof contract> = { ... };
 ```
 
-```ts title="ts-kizuna"
+```ts title="Kizuna"
 getUser: k
     .route({ ... })
     .handler(async ({ params }) => { ... }),
@@ -223,7 +223,7 @@ getUser: k
 createExpressEndpoints(contract, router, app);
 ```
 
-```ts title="ts-kizuna"
+```ts title="Kizuna"
 import kizuna from '../kizuna.config';
 
 kizuna.api.mount(app);
@@ -245,7 +245,7 @@ const handler = createNextHandler(contract, router, {
 export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE, handler as OPTIONS };
 ```
 
-```ts title="ts-kizuna"
+```ts title="Kizuna"
 import kizuna from '../../../../kizuna.config';
 
 export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
@@ -255,7 +255,7 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount
 
 ## Authentication
 
-ts-rest leaves authentication to your framework's middleware. ts-kizuna declares it: an [identity](/docs/reference/k-identity) says how the credential travels and what a passing guard provides, the guard sits on that identity, and a route's `auth` names the one it requires.
+ts-rest leaves authentication to your framework's middleware. Kizuna declares it: an [identity](/docs/reference/k-identity) says how the credential travels and what a passing guard provides, the guard sits on that identity, and a route's `auth` names the one it requires.
 
 ```ts title="src/identities.ts"
 export const user = k.identity
@@ -284,11 +284,11 @@ Handlers of a route with `auth: 'user'` then read `auth.user.userId`, typed, and
 
 ## Zod version
 
-ts-kizuna targets **Zod 4 only**. ts-rest supports Zod 3 and 4.
+Kizuna targets **Zod 4 only**. ts-rest supports Zod 3 and 4.
 
 If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this change:
 
-| Zod 3 / ts-rest           | Zod 4 / ts-kizuna                  |
+| Zod 3 / ts-rest           | Zod 4 / Kizuna                     |
 | ------------------------- | ---------------------------------- |
 | `c.noBody()`              | `z.void()` or omit `body` entirely |
 | `z.ZodTypeAny`            | `z.ZodType`                        |
@@ -296,8 +296,8 @@ If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this cha
 
 ## Error responses
 
-ts-kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response. Error responses must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array, instead of ts-rest's `{ message, issues }`. If you are porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.
+Kizuna returns [RFC 9457 Problem Details](/docs/reference/problem-details-schema) (`application/problem+json`) for every error response. Error responses must use `ProblemDetailsSchema` (or `ProblemDetailsSchema.extend({...})` for extra fields), not an arbitrary shape. Validation errors are Problem Details with a `detail` string and an `errors` array, instead of ts-rest's `{ message, issues }`. If you are porting an API whose clients expect the old shape, see [Migrating an existing API](/docs/migration/existing-api) for how to keep old clients working during the transition.
 
 ## Method mismatch behaviour
 
-ts-rest returns 404 for requests to a known path with an unsupported method. ts-kizuna returns **405 with an `Allow` header** per [RFC 9110 §15.5.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6).
+ts-rest returns 404 for requests to a known path with an unsupported method. Kizuna returns **405 with an `Allow` header** per [RFC 9110 §15.5.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6).

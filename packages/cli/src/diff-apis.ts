@@ -97,6 +97,12 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
     // A route that left and one that arrived on the same method and path is a
     // rename, which leaves the HTTP surface alone and breaks every client.
     const renames = new Map<string, string>();
+    /**
+     * A route as it is called over HTTP.
+     */
+    const httpLabel = (route: { method: string; path: string } | undefined, fallback: string): string =>
+        route ? `${route.method} ${route.path}` : fallback;
+
     for (const goneKey of removed) {
         const gone = beforeRoutes.get(goneKey);
         const match = added.find((key) => {
@@ -121,7 +127,7 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
         changes.push({
             level: 'breaking',
             key,
-            summary: `${key} is gone`,
+            summary: `${httpLabel(gone, key)} is gone`,
             detail: `${gone?.method} ${gone?.path} no longer exists`,
         });
     }
@@ -132,7 +138,7 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
         changes.push({
             level: 'added',
             key,
-            summary: `${key} added`,
+            summary: `${httpLabel(arrived, key)} added`,
             detail: `${arrived?.method} ${arrived?.path}`,
         });
     }
@@ -145,7 +151,7 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
             changes.push({
                 level: 'breaking',
                 key,
-                summary: `${key} answers ${arrived.method} instead of ${gone.method}`,
+                summary: `${gone.path} answers ${arrived.method} instead of ${gone.method}`,
             });
         }
 
@@ -153,7 +159,7 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
             changes.push({
                 level: 'breaking',
                 key,
-                summary: `${key} moved from ${gone.path} to ${arrived.path}`,
+                summary: `${gone.method} ${gone.path} moved to ${arrived.path}`,
             });
         }
 
@@ -162,7 +168,7 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
             changes.push({
                 level: 'breaking',
                 key,
-                summary: `${key} no longer answers ${droppedStatuses.join(', ')}`,
+                summary: `${httpLabel(gone, key)} no longer answers ${droppedStatuses.join(', ')}`,
                 detail: 'a caller handling that status will not see it again',
             });
         }
@@ -172,7 +178,7 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
             changes.push({
                 level: 'changed',
                 key,
-                summary: `${key} can now answer ${newStatuses.join(', ')}`,
+                summary: `${httpLabel(arrived, key)} can now answer ${newStatuses.join(', ')}`,
             });
         }
 
@@ -187,7 +193,7 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
                 changes.push({
                     level: change.breaking ? 'breaking' : 'changed',
                     key,
-                    summary: `${key} ${change.summary}`,
+                    summary: `${httpLabel(arrived, key)} ${change.summary}`,
                 });
             }
         }
@@ -199,17 +205,17 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
                 changes.push({
                     level: change.breaking ? 'breaking' : 'changed',
                     key,
-                    summary: `${key} ${change.summary}`,
+                    summary: `${httpLabel(arrived, key)} ${change.summary}`,
                 });
             }
         }
 
         if (!gone.deprecated && arrived.deprecated) {
-            changes.push({ level: 'changed', key, summary: `${key} is now deprecated` });
+            changes.push({ level: 'changed', key, summary: `${httpLabel(arrived, key)} is now deprecated` });
         }
 
         if (gone.sunset !== arrived.sunset && arrived.sunset !== undefined) {
-            changes.push({ level: 'changed', key, summary: `${key} sunsets on ${arrived.sunset}` });
+            changes.push({ level: 'changed', key, summary: `${httpLabel(arrived, key)} sunsets on ${arrived.sunset}` });
         }
     }
 

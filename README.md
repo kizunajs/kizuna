@@ -1,6 +1,6 @@
-# ts-kizuna
+# Kizuna
 
-![ts-kizuna](https://raw.githubusercontent.com/ts-kizuna/kizuna/main/docs/public/readme-beta.png)
+![Kizuna](https://raw.githubusercontent.com/ts-kizuna/kizuna/main/docs/public/readme-beta.png)
 
 Build fully typed REST APIs with TypeScript. Declare a route once. Get a typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
 
@@ -10,9 +10,7 @@ Build fully typed REST APIs with TypeScript. Declare a route once. Get a typed s
 [Documentation](https://ts-kizuna.com)
 
 > [!NOTE]
-> **Why is it already 1.0 if it's in beta?** We built ts-kizuna for our own apps and have been battle-testing it in production since before we open-sourced it. The version number came with it from that internal history, so read it as 0.x. It's labeled beta because the syntax for how you declare routes, handlers, and clients may still change before v2.
->
-> So a minor version can carry a breaking change while ts-kizuna is in beta. Every release names them under **⚠ BREAKING CHANGES**, so pin your version and upgrade when it suits you.
+> v2 is in beta while the way you declare routes and call them settles, so a minor version can carry a breaking change. Every release names them under **⚠ BREAKING CHANGES**, so pin your version and upgrade when it suits you.
 >
 > [See the release notes](https://github.com/ts-kizuna/kizuna/releases)
 

@@ -156,7 +156,7 @@ tool: {
 
 ### From the whole server
 
-`instructions` is a single string clients put in front of the model before it picks any tool. kizuna builds one from your [tags](/docs/reference/k-tags), so the groups in your API arrive with their titles and descriptions, and your own text is appended to it:
+`instructions` is a single string clients put in front of the model before it picks any tool. Kizuna builds one from your [tags](/docs/reference/k-tags), so the groups in your API arrive with their titles and descriptions, and your own text is appended to it:
 
 ```ts title="kizuna.config.ts"
 mcpPlugin({
@@ -284,7 +284,7 @@ claude mcp add --transport http my-api http://localhost:3000/mcp
 
 ## Tool input structure
 
-Tool inputs use structured keys that mirror the kizuna handler args:
+Tool inputs use structured keys that mirror the Kizuna handler args:
 
 ```json
 {

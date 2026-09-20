@@ -1,11 +1,11 @@
 ---
 title: Migrating an existing API
-description: Move an existing API onto kizuna without breaking deployed clients, using the additive pattern and the escape hatch for the rest.
+description: Move an existing API onto Kizuna without breaking deployed clients, using the additive pattern and the escape hatch for the rest.
 ---
 
-You have an API in production with clients you cannot redeploy. Moving it onto kizuna is mostly mechanical: routes, schemas, and success responses port across unchanged, and your URLs and status codes stay exactly where they are.
+You have an API in production with clients you cannot redeploy. Moving it onto Kizuna is mostly mechanical: routes, schemas, and success responses port across unchanged, and your URLs and status codes stay exactly where they are.
 
-Errors are the one place kizuna has an opinion. Every error response takes the [RFC 9457 Problem Details](/docs/reference/problem-details-schema) shape, `type`, `title`, `status`, `detail`, plus any extra fields you add. Whether your deployed clients notice depends on what your errors look like today, which is the first thing to work out.
+Errors are the one place Kizuna has an opinion. Every error response takes the [RFC 9457 Problem Details](/docs/reference/problem-details-schema) shape, `type`, `title`, `status`, `detail`, plus any extra fields you add. Whether your deployed clients notice depends on what your errors look like today, which is the first thing to work out.
 
 ## Do I need a new API version?
 

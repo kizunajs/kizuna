@@ -1,6 +1,6 @@
 # @ts-kizuna/hono
 
-`@ts-kizuna/hono` connects a ts-kizuna API to a Hono application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
+`@ts-kizuna/hono` connects a Kizuna API to a Hono application. Hono runs on Cloudflare Workers, Deno, Bun, Node.js, and other runtimes.
 
 **Requires Hono >= 4.**
 

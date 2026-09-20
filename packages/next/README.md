@@ -1,6 +1,6 @@
 # @ts-kizuna/next
 
-`@ts-kizuna/next` connects a ts-kizuna API to the Next.js App Router, as a catch-all route handler.
+`@ts-kizuna/next` connects a Kizuna API to the Next.js App Router, as a catch-all route handler.
 
 **Requires Next.js >= 16.**
 

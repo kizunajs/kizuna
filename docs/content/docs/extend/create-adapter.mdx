@@ -1,6 +1,6 @@
 ---
 title: Create an Adapter
-description: Build and ship your own ts-kizuna adapter for any HTTP runtime using createAdapter from @ts-kizuna/core/adapter.
+description: Build and ship your own Kizuna adapter for any HTTP runtime using createAdapter from @ts-kizuna/core/adapter.
 ---
 
 <BetaNotice>
@@ -9,13 +9,13 @@ The adapter API is new and still settling. `createAdapter` and the `AdapterResul
 
 </BetaNotice>
 
-`@ts-kizuna/core/adapter` exposes `createAdapter` so third parties can build and ship their own adapters independently. ts-kizuna ships Express, Fastify, Hono, and Next.js.
+`@ts-kizuna/core/adapter` exposes `createAdapter` so third parties can build and ship their own adapters independently. Kizuna ships Express, Fastify, Hono, and Next.js.
 
 Whether an adapter goes first-party comes down to adoption, not age. If a framework picks up real usage, we will very likely add it. What we will not take on is a framework a handful of people use, since we maintain everything we merge. The adapter API is public, so you can build and publish your own today.
 
 ## Overview
 
-An adapter translates between a native HTTP runtime (Bun, Cloudflare Workers, Deno, etc.) and ts-kizuna's handler pipeline. You provide three things:
+An adapter translates between a native HTTP runtime (Bun, Cloudflare Workers, Deno, etc.) and Kizuna's handler pipeline. You provide three things:
 
 - `buildHandlerContext` builds the context object your handlers receive alongside validated inputs
 - `respond` translates an `AdapterResult` to a native response
@@ -111,7 +111,7 @@ interface AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, Respo
 | `buildHandlerContext` | Returns the context object each handler receives alongside `params`, `query`, `body`, `headers`.                                                          |
 | `respond`             | Translates an `AdapterResult` to a native response. Always handle `kind: 'raw-response'` first, as it carries a pre-built native response from `onError`. |
 | `onError`             | Called on unhandled handler errors. Return an `AdapterResult` to override the default 500, or return `void` to let it pass through.                       |
-| `matcher`             | Custom route matcher. Defaults to ts-kizuna's built-in path matcher.                                                                                      |
+| `matcher`             | Custom route matcher. Defaults to Kizuna's built-in path matcher.                                                                                         |
 
 ## `AdapterRequest`
 
@@ -147,7 +147,7 @@ Use `kind: 'core-match'` for catch-all routing (one handler handles all paths). 
 
 ### `renderJsonResult`
 
-Translates any `AdapterResult` (except `raw-response`) to `{ status, headers, body }` using ts-kizuna's defaults, such as 405 with an `Allow` header and validation errors as Problem Details (`detail` plus an `errors` array).
+Translates any `AdapterResult` (except `raw-response`) to `{ status, headers, body }` using Kizuna's defaults, such as 405 with an `Allow` header and validation errors as Problem Details (`detail` plus an `errors` array).
 
 ```ts
 const rendered = renderJsonResult(result);

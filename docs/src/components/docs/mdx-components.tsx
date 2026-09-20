@@ -12,6 +12,7 @@ import { AlphaNotice } from './alpha-notice';
 import { BetaNotice } from './beta-notice';
 import { InstallTabs } from './install-tabs';
 import { FeatureList } from './feature-list';
+import { ChangeCost } from './change-cost';
 import { GeneratedSurfaces } from './generated-surfaces';
 import { Supports } from './supports';
 
@@ -38,6 +39,7 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         BetaNotice,
         InstallTabs,
         FeatureList,
+        ChangeCost,
         GeneratedSurfaces,
         Supports,
     };
