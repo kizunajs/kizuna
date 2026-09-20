@@ -347,7 +347,7 @@ public enum API {
 
 public final class APIClient: Sendable {
 
-    /// Values sent as headers on every request, from the contract's request context.
+    /// Values sent as headers on every request, from the api's request context.
     public struct RequestContext: Sendable, Equatable {
         public var xPosthogSessionId: String?
         public var xPosthogDistinctId: String?

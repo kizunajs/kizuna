@@ -14,12 +14,12 @@ import { generateOpenApi } from '@ts-kizuna/openapi';
 ## Parameters
 
 ```ts
-generateOpenApi(contract: Contract, overrides?: Partial<GenerateOpenApiOptions>): OpenApiRenderer
+generateOpenApi(api: Contract, overrides?: Partial<GenerateOpenApiOptions>): OpenApiRenderer
 ```
 
 | Parameter   | Type                              | Description                                                    |
 | ----------- | --------------------------------- | -------------------------------------------------------------- |
-| `contract`  | `Contract`                        | The `api` from [`defineConfig`](/docs/reference/define-config) |
+| `api`       | `Contract`                        | The `api` from [`defineConfig`](/docs/reference/define-config) |
 | `overrides` | `Partial<GenerateOpenApiOptions>` | Merged over the plugin's options, for what only a build knows  |
 
 It lives on `@ts-kizuna/openapi`, beside [`openApiPlugin`](/docs/reference/openapi-plugin) and the document types.

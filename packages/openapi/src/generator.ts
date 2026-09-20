@@ -233,7 +233,7 @@ const deriveHeadOperation = (getOperation: OpenApiOperation): OpenApiOperation =
     return operation;
 };
 
-const openApiGenerator = createGenerator((options: GeneratorContext, contract: Contract) => {
+const openApiGenerator = createGenerator((options: GeneratorContext, api: Contract) => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
 
     return {
@@ -258,9 +258,9 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
                 operation.tags = mergedTags;
             }
             if (route.security && route.security.length > 0) {
-                const emittedSecurity = toOpenApiSecurity(route.security, contract);
+                const emittedSecurity = toOpenApiSecurity(route.security, api);
                 if (emittedSecurity.length > 0) operation.security = emittedSecurity;
-                const customGuards = customGuardsFor(route.security, contract);
+                const customGuards = customGuardsFor(route.security, api);
                 if (customGuards.length > 0) operation['x-kizuna-guarded'] = customGuards;
                 if (route.roles !== undefined) operation['x-kizuna-roles'] = [...route.roles];
                 if (route.requires !== undefined) operation['x-kizuna-requires'] = requiresExtension(route.requires);
@@ -506,7 +506,7 @@ const openApiGenerator = createGenerator((options: GeneratorContext, contract: C
             if (options.externalDocs) document.externalDocs = options.externalDocs;
 
             const componentSchemas = buildComponentSchemas();
-            const securitySchemes = buildSecuritySchemes(contract);
+            const securitySchemes = buildSecuritySchemes(api);
             if (componentSchemas || securitySchemes) {
                 document.components = {
                     ...(securitySchemes ? { securitySchemes } : {}),
@@ -534,8 +534,8 @@ const requiresExtension = (requires: RequiredPermissions): Record<string, string
  * Whether a scheme is a `custom` identity: registered, but with no OpenAPI scheme
  * to emit. Dropped from `security`, surfaced under `x-kizuna-guarded`.
  */
-const isCustomScheme = (name: string, contract: Contract): boolean => {
-    const scheme = contract.securitySchemes?.[name];
+const isCustomScheme = (name: string, api: Contract): boolean => {
+    const scheme = api.securitySchemes?.[name];
     return scheme !== undefined && scheme.openapi === undefined;
 };
 
@@ -544,15 +544,15 @@ const isCustomScheme = (name: string, contract: Contract): boolean => {
  * to the OpenAPI `operation.security` shape. Any `custom` scheme is dropped (see
  * {@link isCustomScheme}); a requirement object left empty is omitted.
  */
-const toOpenApiSecurity = (security: readonly SecurityRequirement[], contract: Contract): Array<Record<string, string[]>> => {
-    const emittedName = (name: string): string => contract.securitySchemes?.[name]?.scheme ?? name;
+const toOpenApiSecurity = (security: readonly SecurityRequirement[], api: Contract): Array<Record<string, string[]>> => {
+    const emittedName = (name: string): string => api.securitySchemes?.[name]?.scheme ?? name;
     const result: Array<Record<string, string[]>> = [];
     for (const entry of security) {
         if (typeof entry === 'string') {
-            if (!isCustomScheme(entry, contract)) result.push({ [emittedName(entry)]: [] });
+            if (!isCustomScheme(entry, api)) result.push({ [emittedName(entry)]: [] });
             continue;
         }
-        const describable = Object.entries(entry).filter(([scheme]) => !isCustomScheme(scheme, contract));
+        const describable = Object.entries(entry).filter(([scheme]) => !isCustomScheme(scheme, api));
         if (describable.length > 0) {
             result.push(Object.fromEntries(describable.map(([scheme, scopes]) => [emittedName(scheme), [...(scopes ?? [])]])));
         }
@@ -564,13 +564,13 @@ const toOpenApiSecurity = (security: readonly SecurityRequirement[], contract: C
  * The `custom` schemes guarding a route, in their registered names, for the
  * `x-kizuna-guarded` extension.
  */
-const customGuardsFor = (security: readonly SecurityRequirement[], contract: Contract): string[] => {
-    const emittedName = (name: string): string => contract.securitySchemes?.[name]?.scheme ?? name;
+const customGuardsFor = (security: readonly SecurityRequirement[], api: Contract): string[] => {
+    const emittedName = (name: string): string => api.securitySchemes?.[name]?.scheme ?? name;
     const names: string[] = [];
     for (const entry of security) {
         const schemeNames = typeof entry === 'string' ? [entry] : Object.keys(entry);
         for (const name of schemeNames) {
-            if (isCustomScheme(name, contract) && !names.includes(emittedName(name))) names.push(emittedName(name));
+            if (isCustomScheme(name, api) && !names.includes(emittedName(name))) names.push(emittedName(name));
         }
     }
     return names;
@@ -580,8 +580,8 @@ const customGuardsFor = (security: readonly SecurityRequirement[], contract: Con
  * Build the `components.securitySchemes` object from the identities registered
  * on the api. Each contributes its OpenAPI definition under its name.
  */
-const buildSecuritySchemes = (contract: Contract): Record<string, unknown> | undefined => {
-    const schemes = contract.securitySchemes;
+const buildSecuritySchemes = (api: Contract): Record<string, unknown> | undefined => {
+    const schemes = api.securitySchemes;
     if (!schemes || Object.keys(schemes).length === 0) return undefined;
     const result: Record<string, unknown> = {};
     for (const [name, scheme] of Object.entries(schemes)) {
@@ -592,14 +592,14 @@ const buildSecuritySchemes = (contract: Contract): Record<string, unknown> | und
     return Object.keys(result).length > 0 ? result : undefined;
 };
 
-const buildTagLookup = (contract: Contract): ReadonlyMap<string, TagOptions> => new Map(Object.entries(contract.tags?.tags ?? {}));
+const buildTagLookup = (api: Contract): ReadonlyMap<string, TagOptions> => new Map(Object.entries(api.tags?.tags ?? {}));
 
 /**
  * Document-level tag definitions from the api's declared tag set, one
  * entry per declared tag, in declaration order, named by its `title`.
  */
-const tagsFromContract = (contract: Contract): OpenApiTag[] => {
-    const declared = contract.tags?.tags;
+const tagsFromApi = (api: Contract): OpenApiTag[] => {
+    const declared = api.tags?.tags;
     if (!declared) return [];
     const tags: OpenApiTag[] = [];
     for (const options of Object.values(declared)) {
@@ -614,8 +614,8 @@ const tagsFromContract = (contract: Contract): OpenApiTag[] => {
 /**
  * So a build step does not restate the options and drift from what is served.
  */
-const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions => {
-    for (const declaration of Object.values(contract.plugins ?? {})) {
+const optionsFromInstalledPlugin = (api: Contract): GenerateOpenApiOptions => {
+    for (const declaration of Object.values(api.plugins ?? {})) {
         if (declaration.slug === OPENAPI_PLUGIN_SLUG) return declaration.props as unknown as GenerateOpenApiOptions;
     }
     throw new Error("generateOpenApi reads its options from the config. Name `openApiPlugin` under `plugins` with the API's `info`.");
@@ -624,12 +624,12 @@ const optionsFromInstalledPlugin = (contract: Contract): GenerateOpenApiOptions 
 /**
  * Render from options held directly, for the plugin's own routes.
  */
-export function renderOpenApi(contract: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
-    const renderer = openApiGenerator(contract, {
+export function renderOpenApi(api: Contract, options: GenerateOpenApiOptions): OpenApiRenderer {
+    const renderer = openApiGenerator(api, {
         ...options,
-        tagLookup: buildTagLookup(contract),
+        tagLookup: buildTagLookup(api),
     });
-    const tags = tagsFromContract(contract);
+    const tags = tagsFromApi(api);
     if (tags.length > 0) {
         (renderer('json') as OpenApiDocument).tags = tags;
     }
@@ -644,7 +644,7 @@ export function renderOpenApi(contract: Contract, options: GenerateOpenApiOption
  * Pass `overrides` for what only a build step knows, such as the public
  * `servers` list.
  */
-export function generateOpenApi(contract: Contract, overrides?: Partial<GenerateOpenApiOptions>): OpenApiRenderer {
-    const options = optionsFromInstalledPlugin(contract);
-    return renderOpenApi(contract, overrides ? { ...options, ...overrides } : options);
+export function generateOpenApi(api: Contract, overrides?: Partial<GenerateOpenApiOptions>): OpenApiRenderer {
+    const options = optionsFromInstalledPlugin(api);
+    return renderOpenApi(api, overrides ? { ...options, ...overrides } : options);
 }

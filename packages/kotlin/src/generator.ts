@@ -118,7 +118,7 @@ interface RouteGroup {
     methods: RouteMethod[];
 }
 
-interface ContractPartition {
+interface ApiPartition {
     flatMethods: RouteMethod[];
     groups: RouteGroup[];
 }
@@ -337,7 +337,7 @@ const buildRouteMethod = (
     };
 };
 
-const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, _contract: Contract) => {
+const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, _api: Contract) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
 
@@ -365,7 +365,7 @@ const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: Typ
             }
         },
 
-        finalize(): ContractPartition {
+        finalize(): ApiPartition {
             const groups: RouteGroup[] = [];
             for (const [groupKey, methods] of groupMap) {
                 groups.push({
@@ -1730,7 +1730,7 @@ const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean })
 const emitClient = (
     writer: KotlinWriter,
     config: { clientName: string },
-    partition: ContractPartition,
+    partition: ApiPartition,
     context: EmitContext,
     typesByOperation: Map<string, KotlinType[]>,
     registry: TypeRegistry
@@ -1751,7 +1751,7 @@ const emitClient = (
         () => {
             if (contextFields.length > 0) {
                 writer.blank();
-                writer.line("/** Values sent as headers on every request, from the contract's request context. */");
+                writer.line("/** Values sent as headers on every request, from the api's request context. */");
                 emitConstructorClass(
                     writer,
                     'data class RequestContext',
@@ -1839,16 +1839,16 @@ const emitClient = (
 /**
  * Generate a Kotlin API client from a ts-kizunan api.
  *
- * @param contract - What `defineConfig` assembled.
+ * @param api - What `defineConfig` assembled.
  * @param config - Override the generated names:
  *   - `namespaceName`: the object wrapping shared types.
  *   - `packageName`: optional package declaration for the generated file.
  */
-export const generateKotlinClient = (contract: Contract, config: KotlinConfig): string => {
+export const generateKotlinClient = (api: Contract, config: KotlinConfig): string => {
     const { namespaceName, packageName, camelCaseProperties = false, unknownEnumCase = false } = config;
 
     const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);
-    const partition = kotlinGenerator(contract, {
+    const partition = kotlinGenerator(api, {
         namespaceName,
         registry,
     });
@@ -1932,7 +1932,7 @@ export const generateKotlinClient = (contract: Contract, config: KotlinConfig): 
     const topLevelSharedTypes = sharedTypes.filter((type) => !ownedTypeMap.has(type.name) && !registry.isSealedVariantPayload(type.name));
 
     const requestContextFields: KotlinField[] = [];
-    for (const declaration of Object.values(contract.requestContext ?? {})) {
+    for (const declaration of Object.values(api.requestContext ?? {})) {
         const headersSchema = (declaration as { headers?: z.ZodType }).headers;
         if (!headersSchema) continue;
         requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext'));

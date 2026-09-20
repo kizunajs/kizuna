@@ -20,13 +20,13 @@ import { generateKotlinClient } from '@ts-kizuna/kotlin';
 ## Parameters
 
 ```ts
-generateKotlinClient(contract: Contract, config: KotlinConfig): string
+generateKotlinClient(api: Contract, config: KotlinConfig): string
 ```
 
-| Parameter  | Type           | Description                                                    |
-| ---------- | -------------- | -------------------------------------------------------------- |
-| `contract` | `Contract`     | The `api` from [`defineConfig`](/docs/reference/define-config) |
-| `config`   | `KotlinConfig` | Generation configuration                                       |
+| Parameter | Type           | Description                                                    |
+| --------- | -------------- | -------------------------------------------------------------- |
+| `api`     | `Contract`     | The `api` from [`defineConfig`](/docs/reference/define-config) |
+| `config`  | `KotlinConfig` | Generation configuration                                       |
 
 ## `KotlinConfig`
 

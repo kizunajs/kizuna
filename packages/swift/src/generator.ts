@@ -349,7 +349,7 @@ const buildRouteMethod = (
     };
 };
 
-const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, _contract: Contract) => {
+const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, _api: Contract) => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
 
@@ -2028,7 +2028,7 @@ const emitClient = (
     writer.block(`public final class ${clientName}: Sendable`, () => {
         if (contextFields.length > 0) {
             writer.blank();
-            writer.docComment("Values sent as headers on every request, from the contract's request context.");
+            writer.docComment("Values sent as headers on every request, from the api's request context.");
             writer.block('public struct RequestContext: Sendable, Equatable', () => {
                 for (const field of contextFields) {
                     writer.line(`public var ${escapeKeyword(field.name)}: ${field.type}`);
@@ -2216,11 +2216,11 @@ const emitClient = (
  *
  *   - `namespaceName`: the actor class. Defaults to `APIClient`.
  */
-export const generateSwiftClient = (contract: Contract, options: SwiftConfig): string => {
+export const generateSwiftClient = (api: Contract, options: SwiftConfig): string => {
     const { namespaceName, camelCaseProperties = false, unknownEnumCase = false } = options;
 
     const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);
-    const partition = swiftGenerator(contract, {
+    const partition = swiftGenerator(api, {
         namespaceName,
         registry,
     });
@@ -2284,7 +2284,7 @@ export const generateSwiftClient = (contract: Contract, options: SwiftConfig): s
     const topLevelSharedTypes = sharedTypes.filter((type) => !ownedTypeMap.has(type.name));
 
     const requestContextFields: SwiftField[] = [];
-    for (const declaration of Object.values(contract.requestContext ?? {})) {
+    for (const declaration of Object.values(api.requestContext ?? {})) {
         const headersSchema = (declaration as { headers?: z.ZodType }).headers;
         if (!headersSchema) continue;
         requestContextFields.push(...collectObjectFields(headersSchema, registry, 'RequestContext'));
