@@ -94,16 +94,22 @@ export const resolveBaseType = (schema: z.core.$ZodType): string => {
 };
 
 /**
- * Removes optional/nullable/default wrappers, returning the inner schema and
- * whether any were present.
+ * Removes optional/nullable/default wrappers, returning the inner schema,
+ * whether the key may be absent, and whether the value may be null. A
+ * `z.string().nullable()` field is required, so it reports `optional: false`.
  */
-export const unwrapOptionalWrappers = (schema: z.core.$ZodType): { inner: z.core.$ZodType; optional: boolean } => {
+export const unwrapOptionalWrappers = (schema: z.core.$ZodType): { inner: z.core.$ZodType; optional: boolean; nullable: boolean } => {
     let current = schema;
     let optional = false;
+    let nullable = false;
     while (true) {
         const def = readDef(current);
-        if (def.type !== 'optional' && def.type !== 'nullable' && def.type !== 'default' && def.type !== 'nullish') break;
-        optional = true;
+        if (def.type === 'optional' || def.type === 'default') optional = true;
+        else if (def.type === 'nullable') nullable = true;
+        else if (def.type === 'nullish') {
+            optional = true;
+            nullable = true;
+        } else break;
         const next = def.innerType;
         if (!next) break;
         current = next;
@@ -111,6 +117,7 @@ export const unwrapOptionalWrappers = (schema: z.core.$ZodType): { inner: z.core
     return {
         inner: current,
         optional,
+        nullable,
     };
 };
 

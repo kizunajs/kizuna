@@ -284,8 +284,8 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
         };
     }
 
-    const { inner, optional } = unwrapOptionalWrappers(schema);
-    if (optional) {
+    const { inner, optional, nullable } = unwrapOptionalWrappers(schema);
+    if (optional || nullable) {
         const innerResult = mapType(inner, registry, hint);
         return {
             expression: innerResult.expression.endsWith('?') ? innerResult.expression : `${innerResult.expression}?`,

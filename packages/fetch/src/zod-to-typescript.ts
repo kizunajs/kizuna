@@ -231,11 +231,7 @@ export const typeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: 
     if (def.type === 'nullable' && def.innerType) return `${typeOf(def.innerType, collector, hint)} | null`;
     if (def.type === 'nullish' && def.innerType) return `${typeOf(def.innerType, collector, hint)} | null`;
 
-    if (def.innerType && def.type !== 'object') {
-        const { inner } = unwrapOptionalWrappers(schema);
-        if (inner !== schema) return typeOf(inner, collector, hint);
-        return typeOf(def.innerType, collector, hint);
-    }
+    if (def.innerType && def.type !== 'object') return typeOf(def.innerType, collector, hint);
 
     if (def.type === 'pipe') {
         const side = def.out ?? def.in;

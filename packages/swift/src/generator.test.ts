@@ -1073,6 +1073,34 @@ describe('Swift generator: owned type nesting', () => {
     });
 });
 
+describe('Swift generator: nullable', () => {
+    const contract = defineConfig({
+        ...config,
+        routes: k.routes('api', {
+            getUser: k.route({
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: Kizuna.model({
+                        title: 'NullableUser',
+                        schema: z.object({
+                            id: z.string(),
+                            appVersion: z.string().nullable(),
+                            releaseNotes: z.string().nullable().optional(),
+                        }),
+                    }),
+                },
+            }),
+        }),
+    }).api;
+
+    it('maps a nullable field to an optional, since Swift has only the one', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('let appVersion: String?');
+        expect(output).toContain('let releaseNotes: String?');
+    });
+});
+
 describe('Swift generator: @available(*, deprecated)', () => {
     const DeprecatedFieldSchema = z.object({
         id: z.string(),

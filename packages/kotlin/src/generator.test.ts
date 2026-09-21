@@ -33,6 +33,35 @@ describe('Kotlin generator: z.void()', () => {
     });
 });
 
+describe('Kotlin generator: nullable', () => {
+    const contract = defineConfig({
+        routes: {
+            users: k.routes('users', {
+                getUser: k.route({
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: Kizuna.model({
+                            title: 'NullableUser',
+                            schema: z.object({
+                                id: z.string(),
+                                appVersion: z.string().nullable(),
+                                releaseNotes: z.string().nullable().optional(),
+                            }),
+                        }),
+                    },
+                }),
+            }),
+        },
+    }).api;
+
+    it('maps a nullable field to a nullable type, since Kotlin has only the one', () => {
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val appVersion: String?');
+        expect(output).toContain('val releaseNotes: String?');
+    });
+});
+
 describe('Kotlin generator: z.union()', () => {
     it('resolves one-or-many union (array | single.transform) to list type', () => {
         const contract = defineConfig({

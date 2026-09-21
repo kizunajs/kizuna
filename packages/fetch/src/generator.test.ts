@@ -14,6 +14,8 @@ const UserSchema = Kizuna.model({
         id: z.string(),
         name: z.string(),
         nickname: z.string().optional(),
+        appVersion: z.string().nullable(),
+        description: z.string().nullable().optional(),
     }),
 });
 
@@ -106,6 +108,14 @@ describe('generateFetchClient', () => {
     it('names the contract it came from', () => {
         expect(source).toContain(' * Source: ../src/contract.ts');
         expect(source).toContain(' * Regenerate: kizuna generate');
+    });
+
+    it('keeps a nullable field required, since only the value may be null', () => {
+        expect(source).toContain('appVersion: string | null;');
+    });
+
+    it('keeps the null on a field that is both nullable and optional', () => {
+        expect(source).toContain('description?: string | null;');
     });
 
     it('ships no schema library and no handlers', () => {

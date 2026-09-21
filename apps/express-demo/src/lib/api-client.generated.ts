@@ -122,7 +122,7 @@ export namespace API {
         avatar?: {
             id: string;
             url: string;
-        };
+        } | null;
         avatars?: Array<{
             id: string;
             url: string;
@@ -214,7 +214,7 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 users: Array<User>;
-                nextCursor?: number | null;
+                nextCursor: number | null;
             }; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
@@ -407,12 +407,12 @@ export namespace API {
             | { status: 200; body: {
                 events: Array<EventRecord>;
                 echo: {
-                    since?: string | null;
-                    kind?: "login" | "logout" | "signup" | null;
-                    ids?: Array<string> | null;
-                    label?: string | null;
-                    tagIds?: Array<string> | null;
-                    sessionId?: string | null;
+                    since: string | null;
+                    kind: "login" | "logout" | "signup" | null;
+                    ids: Array<string> | null;
+                    label: string | null;
+                    tagIds: Array<string> | null;
+                    sessionId: string | null;
                 };
             }; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
@@ -670,7 +670,7 @@ export namespace API {
             | { status: 200; body: {
                 ip: string;
                 protocol: string;
-                userAgent?: string | null;
+                userAgent: string | null;
             }; headers: Record<string, string> };
     }
 }
