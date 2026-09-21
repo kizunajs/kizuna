@@ -1,6 +1,6 @@
 {
   "name": "@kizunajs/cli",
-  "version": "2.0.0-beta.4",
+  "version": "2.0.0-beta.5",
   "description": "Command line tooling for Kizuna.js",
   "keywords": [
     "kizunajs",
