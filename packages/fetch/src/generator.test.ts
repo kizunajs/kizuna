@@ -138,6 +138,28 @@ describe('generateFetchClient', () => {
     });
 });
 
+describe('the namespace the generated types live in', () => {
+    const named = generateFetchClient(contract, { namespace: 'MyAPI' });
+
+    it('defaults to API', () => {
+        expect(source).toContain('export namespace API {');
+        expect(source).toContain('params: API.UsersGetUser.Params');
+    });
+
+    it('takes the name the config gives it', () => {
+        expect(named).toContain('export namespace MyAPI {');
+        expect(named).not.toContain('export namespace API {');
+    });
+
+    it('references every route type through that name', () => {
+        expect(named).toContain('params: MyAPI.UsersGetUser.Params');
+        expect(named).toContain('query?: MyAPI.UsersListUsers.Query');
+        expect(named).toContain('body: MyAPI.UsersUploadAvatar.Body');
+        expect(named).toContain('MyAPI.UsersGetUser.Result>');
+        expect(named).not.toMatch(/\bAPI\.UsersGetUser/);
+    });
+});
+
 describe('the generated table drives real requests', () => {
     const table: GeneratedRoutes = {
         users: {

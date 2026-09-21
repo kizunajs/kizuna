@@ -387,6 +387,17 @@ export function UserCard({ user }: { user: API.User }) {
 
 `users.getUser` becomes `UsersGetUser` in every generated client, so the three read as one API.
 
+The namespace is called `API` until the config says otherwise, and `namespace` names it whatever the app calls its API. Every route type is reached through that name, so `MyAPI.UsersGetUser.Params`.
+
+```ts title="kizuna.config.ts"
+clients: [
+    fetchClient({
+        output: './src/lib/api-client.generated.ts',
+        namespace: 'MyAPI',
+    }),
+],
+```
+
 ## Documentation in the client
 
 Each method carries what the route declared, so an editor shows it at the call site: the route's `summary` and `description`, `@deprecated` with its migration message, and an `@example` of the call with the arguments it cannot be called without.
