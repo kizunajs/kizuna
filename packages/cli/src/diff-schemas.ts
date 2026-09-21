@@ -28,7 +28,9 @@ const elementOf = (schema: SchemaNode): SchemaNode | undefined =>
 const valuesOf = (schema: SchemaNode): string[] | undefined =>
     schema.kind === 'enum' ? (schema as Extract<SchemaNode, { kind: 'enum' }>).values : undefined;
 
-/** What a reader sees when the kinds differ, so `array` reads as `array<string>`. */
+/**
+ * What a reader sees when the kinds differ, so `array` reads as `array<string>`.
+ */
 const describeKind = (schema: SchemaNode): string => {
     const element = elementOf(schema);
     return element ? `array<${describeKind(element)}>` : schema.kind;

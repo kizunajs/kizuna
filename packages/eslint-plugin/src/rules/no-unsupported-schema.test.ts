@@ -50,4 +50,20 @@ describe.each([
     it('uses the direct variant on Kizuna.model fields', async () => {
         expect(await messageIdsFor('contract-model.ts', parserOptions)).toEqual(['coerce']);
     });
+
+    it('flags z.set and z.map, which JSON cannot carry', async () => {
+        expect(await messageIdsFor('contract-collection.ts', parserOptions)).toEqual(['collection', 'collection']);
+    });
+
+    it('flags a union of objects with nothing on the wire naming the branch', async () => {
+        expect(await messageIdsFor('contract-union.ts', parserOptions)).toEqual(['union']);
+    });
+
+    it('leaves a one-or-many union and a discriminated union alone', async () => {
+        expect(await messageIdsFor('contract-union-allowed.ts', parserOptions)).toEqual([]);
+    });
+
+    it('flags a transform on the way out but not on the way in', async () => {
+        expect(await messageIdsFor('contract-transform.ts', parserOptions)).toEqual(['transform']);
+    });
 });

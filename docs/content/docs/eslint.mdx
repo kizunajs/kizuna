@@ -47,7 +47,7 @@ query: z.object({
 
 ## `no-unsupported-schema`
 
-Flags anything using something Kizuna can't support: `body`, `query`, `pathParams`, `headers`, and response schemas in your routes, plus `Kizuna.model` schemas, inline or imported. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
+Flags anything no generated client can produce a type for: `body`, `query`, `pathParams`, `headers`, and response schemas in your routes, plus `Kizuna.model` schemas, inline or imported. It follows imports, so the error lands on the offending field when it's local, or on the reference when the schema comes from another file.
 
 ### `z.coerce`
 
@@ -64,6 +64,66 @@ query: z.object({
     page: z.number(),
 });
 ```
+
+### `z.set` and `z.map`
+
+JSON has neither, so `JSON.stringify(new Set(['a']))` is `{}` and the value never reaches the caller. The generated clients cannot name a type for something the wire does not carry:
+
+```ts
+// flagged
+body: z.object({
+    tags: z.set(z.string()),
+    counts: z.map(z.string(), z.number()),
+});
+
+// good, both survive the round trip
+body: z.object({
+    tags: z.array(z.string()),
+    counts: z.record(z.string(), z.number()),
+});
+```
+
+### A union of objects with no discriminator
+
+Two object branches with overlapping fields cannot be told apart from the JSON, so a decoder picks whichever matches first, and which one that is depends on the order you declared them. [`z.discriminatedUnion`](/docs/zod) puts the answer on the wire:
+
+```ts
+// flagged
+body: z.union([CircleSchema, SquareSchema]);
+
+// good, `kind` says which branch arrived
+body: z.discriminatedUnion('kind', [CircleSchema, SquareSchema]);
+```
+
+A union of different kinds is untouched, so the one-or-many query param that accepts a single value or a list still works:
+
+```ts
+query: z.object({
+    ids: z.union([z.array(z.string()), z.string()]),
+});
+```
+
+### A transform on a response body
+
+A transform's output is whatever the function returns, which no generator can read, so the client would be typed from the input and be wrong about what it receives. Declare the response as the shape it sends:
+
+```ts
+// flagged
+responses: {
+    200: z.object({
+        length: z.string().transform((value) => value.length),
+    }),
+}
+
+// good
+responses: {
+    200: z.object({
+        length: z.number(),
+    }),
+}
+```
+
+A transform on the way in is fine, since the caller sends the input and the server parses it.
 
 ### Across files
 

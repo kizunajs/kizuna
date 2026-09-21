@@ -32,14 +32,18 @@ export interface RouteSnapshot {
     body?: SchemaNode;
     query?: SchemaNode;
     headers?: SchemaNode;
-    /** Keyed by status, `null` when the status answers with no body. */
+    /**
+     * Keyed by status, `null` when the status answers with no body.
+     */
     responses: Record<string, SchemaNode | null>;
 }
 
 export interface ApiSnapshot {
     routes: Record<string, RouteSnapshot>;
     jobs: string[];
-    /** MCP tool name, keyed by the route key that publishes it. */
+    /**
+     * MCP tool name, keyed by the route key that publishes it.
+     */
     tools: Record<string, string>;
 }
 
@@ -52,14 +56,18 @@ export interface RouteSnapshot {
     body?: SchemaNode;
     query?: SchemaNode;
     headers?: SchemaNode;
-    /** Keyed by status, `null` when the status answers with no body. */
+    /**
+     * Keyed by status, `null` when the status answers with no body.
+     */
     responses: Record<string, SchemaNode | null>;
 }
 
 export interface ApiSnapshot {
     routes: Record<string, RouteSnapshot>;
     jobs: string[];
-    /** MCP tool name, keyed by the route key that publishes it. */
+    /**
+     * MCP tool name, keyed by the route key that publishes it.
+     */
     tools: Record<string, string>;
 }
 

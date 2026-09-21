@@ -17,7 +17,9 @@ export interface DiffAgainstOptions extends DiffOptions {
 const git = (cwd: string, ...args: string[]): string =>
     execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
-/** The repository holding the snapshot, falling back to the one the caller ran in. */
+/**
+ * The repository holding the snapshot, falling back to the one the caller ran in.
+ */
 const repositoryFor = (directory: string, cwd: string): string => {
     try {
         return git(directory, 'rev-parse', '--show-toplevel');
@@ -34,7 +36,9 @@ const parseSnapshot = (contents: string, source: string): ApiSnapshot => {
     }
 };
 
-/** Reads a path out of a ref without checking anything out. */
+/**
+ * Reads a path out of a ref without checking anything out.
+ */
 const showAtRef = (root: string, ref: string, path: string): string => {
     try {
         return git(root, 'show', `${ref}:${path}`);
