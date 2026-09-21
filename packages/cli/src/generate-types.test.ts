@@ -132,6 +132,33 @@ export default defineConfig({ validation: { issueCodes: codes } });
         ).toThrow(/array of string literals/);
     });
 
+    it('writes relative imports from the output file, not from the config', () => {
+        const source = `
+import { defineConfig } from 'kizunajs';
+import { expressAdapter } from '@kizunajs/express';
+import { tags } from './src/tags';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    tags,
+});
+`;
+        const types = generateConfigTypes(source, '/app/kizuna.config.ts', '/app/src/admin/kizuna.types.ts');
+        expect(types).toContain("import type { tags } from '../tags';");
+        expect(types).toContain("import type { expressAdapter } from '@kizunajs/express';");
+    });
+
+    it('leaves the imports alone when the output sits beside the config', () => {
+        const source = `
+import { defineConfig } from 'kizunajs';
+import { tags } from './src/tags';
+
+export default defineConfig({ tags });
+`;
+        const types = generateConfigTypes(source, '/app/kizuna.config.ts', '/app/kizuna.types.ts');
+        expect(types).toContain("import type { tags } from './src/tags';");
+    });
+
     /**
      * The demos are the worked examples the docs are written from, so the
      * generator has to reproduce each one exactly.
@@ -139,6 +166,7 @@ export default defineConfig({ validation: { issueCodes: codes } });
     it.each(['express-demo', 'fastify-demo', 'hono-demo', 'next-demo'])('reproduces %s/kizuna.types.ts', (app) => {
         const configPath = path.join(ROOT, 'apps', app, 'kizuna.config.ts');
         const expected = fs.readFileSync(path.join(ROOT, 'apps', app, 'kizuna.types.ts'), 'utf8');
-        expect(generateConfigTypes(fs.readFileSync(configPath, 'utf8'), configPath)).toEqual(expected);
+        const typesPath = path.join(ROOT, 'apps', app, 'kizuna.types.ts');
+        expect(generateConfigTypes(fs.readFileSync(configPath, 'utf8'), configPath, typesPath)).toEqual(expected);
     });
 });

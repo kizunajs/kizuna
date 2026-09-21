@@ -65,14 +65,6 @@ const loadOrDie = async (configPath: string) => {
 
 const runGenerate = async (values: { check?: boolean; config?: string; types?: string }): Promise<void> => {
     const configPath = configPathFrom(values.config);
-    let types: string;
-    try {
-        types = generateConfigTypes(readFileSync(configPath, 'utf8'), configPath);
-    } catch (error) {
-        if (error instanceof ConfigSyntaxError) die(`${displayPath(configPath)}: ${error.message}`);
-        throw error;
-    }
-
     const config = await loadOrDie(configPath);
     // `--types` beats the config, which beats the file beside the config.
     const typesOutput = values.types ?? config.typesOutput;
@@ -83,6 +75,16 @@ const runGenerate = async (values: { check?: boolean; config?: string; types?: s
         );
     }
     const typesPath = resolve(dirname(configPath), typesOutput);
+
+    // Settled first: the generated imports are written relative to it.
+    let types: string;
+    try {
+        types = generateConfigTypes(readFileSync(configPath, 'utf8'), configPath, typesPath);
+    } catch (error) {
+        if (error instanceof ConfigSyntaxError) die(`${displayPath(configPath)}: ${error.message}`);
+        throw error;
+    }
+
     const typesCurrent = existsSync(typesPath) ? readFileSync(typesPath, 'utf8') : undefined;
     const typesBehind = typesCurrent !== types;
 

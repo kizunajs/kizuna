@@ -1,3 +1,4 @@
+import { dirname, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 
 /**
@@ -219,22 +220,33 @@ const HEADER = `/**
  */`;
 
 /**
+ * Points a relative specifier at the same file from somewhere else, so a
+ * `Config` written outside the config's own directory still resolves.
+ */
+const rebaseSpecifier = (specifier: string, configDir: string, outputDir: string): string => {
+    if (!specifier.startsWith('./') && !specifier.startsWith('../')) return specifier;
+    const rebased = relative(outputDir, resolve(configDir, specifier)).split(sep).join('/');
+    return rebased.startsWith('.') ? rebased : `./${rebased}`;
+};
+
+/**
  * The `import type` lines the interface needs, grouped by module and written in
  * the order the config imported them.
  */
-const renderImports = (imports: Map<string, ImportedName>, used: Set<string>): string => {
+const renderImports = (imports: Map<string, ImportedName>, used: Set<string>, rebase: (specifier: string) => string): string => {
     const byModule = new Map<string, string[]>();
     const defaults: string[] = [];
     for (const [local, imported] of imports) {
         if (!used.has(local)) continue;
+        const module = rebase(imported.module);
         if (imported.isDefault) {
-            defaults.push(`import type ${local} from '${imported.module}';`);
+            defaults.push(`import type ${local} from '${module}';`);
             continue;
         }
         const specifier = imported.exported === local ? local : `${imported.exported} as ${local}`;
-        const existing = byModule.get(imported.module);
+        const existing = byModule.get(module);
         if (existing) existing.push(specifier);
-        else byModule.set(imported.module, [specifier]);
+        else byModule.set(module, [specifier]);
     }
     const named = [...byModule].map(([module, names]) => `import type { ${names.join(', ')} } from '${module}';`);
     return [...defaults, ...named].join('\n');
@@ -247,8 +259,11 @@ const renderImports = (imports: Map<string, ImportedName>, used: Set<string>): s
  * Read from the config's syntax rather than by running it: the generated file
  * imports the same names the config did, and a config that loads is not a
  * prerequisite for typing the routes it serves.
+ *
+ * `outputPath` is what the imports are written relative to. Left out, they stay
+ * relative to the config.
  */
-export const generateConfigTypes = (configSource: string, fileName = 'kizuna.config.ts'): string => {
+export const generateConfigTypes = (configSource: string, fileName = 'kizuna.config.ts', outputPath?: string): string => {
     const source = ts.createSourceFile(fileName, configSource, ts.ScriptTarget.Latest, true);
     const imports = collectImports(source);
     const configObject = findConfigObject(source);
@@ -284,7 +299,11 @@ export const generateConfigTypes = (configSource: string, fileName = 'kizuna.con
         }
     }
 
-    const importBlock = renderImports(imports, used);
+    const configDir = dirname(resolve(fileName));
+    const outputDir = outputPath === undefined ? configDir : dirname(resolve(outputPath));
+    const importBlock = renderImports(imports, used, (specifier) =>
+        outputDir === configDir ? specifier : rebaseSpecifier(specifier, configDir, outputDir)
+    );
     const body = `export interface Config {\n${lines.join('\n')}\n}`;
     // The header sits directly on the imports, the way a generated file reads.
     const head = importBlock === '' ? HEADER : `${HEADER}\n${importBlock}`;
