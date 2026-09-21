@@ -22,4 +22,12 @@ for (const name of fs.readdirSync(packagesDirectory)) {
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
 }
 
+const npmLink = /https:\/\/www\.npmjs\.com\/package\/kizunajs\/v\/[^)]+/;
+
+for (const readme of ['README.md', path.join('packages', 'core', 'README.md')]) {
+    const readmePath = path.join(root, readme);
+    const contents = fs.readFileSync(readmePath, 'utf8');
+    fs.writeFileSync(readmePath, contents.replace(npmLink, `https://www.npmjs.com/package/kizunajs/v/${version}`));
+}
+
 console.log(`Synced version ${version} to all packages`);
