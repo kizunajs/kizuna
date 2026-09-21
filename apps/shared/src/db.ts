@@ -2,7 +2,7 @@ import type { User } from './types';
 
 const users = new Map<string, User>([
     ['1', { id: '1', name: 'Ada Lovelace', email: 'ada@example.com', last_name: 'Lovelace' }],
-    ['2', { id: '2', name: 'Linus Torvalds', email: 'linus@example.com' }],
+    ['2', { id: '2', name: 'Linus Torvalds', email: 'linus@example.com', metadata: { team: 'kernel' }, tags: ['maintainer', null] }],
 ]);
 
 const archivedUsers = new Set<string>();

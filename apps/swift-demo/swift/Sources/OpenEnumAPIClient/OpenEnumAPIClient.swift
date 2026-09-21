@@ -48,6 +48,10 @@ public enum OpenEnumAPI {
         /// Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.
         public let avatar: Avatar?
         public let avatars: [AvatarsItem]?
+        /// Free-form string map, exercises a record through the generators.
+        public let metadata: [String: String]?
+        /// Entries may be null, exercises a nullable array element, which `optional` cannot express.
+        public let tags: [String?]?
 
         private enum CodingKeys: String, CodingKey {
             case id
@@ -57,6 +61,8 @@ public enum OpenEnumAPI {
             case last_name
             case avatar
             case avatars
+            case metadata
+            case tags
         }
 
         public init(
@@ -66,7 +72,9 @@ public enum OpenEnumAPI {
             email_address: String? = nil,
             last_name: String? = nil,
             avatar: Avatar? = nil,
-            avatars: [AvatarsItem]? = nil
+            avatars: [AvatarsItem]? = nil,
+            metadata: [String: String]? = nil,
+            tags: [String?]? = nil
         ) {
             self.id = id
             self.name = name
@@ -75,6 +83,8 @@ public enum OpenEnumAPI {
             self.last_name = last_name
             self.avatar = avatar
             self.avatars = avatars
+            self.metadata = metadata
+            self.tags = tags
         }
     }
 

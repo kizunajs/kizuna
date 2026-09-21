@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import {
+    isBinarySchema,
     isFileSchema,
     isIntegerSchema,
     readDef,
@@ -160,8 +161,12 @@ const propertyName = (key: string, camelCase: boolean): string => {
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };
 
-const objectFields = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): KotlinField[] => {
-    const shape = readObjectShape(schema) ?? {};
+const objectFields = (
+    schema: z.core.$ZodType,
+    registry: TypeRegistry,
+    hint: string,
+    shape: Record<string, z.core.$ZodType> = readObjectShape(schema) ?? {}
+): KotlinField[] => {
     const fields: KotlinField[] = [];
     const seen = new Map<string, string>();
     for (const [key, value] of Object.entries(shape)) {
@@ -198,6 +203,13 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
             expression: 'MultipartFile',
             optional: false,
             isFile: true,
+        };
+    }
+
+    if (isBinarySchema(schema)) {
+        return {
+            expression: 'ByteArray',
+            optional: false,
         };
     }
 
@@ -350,8 +362,9 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
                 };
             }
             const elementResult = mapType(element, registry, `${hint}Item`);
+            const elementType = elementResult.expression.replace(/\?$/, '');
             return {
-                expression: `List<${elementResult.expression.replace(/\?$/, '')}>`,
+                expression: `List<${unwrapOptionalWrappers(element).nullable ? `${elementType}?` : elementType}>`,
                 optional: false,
             };
         }

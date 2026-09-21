@@ -52,6 +52,12 @@ export const UserSchema = Kizuna.model({
                 })
             )
             .optional(),
+        metadata: z.record(z.string(), z.string()).optional().meta({
+            description: 'Free-form string map, exercises a record through the generators.',
+        }),
+        tags: z.array(z.string().nullable()).optional().meta({
+            description: 'Entries may be null, exercises a nullable array element, which `optional` cannot express.',
+        }),
     }),
 });
 

@@ -2066,3 +2066,50 @@ describe('Kotlin generator: the statuses the auth map adds', () => {
         expect(output).not.toContain('TestAPIClient.Health.Failure.Forbidden');
     });
 });
+
+describe('Kotlin generator: shapes the mapper used to give up on', () => {
+    const Money = Kizuna.model({
+        title: 'Money',
+        schema: z.object({
+            amount: z.number(),
+        }),
+    });
+
+    const output = (schema: z.ZodType): string => {
+        const contract = defineConfig({
+            routes: k.routes('api', {
+                read: k.route({
+                    method: 'GET',
+                    path: '/thing',
+                    responses: {
+                        200: schema,
+                    },
+                }),
+            }),
+        }).api;
+        return generateKotlinClient(contract, baseConfig);
+    };
+
+    it('keeps a null inside a list, which an element cannot express by being optional', () => {
+        expect(output(z.array(Money.nullable()))).toContain('List<TestAPI.Money?>');
+    });
+
+    it('drops an optional inside a list, where absence cannot happen', () => {
+        expect(output(z.array(Money.optional()))).toContain('List<TestAPI.Money>');
+    });
+
+    it('answers a binary body with ByteArray rather than a JSON container', () => {
+        const kotlin = output(z.instanceof(Uint8Array));
+
+        expect(kotlin).toContain('ByteArray');
+        expect(kotlin).not.toContain('TestAPI.ByteArray');
+        expect(kotlin).not.toContain('JsonElement');
+    });
+
+    it('hands back the bytes it received rather than parsing them as JSON', () => {
+        const kotlin = output(z.instanceof(Uint8Array));
+
+        expect(kotlin).toContain('val payload = data');
+        expect(kotlin).not.toContain('json.decodeFromString<ByteArray>');
+    });
+});

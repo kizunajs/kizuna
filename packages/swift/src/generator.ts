@@ -897,6 +897,20 @@ const buildOperationTypeMap = (allMethods: RouteMethod[], registry: TypeRegistry
 
 const SWIFT_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Bool', 'Date', 'Void', 'Foundation.Data']);
 
+/**
+ * Where a dictionary's key ends and its value begins, or -1 for an array.
+ */
+const dictionarySeparator = (inner: string): number => {
+    let depth = 0;
+    for (let index = 0; index < inner.length; index += 1) {
+        const character = inner[index];
+        if (character === '[') depth += 1;
+        else if (character === ']') depth -= 1;
+        else if (character === ':' && depth === 0) return index;
+    }
+    return -1;
+};
+
 // Resolve a registry type name to the Swift reference expression appropriate for the given context.
 // scope 'operation-enum': inside the operation's nested enum, same-op types use unqualified short name.
 // scope 'actor': anywhere else, operation types are fully qualified (works inside actor AND sub-client structs).
@@ -914,6 +928,12 @@ const resolveType = (
 
     if (base.startsWith('[') && base.endsWith(']')) {
         const inner = base.slice(1, -1);
+        const separator = dictionarySeparator(inner);
+        if (separator !== -1) {
+            const key = resolveType(inner.slice(0, separator).trim(), currentOperation, context, scope);
+            const value = resolveType(inner.slice(separator + 1).trim(), currentOperation, context, scope);
+            return optional ? `[${key}: ${value}]?` : `[${key}: ${value}]`;
+        }
         const resolved = resolveType(inner, currentOperation, context, scope);
         return optional ? `[${resolved}]?` : `[${resolved}]`;
     }

@@ -139,8 +139,12 @@ const propertyName = (key: string, camelCase: boolean): string => {
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };
 
-const objectFields = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): SwiftField[] => {
-    const shape = readObjectShape(schema) ?? {};
+const objectFields = (
+    schema: z.core.$ZodType,
+    registry: TypeRegistry,
+    hint: string,
+    shape: Record<string, z.core.$ZodType> = readObjectShape(schema) ?? {}
+): SwiftField[] => {
     const fields: SwiftField[] = [];
     const seen = new Map<string, string>();
     for (const [key, value] of Object.entries(shape)) {
@@ -327,8 +331,9 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
                 };
             }
             const elementResult = mapType(element, registry, `${hint}Item`);
+            const elementType = elementResult.expression.replace(/\?$/, '');
             return {
-                expression: `[${elementResult.expression.replace(/\?$/, '')}]`,
+                expression: `[${unwrapOptionalWrappers(element).nullable ? `${elementType}?` : elementType}]`,
                 optional: false,
             };
         }

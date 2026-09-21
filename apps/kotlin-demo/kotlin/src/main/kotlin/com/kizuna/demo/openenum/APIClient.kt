@@ -30,7 +30,9 @@ object OpenEnumAPI {
         val email_address: String? = null,
         val last_name: String? = null,
         val avatar: Avatar? = null,
-        val avatars: List<AvatarsItem>? = null
+        val avatars: List<AvatarsItem>? = null,
+        val metadata: Map<String, String>? = null,
+        val tags: List<String?>? = null
     ) {
 
         @Serializable
@@ -308,7 +310,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         class AfterParams internal constructor(override val params: Params) : Args
 
-        data class Result(val body: JsonElement)
+        data class Result(val body: ByteArray)
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
@@ -1681,7 +1683,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<JsonElement>(data.decodeToString())
+                        val payload = data
                         return@use OpenEnumAPIClient.UsersUserBadge.Result(body = payload)
                     }
                     catch (error: Exception) { throw OpenEnumAPIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }

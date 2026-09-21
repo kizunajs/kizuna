@@ -2143,3 +2143,46 @@ describe('Swift generator: the statuses the auth map adds', () => {
         expect(output).not.toContain('TestAPIClient.Health.Failure.forbidden');
     });
 });
+
+describe('Swift generator: shapes the mapper used to give up on', () => {
+    const Money = Kizuna.model({
+        title: 'Money',
+        schema: z.object({
+            amount: z.number(),
+        }),
+    });
+
+    const output = (schema: z.ZodType): string => {
+        const contractRoutes = k.routes('api', {
+            read: k.route({
+                method: 'GET',
+                path: '/thing',
+                responses: {
+                    200: schema,
+                },
+            }),
+        });
+        return generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: contractRoutes,
+            }).api,
+            baseConfig
+        );
+    };
+
+    it('keeps a null inside an array, which an element cannot express by being optional', () => {
+        expect(output(z.array(Money.nullable()))).toContain('[TestAPI.Money?]');
+    });
+
+    it('drops an optional inside an array, where absence cannot happen', () => {
+        expect(output(z.array(Money.optional()))).toContain('[TestAPI.Money]');
+    });
+
+    it('resolves both sides of a dictionary, so the key stays a Swift String', () => {
+        const swift = output(z.record(z.string(), Money));
+
+        expect(swift).toContain('[String: TestAPI.Money]');
+        expect(swift).not.toContain('TestAPI.String');
+    });
+});

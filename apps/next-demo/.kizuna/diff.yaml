@@ -75,6 +75,16 @@ routes:
                             optional: false
                             schema:
                               kind: string
+                  metadata:
+                    optional: true
+                    schema:
+                      kind: record
+                  tags:
+                    optional: true
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
           total:
             optional: false
             schema:
@@ -226,6 +236,16 @@ routes:
                             optional: false
                             schema:
                               kind: string
+                  metadata:
+                    optional: true
+                    schema:
+                      kind: record
+                  tags:
+                    optional: true
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
           nextCursor:
             optional: false
             schema:
@@ -296,6 +316,16 @@ routes:
                     optional: false
                     schema:
                       kind: string
+          metadata:
+            optional: true
+            schema:
+              kind: record
+          tags:
+            optional: true
+            schema:
+              kind: array
+              element:
+                kind: string
       "404":
         kind: object
         fields:
@@ -416,6 +446,16 @@ routes:
                     optional: false
                     schema:
                       kind: string
+          metadata:
+            optional: true
+            schema:
+              kind: record
+          tags:
+            optional: true
+            schema:
+              kind: array
+              element:
+                kind: string
       "404":
         kind: object
         fields:
@@ -513,6 +553,16 @@ routes:
                     optional: false
                     schema:
                       kind: string
+          metadata:
+            optional: true
+            schema:
+              kind: record
+          tags:
+            optional: true
+            schema:
+              kind: array
+              element:
+                kind: string
       "400":
         kind: object
         fields:
@@ -1013,6 +1063,16 @@ routes:
                             optional: false
                             schema:
                               kind: string
+                  metadata:
+                    optional: true
+                    schema:
+                      kind: record
+                  tags:
+                    optional: true
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
       "401":
         kind: object
         fields:
@@ -1137,6 +1197,16 @@ routes:
                     optional: false
                     schema:
                       kind: string
+          metadata:
+            optional: true
+            schema:
+              kind: record
+          tags:
+            optional: true
+            schema:
+              kind: array
+              element:
+                kind: string
       "401":
         kind: object
         fields:

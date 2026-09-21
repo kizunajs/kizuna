@@ -418,7 +418,13 @@ const optionalize = (type: string, optional: boolean): string => {
     return type.endsWith('?') ? type : `${type}?`;
 };
 
-const KOTLIN_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Long', 'Boolean', 'Instant', 'Unit']);
+const KOTLIN_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Long', 'Boolean', 'Instant', 'Unit', 'ByteArray']);
+
+/**
+ * How a response body is read. Raw bytes are the body already.
+ */
+const decodeBody = (resolved: string): string =>
+    resolved === 'ByteArray' ? 'data' : `json.decodeFromString<${resolved}>(data.decodeToString())`;
 
 const resolveType = (
     typeName: string,
@@ -1413,7 +1419,7 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
                 writer.indent(() => {
                     const resolved = resolveType(successResponse.type, method.operationName, context);
                     writer.block('try', () => {
-                        writer.line(`val payload = json.decodeFromString<${resolved}>(data.decodeToString())`);
+                        writer.line(`val payload = ${decodeBody(resolved)}`);
                         const bodyExpr = isMultiSuccess ? `${operationRef}.Success.Status${successResponse.status}(payload)` : 'payload';
                         if (hasHeaders) {
                             for (const field of successResponse.responseHeaders) {
@@ -1466,7 +1472,7 @@ const emitErrorBranches = (writer: KotlinWriter, method: RouteMethod, context: E
                     const resolved = resolveType(errorCase.type, method.operationName, context);
                     writer.line('val payload = try {');
                     writer.indent(() => {
-                        writer.line(`json.decodeFromString<${resolved}>(data.decodeToString())`);
+                        writer.line(decodeBody(resolved));
                     });
                     writer.line(`} catch (error: Exception) { throw ${failureRef}.Decoding(error, statusCode, data) }`);
                     writer.line(`throw ${failureRef}.${caseName}(body = payload)`);
@@ -1480,7 +1486,7 @@ const emitErrorBranches = (writer: KotlinWriter, method: RouteMethod, context: E
                         const resolved = resolveType(errorCase.type, method.operationName, context);
                         writer.line(`val ${errorCase.caseName} = try {`);
                         writer.indent(() => {
-                            writer.line(`json.decodeFromString<${resolved}>(data.decodeToString())`);
+                            writer.line(decodeBody(resolved));
                         });
                         writer.line('} catch (_: Exception) { null }');
                         writer.line(`if (${errorCase.caseName} != null) throw ${failureRef}.${caseName}(body = ${errorCase.caseName})`);

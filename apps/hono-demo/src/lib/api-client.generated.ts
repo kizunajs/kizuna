@@ -131,6 +131,14 @@ export namespace API {
             id: string;
             url: string;
         }>;
+        /**
+         * Free-form string map, exercises a record through the generators.
+         */
+        metadata?: Record<string, string>;
+        /**
+         * Entries may be null, exercises a nullable array element, which `optional` cannot express.
+         */
+        tags?: Array<string | null>;
     };
 
     export type UserSessionEvent = {
