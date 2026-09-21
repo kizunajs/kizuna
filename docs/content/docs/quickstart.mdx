@@ -93,14 +93,18 @@ export const k = new Kizuna<Config>();
 Each route pairs a method and path with Zod schemas, and carries the handler that answers it:
 
 ```ts title="src/routes/users.ts"
+import { Kizuna } from 'kizunajs';
 import { z } from 'zod';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { k } from '../k';
 
-export const UserSchema = z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.email(),
+export const UserSchema = Kizuna.model({
+    title: 'User',
+    schema: z.object({
+        id: z.string(),
+        name: z.string(),
+        email: z.email(),
+    }),
 });
 
 export const users = k.routes({
@@ -185,6 +189,8 @@ export const users = k.routes({
 ```
 
 The handler's `query`, `body` and `params` are typed from the declaration right above it, and its return is checked against that route's `responses`.
+
+[`Kizuna.model`](/docs/reference/kizuna-model) names `UserSchema`, so it lands as `User` in the generated client and `components.schemas.User` in the OpenAPI document rather than being written out at each use.
 
 Add them to the config:
 

@@ -44,9 +44,11 @@ export namespace API {
         subject: string;
     };
 
+    export type EventKind = "login" | "logout" | "signup";
+
     export type EventRecord = {
         id: string;
-        kind: "login" | "logout" | "signup";
+        kind: EventKind;
         occurredAt: string;
         userId: string;
     };
@@ -58,6 +60,8 @@ export namespace API {
         detail: string;
         code?: "unauthenticated" | "expired_token" | "forbidden" | "not_found";
     };
+
+    export type NotificationEvent = EmailEvent | SmsEvent;
 
     /**
      * RFC 9457 Problem Details error response.
@@ -129,6 +133,17 @@ export namespace API {
         }>;
     };
 
+    export type UserSessionEvent = {
+        kind: "login";
+        at: string;
+        ipAddress: string;
+        userAgent: string;
+    } | {
+        kind: "logout";
+        at: string;
+        reason: "signed_out" | "session_expired";
+    };
+
     /**
      * RFC 9457 Problem Details error response for validation failures.
      */
@@ -191,16 +206,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: {
-                kind: "login";
-                at: string;
-                ipAddress: string;
-                userAgent: string;
-            } | {
-                kind: "logout";
-                at: string;
-                reason: "signed_out" | "session_expired";
-            }; headers: Record<string, string> }
+            | { status: 200; body: UserSessionEvent; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
@@ -287,7 +293,7 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: {
-                alreadyArchived: "true";
+                alreadyArchived: true;
                 userId: string;
             }; headers: Record<string, string> }
             | { status: 201; body: {
@@ -371,7 +377,7 @@ export namespace API {
     }
 
     export namespace NotificationsSendNotification {
-        export type Body = EmailEvent | SmsEvent;
+        export type Body = NotificationEvent;
 
         export type Result =
             | { status: 202; body: {
@@ -386,7 +392,7 @@ export namespace API {
              * Lower bound for occurredAt, wire format is ISO-8601
              */
             since?: string;
-            kind?: "login" | "logout" | "signup";
+            kind?: EventKind;
             /**
              * Filter by id; repeated query param
              */
@@ -406,7 +412,7 @@ export namespace API {
                 events: Array<EventRecord>;
                 echo: {
                     since: string | null;
-                    kind: "login" | "logout" | "signup" | null;
+                    kind: EventKind | null;
                     ids: Array<string> | null;
                     label: string | null;
                     tagIds: Array<string> | null;

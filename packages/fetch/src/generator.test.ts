@@ -181,3 +181,97 @@ describe('the generated table drives real requests', () => {
         expect(result.body).toEqual({ id: '1' });
     });
 });
+
+describe('a model on something other than an object', () => {
+    const Circle = Kizuna.model({
+        title: 'Circle',
+        schema: z.object({
+            kind: z.literal('circle'),
+            radius: z.number(),
+        }),
+    });
+
+    const Square = Kizuna.model({
+        title: 'Square',
+        schema: z.object({
+            kind: z.literal('square'),
+            side: z.number(),
+        }),
+    });
+
+    const Shape = Kizuna.model({
+        title: 'Shape',
+        schema: z.discriminatedUnion('kind', [Circle, Square]),
+    });
+
+    const Priority = Kizuna.model({
+        title: 'Priority',
+        schema: z.enum(['low', 'high']),
+    });
+
+    const shapeRoutes = k.routes('shapes', {
+        getShape: k.route({
+            method: 'GET',
+            path: '/shapes/:id',
+            responses: {
+                200: Shape,
+            },
+        }),
+        createShape: k.route({
+            method: 'POST',
+            path: '/shapes',
+            body: Shape,
+            query: z.object({
+                priority: Priority,
+            }),
+            responses: {
+                201: Shape,
+            },
+        }),
+    });
+
+    const output = generateFetchClient(
+        defineConfig({
+            routes: shapeRoutes,
+        }).api
+    );
+
+    it('declares a discriminated union once and references it everywhere', () => {
+        expect(output).toContain('export type Shape = Circle | Square;');
+        expect(output).toContain('export type Body = Shape;');
+        expect(output.match(/kind: "circle"/g)).toHaveLength(1);
+    });
+
+    it('declares an enum once and references it', () => {
+        expect(output).toContain('export type Priority = "low" | "high";');
+        expect(output).toContain('priority: Priority;');
+    });
+});
+
+describe('a literal that is not a string', () => {
+    const envelopeRoutes = k.routes('envelope', {
+        read: k.route({
+            method: 'GET',
+            path: '/envelope',
+            responses: {
+                200: z.object({
+                    success: z.literal(true),
+                    version: z.literal(1),
+                    kind: z.literal('full'),
+                }),
+            },
+        }),
+    });
+
+    const output = generateFetchClient(
+        defineConfig({
+            routes: envelopeRoutes,
+        }).api
+    );
+
+    it('types it as the JSON value rather than a string', () => {
+        expect(output).toContain('success: true;');
+        expect(output).toContain('version: 1;');
+        expect(output).toContain('kind: "full";');
+    });
+});

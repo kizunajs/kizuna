@@ -53,6 +53,16 @@ export class TypeCollector {
 
 const quote = (value: string): string => JSON.stringify(value);
 
+/**
+ * A literal as the type the JSON carries, so `z.literal(true)` is `true`.
+ */
+const literalType = (value: unknown): string => {
+    if (typeof value === 'string') return quote(value);
+    if (typeof value === 'bigint') return `${value}n`;
+    if (value === undefined) return 'undefined';
+    return String(value);
+};
+
 const indent = (text: string, depth = 1): string =>
     text
         .split('\n')
@@ -239,16 +249,25 @@ export const typeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: 
     }
 
     const modelName = readMetaId(schema);
-    if (modelName !== undefined && def.type === 'object') {
+    if (modelName !== undefined) {
         if (collector.claim(modelName)) {
             collector.add({
                 name: modelName,
                 description: readMetaDescription(schema),
-                body: objectBody(schema, collector, modelName),
+                body: structuralType(schema, collector, modelName),
             });
         }
         return modelName;
     }
+
+    return structuralType(schema, collector, hint);
+};
+
+/**
+ * The type a schema describes by its shape, its name already spent by the caller.
+ */
+const structuralType = (schema: z.core.$ZodType, collector: TypeCollector, hint: string): string => {
+    const def = readDef(schema);
 
     switch (def.type) {
         case 'string':
@@ -274,11 +293,11 @@ export const typeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: 
             return 'undefined';
         case 'literal': {
             const values = def.values ?? [];
-            return values.length > 0 ? values.map((value) => quote(String(value))).join(' | ') : 'never';
+            return values.length > 0 ? values.map(literalType).join(' | ') : 'never';
         }
         case 'enum': {
             const values = Object.values(def.entries ?? {});
-            return values.length > 0 ? values.map((value) => quote(String(value))).join(' | ') : 'never';
+            return values.length > 0 ? values.map(literalType).join(' | ') : 'never';
         }
         case 'array':
             return def.element ? `Array<${typeOf(def.element, collector, `${hint}Item`)}>` : 'unknown[]';
