@@ -10,8 +10,25 @@ pnpm add -D @kizunajs/kotlin
 
 ## Usage
 
+Name the client in your config, and `kizuna generate` writes it with the rest:
+
+```ts
+import { kotlinClient } from '@kizunajs/kotlin';
+
+export default defineConfig({
+    routes,
+    clients: [
+        kotlinClient({
+            output: '../android/app/src/main/kotlin/com/example/APIClient.kt',
+            namespace: 'API',
+            package: 'com.example',
+        }),
+    ],
+});
+```
+
 ```sh
-kizuna-kotlin generate --config kizuna.config.ts --out android/app/src/main/kotlin/com/example/APIClient.kt --namespace-name API --package com.example
+kizuna generate
 ```
 
 ## Documentation

@@ -41,15 +41,7 @@ kizuna generate
 | `camelCaseProperties` | Convert wire field names to camelCase properties with CodingKeys                        |
 | `unknownEnumCase`     | Emit enums with an `unknown(String)` fallback so new server values don't break decoding |
 
-### Without the config
-
-`kizuna-swift` generates one client on its own, for a repository that does not run `kizuna generate`:
-
-```sh title="Terminal"
-kizuna-swift generate --config kizuna.config.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
-```
-
-`--config` takes the path to your `kizuna.config.ts`, suffixed with an export to read something other than the default, as in `src/apis.ts:workspace`. `--camel-case` and `--unknown-enum-case` are the flag forms of the options above, and `--export` names the export to read when none is suffixed, `api` by default. The CLI loads the config at runtime using `jiti`.
+The path is relative to the config, so a client can land outside the TypeScript project. When the iOS app lives in the same repository, `../ios/MyApp/Generated/APIClient.swift` writes straight into it. An app in its own repository takes the generated file the way it takes any other vendored source, by copying it in from a build step or committing it.
 
 </Step>
 
@@ -228,17 +220,20 @@ for try await event in result.body {
 
 A stream of one schema yields that type directly, a `text/*` stream yields one `String` per line, and a binary stream yields `Data` chunks. The status and headers are checked before the method returns, so a `400` throws its `Failure` as on any route. Cancelling the task that reads the stream closes the connection. A route that mixes a streamed status with another `2xx` is left out of the client, with a warning.
 
-## Tip: automate with a script
+## Keeping it current
 
-You can add a script to your `package.json` to regenerate the client whenever your routes change:
+`kizuna generate` writes every client the config declares, so the Swift one is never generated on its own:
 
 ```json title="package.json"
 {
     "scripts": {
-        "generate:swift": "kizuna-swift generate --config kizuna.config.ts --output ../ios/MyApp/Generated/APIClient.swift --namespace-name API"
+        "kizuna:generate": "kizuna generate",
+        "kizuna:check": "kizuna generate --check"
     }
 }
 ```
+
+Run [`kizuna generate --check`](/docs/config#kizuna-generate---check) in CI, and a Swift client nobody regenerated fails the build instead of drifting from the routes it was generated from.
 
 ## Reference
 

@@ -94,3 +94,51 @@ import { readMetaExamples } from 'kizunajs/generator';
 
 const [example] = readMetaExamples(fieldSchema);
 ```
+
+## Shipping a `ClientTarget`
+
+A generator becomes something a config can name by wrapping it in a `ClientTarget`, which is the whole plug-in point:
+
+```ts
+export interface ClientTarget {
+    readonly kind: string;
+    readonly output: string;
+    readonly generate: (api: ApiDefinition) => string;
+}
+```
+
+Export a factory returning one, and `kizuna generate` writes the file while `kizuna generate --check` verifies it:
+
+```ts title="src/client-target.ts"
+import type { ApiDefinition, ClientTarget } from 'kizunajs';
+import { generateGoClient } from './generator.js';
+
+export const goClient = (options: { output: string; package?: string }): ClientTarget => ({
+    kind: 'go',
+    output: options.output,
+    generate: (api: ApiDefinition) => generateGoClient(api, options.package ?? 'api'),
+});
+```
+
+```ts title="kizuna.config.ts"
+import { goClient } from '@example/kizuna-go';
+
+export default defineConfig({
+    routes,
+    clients: [
+        goClient({
+            output: '../cmd/client/api_client.go',
+            package: 'api',
+        }),
+    ],
+});
+```
+
+Four things the contract asks of you:
+
+- **`generate` must be deterministic.** `kizuna generate --check` re-renders and compares byte for byte, so a timestamp or a sorted-by-`Map`-insertion-order header fails every CI run after the first.
+- **One string, one file.** There is no multi-file target. Export several `ClientTarget`s instead, as the Swift generator does for its open-enum variant.
+- **`generate` is synchronous.** It returns `string`, not `Promise<string>`, so read whatever you need before you build the target.
+- **`output` resolves against the config's directory**, not the shell's working directory, so `../ios/MyApp/Generated/APIClient.swift` writes into a sibling project and the result does not move with the caller.
+
+`kind` is yours to choose and appears only in what the CLI prints. Nothing validates it and nothing minds two targets sharing one.

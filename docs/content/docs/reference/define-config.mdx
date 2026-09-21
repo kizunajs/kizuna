@@ -48,7 +48,7 @@ kizuna.api.mount(app);
 | `plugins`        | What this API installs beside its own routes, as a list.                                                                                                                      |
 | `tags`           | The OpenAPI tags routes are grouped under, from [`k.tags`](/docs/reference/k-tags).                                                                                           |
 | `typescript`     | Where `kizuna generate` writes the `Config`, as `{ outputFile }`.                                                                                                             |
-| `clients`        | What `kizuna generate` writes from this API.                                                                                                                                  |
+| `clients`        | What `kizuna generate` writes from this API, as a list of [`ClientTarget`](/docs/extend/create-generator#shipping-a-clienttarget).                                            |
 
 `jobs` is what the jobs are, and `jobRunner` is how this deployment runs them: the first is shared by every config that serves these routes, the second differs between dev and production.
 

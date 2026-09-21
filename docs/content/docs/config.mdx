@@ -149,7 +149,7 @@ Rate limiting, multipart parsing, and the rest go in your framework's own middle
 
 ## Clients
 
-Each client comes from the package that generates it, so its options are typed there and a generator you have not installed cannot be configured by accident.
+Each client comes from the package that generates it, so its options are typed there and a generator you have not installed cannot be configured by accident. The list is not closed: any package exporting a [`ClientTarget`](/docs/extend/create-generator#shipping-a-clienttarget) factory drops into `clients` the same way.
 
 | Target            | Import from         | Writes                        |
 | ----------------- | ------------------- | ----------------------------- |
@@ -169,7 +169,7 @@ clients: [
 ],
 ```
 
-The generated client holds the route shapes and the schemas, and is what a browser imports.
+The generated client holds the route shapes and the schemas, and is what a browser imports. An `output` is resolved against the config's own directory, so in a repository holding both, `../ios/MyApp/Generated/APIClient.swift` writes into the app beside it.
 
 ## Client options
 
@@ -281,11 +281,7 @@ A route declared against the admin `k` sees the admin identities and nothing els
 }
 ```
 
-The native generators take `--config` the same way, suffixing an export when a file holds more than the default:
-
-```sh title="Terminal"
-kizuna-swift generate --config kizuna.admin.config.ts --output ... --namespace-name AdminAPI
-```
+Each config declares its own clients, so the Swift and Kotlin clients for the admin API come out of `kizuna.admin.config.ts` along with its types.
 
 ### Sharing between them
 

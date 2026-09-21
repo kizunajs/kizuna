@@ -10,8 +10,24 @@ pnpm add -D @kizunajs/swift
 
 ## Usage
 
+Name the client in your config, and `kizuna generate` writes it with the rest:
+
+```ts
+import { swiftClient } from '@kizunajs/swift';
+
+export default defineConfig({
+    routes,
+    clients: [
+        swiftClient({
+            output: '../ios/MyApp/Generated/APIClient.swift',
+            namespace: 'API',
+        }),
+    ],
+});
+```
+
 ```sh
-kizuna-swift generate --config kizuna.config.ts --output ios/MyApp/Generated/APIClient.swift --namespace-name API
+kizuna generate
 ```
 
 ## Documentation
