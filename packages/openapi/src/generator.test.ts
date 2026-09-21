@@ -2426,3 +2426,60 @@ describe('routes carrying handlers', () => {
         expect(JSON.stringify(spec)).not.toContain('handler');
     });
 });
+
+describe('types JSON Schema has no keyword for', () => {
+    const wireRoutes = k.routes('api', {
+        read: k.route({
+            method: 'GET',
+            path: '/wire',
+            query: z.object({
+                from: z.date(),
+                bigId: z.bigint(),
+            }),
+            responses: {
+                200: z.object({
+                    when: z.date(),
+                    anything: z.any(),
+                }),
+            },
+        }),
+    });
+
+    const spec = generateJson(
+        defineConfig({
+            ...config,
+            routes: wireRoutes,
+        }).api,
+        baseConfig
+    );
+
+    const parameter = (name: string) =>
+        (spec.paths['/wire']?.get?.parameters as Array<{ name: string; schema: Record<string, unknown> }>).find(
+            (candidate) => candidate.name === name
+        )?.schema;
+
+    it('documents a date as the string it is sent as', () => {
+        expect(parameter('from')).toEqual({
+            type: 'string',
+            format: 'date-time',
+        });
+    });
+
+    it('documents a bigint as a string, which is how JSON carries it', () => {
+        expect(parameter('bigId')).toEqual({
+            type: 'string',
+        });
+    });
+
+    it('leaves z.any() open, because the value really is anything', () => {
+        const body = spec.paths['/wire']?.get?.responses?.['200']?.content?.['application/json']?.schema as {
+            properties: Record<string, unknown>;
+        };
+
+        expect(body.properties.when).toEqual({
+            type: 'string',
+            format: 'date-time',
+        });
+        expect(body.properties.anything).toEqual({});
+    });
+});
