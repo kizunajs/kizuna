@@ -186,6 +186,12 @@ importers:
       '@kizunajs/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@kizunajs/kotlin':
+        specifier: workspace:*
+        version: link:../../packages/kotlin
+      '@kizunajs/swift':
+        specifier: workspace:*
+        version: link:../../packages/swift
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.6

@@ -1,5 +1,7 @@
 import { defineConfig } from 'kizunajs';
 import { fetchClient } from '@kizunajs/fetch/server';
+import { kotlinClient } from '@kizunajs/kotlin';
+import { swiftClient } from '@kizunajs/swift';
 import { expressAdapter } from '@kizunajs/express';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';
@@ -40,6 +42,26 @@ export default defineConfig({
     clients: [
         fetchClient({
             output: './src/lib/api-client.generated.ts',
+        }),
+        swiftClient({
+            output: '../swift-demo/swift/Sources/APIClient/APIClient.swift',
+            namespace: 'API',
+        }),
+        swiftClient({
+            output: '../swift-demo/swift/Sources/OpenEnumAPIClient/OpenEnumAPIClient.swift',
+            namespace: 'OpenEnumAPI',
+            unknownEnumCase: true,
+        }),
+        kotlinClient({
+            output: '../kotlin-demo/kotlin/src/main/kotlin/com/kizuna/demo/APIClient.kt',
+            namespace: 'API',
+            package: 'com.kizuna.demo',
+        }),
+        kotlinClient({
+            output: '../kotlin-demo/kotlin/src/main/kotlin/com/kizuna/demo/openenum/APIClient.kt',
+            namespace: 'OpenEnumAPI',
+            package: 'com.kizuna.demo.openenum',
+            unknownEnumCase: true,
         }),
     ],
     plugins: [

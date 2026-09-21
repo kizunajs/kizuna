@@ -25,6 +25,8 @@
   },
   "devDependencies": {
     "@kizunajs/cli": "workspace:*",
+    "@kizunajs/kotlin": "workspace:*",
+    "@kizunajs/swift": "workspace:*",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "concurrently": "catalog:",
