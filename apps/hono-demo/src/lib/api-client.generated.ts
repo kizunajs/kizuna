@@ -315,8 +315,6 @@ export namespace API {
             id: string;
         };
 
-        export type Body = undefined;
-
         export type Result =
             | { status: 204; body: undefined; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
@@ -863,12 +861,10 @@ export interface Client {
          *     params: {
          *         id: '1',
          *     },
-         *     body: undefined,
          * });
          */
         pingUser: ClientMethod<'POST', false, {
             params: API.UsersPingUser.Params;
-            body: API.UsersPingUser.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.UsersPingUser.Result>;

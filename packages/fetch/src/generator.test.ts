@@ -51,6 +51,14 @@ const routes = k.routes('users', {
             204: z.void(),
         },
     }),
+    pingUser: k.route({
+        method: 'POST',
+        path: '/users/:id/ping',
+        body: z.void(),
+        responses: {
+            204: z.void(),
+        },
+    }),
     watch: k.route({
         method: 'GET',
         path: '/users/:id/events',
@@ -116,6 +124,12 @@ describe('generateFetchClient', () => {
 
     it('keeps the null on a field that is both nullable and optional', () => {
         expect(source).toContain('description?: string | null;');
+    });
+
+    it('asks for no body on a route that declares z.void()', () => {
+        expect(source).toContain('export namespace UsersPingUser');
+        expect(source).not.toContain('body: API.UsersPingUser.Body');
+        expect(source).not.toContain('body: undefined,');
     });
 
     it('ships no schema library and no handlers', () => {

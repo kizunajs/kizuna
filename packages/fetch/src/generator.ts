@@ -3,6 +3,7 @@ import type { ApiDefinition, RouteDefinition, Routes } from 'kizunajs';
 import { ValidationErrorSchema } from 'kizunajs/schemas';
 import {
     isStreamResponse,
+    isVoidSchema,
     readObjectShape,
     resolveResponseBody,
     resolveResponseHeaders,
@@ -97,7 +98,9 @@ const exampleCall = (routeKey: string, route: RouteDefinition): string => {
         entries.push(`params: {\n${indent(fields.join('\n'))}\n},`);
     }
     if (route.query && requiresArgument(route.query)) entries.push(`query: ${sampleObject(route.query)},`);
-    if (route.body && requiresArgument(route.body)) entries.push(`body: ${sampleValue(route.body)},`);
+    if (route.body && !isVoidSchema(route.body) && requiresArgument(route.body)) {
+        entries.push(`body: ${sampleValue(route.body)},`);
+    }
 
     const args = entries.length > 0 ? `{\n${indent(entries.join('\n'))}\n}` : '';
     return `const result = await client.${routeKey}(${args});`;
@@ -160,7 +163,7 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
         args.push(`query?: API.${namespace}.Query`);
     }
 
-    if (route.body) {
+    if (route.body && !isVoidSchema(route.body)) {
         members.push(`export type Body = ${typeOf(route.body, collector, `${namespace}Body`)};`);
         args.push(`body: API.${namespace}.Body`);
     }
