@@ -26,6 +26,8 @@ export interface LoadedApi {
 export const loadConfig = async (configPath: string): Promise<LoadedApi[]> => {
     const jiti = createJiti(import.meta.url, {
         interopDefault: true,
+        jsx: true,
+        tsconfigPaths: true,
     });
 
     const loaded = (await jiti.import(configPath)) as Record<string, unknown>;

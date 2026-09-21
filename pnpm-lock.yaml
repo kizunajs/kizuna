@@ -534,6 +534,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
       kizunajs:
         specifier: workspace:*
         version: link:../core

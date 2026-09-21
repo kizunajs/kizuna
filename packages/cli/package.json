@@ -71,6 +71,7 @@
   "devDependencies": {
     "kizunajs": "workspace:*",
     "@types/node": "catalog:",
+    "@types/react": "catalog:",
     "tsdown": "catalog:",
     "zod": "catalog:"
   }

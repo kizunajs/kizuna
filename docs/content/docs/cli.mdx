@@ -19,6 +19,8 @@ description: Write your types and clients, print the routes your config serves, 
 
 See [Configuration](/docs/config#kizuna-generate) for what it writes and where.
 
+In a monorepo, build the other packages your config imports before generating. The config reads their built output, and an out-of-date build loads without complaint.
+
 ## `kizuna routes`
 
 Every route, with what it asks of a caller and what it publishes:
