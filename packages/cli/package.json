@@ -62,7 +62,8 @@
   },
   "dependencies": {
     "jiti": "^2.7.0",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "yaml": "^2.8.4"
   },
   "peerDependencies": {
     "kizunajs": "workspace:*",

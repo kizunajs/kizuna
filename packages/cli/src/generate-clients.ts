@@ -73,7 +73,7 @@ export const formatStale = (stale: readonly StaleClient[], command = 'kizuna gen
     });
 
     return [
-        stale.length === 1 ? 'A generated client is out of date:' : `${stale.length} generated clients are out of date:`,
+        stale.length === 1 ? 'A generated file is out of date:' : `${stale.length} generated files are out of date:`,
         ...lines,
         '',
         `Run \`${command}\` and commit the result.`,

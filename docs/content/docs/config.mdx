@@ -328,7 +328,7 @@ On Next.js each API is its own catch-all route file, and `mount({ basePath })` i
 kizuna generate
 ```
 
-It writes two things from `kizuna.config.ts`: the `Config` in `kizuna.types.ts`, and every client under `clients`. A file that already matches is left alone, so watchers and build tools see no change.
+It writes three things from `kizuna.config.ts`: the `Config` in `kizuna.types.ts`, every client under `clients`, and the `.kizuna/diff.yaml` snapshot [`kizuna diff`](/docs/breaking-changes) compares. A file that already matches is left alone, so watchers and build tools see no change.
 
 | Option     | Default            | Description                                                                             |
 | ---------- | ------------------ | --------------------------------------------------------------------------------------- |
@@ -410,16 +410,19 @@ export const k = new Kizuna<Config>();
 kizuna generate --check
 ```
 
-The same work without writing. It names whatever has fallen behind and exits `1`, so a pipeline fails on a generated client nobody regenerated:
+The same work without writing. It names whatever has fallen behind and exits `1`, so a pipeline fails on a file nobody regenerated:
 
 ```text
-  kizuna.types.ts is behind the config
+2 generated files are out of date:
   src/lib/api-client.generated.ts is behind the config
+  .kizuna/diff.yaml is behind the config
+
+Run `kizuna generate` and commit the result.
 ```
 
 Commit what `kizuna generate` writes. The check compares the files on disk against the config, so a generated client that is gitignored reads as missing on every clean checkout and the pipeline fails on it.
 
-Run it in CI beside your typecheck. See [Breaking changes](/docs/breaking-changes) for the rest of the pipeline.
+Run it in CI, where [the CLI page](/docs/cli#kizuna-generate) has the workflow. [`kizuna diff`](/docs/breaking-changes) reads the snapshot this writes, so the two belong in the same pipeline: the check proves the snapshot matches today's config, and the diff compares it against the base.
 
 `writeClients` and `checkClients` from `@kizunajs/cli` are the same two steps as functions, for a script that does more than the command does.
 

@@ -1,9 +1,6 @@
-import type { ApiDefinition, RouteDefinition } from 'kizunajs';
-import { createGenerator, flattenJobs, toToolName } from 'kizunajs/generator';
-import { flattenRoutes } from 'kizunajs/adapter';
-import { resolveResponseBody } from 'kizunajs/generator';
+import type { ApiDefinition } from 'kizunajs';
 import { diffSchemas, type Direction } from './diff-schemas.js';
-import type { z } from 'zod';
+import { toSnapshot, type ApiSnapshot, type SchemaNode } from './snapshot.js';
 
 /**
  * How much a change asks of the people already calling an API.
@@ -23,73 +20,37 @@ export interface Change {
     detail?: string;
 }
 
-interface RouteFacts {
-    method: string;
-    path: string;
-    statuses: number[];
-    deprecated: boolean;
-    sunset?: string;
-    body?: z.core.$ZodType;
-    query?: z.core.$ZodType;
-    headers?: z.core.$ZodType;
-    responses: Map<number, z.core.$ZodType | undefined>;
+export interface DiffOptions {
+    /**
+     * Report a job key that is gone. A job answers `POST /jobs/run` by its
+     * dotted key, so this matters once something outside your own code
+     * dispatches them.
+     *
+     * @default false
+     */
+    jobs?: boolean;
+    /**
+     * Report an MCP tool a model can no longer call.
+     *
+     * @default false
+     */
+    tools?: boolean;
+    /**
+     * Treat a renamed dotted key, such as `users.getUser` becoming
+     * `users.fetchUser`, as breaking. The key names the method on a generated
+     * client, so a rename breaks anyone building an SDK on one and leaves the
+     * HTTP surface untouched.
+     *
+     * @default false
+     */
+    dottedKeys?: boolean;
 }
 
-const routeFacts = createGenerator<Record<string, never>, Map<string, RouteFacts>>(() => {
-    const facts = new Map<string, RouteFacts>();
-    return {
-        processRoute({ routeKey, route, deprecated }) {
-            facts.set(routeKey, {
-                method: route.method,
-                path: route.path,
-                statuses: Object.keys(route.responses).map(Number).sort(),
-                deprecated,
-                ...(sunsetOf(route) === undefined ? {} : { sunset: sunsetOf(route) }),
-                ...(route.body ? { body: route.body } : {}),
-                ...(route.query ? { query: route.query } : {}),
-                ...(route.headers ? { headers: route.headers } : {}),
-                responses: new Map(
-                    Object.entries(route.responses).map(([status, response]) => [Number(status), resolveResponseBody(response)])
-                ),
-            });
-        },
-        finalize: () => facts,
-    };
-});
-
-const sunsetOf = (route: RouteDefinition): string | undefined => {
-    const declared = route.sunset;
-    if (declared === undefined) return undefined;
-    return typeof declared === 'string' ? declared : declared.date;
-};
-
-const jobKeys = (contract: ApiDefinition): Set<string> => {
-    const jobs = (contract as { jobs?: unknown }).jobs;
-    if (!jobs) return new Set();
-    return new Set(flattenJobs(jobs as never).map((job) => job.jobKey));
-};
-
-/**
- * The MCP name of every route that publishes as a tool, keyed by route key.
- */
-const toolNames = (contract: ApiDefinition): Map<string, string> =>
-    new Map(
-        flattenRoutes(contract.routes)
-            .filter(({ route }) => route.tool !== undefined && route.tool !== false)
-            .map(({ routeKey }) => [routeKey, toToolName(routeKey)])
-    );
-
-/**
- * What changed between two apis, worst first.
- *
- * Compares the declarations rather than an OpenAPI document, so it sees route
- * keys, MCP tool names and job keys, none of which a document carries.
- */
-export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] => {
+export const diffSnapshots = (before: ApiSnapshot, after: ApiSnapshot, options: DiffOptions = {}): Change[] => {
     const changes: Change[] = [];
 
-    const beforeRoutes = routeFacts(before, {});
-    const afterRoutes = routeFacts(after, {});
+    const beforeRoutes = new Map(Object.entries(before.routes));
+    const afterRoutes = new Map(Object.entries(after.routes));
 
     const removed = [...beforeRoutes.keys()].filter((key) => !afterRoutes.has(key));
     const added = [...afterRoutes.keys()].filter((key) => !beforeRoutes.has(key));
@@ -114,10 +75,10 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
 
     for (const [toKey, fromKey] of renames) {
         changes.push({
-            level: 'breaking',
+            level: options.dottedKeys ? 'breaking' : 'changed',
             key: fromKey,
             summary: `${fromKey} renamed to ${toKey}`,
-            detail: 'client method and generated client names change, HTTP surface unaffected',
+            detail: 'the generated client method changes name, the HTTP surface does not',
         });
     }
 
@@ -182,7 +143,7 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
             });
         }
 
-        const inputs: Array<[Direction, string, z.core.$ZodType | undefined, z.core.$ZodType | undefined]> = [
+        const inputs: Array<[Direction, string, SchemaNode | undefined, SchemaNode | undefined]> = [
             ['request', 'body', gone.body, arrived.body],
             ['request', 'query', gone.query, arrived.query],
             ['request', 'headers', gone.headers, arrived.headers],
@@ -198,10 +159,10 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
             }
         }
 
-        for (const [status, was] of gone.responses) {
-            const now = arrived.responses.get(status);
-            if (!arrived.responses.has(status)) continue;
-            for (const change of diffSchemas(was, now, 'response', `${status}`)) {
+        for (const [status, was] of Object.entries(gone.responses)) {
+            if (!(status in arrived.responses)) continue;
+            const now = arrived.responses[status];
+            for (const change of diffSchemas(was ?? undefined, now ?? undefined, 'response', status)) {
                 changes.push({
                     level: change.breaking ? 'breaking' : 'changed',
                     key,
@@ -219,8 +180,8 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
         }
     }
 
-    for (const key of jobKeys(before)) {
-        if (jobKeys(after).has(key)) continue;
+    for (const key of options.jobs ? before.jobs : []) {
+        if (after.jobs.includes(key)) continue;
         changes.push({
             level: 'breaking',
             key,
@@ -229,11 +190,8 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
         });
     }
 
-    const beforeTools = toolNames(before);
-    const afterTools = toolNames(after);
-
-    for (const [key, name] of beforeTools) {
-        const arrived = afterTools.get(key);
+    for (const [key, name] of options.tools ? Object.entries(before.tools) : []) {
+        const arrived = after.tools[key];
         if (arrived === undefined) {
             changes.push({
                 level: 'breaking',
@@ -256,6 +214,15 @@ export const diffApis = (before: ApiDefinition, after: ApiDefinition): Change[] 
     const order: Record<ChangeLevel, number> = { breaking: 0, changed: 1, added: 2 };
     return changes.sort((left, right) => order[left.level] - order[right.level] || left.key.localeCompare(right.key));
 };
+
+/**
+ * What changed between two apis, for a caller holding both in memory.
+ *
+ * `kizuna diff` reads snapshots instead, so it never has to load the other
+ * side's code.
+ */
+export const diffApis = (before: ApiDefinition, after: ApiDefinition, options: DiffOptions = {}): Change[] =>
+    diffSnapshots(toSnapshot(before), toSnapshot(after), options);
 
 /**
  * One block per change, ready to print: the level, the summary, and the

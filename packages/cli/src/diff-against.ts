@@ -1,59 +1,70 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { isAbsolute, join, relative, resolve } from 'node:path';
-import { loadConfig } from './load-config.js';
-import { diffApis, type Change } from './diff-apis.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { diffSnapshots, type Change, type DiffOptions } from './diff-apis.js';
+import { parse } from 'yaml';
+import type { ApiSnapshot } from './snapshot.js';
 
-export interface DiffAgainstOptions {
+export interface DiffAgainstOptions extends DiffOptions {
     /**
-     * Repository the ref lives in.
+     * Where a relative path is resolved from.
      *
      * @default process.cwd()
      */
     cwd?: string;
 }
 
-const git = (cwd: string, ...args: string[]): string => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+const git = (cwd: string, ...args: string[]): string =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+
+/** The repository holding the snapshot, falling back to the one the caller ran in. */
+const repositoryFor = (directory: string, cwd: string): string => {
+    try {
+        return git(directory, 'rev-parse', '--show-toplevel');
+    } catch {
+        return git(cwd, 'rev-parse', '--show-toplevel');
+    }
+};
+
+const parseSnapshot = (contents: string, source: string): ApiSnapshot => {
+    try {
+        return parse(contents) as ApiSnapshot;
+    } catch {
+        throw new Error(`${source} is not a Kizuna diff file. Run \`kizuna generate\` to write one.`);
+    }
+};
+
+/** Reads a path out of a ref without checking anything out. */
+const showAtRef = (root: string, ref: string, path: string): string => {
+    try {
+        return git(root, 'show', `${ref}:${path}`);
+    } catch {
+        throw new Error(`${path} does not exist at ${ref}. It was added or renamed since, so there is nothing to compare against.`);
+    }
+};
+
+export const readSnapshot = (path: string): ApiSnapshot => {
+    if (!existsSync(path)) throw new Error(`No snapshot at ${path}. Run \`kizuna generate\` to write one.`);
+    return parseSnapshot(readFileSync(path, 'utf8'), path);
+};
 
 /**
- * Compares the config on disk against the same config at a git ref.
+ * Compares a snapshot against the same file at a git ref.
  *
- * The ref is checked out into a worktree inside the repository, which costs a
- * few files rather than a clone. Nothing is installed there: module resolution
- * walks up to the repository's own `node_modules`, so the base tree needs only
- * its source.
- *
- * @example
- * const changes = await diffAgainst('main', './src/contract.ts');
+ * The ref is read with `git show`, so nothing is checked out, installed or
+ * executed for the other side. A snapshot written a year ago compares fine
+ * against one written today.
  */
-export const diffAgainst = async (ref: string, configPath: string, options: DiffAgainstOptions = {}): Promise<Change[]> => {
-    const { cwd = process.cwd() } = options;
+export const diffAgainst = (ref: string, snapshotPath: string, options: DiffAgainstOptions = {}): Change[] => {
+    const { cwd = process.cwd(), ...diff } = options;
 
-    const root = git(cwd, 'rev-parse', '--show-toplevel');
-    const absolute = isAbsolute(configPath) ? configPath : resolve(cwd, configPath);
+    const absolute = isAbsolute(snapshotPath) ? snapshotPath : resolve(cwd, snapshotPath);
+    const root = repositoryFor(dirname(absolute), cwd);
     const fromRoot = relative(root, absolute);
 
-    if (fromRoot.startsWith('..')) throw new Error(`${configPath} is outside the repository at ${root}`);
+    if (fromRoot.startsWith('..')) throw new Error(`${snapshotPath} is outside the repository at ${root}`);
 
-    // Inside the repository, so Node resolves dependencies by walking up to the
-    // root's `node_modules` instead of needing an install of its own.
-    const worktree = mkdtempSync(join(root, '.kizuna-diff-'));
+    const before = parseSnapshot(showAtRef(root, ref, fromRoot.split('\\').join('/')), `${fromRoot} at ${ref}`);
 
-    try {
-        git(root, 'worktree', 'add', '--detach', '--force', worktree, ref);
-
-        const [before] = await loadConfig(join(worktree, fromRoot));
-        if (before === undefined) throw new Error(`No config found in ${fromRoot} at ${ref}`);
-
-        const [after] = await loadConfig(absolute);
-        if (after === undefined) throw new Error(`No config found in ${configPath}`);
-
-        return diffApis(before.api, after.api);
-    } finally {
-        try {
-            git(root, 'worktree', 'remove', '--force', worktree);
-        } catch {
-            rmSync(worktree, { recursive: true, force: true });
-        }
-    }
+    return diffSnapshots(before, readSnapshot(absolute), diff);
 };

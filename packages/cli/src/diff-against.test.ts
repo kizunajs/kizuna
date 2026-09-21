@@ -1,9 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { stringify } from 'yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 import { diffAgainst } from './diff-against.js';
+import type { ApiSnapshot } from './snapshot.js';
 
 const repositories: string[] = [];
 
@@ -13,13 +15,22 @@ afterEach(() => {
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' });
 
-/**
- * A contract with no imports, so the repository needs no dependencies of its
- * own and the test is about the ref handling rather than module resolution.
- */
-const contractSource = (routes: string) => `export const api = { routes: ${routes} };\n`;
+const snapshotOf = (path: string): ApiSnapshot => ({
+    routes: {
+        'users.getUser': { method: 'GET', path, statuses: [200], deprecated: false, responses: { 200: null } },
+    },
+    jobs: [],
+    tools: {},
+});
 
-const repository = (initial: string) => {
+const SNAPSHOT = join('.kizuna', 'diff.yaml');
+
+const write = (directory: string, snapshot: ApiSnapshot) => {
+    mkdirSync(join(directory, '.kizuna'), { recursive: true });
+    writeFileSync(join(directory, SNAPSHOT), stringify(snapshot, { lineWidth: 0 }));
+};
+
+const repository = (snapshot: ApiSnapshot) => {
     const directory = realpathSync(mkdtempSync(join(tmpdir(), 'kizuna-diff-against-')));
     repositories.push(directory);
 
@@ -27,72 +38,62 @@ const repository = (initial: string) => {
     git(directory, 'config', 'user.email', 'test@example.com');
     git(directory, 'config', 'user.name', 'Test');
 
-    writeFileSync(join(directory, 'contract.ts'), contractSource(initial));
+    write(directory, snapshot);
     git(directory, 'add', '.');
     git(directory, 'commit', '--quiet', '-m', 'first');
 
     return directory;
 };
 
-const userRoutes = (extra = '') => `{ users: { getUser: { method: 'GET', path: '/users/:id', responses: { 200: {}, 404: {} } }${extra} } }`;
-
 describe('diffAgainst', () => {
-    it('says nothing when the contract has not moved', async () => {
-        const directory = repository(userRoutes());
+    it('says nothing when the api has not moved', () => {
+        const directory = repository(snapshotOf('/users/:id'));
 
-        expect(await diffAgainst('HEAD', 'contract.ts', { cwd: directory })).toEqual([]);
+        expect(diffAgainst('HEAD', SNAPSHOT, { cwd: directory })).toEqual([]);
     });
 
-    it('reports what changed since a ref', async () => {
-        const directory = repository(userRoutes());
+    it('reports what changed since a ref', () => {
+        const directory = repository(snapshotOf('/users/:id'));
+        write(directory, snapshotOf('/people/:id'));
 
-        writeFileSync(
-            join(directory, 'contract.ts'),
-            contractSource(`{ users: { listUsers: { method: 'GET', path: '/users', responses: { 200: {} } } } }`)
-        );
-
-        const changes = await diffAgainst('HEAD', 'contract.ts', { cwd: directory });
-
-        expect(changes.map((change) => change.summary)).toEqual(['GET /users/:id is gone', 'GET /users added']);
-    });
-
-    it('reads a ref that is several commits back', async () => {
-        const directory = repository(userRoutes());
-
-        writeFileSync(
-            join(directory, 'contract.ts'),
-            contractSource(userRoutes(`, archiveUser: { method: 'POST', path: '/users/:id/archive', responses: { 200: {} } }`))
-        );
-        git(directory, 'commit', '--quiet', '-am', 'second');
-
-        writeFileSync(join(directory, 'contract.ts'), contractSource(userRoutes()));
-
-        expect((await diffAgainst('HEAD~1', 'contract.ts', { cwd: directory })).map((change) => change.summary)).toEqual([]);
-        expect((await diffAgainst('HEAD', 'contract.ts', { cwd: directory })).map((change) => change.summary)).toEqual([
-            'POST /users/:id/archive is gone',
+        expect(diffAgainst('HEAD', SNAPSHOT, { cwd: directory }).map((change) => change.summary)).toEqual([
+            'GET /users/:id moved to /people/:id',
         ]);
     });
 
-    it('leaves no worktree behind', async () => {
-        const directory = repository(userRoutes());
-        await diffAgainst('HEAD', 'contract.ts', { cwd: directory });
+    it('reads a ref that is several commits back', () => {
+        const directory = repository(snapshotOf('/users/:id'));
+
+        write(directory, snapshotOf('/people/:id'));
+        git(directory, 'commit', '--quiet', '-am', 'second');
+        write(directory, snapshotOf('/users/:id'));
+
+        expect(diffAgainst('HEAD~1', SNAPSHOT, { cwd: directory })).toEqual([]);
+        expect(diffAgainst('HEAD', SNAPSHOT, { cwd: directory }).map((change) => change.summary)).toEqual([
+            'GET /people/:id moved to /users/:id',
+        ]);
+    });
+
+    it('never checks anything out', () => {
+        const directory = repository(snapshotOf('/users/:id'));
+        diffAgainst('HEAD', SNAPSHOT, { cwd: directory });
 
         expect(git(directory, 'worktree', 'list').trim().split('\n')).toHaveLength(1);
         expect(git(directory, 'status', '--porcelain').trim()).toBe('');
     });
 
-    it('cleans up even when the contract at the ref cannot be read', async () => {
-        const directory = repository(userRoutes());
-        writeFileSync(join(directory, 'contract.ts'), 'export const nothing = true;\n');
-        git(directory, 'commit', '--quiet', '-am', 'no contract');
+    it('says so when the ref has no snapshot', () => {
+        const directory = repository(snapshotOf('/users/:id'));
+        git(directory, 'rm', '--quiet', SNAPSHOT);
+        git(directory, 'commit', '--quiet', '-m', 'no snapshot');
+        write(directory, snapshotOf('/users/:id'));
 
-        await expect(diffAgainst('HEAD', 'contract.ts', { cwd: directory })).rejects.toThrow('No config found');
-        expect(git(directory, 'worktree', 'list').trim().split('\n')).toHaveLength(1);
+        expect(() => diffAgainst('HEAD', SNAPSHOT, { cwd: directory })).toThrow('does not exist at HEAD');
     });
 
-    it('refuses a contract outside the repository', async () => {
-        const directory = repository(userRoutes());
+    it('refuses a snapshot outside the repository', () => {
+        const directory = repository(snapshotOf('/users/:id'));
 
-        await expect(diffAgainst('HEAD', '/etc/hosts', { cwd: directory })).rejects.toThrow('outside the repository');
+        expect(() => diffAgainst('HEAD', '/etc/hosts', { cwd: directory })).toThrow('outside the repository');
     });
 });

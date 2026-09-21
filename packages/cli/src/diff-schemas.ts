@@ -1,5 +1,4 @@
-import type { z } from 'zod';
-import { readDef, readObjectShape, unwrapOptionalWrappers } from 'kizunajs/generator';
+import type { SchemaNode } from './snapshot.js';
 
 /**
  * Which way a schema travels, which decides what a change costs.
@@ -18,57 +17,21 @@ export interface SchemaChange {
     summary: string;
 }
 
-interface Shape {
-    fields: Map<string, { schema: z.core.$ZodType; optional: boolean }>;
-}
-
-const shapeOf = (schema: z.core.$ZodType): Shape | undefined => {
-    const { inner } = unwrapOptionalWrappers(schema);
-    const raw = readObjectShape(inner);
-    if (!raw) return undefined;
-
-    const fields = new Map<string, { schema: z.core.$ZodType; optional: boolean }>();
-    for (const [key, field] of Object.entries(raw)) {
-        fields.set(key, { schema: field, optional: unwrapOptionalWrappers(field).optional });
-    }
-    return { fields };
-};
-
-/**
- * What a schema accepts, flattened enough to compare: its kind, and its values
- * when it is closed.
- */
-const describe = (schema: z.core.$ZodType): { kind: string; values?: string[] } => {
-    const { inner } = unwrapOptionalWrappers(schema);
-    const def = readDef(inner);
-
-    if (def.type === 'enum') {
-        return {
-            kind: 'enum',
-            values: Object.values(def.entries ?? {})
-                .map(String)
-                .sort(),
-        };
-    }
-    if (def.type === 'literal') {
-        return { kind: 'enum', values: (def.values ?? []).map(String).sort() };
-    }
-    if (def.type === 'array' && def.element) {
-        return { kind: `array<${describe(def.element).kind}>` };
-    }
-    return { kind: def.type ?? 'unknown' };
-};
-
 const joinPath = (parent: string, key: string): string => (parent === '' ? key : `${parent}.${key}`);
 
-/**
- * The element of an array, so a change inside one is reported at its own path
- * rather than as the whole array changing shape.
- */
-const elementOf = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
-    const { inner } = unwrapOptionalWrappers(schema);
-    const def = readDef(inner);
-    return def.type === 'array' ? def.element : undefined;
+const fieldsOf = (schema: SchemaNode): Record<string, { optional: boolean; schema: SchemaNode }> | undefined =>
+    schema.kind === 'object' ? (schema as Extract<SchemaNode, { kind: 'object' }>).fields : undefined;
+
+const elementOf = (schema: SchemaNode): SchemaNode | undefined =>
+    schema.kind === 'array' ? (schema as Extract<SchemaNode, { kind: 'array' }>).element : undefined;
+
+const valuesOf = (schema: SchemaNode): string[] | undefined =>
+    schema.kind === 'enum' ? (schema as Extract<SchemaNode, { kind: 'enum' }>).values : undefined;
+
+/** What a reader sees when the kinds differ, so `array` reads as `array<string>`. */
+const describeKind = (schema: SchemaNode): string => {
+    const element = elementOf(schema);
+    return element ? `array<${describeKind(element)}>` : schema.kind;
 };
 
 /**
@@ -76,8 +39,8 @@ const elementOf = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
  * people already calling the route.
  */
 export const diffSchemas = (
-    before: z.core.$ZodType | undefined,
-    after: z.core.$ZodType | undefined,
+    before: SchemaNode | undefined,
+    after: SchemaNode | undefined,
     direction: Direction,
     path = ''
 ): SchemaChange[] => {
@@ -96,13 +59,7 @@ export const diffSchemas = (
     }
 
     if (after === undefined) {
-        return [
-            {
-                breaking: direction === 'response',
-                path,
-                summary: `${path || 'the body'} is gone`,
-            },
-        ];
+        return [{ breaking: direction === 'response', path, summary: `${path || 'the body'} is gone` }];
     }
 
     const changes: SchemaChange[] = [];
@@ -111,12 +68,12 @@ export const diffSchemas = (
     const afterElement = elementOf(after);
     if (beforeElement && afterElement) return diffSchemas(beforeElement, afterElement, direction, `${path}[]`);
 
-    const beforeShape = shapeOf(before);
-    const afterShape = shapeOf(after);
+    const beforeFields = fieldsOf(before);
+    const afterFields = fieldsOf(after);
 
-    if (beforeShape && afterShape) {
-        for (const [key, field] of afterShape.fields) {
-            const existing = beforeShape.fields.get(key);
+    if (beforeFields && afterFields) {
+        for (const [key, field] of Object.entries(afterFields)) {
+            const existing = beforeFields[key];
             const here = joinPath(path, key);
 
             if (!existing) {
@@ -131,53 +88,42 @@ export const diffSchemas = (
             }
 
             if (existing.optional && !field.optional) {
-                changes.push({
-                    breaking: direction === 'request',
-                    path: here,
-                    summary: `${here} is no longer optional`,
-                });
+                changes.push({ breaking: direction === 'request', path: here, summary: `${here} is no longer optional` });
             }
 
             changes.push(...diffSchemas(existing.schema, field.schema, direction, here));
         }
 
-        for (const [key] of beforeShape.fields) {
-            if (afterShape.fields.has(key)) continue;
+        for (const key of Object.keys(beforeFields)) {
+            if (afterFields[key]) continue;
             const here = joinPath(path, key);
-            changes.push({
-                breaking: direction === 'response',
-                path: here,
-                summary: `${here} is gone`,
-            });
+            changes.push({ breaking: direction === 'response', path: here, summary: `${here} is gone` });
         }
 
         return changes;
     }
 
-    const was = describe(before);
-    const now = describe(after);
-
-    if (was.kind !== now.kind) {
-        changes.push({
-            breaking: true,
-            path,
-            summary: `${path || 'the body'} is ${now.kind} instead of ${was.kind}`,
-        });
-        return changes;
+    if (before.kind !== after.kind) {
+        return [
+            {
+                breaking: true,
+                path,
+                summary: `${path || 'the body'} is ${describeKind(after)} instead of ${describeKind(before)}`,
+            },
+        ];
     }
 
-    if (was.values && now.values) {
-        const removed = was.values.filter((value) => !now.values?.includes(value));
-        const added = now.values.filter((value) => !was.values?.includes(value));
+    const was = valuesOf(before);
+    const now = valuesOf(after);
+
+    if (was && now) {
+        const removed = was.filter((value) => !now.includes(value));
+        const added = now.filter((value) => !was.includes(value));
 
         // A caller sending a value it can no longer send, or reading one it was
         // never built to handle, is broken either way round.
         if (removed.length > 0) {
-            changes.push({
-                breaking: true,
-                path,
-                summary: `${path || 'the body'} no longer accepts ${removed.join(', ')}`,
-            });
+            changes.push({ breaking: true, path, summary: `${path || 'the body'} no longer accepts ${removed.join(', ')}` });
         }
         if (added.length > 0) {
             changes.push({
@@ -189,6 +135,21 @@ export const diffSchemas = (
                         : `${path || 'the body'} also accepts ${added.join(', ')}`,
             });
         }
+    }
+
+    // A predicate cannot be compared across two files, but one arriving or
+    // leaving changes what the route accepts.
+    const wasRefined = before.refinements ?? 0;
+    const isRefined = after.refinements ?? 0;
+    if (wasRefined !== isRefined) {
+        changes.push({
+            breaking: direction === 'request' && isRefined > wasRefined,
+            path,
+            summary:
+                isRefined > wasRefined
+                    ? `${path || 'the body'} is validated more tightly`
+                    : `${path || 'the body'} is validated less tightly`,
+        });
     }
 
     return changes;

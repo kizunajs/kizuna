@@ -7,17 +7,48 @@ description: Write your types and clients, print the routes your config serves, 
 
 <InstallTabs packageName="-D @kizunajs/cli" />
 
-| Command           | What it does                                                  |
-| ----------------- | ------------------------------------------------------------- |
-| `kizuna generate` | Writes `kizuna.types.ts` and every client the config declares |
-| `kizuna routes`   | Prints every route the config serves                          |
-| `kizuna diff`     | Compares the config against the same config at a git ref      |
+| Command           | What it does                                                                      |
+| ----------------- | --------------------------------------------------------------------------------- |
+| `kizuna generate` | Writes `kizuna.types.ts`, every client the config declares, and the diff snapshot |
+| `kizuna routes`   | Prints every route the config serves                                              |
+| `kizuna diff`     | Compares the config against the same config at a git ref                          |
 
 `--config <path>` points any of them at a config other than `kizuna.config.ts`.
 
 ## `kizuna generate`
 
 See [Configuration](/docs/config#kizuna-generate) for what it writes and where.
+
+`--check` writes nothing and exits `1` when anything on disk has fallen behind the config:
+
+```sh title="Terminal"
+kizuna generate --check
+```
+
+It covers `kizuna.types.ts`, every client under `clients`, and `.kizuna/diff.yaml`, so one command answers whether everything generated matches today's config.
+
+```yaml title=".github/workflows/kizuna-checks.yml"
+name: Kizuna Checks
+
+on: pull_request
+
+jobs:
+    kizuna-checks:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+
+            - uses: pnpm/action-setup@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm kizuna generate --check
+```
+
+[Configuration](/docs/config#kizuna-generate---check) has what each file is and where it lands.
 
 In a monorepo, build the other packages your config imports before generating. The config reads their built output, and an out-of-date build loads without complaint.
 
@@ -66,10 +97,10 @@ kizuna diff --against main
 ```
 
 ```text
-BREAKING users.patchUser renamed to users.updateUser
-         client method and generated client names change, HTTP surface unaffected
-
 BREAKING POST /users body.organisationId is now required
+
+CHANGED  users.patchUser renamed to users.updateUser
+         the generated client method changes name, the HTTP surface does not
 
 CHANGED  GET /users/:id can now answer 410
 ADDED    POST /users/:id/archive added
@@ -77,7 +108,15 @@ ADDED    POST /users/:id/archive added
 
 It exits `1` when a change breaks callers, so a pipeline fails on one. `--against` defaults to `main`, and `--json` prints the changes as an array. See [Breaking changes](/docs/breaking-changes) for what counts as breaking and how to gate a pull request on it.
 
-The ref is checked out into a git worktree inside the repository, so nothing is installed for the base tree: it resolves its dependencies by walking up to the `node_modules` you already have. In a workspace where each package has its own `node_modules`, that walk does not find them, so run `diff` from a repository whose dependencies sit at the root.
+`kizuna generate` writes `.kizuna/diff.yaml` beside your config, and `diff` compares two of those. The base version is read straight out of git, so nothing is checked out, installed or run for the other side, and a comparison against a commit from a year ago costs the same as one against yesterday.
+
+The head version is whatever is on disk, so run `kizuna generate --check` first. A snapshot nobody regenerated compares cleanly against a base it no longer describes.
+
+Two snapshots can also be compared directly, with no git and no config:
+
+```bash
+kizuna diff --from base.yaml --to .kizuna/diff.yaml
+```
 
 ## Scripts
 

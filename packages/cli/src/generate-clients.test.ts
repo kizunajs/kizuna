@@ -114,7 +114,7 @@ describe('formatStale', () => {
             { kind: 'swift', output: join(directory, 'APIClient.swift'), reason: 'missing' },
         ]);
 
-        expect(message).toContain('2 generated clients are out of date');
+        expect(message).toContain('2 generated files are out of date');
         expect(message).toContain('has not been generated');
     });
 });

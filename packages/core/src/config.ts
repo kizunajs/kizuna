@@ -23,6 +23,35 @@ export interface ClientTarget {
 }
 
 /**
+ * What else `kizuna diff` treats as breaking.
+ */
+export interface DiffSettings {
+    /**
+     * Report a renamed dotted key, such as `users.getUser` becoming
+     * `users.fetchUser`, as breaking. The key names the method on a generated
+     * client, so a rename breaks anyone shipping one as an SDK and leaves the
+     * HTTP surface untouched.
+     *
+     * @default false
+     */
+    dottedKeys?: boolean;
+    /**
+     * Report a job key that is gone. A job answers `POST /jobs/run` by its
+     * dotted key, so this matters once something outside your own code
+     * dispatches them.
+     *
+     * @default false
+     */
+    jobs?: boolean;
+    /**
+     * Report an MCP tool a model can no longer call.
+     *
+     * @default false
+     */
+    tools?: boolean;
+}
+
+/**
  * What `kizuna.config.ts` default-exports: the api its config assembles, and
  * what is generated from it.
  */
@@ -35,6 +64,10 @@ export interface ApiEntry {
     typescript?: {
         outputFile?: string;
     };
+    /**
+     * What else `kizuna diff` treats as breaking.
+     */
+    diff?: DiffSettings;
 }
 
 /**
@@ -51,6 +84,7 @@ export const apiEntries = (module: Record<string, unknown>): [string, ApiEntry][
                 api: config.api,
                 clients: config.clients ?? [],
                 typescript: config.typescript,
+                diff: config.diff,
             },
         ],
     ];

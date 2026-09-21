@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import type { ClientTarget } from 'kizunajs';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -6,8 +7,9 @@ import { ConfigSyntaxError, generateConfigTypes } from './generate-types.js';
 import { checkClients, formatStale, writeClients } from './generate-clients.js';
 import { loadConfig } from './load-config.js';
 import { formatRoutes, routeMap } from './route-map.js';
-import { diffAgainst } from './diff-against.js';
-import { formatChange, hasBreakingChange } from './diff-apis.js';
+import { diffAgainst, readSnapshot } from './diff-against.js';
+import { diffSnapshots, formatChange, hasBreakingChange } from './diff-apis.js';
+import { snapshotPathFor, snapshotTarget } from './snapshot.js';
 
 const usage = `Usage: kizuna <command> [options]
 
@@ -29,6 +31,8 @@ generate:
 diff:
   --against <ref>   The git ref to compare against. Default: main
                     Exits 1 when a change breaks callers.
+  --from <path>     Compare two snapshots directly, with no git and no
+  --to <path>       config. Pass both.
 `;
 
 const COMMANDS = ['generate', 'routes', 'diff'];
@@ -63,6 +67,14 @@ const loadOrDie = async (configPath: string) => {
     return config;
 };
 
+/**
+ * A client writes where its config says, not where the command was run from,
+ * so `kizuna generate --config apps/api/kizuna.config.ts` lands the same files
+ * wherever it is invoked.
+ */
+const besideConfig = (configPath: string, clients: readonly ClientTarget[]): ClientTarget[] =>
+    clients.map((client) => ({ ...client, output: resolve(dirname(configPath), client.output) }));
+
 const runGenerate = async (values: { check?: boolean; config?: string; types?: string }): Promise<void> => {
     const configPath = configPathFrom(values.config);
     const config = await loadOrDie(configPath);
@@ -89,7 +101,7 @@ const runGenerate = async (values: { check?: boolean; config?: string; types?: s
     const typesBehind = typesCurrent !== types;
 
     if (values.check) {
-        const stale = checkClients(config.api, config.clients);
+        const stale = checkClients(config.api, [...besideConfig(configPath, config.clients), snapshotTarget(configPath)]);
         if (!typesBehind && stale.length === 0) {
             process.stdout.write('Everything kizuna generates is up to date.\n');
             return;
@@ -102,7 +114,7 @@ const runGenerate = async (values: { check?: boolean; config?: string; types?: s
     }
 
     if (typesBehind) writeFileSync(typesPath, types);
-    const written = writeClients(config.api, config.clients);
+    const written = writeClients(config.api, [...besideConfig(configPath, config.clients), snapshotTarget(configPath)]);
 
     const changed = [
         ...(typesBehind ? [displayPath(typesPath)] : []),
@@ -119,9 +131,17 @@ const runRoutes = async (values: { config?: string; json?: boolean }): Promise<v
     process.stdout.write(values.json ? `${JSON.stringify(entries, null, 2)}\n` : `${formatRoutes(entries)}\n`);
 };
 
-const runDiff = async (values: { config?: string; json?: boolean; against?: string }): Promise<void> => {
-    const configPath = configPathFrom(values.config);
-    const changes = await diffAgainst(values.against ?? 'main', configPath);
+const runDiff = async (values: { config?: string; json?: boolean; against?: string; from?: string; to?: string }): Promise<void> => {
+    let changes;
+
+    if (values.from !== undefined || values.to !== undefined) {
+        if (values.from === undefined || values.to === undefined) die('Pass --from and --to together, or neither.');
+        changes = diffSnapshots(readSnapshot(values.from!), readSnapshot(values.to!));
+    } else {
+        const configPath = configPathFrom(values.config);
+        const config = await loadOrDie(configPath);
+        changes = diffAgainst(values.against ?? 'main', snapshotPathFor(configPath), config.diff);
+    }
 
     if (values.json) {
         process.stdout.write(`${JSON.stringify(changes, null, 2)}\n`);
@@ -157,6 +177,12 @@ const main = async (): Promise<void> => {
                 type: 'boolean',
             },
             against: {
+                type: 'string',
+            },
+            from: {
+                type: 'string',
+            },
+            to: {
                 type: 'string',
             },
         },

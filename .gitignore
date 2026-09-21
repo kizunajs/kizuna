@@ -16,9 +16,6 @@ tsconfig.tsbuildinfo
 Package.resolved
 DerivedData/
 
-# kizuna generated output
-.kizuna/
-
 # generated openapi files
 apps/*/openapi.json
 apps/*/openapi.yaml

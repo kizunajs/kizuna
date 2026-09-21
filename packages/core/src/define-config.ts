@@ -18,7 +18,7 @@ import { permissionNames } from './permissions.js';
 import { GUARD } from './identity-builder.js';
 import { RESOLVER } from './request-context-builder.js';
 import { buildApi, type Api } from './api.js';
-import type { ClientTarget } from './config.js';
+import type { ClientTarget, DiffSettings } from './config.js';
 
 /**
  * Kizuna sends the guard body itself when a route's `requires` turns a caller
@@ -251,6 +251,15 @@ export type KizunaConfigInput<
      * ],
      */
     clients?: readonly ClientTarget[];
+    /**
+     * What else `kizuna diff` treats as breaking.
+     *
+     * @example
+     * diff: {
+     *     dottedKeys: true,
+     * }
+     */
+    diff?: DiffSettings;
 };
 
 /**
@@ -321,6 +330,7 @@ export const defineConfig = <
     api: ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
     clients: readonly ClientTarget[];
     typescript: { outputFile?: string } | undefined;
+    diff: DiffSettings | undefined;
 } => {
     const guardSchema = options.auth?.guardSchema;
     if (guardSchema) assertFillableGuardSchema(guardSchema);
@@ -390,6 +400,7 @@ export const defineConfig = <
     return {
         api,
         clients: options.clients ?? [],
+        diff: options.diff,
         typescript: options.typescript,
     };
 };

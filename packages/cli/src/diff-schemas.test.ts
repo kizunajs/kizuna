@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { diffSchemas } from './diff-schemas.js';
+import { diffSchemas as diffSchemaNodes } from './diff-schemas.js';
+import { toSchemaNode } from './snapshot.js';
+
+const diffSchemas = (before: z.ZodType | undefined, after: z.ZodType | undefined, direction: 'request' | 'response', path?: string) =>
+    diffSchemaNodes(before && toSchemaNode(before), after && toSchemaNode(after), direction, path);
 
 const summaries = (before: z.ZodType, after: z.ZodType, direction: 'request' | 'response') =>
     diffSchemas(before, after, direction).map((change) => `${change.breaking ? 'BREAKING' : 'changed '} ${change.summary}`);

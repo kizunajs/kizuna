@@ -16,17 +16,34 @@ kizuna diff --against main
 ```
 
 ```
-BREAKING users.patchUser renamed to users.updateUser
-         client method and generated client names change, HTTP surface unaffected
-
 BREAKING POST /users body.organisationId is now required
 
-BREAKING the job reconcileInvoices is gone
-         whatever calls POST /jobs/run with that key stops working
+CHANGED  users.patchUser renamed to users.updateUser
+         the generated client method changes name, the HTTP surface does not
 
 CHANGED  GET /users/:id can now answer 410
 ADDED    POST /users/:id/archive added
 ```
+
+Routes are always compared: the method, the path, every status, and every request and response schema. The rest is opt-in.
+
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    diff: {
+        dottedKeys: true,
+        jobs: true,
+        tools: true,
+    },
+});
+```
+
+| Option       | Fails the gate on                                                                 |
+| ------------ | --------------------------------------------------------------------------------- |
+| `dottedKeys` | a renamed route key, which names the method when you publish the client as an SDK |
+| `jobs`       | a job key gone, which `POST /jobs/run` addresses by name                          |
+| `tools`      | an MCP tool a model can no longer call                                            |
+
+All of it is recorded in `.kizuna/diff.yaml` either way, so switching one on later still compares against what you already committed.
 
 </Step>
 
@@ -34,7 +51,7 @@ ADDED    POST /users/:id/archive added
 
 ## Gate it in CI
 
-One checkout, one install, no build. `fetch-depth: 0` matters, since the default shallow clone has no base commit to compare against.
+`fetch-depth: 0` is there because `diff` reads the base out of git. `generate --check` runs first, so a snapshot nobody regenerated fails the build instead of answering from a stale file. `continue-on-error` keeps the job alive past a breaking change, which is the only way the label step runs.
 
 ```yaml title=".github/workflows/breaking-changes.yml"
 name: Breaking Changes
@@ -59,8 +76,12 @@ jobs:
 
             - run: pnpm install --frozen-lockfile
 
+            - name: Check the snapshot is current
+              run: pnpm kizuna generate --check
+
             - name: Compare against main
               id: diff
+              continue-on-error: true
               run: pnpm kizuna diff --against ${{ github.event.pull_request.base.sha }}
 
             - name: Require a label for breaking changes
@@ -119,30 +140,7 @@ BREAKING POST /users body.address.postcode is now required
 BREAKING GET /users 200.items[].id is number instead of string
 ```
 
-**What it cannot see** is a rule inside `.refine()` or `.superRefine()`, because those are functions rather than declarations. A tightened refinement passes quietly.
-
-## Keeping generated clients current
-
-A generated client that has fallen behind is a compile error waiting to happen in whatever imports it. [`kizuna generate --check`](/docs/config#kizuna-generate---check) catches it, and `checkClients` does the same inside a script of your own:
-
-```ts title="scripts/check-clients.ts"
-import { checkClients, formatStale } from '@kizunajs/cli';
-import kizuna from '../kizuna.config';
-
-const stale = checkClients(kizuna.api, kizuna.clients);
-
-if (stale.length > 0) {
-    console.error(formatStale(stale));
-    process.exit(1);
-}
-```
-
-```
-A generated client is out of date:
-  src/lib/api-client.generated.ts is behind the config
-
-Run `kizuna generate` and commit the result.
-```
+**What it cannot read** is the rule inside a `.refine()` or `.superRefine()`, because a predicate is a function rather than a declaration. It does see one arrive or leave, so adding a refinement is reported as tightened validation, but a rewritten predicate that accepts less than it did passes quietly.
 
 ## Reference
 

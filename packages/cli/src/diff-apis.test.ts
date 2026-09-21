@@ -46,19 +46,28 @@ describe('routes that come and go', () => {
 });
 
 describe('a rename, which OpenAPI cannot see', () => {
-    it('reads as a rename rather than a removal and an addition', () => {
-        const after = contractOf({
+    const renamed = () =>
+        contractOf({
             fetchUser: { method: 'GET', path: '/users/:id', responses: { ...ok, 404: z.object({ detail: z.string() }) } },
             listUsers: { method: 'GET', path: '/users', responses: ok },
         });
-        const changes = diffApis(base, after);
+
+    it('reads as a rename rather than a removal and an addition', () => {
+        const changes = diffApis(base, renamed());
 
         expect(changes).toHaveLength(1);
         expect(changes[0]).toMatchObject({
-            level: 'breaking',
+            level: 'changed',
             summary: 'users.getUser renamed to users.fetchUser',
         });
-        expect(changes[0]?.detail).toContain('HTTP surface unaffected');
+        expect(changes[0]?.detail).toContain('the HTTP surface does not');
+    });
+
+    it('breaks when clients are shipped as an SDK', () => {
+        const changes = diffApis(base, renamed(), { dottedKeys: true });
+
+        expect(changes).toHaveLength(1);
+        expect(changes[0]).toMatchObject({ level: 'breaking', summary: 'users.getUser renamed to users.fetchUser' });
     });
 });
 
@@ -195,8 +204,12 @@ describe('what a document cannot carry', () => {
         routes: { users: k.routes('users', { listUsers: k.route({ method: 'GET', path: '/users', responses: ok }) }) },
     }).api;
 
-    it('reports a removed job key as breaking', () => {
-        const changes = diffApis(withJob, withoutJob);
+    it('says nothing about jobs until they are tracked', () => {
+        expect(diffApis(withJob, withoutJob)).toEqual([]);
+    });
+
+    it('reports a removed job key as breaking once they are', () => {
+        const changes = diffApis(withJob, withoutJob, { jobs: true });
 
         expect(changes).toHaveLength(1);
         expect(changes[0]).toMatchObject({ level: 'breaking', key: 'reconcile' });
