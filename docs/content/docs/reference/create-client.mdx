@@ -85,7 +85,7 @@ const { body } = await apiClient.users.listUsers({
 
 ## Named types
 
-The generated file also exports `API`, the namespace holding every model and every route's `Params`, `Query`, `Body` and `Result`:
+The generated file also exports `API`, the namespace holding every model and every route's `Params`, `Query`, `Body` and `Result`. The config's `namespace` option calls it something else:
 
 ```tsx
 import type { API } from './api-client.generated';

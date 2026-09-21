@@ -19,6 +19,13 @@ import { TypeCollector, docComment, sampleObject, sampleValue, typeOf } from './
  */
 export interface FetchClientOptions {
     /**
+     * Name of the generated namespace holding every model and every route's
+     * `Params`, `Query`, `Body`, `Headers` and `Result`.
+     *
+     * @default 'API'
+     */
+    namespace?: string;
+    /**
      * Module the generated file imports its runtime from.
      *
      * @default '@kizunajs/fetch'
@@ -144,7 +151,7 @@ const routeDoc = (routeKey: string, route: RouteDefinition): string => {
     return docComment(lines);
 };
 
-const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collector: TypeCollector): RouteEmit => {
+const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collector: TypeCollector, namespaceName: string): RouteEmit => {
     const namespace = routeKey.split('.').map(toPascalCase).join('');
     const members: string[] = [];
     const args: string[] = [];
@@ -155,22 +162,22 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
             ? typeOf(route.pathParams, collector, `${namespace}Params`)
             : `{\n${indent(params.map((name) => `${name}: string;`).join('\n'))}\n}`;
         members.push(`export type Params = ${body};`);
-        args.push(`params: API.${namespace}.Params`);
+        args.push(`params: ${namespaceName}.${namespace}.Params`);
     }
 
     if (route.query) {
         members.push(`export type Query = ${typeOf(route.query, collector, `${namespace}Query`)};`);
-        args.push(`query?: API.${namespace}.Query`);
+        args.push(`query?: ${namespaceName}.${namespace}.Query`);
     }
 
     if (route.body && !isVoidSchema(route.body)) {
         members.push(`export type Body = ${typeOf(route.body, collector, `${namespace}Body`)};`);
-        args.push(`body: API.${namespace}.Body`);
+        args.push(`body: ${namespaceName}.${namespace}.Body`);
     }
 
     if (route.headers) {
         members.push(`export type Headers = ${typeOf(route.headers, collector, `${namespace}Headers`)};`);
-        args.push(`headers?: API.${namespace}.Headers`);
+        args.push(`headers?: ${namespaceName}.${namespace}.Headers`);
     } else {
         args.push('headers?: Record<string, string>');
     }
@@ -220,7 +227,7 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
 
     return {
         namespace,
-        signature: `${routeDoc(routeKey, route)}${key}: ClientMethod<'${route.method}', ${streams}, ${argsType}, API.${namespace}.Result>;`,
+        signature: `${routeDoc(routeKey, route)}${key}: ClientMethod<'${route.method}', ${streams}, ${argsType}, ${namespaceName}.${namespace}.Result>;`,
         declaration: `export namespace ${namespace} {\n${indent(members.join('\n\n'))}\n}`,
         table: `${key}: {\n${indent(tableEntries.map((entry) => `${entry},`).join('\n'))}\n},`,
     };
@@ -235,7 +242,7 @@ interface TreeEmit {
     declarations: string[];
 }
 
-const emitTree = (routes: Routes, prefix: string, collector: TypeCollector): TreeEmit => {
+const emitTree = (routes: Routes, prefix: string, collector: TypeCollector, namespaceName: string): TreeEmit => {
     const signatures: string[] = [];
     const tables: string[] = [];
     const declarations: string[] = [];
@@ -245,7 +252,7 @@ const emitTree = (routes: Routes, prefix: string, collector: TypeCollector): Tre
         const routeKey = prefix ? `${prefix}.${key}` : key;
 
         if (isRoute(node)) {
-            const emitted = emitRoute(routeKey, key, node, collector);
+            const emitted = emitRoute(routeKey, key, node, collector, namespaceName);
             signatures.push(emitted.signature);
             tables.push(emitted.table);
             declarations.push(emitted.declaration);
@@ -253,7 +260,7 @@ const emitTree = (routes: Routes, prefix: string, collector: TypeCollector): Tre
         }
 
         if (node && typeof node === 'object') {
-            const group = emitTree(node as Routes, routeKey, collector);
+            const group = emitTree(node as Routes, routeKey, collector, namespaceName);
             signatures.push(`${key}: {\n${indent(group.signatures)}\n};`);
             tables.push(`${key}: {\n${indent(group.table)}\n},`);
             declarations.push(...group.declarations);
@@ -296,9 +303,9 @@ const emitRequestContext = (contract: ApiDefinition, collector: TypeCollector): 
 };
 
 export const generateFetchClient = (contract: ApiDefinition, options: FetchClientOptions = {}): string => {
-    const { runtimeModule = '@kizunajs/fetch', regenerateCommand = 'kizuna generate', source } = options;
+    const { namespace: namespaceName = 'API', runtimeModule = '@kizunajs/fetch', regenerateCommand = 'kizuna generate', source } = options;
     const collector = new TypeCollector();
-    const tree = emitTree(contract.routes, '', collector);
+    const tree = emitTree(contract.routes, '', collector, namespaceName);
 
     const models = collector.all().map((model) => {
         const doc = model.description ? `/**\n * ${model.description}\n */\n` : '';
@@ -321,7 +328,7 @@ ${header}
  */
 import { createGeneratedClient, type ClientConfig, type ClientMethod, type GeneratedRoutes } from '${runtimeModule}';
 
-export namespace API {
+export namespace ${namespaceName} {
 ${indent(api)}
 }
 
