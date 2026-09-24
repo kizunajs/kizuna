@@ -44,19 +44,24 @@
     inset: 12px var(--kizuna-gutter);
     z-index: -1;
     border-radius: 16px;
-    background-color: color-mix(in srgb, var(--kizuna-surface) 82%, transparent);
-    box-shadow: var(--kizuna-elevation-hover), var(--kizuna-header-shadow);
-    backdrop-filter: saturate(1.4) blur(14px);
-    opacity: 0;
+    background-color: transparent;
+    -webkit-backdrop-filter: saturate(1) blur(0);
+    backdrop-filter: saturate(1) blur(0);
     transform: scale(0.985);
     transition:
-        opacity 0.25s ease,
+        background-color 0.25s ease,
+        box-shadow 0.25s ease,
+        -webkit-backdrop-filter 0.25s ease,
+        backdrop-filter 0.25s ease,
         transform 0.25s ease;
     pointer-events: none;
 }
 
 .header[data-scrolled] .inner::before {
-    opacity: 1;
+    background-color: color-mix(in srgb, var(--kizuna-surface) 82%, transparent);
+    box-shadow: var(--kizuna-elevation-hover), var(--kizuna-header-shadow);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    backdrop-filter: saturate(1.4) blur(14px);
     transform: none;
 }
 

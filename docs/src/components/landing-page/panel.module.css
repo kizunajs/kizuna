@@ -29,7 +29,7 @@
 }
 
 @media (hover: hover) {
-    .body:has(.title:hover) {
+    .body:has(a.title:hover) {
         background-color: var(--kizuna-raised-hover);
     }
 }

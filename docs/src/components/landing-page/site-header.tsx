@@ -29,16 +29,16 @@ const navigation: NavigationItem[] = [
         href: '/docs/reference',
     },
     {
-        label: 'Changelog',
-        href: `${GITHUB_URL}/releases`,
-    },
-    {
         label: 'About',
         href: '/about',
     },
     {
         label: 'FAQ',
         href: '/faq',
+    },
+    {
+        label: 'Releases',
+        href: `${GITHUB_URL}/releases`,
     },
 ];
 
