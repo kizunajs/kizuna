@@ -17,12 +17,13 @@
 
 .visual {
     display: flex;
-    min-height: 132px;
     flex-direction: column;
-    justify-content: center;
     gap: 12px;
-    margin: 0 0 28px;
-    padding: 0;
+    margin: auto -18px -18px;
+    border-radius: 10px;
+    background-color: var(--kizuna-raised);
+    box-shadow: var(--kizuna-elevation-hover);
+    padding: 18px 20px;
     list-style: none;
 }
 
@@ -100,6 +101,10 @@
     text-wrap: pretty;
 }
 
+.card .body {
+    margin-bottom: 28px;
+}
+
 .link {
     color: var(--kizuna-ink);
     font-weight: var(--font-weight-600);
@@ -136,16 +141,16 @@
     .stories {
         grid-template-columns: minmax(0, 1fr);
     }
-
-    .visual {
-        min-height: 0;
-    }
 }
 
 @media (max-width: 767px) {
     .card,
     .nameCard {
         padding: 24px;
+    }
+
+    .visual {
+        margin: auto -14px -14px;
     }
 
     .nameCard {

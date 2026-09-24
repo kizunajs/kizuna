@@ -2,47 +2,65 @@
 
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
-import { Dithering, MeshGradient, NeuroNoise } from '@paper-design/shaders-react';
+import { MeshGradient, Water } from '@paper-design/shaders-react';
 import styles from './hero-backdrop.module.css';
-
-type Backdrop = 'mesh' | 'dithering' | 'neuro';
-
-const BACKDROP: Backdrop = 'mesh';
+import { usePrefersReducedMotion } from './use-prefers-reduced-motion';
 
 const palette = {
     canvas: '#0c0c0c',
     soft: '#1a1a1a',
     mid: '#333333',
-    strong: '#4a4a4a',
 };
 
-function usePrefersReducedMotion() {
-    const [reduced, setReduced] = useState(false);
+const logoMark = '/logo-mark.svg';
+
+function useImageReady(source: string | undefined) {
+    const [ready, setReady] = useState(source === undefined);
 
     useEffect(() => {
-        const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-        const update = () => setReduced(query.matches);
-        update();
-        query.addEventListener('change', update);
-        return () => query.removeEventListener('change', update);
-    }, []);
+        if (source === undefined) return;
+        const image = new Image();
+        image.src = source;
+        image
+            .decode()
+            .catch(() => undefined)
+            .then(() => setReady(true));
+    }, [source]);
 
-    return reduced;
+    return ready;
 }
 
-export function HeroBackdrop({ className }: { className?: string }) {
+export function HeroBackdrop({ variant = 'mesh', className }: { variant?: 'mesh' | 'water'; className?: string }) {
     const reducedMotion = usePrefersReducedMotion();
     const [mounted, setMounted] = useState(false);
+    const imageReady = useImageReady(variant === 'water' ? logoMark : undefined);
 
     useEffect(() => setMounted(true), []);
 
-    if (!mounted) return <div className={clsx(styles.root, className)} aria-hidden />;
+    if (!mounted || !imageReady) return <div className={clsx(styles.root, className)} aria-hidden />;
 
     const speed = reducedMotion ? 0 : 1;
 
     return (
         <div className={clsx(styles.root, styles.shown, className)} aria-hidden>
-            {BACKDROP === 'mesh' ? (
+            {variant === 'water' ? (
+                <Water
+                    width="100%"
+                    height="100%"
+                    image={logoMark}
+                    fit="contain"
+                    colorBack={palette.canvas}
+                    colorHighlight={palette.mid}
+                    highlights={0.07}
+                    layering={0.5}
+                    edges={0.8}
+                    waves={0.3}
+                    caustic={0.1}
+                    scale={0.36}
+                    offsetY={0.14}
+                    speed={0.5 * speed}
+                />
+            ) : (
                 <MeshGradient
                     width="100%"
                     height="100%"
@@ -52,32 +70,8 @@ export function HeroBackdrop({ className }: { className?: string }) {
                     grainOverlay={0.08}
                     speed={0.45 * speed}
                 />
-            ) : null}
-            {BACKDROP === 'dithering' ? (
-                <Dithering
-                    width="100%"
-                    height="100%"
-                    colorBack={palette.canvas}
-                    colorFront={palette.mid}
-                    shape="warp"
-                    type="4x4"
-                    size={2}
-                    speed={0.3 * speed}
-                />
-            ) : null}
-            {BACKDROP === 'neuro' ? (
-                <NeuroNoise
-                    width="100%"
-                    height="100%"
-                    colorBack={palette.canvas}
-                    colorMid={palette.mid}
-                    colorFront={palette.strong}
-                    brightness={0.05}
-                    contrast={0.3}
-                    speed={0.25 * speed}
-                />
-            ) : null}
-            <span className={styles.scrim} />
+            )}
+            {variant === 'mesh' ? <span className={styles.scrim} /> : null}
         </div>
     );
 }
