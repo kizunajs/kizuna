@@ -32,7 +32,7 @@ const parseSnapshot = (contents: string, source: string): ApiSnapshot => {
     try {
         return parse(contents) as ApiSnapshot;
     } catch {
-        throw new Error(`${source} is not a Kizuna diff file. Run \`kizuna generate\` to write one.`);
+        throw new Error(`${source} is not a Kizuna snapshot. Run \`kizuna generate\` to write one.`);
     }
 };
 

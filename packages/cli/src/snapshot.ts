@@ -212,7 +212,7 @@ export const snapshotPathFor = (configPath: string): string => {
         .replace(/\.config\.[cm]?[jt]s$/, '')
         .replace(/^kizuna\./, '');
 
-    const name = declared === '' || declared === 'kizuna' ? 'diff' : `${declared}.diff`;
+    const name = declared === '' || declared === 'kizuna' ? 'snapshot' : `${declared}.snapshot`;
     return join(dirname(configPath), '.kizuna', `${name}.yaml`);
 };
 
@@ -221,7 +221,7 @@ export const snapshotPathFor = (configPath: string): string => {
  * `kizuna generate --check` refuses to let it go stale.
  */
 export const snapshotTarget = (configPath: string): ClientTarget => ({
-    kind: 'diff',
+    kind: 'snapshot',
     output: snapshotPathFor(configPath),
     generate: renderSnapshot,
 });

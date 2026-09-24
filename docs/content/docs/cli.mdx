@@ -7,11 +7,11 @@ description: Write your types and clients, print the routes your config serves, 
 
 <InstallTabs packageName="-D @kizunajs/cli" />
 
-| Command           | What it does                                                                      |
-| ----------------- | --------------------------------------------------------------------------------- |
-| `kizuna generate` | Writes `kizuna.types.ts`, every client the config declares, and the diff snapshot |
-| `kizuna routes`   | Prints every route the config serves                                              |
-| `kizuna diff`     | Compares the config against the same config at a git ref                          |
+| Command           | What it does                                                                 |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `kizuna generate` | Writes `kizuna.types.ts`, every client the config declares, and the snapshot |
+| `kizuna routes`   | Prints every route the config serves                                         |
+| `kizuna diff`     | Compares the config against the same config at a git ref                     |
 
 `--config <path>` points any of them at a config other than `kizuna.config.ts`.
 
@@ -25,7 +25,7 @@ See [Configuration](/docs/config#kizuna-generate) for what it writes and where.
 kizuna generate --check
 ```
 
-It covers `kizuna.types.ts`, every client under `clients`, and `.kizuna/diff.yaml`, so one command answers whether everything generated matches today's config.
+It covers `kizuna.types.ts`, every client under `clients`, and `.kizuna/snapshot.yaml`, so one command answers whether everything generated matches today's config.
 
 ```yaml title=".github/workflows/kizuna-checks.yml"
 name: Kizuna Checks
@@ -108,14 +108,14 @@ ADDED    POST /users/:id/archive added
 
 It exits `1` when a change breaks callers, so a pipeline fails on one. `--against` defaults to `main`, and `--json` prints the changes as an array. See [Breaking changes](/docs/breaking-changes) for what counts as breaking and how to gate a pull request on it.
 
-`kizuna generate` writes `.kizuna/diff.yaml` beside your config, and `diff` compares two of those. The base version is read straight out of git, so nothing is checked out, installed or run for the other side, and a comparison against a commit from a year ago costs the same as one against yesterday.
+`kizuna generate` writes `.kizuna/snapshot.yaml` beside your config, and `diff` compares two of those. The base version is read straight out of git, so nothing is checked out, installed or run for the other side, and a comparison against a commit from a year ago costs the same as one against yesterday.
 
 The head version is whatever is on disk, so run `kizuna generate --check` first. A snapshot nobody regenerated compares cleanly against a base it no longer describes.
 
 Two snapshots can also be compared directly, with no git and no config:
 
 ```bash
-kizuna diff --from base.yaml --to .kizuna/diff.yaml
+kizuna diff --from base.yaml --to .kizuna/snapshot.yaml
 ```
 
 ## Scripts

@@ -324,7 +324,7 @@ On Next.js each API is its own catch-all route file, and `mount({ basePath })` i
 kizuna generate
 ```
 
-It writes three things from `kizuna.config.ts`: the `Config` in `kizuna.types.ts`, every client under `clients`, and the `.kizuna/diff.yaml` snapshot [`kizuna diff`](/docs/breaking-changes) compares. A file that already matches is left alone, so watchers and build tools see no change.
+It writes three things from `kizuna.config.ts`: the `Config` in `kizuna.types.ts`, every client under `clients`, and the `.kizuna/snapshot.yaml` that [`kizuna diff`](/docs/breaking-changes) compares. A file that already matches is left alone, so watchers and build tools see no change.
 
 | Option     | Default            | Description                                                                             |
 | ---------- | ------------------ | --------------------------------------------------------------------------------------- |
@@ -411,7 +411,7 @@ The same work without writing. It names whatever has fallen behind and exits `1`
 ```text
 2 generated files are out of date:
   src/lib/api-client.generated.ts is behind the config
-  .kizuna/diff.yaml is behind the config
+  .kizuna/snapshot.yaml is behind the config
 
 Run `kizuna generate` and commit the result.
 ```

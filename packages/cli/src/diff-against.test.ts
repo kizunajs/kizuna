@@ -23,7 +23,7 @@ const snapshotOf = (path: string): ApiSnapshot => ({
     tools: {},
 });
 
-const SNAPSHOT = join('.kizuna', 'diff.yaml');
+const SNAPSHOT = join('.kizuna', 'snapshot.yaml');
 
 const write = (directory: string, snapshot: ApiSnapshot) => {
     mkdirSync(join(directory, '.kizuna'), { recursive: true });
