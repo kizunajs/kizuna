@@ -1,36 +1,35 @@
 import { docs } from 'fumadocs-mdx:collections/server';
 import { loader } from 'fumadocs-core/source';
-import { Badge } from '@/components/shared/badge';
+import { Badge, type Stage } from '@/components/shared/badge';
 
 /**
- * Sidebar badges, keyed by page url. Add or remove an entry to change what a
- * page is labelled with, or drop the entry to remove the badge entirely.
+ * Sidebar badges, keyed by page url.
  */
-const badges: Record<string, string> = {
-    '/docs/authentication': 'Beta',
-    '/docs/access-control': 'Alpha',
-    '/docs/oauth': 'Alpha',
-    '/docs/jobs': 'Alpha',
-    '/docs/caching': 'Beta',
-    '/docs/mcp': 'Beta',
-    '/docs/streaming': 'Alpha',
-    '/docs/tools': 'Alpha',
-    '/docs/extend/create-adapter': 'Beta',
-    '/docs/extend/create-generator': 'Beta',
-    '/docs/extend/create-plugin': 'Alpha',
-    '/docs/extend/create-job-transport': 'Alpha',
-    '/docs/extend/create-ts-client': 'Beta',
-    '/docs/clients/kotlin': 'Beta',
-    '/docs/clients/tanstack-query': 'Beta',
-    '/docs/reference/k-identity': 'Beta',
-    '/docs/reference/kizuna-roles': 'Alpha',
-    '/docs/reference/kizuna-permissions': 'Alpha',
-    '/docs/reference/k-jobs': 'Alpha',
-    '/docs/reference/k-issue': 'Beta',
-    '/docs/reference/kizuna-tanstack-query': 'Beta',
-    '/docs/reference/generate-kotlin-client': 'Beta',
-    '/docs/reference/mcp-plugin': 'Beta',
-    '/docs/reference/create-mcp-server': 'Beta',
+const badges: Record<string, Stage> = {
+    '/docs/authentication': 'beta',
+    '/docs/access-control': 'alpha',
+    '/docs/oauth': 'alpha',
+    '/docs/jobs': 'alpha',
+    '/docs/caching': 'beta',
+    '/docs/mcp': 'beta',
+    '/docs/streaming': 'alpha',
+    '/docs/tools': 'alpha',
+    '/docs/extend/create-adapter': 'beta',
+    '/docs/extend/create-generator': 'beta',
+    '/docs/extend/create-plugin': 'alpha',
+    '/docs/extend/create-job-transport': 'alpha',
+    '/docs/extend/create-ts-client': 'beta',
+    '/docs/clients/kotlin': 'beta',
+    '/docs/clients/tanstack-query': 'beta',
+    '/docs/reference/k-identity': 'beta',
+    '/docs/reference/kizuna-roles': 'alpha',
+    '/docs/reference/kizuna-permissions': 'alpha',
+    '/docs/reference/k-jobs': 'alpha',
+    '/docs/reference/k-issue': 'beta',
+    '/docs/reference/kizuna-tanstack-query': 'beta',
+    '/docs/reference/generate-kotlin-client': 'beta',
+    '/docs/reference/mcp-plugin': 'beta',
+    '/docs/reference/create-mcp-server': 'beta',
 };
 
 export const source = loader({
@@ -40,15 +39,15 @@ export const source = loader({
         transformers: [
             {
                 file(node) {
-                    const label = node.type === 'page' ? badges[node.url] : undefined;
-                    if (!label) return node;
+                    const stage = node.type === 'page' ? badges[node.url] : undefined;
+                    if (!stage) return node;
 
                     return {
                         ...node,
                         name: (
                             <>
                                 {node.name}
-                                <Badge>{label}</Badge>
+                                <Badge stage={stage} />
                             </>
                         ),
                     };

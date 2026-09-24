@@ -1,6 +1,8 @@
 .window {
-    --window-surface: var(--kizuna-surface, #f4f4f4);
-    --window-line: #d8d8d8;
+    --completion-selected: var(--kizuna-control-hover);
+    --completion-surface: var(--kizuna-control);
+    --window-surface: var(--kizuna-window, #f5f5f5);
+    --window-line: var(--kizuna-window-line, #e4e4e4);
 
     display: flex;
     flex: 1;
@@ -9,20 +11,13 @@
     overflow: hidden;
     border-radius: 10px;
     background-color: var(--window-surface);
-}
-
-:global(.dark) .window {
-    --window-surface: var(--kizuna-surface, #1c1c1c);
-    --window-line: #3a3a3a;
-    --completion-surface: #252526;
-    --completion-selected: #3a3a3a;
+    box-shadow: var(--kizuna-window-elevation, none);
 }
 
 .dots {
     display: flex;
     gap: 6px;
     padding: 12px 16px 10px;
-    border-bottom: 1px solid var(--window-line);
 }
 
 .dot {
@@ -94,10 +89,11 @@
     flex-direction: column;
     min-width: 11em;
     padding: 4px;
-    border: 1px solid var(--window-line);
     border-radius: 6px;
     background-color: var(--completion-surface, #fff);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+    box-shadow:
+        var(--kizuna-elevation-hover, none),
+        0 8px 24px rgb(0 0 0 / 40%);
     user-select: none;
 }
 
@@ -111,7 +107,7 @@
 }
 
 .code :global(.kizuna-completion-item-selected) {
-    background-color: var(--completion-selected, #e8e8e8);
+    background-color: var(--completion-selected, var(--kizuna-control, #f0f0f0));
 }
 
 .code :global(.kizuna-completion-icon) {
@@ -123,5 +119,5 @@
 }
 
 .code :global(.border-b) {
-    border-bottom-color: var(--window-line) !important;
+    border-bottom-color: transparent !important;
 }

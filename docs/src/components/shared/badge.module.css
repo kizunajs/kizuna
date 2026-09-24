@@ -1,19 +1,24 @@
 .badge {
-    display: inline-block;
-    border: 1px solid currentColor;
-    border-radius: 999px;
-    padding: 0 6px;
-    font-size: 0.625rem;
-    font-weight: 600;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    border-radius: var(--kizuna-radius-pill);
+    background-color: rgb(255 255 255 / 0.08);
+    box-shadow: var(--kizuna-elevation-hover);
+    font-weight: var(--font-weight-600);
     letter-spacing: 0.06em;
     line-height: 1.6;
     text-transform: uppercase;
-    vertical-align: middle;
     white-space: nowrap;
+    color: var(--kizuna-ink);
 }
 
-/* -- For inline badges in text -- */
-p > .badge {
-    margin-inline-start: 6px;
-    transform: translateY(-2px);
+.small {
+    padding: 0 7px;
+    font-size: 0.625rem;
+}
+
+.medium {
+    padding: 2px 10px;
+    font-size: 0.6875rem;
 }

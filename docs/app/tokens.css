@@ -1,17 +1,40 @@
 :root {
-    --kizuna-canvas: #ffffff;
-    --kizuna-surface: #f3f3f3;
-    --kizuna-ink: #0b0b0b;
-    --kizuna-muted: #5c5c5c;
-    --kizuna-line: #e4e4e4;
-    --kizuna-line-strong: #cfcfcf;
-    --kizuna-field: #f0f0f0;
+    --kizuna-canvas: #0b0b0b;
+    --kizuna-surface: #121212;
+    --kizuna-raised: #1a1a1a;
+    --kizuna-control: #252525;
+    --kizuna-surface-hover: #171717;
+    --kizuna-raised-hover: #1f1f1f;
+    --kizuna-control-hover: #2c2c2c;
 
-    --kizuna-max-width: 1152px;
+    --kizuna-hover: rgb(255 255 255 / 0.06);
+    --kizuna-tint: rgb(255 255 255 / 0.08);
+
+    --kizuna-ink: #ffffff;
+    --kizuna-muted: #9a9a9a;
+    --kizuna-line: #1f1f1f;
+    --kizuna-line-strong: #2e2e2e;
+    --kizuna-window: var(--kizuna-surface);
+    --kizuna-window-line: #242424;
+
+    --kizuna-elevation: inset 0 1px 0 rgb(255 255 255 / 0.05);
+    --kizuna-elevation-hover: inset 0 1px 0 rgb(255 255 255 / 0.08);
+    --kizuna-window-elevation: var(--kizuna-elevation);
+    --kizuna-control-elevation: var(--kizuna-elevation-hover), 0 2px 6px rgb(0 0 0 / 0.25);
+
+    --kizuna-red: oklch(71% 0.165 22);
+    --kizuna-amber: oklch(84% 0.135 83);
+    --kizuna-green: oklch(79% 0.145 158);
+    --kizuna-blue: oklch(75% 0.125 251);
+    color-scheme: dark;
+
+    --kizuna-max-width: 1280px;
     --kizuna-gutter: 20px;
-    --kizuna-section-gap: 96px;
+    --kizuna-section-gap: 140px;
     --kizuna-head-gap: 22px;
     --kizuna-footer-gap: 32px;
+
+    --kizuna-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 
     --kizuna-text-ui: 1.0625rem;
     --kizuna-text-button: 1rem;
@@ -25,21 +48,27 @@
     --kizuna-hairline: 1px;
     --kizuna-border-button: 1.5px;
     --kizuna-radius-pill: 999px;
-    --kizuna-radius-card: 14px;
+    --kizuna-radius-card: 18px;
     --kizuna-button-height: 51px;
     --kizuna-button-padding-inline: 20px;
     --kizuna-logo-width: 137px;
     --kizuna-gap-actions: 12px;
-}
 
-.dark {
-    --kizuna-canvas: #131313;
-    --kizuna-surface: #212121;
-    --kizuna-ink: #ffffff;
-    --kizuna-muted: #a0a0a0;
-    --kizuna-line: #2a2a2a;
-    --kizuna-line-strong: #3d3d3d;
-    --kizuna-field: #2b2b2b;
+    --kizuna-header-height: 80px;
+
+    --kizuna-hero-offset: 76px;
+    --kizuna-hero-after: 88px;
+    --kizuna-cards-after: 72px;
+    --kizuna-docs-offset: 4px;
+    --kizuna-docs-bottom: 24px;
+    --kizuna-docs-title-offset: 0px;
+    --kizuna-page-offset: 64px;
+    --kizuna-page-gap: 96px;
+
+    --kizuna-control-height: 40px;
+    --kizuna-control-height-small: 34px;
+    --kizuna-radius-control: 10px;
+    --kizuna-grid-size: 56px;
 }
 
 html:has(.kizuna-landing-page),
@@ -49,17 +78,47 @@ body:has(.kizuna-landing-page) {
 
 .kizuna-landing-page {
     flex: 1;
+    overflow-x: clip;
     background-color: var(--kizuna-canvas);
     color: var(--kizuna-ink);
     font-family: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
 }
 
+/*
+ * No paragraph ends on a word of its own. `:where` keeps this at zero
+ * specificity so a component's own `text-wrap` wins.
+ */
+:where(.kizuna-landing-page) :where(p, li, dd, blockquote, figcaption, td) {
+    text-wrap: pretty;
+}
+
+:where(.kizuna-landing-page) :where(h1, h2, h3, h4, h5, h6) {
+    text-wrap: balance;
+}
+
 @media (max-width: 767px) {
     :root {
-        --kizuna-section-gap: 40px;
+        --kizuna-section-gap: 64px;
         --kizuna-text-nav: 0.95rem;
         --kizuna-text-button: 0.95rem;
         --kizuna-button-height: 44px;
         --kizuna-button-padding-inline: 18px;
+        --kizuna-hero-offset: 28px;
+        --kizuna-hero-after: 52px;
+        --kizuna-cards-after: 56px;
+        --kizuna-page-offset: 0px;
+        --kizuna-page-gap: 64px;
+    }
+}
+
+/*
+ * The docs sidebar and page hero start where the header ends, so the space
+ * below the nav matches the space above it. The title offset is the hero's top
+ * padding, and the table of contents starts level with the title.
+ */
+@media (min-width: 1024px) {
+    :root {
+        --kizuna-docs-offset: 0px;
+        --kizuna-docs-title-offset: 24px;
     }
 }

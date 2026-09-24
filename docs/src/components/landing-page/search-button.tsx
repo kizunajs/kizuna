@@ -6,10 +6,8 @@ import { useSearchContext } from 'fumadocs-ui/contexts/search';
 import styles from './search-button.module.css';
 
 /**
- * `/api/search` builds its Orama index on the first request to the route, so the
- * first query a visitor types waits for the whole index. The dialog shows "No
- * results" while it waits, which reads as search being broken. One throwaway
- * request on idle builds the index before anyone types.
+ * `/api/search` builds its index on the first request, and the dialog shows "No
+ * results" until it is ready. A request on idle builds it before anyone types.
  */
 let warmed = false;
 
@@ -42,7 +40,7 @@ export function SearchButton() {
     return (
         <button type="button" className={styles.button} onClick={() => setOpenSearch(true)}>
             <Search className={styles.icon} aria-hidden />
-            Search in docs
+            Search docs
             <kbd className={styles.hotKey}>
                 {hotKey.map((key, index) => (
                     <span key={index}>{key.display}</span>

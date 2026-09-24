@@ -1,6 +1,8 @@
 'use client';
 
+import clsx from 'clsx';
 import { useSyncExternalStore, type ReactNode } from 'react';
+import styles from './access-style.module.css';
 
 type AccessStyleValue = 'identity' | 'roles' | 'permissions';
 
@@ -60,7 +62,7 @@ const useAccessStyle = (): AccessStyleValue => useSyncExternalStore(subscribe, r
 export function AccessStyleSwitch() {
     const active = useAccessStyle();
     return (
-        <div className="not-prose my-6 flex w-fit gap-1 rounded-lg border bg-fd-secondary p-1" role="tablist">
+        <div className={clsx('not-prose', styles.switch)} role="tablist">
             {options.map((option) => {
                 const selected = option.value === active;
                 return (
@@ -70,11 +72,7 @@ export function AccessStyleSwitch() {
                         role="tab"
                         aria-selected={selected}
                         onClick={() => write(option.value)}
-                        className={
-                            selected
-                                ? 'rounded-md bg-fd-background px-3 py-1.5 text-sm font-medium text-fd-foreground shadow-sm'
-                                : 'rounded-md px-3 py-1.5 text-sm font-medium text-fd-muted-foreground hover:text-fd-foreground'
-                        }>
+                        className={clsx(styles.option, selected && styles.optionSelected)}>
                         {option.label}
                     </button>
                 );

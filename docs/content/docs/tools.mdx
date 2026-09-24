@@ -436,7 +436,7 @@ Nothing here is a new transport. Every piece reduces to something Kizuna already
 
 **Execution is the route's own pipeline.** A tool call runs the route handler through the same validation, guards and Problem Details an HTTP request does, so there is one place a route runs whoever asked.
 
-## What Kizuna leaves out
+## What Kizuna.js leaves out
 
 - **Models.** Kizuna never calls one, holds a conversation, or runs an agent loop. It validates input, runs a handler, validates output. The loop lives in your route handler, the way a job's transport lives outside kizuna.
 - **Provider wire shapes.** There is no `toAnthropicTools` or `toOpenAITools`, because those track a vendor changelog. `buildToolDefinitions` hands you MCP's shape and the `.map` to a provider is a few lines you can read.

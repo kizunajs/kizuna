@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { CodeWindow } from '@/components/code/code-window';
 import type { CodeCompletion } from '@/components/code/code-completion';
 import TsLogo from '@/icons/TypeScript.svg';
@@ -25,7 +26,7 @@ interface Question {
 
 export const questions: Question[] = [
     {
-        question: 'Why Kizuna?',
+        question: 'Why Kizuna.js',
         answer: (
             <>
                 <p className={styles.body}>One config, a fully typed stack.</p>
@@ -84,6 +85,32 @@ export const questions: Question[] = [
         ),
     },
     {
+        question: 'Why generate the client instead of inferring it?',
+        answer: (
+            <>
+                <p className={styles.body}>
+                    An inferred client has to import your server&rsquo;s types. That ties both to one TypeScript project, and on a large API
+                    it is what makes the editor crawl.
+                </p>
+                <p className={styles.body}>
+                    A generated client is a plain file. It imports <code className={styles.inlineCode}>@kizunajs/fetch</code> and nothing
+                    else, works in any repository, and every API change shows up in the pull request as a diff to the client you can review.
+                </p>
+                <p className={styles.body}>
+                    The step itself costs nothing anymore. Agents write most of the code these days, and one line in{' '}
+                    <Link className={styles.link} href="/docs/config#kizuna-generate">
+                        AGENTS.md
+                    </Link>{' '}
+                    has them run <code className={styles.inlineCode}>kizuna generate</code> after every route change.{' '}
+                    <Link className={styles.link} href="/docs/cli#kizuna-generate">
+                        kizuna generate --check
+                    </Link>{' '}
+                    in CI catches the times one forgets.
+                </p>
+            </>
+        ),
+    },
+    {
         question: 'Coming from ts-rest?',
         answer: (
             <p className={styles.body}>
@@ -108,7 +135,7 @@ export const questions: Question[] = [
                         tRPC
                     </a>{' '}
                     is a great choice for a pure TypeScript stack, and Kizuna does not ask you to give up the RPC-like client. You still
-                    call your endpoints like functions and get fully typed results back:
+                    call your routes like functions and get fully typed results back:
                 </p>
                 <div className={styles.code}>
                     <CodeWindow
@@ -124,6 +151,47 @@ export const questions: Question[] = [
                     Kizuna fits better when your API has consumers outside that client: another language, a public integration, or anything
                     reading the OpenAPI spec. The same routes also generate native Swift and Kotlin clients, so your iOS and Android apps
                     are typed against the API too.
+                </p>
+            </>
+        ),
+    },
+    {
+        question: 'Why not just use an OpenAPI generator?',
+        answer: (
+            <>
+                <p className={styles.body}>
+                    A generator types your client against the OpenAPI document, and nothing types the document against your server. Kizuna
+                    closes that gap: the routes that answer the request generate the document and every client.
+                </p>
+                <p className={styles.body}>
+                    The gap hurts most on iOS. With{' '}
+                    <a className={styles.link} href="https://github.com/apple/swift-openapi-generator" target="_blank" rel="noreferrer">
+                        Swift OpenAPI Generator
+                    </a>
+                    :
+                </p>
+                <ul className={styles.bullets}>
+                    <li>
+                        every response unwraps through <code className={styles.inlineCode}>.ok</code>,{' '}
+                        <code className={styles.inlineCode}>.body</code> and <code className={styles.inlineCode}>.json</code>, and every
+                        type is <code className={styles.inlineCode}>Components.Schemas.User</code>
+                    </li>
+                    <li>
+                        a new enum value from the server fails the whole response in apps already shipped, and the request to fix it was{' '}
+                        <a
+                            className={styles.link}
+                            href="https://github.com/apple/swift-openapi-generator/issues/428"
+                            target="_blank"
+                            rel="noreferrer">
+                            closed as not planned
+                        </a>
+                    </li>
+                    <li>it runs as a build plugin, with three packages to add</li>
+                </ul>
+                <p className={styles.body}>
+                    Kizuna&rsquo;s Swift client is one file with no dependencies. A call returns its body, a model is{' '}
+                    <code className={styles.inlineCode}>API.User</code>, enums can take an unknown case, and a pull request that would break
+                    a shipped app fails.
                 </p>
             </>
         ),
@@ -180,11 +248,16 @@ export const questions: Question[] = [
 export function Faq() {
     return (
         <div className={styles.faq}>
-            {questions.map((entry) => (
-                <section key={entry.question} className={styles.entry}>
-                    <h2 className={styles.heading}>{entry.question}</h2>
-                    {entry.answer}
-                </section>
+            {questions.map((entry, index) => (
+                <details key={entry.question} className={styles.entry} open={index === 0}>
+                    <summary className={styles.summary}>
+                        <h2 className={styles.heading}>{entry.question}</h2>
+                        <span className={styles.toggle} aria-hidden>
+                            <Plus className={styles.toggleIcon} />
+                        </span>
+                    </summary>
+                    <div className={styles.answer}>{entry.answer}</div>
+                </details>
             ))}
         </div>
     );

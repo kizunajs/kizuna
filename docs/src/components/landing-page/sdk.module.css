@@ -1,0 +1,28 @@
+.panels {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+}
+
+.visual {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.visual > * {
+    flex: 1;
+}
+
+.fileIcon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+@media (min-width: 1024px) {
+    .panels {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}

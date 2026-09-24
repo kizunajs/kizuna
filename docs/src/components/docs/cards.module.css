@@ -1,0 +1,69 @@
+.cards {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-block: 20px 28px;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-radius: var(--kizuna-radius-card);
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    padding: 16px 18px 18px;
+    color: var(--kizuna-ink);
+    text-decoration: none;
+    transition:
+        background-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+a.card:hover {
+    background-color: var(--kizuna-surface-hover);
+    box-shadow: var(--kizuna-elevation-hover);
+    opacity: 1;
+}
+
+.title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9375rem;
+    font-weight: var(--font-weight-600);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+}
+
+.arrow {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    stroke-width: 2.5;
+    transition: transform 0.15s ease;
+}
+
+a.card:hover .arrow {
+    transform: translateX(2px);
+}
+
+.text {
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--kizuna-muted);
+}
+
+.text :global(p) {
+    margin: 0;
+}
+
+.text :global(code) {
+    font-size: 0.8125rem;
+}
+
+@media (max-width: 639px) {
+    .cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

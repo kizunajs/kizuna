@@ -1,21 +1,28 @@
-import Link from 'next/link';
+import clsx from 'clsx';
+import { ArrowRight } from 'lucide-react';
+import { ButtonLink } from '@/components/ui/button';
 import GithubIcon from '@/icons/Github.svg';
+import LogoMark from '@/icons/LogoMark.svg';
 import styles from './closing-cta.module.css';
 
-export function ClosingCta() {
+export function ClosingCta({ className }: { className?: string }) {
     return (
-        <div className={styles.closingCta}>
-            <p className={styles.ctaTitle}>Ready to build?</p>
+        <section className={clsx(styles.closingCta, className)}>
+            <span className={styles.mark}>
+                <LogoMark />
+            </span>
+            <h2 className={styles.ctaTitle}>Ready to build?</h2>
             <p className={styles.ctaText}>8 minutes from an empty file to a typed client calling a real endpoint.</p>
             <div className={styles.ctaActions}>
-                <Link href="/docs" className={styles.primary}>
+                <ButtonLink href="/docs/quickstart">
                     Get started
-                </Link>
-                <a href="https://github.com/kizunajs/kizuna" className={styles.secondary} target="_blank" rel="noreferrer">
-                    <GithubIcon className={styles.secondaryIcon} />
+                    <ArrowRight aria-hidden />
+                </ButtonLink>
+                <ButtonLink href="https://github.com/kizunajs/kizuna" variant="secondary">
+                    <GithubIcon />
                     Star on GitHub
-                </a>
+                </ButtonLink>
             </div>
-        </div>
+        </section>
     );
 }

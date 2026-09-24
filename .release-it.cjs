@@ -49,7 +49,8 @@ module.exports = {
         publish: false,
     },
     hooks: {
-        'after:bump': 'node tools/sync-versions.cjs && git add package.json packages/*/package.json README.md packages/core/README.md',
+        'after:bump':
+            'node tools/sync-versions.cjs && git add package.json packages/*/package.json README.md packages/core/README.md docs/src/lib/site.ts',
         'after:release': 'node tools/publish.cjs',
     },
     plugins: {

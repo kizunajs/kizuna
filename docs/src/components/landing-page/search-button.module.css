@@ -1,41 +1,46 @@
 .button {
     display: none;
     align-items: center;
-    gap: 10px;
-    min-width: 256px;
-    height: var(--kizuna-button-height);
+    gap: 8px;
+    width: 220px;
+    height: var(--kizuna-control-height-small);
     border: none;
-    border-radius: var(--kizuna-radius-pill);
-    background-color: var(--kizuna-field);
-    padding-inline: var(--kizuna-button-padding-inline);
+    border-radius: 9px;
+    background-color: var(--kizuna-raised);
+    box-shadow: var(--kizuna-control-elevation);
+    padding: 0 6px 0 10px;
     font: inherit;
-    font-size: var(--kizuna-text-nav);
-    font-weight: var(--font-weight-600);
-    color: var(--kizuna-muted);
+    font-size: 0.875rem;
+    color: color-mix(in srgb, var(--kizuna-ink) 68%, var(--kizuna-canvas));
     text-align: left;
     cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.button:hover {
+    color: var(--kizuna-ink);
 }
 
 .icon {
-    width: 18px;
-    height: 18px;
+    width: 15px;
+    height: 15px;
     flex-shrink: 0;
-    stroke-width: 2.75;
+    stroke-width: 2.25;
 }
 
 .hotKey {
     display: inline-flex;
     align-items: center;
-    gap: 1px;
+    gap: 2px;
     margin-inline-start: auto;
-    border: var(--kizuna-border-button) solid var(--kizuna-ink);
-    border-radius: var(--kizuna-radius-pill);
-    padding: 3px 8px;
-    font: inherit;
-    font-size: 0.8125rem;
-    font-weight: var(--font-weight-600);
-    line-height: 1.2;
-    color: var(--kizuna-ink);
+    border-radius: 6px;
+    background-color: var(--kizuna-tint);
+    box-shadow: var(--kizuna-elevation-hover);
+    padding: 1px 6px;
+    font-family: var(--kizuna-mono);
+    font-size: 0.6875rem;
+    line-height: 1.5;
+    color: var(--kizuna-muted);
 }
 
 @media (min-width: 1024px) {

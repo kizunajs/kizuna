@@ -1,0 +1,43 @@
+.switch {
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    gap: 2px;
+    margin-block: 24px;
+    overflow-x: auto;
+    border-radius: 12px;
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    padding: 4px;
+    scrollbar-width: none;
+}
+
+.option {
+    height: 32px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-500);
+    white-space: nowrap;
+    color: var(--kizuna-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+@media (hover: hover) {
+    .option:hover {
+        color: var(--kizuna-ink);
+    }
+}
+
+.optionSelected {
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    color: var(--kizuna-ink);
+}

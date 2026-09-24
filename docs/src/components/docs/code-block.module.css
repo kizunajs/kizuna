@@ -1,0 +1,103 @@
+.block {
+    position: relative;
+    margin-block: 20px;
+    overflow: hidden;
+    border-radius: 12px;
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    font-size: 0.8125rem;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 8px 0 16px;
+    font-size: 0.8125rem;
+    color: var(--kizuna-muted);
+}
+
+.icon {
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+.icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 7px;
+    background: none;
+    padding: 0;
+    color: var(--kizuna-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.copy:hover {
+    background-color: var(--kizuna-hover);
+    color: var(--kizuna-ink);
+}
+
+.copy svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2.25;
+}
+
+.floatingCopy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.block:hover .floatingCopy,
+.floatingCopy:focus-within {
+    opacity: 1;
+}
+
+.viewport {
+    max-height: 600px;
+    overflow: auto;
+    padding-block: 2px 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--kizuna-line-strong) transparent;
+}
+
+.viewportUntitled {
+    padding-top: 14px;
+}
+
+.viewport:focus-visible {
+    outline: 2px solid var(--kizuna-line-strong);
+    outline-offset: -2px;
+}
+
+.viewport pre {
+    margin: 0;
+    background: none !important;
+    line-height: 1.7;
+}

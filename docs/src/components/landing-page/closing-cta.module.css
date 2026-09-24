@@ -1,27 +1,46 @@
 .closingCta {
+    margin-top: min(0px, calc(86px - var(--kizuna-section-gap)));
+    margin-bottom: 6px;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
 }
 
+.mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    margin-bottom: 20px;
+    border-radius: 14px;
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    color: var(--kizuna-ink);
+}
+
+.mark svg {
+    width: 26px;
+    height: 26px;
+}
+
 .ctaTitle {
     margin: 0;
-    font-size: clamp(2.125rem, 6vw, 4.125rem);
+    font-size: clamp(2.5rem, 6vw, 4rem);
     font-weight: var(--font-weight-700);
-    line-height: 1.05;
-    letter-spacing: -0.03em;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
     text-wrap: balance;
     color: var(--kizuna-ink);
 }
 
 .ctaText {
-    max-width: 38ch;
-    margin: 14px 0 0;
-    font-size: 1.35rem;
-    line-height: 1.5;
-    color: var(--kizuna-ink);
-    opacity: 0.7;
+    max-width: 36ch;
+    margin: 16px 0 0;
+    font-size: 1.25rem;
+    line-height: 1.55;
+    color: var(--kizuna-muted);
     text-wrap: balance;
 }
 
@@ -34,51 +53,19 @@
     margin-top: 26px;
 }
 
-.primary,
-.secondary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    height: var(--kizuna-button-height);
-    border: var(--kizuna-border-button) solid var(--kizuna-ink);
-    border-radius: var(--kizuna-radius-pill);
-    padding-inline: var(--kizuna-button-padding-inline);
-    font-size: var(--kizuna-text-button);
-    font-weight: var(--font-weight-600);
-    text-decoration: none;
-    white-space: nowrap;
-}
-
-.primary {
-    background-color: var(--kizuna-ink);
-    color: var(--kizuna-canvas);
-}
-
-.secondary {
-    color: var(--kizuna-ink);
-}
-
-.secondaryIcon {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-}
-
 @media (max-width: 767px) {
     .ctaTitle {
         max-width: 14ch;
-        font-size: 2rem;
-        letter-spacing: -0.02em;
-        text-wrap: pretty;
+        font-size: 2.25rem;
+        letter-spacing: -0.025em;
     }
 
     .ctaText {
-        margin-top: 16px;
+        margin-top: 14px;
         font-size: 1.0625rem;
     }
 
     .ctaActions {
-        margin-top: 20px;
+        margin-top: 24px;
     }
 }

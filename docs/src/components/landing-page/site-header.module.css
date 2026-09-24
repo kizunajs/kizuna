@@ -2,30 +2,79 @@
     position: sticky;
     top: 0;
     z-index: 40;
-    background-color: color-mix(in srgb, var(--kizuna-canvas) 80%, transparent);
-    backdrop-filter: blur(12px);
+}
+
+.header::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: -1;
+    height: calc(var(--kizuna-header-height) + 24px);
+    background: linear-gradient(to bottom, var(--kizuna-canvas) 30%, transparent);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+
+.header[data-scrolled]::before {
+    opacity: 1;
 }
 
 .inner {
+    position: relative;
+    isolation: isolate;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 24px;
     max-width: var(--kizuna-max-width);
+    height: var(--kizuna-header-height);
     margin: 0 auto;
-    padding: 24px var(--kizuna-gutter);
+    padding-inline: var(--kizuna-gutter);
+    transition: padding-inline 0.25s ease;
 }
 
-.left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
+.header[data-scrolled] .inner {
+    padding-inline: calc(var(--kizuna-gutter) + 16px);
 }
 
-.right {
+.inner::before {
+    content: '';
+    position: absolute;
+    inset: 12px var(--kizuna-gutter);
+    z-index: -1;
+    border-radius: 16px;
+    background-color: color-mix(in srgb, var(--kizuna-surface) 82%, transparent);
+    box-shadow:
+        var(--kizuna-elevation-hover),
+        0 16px 40px -12px rgb(0 0 0 / 0.9);
+    backdrop-filter: saturate(1.4) blur(14px);
+    opacity: 0;
+    transform: scale(0.985);
+    transition:
+        opacity 0.25s ease,
+        transform 0.25s ease;
+    pointer-events: none;
+}
+
+.header[data-scrolled] .inner::before {
+    opacity: 1;
+    transform: none;
+}
+
+.start,
+.end {
     display: flex;
     align-items: center;
-    gap: var(--kizuna-gap-actions);
+}
+
+.start {
+    min-width: 0;
+    gap: 12px;
+}
+
+.end {
+    gap: 8px;
 }
 
 .logoLink {
@@ -35,88 +84,251 @@
 }
 
 .logo {
-    width: var(--kizuna-logo-width);
+    width: 104px;
     height: auto;
-    margin-top: -6px;
+    margin-top: -4px;
 }
 
-.links {
+.nav {
     display: none;
     align-items: center;
-    gap: 24px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+    gap: 2px;
+    margin-left: 8px;
 }
 
 .link {
-    font-size: var(--kizuna-text-nav);
-    font-weight: var(--font-weight-600);
-    color: var(--kizuna-ink);
-    text-decoration: none;
-}
-
-.github {
     display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.9375rem;
+    font-weight: var(--font-weight-500);
+    color: var(--kizuna-muted);
+    text-decoration: none;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+@media (hover: hover) {
+    .link:hover {
+        background-color: var(--kizuna-hover);
+        color: var(--kizuna-ink);
+    }
+}
+
+.link:active,
+.link[aria-current='page'] {
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
     color: var(--kizuna-ink);
 }
 
-.githubIcon {
-    width: 26px;
-    height: 26px;
+.externalIcon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2.25;
+    opacity: 0.6;
+    transition: transform 0.15s ease;
 }
 
-.divider {
-    display: none;
-    width: var(--kizuna-border-button);
-    height: 28px;
-    margin-inline: 8px;
-    background-color: var(--kizuna-ink);
+@media (hover: hover) {
+    .link:hover .externalIcon {
+        transform: translate(1px, -1px);
+    }
 }
 
-.cta {
+.iconButton {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    height: var(--kizuna-button-height);
-    border: var(--kizuna-border-button) solid var(--kizuna-ink);
-    border-radius: var(--kizuna-radius-pill);
-    padding-inline: var(--kizuna-button-padding-inline);
-    font-size: var(--kizuna-text-nav);
-    font-weight: var(--font-weight-600);
-    color: var(--kizuna-ink);
+    width: var(--kizuna-control-height-small);
+    height: var(--kizuna-control-height-small);
+    border: none;
+    border-radius: 9px;
+    background: none;
+    padding: 0;
+    color: var(--kizuna-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+@media (hover: hover) {
+    .iconButton:hover {
+        color: var(--kizuna-ink);
+    }
+}
+
+.githubIcon {
+    width: 19px;
+    height: 19px;
+}
+
+.menuButton {
+    margin-left: -2px;
+}
+
+.toggleIcon {
+    width: 22px;
+    height: 22px;
+    stroke-width: 2;
+}
+
+.end .cta {
+    display: none;
+    margin-left: 4px;
+}
+
+.menuLayer {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: calc(100dvh - var(--kizuna-header-height));
+    padding: 4px var(--kizuna-gutter) 16px;
+}
+
+.scrim {
+    position: absolute;
+    inset: 0;
+    background-color: color-mix(in srgb, var(--kizuna-canvas) 72%, transparent);
+    backdrop-filter: blur(6px);
+    animation: fade-in 0.2s ease;
+}
+
+.menu {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 100%;
+    overflow-y: auto;
+    border-radius: var(--kizuna-radius-card);
+    background-color: var(--kizuna-surface);
+    box-shadow:
+        var(--kizuna-elevation),
+        0 16px 40px rgb(0 0 0 / 0.5);
+    padding: 8px;
+    transform-origin: top right;
+    animation: menu-in 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.menuGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: 12px;
+    background-color: var(--kizuna-raised);
+    box-shadow: var(--kizuna-elevation-hover);
+    padding: 4px;
+}
+
+.menuLink {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    border-radius: 9px;
+    padding-inline: 12px;
+    font-size: 1rem;
+    font-weight: var(--font-weight-500);
+    color: var(--kizuna-muted);
     text-decoration: none;
-    white-space: nowrap;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+@media (hover: hover) {
+    .menuLink:hover {
+        color: var(--kizuna-ink);
+    }
+}
+
+.menuLink:active,
+.menuLink[aria-current='page'] {
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    color: var(--kizuna-ink);
+}
+
+.menuLink:focus-visible {
+    outline: 2px solid var(--kizuna-ink);
+    outline-offset: -2px;
+}
+
+.menuIcon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.25;
+    opacity: 0.6;
+}
+
+.menuCta {
+    width: 100%;
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes menu-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scrim,
+    .menu {
+        animation: none;
+    }
 }
 
 @media (max-width: 767px) {
-    .inner {
-        gap: 16px;
-        padding: 20px var(--kizuna-gutter);
+    .iconButton {
+        width: var(--kizuna-control-height);
+        height: var(--kizuna-control-height);
     }
 
-    .right {
-        gap: 14px;
+    .githubIcon {
+        width: 22px;
+        height: 22px;
+        translate: 0 -1px;
     }
 
-    .logo {
-        width: 112px;
-        margin-top: -4px;
+    .menuButton {
+        margin-left: -6px;
+    }
+
+    .end {
+        margin-right: -4px;
+    }
+
+    .toggleIcon {
+        width: 26px;
+        height: 26px;
     }
 }
 
 @media (min-width: 768px) {
-    .left {
-        gap: 32px;
-    }
-
-    .links {
+    .nav {
         display: flex;
     }
-}
 
-@media (min-width: 1024px) {
-    .divider {
-        display: block;
+    .end .cta {
+        display: inline-flex;
+    }
+
+    .menuButton,
+    .menuLayer {
+        display: none;
     }
 }

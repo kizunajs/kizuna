@@ -1,0 +1,51 @@
+.command {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    height: var(--kizuna-control-height);
+    border-radius: var(--kizuna-radius-control);
+    background-color: var(--kizuna-raised);
+    box-shadow: var(--kizuna-control-elevation);
+    padding: 0 4px 0 14px;
+    font-family: var(--kizuna-mono);
+    font-size: 0.8125rem;
+    color: var(--kizuna-ink);
+}
+
+.prompt {
+    color: var(--kizuna-muted);
+    user-select: none;
+}
+
+.text {
+    font: inherit;
+    white-space: nowrap;
+}
+
+.copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 7px;
+    background: none;
+    padding: 0;
+    color: var(--kizuna-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.copy:hover {
+    background-color: var(--kizuna-hover);
+    color: var(--kizuna-ink);
+}
+
+.icon {
+    width: 15px;
+    height: 15px;
+    stroke-width: 2.25;
+}

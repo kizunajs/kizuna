@@ -1,7 +1,7 @@
 'use client';
 
 import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
-import { DynamicCodeBlock } from 'fumadocs-ui/components/dynamic-codeblock';
+import { CodeWindow } from '@/components/code/code-window';
 import { InstallTabs } from './install-tabs';
 import styles from './adapter-tabs.module.css';
 
@@ -37,10 +37,10 @@ export function AdapterTabs({ functionName, adapters = ['Express', 'Fastify', 'H
                     {showInstall ? (
                         <div className={styles.install}>
                             <InstallTabs packageName={adapter.package} />
-                            <DynamicCodeBlock lang="ts" code={`import { ${functionName} } from '${adapter.package}';`} />
+                            <CodeWindow lang="ts" code={`import { ${functionName} } from '${adapter.package}';`} />
                         </div>
                     ) : (
-                        <DynamicCodeBlock lang="ts" code={`import { ${functionName} } from '${adapter.package}';`} />
+                        <CodeWindow lang="ts" code={`import { ${functionName} } from '${adapter.package}';`} />
                     )}
                 </Tab>
             ))}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { CodeTabs } from './code-tabs';
 
 interface InstallTabsProps {
     packageName?: string;
@@ -52,22 +52,21 @@ const MANAGERS = [
 ];
 
 export function InstallTabs({ packageName, devPackageName, dev = false }: InstallTabsProps) {
-    return (
-        <Tabs groupId="package-manager" items={MANAGERS.map((manager) => manager.id)}>
-            {MANAGERS.map((manager) => {
-                const commands = [
-                    packageName === undefined ? undefined : `${manager.add} ${dev ? manager.devFlag : ''}${tagged(packageName)}`,
-                    devPackageName === undefined ? undefined : `${manager.add} ${manager.devFlag}${tagged(devPackageName)}`,
-                ].filter((command) => command !== undefined);
+    const tabs = MANAGERS.map((manager) => {
+        const command = [
+            packageName === undefined ? undefined : `${manager.add} ${dev ? manager.devFlag : ''}${tagged(packageName)}`,
+            devPackageName === undefined ? undefined : `${manager.add} ${manager.devFlag}${tagged(devPackageName)}`,
+        ]
+            .filter((part) => part !== undefined)
+            .join(' && ');
 
-                return (
-                    <Tab key={manager.id} value={manager.id}>
-                        <pre>
-                            <code>{commands.join(' && ')}</code>
-                        </pre>
-                    </Tab>
-                );
-            })}
-        </Tabs>
-    );
+        return {
+            id: manager.id,
+            label: manager.id,
+            code: command,
+            copy: command,
+        };
+    });
+
+    return <CodeTabs group="package-manager" tabs={tabs} />;
 }
