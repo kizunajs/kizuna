@@ -1,21 +1,21 @@
 :root {
-    --kizuna-canvas: #0b0b0b;
-    --kizuna-surface: #121212;
-    --kizuna-raised: #1a1a1a;
-    --kizuna-control: #252525;
-    --kizuna-surface-hover: #171717;
-    --kizuna-raised-hover: #1f1f1f;
-    --kizuna-control-hover: #2c2c2c;
+    --kizuna-canvas: #0c0c0c;
+    --kizuna-surface: #141414;
+    --kizuna-raised: #1c1c1c;
+    --kizuna-control: #272727;
+    --kizuna-surface-hover: #181818;
+    --kizuna-raised-hover: #212121;
+    --kizuna-control-hover: #2e2e2e;
 
     --kizuna-hover: rgb(255 255 255 / 0.06);
     --kizuna-tint: rgb(255 255 255 / 0.08);
 
     --kizuna-ink: #ffffff;
     --kizuna-muted: #9a9a9a;
-    --kizuna-line: #1f1f1f;
-    --kizuna-line-strong: #2e2e2e;
+    --kizuna-line: #222222;
+    --kizuna-line-strong: #313131;
     --kizuna-window: var(--kizuna-surface);
-    --kizuna-window-line: #242424;
+    --kizuna-window-line: #262626;
 
     --kizuna-elevation: inset 0 1px 0 rgb(255 255 255 / 0.05);
     --kizuna-elevation-hover: inset 0 1px 0 rgb(255 255 255 / 0.08);
@@ -55,6 +55,7 @@
     --kizuna-gap-actions: 12px;
 
     --kizuna-header-height: 80px;
+    --kizuna-header-shadow: 0 16px 40px -12px rgb(0 0 0 / 0.9);
 
     --kizuna-hero-offset: 76px;
     --kizuna-hero-after: 88px;

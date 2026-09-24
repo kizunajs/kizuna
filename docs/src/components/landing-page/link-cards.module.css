@@ -16,9 +16,11 @@
         box-shadow 0.15s ease;
 }
 
-.card:hover {
-    background-color: var(--kizuna-surface-hover);
-    box-shadow: var(--kizuna-elevation-hover);
+@media (hover: hover) {
+    .card:hover {
+        background-color: var(--kizuna-surface-hover);
+        box-shadow: var(--kizuna-elevation-hover);
+    }
 }
 
 .title {

@@ -54,9 +54,11 @@
         background-color 0.15s ease;
 }
 
-.copy:hover {
-    background-color: var(--kizuna-hover);
-    color: var(--kizuna-ink);
+@media (hover: hover) {
+    .copy:hover {
+        background-color: var(--kizuna-hover);
+        color: var(--kizuna-ink);
+    }
 }
 
 .copy svg {
@@ -74,7 +76,18 @@
     transition: opacity 0.15s ease;
 }
 
-.block:hover .floatingCopy,
+@media (hover: hover) {
+    .block:hover .floatingCopy {
+        opacity: 1;
+    }
+}
+
+@media (hover: none) {
+    .floatingCopy {
+        opacity: 1;
+    }
+}
+
 .floatingCopy:focus-within {
     opacity: 1;
 }

@@ -17,9 +17,11 @@
     --kizuna-window-elevation: var(--kizuna-elevation-hover);
 }
 
-.entry:not([open]):hover {
-    background-color: var(--kizuna-surface-hover);
-    box-shadow: var(--kizuna-elevation-hover);
+@media (hover: hover) {
+    .entry:not([open]):hover {
+        background-color: var(--kizuna-surface-hover);
+        box-shadow: var(--kizuna-elevation-hover);
+    }
 }
 
 .summary {

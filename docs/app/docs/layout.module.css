@@ -1,6 +1,8 @@
 .root {
     --kizuna-footer-offset: 40px;
 
+    --kizuna-header-shadow: 0 0 #0000;
+
     display: flex;
     flex-direction: column;
 }
@@ -23,6 +25,10 @@
 }
 
 @media (min-width: 1024px) {
+    .root {
+        --kizuna-header-shadow: inherit;
+    }
+
     .shell {
         grid-template-columns: 240px minmax(0, 1fr);
         gap: 48px;

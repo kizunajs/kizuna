@@ -28,8 +28,10 @@
     transition: background-color 0.15s ease;
 }
 
-.body:has(.title:hover) {
-    background-color: var(--kizuna-raised-hover);
+@media (hover: hover) {
+    .body:has(.title:hover) {
+        background-color: var(--kizuna-raised-hover);
+    }
 }
 
 .title {
@@ -67,8 +69,10 @@
     outline-offset: 2px;
 }
 
-.title:hover .arrow {
-    transform: translateX(2px);
+@media (hover: hover) {
+    .title:hover .arrow {
+        transform: translateX(2px);
+    }
 }
 
 .text {
@@ -106,8 +110,10 @@
         background-color 0.15s ease;
 }
 
-.tab:hover {
-    color: var(--kizuna-ink);
+@media (hover: hover) {
+    .tab:hover {
+        color: var(--kizuna-ink);
+    }
 }
 
 .tab:focus-visible {

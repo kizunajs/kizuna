@@ -39,9 +39,11 @@
         background-color 0.15s ease;
 }
 
-.copy:hover {
-    background-color: var(--kizuna-hover);
-    color: var(--kizuna-ink);
+@media (hover: hover) {
+    .copy:hover {
+        background-color: var(--kizuna-hover);
+        color: var(--kizuna-ink);
+    }
 }
 
 .icon {

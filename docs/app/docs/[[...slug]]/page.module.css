@@ -65,8 +65,10 @@
     transition: color 0.15s ease;
 }
 
-.crumbLink:hover {
-    color: var(--kizuna-ink);
+@media (hover: hover) {
+    .crumbLink:hover {
+        color: var(--kizuna-ink);
+    }
 }
 
 .title {
@@ -134,9 +136,11 @@
         box-shadow 0.15s ease;
 }
 
-.neighbour:hover {
-    background-color: var(--kizuna-surface-hover);
-    box-shadow: var(--kizuna-elevation-hover);
+@media (hover: hover) {
+    .neighbour:hover {
+        background-color: var(--kizuna-surface-hover);
+        box-shadow: var(--kizuna-elevation-hover);
+    }
 }
 
 .neighbourNext {
