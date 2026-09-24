@@ -7,6 +7,7 @@ import { ClosingCta } from '@/components/landing-page/closing-cta';
 import { Config } from '@/components/landing-page/config';
 import { FeatureCards } from '@/components/landing-page/feature-cards';
 import { Hero } from '@/components/landing-page/hero';
+import { Sdk } from '@/components/landing-page/sdk';
 import { Section } from '@/components/landing-page/section';
 import { Standards } from '@/components/landing-page/standards';
 import styles from './page.module.css';
@@ -35,9 +36,11 @@ export default function HomePage() {
 
                 <Agents />
 
-                <BreakingChanges />
-
                 <HandlerExplorer />
+
+                <Sdk />
+
+                <BreakingChanges />
 
                 <Standards />
 

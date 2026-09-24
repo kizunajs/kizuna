@@ -145,6 +145,21 @@ html.dark {
     color: var(--kizuna-ink);
 }
 
+.kizuna-docs-content div:has(> [role='tabpanel'] > figure > * > [role='tablist']) > [role='tabpanel'] {
+    padding: 6px 8px 8px;
+}
+
+.kizuna-docs-content div:has(> [role='tabpanel'] > figure > * > [role='tablist']) > [role='tabpanel'] > figure {
+    border-radius: 10px;
+    background-color: var(--kizuna-raised);
+    box-shadow: var(--kizuna-elevation-hover);
+}
+
+.kizuna-docs-content div:has(> [role='tabpanel'] > figure > * > [role='tablist']) > [role='tabpanel'] > figure > [role='tabpanel'] {
+    background-color: transparent;
+    box-shadow: none;
+}
+
 .kizuna-docs-content [role='tabpanel']:has(> figure:only-child) {
     padding: 0;
 }

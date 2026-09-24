@@ -9,7 +9,6 @@
 }
 
 .head {
-    max-width: 704px;
     margin-bottom: 40px;
 }
 
@@ -42,6 +41,10 @@
     text-align: center;
 }
 
+.headCenter .description {
+    margin-inline: auto;
+}
+
 .title {
     margin: 0;
     font-size: clamp(1.9rem, 4vw, 2.75rem);
@@ -53,6 +56,7 @@
 }
 
 .description {
+    max-width: 704px;
     margin: 12px 0 0;
     font-size: 1.125rem;
     line-height: 1.6;

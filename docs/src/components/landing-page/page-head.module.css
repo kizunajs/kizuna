@@ -46,6 +46,11 @@
 }
 
 @media (max-width: 767px) {
+    .center {
+        align-items: flex-start;
+        text-align: left;
+    }
+
     .title {
         letter-spacing: -0.025em;
     }

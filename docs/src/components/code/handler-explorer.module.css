@@ -1,13 +1,14 @@
 .split {
     display: grid;
-    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
 }
 
 .options {
     display: flex;
-    flex-direction: column;
     gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
     border-radius: 10px;
     background-color: var(--kizuna-window);
     box-shadow: var(--kizuna-window-elevation);
@@ -16,9 +17,9 @@
 
 .option {
     display: flex;
-    flex: 1;
+    flex-shrink: 0;
     align-items: center;
-    min-height: 30px;
+    min-height: 34px;
     border: none;
     border-radius: 8px;
     background: none;
@@ -74,12 +75,6 @@
     pointer-events: none;
 }
 
-.brandIcon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-}
-
 .argument {
     font-family: var(--kizuna-mono);
     font-size: 0.95em;
@@ -104,16 +99,6 @@
 }
 
 @media (max-width: 767px) {
-    .split {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .options {
-        flex-direction: row;
-        overflow-x: auto;
-        scrollbar-width: none;
-    }
-
     .sceneItem {
         flex-direction: column;
     }

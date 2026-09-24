@@ -77,8 +77,8 @@ export function BreakingChanges() {
     return (
         <Section
             aside={<DocsLink href="/docs/breaking-changes" />}
-            title="Catch breaking changes before your users do"
-            description="Kizuna compares every change against main and fails the pull request on anything that would break an app already in the App Store.">
+            title="Ship without breaking apps"
+            description="Kizuna compares every change against main and fails the pull request on anything that would break a consumer of your API.">
             <div className={clsx(panel.panel, styles.root)}>
                 <div className={styles.windows} aria-hidden>
                     <div className={styles.terminal}>

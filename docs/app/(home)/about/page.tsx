@@ -18,6 +18,7 @@ export default function AboutPage() {
     return (
         <div className={styles.page}>
             <PageHead
+                className={styles.introTight}
                 label="About"
                 title="Why we built Kizuna.js"
                 description="The goal is simple: make it impossible to ship a client that has drifted from your API."

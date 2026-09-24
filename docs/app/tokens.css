@@ -106,7 +106,7 @@ body:has(.kizuna-landing-page) {
         --kizuna-hero-offset: 28px;
         --kizuna-hero-after: 52px;
         --kizuna-cards-after: 56px;
-        --kizuna-page-offset: 36px;
+        --kizuna-page-offset: 0px;
         --kizuna-page-gap: 64px;
     }
 }
