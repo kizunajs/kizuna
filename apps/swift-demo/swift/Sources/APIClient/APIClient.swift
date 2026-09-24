@@ -770,6 +770,7 @@ public final class APIClient: Sendable {
 
             public struct Headers: Sendable {
                 public let xRequestId: String?
+                public let xRateLimitRemaining: Int
             }
 
             public init(body: API.User, headers: Headers) {
@@ -2875,8 +2876,9 @@ public struct APIUsersClient: Sendable {
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(API.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
-            let xRequestId = httpResponse.value(forHTTPHeaderField: "x-request-id")
-            return APIClient.UsersGetUser.Result(body: body, headers: .init(xRequestId: xRequestId))
+            let xRequestId = try Kizuna.header(httpResponse, name: "x-request-id", failure: APIClient.UsersGetUser.Failure.self, parse: { $0 })
+            guard let xRateLimitRemaining = try Kizuna.header(httpResponse, name: "x-rate-limit-remaining", failure: APIClient.UsersGetUser.Failure.self, parse: { Int($0) }) else { throw APIClient.UsersGetUser.Failure.invalidResponse }
+            return APIClient.UsersGetUser.Result(body: body, headers: .init(xRequestId: xRequestId, xRateLimitRemaining: xRateLimitRemaining))
         case 404:
             let payload = try Kizuna.decode(API.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersGetUser.Failure.self)
             throw APIClient.UsersGetUser.Failure.notFound(payload)
@@ -3720,6 +3722,12 @@ private enum Kizuna {
     static func setHeader<Value>(_ request: inout URLRequest, name: String, value: Value?) {
         guard let value else { return }
         request.setValue(stringifyQueryValue(value).joined(separator: ", "), forHTTPHeaderField: name)
+    }
+
+    static func header<Value, Failure: KizunaFailure>(_ response: HTTPURLResponse, name: String, failure: Failure.Type, parse: (String) -> Value?) throws(Failure) -> Value? {
+        guard let raw = response.value(forHTTPHeaderField: name) else { return nil }
+        guard let value = parse(raw) else { throw Failure.invalidResponse }
+        return value
     }
 
     static func makeURL<Failure: KizunaFailure>(baseURL: URL, path: String, queryItems: [URLQueryItem], failure: Failure.Type) throws(Failure) -> URL {

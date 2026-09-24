@@ -710,6 +710,31 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 }
             );
         },
+        'responses.headers': async () => {
+            await usingShapes(async (shapes) => {
+                const response = await shapes.request({
+                    method: 'GET',
+                    path: '/quota',
+                });
+                expect(response.status).toBe(200);
+                expect(response.headers.get('x-rate-limit-remaining')).toBe('42');
+            });
+        },
+        'responses.headerValidation': async () => {
+            await using(
+                {
+                    input: brokenInput,
+                    responseValidation: true,
+                },
+                async (broken) => {
+                    const response = await broken.request({
+                        method: 'GET',
+                        path: '/broken-quota',
+                    });
+                    expect(response.status).toBe(500);
+                }
+            );
+        },
         'deprecation.deprecationHeader': async () => {
             await usingDeprecated(async (mounted) => {
                 const response = await mounted.request({

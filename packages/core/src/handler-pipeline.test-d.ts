@@ -156,3 +156,70 @@ test('ProblemDetailsSchema body rejects title and status from handler input', ()
     expectTypeOf<{ title: string; detail: string }>().not.toMatchTypeOf<ErrorBody>();
     expectTypeOf<{ status: number; detail: string }>().not.toMatchTypeOf<ErrorBody>();
 });
+
+const quotaRoutes = k.routes('api', {
+    getQuota: k.route({
+        method: 'GET',
+        path: '/quota',
+        responses: {
+            200: {
+                body: z.object({
+                    plan: z.string(),
+                }),
+                headers: z.object({
+                    'x-rate-limit-remaining': z.int(),
+                    'x-trace-id': z.string().optional(),
+                }),
+            },
+        },
+    }),
+});
+
+type QuotaReturn = HandlerReturn<(typeof quotaRoutes)['getQuota']>;
+
+test('declared response headers are typed from their schema, beside any other header', () => {
+    expectTypeOf<{
+        status: 200;
+        body: {
+            plan: string;
+        };
+        headers: {
+            'x-rate-limit-remaining': number;
+            'cache-control': string;
+        };
+    }>().toMatchTypeOf<QuotaReturn>();
+});
+
+test('a declared response header of the wrong type is refused', () => {
+    expectTypeOf<{
+        status: 200;
+        body: {
+            plan: string;
+        };
+        headers: {
+            'x-rate-limit-remaining': string;
+        };
+    }>().not.toMatchTypeOf<QuotaReturn>();
+});
+
+test('a required declared response header cannot be left out', () => {
+    expectTypeOf<{
+        status: 200;
+        body: {
+            plan: string;
+        };
+    }>().not.toMatchTypeOf<QuotaReturn>();
+});
+
+test('a route declaring no response headers keeps string headers', () => {
+    expectTypeOf<{
+        status: 200;
+        body: {
+            id: string;
+            name: string;
+        };
+        headers: {
+            'x-count': number;
+        };
+    }>().not.toMatchTypeOf<HandlerReturn<GetUserRoute>>();
+});

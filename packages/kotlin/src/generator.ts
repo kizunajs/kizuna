@@ -426,6 +426,30 @@ const KOTLIN_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Long', 'Bool
 const decodeBody = (resolved: string): string =>
     resolved === 'ByteArray' ? 'data' : `json.decodeFromString<${resolved}>(data.decodeToString())`;
 
+/**
+ * Converts a response header from its string form to the field's type. An enum
+ * decodes through the client's `json`, which knows its wire values.
+ */
+const HEADER_PARSERS: Record<string, string> = {
+    String: '{ it }',
+    Int: '{ it.toIntOrNull() }',
+    Long: '{ it.toLongOrNull() }',
+    Double: '{ it.toDoubleOrNull() }',
+    Boolean: '{ it.toBooleanStrictOrNull() }',
+};
+
+/**
+ * Reads one response header into the field's type. A value that does not
+ * convert, or a required header that is missing, fails as a decoding error.
+ */
+const readResponseHeader = (field: KotlinField, method: RouteMethod, context: EmitContext): string => {
+    const type = resolveType(field.type, method.operationName, context).replace(/\?$/, '');
+    const parse = HEADER_PARSERS[type] ?? `{ json.decodeFromJsonElement<${type}>(JsonPrimitive(it)) }`;
+    const read = `Kizuna.header(httpResponse, ${stringLiteral(field.wireName)}) ${parse}`;
+    const missing = `throw IllegalStateException(${stringLiteral(`Missing response header ${field.wireName}`)})`;
+    return `val ${escapeKeyword(field.name)} = ${field.optional ? read : `${read} ?: ${missing}`}`;
+};
+
 const resolveType = (
     typeName: string,
     currentOperation: string | undefined,
@@ -1423,7 +1447,7 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
                         const bodyExpr = isMultiSuccess ? `${operationRef}.Success.Status${successResponse.status}(payload)` : 'payload';
                         if (hasHeaders) {
                             for (const field of successResponse.responseHeaders) {
-                                writer.line(`val ${escapeKeyword(field.name)} = httpResponse.header(${stringLiteral(field.wireName)})`);
+                                writer.line(readResponseHeader(field, method, context));
                             }
                             const headersArgs = method.resultHeaderFields
                                 .map((field) => `${escapeKeyword(field.name)} = ${escapeKeyword(field.name)}`)
@@ -1533,7 +1557,7 @@ const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context
         }
         if (hasHeaders) {
             for (const field of successResponse.responseHeaders) {
-                writer.line(`val ${escapeKeyword(field.name)} = httpResponse.header(${stringLiteral(field.wireName)})`);
+                writer.line(readResponseHeader(field, method, context));
             }
             const headersArgs = method.resultHeaderFields
                 .map((field) => `${escapeKeyword(field.name)} = ${escapeKeyword(field.name)}`)
@@ -1695,6 +1719,11 @@ const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean })
         writer.block('fun encodePathSegment(value: Any): String', () => {
             writer.line('val text = stringifyQueryValue(value).firstOrNull() ?: ""');
             writer.line('return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")');
+        });
+        writer.blank();
+        writer.block('fun <T> header(response: Response, name: String, parse: (String) -> T?): T?', () => {
+            writer.line('val raw = response.header(name) ?: return null');
+            writer.line('return parse(raw) ?: throw IllegalStateException("Response header $name has an unreadable value: $raw")');
         });
         writer.blank();
         writer.block('fun stringifyQueryValue(value: Any): List<String>', () => {

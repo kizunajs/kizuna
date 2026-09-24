@@ -198,3 +198,83 @@ test('pathParams has to match the path', () => {
         },
     });
 });
+
+test('a request header declared as an object is refused', () => {
+    k.route({
+        method: 'GET',
+        path: '/users',
+        // @ts-expect-error a header holds one value
+        headers: z.object({
+            'x-filter': z.object({
+                name: z.string(),
+            }),
+        }),
+        responses: {
+            200: UserSchema,
+        },
+    });
+});
+
+test('a request header may be a scalar, a date, or a list of scalars', () => {
+    k.route({
+        method: 'GET',
+        path: '/users',
+        headers: z.object({
+            'x-tenant': z.uuid(),
+            'x-page': z.int(),
+            'if-modified-since': z.date().optional(),
+            'x-tag': z.array(z.string()).optional(),
+        }),
+        responses: {
+            200: UserSchema,
+        },
+    });
+});
+
+test('a response header declared as a date or a list is refused', () => {
+    k.route({
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: {
+                body: UserSchema,
+                // @ts-expect-error a client has no type to read a date header into
+                headers: z.object({
+                    'x-reset': z.date(),
+                }),
+            },
+        },
+    });
+    k.route({
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: {
+                body: UserSchema,
+                // @ts-expect-error a response header is one value
+                headers: z.object({
+                    'x-tag': z.array(z.string()),
+                }),
+            },
+        },
+    });
+});
+
+test('a response header may be a string, number, boolean, bigint, or enum', () => {
+    k.route({
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: {
+                body: UserSchema,
+                headers: z.object({
+                    'x-request-id': z.uuid().optional(),
+                    'x-rate-limit-remaining': z.int(),
+                    'x-cached': z.boolean(),
+                    'x-sequence': z.bigint(),
+                    'x-plan': z.enum(['free', 'pro']),
+                }),
+            },
+        },
+    });
+});

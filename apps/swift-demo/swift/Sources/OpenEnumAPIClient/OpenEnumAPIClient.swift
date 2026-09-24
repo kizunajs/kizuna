@@ -857,6 +857,7 @@ public final class OpenEnumAPIClient: Sendable {
 
             public struct Headers: Sendable {
                 public let xRequestId: String?
+                public let xRateLimitRemaining: Int
             }
 
             public init(body: OpenEnumAPI.User, headers: Headers) {
@@ -3130,8 +3131,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPI.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersGetUser.Failure.self)
-            let xRequestId = httpResponse.value(forHTTPHeaderField: "x-request-id")
-            return OpenEnumAPIClient.UsersGetUser.Result(body: body, headers: .init(xRequestId: xRequestId))
+            let xRequestId = try Kizuna.header(httpResponse, name: "x-request-id", failure: OpenEnumAPIClient.UsersGetUser.Failure.self, parse: { $0 })
+            guard let xRateLimitRemaining = try Kizuna.header(httpResponse, name: "x-rate-limit-remaining", failure: OpenEnumAPIClient.UsersGetUser.Failure.self, parse: { Int($0) }) else { throw OpenEnumAPIClient.UsersGetUser.Failure.invalidResponse }
+            return OpenEnumAPIClient.UsersGetUser.Result(body: body, headers: .init(xRequestId: xRequestId, xRateLimitRemaining: xRateLimitRemaining))
         case 404:
             let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersGetUser.Failure.self)
             throw OpenEnumAPIClient.UsersGetUser.Failure.notFound(payload)
@@ -3975,6 +3977,12 @@ private enum Kizuna {
     static func setHeader<Value>(_ request: inout URLRequest, name: String, value: Value?) {
         guard let value else { return }
         request.setValue(stringifyQueryValue(value).joined(separator: ", "), forHTTPHeaderField: name)
+    }
+
+    static func header<Value, Failure: KizunaFailure>(_ response: HTTPURLResponse, name: String, failure: Failure.Type, parse: (String) -> Value?) throws(Failure) -> Value? {
+        guard let raw = response.value(forHTTPHeaderField: name) else { return nil }
+        guard let value = parse(raw) else { throw Failure.invalidResponse }
+        return value
     }
 
     static func makeURL<Failure: KizunaFailure>(baseURL: URL, path: String, queryItems: [URLQueryItem], failure: Failure.Type) throws(Failure) -> URL {

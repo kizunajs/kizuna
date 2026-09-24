@@ -262,6 +262,7 @@ export const usersRoutes = k.routes('users', {
                     body: UserSchema,
                     headers: z.object({
                         'x-request-id': z.string().optional(),
+                        'x-rate-limit-remaining': z.int(),
                     }),
                 },
                 404: ProblemDetailsSchema,
@@ -283,6 +284,7 @@ export const usersRoutes = k.routes('users', {
                 body: user,
                 headers: {
                     'x-request-id': headers['x-request-id'],
+                    'x-rate-limit-remaining': 99,
                 },
             };
         }),

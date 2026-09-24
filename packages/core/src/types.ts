@@ -241,6 +241,12 @@ export type RouteAuth<Names extends string = string> =
 export type ResponseHeaders = Record<string, string>;
 
 /**
+ * A response header value a handler may return. Anything other than a string
+ * is sent as its string form.
+ */
+export type ResponseHeaderValue = string | number | boolean | bigint;
+
+/**
  * Key under which every declaration says what it is, so `kizuna generate` can
  * tell a route from a job from any other export. A symbol, so nothing that
  * walks a declaration's own entries sees it.

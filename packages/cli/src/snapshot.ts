@@ -7,6 +7,7 @@ import {
     readDef,
     readObjectShape,
     resolveResponseBody,
+    resolveResponseHeaders,
     toToolName,
     unwrapOptionalWrappers,
 } from 'kizunajs/generator';
@@ -36,30 +37,10 @@ export interface RouteSnapshot {
      * Keyed by status, `null` when the status answers with no body.
      */
     responses: Record<string, SchemaNode | null>;
-}
-
-export interface ApiSnapshot {
-    routes: Record<string, RouteSnapshot>;
-    jobs: string[];
     /**
-     * MCP tool name, keyed by the route key that publishes it.
+     * Keyed by status, for the statuses that declare response headers.
      */
-    tools: Record<string, string>;
-}
-
-export interface RouteSnapshot {
-    method: string;
-    path: string;
-    statuses: number[];
-    deprecated: boolean;
-    sunset?: string;
-    body?: SchemaNode;
-    query?: SchemaNode;
-    headers?: SchemaNode;
-    /**
-     * Keyed by status, `null` when the status answers with no body.
-     */
-    responses: Record<string, SchemaNode | null>;
+    responseHeaders?: Record<string, SchemaNode>;
 }
 
 export interface ApiSnapshot {
@@ -145,9 +126,12 @@ const routeSnapshots = createGenerator<Record<string, never>, Record<string, Rou
         processRoute({ routeKey, route, deprecated }) {
             const sunset = sunsetOf(route);
             const responses: Record<string, SchemaNode | null> = {};
+            const responseHeaders: Record<string, SchemaNode> = {};
             for (const [status, response] of Object.entries(route.responses)) {
                 const body = resolveResponseBody(response);
                 responses[status] = body === undefined ? null : toSchemaNode(body);
+                const headers = resolveResponseHeaders(response);
+                if (headers) responseHeaders[status] = toSchemaNode(headers);
             }
 
             routes[routeKey] = {
@@ -162,6 +146,7 @@ const routeSnapshots = createGenerator<Record<string, never>, Record<string, Rou
                 ...(route.query ? { query: toSchemaNode(route.query) } : {}),
                 ...(route.headers ? { headers: toSchemaNode(route.headers) } : {}),
                 responses,
+                ...(Object.keys(responseHeaders).length > 0 ? { responseHeaders } : {}),
             };
         },
         finalize: () => routes,

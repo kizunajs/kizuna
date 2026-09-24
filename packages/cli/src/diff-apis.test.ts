@@ -238,3 +238,66 @@ describe('reporting', () => {
         expect(hasBreakingChange([])).toBe(false);
     });
 });
+
+describe('response headers', () => {
+    const withHeaders = (headers: z.ZodType) =>
+        contractOf({
+            getUser: {
+                method: 'GET',
+                path: '/users/:id',
+                responses: {
+                    200: {
+                        body: z.object({
+                            id: z.string(),
+                        }),
+                        headers,
+                    },
+                },
+            },
+        });
+
+    const before = withHeaders(
+        z.object({
+            'x-rate-limit-remaining': z.int(),
+        })
+    );
+
+    it('reports a removed response header as breaking', () => {
+        const changes = diffApis(before, withHeaders(z.object({})));
+
+        expect(changes[0]).toMatchObject({
+            level: 'breaking',
+            key: 'users.getUser',
+        });
+        expect(summaries(changes)[0]).toContain('x-rate-limit-remaining is gone');
+    });
+
+    it('reports a response header that changed type as breaking', () => {
+        const changes = diffApis(
+            before,
+            withHeaders(
+                z.object({
+                    'x-rate-limit-remaining': z.string(),
+                })
+            )
+        );
+
+        expect(hasBreakingChange(changes)).toBe(true);
+        expect(summaries(changes)[0]).toContain('x-rate-limit-remaining is string instead of number');
+    });
+
+    it('reports a new response header as a change, not a break', () => {
+        const changes = diffApis(
+            before,
+            withHeaders(
+                z.object({
+                    'x-rate-limit-remaining': z.int(),
+                    'x-request-id': z.string(),
+                })
+            )
+        );
+
+        expect(hasBreakingChange(changes)).toBe(false);
+        expect(summaries(changes)[0]).toContain('x-request-id');
+    });
+});

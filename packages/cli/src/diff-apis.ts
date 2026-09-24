@@ -171,6 +171,19 @@ export const diffSnapshots = (before: ApiSnapshot, after: ApiSnapshot, options: 
             }
         }
 
+        for (const status of Object.keys(gone.responses)) {
+            if (!(status in arrived.responses)) continue;
+            const was = gone.responseHeaders?.[status];
+            const now = arrived.responseHeaders?.[status];
+            for (const change of diffSchemas(was, now, 'response', `${status} headers`)) {
+                changes.push({
+                    level: change.breaking ? 'breaking' : 'changed',
+                    key,
+                    summary: `${httpLabel(arrived, key)} ${change.summary}`,
+                });
+            }
+        }
+
         if (!gone.deprecated && arrived.deprecated) {
             changes.push({ level: 'changed', key, summary: `${httpLabel(arrived, key)} is now deprecated` });
         }

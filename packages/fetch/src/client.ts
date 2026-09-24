@@ -16,7 +16,7 @@ import {
     type RoutePath,
 } from 'kizunajs';
 import type { ExtractPathParams, HasPathParams } from 'kizunajs';
-import { buildPath, isRouteDefinition } from 'kizunajs';
+import { applyCoercion, buildPath, coercionPlanFor, isRouteDefinition, isZodSchema, type CoercionPlan } from 'kizunajs';
 import { parseServerSentEvents, readByteChunks, readTextChunks } from './sse.js';
 
 type ResponseUnion<R extends RouteDefinition> = {
@@ -228,6 +228,21 @@ export const CLIENT_ROUTE: unique symbol = Symbol.for('kizuna.client-route') as 
 export const routeOf = (value: unknown): RouteDefinition | undefined =>
     typeof value === 'function' ? ((value as unknown as Record<symbol, unknown>)[CLIENT_ROUTE] as RouteDefinition | undefined) : undefined;
 
+/**
+ * The declared response headers to convert from their string form. A route
+ * carries their schema, a generated table the kind of each.
+ */
+const headerCoercionPlan = (response: unknown): CoercionPlan => {
+    const headers = response !== null && typeof response === 'object' ? (response as { headers?: unknown }).headers : undefined;
+    if (headers === undefined || headers === null) return null;
+    if (isZodSchema(headers)) return coercionPlanFor(headers);
+    return Object.entries(headers as Record<string, string>).map(([key, type]) => ({
+        key,
+        type,
+        array: false,
+    }));
+};
+
 const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
     const call = async (
         args: {
@@ -271,11 +286,12 @@ const buildRouteFn = (route: RouteDefinition, config: ClientConfig) => {
             credentials: config.credentials,
             ...args.fetchOptions,
         });
-        const responseHeaders: Record<string, string> = {};
+        const rawHeaders: Record<string, string> = {};
         res.headers.forEach((value, key) => {
-            responseHeaders[key] = value;
+            rawHeaders[key] = value;
         });
         const responseSpec = route.responses[res.status];
+        const responseHeaders = applyCoercion(rawHeaders, headerCoercionPlan(responseSpec));
         if (isStreamResponse(responseSpec) && res.body !== null) {
             return {
                 status: res.status,
@@ -342,10 +358,15 @@ const withContextHeaders = (config: ClientConfig): ClientConfig => {
 };
 
 /**
- * What a generated client knows about one response: nothing for a body it
- * parses as JSON, the media type for one it streams.
+ * What a generated client knows about one response: the media type for one it
+ * streams, and the kind of each declared header it converts from a string.
  */
-export type GeneratedResponse = Record<string, never> | { stream: { contentType?: string } };
+export interface GeneratedResponse {
+    stream?: {
+        contentType?: string;
+    };
+    headers?: Record<string, string>;
+}
 
 /**
  * One route in a generated client's table: how to reach it, and enough about

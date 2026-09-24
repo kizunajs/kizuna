@@ -1512,6 +1512,15 @@ const emitKizunaNamespace = (
         });
         writer.blank();
         writer.block(
+            'static func header<Value, Failure: KizunaFailure>(_ response: HTTPURLResponse, name: String, failure: Failure.Type, parse: (String) -> Value?) throws(Failure) -> Value?',
+            () => {
+                writer.line('guard let raw = response.value(forHTTPHeaderField: name) else { return nil }');
+                writer.line('guard let value = parse(raw) else { throw Failure.invalidResponse }');
+                writer.line('return value');
+            }
+        );
+        writer.blank();
+        writer.block(
             'static func makeURL<Failure: KizunaFailure>(baseURL: URL, path: String, queryItems: [URLQueryItem], failure: Failure.Type) throws(Failure) -> URL',
             () => {
                 writer.line('guard var components = URLComponents(url: appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {');
@@ -1698,6 +1707,29 @@ const failureRef = (method: RouteMethod, context: EmitContext): string =>
  * through `Kizuna.decode`; binary responses are the raw `Data`; other raw
  * (non-JSON) responses are read as a UTF-8 string.
  */
+/**
+ * Converts a response header from its string form to the field's type.
+ */
+const HEADER_PARSERS: Record<string, string> = {
+    String: '{ $0 }',
+    Int: '{ Int($0) }',
+    Int64: '{ Int64($0) }',
+    Double: '{ Double($0) }',
+    Bool: '{ Bool($0) }',
+};
+
+/**
+ * Reads one response header into the field's type. A value that does not
+ * convert, or a required header that is missing, fails as an invalid response.
+ */
+const readResponseHeader = (field: SwiftField, method: RouteMethod, context: EmitContext, failure: string): string => {
+    const type = resolveType(field.type, method.operationName, context).replace(/\?$/, '');
+    const parse = HEADER_PARSERS[type] ?? `{ ${type}(rawValue: $0) }`;
+    const read = `try Kizuna.header(httpResponse, name: ${stringLiteral(field.wireName)}, failure: ${failure}.self, parse: ${parse})`;
+    const name = escapeKeyword(field.name);
+    return field.optional ? `let ${name} = ${read}` : `guard let ${name} = ${read} else { throw ${failure}.invalidResponse }`;
+};
+
 const decodeBodyStatement = (
     name: string,
     resolvedType: string,
@@ -1782,9 +1814,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 const resolved = resolveType(successResponse.type, method.operationName, context);
                 if (resolved === 'Void') {
                     for (const field of successResponse.responseHeaders) {
-                        writer.line(
-                            `    let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
-                        );
+                        writer.line(`    ${readResponseHeader(field, method, context, failure)}`);
                     }
                     if (hasHeaders) {
                         writer.line(
@@ -1796,9 +1826,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 } else {
                     writer.line(decodeBodyStatement('payload', resolved, successResponse, failure, receiver));
                     for (const field of successResponse.responseHeaders) {
-                        writer.line(
-                            `    let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
-                        );
+                        writer.line(`    ${readResponseHeader(field, method, context, failure)}`);
                     }
                     if (hasHeaders) {
                         writer.line(
@@ -1812,9 +1840,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
                 const resolved = resolveType(successResponse.type, method.operationName, context);
                 writer.line(decodeBodyStatement('body', resolved, successResponse, failure, receiver));
                 for (const field of successResponse.responseHeaders) {
-                    writer.line(
-                        `    let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`
-                    );
+                    writer.line(`    ${readResponseHeader(field, method, context, failure)}`);
                 }
                 if (hasHeaders) {
                     writer.line(`    return ${qualifiedResult}(body: body, headers: .init(${headersInitArgs}))`);
@@ -1921,7 +1947,7 @@ const emitStreamMethodTail = (
             });
         }
         for (const field of successResponse.responseHeaders) {
-            writer.line(`let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`);
+            writer.line(readResponseHeader(field, method, context, failure));
         }
         if (hasHeaders) {
             const headersInitArgs = method.resultHeaderFields

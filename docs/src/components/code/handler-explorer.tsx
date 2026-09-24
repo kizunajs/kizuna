@@ -102,7 +102,7 @@ const MOMENTS: Moment[] = [
         },
     })
     .handler(async ({ params, headers }) => {
-        const version = Number(headers['`,
+        const etag = headers['`,
         completion: {
             after: "headers['",
             items: ["'if-match'", "'accept-language'"],

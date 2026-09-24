@@ -8,6 +8,7 @@ import {
     AUTO_GUARD_WRITTEN_BRAND,
     type GuardStatus,
     type ResponseHeaders,
+    type ResponseHeaderValue,
     type RouteDefinition,
     type Routes,
     type Method,
@@ -45,11 +46,26 @@ type HandlerBody<S, Status> = S extends z.ZodType
         ? ApplyErrorEnvelope<z.input<S['body']>, Status>
         : never;
 
+/**
+ * The headers a response returns: its declared headers typed from their schema,
+ * required when any is, beside any other header as a string.
+ */
+type ResponseHeadersField<S> = S extends { headers: z.ZodType }
+    ? {} extends z.input<S['headers']>
+        ? {
+              headers?: z.input<S['headers']> & Record<string, ResponseHeaderValue | undefined>;
+          }
+        : {
+              headers: z.input<S['headers']> & Record<string, ResponseHeaderValue | undefined>;
+          }
+    : {
+          headers?: ResponseHeaders;
+      };
+
 type ResponseReturn<R extends Pick<RouteDefinition, 'responses'>, Status extends keyof R['responses']> = {
     status: Status extends number ? Status : never;
     body: HandlerBody<R['responses'][Status], Status>;
-    headers?: ResponseHeaders;
-};
+} & ResponseHeadersField<R['responses'][Status]>;
 
 /**
  * Constrained to `responses` alone so a job, which has no method or path, reuses it.

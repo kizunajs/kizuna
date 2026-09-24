@@ -730,7 +730,9 @@ describe('Swift generator: responseHeaders', () => {
         }).api;
         const output = generateSwiftClient(contract, baseConfig);
         expect(output).toContain('let (data, statusCode, httpResponse) = try await Kizuna.send(&request');
-        expect(output).toContain('httpResponse.value(forHTTPHeaderField: "x-request-id")');
+        expect(output).toContain(
+            'let xRequestId = try Kizuna.header(httpResponse, name: "x-request-id", failure: TestAPIClient.GetUser.Failure.self, parse: { $0 })'
+        );
         expect(output).toContain('return TestAPIClient.GetUser.Result(body: body, headers: .init(xRequestId: xRequestId))');
     });
 

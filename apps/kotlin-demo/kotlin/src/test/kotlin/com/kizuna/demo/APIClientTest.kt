@@ -151,6 +151,7 @@ class APIClientTest {
             )
         }
         assertEquals("trace-xyz-999", response.headers.xRequestId)
+        assertEquals(99, response.headers.xRateLimitRemaining)
     }
 
     @Test

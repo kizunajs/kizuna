@@ -189,7 +189,8 @@ export const userInput = {
 export const userContract = defineConfig(userInput).api;
 
 /**
- * A route whose handler returns a body the api does not allow, for `responses.validation`.
+ * Routes whose handlers return a body or a header the api does not allow, for
+ * `responses.validation` and `responses.headerValidation`.
  */
 export const brokenRoutes = k.routes('api', {
     getBroken: k
@@ -206,6 +207,30 @@ export const brokenRoutes = k.routes('api', {
             status: 200,
             body: {
                 id: 42 as unknown as string,
+            },
+        })),
+    getBrokenQuota: k
+        .route({
+            method: 'GET',
+            path: '/broken-quota',
+            responses: {
+                200: {
+                    body: z.object({
+                        plan: z.string(),
+                    }),
+                    headers: z.object({
+                        'x-rate-limit-remaining': z.int(),
+                    }),
+                },
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                plan: 'free',
+            },
+            headers: {
+                'x-rate-limit-remaining': 'plenty' as unknown as number,
             },
         })),
 });
@@ -535,6 +560,30 @@ export const responseShapeRoutes = k.routes('api', {
             status: 201,
             body: {
                 id: '1',
+            },
+        })),
+    getQuota: k
+        .route({
+            method: 'GET',
+            path: '/quota',
+            responses: {
+                200: {
+                    body: z.object({
+                        plan: z.string(),
+                    }),
+                    headers: z.object({
+                        'x-rate-limit-remaining': z.int(),
+                    }),
+                },
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                plan: 'free',
+            },
+            headers: {
+                'x-rate-limit-remaining': 42,
             },
         })),
 });

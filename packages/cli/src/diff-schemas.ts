@@ -93,6 +93,14 @@ export const diffSchemas = (
                 changes.push({ breaking: direction === 'request', path: here, summary: `${here} is no longer optional` });
             }
 
+            if (!existing.optional && field.optional) {
+                changes.push({
+                    breaking: direction === 'response',
+                    path: here,
+                    summary: direction === 'response' ? `${here} may now be missing` : `${here} is now optional`,
+                });
+            }
+
             changes.push(...diffSchemas(existing.schema, field.schema, direction, here));
         }
 

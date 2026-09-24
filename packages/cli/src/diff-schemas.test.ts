@@ -47,6 +47,18 @@ describe('a field tightening', () => {
         expect(summaries(before, after, 'request')).toEqual(['BREAKING email is no longer optional']);
     });
 
+    it('breaks a response when a field may now be missing', () => {
+        const before = z.object({
+            email: z.string(),
+        });
+        const after = z.object({
+            email: z.string().optional(),
+        });
+
+        expect(summaries(before, after, 'response')).toEqual(['BREAKING email may now be missing']);
+        expect(summaries(before, after, 'request')).toEqual(['changed  email is now optional']);
+    });
+
     it('breaks either direction when the type changes', () => {
         const before = z.object({ count: z.string() });
         const after = z.object({ count: z.number() });

@@ -1,6 +1,6 @@
 import { HANDLER } from './types.js';
 import { z } from 'zod';
-import type { ResponseDefinition, ResponseHeaders, RouteDefinition, Routes, Method } from './types.js';
+import type { ResponseDefinition, ResponseHeaders, ResponseHeaderValue, RouteDefinition, Routes, Method } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import { authenticationChallenge, resolveSecurityRequirements } from './security-scheme.js';
 import type { Credential, NoCredential } from './identity.js';
@@ -24,8 +24,8 @@ import { cacheHeaders } from './cache.js';
 import { computeEtag, etagMatches } from './etag.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
-import { isVoidSchema, isBinarySchema } from './zod-internals.js';
-import { resolveCoercionPlans } from './coercion.js';
+import { isVoidSchema, isBinarySchema, readObjectShape } from './zod-internals.js';
+import { resolveCoercionPlans, serializeHeaders } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ApiPlugins } from './plugin.js';
 import { resolvePluginServers } from './plugin-server.js';
@@ -34,6 +34,7 @@ import {
     resolveResponseContentType,
     resolveResponseCache,
     resolveResponseEtag,
+    resolveResponseHeaders,
     isJsonMediaType,
     isStreamResponse,
     isSuccessStatus,
@@ -53,7 +54,7 @@ import { ProblemDetailsSchema } from './schemas.js';
 import type { ApiDefinition } from './api-definition.js';
 import type { JobTransport } from './job-transport.js';
 
-export type { ResponseHeaders, RouteDefinition, RoutePath, Routes, Method } from './types.js';
+export type { ResponseHeaders, ResponseHeaderValue, RouteDefinition, RoutePath, Routes, Method } from './types.js';
 export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js';
 export { encodeStreamBody, type EncodeStreamOptions, type StreamContext } from './stream.js';
 export { isStreamResponse } from './generator-utils.js';
@@ -771,11 +772,21 @@ const parseCookies = (cookieHeader: string | undefined): Record<string, string> 
 
 /**
  * An error body is checked as the wire shape, envelope and all, because the
- * author only ever supplies `detail` and extensions.
+ * author only ever supplies `detail` and extensions. Only the declared headers
+ * are checked, so a handler may send others beside them.
  */
-const assertDeclaredBody = (route: RouteDefinition, routeKey: string, status: number, body: unknown): void => {
+const assertDeclaredResponse = (route: RouteDefinition, routeKey: string, status: number, body: unknown, headers: unknown): void => {
     const responseSpec = route.responses[status];
-    if (responseSpec === undefined || isStreamResponse(responseSpec)) return;
+    if (responseSpec === undefined) return;
+    const headersSchema = resolveResponseHeaders(responseSpec);
+    const headersShape = headersSchema ? readObjectShape(headersSchema) : undefined;
+    if (headersSchema && headersShape) {
+        const supplied = (headers ?? {}) as Record<string, unknown>;
+        const declared = Object.fromEntries(Object.keys(headersShape).map((name) => [name, supplied[name]]));
+        const parsed = headersSchema.safeParse(declared);
+        if (!parsed.success) throw new ResponseValidationError(routeKey, status, parsed.error.issues);
+    }
+    if (isStreamResponse(responseSpec)) return;
     const bodySchema = 'safeParse' in responseSpec ? responseSpec : responseSpec.body;
     const wire = status >= 400 && body !== null && typeof body === 'object' ? problemFromBody(status, body) : body;
     const parsed = bodySchema.safeParse(wire);
@@ -1242,7 +1253,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 ...(hasRequestContext ? { requestContext } : {}),
             } as Parameters<typeof guard>[0]);
             if (isGuardDenial(guardResult)) {
-                if (responseValidation) assertDeclaredBody(route, routeKey, guardResult.status, guardResult.body);
+                if (responseValidation) assertDeclaredResponse(route, routeKey, guardResult.status, guardResult.body, guardResult.headers);
                 return {
                     kind: 'guard-denied',
                     status: guardResult.status,
@@ -1285,11 +1296,17 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             };
         }
 
-        const throwError = (response: { status: number; body: unknown; headers?: ResponseHeaders }): never => {
+        const throwError = (response: {
+            status: number;
+            body: unknown;
+            headers?: Record<string, ResponseHeaderValue | undefined>;
+        }): never => {
             throw new ResponseError(response);
         };
         const handlerResult = await (
-            handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: ResponseHeaders } | RawResponse>
+            handler as (
+                args: unknown
+            ) => Promise<{ status: number; body: unknown; headers?: Record<string, ResponseHeaderValue | undefined> } | RawResponse>
         )({
             params: validation.parsed.params,
             query: validation.parsed.query,
@@ -1308,14 +1325,15 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 response: handlerResult.response,
             };
         }
-        if (responseValidation) assertDeclaredBody(route, routeKey, handlerResult.status, handlerResult.body);
+        if (responseValidation) assertDeclaredResponse(route, routeKey, handlerResult.status, handlerResult.body, handlerResult.headers);
+        const handlerHeaders = serializeHeaders(handlerResult.headers);
         const successHeaders =
             route.method === 'OPTIONS'
                 ? {
                       allow: allowedMethodsForPath(routes, route.path).join(', '),
-                      ...(handlerResult.headers ?? {}),
+                      ...(handlerHeaders ?? {}),
                   }
-                : handlerResult.headers;
+                : handlerHeaders;
         return {
             kind: 'success',
             routeKey,
@@ -1332,7 +1350,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 route,
                 status: error.status,
                 body: error.body,
-                headers: error.headers ?? {},
+                headers: serializeHeaders(error.headers) ?? {},
             };
         }
         if (definition.onError) {

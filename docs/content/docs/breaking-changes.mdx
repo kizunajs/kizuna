@@ -127,13 +127,14 @@ A caller sends requests and reads responses, so tightening an input and dropping
 | An optional field added    | quiet        | changed      |
 | A field removed            | changed      | **breaking** |
 | An optional field required | **breaking** | changed      |
+| A required field optional  | changed      | **breaking** |
 | A type changed             | **breaking** | **breaking** |
 | An enum value removed      | **breaking** | **breaking** |
 | An enum value added        | changed      | **breaking** |
 
 That last row catches people out. Adding a value to a response enum breaks any client that generated a closed enum for it, which is what [`unknownEnumCase`](/docs/clients/swift) exists for in the Swift and Kotlin clients.
 
-Bodies, query parameters, headers and every response body are compared, reported by path and followed into arrays:
+Bodies, query parameters, request headers, and every response body and its headers are compared, reported by path and followed into arrays:
 
 ```
 BREAKING POST /users body.address.postcode is now required
