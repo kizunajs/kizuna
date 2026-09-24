@@ -29,7 +29,7 @@ const navigation: NavigationItem[] = [
         href: '/docs/reference',
     },
     {
-        label: 'Changelog',
+        label: 'Releases',
         href: `${GITHUB_URL}/releases`,
     },
     {

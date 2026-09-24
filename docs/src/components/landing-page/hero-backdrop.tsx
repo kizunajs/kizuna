@@ -33,7 +33,7 @@ function useImageReady(source: string | undefined) {
 export function HeroBackdrop({ variant = 'mesh', className }: { variant?: 'mesh' | 'water'; className?: string }) {
     const reducedMotion = usePrefersReducedMotion();
     const [mounted, setMounted] = useState(false);
-    const imageReady = useImageReady(variant === 'water' ? logoMark : undefined);
+    const imageReady = useImageReady(variant === 'mesh' ? undefined : logoMark);
 
     useEffect(() => setMounted(true), []);
 

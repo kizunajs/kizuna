@@ -1,13 +1,14 @@
 .footer {
     position: relative;
     isolation: isolate;
-    padding: var(--kizuna-footer-offset, min(96px, var(--kizuna-section-gap))) var(--kizuna-gutter) 0;
+    padding: var(--kizuna-footer-offset, min(96px, var(--kizuna-section-gap))) var(--kizuna-gutter)
+        calc(32px + env(safe-area-inset-bottom, 0px));
 }
 
 .card {
     max-width: calc(var(--kizuna-max-width) - 2 * var(--kizuna-gutter));
     margin: 0 auto;
-    border-radius: 24px 24px 0 0;
+    border-radius: 24px;
     background-color: var(--kizuna-surface);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
     display: flex;

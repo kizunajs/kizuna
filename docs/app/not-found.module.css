@@ -1,0 +1,12 @@
+.main {
+    display: grid;
+    place-items: center;
+    padding: 48px var(--kizuna-gutter) 0;
+}
+
+@media (max-width: 767px) {
+    .main {
+        margin-bottom: -20px;
+        padding-top: 16px;
+    }
+}
