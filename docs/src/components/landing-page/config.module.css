@@ -252,11 +252,17 @@
         opacity 0.15s ease;
 }
 
-.clientTab:hover {
-    color: var(--kizuna-ink);
+@media (hover: hover) {
+    .clientTab:hover {
+        color: var(--kizuna-ink);
+    }
+
+    .clientTab:hover svg {
+        filter: none;
+        opacity: 1;
+    }
 }
 
-.clientTab:hover svg,
 .clientTabActive svg {
     filter: none;
     opacity: 1;

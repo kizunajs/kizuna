@@ -82,8 +82,10 @@
     transition: color 0.15s ease;
 }
 
-.handle:hover {
-    color: var(--kizuna-ink);
+@media (hover: hover) {
+    .handle:hover {
+        color: var(--kizuna-ink);
+    }
 }
 
 .divider {

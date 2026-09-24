@@ -17,8 +17,10 @@
     transition: color 0.15s ease;
 }
 
-.button:hover {
-    color: var(--kizuna-ink);
+@media (hover: hover) {
+    .button:hover {
+        color: var(--kizuna-ink);
+    }
 }
 
 .icon {

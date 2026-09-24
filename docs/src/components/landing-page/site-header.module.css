@@ -45,9 +45,7 @@
     z-index: -1;
     border-radius: 16px;
     background-color: color-mix(in srgb, var(--kizuna-surface) 82%, transparent);
-    box-shadow:
-        var(--kizuna-elevation-hover),
-        0 16px 40px -12px rgb(0 0 0 / 0.9);
+    box-shadow: var(--kizuna-elevation-hover), var(--kizuna-header-shadow);
     backdrop-filter: saturate(1.4) blur(14px);
     opacity: 0;
     transform: scale(0.985);
@@ -185,19 +183,27 @@
 
 .menuLayer {
     position: absolute;
+    z-index: -1;
     top: 100%;
     right: 0;
     left: 0;
     height: calc(100dvh - var(--kizuna-header-height));
     padding: 4px var(--kizuna-gutter) 16px;
+    visibility: hidden;
+    transition: visibility 0s linear 0.2s;
+}
+
+.menuLayer[data-open] {
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 .scrim {
     position: absolute;
-    inset: 0;
-    background-color: color-mix(in srgb, var(--kizuna-canvas) 72%, transparent);
-    backdrop-filter: blur(6px);
-    animation: fade-in 0.2s ease;
+    inset: calc(-1 * var(--kizuna-header-height)) 0 0;
+    background-color: color-mix(in srgb, var(--kizuna-canvas) 80%, transparent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
 .menu {
@@ -214,7 +220,11 @@
         0 16px 40px rgb(0 0 0 / 0.5);
     padding: 8px;
     transform-origin: top right;
-    animation: menu-in 0.2s cubic-bezier(0.2, 0, 0, 1);
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .menuGroup {
@@ -272,23 +282,19 @@
     width: 100%;
 }
 
-@keyframes fade-in {
-    from {
-        opacity: 0;
-    }
+.menuLayer[data-open] .scrim {
+    opacity: 1;
 }
 
-@keyframes menu-in {
-    from {
-        opacity: 0;
-        transform: translateY(-6px) scale(0.98);
-    }
+.menuLayer[data-open] .menu {
+    opacity: 1;
+    transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .scrim,
     .menu {
-        animation: none;
+        transform: none;
+        transition: opacity 0.2s ease;
     }
 }
 

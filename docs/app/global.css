@@ -19,10 +19,6 @@
     font-weight: 600;
 }
 
-.kizuna-handler .kizuna-type-token {
-    border-bottom: 1px dashed color-mix(in oklab, currentColor 55%, transparent);
-}
-
 html.dark {
     --color-fd-background: var(--kizuna-canvas);
     --color-fd-foreground: var(--kizuna-ink);
@@ -135,8 +131,10 @@ html.dark {
     color: var(--kizuna-muted);
 }
 
-.kizuna-docs-content [role='tablist'] > [role='tab'][data-radix-collection-item]:hover {
-    color: var(--kizuna-ink);
+@media (hover: hover) {
+    .kizuna-docs-content [role='tablist'] > [role='tab'][data-radix-collection-item]:hover {
+        color: var(--kizuna-ink);
+    }
 }
 
 .kizuna-docs-content [role='tablist'] > [role='tab'][data-radix-collection-item][data-state='active'] {

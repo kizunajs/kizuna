@@ -125,7 +125,7 @@ export function SiteHeader() {
     }, [menuOpen]);
 
     return (
-        <header className={styles.header} data-scrolled={scrolled || menuOpen ? '' : undefined}>
+        <header className={styles.header} data-scrolled={scrolled ? '' : undefined}>
             <div className={styles.inner}>
                 <div className={styles.start}>
                     <Link href="/" className={styles.logoLink} aria-label="Kizuna home">
@@ -176,39 +176,37 @@ export function SiteHeader() {
                 </div>
             </div>
 
-            {menuOpen ? (
-                <div className={styles.menuLayer}>
-                    <div className={styles.scrim} aria-hidden onClick={() => setMenuOpen(false)} />
-                    <div id="site-menu" className={styles.menu}>
-                        <nav className={styles.menuGroup} aria-label="Main">
-                            {navigation
-                                .filter((item) => !isExternal(item))
-                                .map((item) => (
-                                    <Link
-                                        key={item.label}
-                                        href={item.href}
-                                        className={styles.menuLink}
-                                        aria-current={currentItem(pathname) === item ? 'page' : undefined}
-                                        onClick={() => setMenuOpen(false)}>
-                                        {item.label}
-                                        <ChevronRight className={styles.menuIcon} aria-hidden />
-                                    </Link>
-                                ))}
-                        </nav>
-                        <div className={styles.menuGroup}>
-                            {[...navigation, ...menuExtras].filter(isExternal).map((item) => (
-                                <a key={item.label} href={item.href} className={styles.menuLink} target="_blank" rel="noreferrer">
+            <div className={styles.menuLayer} data-open={menuOpen ? '' : undefined} inert={!menuOpen}>
+                <div className={styles.scrim} aria-hidden onClick={() => setMenuOpen(false)} />
+                <div id="site-menu" className={styles.menu}>
+                    <nav className={styles.menuGroup} aria-label="Main">
+                        {navigation
+                            .filter((item) => !isExternal(item))
+                            .map((item) => (
+                                <Link
+                                    key={item.label}
+                                    href={item.href}
+                                    className={styles.menuLink}
+                                    aria-current={currentItem(pathname) === item ? 'page' : undefined}
+                                    onClick={() => setMenuOpen(false)}>
                                     {item.label}
-                                    <ArrowUpRight className={styles.menuIcon} aria-hidden />
-                                </a>
+                                    <ChevronRight className={styles.menuIcon} aria-hidden />
+                                </Link>
                             ))}
-                        </div>
-                        <ButtonLink href="/docs/quickstart" className={styles.menuCta} onClick={() => setMenuOpen(false)}>
-                            Get started
-                        </ButtonLink>
+                    </nav>
+                    <div className={styles.menuGroup}>
+                        {[...navigation, ...menuExtras].filter(isExternal).map((item) => (
+                            <a key={item.label} href={item.href} className={styles.menuLink} target="_blank" rel="noreferrer">
+                                {item.label}
+                                <ArrowUpRight className={styles.menuIcon} aria-hidden />
+                            </a>
+                        ))}
                     </div>
+                    <ButtonLink href="/docs/quickstart" className={styles.menuCta} onClick={() => setMenuOpen(false)}>
+                        Get started
+                    </ButtonLink>
                 </div>
-            ) : null}
+            </div>
         </header>
     );
 }

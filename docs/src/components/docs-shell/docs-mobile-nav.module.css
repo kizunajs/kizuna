@@ -2,9 +2,16 @@
     position: sticky;
     top: var(--kizuna-header-height);
     z-index: 30;
-    background-color: color-mix(in srgb, var(--kizuna-canvas) 88%, transparent);
-    backdrop-filter: saturate(1.4) blur(14px);
     padding: 4px var(--kizuna-gutter) 12px;
+}
+
+.bar::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--kizuna-header-height)) 0 -16px;
+    z-index: -1;
+    background: linear-gradient(to top, transparent, var(--kizuna-canvas) 16px);
+    pointer-events: none;
 }
 
 .toggle {
@@ -75,15 +82,22 @@
     left: 0;
     height: calc(100dvh - var(--kizuna-header-height) - 58px);
     padding: 0 var(--kizuna-gutter) 16px;
+    visibility: hidden;
+    transition: visibility 0s linear 0.2s;
+}
+
+.menuLayer[data-open] {
+    visibility: visible;
+    transition-delay: 0s;
 }
 
 .scrim {
     position: absolute;
     inset: -58px 0 0;
     z-index: -1;
-    background-color: color-mix(in srgb, var(--kizuna-canvas) 72%, transparent);
-    backdrop-filter: blur(6px);
-    animation: fade-in 0.2s ease;
+    background-color: color-mix(in srgb, var(--kizuna-canvas) 80%, transparent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
 .menu {
@@ -96,7 +110,11 @@
         var(--kizuna-elevation),
         0 16px 40px rgb(0 0 0 / 0.5);
     transform-origin: top center;
-    animation: menu-in 0.2s cubic-bezier(0.2, 0, 0, 1);
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .panel {
@@ -104,23 +122,19 @@
     min-width: 0;
 }
 
-@keyframes fade-in {
-    from {
-        opacity: 0;
-    }
+.menuLayer[data-open] .scrim {
+    opacity: 1;
 }
 
-@keyframes menu-in {
-    from {
-        opacity: 0;
-        transform: translateY(-6px) scale(0.98);
-    }
+.menuLayer[data-open] .menu {
+    opacity: 1;
+    transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .scrim,
     .menu {
-        animation: none;
+        transform: none;
+        transition: opacity 0.2s ease;
     }
 }
 

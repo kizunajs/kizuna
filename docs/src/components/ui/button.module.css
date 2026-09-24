@@ -48,8 +48,10 @@
     color: var(--kizuna-canvas);
 }
 
-.primary:hover {
-    opacity: 0.86;
+@media (hover: hover) {
+    .primary:hover {
+        opacity: 0.86;
+    }
 }
 
 .secondary {
@@ -58,6 +60,8 @@
     color: var(--kizuna-ink);
 }
 
-.secondary:hover {
-    background-color: var(--kizuna-raised-hover);
+@media (hover: hover) {
+    .secondary:hover {
+        background-color: var(--kizuna-raised-hover);
+    }
 }

@@ -20,10 +20,12 @@
         box-shadow 0.15s ease;
 }
 
-a.card:hover {
-    background-color: var(--kizuna-surface-hover);
-    box-shadow: var(--kizuna-elevation-hover);
-    opacity: 1;
+@media (hover: hover) {
+    a.card:hover {
+        background-color: var(--kizuna-surface-hover);
+        box-shadow: var(--kizuna-elevation-hover);
+        opacity: 1;
+    }
 }
 
 .title {
@@ -44,8 +46,10 @@ a.card:hover {
     transition: transform 0.15s ease;
 }
 
-a.card:hover .arrow {
-    transform: translateX(2px);
+@media (hover: hover) {
+    a.card:hover .arrow {
+        transform: translateX(2px);
+    }
 }
 
 .text {

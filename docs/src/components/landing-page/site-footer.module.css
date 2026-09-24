@@ -68,8 +68,10 @@
     transition: color 0.15s ease;
 }
 
-.link:hover {
-    color: var(--kizuna-ink);
+@media (hover: hover) {
+    .link:hover {
+        color: var(--kizuna-ink);
+    }
 }
 
 .meta {

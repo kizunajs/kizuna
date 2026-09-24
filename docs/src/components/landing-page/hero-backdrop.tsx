@@ -10,7 +10,7 @@ type Backdrop = 'mesh' | 'dithering' | 'neuro';
 const BACKDROP: Backdrop = 'mesh';
 
 const palette = {
-    canvas: '#0b0b0b',
+    canvas: '#0c0c0c',
     soft: '#1a1a1a',
     mid: '#333333',
     strong: '#4a4a4a',

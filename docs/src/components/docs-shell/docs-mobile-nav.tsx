@@ -97,14 +97,12 @@ export function DocsMobileNav({ tree }: { tree: PageTree.Root }) {
                 <ChevronsUpDown className={styles.chevron} aria-hidden />
             </button>
 
-            {open ? (
-                <div className={styles.menuLayer}>
-                    <div className={styles.scrim} aria-hidden onClick={() => setOpen(false)} />
-                    <div id="docs-menu" ref={menuRef} className={styles.menu}>
-                        <DocsSidebarPanel tree={tree} className={styles.panel} />
-                    </div>
+            <div className={styles.menuLayer} data-open={open ? '' : undefined} inert={!open}>
+                <div className={styles.scrim} aria-hidden onClick={() => setOpen(false)} />
+                <div id="docs-menu" ref={menuRef} className={styles.menu}>
+                    <DocsSidebarPanel tree={tree} className={styles.panel} />
                 </div>
-            ) : null}
+            </div>
         </div>
     );
 }
