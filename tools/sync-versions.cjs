@@ -32,9 +32,12 @@ for (const readme of ['README.md', path.join('packages', 'core', 'README.md')]) 
 
 const sitePath = path.join(root, 'docs', 'src', 'lib', 'site.ts');
 const site = fs.readFileSync(sitePath, 'utf8');
-fs.writeFileSync(
-    sitePath,
-    site.replace(/export const npmUrl = '[^']*';/, `export const npmUrl = 'https://www.npmjs.com/package/kizunajs/v/${version}';`)
-);
+const siteVersion = /export const version = '[^']*';/;
+
+if (!siteVersion.test(site)) {
+    throw new Error(`No \`export const version\` in ${sitePath}`);
+}
+
+fs.writeFileSync(sitePath, site.replace(siteVersion, `export const version = '${version}';`));
 
 console.log(`Synced version ${version} to all packages`);
