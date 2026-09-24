@@ -4,7 +4,7 @@
 
 A spec-driven framework for building fully typed REST APIs in TypeScript, where your route declarations produce the validation, the documentation, the clients, and the AI tools.
 
-[![npm](https://img.shields.io/npm/v/kizunajs/beta?color=blue&label=npm)](https://www.npmjs.com/package/kizunajs/v/2.0.0-beta.7)
+[![npm](https://img.shields.io/npm/v/kizunajs/beta?color=blue&label=npm)](https://www.npmjs.com/package/kizunajs/v/2.0.0-beta.8)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
 [Documentation](https://kizunajs.com)
