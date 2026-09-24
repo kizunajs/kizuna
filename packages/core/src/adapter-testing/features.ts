@@ -96,6 +96,12 @@ export const ADAPTER_FEATURES = {
     'responses.validation': {
         summary: 'With `responseValidation` on, a body the contract disallows fails as a 500.',
     },
+    'responses.headers': {
+        summary: 'A declared response header is sent in its string form.',
+    },
+    'responses.headerValidation': {
+        summary: 'With `responseValidation` on, a declared header the contract disallows fails as a 500.',
+    },
     'deprecation.deprecationHeader': {
         summary: 'A route with a deprecation date announces it in `Deprecation`, with its documentation link in `Link`.',
     },

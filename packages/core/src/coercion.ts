@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { RouteDefinition } from './types.js';
+import type { ResponseHeaders, ResponseHeaderValue, RouteDefinition } from './types.js';
 import { readDef, readObjectShape, resolveBaseType, WRAPPER_TYPES } from './zod-internals.js';
 
 /**
@@ -20,7 +20,7 @@ interface CoercionField {
  */
 export type CoercionPlan = CoercionField[] | null;
 
-const resolveArrayElement = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
+export const resolveArrayElement = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
     const def = readDef(schema);
     if (def.type === 'array' && def.element) {
         return def.element;
@@ -139,4 +139,18 @@ export const applyCoercion = (input: unknown, plan: CoercionPlan): unknown => {
         result[field.key] = coerced;
     }
     return result ?? input;
+};
+
+/**
+ * A handler's response headers as sent: each value in its string form, and
+ * absent ones dropped.
+ */
+export const serializeHeaders = (headers: Record<string, ResponseHeaderValue | undefined> | undefined): ResponseHeaders | undefined => {
+    if (headers === undefined) return undefined;
+    const serialized: ResponseHeaders = {};
+    for (const [name, value] of Object.entries(headers)) {
+        if (value === undefined) continue;
+        serialized[name] = String(value);
+    }
+    return serialized;
 };

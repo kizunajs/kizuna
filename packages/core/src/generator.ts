@@ -48,6 +48,7 @@ export {
     type StreamMode,
 } from './stream.js';
 export { cacheHeaders } from './cache.js';
+export { coercionPlanFor } from './coercion.js';
 
 export {
     resolveResponseBody,

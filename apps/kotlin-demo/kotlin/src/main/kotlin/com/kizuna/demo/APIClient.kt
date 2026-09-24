@@ -327,7 +327,10 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             val headers: Headers
         ) {
 
-            data class Headers(val xRequestId: String?)
+            data class Headers(
+                val xRequestId: String?,
+                val xRateLimitRemaining: Int
+            )
         }
 
         sealed class Failure(message: String? = null) : Exception(message) {
@@ -1593,8 +1596,9 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                 200 -> {
                     try {
                         val payload = json.decodeFromString<API.User>(data.decodeToString())
-                        val xRequestId = httpResponse.header("x-request-id")
-                        return@use APIClient.UsersGetUser.Result(body = payload, headers = APIClient.UsersGetUser.Result.Headers(xRequestId = xRequestId))
+                        val xRequestId = Kizuna.header(httpResponse, "x-request-id") { it }
+                        val xRateLimitRemaining = Kizuna.header(httpResponse, "x-rate-limit-remaining") { it.toIntOrNull() } ?: throw IllegalStateException("Missing response header x-rate-limit-remaining")
+                        return@use APIClient.UsersGetUser.Result(body = payload, headers = APIClient.UsersGetUser.Result.Headers(xRequestId = xRequestId, xRateLimitRemaining = xRateLimitRemaining))
                     }
                     catch (error: Exception) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
                 }
@@ -2891,6 +2895,11 @@ private object Kizuna {
     fun encodePathSegment(value: Any): String {
         val text = stringifyQueryValue(value).firstOrNull() ?: ""
         return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")
+    }
+
+    fun <T> header(response: Response, name: String, parse: (String) -> T?): T? {
+        val raw = response.header(name) ?: return null
+        return parse(raw) ?: throw IllegalStateException("Response header $name has an unreadable value: $raw")
     }
 
     fun stringifyQueryValue(value: Any): List<String> {

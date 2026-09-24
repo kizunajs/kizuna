@@ -179,6 +179,7 @@ export { ResponseError } from './response-error.js';
 export { STATUS_TITLES, getStatusText } from './status-titles.js';
 export { getHeaderValue } from './adapter.js';
 export { isStreamResponse, isZodSchema } from './generator-utils.js';
+export { applyCoercion, coercionPlanFor, type CoercionPlan } from './coercion.js';
 export {
     streamMode,
     streamContentType,

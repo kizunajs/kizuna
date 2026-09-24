@@ -245,6 +245,7 @@ export namespace API {
         export type Result =
             | { status: 200; body: User; headers: {
                 "x-request-id"?: string;
+                "x-rate-limit-remaining": number;
             } }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
@@ -1246,7 +1247,7 @@ const routes: GeneratedRoutes = {
             method: 'GET',
             path: '/users/:id',
             responses: {
-                200: {},
+                200: { headers: { 'x-rate-limit-remaining': 'number' } },
                 404: {},
             },
         },

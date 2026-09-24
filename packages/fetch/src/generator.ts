@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type { ApiDefinition, RouteDefinition, Routes } from 'kizunajs';
 import { ValidationErrorSchema } from 'kizunajs/schemas';
 import {
+    coercionPlanFor,
     isStreamResponse,
     isVoidSchema,
     readObjectShape,
@@ -218,9 +219,14 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
 
     const tableEntries = [`method: '${route.method}'`, `path: '${route.path}'`];
     if (route.contentType) tableEntries.push(`contentType: '${route.contentType}'`);
-    const responses = Object.entries(route.responses).map(([status, response]) =>
-        isStreamResponse(response) ? `${status}: { stream: { contentType: '${streamContentType(response)}' } }` : `${status}: {}`
-    );
+    const responses = Object.entries(route.responses).map(([status, response]) => {
+        const entries: string[] = [];
+        if (isStreamResponse(response)) entries.push(`stream: { contentType: '${streamContentType(response)}' }`);
+        const headers = resolveResponseHeaders(response);
+        const plan = headers ? coercionPlanFor(headers) : null;
+        if (plan) entries.push(`headers: { ${plan.map((field) => `'${field.key}': '${field.type}'`).join(', ')} }`);
+        return entries.length > 0 ? `${status}: { ${entries.join(', ')} }` : `${status}: {}`;
+    });
     tableEntries.push(`responses: {\n${indent(responses.map((entry) => `${entry},`).join('\n'))}\n}`);
 
     const streams = Object.values(route.responses).some((response) => isStreamResponse(response));

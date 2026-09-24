@@ -185,6 +185,7 @@ const contractWithResponseHeadersRoutes = k.routes('api', {
                     }),
                     headers: z.object({
                         'x-request-id': z.string().optional(),
+                        'x-rate-limit-remaining': z.int(),
                     }),
                 },
                 404: ProblemDetailsSchema,
@@ -198,6 +199,9 @@ const contractWithResponseHeadersRoutes = k.routes('api', {
                 body: {
                     id: params.id,
                     name: 'Alice',
+                },
+                headers: {
+                    'x-rate-limit-remaining': 99,
                 },
             };
         }),
@@ -246,6 +250,18 @@ describe('end-to-end: response headers', () => {
         });
         expect(result.status).toBe(200);
         expect(result.headers['x-request-id']).toBe('trace-e2e-999');
+    });
+
+    it('client reads a declared int response header as a number', async () => {
+        const result = await client.getUser({
+            params: {
+                id: '1',
+            },
+        });
+        expect(result.status).toBe(200);
+        if (result.status === 200) {
+            expect(result.headers['x-rate-limit-remaining']).toBe(99);
+        }
     });
 });
 

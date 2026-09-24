@@ -14,6 +14,7 @@ import type { Routes, AuthoredRoutes, AuthoredRouteDefinition } from './types.js
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { PathParamsCheck, RoutePathParamsCheck } from './path-params.js';
+import type { RouteHeadersCheck } from './header-check.js';
 import type { AuthCheck, RouteAuthCheck } from './auth-check.js';
 import { createRoute, type RouteBuilder } from './route.js';
 import { createJob, type JobBuilder } from './job.js';
@@ -134,7 +135,10 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *     }));
      */
     route<const Definition extends AuthoredRouteDefinition<TagNamesOf<Spec>, IdentityNamesOf<Spec>>>(
-        definition: Definition & RoutePathParamsCheck<Definition> & RouteAuthCheck<Definition, Spec['identities']>
+        definition: Definition &
+            RoutePathParamsCheck<Definition> &
+            RouteHeadersCheck<Definition> &
+            RouteAuthCheck<Definition, Spec['identities']>
     ): RouteBuilder<
         Definition & RouteGuardBrandOf<Definition, GuardOutput<Spec['guardSchema']>, GuardBody<Spec['guardSchema']>>,
         HandlerContextFor<Spec, Definition>

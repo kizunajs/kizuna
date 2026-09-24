@@ -2,10 +2,10 @@ import type { z } from 'zod';
 import { ROUTES_TAG, type Routes, type RouteDefinition, type ResponseDefinition } from './types.js';
 import { isRouteDefinition } from './handler-pipeline.js';
 import { type TagSet, type TagKeysOf, isTagSet } from './tags.js';
-import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from './zod-internals.js';
-import { resolveCoercionPlans } from './coercion.js';
+import { findCoercedSchemaPath, readDef, readObjectShape, resolveBaseType, unwrapOptionalWrappers } from './zod-internals.js';
+import { resolveArrayElement, resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
-import { isStreamResponse, isZodSchema } from './generator-utils.js';
+import { isStreamResponse, isZodSchema, resolveResponseHeaders } from './generator-utils.js';
 import { assertValidStreams, streamSchemas } from './stream.js';
 import { expandStreamTools } from './tool-events.js';
 
@@ -92,6 +92,65 @@ const assertPathParamsAreScalar = (route: RouteDefinition, routeKey: string): vo
 };
 
 /**
+ * The structured kind a request header field declares, or `undefined` when it
+ * is scalar. A repeated request header arrives as a list, so it may be an
+ * array of scalars.
+ */
+const structuredRequestHeader = (fieldSchema: z.core.$ZodType): string | undefined => {
+    const baseType = resolveBaseType(fieldSchema);
+    if (baseType !== 'array') return STRUCTURED_TYPES.has(baseType) ? baseType : undefined;
+    const element = resolveArrayElement(fieldSchema);
+    const elementType = element ? resolveBaseType(element) : '';
+    return STRUCTURED_TYPES.has(elementType) ? `array of ${elementType}` : undefined;
+};
+
+/**
+ * Whether a schema is a date, or a string holding a datetime, which the Swift
+ * and Kotlin clients read as a date.
+ */
+const isDateSchema = (fieldSchema: z.core.$ZodType): boolean => {
+    const def = readDef(unwrapOptionalWrappers(fieldSchema).inner);
+    if (def.type === 'date') return true;
+    return def.type === 'string' && (def.format === 'datetime' || (def.checks ?? []).some((check) => check.format === 'datetime'));
+};
+
+/**
+ * Throws when a request header is declared as a structured type, or a response
+ * header as anything but a string, number, boolean, bigint, or enum. A header
+ * value is a single string, and a client reads a response header back into one
+ * of those.
+ */
+const assertHeadersAreScalar = (route: RouteDefinition, routeKey: string): void => {
+    const requestShape = route.headers ? readObjectShape(route.headers) : undefined;
+    for (const [name, fieldSchema] of Object.entries(requestShape ?? {})) {
+        const structured = structuredRequestHeader(fieldSchema);
+        if (structured === undefined) continue;
+        throw new Error(
+            `Route "${routeKey}" declares request header "${name}" as ${structured}. ` +
+                `A header value is a single string, so this is not supported.\n` +
+                `Use a scalar schema (z.string(), z.int(), z.boolean(), z.enum([...])), move the value to the body, ` +
+                `or parse it yourself with z.string().transform(...).`
+        );
+    }
+    for (const [status, response] of Object.entries(route.responses)) {
+        const headers = resolveResponseHeaders(response);
+        const responseShape = headers ? readObjectShape(headers) : undefined;
+        for (const [name, fieldSchema] of Object.entries(responseShape ?? {})) {
+            const baseType = resolveBaseType(fieldSchema);
+            const unsupported = STRUCTURED_TYPES.has(baseType) ? baseType : isDateSchema(fieldSchema) ? 'date' : undefined;
+            if (unsupported === undefined) continue;
+            throw new Error(
+                `Route "${routeKey}" declares ${status} response header "${name}" as ${unsupported}. ` +
+                    `A response header is a string, number, boolean, bigint, or enum.\n` +
+                    (unsupported === 'date'
+                        ? `Declare it as z.string() and send the date in the format the header calls for.`
+                        : `Move the value to the body.`)
+            );
+        }
+    }
+};
+
+/**
  * A tool's description is the one thing a model reads before choosing it, so a
  * route that publishes as one has to carry it.
  */
@@ -115,6 +174,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             expandStreamTools(value, fullKey);
             assertPathParamsMatchPath(value, fullKey);
             assertPathParamsAreScalar(value, fullKey);
+            assertHeadersAreScalar(value, fullKey);
             assertNoCoercion(value, fullKey);
             assertValidStreams(value, fullKey);
             assertToolDescribed(value, fullKey);

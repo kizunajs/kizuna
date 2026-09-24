@@ -249,14 +249,14 @@ return {
 };
 ```
 
-For routes with typed response headers, include `headers` too:
+For routes with typed response headers, include `headers` too, typed from the route's schema:
 
 ```ts
 return {
     status: 200,
     body: user,
     headers: {
-        'x-request-id': req.headers['x-request-id'] ?? '',
+        'x-rate-limit-remaining': 99,
     },
 };
 ```
@@ -363,7 +363,7 @@ Values in the URL and in headers always arrive as strings. Kizuna coerces them t
 | `z.bigint()`             | `"9007199254740993"` | `9007199254740993n` |
 | `z.date()`               | an ISO 8601 string   | `Date`              |
 
-Arrays of these coerce too (`z.array(z.number())`). The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
+Arrays of these coerce too (`z.array(z.number())`), which is how a repeated header arrives. A header holds one value, so a header declared as an object is an error on the route. The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
 
 Because coercion is built in, **`z.coerce` is not supported**, and `k.routes` throws if any schema uses it. Declare the plain schema (`z.number()`, `z.date()`, `z.bigint()`). To receive a different type than you send, use `z.string().transform(...)`.
 
@@ -394,11 +394,13 @@ responses: {
     200: {
         body: UserSchema,
         headers: z.object({
-            'x-request-id': z.string().optional(),
+            'x-rate-limit-remaining': z.int(),
         }),
     },
 },
 ```
+
+A response header can be a string, number, boolean, bigint, or enum. When the handler returns `99`, the fetch, Swift, and Kotlin clients receive `99`. An object, an array, or a date is an error on the route, because no client can read it back. Declare a date as `z.string()` in the format the header calls for. With `responseValidation` on, a header that fails its schema is a 500, the same as a body.
 
 To send a response piece by piece, declare `stream` in place of `body`, with the schema of one message, or a record of event name to schema:
 

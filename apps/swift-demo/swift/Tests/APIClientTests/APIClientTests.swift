@@ -50,6 +50,7 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(result.body.id, "1")
         XCTAssertEqual(result.body.name, "Ada Lovelace")
         XCTAssertEqual(result.body.email, "ada@example.com")
+        XCTAssertEqual(result.headers.xRateLimitRemaining, 99)
     }
 
     func testTypedPathParamIsSentOnTheWire() async throws {

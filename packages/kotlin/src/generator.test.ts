@@ -505,7 +505,7 @@ describe('Kotlin generator: responseHeaders', () => {
             },
         }).api;
         const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('httpResponse.header("x-request-id")');
+        expect(output).toContain('val xRequestId = Kizuna.header(httpResponse, "x-request-id") { it }');
     });
 
     it('routes without responseHeaders emit Response with body only', () => {

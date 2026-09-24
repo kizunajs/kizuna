@@ -360,6 +360,93 @@ describe('k.routes pathParams/path agreement', () => {
     });
 });
 
+describe('k.routes structured headers', () => {
+    const requestHeaderWith = (schema: z.ZodType) => () =>
+        k.routes('users', {
+            listUsers: k.route({
+                method: 'GET',
+                path: '/users',
+                headers: z.object({
+                    'x-tenant': schema,
+                }),
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            }),
+        });
+
+    const responseHeaderWith = (schema: z.ZodType) => () =>
+        k.routes('users', {
+            listUsers: k.route({
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: {
+                        body: z.object({
+                            id: z.string(),
+                        }),
+                        headers: z.object({
+                            'x-tenant': schema,
+                        }),
+                    },
+                },
+            }),
+        });
+
+    it('throws for a structured request header, naming the header', () => {
+        expect(
+            requestHeaderWith(
+                z.object({
+                    id: z.string(),
+                })
+            )
+        ).toThrowError(
+            'Route "listUsers" declares request header "x-tenant" as object. A header value is a single string, so this is not supported.'
+        );
+        expect(requestHeaderWith(z.record(z.string(), z.string()))).toThrowError('as record');
+        expect(
+            requestHeaderWith(
+                z.array(
+                    z.object({
+                        id: z.string(),
+                    })
+                )
+            )
+        ).toThrowError('as array of object');
+    });
+
+    it('accepts a scalar request header, and an array of scalars for a repeated one', () => {
+        expect(requestHeaderWith(z.string())).not.toThrow();
+        expect(requestHeaderWith(z.int())).not.toThrow();
+        expect(requestHeaderWith(z.array(z.string()))).not.toThrow();
+    });
+
+    it('throws for a structured response header, arrays included', () => {
+        expect(
+            responseHeaderWith(
+                z.object({
+                    id: z.string(),
+                })
+            )
+        ).toThrowError('Route "listUsers" declares 200 response header "x-tenant" as object.');
+        expect(responseHeaderWith(z.array(z.string()))).toThrowError('as array');
+    });
+
+    it('throws for a date response header, pointing at z.string()', () => {
+        expect(responseHeaderWith(z.date())).toThrowError('declares 200 response header "x-tenant" as date');
+        expect(responseHeaderWith(z.iso.datetime())).toThrowError(/Declare it as z.string\(\)/);
+    });
+
+    it('accepts a scalar response header', () => {
+        expect(responseHeaderWith(z.string())).not.toThrow();
+        expect(responseHeaderWith(z.int())).not.toThrow();
+        expect(responseHeaderWith(z.boolean())).not.toThrow();
+        expect(responseHeaderWith(z.enum(['free', 'pro']))).not.toThrow();
+    });
+});
+
 describe('k.routes structured path params', () => {
     const routeWith = (schema: z.ZodType) => () =>
         k.routes('users', {
