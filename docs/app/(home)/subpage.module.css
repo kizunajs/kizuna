@@ -9,6 +9,27 @@
     padding: var(--kizuna-page-offset) var(--kizuna-gutter) 0;
 }
 
+.backdropped {
+    position: relative;
+    padding-bottom: 380px;
+}
+
+.backdrop {
+    position: absolute;
+    top: calc(-1 * (var(--kizuna-header-height) + var(--kizuna-page-offset)));
+    bottom: -120px;
+    left: 50%;
+    z-index: -1;
+    width: 100vw;
+    transform: translateX(-50%);
+    mask-image: radial-gradient(ellipse 100% 100% at 50% 0%, #000 50%, transparent 95%);
+    pointer-events: none;
+}
+
+.overlap {
+    margin-top: -40px;
+}
+
 .pair {
     display: grid;
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
@@ -26,6 +47,10 @@
 }
 
 @media (max-width: 767px) {
+    .overlap {
+        margin-top: -76px;
+    }
+
     .introTight {
         margin-bottom: -32px;
     }

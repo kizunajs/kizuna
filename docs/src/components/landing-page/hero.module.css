@@ -1,6 +1,5 @@
 .hero {
     position: relative;
-    isolation: isolate;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -11,7 +10,7 @@
 .backdrop {
     position: absolute;
     top: calc(-1 * var(--kizuna-header-height));
-    bottom: -230px;
+    bottom: -330px;
     left: 50%;
     z-index: -1;
     width: 100vw;
