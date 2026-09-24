@@ -1,0 +1,53 @@
+.header.header {
+    padding-left: 8px;
+}
+
+.tabs {
+    display: flex;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.tab {
+    height: 28px;
+    border: none;
+    border-radius: 7px;
+    background: none;
+    padding: 0 10px;
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-500);
+    color: var(--kizuna-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.tab:hover {
+    color: var(--kizuna-ink);
+}
+
+.tabActive,
+.tabActive:hover {
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    color: var(--kizuna-ink);
+}
+
+.viewport {
+    margin: 0 8px 8px;
+    border-radius: 8px;
+    background-color: var(--kizuna-raised);
+    box-shadow: var(--kizuna-elevation);
+    padding: 3px 10px;
+}
+
+.pre {
+    font-family: var(--kizuna-mono);
+    white-space: pre;
+    color: var(--kizuna-ink);
+}

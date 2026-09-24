@@ -1,8 +1,8 @@
 import { features } from '@/lib/features';
 
 /**
- * The feature list as prose bullets, for use inside MDX. Shares its source with
- * the landing page card grid so the two can never drift apart.
+ * The feature list as bullets for MDX, from the same source as the landing page
+ * cards.
  */
 export function FeatureList() {
     return (

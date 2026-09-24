@@ -3,13 +3,13 @@ title: Authentication
 description: Say who can call your API. An identity is a credential you accept, a guard turns it into the caller, and the handler receives them typed.
 ---
 
-<Supports items={['Bearer', 'API Key', 'Basic', 'Custom', 'OAuth 2.0', 'OpenID Connect']} />
-
 <BetaNotice>
 
 Authentication is still settling. `k.identity` and an identity's `guard` may change while v2 is in beta, so pin your version if you depend on them.
 
 </BetaNotice>
+
+<Supports items={['Bearer', 'API Key', 'Basic', 'Custom', 'OAuth 2.0', 'OpenID Connect']} />
 
 An **identity** is a credential your API accepts. A **guard** turns it into the caller. What that caller may do is [Access Control](/docs/access-control).
 

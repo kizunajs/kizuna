@@ -1,0 +1,329 @@
+.root {
+    --sot-gap: 20px;
+    --sot-edge: calc((100% - 2 * var(--sot-gap)) / 6);
+    --sot-dash: var(--kizuna-line-strong);
+    --sot-dash-v: repeating-linear-gradient(to bottom, var(--sot-dash) 0 4px, transparent 4px 9px);
+    --sot-dash-h: repeating-linear-gradient(to right, var(--sot-dash) 0 4px, transparent 4px 9px);
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.root > :first-child {
+    align-self: stretch;
+}
+
+.root > :first-child > :first-child {
+    margin-bottom: 28px;
+}
+
+.chips {
+    display: flex;
+    justify-content: center;
+}
+
+.chipCell {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    padding-inline: 9px;
+    padding-bottom: 28px;
+}
+
+.chipCell::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    height: 28px;
+    background-image: var(--sot-dash-v);
+}
+
+.chipCell::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background-image: var(--sot-dash-h);
+}
+
+.chipCell:first-child::after {
+    left: 50%;
+}
+
+.chipCell:last-child::after {
+    right: 50%;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 12px;
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    padding: 10px 16px;
+    font-size: 0.9375rem;
+    font-weight: var(--font-weight-500);
+    color: var(--kizuna-ink);
+}
+
+.chipIcon {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2;
+}
+
+.joinIn {
+    width: 1px;
+    height: 28px;
+    background-image: var(--sot-dash-v);
+}
+
+.terminal {
+    width: min(320px, 100%);
+    overflow: hidden;
+    border-radius: 14px;
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+}
+
+.terminalBar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+}
+
+.terminalDots {
+    position: absolute;
+    left: 14px;
+    display: flex;
+    gap: 6px;
+}
+
+.terminalDot {
+    width: 10px;
+    height: 10px;
+    border-radius: var(--kizuna-radius-pill);
+    background-color: var(--kizuna-line-strong);
+}
+
+.terminalTitle {
+    font-family: var(--kizuna-mono);
+    font-size: 0.75rem;
+    color: var(--kizuna-muted);
+}
+
+.joinOut {
+    position: relative;
+    width: 100%;
+    height: 72px;
+}
+
+.joinOutDrop {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 1px;
+    height: 36px;
+    background-image: var(--sot-dash-v);
+}
+
+.joinOutRail {
+    position: absolute;
+    top: 36px;
+    right: var(--sot-edge);
+    left: var(--sot-edge);
+    height: 1px;
+    background-image: var(--sot-dash-h);
+}
+
+.joinOutStub {
+    position: absolute;
+    top: 36px;
+    width: 1px;
+    height: 36px;
+    background-image: var(--sot-dash-v);
+}
+
+.joinOutStub:nth-child(3) {
+    left: var(--sot-edge);
+}
+
+.joinOutStub:nth-child(4) {
+    left: 50%;
+}
+
+.joinOutStub:nth-child(5) {
+    left: calc(100% - var(--sot-edge));
+}
+
+.joinOutDot {
+    position: absolute;
+    bottom: -4px;
+    width: 8px;
+    height: 8px;
+    transform: translateX(-50%);
+    border-radius: var(--kizuna-radius-pill);
+    background-color: var(--kizuna-line-strong);
+    z-index: 1;
+}
+
+.joinOutDot:nth-child(6) {
+    left: var(--sot-edge);
+}
+
+.joinOutDot:nth-child(7) {
+    left: 50%;
+}
+
+.joinOutDot:nth-child(8) {
+    left: calc(100% - var(--sot-edge));
+}
+
+.columns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sot-gap);
+    width: 100%;
+}
+
+.frame {
+    display: flex;
+    height: 360px;
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
+}
+
+.frameShort {
+    height: 316px;
+}
+
+.clientTabsFrame {
+    container-type: inline-size;
+}
+
+.clientTabs {
+    display: flex;
+    gap: 2px;
+    max-width: 100%;
+    border-radius: 12px;
+    background-color: var(--kizuna-window);
+    box-shadow: var(--kizuna-window-elevation);
+    padding: 3px;
+}
+
+.clientTab {
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 32px;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    padding: 0 11px;
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-500);
+    white-space: nowrap;
+    color: var(--kizuna-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.clientTab svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    filter: grayscale(1);
+    opacity: 0.55;
+    transition:
+        filter 0.15s ease,
+        opacity 0.15s ease;
+}
+
+.clientTab:hover {
+    color: var(--kizuna-ink);
+}
+
+.clientTab:hover svg,
+.clientTabActive svg {
+    filter: none;
+    opacity: 1;
+}
+
+.clientTab:focus-visible {
+    outline: 2px solid var(--kizuna-ink);
+    outline-offset: -2px;
+}
+
+.clientTabActive {
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    color: var(--kizuna-ink);
+}
+
+@container (max-width: 359px) {
+    .clientTab:not(.clientTabActive) .clientLabel {
+        display: none;
+    }
+}
+
+.fileIcon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 1023px) {
+    .joinOut {
+        height: 44px;
+    }
+
+    .joinOutRail,
+    .joinOutStub,
+    .joinOutDot {
+        display: none;
+    }
+
+    .joinOutDrop {
+        height: 44px;
+    }
+
+    .columns {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 639px) {
+    .chipCell {
+        padding-inline: 3px;
+        padding-bottom: 22px;
+    }
+
+    .chipCell::before {
+        height: 22px;
+    }
+
+    .chip {
+        gap: 6px;
+        border-radius: 10px;
+        padding: 6px 9px;
+        font-size: 0.75rem;
+    }
+
+    .chipIcon {
+        width: 13px;
+        height: 13px;
+    }
+}

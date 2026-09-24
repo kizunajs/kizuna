@@ -30,4 +30,11 @@ for (const readme of ['README.md', path.join('packages', 'core', 'README.md')]) 
     fs.writeFileSync(readmePath, contents.replace(npmLink, `https://www.npmjs.com/package/kizunajs/v/${version}`));
 }
 
+const sitePath = path.join(root, 'docs', 'src', 'lib', 'site.ts');
+const site = fs.readFileSync(sitePath, 'utf8');
+fs.writeFileSync(
+    sitePath,
+    site.replace(/export const npmUrl = '[^']*';/, `export const npmUrl = 'https://www.npmjs.com/package/kizunajs/v/${version}';`)
+);
+
 console.log(`Synced version ${version} to all packages`);

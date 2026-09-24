@@ -1,23 +1,26 @@
 import clsx from 'clsx';
-import Link from 'next/link';
-import GithubIcon from '@/icons/Github.svg';
+import { ArrowRight } from 'lucide-react';
+import { ButtonLink } from '@/components/ui/button';
+import { HeroBackdrop } from './hero-backdrop';
+import { InstallCommand } from './install-command';
 import styles from './hero.module.css';
 
 export function Hero({ className }: { className?: string }) {
     return (
         <section className={clsx(styles.hero, className)}>
-            <h1 className={styles.headline}>Build fully typed REST APIs with TypeScript</h1>
-            <h2 className={styles.tagline}>
+            <HeroBackdrop className={styles.backdrop} />
+
+            <h1 className={styles.headline}>Build fully typed REST APIs in TypeScript</h1>
+            <p className={styles.tagline}>
                 Write one config. Get a fully typed server, an OpenAPI spec, Swift and Kotlin clients, and more.
-            </h2>
+            </p>
+
             <div className={styles.actions}>
-                <Link href="/docs" className={styles.primary}>
+                <ButtonLink href="/docs/quickstart">
                     Get started
-                </Link>
-                <a href="https://github.com/kizunajs/kizuna" className={styles.secondary} target="_blank" rel="noreferrer">
-                    <GithubIcon className={styles.secondaryIcon} />
-                    View on GitHub
-                </a>
+                    <ArrowRight aria-hidden />
+                </ButtonLink>
+                <InstallCommand />
             </div>
         </section>
     );

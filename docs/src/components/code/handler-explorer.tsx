@@ -1,10 +1,15 @@
 'use client';
 
 import clsx from 'clsx';
+import Link from 'next/link';
 import { useState } from 'react';
+import { ArrowRight } from 'lucide-react';
+import { Section } from '@/components/landing-page/section';
+import panel from '@/components/landing-page/panel.module.css';
 import { CodeWindow } from './code-window';
 import styles from './handler-explorer.module.css';
 import type { CodeCompletion } from './code-completion';
+import { DocsLink } from '@/components/landing-page/docs-link';
 
 function TsLogo({ className }: { className?: string }) {
     return (
@@ -14,7 +19,7 @@ function TsLogo({ className }: { className?: string }) {
     );
 }
 
-interface Feature {
+interface Moment {
     id: string;
     file: string;
     note: string;
@@ -22,19 +27,19 @@ interface Feature {
     completion?: CodeCompletion;
 }
 
-const FEATURES: Feature[] = [
+const MOMENTS: Moment[] = [
     {
         id: 'params',
         file: 'routes/reports.ts',
         note: 'Typed from the path string itself. Rename a param and every handler that reads it fails to compile.',
         code: `.handler(async ({ params }) => {
+    const month = params.month;
     const report = await db.reports.findFirst({
         where: {
-            month: params.month,
             year: params.`,
         completion: {
             after: 'params.',
-            items: ['year', 'month', 'day'],
+            items: ['year', 'month'],
             selected: 'year',
         },
     },
@@ -49,7 +54,7 @@ const FEATURES: Feature[] = [
             createdAt: query.`,
         completion: {
             after: 'query.',
-            items: ['perPage', 'order', 'search'],
+            items: ['order', 'search'],
             selected: 'order',
         },
     },
@@ -59,13 +64,12 @@ const FEATURES: Feature[] = [
         note: 'Validated against your schema before the handler runs, so invalid requests never reach your code.',
         code: `.handler(async ({ body }) => {
     const user = await db.users.create({
-        data: {
-            name: body.name,
-            role: 'member',
-            email: body.`,
+        data: body,
+    });
+    await mailer.sendWelcome(body.`,
         completion: {
             after: 'body.',
-            items: ['name', 'email'],
+            items: ['email', 'name'],
             selected: 'email',
         },
     },
@@ -73,12 +77,8 @@ const FEATURES: Feature[] = [
         id: 'headers',
         file: 'routes/users.ts',
         note: 'Declared headers become literal keys, spelled exactly the way the spec spells them.',
-        code: `.handler(async ({ params, body, headers }) => {
-    const updated = await db.users.update({
-        data: body,
-        where: {
-            id: params.userId,
-            version: Number(headers['`,
+        code: `.handler(async ({ params, headers }) => {
+    const version = Number(headers['`,
         completion: {
             after: "headers['",
             items: ["'if-match'", "'accept-language'"],
@@ -90,31 +90,26 @@ const FEATURES: Feature[] = [
         file: 'routes/users.ts',
         note: 'The guard has already verified the caller, so the handler receives a plain typed value.',
         code: `.handler(async ({ auth }) => {
-    const user = await db.users.findById(auth.member.workspaceUserId);
+    const me = await db.users.findById(auth.member.workspaceUserId);
 
     return {
         status: 200,
-        body: {
-            name: user.name,
-            email: user.email,
-        },
+        body: me,
     };
-},`,
+}),`,
     },
     {
         id: 'requestContext',
         file: 'routes/users.ts',
         note: 'Declared once, resolved per request, available in every handler without touching a signature.',
-        code: `.handler(async ({ requestContext }) => {
+        code: `.handler(async ({ query, requestContext }) => {
     await posthog.capture({
-        distinctId: requestContext.analytics.distinctId,
-        event: 'invite_sent',
-        properties: {
-            $session_id: requestContext.analytics.`,
+        event: 'users_listed',
+        distinctId: requestContext.analytics.`,
         completion: {
             after: 'analytics.',
             items: ['distinctId', 'sessionId'],
-            selected: 'sessionId',
+            selected: 'distinctId',
         },
     },
     {
@@ -122,13 +117,12 @@ const FEATURES: Feature[] = [
         file: 'routes/users.ts',
         note: 'Every job your config declares. Queue it and answer now, or run it and wait for the result.',
         code: `.handler(async ({ body, jobs }) => {
-    await db.users.create({
+    const user = await db.users.create({
         data: body,
     });
-
-    await jobs.updateSearchIndex.`,
+    await jobs.indexUser.`,
         completion: {
-            after: 'updateSearchIndex.',
+            after: 'indexUser.',
             items: ['queue', 'run'],
             selected: 'queue',
         },
@@ -138,14 +132,12 @@ const FEATURES: Feature[] = [
         file: 'routes/users.ts',
         note: 'Plugins are named on your config, so their features arrive typed under their own names.',
         code: `.handler(async ({ params, body, plugins }) => {
-    const user = await db.users.update(params.userId, body);
-
     await plugins.email.send({
-        to: user.email,
+        to: body.email,
         template: '`,
         completion: {
             after: "template: '",
-            items: ["'welcome'", "'profile-updated'", "'password-reset'"],
+            items: ["'welcome'", "'profile-updated'"],
             selected: "'profile-updated'",
         },
     },
@@ -153,60 +145,72 @@ const FEATURES: Feature[] = [
         id: 'throwError',
         file: 'routes/users.ts',
         note: 'Failure responses live on the route, so a handler can only throw what it declares.',
-        code: `.handler(async ({ params, throwError }) => {
-    const user = await db.users.findById(params.userId);
-    if (!user) throwError({
-        status: 404,
-        body: {
-            detail: 'No user with that id',
-        },
-    });
-
-    await db.users.delete(user.id);`,
+        code: `.handler(async ({ params, auth, throwError }) => {
+    if (params.userId === auth.member.workspaceUserId) {
+        throwError({
+            status: 409,
+            body: {
+                detail: 'You cannot remove yourself',
+            },
+        });
+    }`,
     },
 ];
 
-export function HandlerExplorer({ className }: { className?: string }) {
-    const [active, setActive] = useState(FEATURES[0].id);
-    const feature = FEATURES.find((candidate) => candidate.id === active) ?? FEATURES[0];
+export function HandlerExplorer() {
+    const [active, setActive] = useState(MOMENTS[0].id);
+    const moment = MOMENTS.find((candidate) => candidate.id === active) ?? MOMENTS[0];
 
     return (
-        <section className={clsx('not-prose', styles.root, className)}>
-            <div className={styles.copy}>
-                <h2 className={styles.title}>Inside a handler</h2>
-                <p className={styles.description}>Whatever the route declares, the handler gets it validated and typed.</p>
-                <div className={styles.tokens}>
-                    {FEATURES.map((candidate) => (
-                        <button
-                            key={candidate.id}
-                            type="button"
-                            aria-pressed={candidate.id === active}
-                            onClick={() => setActive(candidate.id)}
-                            className={candidate.id === active ? clsx(styles.token, styles.tokenActive) : styles.token}>
-                            {candidate.id}
-                        </button>
-                    ))}
-                </div>
-                <p className={styles.note}>{feature.note}</p>
-            </div>
-
-            <div className={styles.scene}>
-                {FEATURES.map((candidate) => (
-                    <div
-                        key={candidate.id}
-                        aria-hidden={candidate.id !== active}
-                        className={candidate.id === active ? styles.sceneItem : clsx(styles.sceneItem, styles.sceneItemHidden)}>
-                        <CodeWindow
-                            lang="ts"
-                            code={candidate.code}
-                            dots
-                            title={candidate.file}
-                            icon={<TsLogo className={styles.brandIcon} />}
-                            completion={candidate.completion}
-                        />
+        <Section
+            aside={<DocsLink href="/docs/routes" />}
+            title="Everything your handler needs, already typed"
+            description="Params, body, auth, jobs and the rest arrive validated, so a wrong name fails to compile instead of failing in production.">
+            <div className={panel.panel}>
+                <div className={styles.split}>
+                    <div className={styles.options} role="tablist" aria-label="Handler arguments" aria-orientation="vertical">
+                        {MOMENTS.map((candidate) => (
+                            <button
+                                key={candidate.id}
+                                type="button"
+                                role="tab"
+                                aria-selected={candidate.id === active}
+                                onClick={() => setActive(candidate.id)}
+                                className={clsx(styles.option, candidate.id === active && styles.optionActive)}>
+                                {candidate.id}
+                            </button>
+                        ))}
                     </div>
-                ))}
+
+                    <div className={styles.main}>
+                        <div className={styles.scene}>
+                            {MOMENTS.map((candidate) => (
+                                <div
+                                    key={candidate.id}
+                                    aria-hidden={candidate.id !== active}
+                                    className={clsx(styles.sceneItem, candidate.id !== active && styles.sceneItemHidden)}>
+                                    <CodeWindow
+                                        lang="ts"
+                                        code={candidate.code}
+                                        dots
+                                        title={candidate.file}
+                                        icon={<TsLogo className={styles.brandIcon} />}
+                                        completion={candidate.completion}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className={panel.body}>
+                            <Link href="/docs/routes#handler-arguments" className={panel.title}>
+                                <code className={styles.argument}>{moment.id}</code>
+                                <ArrowRight className={panel.arrow} aria-hidden />
+                            </Link>
+                            <p className={clsx(panel.text, styles.note)}>{moment.note}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </section>
+        </Section>
     );
 }

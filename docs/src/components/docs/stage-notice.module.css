@@ -1,0 +1,25 @@
+.notice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-block: 20px;
+    border-radius: 14px;
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    padding: 16px 18px;
+}
+
+.body {
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--kizuna-muted);
+}
+
+.body > :global(p) {
+    margin: 0;
+}
+
+.body > :global(p + p) {
+    margin-top: 8px;
+}

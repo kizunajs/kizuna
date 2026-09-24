@@ -1,18 +1,19 @@
 import type { Metadata } from 'next';
-import { ConfigExplorer } from '@/components/code/config-explorer';
 import { HandlerExplorer } from '@/components/code/handler-explorer';
-import { Adapters } from '@/components/landing-page/adapters';
+import { Agents } from '@/components/landing-page/agents';
 import { Beta } from '@/components/landing-page/beta';
+import { BreakingChanges } from '@/components/landing-page/breaking-changes';
 import { ClosingCta } from '@/components/landing-page/closing-cta';
+import { Config } from '@/components/landing-page/config';
 import { FeatureCards } from '@/components/landing-page/feature-cards';
 import { Hero } from '@/components/landing-page/hero';
-import { LinkCards } from '@/components/landing-page/link-cards';
 import { Section } from '@/components/landing-page/section';
+import { Standards } from '@/components/landing-page/standards';
 import styles from './page.module.css';
 
 export const metadata: Metadata = {
     title: {
-        absolute: 'Kizuna.js | Build fully typed REST APIs with TypeScript',
+        absolute: 'Kizuna.js | Build fully typed REST APIs in TypeScript',
     },
     description:
         'Write one config. Get a fully typed server, typed auth, scheduled jobs, an OpenAPI spec, Swift and Kotlin clients, an MCP endpoint, and more.',
@@ -30,28 +31,18 @@ export default function HomePage() {
             </Section>
 
             <div className={styles.sections}>
-                <Section
-                    title="The idea"
-                    description="One config is the source of truth. Your server, your clients, and everything generated from it read the same declarations.">
-                    <ConfigExplorer />
-                </Section>
+                <Config />
+
+                <Agents />
+
+                <BreakingChanges />
 
                 <HandlerExplorer />
 
-                <Section
-                    title="Runs anywhere"
-                    description="The same routes and handlers move between adapters, and the framework underneath stays available to you.">
-                    <Adapters />
-                </Section>
+                <Standards />
 
-                <Section title="Start here">
-                    <LinkCards />
-                </Section>
-            </div>
-
-            <Section className={styles.cta}>
                 <ClosingCta />
-            </Section>
+            </div>
         </div>
     );
 }

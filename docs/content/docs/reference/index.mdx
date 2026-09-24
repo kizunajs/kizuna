@@ -1,0 +1,114 @@
+---
+title: API Reference
+description: Every function, schema and plugin kizuna exports, with its options and types.
+---
+
+## Declaring an API
+
+The pieces one API is built from, in the order a config usually meets them.
+
+<Cards>
+    <Card title="new Kizuna()" href="/docs/reference/kizuna">
+        The authoring surface, typed by the `Config` that `kizuna generate` writes.
+    </Card>
+    <Card title="defineConfig" href="/docs/reference/define-config">
+        Assemble the routes, identities and plugins into the api you mount.
+    </Card>
+    <Card title="k.route" href="/docs/reference/k-route">
+        One route and the handler that answers it.
+    </Card>
+    <Card title="k.routes" href="/docs/reference/k-routes">
+        A group of routes under one tag.
+    </Card>
+    <Card title="k.tags" href="/docs/reference/k-tags">
+        The tags that group routes in the tree and the OpenAPI document.
+    </Card>
+    <Card title="Kizuna.model" href="/docs/reference/kizuna-model">
+        Name a Zod schema so every client generates a named type.
+    </Card>
+    <Card title="k.requestContext" href="/docs/reference/k-request-context">
+        Typed request-scoped values, such as a logger or the caller's locale.
+    </Card>
+    <Card title="k.issue" href="/docs/reference/k-issue">
+        A validation issue with a code your config declares.
+    </Card>
+    <Card title="k.jobs" href="/docs/reference/k-jobs">
+        Scheduled jobs, with their inputs and results.
+    </Card>
+</Cards>
+
+## Security
+
+Who may call a route, and what they are allowed to do.
+
+<Cards>
+    <Card title="k.identity" href="/docs/reference/k-identity">
+        A kind of caller, the guard that authenticates it, and the context it provides.
+    </Card>
+    <Card title="Kizuna.roles" href="/docs/reference/kizuna-roles">
+        The roles callers hold.
+    </Card>
+    <Card title="Kizuna.permissions" href="/docs/reference/kizuna-permissions">
+        Every permission, for roles to hold and routes to require.
+    </Card>
+    <Card title="ProtectedResourceMetadataSchema" href="/docs/reference/protected-resource-metadata-schema">
+        The RFC 9728 discovery document and its `WWW-Authenticate` challenge.
+    </Card>
+</Cards>
+
+## Calling an API
+
+The TypeScript client and the guards that narrow its errors.
+
+<Cards>
+    <Card title="createClient()" href="/docs/reference/create-client">
+        A typed `fetch` client from the file `kizuna generate` writes.
+    </Card>
+    <Card title="new KizunaTanstackQuery()" href="/docs/reference/kizuna-tanstack-query">
+        TanStack Query options from that client.
+    </Card>
+    <Card title="isValidationError" href="/docs/reference/is-validation-error">
+        Tell a kizuna validation error from your own `400`.
+    </Card>
+    <Card title="isUndeclaredResponseError" href="/docs/reference/is-undeclared-response-error">
+        Catch a status the route does not declare.
+    </Card>
+</Cards>
+
+## Schemas
+
+The Zod schemas kizuna ships for bodies every API shares.
+
+<Cards>
+    <Card title="ProblemDetailsSchema" href="/docs/reference/problem-details-schema">
+        The RFC 9457 body every error response carries.
+    </Card>
+    <Card title="BinarySchema & FileSchema" href="/docs/reference/binary-and-file-schemas">
+        Binary response bodies and multipart upload fields.
+    </Card>
+</Cards>
+
+## Generators and plugins
+
+What kizuna writes and serves from your routes.
+
+<Cards>
+    <Card title="generateOpenApi" href="/docs/reference/generate-openapi">
+        An OpenAPI 3.1.0 document.
+    </Card>
+    <Card title="openApiPlugin" href="/docs/reference/openapi-plugin">
+        Serve that document and a reference UI on any adapter.
+    </Card>
+    <Card title="generateSwiftClient" href="/docs/reference/generate-swift-client">
+        A Swift client on `URLSession` and `Codable`.
+    </Card>
+    <Card title="generateKotlinClient" href="/docs/reference/generate-kotlin-client">
+        A Kotlin client on OkHttp, kotlinx.serialization and coroutines.
+    </Card>
+    <Card title="mcpPlugin" href="/docs/reference/mcp-plugin">
+        An MCP endpoint that publishes your tool routes.
+    </Card>
+    <Card title="createMcpServer" href="/docs/reference/create-mcp-server">
+        A bare MCP server for stdio or any other transport.
+    </Card>
+</Cards>

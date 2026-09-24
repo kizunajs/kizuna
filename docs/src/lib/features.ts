@@ -1,4 +1,4 @@
-import { Clock, FileText, KeyRound, Layers, Plug, Puzzle, Radio, Section, Timer, TriangleAlert, Wrench, Zap } from 'lucide-react';
+import { Clock, FileText, KeyRound, Plug, Radio, Section, Timer, TriangleAlert, Zap } from 'lucide-react';
 import KotlinLogo from '@/icons/Kotlin.svg';
 import McpLogo from '@/icons/Mcp.svg';
 import SwiftLogo from '@/icons/Swift.svg';
@@ -12,8 +12,7 @@ export interface Feature {
     title: string;
     href: string;
     /**
-     * Plain-text summary. Kept free of markup so the same string renders in
-     * both the landing cards and the docs bullet list.
+     * Plain text, since it renders in both the landing cards and the docs list.
      */
     description: string;
 }
@@ -35,7 +34,7 @@ export const features: Feature[] = [
         icons: [McpLogo],
         title: 'MCP endpoint',
         href: '/docs/mcp',
-        description: 'Serve the routes declaring a tool so AI assistants can call them.',
+        description: 'Mark a route as a tool and AI assistants can call it, with hints taken from its HTTP method.',
     },
     {
         icons: [TanstackLogo],
@@ -59,25 +58,7 @@ export const features: Feature[] = [
         icons: [Radio],
         title: 'Streaming',
         href: '/docs/streaming',
-        description: 'Stream an AI reply as typed events. Yield them from the handler, read them with for await in the client.',
-    },
-    {
-        icons: [Wrench],
-        title: 'Tools',
-        href: '/docs/tools',
-        description: 'Declare the tools an AI assistant can call. Run them on the server, and read each call typed in your client.',
-    },
-    {
-        icons: [Puzzle],
-        title: 'Plugins',
-        href: '/docs/extend/create-plugin',
-        description: 'Extend your API with features built on the routes you already wrote, fully typed in your handlers.',
-    },
-    {
-        icons: [Layers],
-        title: 'Request context',
-        href: '/docs/request-context',
-        description: 'Declare request-scoped values once, and every handler receives them typed, resolved once per request.',
+        description: 'Stream an AI reply as typed events. Yield them from the handler, read them with for await.',
     },
     {
         icons: [Clock],
@@ -95,18 +76,18 @@ export const features: Feature[] = [
         icons: [Zap],
         title: 'RPC-like client',
         href: '/docs/clients/fetch',
-        description: 'Call your API like a function. Every route is a method with typed inputs and a response typed by status code.',
+        description: 'Call your API like a function, with every response typed by its status code.',
     },
     {
         icons: [TriangleAlert],
         title: 'Deprecation and sunset',
         href: '/docs/deprecations',
-        description: 'Deprecate routes and fields, and it shows up in your editor, OpenAPI, Swift, Kotlin, and the response headers.',
+        description: 'Deprecate once, and it reaches your editor, OpenAPI, Swift, Kotlin and headers.',
     },
     {
         icons: [Section],
         title: 'Spec-driven everything',
         href: '/docs/standards',
-        description: 'HTTP, OpenAPI, OAuth, and MCP: every status code, error body, and header sits where the spec says it should.',
+        description: 'Every status code, error body and header sits where the RFC says it should.',
     },
 ];

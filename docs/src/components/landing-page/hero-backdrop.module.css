@@ -1,0 +1,27 @@
+.root {
+    overflow: hidden;
+}
+
+.scrim {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(to bottom, rgb(0 0 0 / 0.5), transparent 140px),
+        radial-gradient(ellipse 42% 34% at 50% 44%, rgb(0 0 0 / 0.5), transparent 80%), rgb(0 0 0 / 0.18);
+}
+
+.shown {
+    animation: fade-in 1.2s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .shown {
+        animation: none;
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+}

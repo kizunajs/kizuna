@@ -1,0 +1,131 @@
+.bar {
+    position: sticky;
+    top: var(--kizuna-header-height);
+    z-index: 30;
+    background-color: color-mix(in srgb, var(--kizuna-canvas) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(14px);
+    padding: 4px var(--kizuna-gutter) 12px;
+}
+
+.toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    height: 42px;
+    border: none;
+    border-radius: 12px;
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    padding: 0 12px 0 14px;
+    font: inherit;
+    font-size: 0.9375rem;
+    font-weight: var(--font-weight-500);
+    color: var(--kizuna-ink);
+    text-align: left;
+    cursor: pointer;
+}
+
+.toggle:focus-visible {
+    outline: 2px solid var(--kizuna-ink);
+    outline-offset: 2px;
+}
+
+.location {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+}
+
+.section {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--kizuna-muted);
+}
+
+.page {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.divider {
+    color: var(--kizuna-muted);
+    opacity: 0.6;
+}
+
+.chevron {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke-width: 2.25;
+    color: var(--kizuna-muted);
+}
+
+.menuLayer {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    height: calc(100dvh - var(--kizuna-header-height) - 58px);
+    padding: 0 var(--kizuna-gutter) 16px;
+}
+
+.scrim {
+    position: absolute;
+    inset: -58px 0 0;
+    z-index: -1;
+    background-color: color-mix(in srgb, var(--kizuna-canvas) 72%, transparent);
+    backdrop-filter: blur(6px);
+    animation: fade-in 0.2s ease;
+}
+
+.menu {
+    display: flex;
+    max-height: 100%;
+    overflow: hidden;
+    border-radius: var(--kizuna-radius-card);
+    background-color: var(--kizuna-surface);
+    box-shadow:
+        var(--kizuna-elevation),
+        0 16px 40px rgb(0 0 0 / 0.5);
+    transform-origin: top center;
+    animation: menu-in 0.2s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.panel {
+    flex: 1;
+    min-width: 0;
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes menu-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.98);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scrim,
+    .menu {
+        animation: none;
+    }
+}
+
+@media (min-width: 1024px) {
+    .bar {
+        display: none;
+    }
+}

@@ -13,10 +13,10 @@
     --explorer-surface: var(--kizuna-surface, #1c1c1c);
     --explorer-line: #2e2e2e;
     --explorer-toolbar-line: #3a3a3a;
-    --explorer-method-get: #3fb950;
-    --explorer-method-post: #58a6ff;
-    --explorer-method-write: #d29922;
-    --explorer-method-delete: #f85149;
+    --explorer-method-get: var(--kizuna-green);
+    --explorer-method-post: var(--kizuna-blue);
+    --explorer-method-write: var(--kizuna-amber);
+    --explorer-method-delete: var(--kizuna-red);
 }
 
 .card {

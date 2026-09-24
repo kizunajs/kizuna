@@ -1,0 +1,185 @@
+.panels {
+    --ai-dash-h: repeating-linear-gradient(to right, var(--kizuna-line-strong) 0 4px, transparent 4px 9px);
+    --ai-dash-v: repeating-linear-gradient(to bottom, var(--kizuna-line-strong) 0 4px, transparent 4px 9px);
+    --ai-method-get: var(--kizuna-green);
+    --ai-method-post: var(--kizuna-blue);
+    --ai-method-delete: var(--kizuna-red);
+
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.visual {
+    display: flex;
+    flex: 1;
+    min-height: 380px;
+}
+
+.diagram {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background-color: var(--kizuna-window);
+    box-shadow: var(--kizuna-window-elevation);
+    padding: 24px 18px;
+}
+
+.agents {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.agent {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    border-radius: 12px;
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    padding: 10px 16px;
+    font-family: var(--kizuna-mono);
+    font-size: 0.85rem;
+    color: var(--kizuna-ink);
+}
+
+.agentIcon {
+    width: 16px;
+    height: 16px;
+}
+
+.wire {
+    width: clamp(16px, 4%, 36px);
+    height: 1px;
+    flex-shrink: 0;
+    background-image: var(--ai-dash-h);
+}
+
+.server {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
+    border-radius: 16px;
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    padding: 20px 24px;
+}
+
+.serverIcon {
+    width: 22px;
+    height: 22px;
+    margin-bottom: 5px;
+    color: var(--kizuna-ink);
+    stroke-width: 12;
+}
+
+.serverName {
+    font-size: 0.9375rem;
+    font-weight: var(--font-weight-600);
+    color: var(--kizuna-ink);
+}
+
+.serverRole {
+    font-family: var(--kizuna-mono);
+    font-size: 0.75rem;
+    color: var(--kizuna-muted);
+}
+
+.tools {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 9px;
+    overflow: hidden;
+    mask-image: linear-gradient(to right, #000 70%, transparent 100%);
+}
+
+.toolGroup {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-600);
+    color: var(--kizuna-ink);
+}
+
+.tool {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-family: var(--kizuna-mono);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+    color: var(--kizuna-muted);
+}
+
+.method {
+    display: inline-flex;
+    flex-shrink: 0;
+    justify-content: center;
+    min-width: 34px;
+    border-radius: 6px;
+    padding: 2px 5px;
+    font-size: 0.625rem;
+    font-weight: var(--font-weight-700);
+    letter-spacing: 0.04em;
+}
+
+.methodGet {
+    color: var(--ai-method-get);
+    background-color: color-mix(in srgb, var(--ai-method-get) 13%, transparent);
+}
+
+.methodPost {
+    color: var(--ai-method-post);
+    background-color: color-mix(in srgb, var(--ai-method-post) 13%, transparent);
+}
+
+.methodDelete {
+    color: var(--ai-method-delete);
+    background-color: color-mix(in srgb, var(--ai-method-delete) 13%, transparent);
+}
+
+.claudeFrame {
+    display: flex;
+    width: 100%;
+    align-self: stretch;
+}
+
+@media (max-width: 1023px) {
+    .panels {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 639px) {
+    .diagram {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .agents {
+        width: 100%;
+        max-width: 137px;
+    }
+
+    .agent {
+        justify-content: center;
+    }
+
+    .wire {
+        width: 1px;
+        height: 24px;
+        background-image: var(--ai-dash-v);
+    }
+
+    .tools {
+        align-self: stretch;
+        align-items: center;
+        mask-image: none;
+    }
+}

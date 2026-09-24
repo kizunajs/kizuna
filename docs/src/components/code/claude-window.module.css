@@ -1,7 +1,6 @@
 .window {
-    --window-surface: var(--kizuna-surface, #f4f4f4);
-    --window-line: #d8d8d8;
-    --claude-prompt-surface: #e5e5e5;
+    --window-surface: var(--kizuna-window, #f5f5f5);
+    --window-line: var(--kizuna-window-line, #e4e4e4);
 
     display: flex;
     flex: 1;
@@ -10,19 +9,13 @@
     overflow: hidden;
     border-radius: 10px;
     background-color: var(--window-surface);
-}
-
-:global(.dark) .window {
-    --window-surface: var(--kizuna-surface, #1c1c1c);
-    --window-line: #3a3a3a;
-    --claude-prompt-surface: #313131;
+    box-shadow: var(--kizuna-window-elevation, none);
 }
 
 .dots {
     display: flex;
     gap: 6px;
     padding: 12px 16px 10px;
-    border-bottom: 1px solid var(--window-line);
 }
 
 .dot {
@@ -36,8 +29,7 @@
     display: flex;
     align-items: center;
     gap: 7px;
-    padding: 8px 14px;
-    border-bottom: 1px solid var(--window-line);
+    padding: 2px 16px 10px;
     font-size: 13px;
     color: var(--color-fd-muted-foreground);
 }
@@ -62,10 +54,7 @@
 .promptRow {
     display: flex;
     gap: 8px;
-    margin-inline: -6px;
-    padding: 3px 6px;
-    border-radius: 4px;
-    background-color: var(--claude-prompt-surface);
+    color: var(--color-fd-foreground);
 }
 
 .promptCaret {
@@ -107,10 +96,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin-inline: -6px;
-    padding: 7px 10px;
-    border: 1px solid var(--window-line);
-    border-radius: 6px;
+    padding-left: 1.2em;
 }
 
 .permissionQuestion {

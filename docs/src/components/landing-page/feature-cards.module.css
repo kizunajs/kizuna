@@ -1,32 +1,25 @@
 .grid {
     display: grid;
     grid-template-columns: 1fr;
-    row-gap: 48px;
-    border-radius: 20px;
-    background-color: var(--kizuna-surface);
-    padding: 24px 0;
+    gap: 12px;
 }
 
 .card {
-    position: relative;
     display: block;
     min-width: 0;
-    padding-inline: 24px;
+    border-radius: var(--kizuna-radius-card);
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    padding: 21px 24px 23px;
     text-decoration: none;
+    transition:
+        background-color 0.15s ease,
+        box-shadow 0.15s ease;
 }
 
-.card::after {
-    content: '';
-    position: absolute;
-    right: 24px;
-    bottom: -24px;
-    left: 24px;
-    height: var(--kizuna-hairline);
-    background-color: var(--kizuna-line-strong);
-}
-
-.card:last-child::after {
-    content: none;
+.card:hover {
+    background-color: var(--kizuna-surface-hover);
+    box-shadow: var(--kizuna-elevation-hover);
 }
 
 .head {
@@ -70,6 +63,11 @@
     margin-left: -4px;
     flex-shrink: 0;
     color: var(--kizuna-ink);
+    transition: transform 0.15s ease;
+}
+
+.card:hover .arrow {
+    transform: translateX(2px);
 }
 
 .description {
@@ -80,59 +78,28 @@
 }
 
 @media (max-width: 639px) {
+    .card {
+        padding: 18px 20px 20px;
+    }
+
     .description {
-        margin-top: 4px;
+        margin-top: 6px;
     }
 }
 
 @media (min-width: 640px) and (max-width: 1023px) {
     .grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        row-gap: 44px;
-        padding: 32px 0;
-    }
-
-    .card {
-        padding-inline: 24px;
-    }
-
-    .card:nth-child(2n) {
-        border-left: var(--kizuna-hairline) solid var(--kizuna-line-strong);
-    }
-
-    .card::after {
-        right: 24px;
-        bottom: -22px;
-        left: 24px;
-    }
-
-    .card:nth-last-child(-n + 2)::after {
-        content: none;
     }
 }
 
 @media (min-width: 1024px) {
     .grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        row-gap: 52px;
-        padding: 32px 0;
+        gap: 12px;
     }
 
     .card {
-        padding-inline: 28px;
-    }
-
-    .card:not(:nth-child(3n + 1)) {
-        border-left: var(--kizuna-hairline) solid var(--kizuna-line-strong);
-    }
-
-    .card::after {
-        right: 28px;
-        bottom: -26px;
-        left: 28px;
-    }
-
-    .card:nth-last-child(-n + 3)::after {
-        content: none;
+        padding: 25px 28px 27px;
     }
 }

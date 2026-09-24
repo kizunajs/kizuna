@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { siteUrl } from '@/lib/site';
 
 import './global.css';
+import './tokens.css';
 
 import styles from './layout.module.css';
 
@@ -56,9 +57,16 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
     return (
-        <html lang="en" className={plusJakartaSans.variable} suppressHydrationWarning>
+        <html lang="en" className={`${plusJakartaSans.variable} dark`} style={{ colorScheme: 'dark' }} suppressHydrationWarning>
             <body className={styles.body}>
-                <RootProvider>{children}</RootProvider>
+                <RootProvider
+                    theme={{
+                        forcedTheme: 'dark',
+                        defaultTheme: 'dark',
+                        enableSystem: false,
+                    }}>
+                    {children}
+                </RootProvider>
             </body>
         </html>
     );

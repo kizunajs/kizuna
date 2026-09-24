@@ -1,33 +1,19 @@
 ---
 title: Standards
-description: The specifications Kizuna follows, what each one governs, and what it deliberately leaves out.
+description: The specifications Kizuna follows, what each one covers, and what it deliberately leaves out.
 ---
 
 Kizuna is spec-driven. It tries to follow these specifications as closely as it can.
 
 ## HTTP
 
-| Standard                                                                                         | What it governs                                                                                                                                    |
-| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) HTTP Semantics                                | Methods, status codes, headers, content negotiation, and which methods are safe and idempotent                                                     |
-| [RFC 5789](https://www.rfc-editor.org/rfc/rfc5789) PATCH Method                                  | The `PATCH` method, which RFC 9110 does not define, and its unsafe and non-idempotent semantics                                                    |
-| [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) Problem Details                               | The body of every error response, as `type`, `title`, `status`, `detail`, and `instance`                                                           |
-| [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) URI Syntax                                    | Percent-encoding of path parameters, and exact path matching, so `/users/1` and `/users/1/` are distinct resources                                 |
-| [RFC 8594](https://www.rfc-editor.org/rfc/rfc8594) Sunset Header                                 | The `Sunset` response header and the `sunset` link relation, announcing when a route will be removed and where its retirement policy lives         |
-| [RFC 9745](https://www.rfc-editor.org/rfc/rfc9745) Deprecation Header                            | The `Deprecation` response header and the `deprecation` link relation, carrying the date a route became deprecated and a link to its documentation |
-| [RFC 9111](https://www.rfc-editor.org/rfc/rfc9111) HTTP Caching                                  | The `Cache-Control` and `Vary` response headers a response's `cache` policy sends                                                                  |
-| [RFC 5861](https://www.rfc-editor.org/rfc/rfc5861) Stale Content                                 | The `stale-while-revalidate` and `stale-if-error` cache directives                                                                                 |
-| [RFC 8246](https://www.rfc-editor.org/rfc/rfc8246) Immutable Responses                           | The `immutable` cache directive                                                                                                                    |
-| [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) Conditional Requests                          | The `ETag` a response's `etag` sends, the `If-None-Match` it is compared against, and the `304 Not Modified` a match answers with                  |
-| [Server-sent events](https://html.spec.whatwg.org/multipage/server-sent-events.html) WHATWG HTML | The `text/event-stream` framing of a route's `stream` response: `event`, `data`, `id`, `retry`, and comment lines                                  |
+<StandardsTable group="http" />
 
 Every `GET` route answers `HEAD` too. [RFC 9110 §9.3.2](https://www.rfc-editor.org/rfc/rfc9110#section-9.3.2) defines `HEAD` as `GET` without the content, so Kizuna serves it from the path's `GET` route: same status and headers, a `Content-Length`, no body. A declared `HEAD` route takes the path instead, and `HEAD` joins `GET` in every `Allow` header. The derived route stays out of the OpenAPI document and the clients; the generator's `derivedHead` option opts it in.
 
 ## OpenAPI
 
-| Standard                                              | What it governs                                             |
-| ----------------------------------------------------- | ----------------------------------------------------------- |
-| [OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0) | The document `@kizunajs/openapi` generates from your routes |
+<StandardsTable group="openapi" />
 
 See [OpenAPI](/docs/openapi) for the generator and the reference UI it serves.
 
@@ -35,22 +21,13 @@ See [OpenAPI](/docs/openapi) for the generator and the reference UI it serves.
 
 An API that verifies tokens rather than issuing them is a resource server, and Kizuna serves the documents and challenges one owes its clients.
 
-| Standard                                                                         | What it governs                                                               |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [OAuth 2.1](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-v2-1)         | The resource server model Kizuna implements                                   |
-| [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) Protected Resource Metadata   | The discovery document served at `/.well-known/oauth-protected-resource`      |
-| [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414) Authorization Server Metadata | An identity's `issuer`                                                        |
-| [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707) Resource Indicators           | The canonical `resource` URI, and the audience a guard checks a token against |
-| [RFC 6750](https://www.rfc-editor.org/rfc/rfc6750) Bearer Token Usage            | The `WWW-Authenticate` challenge, including `insufficient_scope`              |
+<StandardsTable group="authentication" />
 
 See [authentication](/docs/authentication) for identities and guards, and [access control](/docs/access-control) for permissions and roles.
 
 ## Model Context Protocol
 
-| Standard                                                                                      | What it governs                                                 |
-| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| [Model Context Protocol](https://modelcontextprotocol.io/specification/latest)                | The MCP endpoint, its tools, and their input and output schemas |
-| [MCP authorization](https://modelcontextprotocol.io/specification/latest/basic/authorization) | Serving the endpoint as an OAuth 2.1 resource server            |
+<StandardsTable group="mcp" />
 
 See [MCP](/docs/mcp) for the endpoint, and [tools](/docs/tools) for declaring your own.
 

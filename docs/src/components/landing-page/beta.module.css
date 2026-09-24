@@ -6,17 +6,6 @@
     gap: 12px;
 }
 
-.pill {
-    border: var(--kizuna-border-button) solid var(--kizuna-ink);
-    border-radius: var(--kizuna-radius-pill);
-    padding: 2px 12px;
-    font-size: 0.75rem;
-    font-weight: var(--font-weight-600);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--kizuna-ink);
-}
-
 .body {
     margin: 0;
     font-size: 1rem;
@@ -49,11 +38,6 @@
 
     .bodyShort {
         display: inline;
-    }
-
-    .pill {
-        padding: 1px 9px;
-        font-size: 0.6875rem;
     }
 
     .body,

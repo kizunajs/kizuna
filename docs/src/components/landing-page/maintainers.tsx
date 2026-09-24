@@ -8,6 +8,7 @@ interface Maintainer {
     role: string;
     country: string;
     github: string;
+    note: string;
 }
 
 const maintainers: Maintainer[] = [
@@ -17,43 +18,46 @@ const maintainers: Maintainer[] = [
         role: 'Full-stack developer & UX/UI-designer',
         country: 'Norway',
         github: 'sondreorland',
+        note: 'It solved a real problem for us. I hope it does the same for you, and there is a lot more coming.',
     },
 ];
 
 export function Maintainers() {
     return (
-        <ul className={styles.list}>
+        <>
             {maintainers.map((maintainer) => (
-                <li key={maintainer.name} className={styles.person}>
+                <article key={maintainer.name} className={styles.person}>
+                    <p className={styles.note}>{maintainer.note}</p>
                     <div className={styles.identity}>
                         <img
                             className={styles.avatar}
                             src={`https://github.com/${maintainer.github}.png?size=160`}
                             alt=""
-                            width={56}
-                            height={56}
+                            width={48}
+                            height={48}
                             loading="lazy"
                             decoding="async"
                         />
                         <div className={styles.identityText}>
                             <p className={styles.name}>{maintainer.name}</p>
-                            <a className={styles.handle} href={`https://github.com/${maintainer.github}`} target="_blank" rel="noreferrer">
-                                <GithubIcon className={styles.githubIcon} />
-                                <span className={styles.handleText}>{maintainer.github}</span>
-                            </a>
+                            <p className={styles.role}>{maintainer.role}</p>
                         </div>
                     </div>
-                    <p className={styles.role}>{maintainer.role}</p>
                     <div className={styles.meta}>
-                        <span className={styles.title}>{maintainer.title}</span>
+                        <span>{maintainer.title}</span>
                         <span className={styles.divider} aria-hidden />
-                        <span className={styles.country}>
-                            <MapPin className={styles.countryIcon} aria-hidden />
+                        <span className={styles.metaItem}>
+                            <MapPin className={styles.metaIcon} aria-hidden />
                             {maintainer.country}
                         </span>
+                        <span className={styles.divider} aria-hidden />
+                        <a className={styles.handle} href={`https://github.com/${maintainer.github}`} target="_blank" rel="noreferrer">
+                            <GithubIcon className={styles.metaIcon} />
+                            {maintainer.github}
+                        </a>
                     </div>
-                </li>
+                </article>
             ))}
-        </ul>
+        </>
     );
 }

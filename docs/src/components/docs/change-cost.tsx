@@ -1,5 +1,5 @@
 import { Terminal } from 'lucide-react';
-import { Card, Cards } from 'fumadocs-ui/components/card';
+import { Card, Cards } from './cards';
 export function ChangeCost() {
     return (
         <div className="mt-2 mb-8 flex flex-col items-center">

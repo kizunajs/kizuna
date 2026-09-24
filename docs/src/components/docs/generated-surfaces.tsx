@@ -1,9 +1,12 @@
-import { FileText, Globe } from 'lucide-react';
+import clsx from 'clsx';
+import Link from 'next/link';
+import { FileText } from 'lucide-react';
 import type { ComponentType } from 'react';
 import KotlinLogo from '@/icons/Kotlin.svg';
 import McpLogo from '@/icons/Mcp.svg';
 import SwiftLogo from '@/icons/Swift.svg';
 import TypeScriptLogo from '@/icons/TypeScript.svg';
+import styles from './generated-surfaces.module.css';
 
 interface Surface {
     icon: ComponentType<{ className?: string }>;
@@ -13,12 +16,6 @@ interface Surface {
 }
 
 const SURFACES: Surface[] = [
-    {
-        icon: Globe,
-        title: 'REST routes',
-        detail: 'Validated and guarded',
-        href: '/docs/routes',
-    },
     {
         icon: FileText,
         title: 'OpenAPI 3.1',
@@ -53,35 +50,25 @@ const SURFACES: Surface[] = [
 
 export function GeneratedSurfaces() {
     return (
-        <div className="not-prose mt-2 mb-8 flex flex-col items-center">
-            <div className="w-full max-w-md rounded-xl border bg-fd-card px-4 py-3 text-center">
-                <div className="font-mono text-sm font-semibold text-fd-foreground">kizuna.config.ts</div>
-                <div className="mt-1 text-sm text-fd-muted-foreground">Your adapter, routes, identities, jobs and plugins</div>
+        <div className={clsx('not-prose', styles.root)}>
+            <div className={styles.source}>
+                <span className={styles.sourceName}>kizuna.config.ts</span>
+                <span className={styles.sourceText}>Your adapter, routes, identities, jobs and plugins</span>
             </div>
 
-            <div aria-hidden className="hidden h-6 w-px bg-fd-border lg:block" />
-
-            <div aria-hidden className="relative hidden h-5 w-full lg:block">
-                <div className="absolute top-0 right-[calc((100%-3.75rem)/12)] left-[calc((100%-3.75rem)/12)] h-px bg-fd-border" />
-                <div className="grid h-full grid-cols-6 gap-x-3">
-                    {SURFACES.map(({ title }) => (
-                        <div key={title} className="flex justify-center">
-                            <div className="h-full w-px bg-fd-border" />
-                        </div>
-                    ))}
-                </div>
+            <div className={styles.join} aria-hidden>
+                <span className={styles.joinDrop} />
+                <span className={styles.joinRail} />
             </div>
 
-            <div className="grid w-full grid-cols-2 gap-3 pt-3 sm:grid-cols-3 lg:grid-cols-6 lg:pt-0">
+            <div className={styles.grid}>
                 {SURFACES.map(({ icon: Icon, title, detail, href }) => (
-                    <a
-                        key={title}
-                        href={href}
-                        className="flex flex-col items-center gap-1.5 rounded-xl border bg-fd-card px-3 py-4 text-center no-underline transition-colors hover:bg-fd-accent/80">
-                        <Icon className="size-[22px] text-fd-foreground" />
-                        <span className="text-sm font-semibold text-fd-foreground">{title}</span>
-                        <span className="text-[13px] leading-snug text-fd-muted-foreground">{detail}</span>
-                    </a>
+                    <Link key={title} href={href} className={styles.card}>
+                        <span className={styles.stub} aria-hidden />
+                        <Icon className={styles.icon} />
+                        <span className={styles.title}>{title}</span>
+                        <span className={styles.detail}>{detail}</span>
+                    </Link>
                 ))}
             </div>
         </div>

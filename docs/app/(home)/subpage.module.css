@@ -1,0 +1,51 @@
+.page {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--kizuna-page-gap);
+    max-width: var(--kizuna-max-width);
+    margin-inline: auto;
+    padding: var(--kizuna-page-offset) var(--kizuna-gutter) 0;
+}
+
+.pair {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 16px;
+}
+
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.closing {
+    margin-top: 0;
+}
+
+@media (max-width: 1023px) {
+    .pair {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 40px;
+}
+
+@media (min-width: 1024px) {
+    .split {
+        grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+        gap: 64px;
+    }
+
+    .splitHead {
+        position: sticky;
+        top: calc(var(--kizuna-header-height) + 24px);
+        align-self: start;
+    }
+}
