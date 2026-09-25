@@ -47,6 +47,10 @@
 }
 
 @media (max-width: 767px) {
+    .tight {
+        gap: 40px;
+    }
+
     .overlap {
         margin-top: -76px;
     }
