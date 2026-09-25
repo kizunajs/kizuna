@@ -58,6 +58,10 @@ const columns = [
                 href: '/faq',
             },
             {
+                label: 'Releases',
+                href: 'https://github.com/kizunajs/kizuna/releases',
+            },
+            {
                 label: 'GitHub',
                 href: 'https://github.com/kizunajs/kizuna',
             },
