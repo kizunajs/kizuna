@@ -1,0 +1,233 @@
+.playground {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.tabsFrame {
+    container-type: inline-size;
+}
+
+.tabs {
+    display: flex;
+    gap: 2px;
+    max-width: 100%;
+    border-radius: 12px;
+    background-color: var(--kizuna-window);
+    box-shadow: var(--kizuna-window-elevation);
+    padding: 3px;
+    overflow-x: auto;
+}
+
+.tab {
+    display: inline-flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    height: 32px;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    padding: 0 11px;
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-500);
+    white-space: nowrap;
+    color: var(--kizuna-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.tab svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    filter: grayscale(1);
+    opacity: 0.55;
+    transition:
+        filter 0.15s ease,
+        opacity 0.15s ease;
+}
+
+@media (hover: hover) {
+    .tab:hover {
+        color: var(--kizuna-ink);
+    }
+
+    .tab:hover svg {
+        filter: none;
+        opacity: 1;
+    }
+}
+
+.tab:focus-visible {
+    outline: 2px solid var(--kizuna-ink);
+    outline-offset: -2px;
+}
+
+.tabActive {
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    color: var(--kizuna-ink);
+}
+
+.tabActive svg {
+    filter: none;
+    opacity: 1;
+}
+
+.tabsCompact {
+    padding: 3px;
+    border-radius: 9px;
+    background-color: var(--kizuna-surface);
+    box-shadow: none;
+}
+
+.tabsCompact .tab {
+    height: 28px;
+    border-radius: 7px;
+    padding: 0 10px;
+    font-family: var(--kizuna-mono);
+    font-size: 0.75rem;
+}
+
+.stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    height: 660px;
+}
+
+.stage > * {
+    min-height: 0;
+}
+
+.slot {
+    display: flex;
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+.response {
+    position: relative;
+}
+
+.empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 28px 24px 24px;
+    font-size: 0.875rem;
+    color: var(--kizuna-muted);
+    text-align: center;
+    pointer-events: none;
+}
+
+.emptyIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    background-color: var(--kizuna-tint);
+    color: var(--kizuna-muted);
+}
+
+.emptyIcon svg {
+    width: 15px;
+    height: 15px;
+    stroke-width: 2.5;
+}
+
+.requestActions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.requestButton {
+    gap: 6px;
+}
+
+.reset {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--kizuna-control-height-small);
+    height: var(--kizuna-control-height-small);
+    border: none;
+    border-radius: 9px;
+    background: none;
+    padding: 0;
+    color: var(--kizuna-muted);
+    cursor: pointer;
+    transition:
+        color 0.15s ease,
+        opacity 0.15s ease;
+}
+
+@media (hover: hover) {
+    .reset:hover {
+        color: var(--kizuna-ink);
+    }
+}
+
+.reset:focus-visible {
+    outline: 2px solid var(--kizuna-ink);
+    outline-offset: -2px;
+}
+
+.reset:disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.reset svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.5;
+}
+
+.requestButton svg {
+    stroke-width: 2.5;
+}
+
+.call :global(.kizuna-deprecated) {
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+}
+
+.call :global([data-warning])::after {
+    content: '⚠ ' attr(data-warning);
+    display: block;
+    width: fit-content;
+    margin: 8px 0 10px;
+    border-radius: 6px;
+    background-color: var(--kizuna-tint);
+    padding: 2px 8px;
+    font-size: 0.9em;
+    color: var(--kizuna-muted);
+    white-space: normal;
+}
+
+.fileIcon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+@media (max-width: 1023px) {
+    .stage {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 460px 660px;
+        height: auto;
+    }
+}

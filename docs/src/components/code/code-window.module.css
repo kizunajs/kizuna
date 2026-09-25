@@ -4,6 +4,7 @@
     --window-surface: var(--kizuna-window, #f5f5f5);
     --window-line: var(--kizuna-window-line, #e4e4e4);
 
+    position: relative;
     display: flex;
     flex: 1;
     min-width: 0;
@@ -25,6 +26,20 @@
     height: 11px;
     border-radius: 999px;
     background-color: var(--window-line);
+}
+
+.action {
+    position: absolute;
+    top: 0;
+    right: 8px;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    height: 38px;
+}
+
+.actionBelowDots {
+    top: 33px;
 }
 
 .code {
@@ -55,6 +70,31 @@
 
 .code :global(button) {
     display: none !important;
+}
+
+.scroll {
+    min-height: 0;
+}
+
+.scroll .code {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.scroll .code :global(figure) {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+}
+
+.scroll .code :global(.fd-scroll-container) {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--kizuna-line-strong) transparent;
 }
 
 .withCompletion .code :global(pre) {

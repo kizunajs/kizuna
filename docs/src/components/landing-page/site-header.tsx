@@ -29,6 +29,10 @@ const navigation: NavigationItem[] = [
         href: '/docs/reference',
     },
     {
+        label: 'Playground',
+        href: '/playground',
+    },
+    {
         label: 'About',
         href: '/about',
     },
