@@ -82,7 +82,7 @@ Every published tool's name, description, and input schema sits in the model's c
 
 - **What an assistant cannot use.** File uploads, CSV exports, anything returning bytes.
 - **What exists for your own infrastructure.** Health checks, readiness probes, webhook receivers.
-- **What you do not want reached by inference.** Deleting a workspace is a person's decision, guard or no guard. If it does publish, give it a [`confirm`](/docs/tools#say-how-it-behaves).
+- **What you do not want reached by inference.** Deleting a workspace is a person's decision, guard or no guard. If it does publish, give it [`needsApproval`](/docs/tools#say-how-it-behaves).
 
 ## What each tool looks like
 
@@ -204,15 +204,15 @@ Routes with `auth: false` run without guards, credentials or not.
 
 ## Asking before it runs
 
-A route's [`confirm`](/docs/tools#say-how-it-behaves) puts the question to the person before the handler is reached, over MCP's elicitation:
+A route with [`needsApproval`](/docs/tools#say-how-it-behaves) asks the person before the handler is reached, over MCP's elicitation:
 
 ```ts title="src/routes/workspace.ts"
 tool: {
-    confirm: 'This deletes the workspace and everything in it. It cannot be undone.',
+    needsApproval: true,
 },
 ```
 
-The first call answers with the elicitation rather than a result. Agreeing runs the handler; declining leaves it uncalled and answers `isError: true`.
+The first call answers with the elicitation rather than a result, asking `Allow "Delete the workspace, owner only"?` from the route's `summary`, or its `title` when it has one. Approving runs the handler. Declining leaves it uncalled and answers `isError: true`.
 
 ## OAuth
 

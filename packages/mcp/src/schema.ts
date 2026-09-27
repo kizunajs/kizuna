@@ -1,66 +1,13 @@
 import { z } from 'zod';
-import { parsePath } from 'kizunajs/adapter';
 import {
     isJsonMediaType,
     isStreamResponse,
     isSuccessStatus,
     isVoidSchema,
-    readObjectShape,
     resolveResponseBody,
     resolveResponseContentType,
 } from 'kizunajs/generator';
 import type { RouteDefinition } from 'kizunajs';
-
-export interface ToolInputSchema {
-    shape: Record<string, z.ZodType> | undefined;
-    hasParams: boolean;
-    hasQuery: boolean;
-    hasBody: boolean;
-}
-
-export const buildToolInputSchema = (route: RouteDefinition): ToolInputSchema => {
-    const shape: Record<string, z.ZodType> = {};
-    let hasParams = false;
-    let hasQuery = false;
-    let hasBody = false;
-
-    const paramNames = parsePath(route.path).paramNames;
-    if (paramNames.length > 0) {
-        hasParams = true;
-        const paramShape: Record<string, z.ZodType> = {};
-        const explicitShape = (route.pathParams ? readObjectShape(route.pathParams) : undefined) as Record<string, z.ZodType> | undefined;
-        for (const name of paramNames) {
-            paramShape[name] = explicitShape?.[name] ?? z.string();
-        }
-        shape['params'] = z.object(paramShape);
-    }
-
-    if (route.query) {
-        hasQuery = true;
-        shape['query'] = route.query.safeParse({}).success ? route.query.optional() : route.query;
-    }
-
-    if (route.body && !isVoidSchema(route.body)) {
-        hasBody = true;
-        shape['body'] = route.body.safeParse(undefined).success ? route.body.optional() : route.body;
-    }
-
-    if (Object.keys(shape).length === 0) {
-        return {
-            shape: undefined,
-            hasParams,
-            hasQuery,
-            hasBody,
-        };
-    }
-
-    return {
-        shape,
-        hasParams,
-        hasQuery,
-        hasBody,
-    };
-};
 
 /**
  * The `{ status, body }` envelope a tool returns, with `body` carrying the

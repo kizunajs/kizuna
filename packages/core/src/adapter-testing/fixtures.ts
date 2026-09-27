@@ -293,7 +293,61 @@ const securedKConfig = {
     },
 };
 
+export const securedTools = securedK.routes({
+    readProfile: securedK
+        .route({
+            method: 'GET',
+            path: '/profile',
+            auth: 'user',
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                }),
+            },
+            summary: 'Read the signed-in user',
+            tool: true,
+        })
+        .handler(({ auth }) => ({
+            status: 200,
+            body: {
+                userId: auth.user.userId,
+            },
+        })),
+});
+
 export const securedRoutes = securedK.routes({
+    tools: securedTools,
+    profileReply: securedK
+        .route({
+            method: 'GET',
+            path: '/profile-reply',
+            auth: false,
+            responses: {
+                200: {
+                    stream: {
+                        done: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                    tools: securedTools,
+                },
+            },
+        })
+        .handler(({ tools }) => ({
+            status: 200,
+            body: async function* () {
+                const result = yield* tools.run({
+                    id: 'call_1',
+                    name: 'read_profile',
+                });
+                yield {
+                    event: 'done',
+                    data: {
+                        ok: result.state === 'done',
+                    },
+                };
+            },
+        })),
     publicRoute: securedK
         .route({
             method: 'GET',

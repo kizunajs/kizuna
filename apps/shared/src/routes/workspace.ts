@@ -158,7 +158,7 @@ const workspaceInfo = k.routes('workspace', {
             },
             summary: 'Delete the workspace, owner only',
             tool: {
-                confirm: 'This deletes the workspace and everything in it. It cannot be undone.',
+                needsApproval: true,
             },
         })
         .handler(async ({ auth }) => ({

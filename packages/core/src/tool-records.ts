@@ -1,7 +1,7 @@
 /**
- * How far along one tool call is.
+ * How far along one tool call is. `needs-approval` waits for the person.
  */
-export type ToolCallState = 'running' | 'done' | 'failed';
+export type ToolCallState = 'running' | 'needs-approval' | 'done' | 'failed';
 
 /**
  * The shape {@link readToolCalls} reads: whatever a stream hands back, as long
@@ -87,13 +87,21 @@ export const readToolCalls = <Message extends ToolCallMessage>(messages: Iterabl
     };
 
     for (const message of messages) {
-        const data = message.data as { id?: unknown; name?: unknown; input?: unknown; output?: unknown; message?: unknown };
+        const data = message.data as {
+            id?: unknown;
+            name?: unknown;
+            input?: unknown;
+            output?: unknown;
+            message?: unknown;
+            needsApproval?: unknown;
+        };
         if (typeof data?.id !== 'string' || typeof data.name !== 'string') continue;
 
         switch (message.event) {
             case 'tool_call': {
                 const call = at(data.id, data.name);
                 call.input = data.input;
+                if (data.needsApproval === true && call.state === 'running') call.state = 'needs-approval';
                 break;
             }
             case 'tool_result': {

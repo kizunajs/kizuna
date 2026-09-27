@@ -1,8 +1,9 @@
-import { countWords, replyWords } from '../assistant';
+import { countWords, noteCallFor, replyFor, replyWords } from '../assistant';
 import { z } from 'zod';
-import { ProblemDetailsSchema } from 'kizunajs/schemas';
+import { ProblemDetailsSchema, ToolAnswerSchema } from 'kizunajs/schemas';
 import { k } from '../k';
 import { assistantTools } from './assistant-tools';
+import { noteRoutes } from './notes';
 
 export const assistantRoutes = k.routes('assistant', {
     reply: k
@@ -48,6 +49,45 @@ export const assistantRoutes = k.routes('assistant', {
                     data: {
                         inputTokens: countWords(body.prompt),
                         outputTokens,
+                    },
+                };
+            },
+        })),
+    chat: k
+        .route({
+            method: 'POST',
+            path: '/assistant/chat',
+            auth: 'user',
+            body: z.object({
+                prompt: z.string().min(1),
+                answer: ToolAnswerSchema.optional(),
+            }),
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                    },
+                    tools: {
+                        notes: noteRoutes,
+                    },
+                },
+                400: ProblemDetailsSchema,
+            },
+            summary: 'Chat with an assistant that keeps notes for the signed-in user, exercises tools on a stream',
+        })
+        .handler(({ body, tools }) => ({
+            status: 200,
+            body: async function* () {
+                // An answer runs the call the person saw, not a new one.
+                const call = body.answer?.call ?? noteCallFor(body.prompt);
+                const result = yield* tools.run(call, body.answer);
+                if (result.state === 'needs-approval') return;
+                yield {
+                    event: 'delta',
+                    data: {
+                        text: replyFor(result),
                     },
                 };
             },

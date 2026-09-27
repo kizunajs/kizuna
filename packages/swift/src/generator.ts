@@ -1033,6 +1033,8 @@ const emitToolTracking = (writer: SwiftWriter, method: RouteMethod): void => {
         writer.line('/// How far along the call is.');
         writer.block('public enum State: Sendable, Equatable', () => {
             writer.line('case running');
+            writer.line('/// The call waits for the person to approve it.');
+            writer.line('case needsApproval');
             writer.line('case done');
             writer.line('case failed');
         });
@@ -1066,6 +1068,9 @@ const emitToolTracking = (writer: SwiftWriter, method: RouteMethod): void => {
                 writer.line('case .tool_call(let payload):');
                 writer.line('    var tracked = at(payload.id, payload.name)');
                 writer.line('    tracked.call = payload');
+                writer.line('    if payload.needsApproval == true, tracked.state == .running {');
+                writer.line('        tracked.state = .needsApproval');
+                writer.line('    }');
                 writer.line('    calls[payload.id] = tracked');
             }
             if (names.has('tool_result')) {

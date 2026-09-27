@@ -1014,24 +1014,28 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         sealed interface ToolCall {
             val id: String
             val name: String
+            val needsApproval: Boolean?
 
             @SerialName("getForecast")
             @Serializable
             data class GetForecast(val value: ToolCallGetForecast) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
             }
             @SerialName("plotSignups")
             @Serializable
             data class PlotSignups(val value: ToolCallPlotSignups) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
             }
             @SerialName("countWords")
             @Serializable
             data class CountWords(val value: ToolCallCountWords) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
             }
         }
 
@@ -1039,6 +1043,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class ToolCallGetForecast(
             val id: String,
             val name: String,
+            val needsApproval: Boolean? = null,
             val input: ToolCallGetForecastInput
         )
 
@@ -1064,6 +1069,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class ToolCallPlotSignups(
             val id: String,
             val name: String,
+            val needsApproval: Boolean? = null,
             val input: ToolCallPlotSignupsInput
         )
 
@@ -1077,6 +1083,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class ToolCallCountWords(
             val id: String,
             val name: String,
+            val needsApproval: Boolean? = null,
             val input: ToolCallCountWordsInput
         )
 
@@ -1198,7 +1205,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             val message: String? = null,
         ) {
             /** How far along the call is. */
-            enum class State { Running, Done, Failed }
+            enum class State { Running, NeedsApproval, Done, Failed }
         }
 
         /** Fold a stream's events into one row per tool call, in the order the calls arrived. */
@@ -1206,7 +1213,10 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
             val calls = LinkedHashMap<String, ToolCallRecord>()
             for (event in events) {
                 when (event) {
-                    is Event.ToolCall -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
+                    is Event.ToolCall -> {
+                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
+                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                    }
                     is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
@@ -1227,6 +1237,205 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: API.ProblemDetails) : Failure()
+            data class ValidationError(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object AssistantChat {
+
+        @Serializable
+        data class Input(
+            val prompt: String,
+            val answer: InputAnswer? = null
+        )
+
+        @Serializable
+        data class InputAnswer(
+            val call: InputAnswerCall,
+            val approved: Boolean
+        )
+
+        @Serializable
+        data class InputAnswerCall(
+            val id: String,
+            val name: String,
+            val input: JsonElement? = null
+        )
+
+        @Serializable
+        data class Delta(val text: String)
+
+        @OptIn(ExperimentalSerializationApi::class)
+        @JsonClassDiscriminator("name")
+        @Serializable
+        sealed interface ToolCall {
+            val id: String
+            val name: String
+            val needsApproval: Boolean?
+
+            @SerialName("notes.list")
+            @Serializable
+            data class Notes_list(val value: ToolCallNotesList) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
+            }
+            @SerialName("notes.add")
+            @Serializable
+            data class Notes_add(val value: ToolCallNotesAdd) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
+            }
+        }
+
+        @Serializable
+        data class ToolCallNotesList(
+            val id: String,
+            val name: String,
+            val needsApproval: Boolean? = null
+        )
+
+        @Serializable
+        data class ToolCallNotesAdd(
+            val id: String,
+            val name: String,
+            val needsApproval: Boolean? = null,
+            val input: ToolCallNotesAddInput
+        )
+
+        @Serializable
+        data class ToolCallNotesAddInput(val body: ToolCallNotesAddInputBody)
+
+        @Serializable
+        data class ToolCallNotesAddInputBody(val text: String)
+
+        @OptIn(ExperimentalSerializationApi::class)
+        @JsonClassDiscriminator("name")
+        @Serializable
+        sealed interface ToolResult {
+            val id: String
+            val name: String
+
+            @SerialName("notes.list")
+            @Serializable
+            data class Notes_list(val value: ToolResultNotesList) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("notes.add")
+            @Serializable
+            data class Notes_add(val value: ToolResultNotesAdd) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+        }
+
+        @Serializable
+        data class ToolResultNotesList(
+            val id: String,
+            val name: String,
+            val output: ToolResultNotesListOutput
+        )
+
+        @Serializable
+        data class ToolResultNotesListOutput(val notes: List<ToolResultNotesListOutputNotesItem>)
+
+        @Serializable
+        data class ToolResultNotesListOutputNotesItem(
+            val id: String,
+            val text: String
+        )
+
+        @Serializable
+        data class ToolResultNotesAdd(
+            val id: String,
+            val name: String,
+            val output: ToolResultNotesAddOutput
+        )
+
+        @Serializable
+        data class ToolResultNotesAddOutput(
+            val id: String,
+            val text: String
+        )
+
+        @Serializable
+        data class ToolError(
+            val id: String,
+            val name: ToolErrorName,
+            val message: String
+        )
+
+        @Serializable
+        enum class ToolErrorName(override val wireValue: String) : KizunaQueryValue {
+            @SerialName("notes.list") NOTES_LIST("notes.list"),
+            @SerialName("notes.add") NOTES_ADD("notes.add")
+        }
+
+        data class Body(
+            val prompt: String,
+            val answer: InputAnswer? = null
+        )
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(prompt: String, answer: InputAnswer? = null): AfterBody = AfterBody(body = Body(prompt = prompt, answer = answer))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        /** One tool call, with its result once it answered. */
+        data class ToolCallRecord(
+            val id: String,
+            val name: String,
+            val state: State = State.Running,
+            /** The call as it arrived, to read its input. */
+            val call: ToolCall? = null,
+            /** The result once it answered, to read its output. */
+            val result: ToolResult? = null,
+            /** What the tool reported when it failed. */
+            val message: String? = null,
+        ) {
+            /** How far along the call is. */
+            enum class State { Running, NeedsApproval, Done, Failed }
+        }
+
+        /** Fold a stream's events into one row per tool call, in the order the calls arrived. */
+        fun readToolCalls(events: List<Event>): List<ToolCallRecord> {
+            val calls = LinkedHashMap<String, ToolCallRecord>()
+            for (event in events) {
+                when (event) {
+                    is Event.ToolCall -> {
+                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
+                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                    }
+                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
+                    else -> Unit
+                }
+            }
+            return calls.values.toList()
+        }
+
+        sealed interface Event {
+            data class Delta(val data: APIClient.AssistantChat.Delta) : Event
+            data class ToolCall(val data: APIClient.AssistantChat.ToolCall) : Event
+            data class ToolResult(val data: APIClient.AssistantChat.ToolResult) : Event
+            data class ToolError(val data: APIClient.AssistantChat.ToolError) : Event
+        }
+
+        data class Result(val body: Flow<Event>)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: API.ProblemDetails) : Failure()
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
             data class ValidationError(val body: APIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
@@ -1344,6 +1553,61 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object NotesList {
+
+        @Serializable
+        data class Response(val notes: List<ResponseNotesItem>)
+
+        @Serializable
+        data class ResponseNotesItem(
+            val id: String,
+            val text: String
+        )
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object NotesAdd {
+
+        @Serializable
+        data class Input(val text: String)
+
+        @Serializable
+        data class Response201(
+            val id: String,
+            val text: String
+        )
+
+        data class Body(val text: String)
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(text: String): AfterBody = AfterBody(body = Body(text = text))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        data class Result(val body: Response201)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object DiagnosticsWhoAmI {
 
         @Serializable
@@ -1376,6 +1640,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     val assistant = APIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val tools = APIToolsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val notes = APINotesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 }
@@ -2664,6 +2930,66 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             }
         }
     }
+
+    /** Chat with an assistant that keeps notes for the signed-in user, exercises tools on a stream */
+    @Throws(APIClient.AssistantChat.Failure::class)
+    suspend fun chat(build: APIClient.AssistantChat.Scope.() -> APIClient.AssistantChat.Args): APIClient.AssistantChat.Result {
+        val args = APIClient.AssistantChat.Scope.build()
+        val body = args.body
+        val path = "/assistant/chat"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = APIClient.AssistantChat.Input(prompt = body.prompt, answer = body.answer)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+        if (httpResponse.code == 200) {
+            val body = Kizuna.events<APIClient.AssistantChat.Event>(httpResponse) { event ->
+                when (event.event) {
+                    "delta" -> APIClient.AssistantChat.Event.Delta(json.decodeFromString<APIClient.AssistantChat.Delta>(event.data))
+                    "tool_call" -> APIClient.AssistantChat.Event.ToolCall(json.decodeFromString<APIClient.AssistantChat.ToolCall>(event.data))
+                    "tool_result" -> APIClient.AssistantChat.Event.ToolResult(json.decodeFromString<APIClient.AssistantChat.ToolResult>(event.data))
+                    "tool_error" -> APIClient.AssistantChat.Event.ToolError(json.decodeFromString<APIClient.AssistantChat.ToolError>(event.data))
+                    else -> null
+                }
+            }
+            return APIClient.AssistantChat.Result(body = body)
+        }
+        return httpResponse.use {
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                400 -> {
+                    val badRequest = try {
+                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                    } catch (_: Exception) { null }
+                    if (badRequest != null) throw APIClient.AssistantChat.Failure.BadRequest(body = badRequest)
+                    val validationError = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (_: Exception) { null }
+                    if (validationError != null) throw APIClient.AssistantChat.Failure.ValidationError(body = validationError)
+                    throw APIClient.AssistantChat.Failure.Unexpected(statusCode = statusCode, data = data)
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantChat.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantChat.Failure.Forbidden(body = payload)
+                }
+                else -> throw APIClient.AssistantChat.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
 }
 
 class APIToolsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -2782,6 +3108,98 @@ class APIToolsClient(private val client: OkHttpClient, private val baseUrl: Stri
                     throw APIClient.ToolsCountWords.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.ToolsCountWords.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
+class APINotesClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** List the notes the signed-in user has saved */
+    @Throws(APIClient.NotesList.Failure::class)
+    suspend fun list(): APIClient.NotesList.Result {
+        val path = "/notes"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.NotesList.Response>(data.decodeToString())
+                        return@use APIClient.NotesList.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.NotesList.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.NotesList.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.NotesList.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.NotesList.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.NotesList.Failure.Forbidden(body = payload)
+                }
+                else -> throw APIClient.NotesList.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Save a note for the signed-in user */
+    @Throws(APIClient.NotesAdd.Failure::class)
+    suspend fun add(build: APIClient.NotesAdd.Scope.() -> APIClient.NotesAdd.Args): APIClient.NotesAdd.Result {
+        val args = APIClient.NotesAdd.Scope.build()
+        val body = args.body
+        val path = "/notes"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = APIClient.NotesAdd.Input(text = body.text)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                201 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.NotesAdd.Response201>(data.decodeToString())
+                        return@use APIClient.NotesAdd.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.NotesAdd.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.NotesAdd.Failure.Forbidden(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.NotesAdd.Failure.BadRequest(body = payload)
+                }
+                else -> throw APIClient.NotesAdd.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

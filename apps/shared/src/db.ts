@@ -36,6 +36,13 @@ export interface Invite {
 
 const invites = new Map<string, Invite>([['inv_9x2k7q', { id: 'invite_1', email: 'grace@example.com', sentBy: '2' }]]);
 
+export interface Note {
+    id: string;
+    text: string;
+}
+
+const notes = new Map<string, Note[]>([['2', [{ id: 'note_1', text: 'Review the scheduler patch before Friday' }]]]);
+
 /**
  * In-memory stand-in for a real data layer, async to mimic a database.
  */
@@ -81,6 +88,18 @@ export const db = {
     workspaces: {
         findById: async (id: string): Promise<{ id: string; name: string } | null> => workspaces.get(id) ?? null,
         delete: async (id: string): Promise<boolean> => workspaces.delete(id),
+    },
+    notes: {
+        findByUser: async (userId: string): Promise<Note[]> => notes.get(userId) ?? [],
+        add: async (userId: string, text: string): Promise<Note> => {
+            const owned = notes.get(userId) ?? [];
+            const note = {
+                id: `note_${owned.length + 1}`,
+                text,
+            };
+            notes.set(userId, [...owned, note]);
+            return note;
+        },
     },
     invites: {
         findByToken: async (token: string): Promise<Invite | null> => invites.get(token) ?? null,

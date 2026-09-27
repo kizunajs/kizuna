@@ -1,4 +1,39 @@
+import { readToolCalls, type ToolAnswer } from 'kizunajs';
 import { apiClient } from '../lib/api-client';
+
+const collect = async <Message>(stream: AsyncIterable<Message>): Promise<Message[]> => {
+    const messages: Message[] = [];
+    for await (const message of stream) messages.push(message);
+    return messages;
+};
+
+/**
+ * One turn of `assistant.chat`, with every message it streamed.
+ */
+const chat = async (prompt: string, headers: Record<string, string>, answer?: ToolAnswer) => {
+    const result = await apiClient.assistant.chat({
+        body: {
+            prompt,
+            ...(answer === undefined
+                ? {}
+                : {
+                      answer,
+                  }),
+        },
+        headers,
+    });
+    return result.status === 200 ? collect(result.body) : [];
+};
+
+/**
+ * Each tool call as one row, then what the assistant said.
+ */
+const show = (messages: Awaited<ReturnType<typeof chat>>): void => {
+    for (const call of readToolCalls(messages)) console.log(`  ${call.name}: ${call.state}`);
+    for (const message of messages) {
+        if (message.event === 'delta') console.log(`  ${message.data.text}`);
+    }
+};
 
 const main = async () => {
     console.log('--- listUsers ---');
@@ -87,6 +122,33 @@ const main = async () => {
             if (message.event === 'done') console.log(`\n(${message.data.outputTokens} tokens)`);
         }
     }
+
+    console.log('--- assistant.chat (runs the notes routes as tools, as whoever is signed in) ---');
+    const asAda = {
+        authorization: 'Bearer tok_ada',
+    };
+    const remember = 'remember the demo is on Friday';
+
+    const asked = await chat(remember, asAda);
+    show(asked);
+    const [waiting] = readToolCalls(asked);
+    if (waiting?.state === 'needs-approval' && waiting.name === 'notes.add') {
+        console.log(`the assistant wants to save "${waiting.input.body.text}", approving`);
+        show(
+            await chat(remember, asAda, {
+                call: waiting,
+                approved: true,
+            })
+        );
+    }
+
+    console.log('--- assistant.chat as Ada, then as Linus: each reads their own notes ---');
+    show(await chat('what do you remember?', asAda));
+    show(
+        await chat('what do you remember?', {
+            authorization: 'Bearer tok_linus',
+        })
+    );
 };
 
 main().catch((error: unknown) => {

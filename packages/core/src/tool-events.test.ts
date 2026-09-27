@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { toolEvents } from './tool-events.js';
+import { streamToolsOf, toolEvents } from './tool-events.js';
 import { formatEvent } from './stream.js';
 import { Kizuna } from './kizuna.js';
 
@@ -182,6 +182,64 @@ describe('toolEvents', () => {
     });
 });
 
+describe('a tool answering with a status other than 200', () => {
+    const events = toolEvents(
+        toolRoutesK.routes({
+            addReminder: toolRoutesK.route({
+                method: 'POST',
+                path: '/reminders',
+                body: z.object({
+                    text: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                    }),
+                },
+                summary: 'Add a reminder',
+                tool: {
+                    needsApproval: true,
+                },
+            }),
+        })
+    );
+
+    it('carries the 201 body as the output', () => {
+        expect(
+            events.tool_result.safeParse({
+                id: 'call_1',
+                name: 'addReminder',
+                output: {
+                    id: 'reminder_1',
+                },
+            }).success
+        ).toBe(true);
+        expect(
+            events.tool_result.safeParse({
+                id: 'call_1',
+                name: 'addReminder',
+            }).success
+        ).toBe(false);
+    });
+
+    it('lets a call say it waits for approval', () => {
+        expect(
+            events.tool_call.parse({
+                id: 'call_1',
+                name: 'addReminder',
+                needsApproval: true,
+                input: {
+                    body: {
+                        text: 'Stand up',
+                    },
+                },
+            })
+        ).toMatchObject({
+            needsApproval: true,
+        });
+    });
+});
+
 describe('the wire a tool event produces', () => {
     it('frames a call and its result as named server-sent events', () => {
         const call = formatEvent(
@@ -262,6 +320,104 @@ describe('expandStreamTools', () => {
         };
         expect(Object.keys(response.stream)).toEqual(['delta', 'tool_call', 'tool_result', 'tool_error']);
         expect('tools' in response).toBe(false);
+        expect(streamToolsOf(response)).toBe(declared);
+    });
+
+    it('throws on a named route that does not declare tool', () => {
+        const undeclared = k.routes({
+            countLines: k.route({
+                method: 'POST',
+                path: '/line-count',
+                responses: {
+                    200: z.object({
+                        lines: z.int(),
+                    }),
+                },
+            }),
+        });
+        expect(() =>
+            k.routes({
+                reply: k.route({
+                    method: 'POST',
+                    path: '/reply',
+                    responses: {
+                        200: {
+                            stream: {
+                                delta: z.object({
+                                    text: z.string(),
+                                }),
+                            },
+                            tools: undeclared,
+                        },
+                    },
+                }),
+            })
+        ).toThrow(/naming "countLines", which does not declare `tool`/);
+    });
+
+    it('throws on a named route that streams', () => {
+        const streaming = k.routes({
+            tail: k.route({
+                method: 'GET',
+                path: '/tail',
+                responses: {
+                    200: {
+                        stream: z.object({
+                            line: z.string(),
+                        }),
+                    },
+                },
+                summary: 'Follow the log',
+                tool: true,
+            }),
+        });
+        expect(() =>
+            k.routes({
+                reply: k.route({
+                    method: 'POST',
+                    path: '/reply',
+                    responses: {
+                        200: {
+                            stream: {
+                                delta: z.object({
+                                    text: z.string(),
+                                }),
+                            },
+                            tools: streaming,
+                        },
+                    },
+                }),
+            })
+        ).toThrow(/naming "tail", which cannot run as a tool: it streams/);
+    });
+
+    it('throws when two responses name tools', () => {
+        expect(() =>
+            k.routes({
+                reply: k.route({
+                    method: 'POST',
+                    path: '/reply',
+                    responses: {
+                        200: {
+                            stream: {
+                                delta: z.object({
+                                    text: z.string(),
+                                }),
+                            },
+                            tools: declared,
+                        },
+                        206: {
+                            stream: {
+                                delta: z.object({
+                                    text: z.string(),
+                                }),
+                            },
+                            tools: declared,
+                        },
+                    },
+                }),
+            })
+        ).toThrow(/name them on one response/);
     });
 
     it('throws when the stream already names a tool event', () => {

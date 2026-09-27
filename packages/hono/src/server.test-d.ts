@@ -2,6 +2,7 @@ import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import type { HandlerContextOf, ApiRouter } from 'kizunajs/adapter';
+import type { ToolDefinition, ToolRunResult } from 'kizunajs';
 import type { Env } from 'hono';
 import type { GuardRun, RequestContextRun } from 'kizunajs/adapter';
 import {
@@ -10,6 +11,7 @@ import {
     inferenceContract,
     inferenceGroupContract,
     streamInferenceContract,
+    streamToolsContract,
     inferenceRoutes,
     pluginTypeContract,
     requestContextContract,
@@ -121,6 +123,40 @@ test('conforms to the shared adapter type catalogue', () => {
                 },
             });
             void wrongEvent;
+        },
+        'streams.toolsArg': () => {
+            const reply: Handlers<typeof streamToolsContract>['reply'] = async ({ tools }) => ({
+                status: 200,
+                body: async function* () {
+                    expectTypeOf(tools.definitions).toEqualTypeOf<ToolDefinition[]>();
+                    const result = yield* tools.run({
+                        id: 'call_1',
+                        name: 'count_words',
+                        input: {
+                            body: {
+                                text: 'one two',
+                            },
+                        },
+                    });
+                    expectTypeOf(result).toEqualTypeOf<ToolRunResult>();
+                    yield {
+                        event: 'done',
+                        data: {
+                            ok: result.state === 'done',
+                        },
+                    };
+                },
+            });
+            void reply;
+            // @ts-expect-error a stream naming no tools gives its handler no `tools`
+            const untooled: Handlers<typeof streamInferenceContract>['reply'] = async ({ tools }) => {
+                void tools;
+                return {
+                    status: 200,
+                    body: async function* () {},
+                };
+            };
+            void untooled;
         },
         'streams.bodyRejectsValue': () => {
             // @ts-expect-error a streamed status takes a generator, not a value
