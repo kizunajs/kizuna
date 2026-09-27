@@ -168,6 +168,9 @@ export const ADAPTER_FEATURES = {
     'streams.midStreamErrorTruncates': {
         summary: 'A throw after the first message ends the connection, so the client’s read fails.',
     },
+    'streams.toolsRunAsCaller': {
+        summary: 'A tool a stream runs passes its guard with the credentials of the request that is streaming.',
+    },
     'streams.itemValidation': {
         summary: 'With `responseValidation` on, a message failing its schema ends the stream.',
     },

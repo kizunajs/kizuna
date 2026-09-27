@@ -198,3 +198,18 @@ test('pathParams has to match the path', () => {
         },
     });
 });
+
+test('tool rejects an option it does not know', () => {
+    k.route({
+        method: 'GET',
+        path: '/users',
+        responses: {
+            200: UserSchema,
+        },
+        summary: 'List users',
+        tool: {
+            // @ts-expect-error `needsAproval` is misspelled
+            needsAproval: true,
+        },
+    });
+});

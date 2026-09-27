@@ -54,11 +54,13 @@ A tool is a route a model may call. Settled; don't relitigate.
 
 - A tool is not a second kind of declaration. A route says `tool` and it publishes, so there is one place a route runs whoever asked.
 - `tool: true` takes the route's `summary` as what a model reads, so a route that publishes carries one. The object form's fields are MCP's own, field for field: `description`, `title`, `readOnlyHint`, `idempotentHint`, `destructiveHint`, `openWorldHint`.
-- `confirm` is kizuna's own, and the one field MCP cannot declare. It asks the person over MCP elicitation before the handler runs, and declining leaves it uncalled. It sits on the declaration because the handler also answers HTTP, where there is nobody to ask.
+- `needsApproval` is kizuna's own, the one field MCP cannot declare: the person approves each call before it runs. It is a boolean. A rule that depends on the input belongs in the handler.
 - The hints default from the method's RFC 9110 semantics. Declare one only to say what the method cannot.
 - A tool is addressed by its dotted key, `weather.getForecast`, and publishes as `weather_get_forecast`.
 - A route that streams, or that takes a form body, never publishes: a tool result is one value and tool input is JSON.
-- A streamed response names routes under `tools`, adding `tool_call`, `tool_result` and `tool_error` to the events it declares.
+- A streamed response names routes under `tools`, adding `tool_call`, `tool_result` and `tool_error` to the events it declares. Every route it names declares `tool`.
+- Its handler receives `tools`: `definitions` for the model, and `run`, which runs a call as the caller. The body delegates to it with `yield*`.
+- On a stream, a call that needs approval returns `needs-approval` and runs nothing. The client sends the call back as a `ToolAnswer`, and the handler runs `run(answer.call, answer)`.
 - `readToolCalls` folds a message list into one row per call. Core exports it; the Swift and Kotlin generators emit it per route.
 
 Deliberate omissions: no LLM clients, no agent loop, no provider wire shapes, and no progressive tool input.

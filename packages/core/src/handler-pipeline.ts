@@ -19,6 +19,7 @@ import type { ContextOf } from './security-scheme.js';
 import type { GuardHoldings, IdentityRole } from './identity.js';
 import { applyCoercion, coercionPlanFor } from './coercion.js';
 import type { ProblemDetails, StripProblemEnvelope } from './problem-details.js';
+import type { StreamTools } from './tool-runner.js';
 
 /**
  * True when a literal status key is in the 4xx/5xx range. Widened `number` keys (no
@@ -70,7 +71,20 @@ export type ThrowableReturn<R extends Pick<RouteDefinition, 'responses'>> = {
     [Status in Exclude<keyof R['responses'], StreamStatuses<R>>]: ResponseReturn<R, Status>;
 }[Exclude<keyof R['responses'], StreamStatuses<R>>];
 
-export type HandlerArgs<R extends RouteDefinition> = {
+type StreamToolsOf<R extends RouteDefinition> = {
+    [Status in keyof R['responses']]: R['responses'][Status] extends { stream: unknown; tools: infer Tools extends Routes } ? Tools : never;
+}[keyof R['responses']];
+
+type ToolsArg<R extends RouteDefinition> = [StreamToolsOf<R>] extends [never]
+    ? {}
+    : {
+          /**
+           * Runs the routes this response names under `tools`, as the caller.
+           */
+          tools: StreamTools<StreamToolsOf<R>>;
+      };
+
+export type HandlerArgs<R extends RouteDefinition> = ToolsArg<R> & {
     params: R extends { pathParams: z.ZodType } ? z.output<R['pathParams']> : ExtractPathParams<R['path']>;
     query: R extends { query: z.ZodType } ? z.output<R['query']> : undefined;
     body: R extends { body: z.ZodType } ? z.output<R['body']> : undefined;

@@ -44,9 +44,11 @@ export namespace API {
         subject: string;
     };
 
+    export type EventKind = "login" | "logout" | "signup";
+
     export type EventRecord = {
         id: string;
-        kind: "login" | "logout" | "signup";
+        kind: EventKind;
         occurredAt: string;
         userId: string;
     };
@@ -58,6 +60,8 @@ export namespace API {
         detail: string;
         code?: "unauthenticated" | "expired_token" | "forbidden" | "not_found";
     };
+
+    export type NotificationEvent = EmailEvent | SmsEvent;
 
     /**
      * RFC 9457 Problem Details error response.
@@ -122,11 +126,30 @@ export namespace API {
         avatar?: {
             id: string;
             url: string;
-        };
+        } | null;
         avatars?: Array<{
             id: string;
             url: string;
         }>;
+        /**
+         * Free-form string map, exercises a record through the generators.
+         */
+        metadata?: Record<string, string>;
+        /**
+         * Entries may be null, exercises a nullable array element, which `optional` cannot express.
+         */
+        tags?: Array<string | null>;
+    };
+
+    export type UserSessionEvent = {
+        kind: "login";
+        at: string;
+        ipAddress: string;
+        userAgent: string;
+    } | {
+        kind: "logout";
+        at: string;
+        reason: "signed_out" | "session_expired";
     };
 
     /**
@@ -191,16 +214,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: {
-                kind: "login";
-                at: string;
-                ipAddress: string;
-                userAgent: string;
-            } | {
-                kind: "logout";
-                at: string;
-                reason: "signed_out" | "session_expired";
-            }; headers: Record<string, string> }
+            | { status: 200; body: UserSessionEvent; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
@@ -214,7 +228,7 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 users: Array<User>;
-                nextCursor?: number | null;
+                nextCursor: number | null;
             }; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
@@ -287,7 +301,7 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: {
-                alreadyArchived: "true";
+                alreadyArchived: true;
                 userId: string;
             }; headers: Record<string, string> }
             | { status: 201; body: {
@@ -314,8 +328,6 @@ export namespace API {
         export type Params = {
             id: string;
         };
-
-        export type Body = undefined;
 
         export type Result =
             | { status: 204; body: undefined; headers: Record<string, string> }
@@ -373,7 +385,7 @@ export namespace API {
     }
 
     export namespace NotificationsSendNotification {
-        export type Body = EmailEvent | SmsEvent;
+        export type Body = NotificationEvent;
 
         export type Result =
             | { status: 202; body: {
@@ -388,7 +400,7 @@ export namespace API {
              * Lower bound for occurredAt, wire format is ISO-8601
              */
             since?: string;
-            kind?: "login" | "logout" | "signup";
+            kind?: EventKind;
             /**
              * Filter by id; repeated query param
              */
@@ -407,12 +419,12 @@ export namespace API {
             | { status: 200; body: {
                 events: Array<EventRecord>;
                 echo: {
-                    since?: string | null;
-                    kind?: "login" | "logout" | "signup" | null;
-                    ids?: Array<string> | null;
-                    label?: string | null;
-                    tagIds?: Array<string> | null;
-                    sessionId?: string | null;
+                    since: string | null;
+                    kind: EventKind | null;
+                    ids: Array<string> | null;
+                    label: string | null;
+                    tagIds: Array<string> | null;
+                    sessionId: string | null;
                 };
             }; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
@@ -565,6 +577,7 @@ export namespace API {
             }; id?: string; retry?: number } | { event: 'tool_call'; data: {
                 id: string;
                 name: "getForecast";
+                needsApproval?: true;
                 input: {
                     params: {
                         city: string;
@@ -576,6 +589,7 @@ export namespace API {
             } | {
                 id: string;
                 name: "plotSignups";
+                needsApproval?: true;
                 input: {
                     query: {
                         days: number;
@@ -584,6 +598,7 @@ export namespace API {
             } | {
                 id: string;
                 name: "countWords";
+                needsApproval?: true;
                 input: {
                     body: {
                         text: string;
@@ -618,6 +633,63 @@ export namespace API {
                 message: string;
             }; id?: string; retry?: number }>; headers: Record<string, string> }
             | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace AssistantChat {
+        export type Body = {
+            prompt: string;
+            answer?: {
+                call: {
+                    id: string;
+                    name: string;
+                    input?: unknown;
+                };
+                approved: boolean;
+            };
+        };
+
+        export type Result =
+            | { status: 200; body: AsyncIterable<{ event: 'delta'; data: {
+                text: string;
+            }; id?: string; retry?: number } | { event: 'tool_call'; data: {
+                id: string;
+                name: "notes.list";
+                needsApproval?: true;
+            } | {
+                id: string;
+                name: "notes.add";
+                needsApproval?: true;
+                input: {
+                    body: {
+                        text: string;
+                    };
+                };
+            }; id?: string; retry?: number } | { event: 'tool_result'; data: {
+                id: string;
+                name: "notes.list";
+                output: {
+                    notes: Array<{
+                        id: string;
+                        text: string;
+                    }>;
+                };
+            } | {
+                id: string;
+                name: "notes.add";
+                output: {
+                    id: string;
+                    text: string;
+                };
+            }; id?: string; retry?: number } | { event: 'tool_error'; data: {
+                id: string;
+                name: "notes.list" | "notes.add";
+                message: string;
+            }; id?: string; retry?: number }>; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
     }
 
     export namespace ToolsGetForecast {
@@ -662,6 +734,37 @@ export namespace API {
             | { status: 200; body: {
                 words: number;
             }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace NotesList {
+        export type Result =
+            | { status: 200; body: {
+                notes: Array<{
+                    id: string;
+                    text: string;
+                }>;
+            }; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
+    }
+
+    export namespace NotesAdd {
+        export type Body = {
+            text: string;
+        };
+
+        export type Result =
+            | { status: 201; body: {
+                id: string;
+                text: string;
+            }; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 }
@@ -854,12 +957,10 @@ export interface Client {
          *     params: {
          *         id: '1',
          *     },
-         *     body: undefined,
          * });
          */
         pingUser: ClientMethod<'POST', false, {
             params: API.UsersPingUser.Params;
-            body: API.UsersPingUser.Body;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.UsersPingUser.Result>;
@@ -1121,6 +1222,21 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.AssistantReply.Result>;
+        /**
+         * Chat with an assistant that keeps notes for the signed-in user, exercises tools on a stream
+         *
+         * @example
+         * const result = await client.assistant.chat({
+         *     body: {
+         *         prompt: 'string',
+         *     },
+         * });
+         */
+        chat: ClientMethod<'POST', true, {
+            body: API.AssistantChat.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.AssistantChat.Result>;
     };
     tools: {
         /**
@@ -1169,6 +1285,33 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.ToolsCountWords.Result>;
+    };
+    notes: {
+        /**
+         * List the notes the signed-in user has saved
+         *
+         * @example
+         * const result = await client.notes.list();
+         */
+        list: ClientMethod<'GET', false, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.NotesList.Result>;
+        /**
+         * Save a note for the signed-in user
+         *
+         * @example
+         * const result = await client.notes.add({
+         *     body: {
+         *         text: 'string',
+         *     },
+         * });
+         */
+        add: ClientMethod<'POST', false, {
+            body: API.NotesAdd.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.NotesAdd.Result>;
     };
 }
 
@@ -1444,6 +1587,16 @@ const routes: GeneratedRoutes = {
                 400: {},
             },
         },
+        chat: {
+            method: 'POST',
+            path: '/assistant/chat',
+            responses: {
+                200: { stream: { contentType: 'text/event-stream' } },
+                400: {},
+                401: {},
+                403: {},
+            },
+        },
     },
     tools: {
         getForecast: {
@@ -1465,6 +1618,26 @@ const routes: GeneratedRoutes = {
             path: '/text/word-count',
             responses: {
                 200: {},
+            },
+        },
+    },
+    notes: {
+        list: {
+            method: 'GET',
+            path: '/notes',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+            },
+        },
+        add: {
+            method: 'POST',
+            path: '/notes',
+            responses: {
+                201: {},
+                401: {},
+                403: {},
             },
         },
     },

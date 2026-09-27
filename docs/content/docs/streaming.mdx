@@ -380,7 +380,7 @@ A streamed response can name the tools the model may call, adding `tool_call`, `
 },
 ```
 
-Each is discriminated on the tool's dotted key. See [tools](/docs/tools).
+Each is discriminated on the tool's dotted key. The handler receives `tools`, whose `run` calls one of those routes as the person streaming and yields its events. See [tools](/docs/tools#running-the-calls).
 
 ## Reference
 

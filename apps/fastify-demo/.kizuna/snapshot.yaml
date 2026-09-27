@@ -1831,6 +1831,125 @@ routes:
             optional: false
             schema:
               kind: string
+  assistant.chat:
+    method: POST
+    path: /assistant/chat
+    statuses:
+      - 200
+      - 400
+      - 401
+      - 403
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        prompt:
+          optional: false
+          schema:
+            kind: string
+        answer:
+          optional: true
+          schema:
+            kind: object
+            fields:
+              call:
+                optional: false
+                schema:
+                  kind: object
+                  fields:
+                    id:
+                      optional: false
+                      schema:
+                        kind: string
+                    name:
+                      optional: false
+                      schema:
+                        kind: string
+                    input:
+                      optional: true
+                      schema:
+                        kind: unknown
+              approved:
+                optional: false
+                schema:
+                  kind: boolean
+    responses:
+      "200": null
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
   tools.getForecast:
     method: GET
     path: /forecast/:city
@@ -1919,6 +2038,172 @@ routes:
             optional: false
             schema:
               kind: number
+  notes.list:
+    method: GET
+    path: /notes
+    statuses:
+      - 200
+      - 401
+      - 403
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          notes:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  text:
+                    optional: false
+                    schema:
+                      kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+  notes.add:
+    method: POST
+    path: /notes
+    statuses:
+      - 201
+      - 401
+      - 403
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        text:
+          optional: false
+          schema:
+            kind: string
+    responses:
+      "201":
+        kind: object
+        fields:
+          id:
+            optional: false
+            schema:
+              kind: string
+          text:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
   diagnostics.whoAmI:
     method: GET
     path: /diagnostics/caller
@@ -1952,3 +2237,5 @@ tools:
   tools.getForecast: tools_get_forecast
   tools.plotSignups: tools_plot_signups
   tools.countWords: tools_count_words
+  notes.list: notes_list
+  notes.add: notes_add

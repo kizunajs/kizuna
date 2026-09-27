@@ -43,6 +43,21 @@ const config = {
     },
 };
 
+const tools = k.routes({
+    ping: k.route({
+        method: 'GET',
+        path: '/ping',
+        auth: false,
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+        summary: 'Answer that the server is up',
+        tool: true,
+    }),
+});
+
 const contract = defineConfig({
     ...config,
     routes: k.routes('api', {
@@ -60,6 +75,14 @@ const contract = defineConfig({
                 200: z.object({
                     ok: z.boolean(),
                 }),
+                206: {
+                    stream: {
+                        done: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                    tools,
+                },
             },
         }),
     }),

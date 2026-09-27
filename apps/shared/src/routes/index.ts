@@ -5,6 +5,7 @@ export * from './notifications';
 export * from './invites';
 export * from './assistant';
 export * from './assistant-tools';
+export * from './notes';
 
 import { usersRoutes } from './users';
 import { healthRoutes } from './health';
@@ -13,6 +14,7 @@ import { notificationsRoutes } from './notifications';
 import { inviteRoutes } from './invites';
 import { assistantRoutes } from './assistant';
 import { assistantTools } from './assistant-tools';
+import { noteRoutes } from './notes';
 
 export const routes = {
     users: usersRoutes,
@@ -23,4 +25,5 @@ export const routes = {
     invites: inviteRoutes,
     assistant: assistantRoutes,
     tools: assistantTools,
+    notes: noteRoutes,
 };

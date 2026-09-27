@@ -577,6 +577,7 @@ export namespace API {
             }; id?: string; retry?: number } | { event: 'tool_call'; data: {
                 id: string;
                 name: "getForecast";
+                needsApproval?: true;
                 input: {
                     params: {
                         city: string;
@@ -588,6 +589,7 @@ export namespace API {
             } | {
                 id: string;
                 name: "plotSignups";
+                needsApproval?: true;
                 input: {
                     query: {
                         days: number;
@@ -596,6 +598,7 @@ export namespace API {
             } | {
                 id: string;
                 name: "countWords";
+                needsApproval?: true;
                 input: {
                     body: {
                         text: string;
@@ -630,6 +633,63 @@ export namespace API {
                 message: string;
             }; id?: string; retry?: number }>; headers: Record<string, string> }
             | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace AssistantChat {
+        export type Body = {
+            prompt: string;
+            answer?: {
+                call: {
+                    id: string;
+                    name: string;
+                    input?: unknown;
+                };
+                approved: boolean;
+            };
+        };
+
+        export type Result =
+            | { status: 200; body: AsyncIterable<{ event: 'delta'; data: {
+                text: string;
+            }; id?: string; retry?: number } | { event: 'tool_call'; data: {
+                id: string;
+                name: "notes.list";
+                needsApproval?: true;
+            } | {
+                id: string;
+                name: "notes.add";
+                needsApproval?: true;
+                input: {
+                    body: {
+                        text: string;
+                    };
+                };
+            }; id?: string; retry?: number } | { event: 'tool_result'; data: {
+                id: string;
+                name: "notes.list";
+                output: {
+                    notes: Array<{
+                        id: string;
+                        text: string;
+                    }>;
+                };
+            } | {
+                id: string;
+                name: "notes.add";
+                output: {
+                    id: string;
+                    text: string;
+                };
+            }; id?: string; retry?: number } | { event: 'tool_error'; data: {
+                id: string;
+                name: "notes.list" | "notes.add";
+                message: string;
+            }; id?: string; retry?: number }>; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
     }
 
     export namespace ToolsGetForecast {
@@ -674,6 +734,37 @@ export namespace API {
             | { status: 200; body: {
                 words: number;
             }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace NotesList {
+        export type Result =
+            | { status: 200; body: {
+                notes: Array<{
+                    id: string;
+                    text: string;
+                }>;
+            }; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
+    }
+
+    export namespace NotesAdd {
+        export type Body = {
+            text: string;
+        };
+
+        export type Result =
+            | { status: 201; body: {
+                id: string;
+                text: string;
+            }; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
@@ -1140,6 +1231,21 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.AssistantReply.Result>;
+        /**
+         * Chat with an assistant that keeps notes for the signed-in user, exercises tools on a stream
+         *
+         * @example
+         * const result = await client.assistant.chat({
+         *     body: {
+         *         prompt: 'string',
+         *     },
+         * });
+         */
+        chat: ClientMethod<'POST', true, {
+            body: API.AssistantChat.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.AssistantChat.Result>;
     };
     tools: {
         /**
@@ -1188,6 +1294,33 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.ToolsCountWords.Result>;
+    };
+    notes: {
+        /**
+         * List the notes the signed-in user has saved
+         *
+         * @example
+         * const result = await client.notes.list();
+         */
+        list: ClientMethod<'GET', false, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.NotesList.Result>;
+        /**
+         * Save a note for the signed-in user
+         *
+         * @example
+         * const result = await client.notes.add({
+         *     body: {
+         *         text: 'string',
+         *     },
+         * });
+         */
+        add: ClientMethod<'POST', false, {
+            body: API.NotesAdd.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.NotesAdd.Result>;
     };
     diagnostics: {
         /**
@@ -1475,6 +1608,16 @@ const routes: GeneratedRoutes = {
                 400: {},
             },
         },
+        chat: {
+            method: 'POST',
+            path: '/assistant/chat',
+            responses: {
+                200: { stream: { contentType: 'text/event-stream' } },
+                400: {},
+                401: {},
+                403: {},
+            },
+        },
     },
     tools: {
         getForecast: {
@@ -1496,6 +1639,26 @@ const routes: GeneratedRoutes = {
             path: '/text/word-count',
             responses: {
                 200: {},
+            },
+        },
+    },
+    notes: {
+        list: {
+            method: 'GET',
+            path: '/notes',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+            },
+        },
+        add: {
+            method: 'POST',
+            path: '/notes',
+            responses: {
+                201: {},
+                401: {},
+                403: {},
             },
         },
     },

@@ -31,7 +31,7 @@ See [authentication](/docs/authentication) for identities and guards, and [acces
 
 See [MCP](/docs/mcp) for the endpoint, and [tools](/docs/tools) for declaring your own.
 
-No standard covers streamed tool calls. MCP deliberately has none, having replaced interactive tool flows with multi round-trip requests in its `2026-07-28` revision, so the `tool_call`, `tool_result` and `tool_error` events a streamed response carries are Kizuna's own vocabulary. Their framing follows the WHATWG server-sent events specification like any other stream.
+No standard covers streamed tool calls. MCP deliberately has none, having replaced interactive tool flows with multi round-trip requests in its `2026-07-28` revision, so the `tool_call`, `tool_result` and `tool_error` events a streamed response carries are Kizuna's own vocabulary. Their framing follows the WHATWG server-sent events specification like any other stream. A route's `needsApproval` follows MCP's multi round-trip model on a stream too: the call waits, and the person's answer arrives as the next request.
 
 ## Deliberate omissions
 

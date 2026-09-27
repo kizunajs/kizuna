@@ -25,8 +25,8 @@ import { contractOf } from 'kizunajs/adapter';
 import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from 'kizunajs';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from 'kizunajs/generator';
-import { buildToolInputSchema, buildToolOutputSchema, type ToolInputSchema } from './schema.js';
-import { selectToolRoutes, toolOptionsOf } from './tool-selection.js';
+import { buildToolOutputSchema } from './schema.js';
+import { buildToolInputSchema, describeTool, selectToolRoutes, toolOptionsOf, type ToolInputSchema } from 'kizunajs/adapter';
 
 export interface McpServerOptions {
     /**
@@ -101,7 +101,7 @@ interface Annotations {
 /**
  * What the elicitation answer comes back under, and the key the retry echoes.
  */
-const CONFIRM_KEY = 'confirm';
+const APPROVAL_KEY = 'approved';
 
 /**
  * What a tool handler is handed beyond its arguments. Only the answers to an
@@ -114,36 +114,35 @@ interface McpToolContext {
 }
 
 /**
- * Ask before running, when the route said to. Returns what the caller should
- * answer with instead of running: the elicitation on the first call, a refusal
- * when the person declined, and nothing once they have agreed.
+ * Ask the person before running, when the call needs approval. Returns the
+ * elicitation on the first call, a refusal when they declined, and nothing once
+ * they approved.
  */
-const confirmed = (route: RouteDefinition, context: McpToolContext): CallToolResult | InputRequiredResult | undefined => {
-    const message = toolOptionsOf(route)?.confirm;
-    if (message === undefined) return undefined;
+const approval = (route: RouteDefinition, context: McpToolContext): CallToolResult | InputRequiredResult | undefined => {
+    if (toolOptionsOf(route)?.needsApproval !== true) return undefined;
 
-    const answer = acceptedContent<{ confirm?: boolean }>(context.mcpReq?.inputResponses as never, CONFIRM_KEY);
+    const answer = acceptedContent<{ approved?: boolean }>(context.mcpReq?.inputResponses as never, APPROVAL_KEY);
     if (answer === undefined) {
         return inputRequired({
             inputRequests: {
-                [CONFIRM_KEY]: inputRequired.elicit({
-                    message,
+                [APPROVAL_KEY]: inputRequired.elicit({
+                    message: `Allow "${toolOptionsOf(route)?.title ?? route.summary ?? `${route.method} ${route.path}`}"?`,
                     requestedSchema: {
                         type: 'object',
                         properties: {
-                            confirm: {
+                            approved: {
                                 type: 'boolean',
-                                title: 'Go ahead',
+                                title: 'Allow',
                             },
                         },
-                        required: [CONFIRM_KEY],
+                        required: [APPROVAL_KEY],
                     },
                 }),
             },
         });
     }
 
-    if (answer.confirm === true) return undefined;
+    if (answer.approved === true) return undefined;
     return {
         content: [
             {
@@ -172,38 +171,7 @@ const buildToolAnnotations = (route: RouteDefinition): Annotations => {
     };
 };
 
-const describeRoles = (route: RouteDefinition): string | undefined =>
-    route.roles !== undefined && route.roles.length > 0 ? `Roles: ${route.roles.join(', ')}` : undefined;
-
-const describeRequires = (route: RouteDefinition): string | undefined => {
-    const requires = route.requires;
-    if (requires === undefined) return undefined;
-    const names = Object.entries(requires).flatMap(([resource, verbs]) => verbs.map((verb) => `${resource}:${verb}`));
-    return names.length > 0 ? `Permissions: ${names.join(', ')}` : undefined;
-};
-
-const buildToolDescription = (route: RouteDefinition): string => {
-    const parts: string[] = [];
-    const declared = toolOptionsOf(route)?.description;
-    if (declared) parts.push(declared);
-    else if (route.summary) parts.push(route.summary);
-    if (route.description) parts.push(route.description);
-    if (parts.length === 0) parts.push(`${route.method} ${route.path}`);
-    parts.push(`\nHTTP: ${route.method} ${route.path}`);
-
-    const requirements = resolveSecurityRequirements(route);
-    if (requirements.length > 0) {
-        parts.push(`Requires: ${requirements.map(({ scheme }) => scheme).join(', ')}`);
-    }
-    const roles = describeRoles(route);
-    if (roles !== undefined) parts.push(roles);
-    const permissions = describeRequires(route);
-    if (permissions !== undefined) parts.push(permissions);
-
-    return parts.join('\n');
-};
-
-export interface ToolDefinition {
+export interface McpTool {
     name: string;
     title: string | undefined;
     description: string;
@@ -214,7 +182,7 @@ export interface ToolDefinition {
     tags: string[];
 }
 
-export const buildToolDefinitions = (routes: Routes): ToolDefinition[] => {
+export const buildMcpTools = (routes: Routes): McpTool[] => {
     const selected = selectToolRoutes(flattenRoutes(routes));
     const names = deriveToolNames(
         selected.map(({ routeKey }) => ({
@@ -222,14 +190,14 @@ export const buildToolDefinitions = (routes: Routes): ToolDefinition[] => {
             origin: 'route',
         }))
     );
-    const definitions: ToolDefinition[] = [];
+    const definitions: McpTool[] = [];
 
     for (const { routeKey, route, routeTags } of selected) {
         const name = names.get(routeKey)!;
         definitions.push({
             name,
             title: route.summary,
-            description: buildToolDescription(route),
+            description: describeTool(route),
             inputSchema: buildToolInputSchema(route),
             outputSchema: buildToolOutputSchema(route),
             route,
@@ -246,7 +214,7 @@ export const buildToolDefinitions = (routes: Routes): ToolDefinition[] => {
  */
 export const buildInstructions = (
     contract: ApiDefinition | undefined,
-    definitions: readonly ToolDefinition[],
+    definitions: readonly McpTool[],
     authored: string | undefined
 ): string => {
     const sections: string[] = [];
@@ -588,7 +556,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
 
     const contract = contractOf<ApiDefinition | undefined>(api);
 
-    const definitions = buildToolDefinitions(api.routes);
+    const definitions = buildMcpTools(api.routes);
 
     const server = new McpServer(
         {
@@ -615,7 +583,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                 annotations: buildToolAnnotations(definition.route),
             },
             async (args: Record<string, unknown>, context: McpToolContext) => {
-                const refusal = confirmed(definition.route, context);
+                const refusal = approval(definition.route, context);
                 if (refusal !== undefined) return refusal;
                 return executeToolCall(
                     definition.route,

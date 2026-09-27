@@ -1,9 +1,26 @@
 import { z } from 'zod';
 import type { RouteDefinition, Routes, StreamDefinition, StreamResponseDefinition } from './types.js';
-import { isStreamResponse, isZodSchema } from './generator-utils.js';
+import {
+    isJsonMediaType,
+    isStreamResponse,
+    isSuccessStatus,
+    isZodSchema,
+    resolveResponseBody,
+    resolveResponseContentType,
+} from './generator-utils.js';
 import { flattenRoutes } from './handler-pipeline.js';
 import { parsePath } from './path-params.js';
-import { readObjectShape } from './zod-internals.js';
+import { isVoidSchema, readObjectShape } from './zod-internals.js';
+import { toolOptionsOf, toolRefusal } from './tool-definitions.js';
+import { deriveToolNames } from './tool-name.js';
+
+/**
+ * Where a streamed response keeps the routes it named under `tools`.
+ */
+export const STREAM_TOOLS: unique symbol = Symbol.for('kizuna.stream.tools') as symbol as typeof STREAM_TOOLS;
+
+export const streamToolsOf = (response: unknown): Routes | undefined =>
+    response !== null && typeof response === 'object' ? (response as { [STREAM_TOOLS]?: Routes })[STREAM_TOOLS] : undefined;
 
 /**
  * Every route in a tree as its dotted key, e.g. `'weather.getForecast'`. A tool
@@ -48,15 +65,21 @@ type ToolInput<Route, Io extends 'input' | 'output'> = Flatten<
         (Route extends { body: infer Body extends z.ZodType } ? { body: SchemaSide<Body, Io> } : {})
 >;
 
+type SuccessBody<Response, Io extends 'input' | 'output'> = Response extends z.ZodType
+    ? SchemaSide<Response, Io>
+    : Response extends { stream: unknown }
+      ? void
+      : Response extends { body: infer Body extends z.ZodType }
+        ? SchemaSide<Body, Io>
+        : never;
+
 /**
- * What the route answers with, read from its `200`.
+ * What the route answers with, from each `2xx` it declares.
  */
-type ToolOutput<Route, Io extends 'input' | 'output'> = Route extends { responses: { 200: infer Response } }
-    ? Response extends z.ZodType
-        ? SchemaSide<Response, Io>
-        : Response extends { body: infer Body extends z.ZodType }
-          ? SchemaSide<Body, Io>
-          : never
+type ToolOutput<Route, Io extends 'input' | 'output'> = Route extends { responses: infer Responses }
+    ? {
+          [Status in keyof Responses]: `${Status & number}` extends `2${string}` ? SuccessBody<Responses[Status], Io> : never;
+      }[keyof Responses]
     : never;
 
 /**
@@ -64,10 +87,11 @@ type ToolOutput<Route, Io extends 'input' | 'output'> = Route extends { response
  */
 type InputField<Route, Io extends 'input' | 'output'> = [keyof ToolInput<Route, Io>] extends [never] ? {} : { input: ToolInput<Route, Io> };
 
-/**
- * The `output` field of a result, absent for a route that reports nothing.
- */
-type OutputField<Route, Io extends 'input' | 'output'> = [ToolOutput<Route, Io>] extends [never] ? {} : { output: ToolOutput<Route, Io> };
+type OutputField<Route, Io extends 'input' | 'output'> = [Exclude<ToolOutput<Route, Io>, void>] extends [never]
+    ? {}
+    : void extends ToolOutput<Route, Io>
+      ? { output?: Exclude<ToolOutput<Route, Io>, void> }
+      : { output: ToolOutput<Route, Io> };
 
 /**
  * One tool call, discriminated on `name` so `input` narrows to the route's own
@@ -78,6 +102,10 @@ export type ToolCall<R extends Routes, Io extends 'input' | 'output' = 'output'>
         {
             id: string;
             name: Key;
+            /**
+             * The call waits for the person to approve it.
+             */
+            needsApproval?: true;
         } & InputField<ToolAt<R, Key>, Io>
     >;
 }[ToolKeys<R>];
@@ -133,13 +161,34 @@ export const toolInputShape = (route: RouteDefinition): Record<string, z.ZodType
 };
 
 /**
- * What a route answers a tool call with, read from its `200`.
+ * The body of each `2xx` the route declares.
  */
 const toolOutputSchema = (route: RouteDefinition): z.ZodType | undefined => {
-    const response = route.responses[200];
-    if (response === undefined) return undefined;
-    if (isZodSchema(response)) return response;
-    return 'body' in response && isZodSchema(response.body) ? response.body : undefined;
+    const bodies: z.ZodType[] = [];
+    let someSuccessHasNoBody = false;
+
+    for (const status of Object.keys(route.responses)
+        .map(Number)
+        .sort((left, right) => left - right)) {
+        if (!isSuccessStatus(status)) continue;
+        const response = route.responses[status];
+        if (response === undefined) continue;
+        const contentType = resolveResponseContentType(response);
+        if (isStreamResponse(response) || (contentType !== undefined && !isJsonMediaType(contentType))) {
+            someSuccessHasNoBody = true;
+            continue;
+        }
+        const body = resolveResponseBody(response);
+        if (body === undefined || isVoidSchema(body)) {
+            someSuccessHasNoBody = true;
+            continue;
+        }
+        bodies.push(body);
+    }
+
+    if (bodies.length === 0) return undefined;
+    const output = bodies.length === 1 ? bodies[0]! : z.union(bodies);
+    return someSuccessHasNoBody ? output.optional() : output;
 };
 
 /**
@@ -173,6 +222,7 @@ export const toolEvents = <const R extends Routes>(tools: R): ToolEvents<R> => {
         return z.object({
             ...identifier,
             name: z.literal(routeKey),
+            needsApproval: z.literal(true).optional(),
             ...(Object.keys(input).length > 0 ? { input: z.object(input) } : {}),
         });
     });
@@ -216,14 +266,34 @@ export type StreamWithTools<Def extends StreamResponseDefinition> = Def extends 
  * `k.routes` before a route is validated.
  */
 export const expandStreamTools = (route: RouteDefinition, routeKey: string): void => {
+    let namedAt: string | undefined;
     for (const [status, response] of Object.entries(route.responses)) {
         if (!isStreamResponse(response)) continue;
         const { tools } = response;
         if (tools === undefined) continue;
 
         const where = `Route "${routeKey}" declares tools on status ${status}`;
+        if (namedAt !== undefined) {
+            throw new Error(`${where} and on status ${namedAt}. A handler runs one set of tools, so name them on one response.`);
+        }
+        namedAt = status;
         if (isZodSchema(response.stream)) {
             throw new Error(`${where} beside a single stream schema. Tool events are named, so name the other events too.`);
+        }
+
+        const toolEntries = flattenRoutes(tools);
+        deriveToolNames(
+            toolEntries.map(({ routeKey: toolKey }) => ({
+                key: toolKey,
+                origin: 'route',
+            }))
+        );
+        for (const { routeKey: toolKey, route: toolRoute } of toolEntries) {
+            if (toolOptionsOf(toolRoute) === undefined) {
+                throw new Error(`${where}, naming "${toolKey}", which does not declare \`tool\`. Declare it on that route.`);
+            }
+            const refusal = toolRefusal(toolRoute);
+            if (refusal !== undefined) throw new Error(`${where}, naming "${toolKey}", which cannot run as a tool: ${refusal}.`);
         }
 
         const events = toolEvents(tools);
@@ -237,11 +307,13 @@ export const expandStreamTools = (route: RouteDefinition, routeKey: string): voi
         const mutable = response as {
             stream: StreamDefinition;
             tools?: Routes;
+            [STREAM_TOOLS]?: Routes;
         };
         mutable.stream = {
             ...named,
             ...(events as unknown as Record<string, z.ZodType>),
         };
+        mutable[STREAM_TOOLS] = tools;
         delete mutable.tools;
     }
 };

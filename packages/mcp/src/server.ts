@@ -16,12 +16,10 @@ import {
     type GuardMap,
     type GuardRun,
 } from 'kizunajs/adapter';
-import { buildToolDefinitions, createMcpServer, type ToolDefinition } from './mcp-server.js';
+import { buildMcpTools, createMcpServer, type McpTool } from './mcp-server.js';
 import type { McpPluginProps } from './plugin.js';
 import { assertCanonicalResource, protectedResourceMetadataUrl, type McpOAuthProps } from './oauth.js';
 import { denialResponse, enforceOAuth } from './oauth-enforcement.js';
-
-export { createMcpServer, buildToolDefinitions, buildInstructions, type McpServerOptions, type ToolDefinition } from './mcp-server.js';
 
 type HandlerArgs = {
     body: unknown;
@@ -47,7 +45,7 @@ interface OAuthEnforcement {
     metadata: ProtectedResourceMetadata;
     metadataUrl: string;
     scopesSupported: readonly string[] | undefined;
-    tools: Map<string, ToolDefinition>;
+    tools: Map<string, McpTool>;
 }
 
 const prepareOAuth = (oauth: McpOAuthProps, endpointPath: `/${string}`, api: ApiWithRouter): OAuthEnforcement => {
@@ -73,7 +71,7 @@ const prepareOAuth = (oauth: McpOAuthProps, endpointPath: `/${string}`, api: Api
         }),
         metadataUrl: protectedResourceMetadataUrl(oauth, endpointPath),
         scopesSupported: declaredScopes(schemeDefinition),
-        tools: new Map(buildToolDefinitions(api.routes).map((definition) => [definition.name, definition])),
+        tools: new Map(buildMcpTools(api.routes).map((definition) => [definition.name, definition])),
     };
 };
 

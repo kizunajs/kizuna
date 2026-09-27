@@ -1115,24 +1115,28 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         sealed interface ToolCall {
             val id: String
             val name: String
+            val needsApproval: Boolean?
 
             @SerialName("getForecast")
             @Serializable
             data class GetForecast(val value: ToolCallGetForecast) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
             }
             @SerialName("plotSignups")
             @Serializable
             data class PlotSignups(val value: ToolCallPlotSignups) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
             }
             @SerialName("countWords")
             @Serializable
             data class CountWords(val value: ToolCallCountWords) : ToolCall {
                 override val id: String get() = value.id
                 override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
             }
         }
 
@@ -1140,6 +1144,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class ToolCallGetForecast(
             val id: String,
             val name: String,
+            val needsApproval: Boolean? = null,
             val input: ToolCallGetForecastInput
         )
 
@@ -1186,6 +1191,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class ToolCallPlotSignups(
             val id: String,
             val name: String,
+            val needsApproval: Boolean? = null,
             val input: ToolCallPlotSignupsInput
         )
 
@@ -1199,6 +1205,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class ToolCallCountWords(
             val id: String,
             val name: String,
+            val needsApproval: Boolean? = null,
             val input: ToolCallCountWordsInput
         )
 
@@ -1365,7 +1372,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             val message: String? = null,
         ) {
             /** How far along the call is. */
-            enum class State { Running, Done, Failed }
+            enum class State { Running, NeedsApproval, Done, Failed }
         }
 
         /** Fold a stream's events into one row per tool call, in the order the calls arrived. */
@@ -1373,7 +1380,10 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             val calls = LinkedHashMap<String, ToolCallRecord>()
             for (event in events) {
                 when (event) {
-                    is Event.ToolCall -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
+                    is Event.ToolCall -> {
+                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
+                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                    }
                     is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
                     is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
                     else -> Unit
@@ -1394,6 +1404,226 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class ValidationError(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object AssistantChat {
+
+        @Serializable
+        data class Input(
+            val prompt: String,
+            val answer: InputAnswer? = null
+        )
+
+        @Serializable
+        data class InputAnswer(
+            val call: InputAnswerCall,
+            val approved: Boolean
+        )
+
+        @Serializable
+        data class InputAnswerCall(
+            val id: String,
+            val name: String,
+            val input: JsonElement? = null
+        )
+
+        @Serializable
+        data class Delta(val text: String)
+
+        @OptIn(ExperimentalSerializationApi::class)
+        @JsonClassDiscriminator("name")
+        @Serializable
+        sealed interface ToolCall {
+            val id: String
+            val name: String
+            val needsApproval: Boolean?
+
+            @SerialName("notes.list")
+            @Serializable
+            data class Notes_list(val value: ToolCallNotesList) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
+            }
+            @SerialName("notes.add")
+            @Serializable
+            data class Notes_add(val value: ToolCallNotesAdd) : ToolCall {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+                override val needsApproval: Boolean? get() = value.needsApproval
+            }
+        }
+
+        @Serializable
+        data class ToolCallNotesList(
+            val id: String,
+            val name: String,
+            val needsApproval: Boolean? = null
+        )
+
+        @Serializable
+        data class ToolCallNotesAdd(
+            val id: String,
+            val name: String,
+            val needsApproval: Boolean? = null,
+            val input: ToolCallNotesAddInput
+        )
+
+        @Serializable
+        data class ToolCallNotesAddInput(val body: ToolCallNotesAddInputBody)
+
+        @Serializable
+        data class ToolCallNotesAddInputBody(val text: String)
+
+        @OptIn(ExperimentalSerializationApi::class)
+        @JsonClassDiscriminator("name")
+        @Serializable
+        sealed interface ToolResult {
+            val id: String
+            val name: String
+
+            @SerialName("notes.list")
+            @Serializable
+            data class Notes_list(val value: ToolResultNotesList) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+            @SerialName("notes.add")
+            @Serializable
+            data class Notes_add(val value: ToolResultNotesAdd) : ToolResult {
+                override val id: String get() = value.id
+                override val name: String get() = value.name
+            }
+        }
+
+        @Serializable
+        data class ToolResultNotesList(
+            val id: String,
+            val name: String,
+            val output: ToolResultNotesListOutput
+        )
+
+        @Serializable
+        data class ToolResultNotesListOutput(val notes: List<ToolResultNotesListOutputNotesItem>)
+
+        @Serializable
+        data class ToolResultNotesListOutputNotesItem(
+            val id: String,
+            val text: String
+        )
+
+        @Serializable
+        data class ToolResultNotesAdd(
+            val id: String,
+            val name: String,
+            val output: ToolResultNotesAddOutput
+        )
+
+        @Serializable
+        data class ToolResultNotesAddOutput(
+            val id: String,
+            val text: String
+        )
+
+        @Serializable
+        data class ToolError(
+            val id: String,
+            val name: ToolErrorName,
+            val message: String
+        )
+
+        @Serializable(with = ToolErrorName.Serializer::class)
+        sealed interface ToolErrorName : KizunaQueryValue {
+            data object NOTES_LIST : ToolErrorName {
+                override val wireValue: String = "notes.list"
+            }
+            data object NOTES_ADD : ToolErrorName {
+                override val wireValue: String = "notes.add"
+            }
+            data class Unknown(override val wireValue: String) : ToolErrorName
+
+            companion object {
+                fun fromWireValue(wireValue: String): ToolErrorName = when (wireValue) {
+                    "notes.list" -> NOTES_LIST
+                    "notes.add" -> NOTES_ADD
+                    else -> Unknown(wireValue)
+                }
+            }
+
+            object Serializer : KSerializer<ToolErrorName> {
+                override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ToolErrorName", PrimitiveKind.STRING)
+                override fun deserialize(decoder: Decoder): ToolErrorName = ToolErrorName.fromWireValue(decoder.decodeString())
+                override fun serialize(encoder: Encoder, value: ToolErrorName) {
+                    encoder.encodeString(value.wireValue)
+                }
+            }
+        }
+
+        data class Body(
+            val prompt: String,
+            val answer: InputAnswer? = null
+        )
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(prompt: String, answer: InputAnswer? = null): AfterBody = AfterBody(body = Body(prompt = prompt, answer = answer))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        /** One tool call, with its result once it answered. */
+        data class ToolCallRecord(
+            val id: String,
+            val name: String,
+            val state: State = State.Running,
+            /** The call as it arrived, to read its input. */
+            val call: ToolCall? = null,
+            /** The result once it answered, to read its output. */
+            val result: ToolResult? = null,
+            /** What the tool reported when it failed. */
+            val message: String? = null,
+        ) {
+            /** How far along the call is. */
+            enum class State { Running, NeedsApproval, Done, Failed }
+        }
+
+        /** Fold a stream's events into one row per tool call, in the order the calls arrived. */
+        fun readToolCalls(events: List<Event>): List<ToolCallRecord> {
+            val calls = LinkedHashMap<String, ToolCallRecord>()
+            for (event in events) {
+                when (event) {
+                    is Event.ToolCall -> {
+                        val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)
+                        calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked
+                    }
+                    is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)
+                    is Event.ToolError -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name.wireValue)).copy(state = ToolCallRecord.State.Failed, message = event.data.message)
+                    else -> Unit
+                }
+            }
+            return calls.values.toList()
+        }
+
+        sealed interface Event {
+            data class Delta(val data: OpenEnumAPIClient.AssistantChat.Delta) : Event
+            data class ToolCall(val data: OpenEnumAPIClient.AssistantChat.ToolCall) : Event
+            data class ToolResult(val data: OpenEnumAPIClient.AssistantChat.ToolResult) : Event
+            data class ToolError(val data: OpenEnumAPIClient.AssistantChat.ToolError) : Event
+        }
+
+        data class Result(val body: Flow<Event>)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
             data class ValidationError(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
@@ -1553,6 +1783,61 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
+    object NotesList {
+
+        @Serializable
+        data class Response(val notes: List<ResponseNotesItem>)
+
+        @Serializable
+        data class ResponseNotesItem(
+            val id: String,
+            val text: String
+        )
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object NotesAdd {
+
+        @Serializable
+        data class Input(val text: String)
+
+        @Serializable
+        data class Response201(
+            val id: String,
+            val text: String
+        )
+
+        data class Body(val text: String)
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(text: String): AfterBody = AfterBody(body = Body(text = text))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        data class Result(val body: Response201)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object DiagnosticsWhoAmI {
 
         @Serializable
@@ -1585,6 +1870,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
     val assistant = OpenEnumAPIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val tools = OpenEnumAPIToolsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val notes = OpenEnumAPINotesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val diagnostics = OpenEnumAPIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 }
@@ -2873,6 +3160,66 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
             }
         }
     }
+
+    /** Chat with an assistant that keeps notes for the signed-in user, exercises tools on a stream */
+    @Throws(OpenEnumAPIClient.AssistantChat.Failure::class)
+    suspend fun chat(build: OpenEnumAPIClient.AssistantChat.Scope.() -> OpenEnumAPIClient.AssistantChat.Args): OpenEnumAPIClient.AssistantChat.Result {
+        val args = OpenEnumAPIClient.AssistantChat.Scope.build()
+        val body = args.body
+        val path = "/assistant/chat"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = OpenEnumAPIClient.AssistantChat.Input(prompt = body.prompt, answer = body.answer)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+        if (httpResponse.code == 200) {
+            val body = Kizuna.events<OpenEnumAPIClient.AssistantChat.Event>(httpResponse) { event ->
+                when (event.event) {
+                    "delta" -> OpenEnumAPIClient.AssistantChat.Event.Delta(json.decodeFromString<OpenEnumAPIClient.AssistantChat.Delta>(event.data))
+                    "tool_call" -> OpenEnumAPIClient.AssistantChat.Event.ToolCall(json.decodeFromString<OpenEnumAPIClient.AssistantChat.ToolCall>(event.data))
+                    "tool_result" -> OpenEnumAPIClient.AssistantChat.Event.ToolResult(json.decodeFromString<OpenEnumAPIClient.AssistantChat.ToolResult>(event.data))
+                    "tool_error" -> OpenEnumAPIClient.AssistantChat.Event.ToolError(json.decodeFromString<OpenEnumAPIClient.AssistantChat.ToolError>(event.data))
+                    else -> null
+                }
+            }
+            return OpenEnumAPIClient.AssistantChat.Result(body = body)
+        }
+        return httpResponse.use {
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                400 -> {
+                    val badRequest = try {
+                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                    } catch (_: Exception) { null }
+                    if (badRequest != null) throw OpenEnumAPIClient.AssistantChat.Failure.BadRequest(body = badRequest)
+                    val validationError = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (_: Exception) { null }
+                    if (validationError != null) throw OpenEnumAPIClient.AssistantChat.Failure.ValidationError(body = validationError)
+                    throw OpenEnumAPIClient.AssistantChat.Failure.Unexpected(statusCode = statusCode, data = data)
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantChat.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantChat.Failure.Forbidden(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.AssistantChat.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
 }
 
 class OpenEnumAPIToolsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -2991,6 +3338,98 @@ class OpenEnumAPIToolsClient(private val client: OkHttpClient, private val baseU
                     throw OpenEnumAPIClient.ToolsCountWords.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.ToolsCountWords.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
+class OpenEnumAPINotesClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** List the notes the signed-in user has saved */
+    @Throws(OpenEnumAPIClient.NotesList.Failure::class)
+    suspend fun list(): OpenEnumAPIClient.NotesList.Result {
+        val path = "/notes"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.NotesList.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.NotesList.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.NotesList.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesList.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.NotesList.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesList.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.NotesList.Failure.Forbidden(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.NotesList.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Save a note for the signed-in user */
+    @Throws(OpenEnumAPIClient.NotesAdd.Failure::class)
+    suspend fun add(build: OpenEnumAPIClient.NotesAdd.Scope.() -> OpenEnumAPIClient.NotesAdd.Args): OpenEnumAPIClient.NotesAdd.Result {
+        val args = OpenEnumAPIClient.NotesAdd.Scope.build()
+        val body = args.body
+        val path = "/notes"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = OpenEnumAPIClient.NotesAdd.Input(text = body.text)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                201 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.NotesAdd.Response201>(data.decodeToString())
+                        return@use OpenEnumAPIClient.NotesAdd.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.NotesAdd.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.NotesAdd.Failure.Forbidden(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.NotesAdd.Failure.BadRequest(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.NotesAdd.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

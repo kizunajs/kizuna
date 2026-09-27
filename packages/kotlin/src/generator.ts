@@ -928,7 +928,7 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
             writer.line(') {');
             writer.indent(() => {
                 writer.line('/** How far along the call is. */');
-                writer.line('enum class State { Running, Done, Failed }');
+                writer.line('enum class State { Running, NeedsApproval, Done, Failed }');
             });
             writer.line('}');
 
@@ -939,9 +939,16 @@ const emitOperationResultTypes = (writer: KotlinWriter, method: RouteMethod, con
                 writer.block('for (event in events)', () => {
                     writer.line('when (event) {');
                     writer.indent(() => {
-                        writer.line(
-                            'is Event.ToolCall -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)'
-                        );
+                        writer.line('is Event.ToolCall -> {');
+                        writer.indent(() => {
+                            writer.line(
+                                'val tracked = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(call = event.data)'
+                            );
+                            writer.line(
+                                'calls[event.data.id] = if (event.data.needsApproval == true && tracked.state == ToolCallRecord.State.Running) tracked.copy(state = ToolCallRecord.State.NeedsApproval) else tracked'
+                            );
+                        });
+                        writer.line('}');
                         writer.line(
                             'is Event.ToolResult -> calls[event.data.id] = (calls[event.data.id] ?: ToolCallRecord(event.data.id, event.data.name)).copy(state = ToolCallRecord.State.Done, result = event.data)'
                         );

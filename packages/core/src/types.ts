@@ -264,7 +264,7 @@ export type RouteHandlerFunction = (args: never) => unknown;
 
 /**
  * What a route publishes as, over MCP. `description`, `title` and the four
- * hints are MCP's own, field for field; `confirm` is kizuna's.
+ * hints are MCP's own, field for field; `needsApproval` is kizuna's.
  *
  * Each hint defaults from the route's method, so a `GET` is already marked read
  * only and a `DELETE` already destructive. Set one to say what the method
@@ -302,14 +302,16 @@ export interface RouteToolOptions {
      */
     openWorldHint?: boolean;
     /**
-     * What the person reads before this route runs as a tool. They agree or
-     * decline, and declining leaves the handler uncalled.
+     * The person approves each call before it runs as a tool.
      *
-     * Kizuna's own, sent over MCP's elicitation. The four hints above say what
-     * the route does, and leave a client to decide whether that warrants
-     * asking; this asks.
+     * @example
+     * ```ts
+     * tool: {
+     *     needsApproval: true,
+     * },
+     * ```
      */
-    confirm?: string;
+    needsApproval?: boolean;
 }
 
 export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {

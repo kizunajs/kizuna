@@ -50,7 +50,7 @@ export const weatherRoutes = k.routes('weather', {
 });
 ```
 
-`tool: true` takes the route's `summary` as what a model reads before calling, so a route that publishes has to carry one. Its input is the `{ params, query, body }` the route already declares, and its output is the `200` response.
+`tool: true` takes the route's `summary` as what a model reads before calling, so a route that publishes has to carry one. Its input is the `{ params, query, body }` the route already declares, and its output is the body of its `2xx` response.
 
 </Step>
 
@@ -68,7 +68,7 @@ deleteWorkspace: k
         auth: { identity: 'member', requires: { workspace: ['delete'] } },
         summary: 'Delete the workspace, owner only',
         tool: {
-            confirm: 'This deletes the workspace and everything in it. It cannot be undone.',
+            needsApproval: true,
         },
         responses: {
             200: z.object({ ok: z.boolean() }),
@@ -77,19 +77,37 @@ deleteWorkspace: k
     .handler(/* ... */),
 ```
 
-| Field             | Meaning                                                                            |
-| ----------------- | ---------------------------------------------------------------------------------- |
-| `description`     | What the model reads when it decides whether to call. Defaults to `summary`        |
-| `title`           | A human-readable name for display. MCP's `ToolAnnotations.title`                   |
-| `readOnlyHint`    | The route only reads. Defaults to true for `GET` and `HEAD`                        |
-| `idempotentHint`  | Calling twice does what calling once did. Defaults to true for `PUT` and `DELETE`  |
-| `destructiveHint` | The route may remove or overwrite. Defaults to true for `DELETE`                   |
-| `openWorldHint`   | The route reaches something outside this API                                       |
-| `confirm`         | What the person is asked before it runs. Kizuna's own, sent over MCP's elicitation |
+| Field             | Meaning                                                                           |
+| ----------------- | --------------------------------------------------------------------------------- |
+| `description`     | What the model reads when it decides whether to call. Defaults to `summary`       |
+| `title`           | A human-readable name for display. MCP's `ToolAnnotations.title`                  |
+| `readOnlyHint`    | The route only reads. Defaults to true for `GET` and `HEAD`                       |
+| `idempotentHint`  | Calling twice does what calling once did. Defaults to true for `PUT` and `DELETE` |
+| `destructiveHint` | The route may remove or overwrite. Defaults to true for `DELETE`                  |
+| `openWorldHint`   | The route reaches something outside this API                                      |
+| `needsApproval`   | The person approves each call before it runs. Kizuna's own                        |
 
 The hints come from the method's RFC 9110 semantics, so a `GET` is already marked read only and a `DELETE` already destructive. Set one to say what the method cannot.
 
-`confirm` is the one field MCP has no way to declare. A client reads the hints and decides for itself whether to ask; `confirm` asks, and declining leaves the handler uncalled. It sits on the declaration rather than in the handler because the handler also answers HTTP, where there is nobody to ask.
+`needsApproval` is the one field MCP has no way to declare. A client reads the hints and decides for itself whether to ask; `needsApproval` asks, and declining leaves the handler uncalled. It sits on the declaration rather than in the handler because the handler also answers HTTP, where there is nobody to ask.
+
+`needsApproval` asks about what the model chose to do in someone's name, not about what they may do. A rule that depends on the input, such as a refund limit, belongs in the handler. HTTP callers meet it too, and a model reads the refusal as the tool's result, with the Problem Details that explain it:
+
+```ts title="src/routes/orders.ts"
+.handler(({ body, throwError }) => {
+    if (body.amount > 100) {
+        throwError({
+            status: 403,
+            body: {
+                detail: 'Refunds over 100 need a manager.',
+            },
+        });
+    }
+    // ...
+}),
+```
+
+Over MCP the person is asked through an elicitation, named after the route's `summary`. On a stream the call waits for them, as [waiting for approval](#wait-for-approval) shows.
 
 </Step>
 
@@ -140,54 +158,267 @@ responses: {
 | `tool_result` | `{ id, name, output }`  |
 | `tool_error`  | `{ id, name, message }` |
 
-`id` ties a result back to its call, and `input` carries the `{ params, query, body }` the route takes.
+`id` ties a result back to its call, and `input` carries the `{ params, query, body }` the route takes. Every route named under `tools` declares `tool`, and `k.routes` throws on one that does not, or on one that streams or takes a form body.
 
 </Step>
 
 </Steps>
 
-## Driving the model
+## Running the calls
 
-`buildToolDefinitions` turns the routes that publish into MCP's shape, so the same list that reaches a model over MCP reaches one you drive yourself:
+A handler whose stream names `tools` receives `tools`, bound to the request that is streaming. It holds the routes that response names and nothing else, so an assistant that names `weatherRoutes` cannot reach a route outside them.
+
+### Describe them to the model
+
+`tools.definitions` has one entry per route: the `name` a model calls it by, the `description` it reads, and `inputSchema` as JSON Schema.
+
+```ts title="src/routes/assistant.ts"
+const stream = anthropic.messages.stream({
+    model: 'claude-opus-5',
+    max_tokens: 64000,
+    messages,
+    tools: tools.definitions.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.inputSchema,
+    })),
+});
+```
+
+### Run what the model asks for
+
+`tools.run` takes a call as the model sent it and runs the route as the person who made the request. The route's own validation, guards and handler run, with the credentials the stream request carried, so a handler never passes a token along. Delegate to it with `yield*`: it sends `tool_call`, then `tool_result` or `tool_error`, and returns what the model reads.
 
 ```ts title="src/routes/assistant.ts"
 import Anthropic from '@anthropic-ai/sdk';
-import { buildToolDefinitions } from '@kizunajs/mcp';
 import { weatherRoutes } from './weather';
 
 const anthropic = new Anthropic();
-const definitions = buildToolDefinitions(weatherRoutes);
 
 reply: k
-    .route({ /* ... */ })
-    .handler(({ body }) => ({
+    .route({
+        method: 'POST',
+        path: '/assistant/reply',
+        auth: 'user',
+        body: z.object({
+            prompt: z.string(),
+        }),
+        responses: {
+            200: {
+                stream: {
+                    delta: z.object({
+                        text: z.string(),
+                    }),
+                },
+                tools: weatherRoutes,
+            },
+        },
+    })
+    .handler(({ body, tools }) => ({
         status: 200,
         body: async function* () {
-            const stream = anthropic.messages.stream({
-                model: 'claude-opus-5',
-                max_tokens: 1024,
-                messages: [{ role: 'user', content: body.prompt }],
-                tools: definitions.map((tool) => ({
-                    name: tool.name,
-                    description: tool.description,
-                    input_schema: tool.inputSchema,
-                })),
-            });
+            const messages: Anthropic.MessageParam[] = [
+                {
+                    role: 'user',
+                    content: body.prompt,
+                },
+            ];
 
-            for await (const event of stream) {
-                if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-                    yield { event: 'delta', data: { text: event.delta.text } };
+            for (;;) {
+                const stream = anthropic.messages.stream({
+                    model: 'claude-opus-5',
+                    max_tokens: 64000,
+                    messages,
+                    tools: tools.definitions.map((tool) => ({
+                        name: tool.name,
+                        description: tool.description,
+                        input_schema: tool.inputSchema,
+                    })),
+                });
+                for await (const event of stream) {
+                    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+                        yield {
+                            event: 'delta',
+                            data: {
+                                text: event.delta.text,
+                            },
+                        };
+                    }
                 }
+
+                const message = await stream.finalMessage();
+                const calls = message.content.filter((block) => block.type === 'tool_use');
+                if (calls.length === 0) return;
+
+                const results: Anthropic.ToolResultBlockParam[] = [];
+                for (const call of calls) {
+                    const result = yield* tools.run(call);
+                    if (result.state === 'needs-approval') return;
+                    results.push({
+                        type: 'tool_result',
+                        tool_use_id: call.id,
+                        content: result.content,
+                        is_error: result.isError,
+                    });
+                }
+                messages.push(
+                    {
+                        role: 'assistant',
+                        content: message.content,
+                    },
+                    {
+                        role: 'user',
+                        content: results,
+                    }
+                );
             }
         },
     })),
 ```
 
-Each definition carries the `name` a model calls it by, the `description` it reads, and `inputSchema` as JSON Schema. Running one is an ordinary call to the route's own handler, which you import like any other function.
+`result.content` is the `{ status, body }` the route answered with, as JSON. When the route refuses, because the input fails its schema, a guard says no, or the handler answers `4xx`, `result.isError` is `true` and `content` carries the same Problem Details an HTTP caller would get, so the model reads why and can try again.
+
+### Wait for approval
+
+Some calls should wait for the person. A notes assistant can read notes freely, but saving one should need a yes. `needsApproval` on the route says so:
+
+```ts title="src/routes/notes.ts"
+add: k
+    .route({
+        method: 'POST',
+        path: '/notes',
+        auth: 'user',
+        body: z.object({
+            text: z.string(),
+        }),
+        responses: {
+            201: NoteSchema,
+        },
+        summary: 'Save a note for the signed-in user',
+        tool: {
+            needsApproval: true,
+        },
+    })
+    .handler(/* ... */),
+```
+
+This is what happens when the person types "remember the demo is on Friday":
+
+1. **The model asks to call `notes_add`.** Kizuna does not run it. The stream sends the call marked `needsApproval`, and `tools.run` returns `needs-approval`, so the loop above ends the stream:
+
+    ```
+    event: tool_call
+    data: {"id":"toolu_1","name":"notes.add","needsApproval":true,"input":{"body":{"text":"the demo is on Friday"}}}
+    ```
+
+2. **The app asks the person.** `readToolCalls` gives the call as a row with `state: 'needs-approval'` and the note in `input`, so the app can put it in its own words.
+3. **They tap Yes.** The app sends a second request carrying the call it showed and the answer.
+4. **The server runs that call.** The note is saved as the signed-in person, `tool_result` streams back, and the model carries on.
+
+Had they tapped No, nothing is saved, and the model reads `Declined, so nothing ran.`
+
+The call comes back from the app in step 3 rather than from the model a second time. The server keeps nothing between the two requests, and a model asked again would make a new call, with a new id and maybe different wording. Sending back what the person saw means exactly that runs.
+
+#### On the client
+
+Ask on a `needs-approval` row, and send the row back with the answer:
+
+```tsx title="components/ToolCallView.tsx"
+if (call.state === 'needs-approval' && call.name === 'notes.add') {
+    return (
+        <p>
+            Save “{call.input.body.text}” to your notes?
+            <button
+                onClick={() =>
+                    send({
+                        prompt,
+                        answer: {
+                            call,
+                            approved: true,
+                        },
+                    })
+                }>
+                Yes
+            </button>
+            <button
+                onClick={() =>
+                    send({
+                        prompt,
+                        answer: {
+                            call,
+                            approved: false,
+                        },
+                    })
+                }>
+                No
+            </button>
+        </p>
+    );
+}
+```
+
+`send` starts the next request to the same route.
+
+#### On the server
+
+Take the answer in the body with `ToolAnswerSchema`:
+
+```ts
+import { ToolAnswerSchema } from 'kizunajs/schemas';
+
+body: z.object({
+    prompt: z.string(),
+    answer: ToolAnswerSchema.optional(),
+}),
+```
+
+When one arrives, run its call before asking the model anything, and put the result in the conversation. `result.call` is the call as the model knows it:
+
+```ts
+body: async function* () {
+    const messages: Anthropic.MessageParam[] = [
+        {
+            role: 'user',
+            content: body.prompt,
+        },
+    ];
+
+    if (body.answer) {
+        const result = yield* tools.run(body.answer.call, body.answer);
+        if (result.state === 'needs-approval') return;
+        messages.push(
+            {
+                role: 'assistant',
+                content: [
+                    {
+                        type: 'tool_use',
+                        ...result.call,
+                    },
+                ],
+            },
+            {
+                role: 'user',
+                content: [
+                    {
+                        type: 'tool_result',
+                        tool_use_id: result.call.id,
+                        content: result.content,
+                        is_error: result.isError,
+                    },
+                ],
+            }
+        );
+    }
+
+    // the loop from above
+},
+```
+
+The call runs as the person who sent the answer, through the route's guards, so an edited answer can do nothing their own request could not.
 
 ## Reading the calls
 
-A call arrives as one event and its answer as another. `readToolCalls` folds them back into one row per call, carrying the tool's `name`, a `state` of `running`, `done` or `failed`, and the payloads narrowed to that tool.
+A call arrives as one event and its answer as another. `readToolCalls` folds them back into one row per call, carrying the tool's `name`, a `state` of `running`, `needs-approval`, `done` or `failed`, and the payloads narrowed to that tool.
 
 TypeScript imports it from `kizunajs`; the Swift and Kotlin generators emit it beside the route's `Event` type.
 
@@ -428,18 +659,18 @@ See [MCP](/docs/mcp) for the rest of the endpoint, including OAuth.
 
 Nothing here is a new transport. Every piece reduces to something Kizuna already had.
 
-**The events are folded into the stream at `k.routes` time.** `tools` on a response is authoring sugar. Before a route is validated, `expandStreamTools` turns each route you named into three Zod schemas and merges them into the response's `stream` record, then deletes the `tools` field. From that point on the response is an ordinary named-event stream, which is why the four adapters, the OpenAPI generator, the fetch client, and the Swift and Kotlin generators needed no changes to carry tools.
+**The events are folded into the stream at `k.routes` time.** Before a route is validated, `expandStreamTools` turns each route you named into three Zod schemas and merges them into the response's `stream` record, then moves the `tools` field under a symbol, where the handler's `tools` reads it. From that point on the response is an ordinary named-event stream, which is why the four adapters, the OpenAPI generator, the fetch client, and the Swift and Kotlin generators needed no changes to carry tools.
 
 **Each event is a discriminated union on the route's dotted key.** `tool_call` is `z.discriminatedUnion('name', [...])` with one arm per route, each carrying that route's own input. The type-level side walks the same tree to the same dotted keys, so `message.data.input` narrows in TypeScript, the Swift generator emits an `enum` with one case per tool, and the Kotlin generator emits a `sealed interface`.
 
 **The dotted key is the discriminator, not the published name.** `weather.getForecast` on the wire, `weather_get_forecast` over MCP. Deriving the snake-case name at the type level would need a string algorithm that has to agree exactly with the runtime one, and disagreeing silently would be worse than reading the name off a definition.
 
-**Execution is the route's own pipeline.** A tool call runs the route handler through the same validation, guards and Problem Details an HTTP request does, so there is one place a route runs whoever asked.
+**Execution is the route's own pipeline.** A tool call runs the route handler through the same validation, guards and Problem Details an HTTP request does, so there is one place a route runs whoever asked. On a stream, `tools.run` enters that pipeline after routing, with the stream request's headers and the adapter's handler context, and the tool's input in place of the URL and body.
 
 ## What Kizuna.js leaves out
 
 - **Models.** Kizuna never calls one, holds a conversation, or runs an agent loop. It validates input, runs a handler, validates output. The loop lives in your route handler, the way a job's transport lives outside kizuna.
-- **Provider wire shapes.** There is no `toAnthropicTools` or `toOpenAITools`, because those track a vendor changelog. `buildToolDefinitions` hands you MCP's shape and the `.map` to a provider is a few lines you can read.
+- **Provider wire shapes.** There is no `toAnthropicTools` or `toOpenAITools`, because those track a vendor changelog. `tools.definitions` hands you a name, a description and JSON Schema, and the `.map` to a provider is a few lines you can read.
 - **Progressive tool input.** A model streams a tool's arguments as partial JSON, which has no schema until it is whole. A half-parsed `{ city: "Os" }` would type-check as a finished value while being wrong, so Kizuna emits `tool_call` once the arguments are complete.
 
 ## A note on standards

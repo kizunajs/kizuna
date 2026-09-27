@@ -1023,6 +1023,34 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(error).toBeDefined();
             });
         },
+        'streams.toolsRunAsCaller': async () => {
+            await usingSecured(async (secured) => {
+                const signedIn = await secured.request({
+                    method: 'GET',
+                    path: '/profile-reply',
+                    headers: {
+                        authorization: sessionAuthorization,
+                    },
+                });
+                expect(signedIn.status).toBe(200);
+                expect(signedIn.text).toBe(
+                    'event: tool_call\ndata: {"id":"call_1","name":"readProfile"}\n\n' +
+                        'event: tool_result\ndata: {"id":"call_1","name":"readProfile","output":{"userId":"1"}}\n\n' +
+                        'event: done\ndata: {"ok":true}\n\n'
+                );
+
+                const anonymous = await secured.request({
+                    method: 'GET',
+                    path: '/profile-reply',
+                });
+                expect(anonymous.status).toBe(200);
+                expect(anonymous.text).toBe(
+                    'event: tool_call\ndata: {"id":"call_1","name":"readProfile"}\n\n' +
+                        'event: tool_error\ndata: {"id":"call_1","name":"readProfile","message":"Unauthorized"}\n\n' +
+                        'event: done\ndata: {"ok":false}\n\n'
+                );
+            });
+        },
         'streams.itemValidation': async () => {
             await usingStreams(async (streams) => {
                 const response = await streams.stream({

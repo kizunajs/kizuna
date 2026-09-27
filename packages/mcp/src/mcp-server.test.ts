@@ -5,7 +5,7 @@ import { defineConfig } from 'kizunajs';
 import { assembleApi, type GuardDeny } from 'kizunajs/adapter';
 import { Client } from '@modelcontextprotocol/client';
 import { InMemoryTransport } from '@modelcontextprotocol/client';
-import { buildInstructions, buildToolDefinitions, createMcpServer } from './mcp-server.js';
+import { buildInstructions, buildMcpTools, createMcpServer } from './mcp-server.js';
 
 interface Config {
     tags: typeof kTags;
@@ -255,9 +255,9 @@ const connectMcpClient = async (testApi: Parameters<typeof createMcpServer>[0] =
     };
 };
 
-describe('buildToolDefinitions', () => {
+describe('buildMcpTools', () => {
     it('generates tool definitions from a contract', () => {
-        const definitions = buildToolDefinitions(contract.routes);
+        const definitions = buildMcpTools(contract.routes);
         const names = definitions.map((definition) => definition.name);
 
         expect(names).toContain('users_list_users');
@@ -268,14 +268,14 @@ describe('buildToolDefinitions', () => {
     });
 
     it('excludes multipart/form-data routes by default', () => {
-        const definitions = buildToolDefinitions(contract.routes);
+        const definitions = buildMcpTools(contract.routes);
         const names = definitions.map((definition) => definition.name);
 
         expect(names).not.toContain('upload_avatar');
     });
 
     it('carries the summary as the tool title', () => {
-        const definitions = buildToolDefinitions(contract.routes);
+        const definitions = buildMcpTools(contract.routes);
         const listUsers = definitions.find((definition) => definition.name === 'users_list_users')!;
         const health = definitions.find((definition) => definition.name === 'health')!;
 
@@ -284,8 +284,8 @@ describe('buildToolDefinitions', () => {
     });
 });
 
-describe('buildToolDefinitions: which routes publish', () => {
-    const names = () => buildToolDefinitions(contract.routes).map((definition) => definition.name);
+describe('buildMcpTools: which routes publish', () => {
+    const names = () => buildMcpTools(contract.routes).map((definition) => definition.name);
 
     it('publishes every route that declared `tool`', () => {
         expect(names()).toEqual(
@@ -307,7 +307,7 @@ describe('buildToolDefinitions: which routes publish', () => {
             }),
         });
 
-        expect(buildToolDefinitions(quiet)).toEqual([]);
+        expect(buildMcpTools(quiet)).toEqual([]);
     });
 
     it('takes `tool: false` as a refusal', () => {
@@ -325,7 +325,7 @@ describe('buildToolDefinitions: which routes publish', () => {
             }),
         });
 
-        expect(buildToolDefinitions(refused)).toEqual([]);
+        expect(buildMcpTools(refused)).toEqual([]);
     });
 
     it('refuses a route that publishes but describes nothing', () => {
@@ -346,9 +346,9 @@ describe('buildToolDefinitions: which routes publish', () => {
     });
 });
 
-describe('buildToolDefinitions: input schema', () => {
+describe('buildMcpTools: input schema', () => {
     it('puts query under a query key', () => {
-        const definitions = buildToolDefinitions(contract.routes);
+        const definitions = buildMcpTools(contract.routes);
         const listUsers = definitions.find((definition) => definition.name === 'users_list_users')!;
 
         expect(listUsers.inputSchema.shape).toBeDefined();
@@ -359,7 +359,7 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('leaves an all-optional query out of required', () => {
-        const definitions = buildToolDefinitions(contract.routes);
+        const definitions = buildMcpTools(contract.routes);
         const listUsers = definitions.find((definition) => definition.name === 'users_list_users')!;
 
         expect(z.object(listUsers.inputSchema.shape!).safeParse({}).success).toBe(true);
@@ -367,7 +367,7 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('puts path params under a params key', () => {
-        const definitions = buildToolDefinitions(contract.routes);
+        const definitions = buildMcpTools(contract.routes);
         const getUser = definitions.find((definition) => definition.name === 'users_get_user')!;
 
         expect(getUser.inputSchema.shape).toBeDefined();
@@ -376,7 +376,7 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('puts body under a body key', () => {
-        const definitions = buildToolDefinitions(contract.routes);
+        const definitions = buildMcpTools(contract.routes);
         const createUser = definitions.find((definition) => definition.name === 'users_create_user')!;
 
         expect(createUser.inputSchema.shape).toBeDefined();
@@ -385,14 +385,14 @@ describe('buildToolDefinitions: input schema', () => {
     });
 
     it('returns undefined shape for routes with no inputs', () => {
-        const definitions = buildToolDefinitions(contract.routes);
+        const definitions = buildMcpTools(contract.routes);
         const health = definitions.find((definition) => definition.name === 'health')!;
 
         expect(health.inputSchema.shape).toBeUndefined();
     });
 
     it('excludes void body from the input schema', () => {
-        const definitions = buildToolDefinitions(contract.routes);
+        const definitions = buildMcpTools(contract.routes);
         const ping = definitions.find((definition) => definition.name === 'ping_user')!;
 
         expect(ping.inputSchema.hasParams).toBe(true);
@@ -431,7 +431,7 @@ describe('buildToolDefinitions: input schema', () => {
             routes: unionContractRoutes,
         }).api;
 
-        const definitions = buildToolDefinitions(unionContract.routes);
+        const definitions = buildMcpTools(unionContract.routes);
         const send = definitions.find((definition) => definition.name === 'send_notification')!;
 
         expect(send.inputSchema.hasBody).toBe(true);
@@ -464,7 +464,7 @@ describe('buildToolDefinitions: input schema', () => {
             routes: complexContractRoutes,
         }).api;
 
-        const definitions = buildToolDefinitions(complexContract.routes);
+        const definitions = buildMcpTools(complexContract.routes);
         const update = definitions.find((definition) => definition.name === 'update_item')!;
 
         expect(update.inputSchema.hasParams).toBe(true);
@@ -494,7 +494,7 @@ describe('buildToolDefinitions: input schema', () => {
             }),
         });
 
-        const definitions = buildToolDefinitions(
+        const definitions = buildMcpTools(
             defineConfig({
                 ...config,
                 routes: contractRoutesWithRequiredQuery,
@@ -580,7 +580,7 @@ describe('tool annotations', () => {
     });
 });
 
-describe('buildToolDefinitions: output schema', () => {
+describe('buildMcpTools: output schema', () => {
     it('describes the status and body envelope', async () => {
         const { client, close } = await connectMcpClient();
 
@@ -622,14 +622,14 @@ describe('buildToolDefinitions: output schema', () => {
 
 describe('instructions', () => {
     it('lists the contract tag groups', () => {
-        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes), undefined);
+        const instructions = buildInstructions(contract, buildMcpTools(contract.routes), undefined);
 
         expect(instructions).toContain('{ status, body }');
         expect(instructions).toContain('- API');
     });
 
     it('appends the authored text after the generated overview', () => {
-        const instructions = buildInstructions(contract, buildToolDefinitions(contract.routes), 'Every timestamp is UTC.');
+        const instructions = buildInstructions(contract, buildMcpTools(contract.routes), 'Every timestamp is UTC.');
 
         expect(instructions.indexOf('- API')).toBeLessThan(instructions.indexOf('Every timestamp is UTC.'));
     });
@@ -648,7 +648,7 @@ describe('instructions', () => {
             }),
         });
 
-        expect(buildInstructions(contract, buildToolDefinitions(quiet), undefined)).not.toContain('- API');
+        expect(buildInstructions(contract, buildMcpTools(quiet), undefined)).not.toContain('- API');
     });
 
     it('reaches the client over the protocol', async () => {
@@ -1252,7 +1252,7 @@ describe('streamed routes', () => {
                 },
             }),
         });
-        const definitions = buildToolDefinitions(streamRoutes);
+        const definitions = buildMcpTools(streamRoutes);
         expect(definitions.map((definition) => definition.name)).toEqual(['ping']);
     });
 });

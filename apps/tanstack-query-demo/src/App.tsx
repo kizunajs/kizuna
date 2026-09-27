@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isUndeclaredResponseError } from '@kizunajs/tanstack-query';
+import { readToolCalls, type ToolAnswer } from 'kizunajs';
 import { api } from './api.js';
 import styles from './App.module.css';
 
@@ -177,6 +178,95 @@ function MissingUser() {
     );
 }
 
+interface ChatTurn {
+    prompt: string;
+    answer?: ToolAnswer;
+}
+
+/**
+ * Ada's seeded session.
+ */
+const asAda = {
+    authorization: 'Bearer tok_ada',
+};
+
+function NotesAssistant() {
+    const [draft, setDraft] = useState('remember the demo is on Friday');
+    const [turn, setTurn] = useState<ChatTurn | null>(null);
+
+    const reply = useQuery(
+        api.assistant.chat.streamOptions({
+            input:
+                turn === null
+                    ? skipToken
+                    : {
+                          body: turn,
+                          headers: asAda,
+                      },
+        })
+    );
+
+    const messages = reply.data ?? [];
+    const text = messages.flatMap((message) => (message.event === 'delta' ? [message.data.text] : [])).join('');
+
+    const submit = (event: React.FormEvent) => {
+        event.preventDefault();
+        setTurn({
+            prompt: draft,
+        });
+    };
+
+    const answer = (call: ToolAnswer['call'], approved: boolean) => {
+        setTurn(
+            (current) =>
+                current && {
+                    prompt: current.prompt,
+                    answer: {
+                        call,
+                        approved,
+                    },
+                }
+        );
+    };
+
+    return (
+        <>
+            <form className={styles.row} onSubmit={submit}>
+                <input className={styles.input} value={draft} onChange={(event) => setDraft(event.target.value)} />
+                <button className={styles.button} type="submit" disabled={draft === ''}>
+                    Send
+                </button>
+            </form>
+
+            {reply.isError && <p className={styles.note}>Could not reach the API. Is the express demo running on :8000?</p>}
+
+            <ul className={styles.users}>
+                {readToolCalls(messages).map((call) => (
+                    <li key={call.id}>
+                        <code className={styles.code}>{call.name}</code> <span className={styles.note}>{call.state}</span>
+                        {call.state === 'needs-approval' && call.name === 'notes.add' && (
+                            <div className={`${styles.row} ${styles.more}`}>
+                                <span>Save “{call.input.body.text}” to your notes?</span>
+                                <button className={styles.button} type="button" onClick={() => answer(call, true)}>
+                                    Yes
+                                </button>
+                                <button className={styles.button} type="button" onClick={() => answer(call, false)}>
+                                    No
+                                </button>
+                            </div>
+                        )}
+                    </li>
+                ))}
+            </ul>
+
+            {text !== '' && <p>{text}</p>}
+            <p className={styles.note}>
+                Signed in as Ada. Start with <code className={styles.code}>remember</code> to save a note, or ask what it remembers.
+            </p>
+        </>
+    );
+}
+
 export function App() {
     return (
         <main className={styles.page}>
@@ -197,6 +287,11 @@ export function App() {
             <section className={styles.section}>
                 <h2 className={styles.heading}>A declared 404 is data</h2>
                 <MissingUser />
+            </section>
+
+            <section className={styles.section}>
+                <h2 className={styles.heading}>An assistant that runs routes as tools</h2>
+                <NotesAssistant />
             </section>
         </main>
     );

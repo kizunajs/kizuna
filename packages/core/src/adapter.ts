@@ -39,6 +39,8 @@ import {
     isSuccessStatus,
 } from './generator-utils.js';
 import { encodeStreamBody, EVENT_STREAM_MEDIA_TYPE, streamContentType, type EncodeStreamOptions } from './stream.js';
+import { streamToolsOf } from './tool-events.js';
+import { createStreamTools, type StreamTools } from './tool-runner.js';
 import { DEFAULT_JOBS_PATH, flattenJobs, type Jobs, type JobsConfig } from './jobs.js';
 import { createJobRunner, jobFnAt, JobInputError, type JobRunner, type JobRunnerOptions, type JobErrorHandler } from './job-runner.js';
 import {
@@ -257,7 +259,7 @@ export const contractOf = <C = unknown>(api: unknown): C => (api as Record<symbo
 /**
  * What kizuna puts in handler args. Must agree with the spread in `runPipeline`.
  */
-export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins'] as const;
+export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins', 'tools'] as const;
 
 /**
  * The adapter's own context, with kizuna's arguments removed.
@@ -587,6 +589,16 @@ export type {
     ContextFromAuth,
 } from './handler-pipeline.js';
 export { buildPath, parsePath, type PathSegment } from './path-params.js';
+export {
+    buildToolDefinitions,
+    buildToolInputSchema,
+    describeTool,
+    selectToolRoutes,
+    toolOptionsOf,
+    toolRefusal,
+    type ToolDefinition,
+    type ToolInputSchema,
+} from './tool-definitions.js';
 export { sortFlattenedRoutes } from './route-matcher.js';
 export {
     ROUTES_TAG,
@@ -1202,7 +1214,118 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         };
     }
 
-    const handler = resolveHandler(router, routeKey);
+    return invokeRoute({
+        resolved,
+        parsed: validation.parsed,
+        handler: resolveHandler(router, routeKey),
+        request,
+        routes,
+        definition,
+        handlerContext: () => definition.buildHandlerContext(request, responseContext),
+        guards,
+        schemes,
+        contextResolvers,
+        pluginExports,
+        jobRunner,
+        responseValidation,
+    });
+};
+
+interface Invocation<NativeRequest, HandlerContext, ResponseContext> {
+    resolved: ResolvedRoute;
+    parsed: RawInputs;
+    handler: unknown;
+    request: AdapterRequest<NativeRequest>;
+    routes: Routes;
+    definition: AdapterDefinition<NativeRequest, unknown, HandlerContext, ResponseContext>;
+    handlerContext: () => HandlerContext | Promise<HandlerContext>;
+    guards: GuardMap<HandlerContext> | undefined;
+    schemes: Record<string, SecurityScheme> | undefined;
+    contextResolvers: RequestContextMap<HandlerContext> | undefined;
+    pluginExports: Record<string, unknown> | undefined;
+    jobRunner: JobRunner<Jobs> | undefined;
+    responseValidation: boolean | undefined;
+}
+
+const streamToolsOfRoute = (route: RouteDefinition): Routes | undefined => {
+    for (const response of Object.values(route.responses)) {
+        const tools = streamToolsOf(response);
+        if (tools !== undefined) return tools;
+    }
+    return undefined;
+};
+
+/**
+ * What a tool call reports: the status and body HTTP would have sent.
+ */
+const toolAnswer = (result: AdapterResult): { status: number; body: unknown } => {
+    if (result.kind === 'raw-response') {
+        return {
+            status: 500,
+            body: problemDetails(500, 'This route answers with a raw response, and a tool answers with a JSON body.'),
+        };
+    }
+    if (result.kind === 'handler-error') console.error(`[kizuna] tool "${result.routeKey}" threw:`, result.error);
+    const rendered = renderJsonResult(result);
+    return {
+        status: rendered.status,
+        body: rendered.body,
+    };
+};
+
+/**
+ * Each call runs its route as a request of its own, from the same caller.
+ */
+const streamToolsFor = <NativeRequest, HandlerContext, ResponseContext>(
+    tools: Routes,
+    invocation: Invocation<NativeRequest, HandlerContext, ResponseContext>,
+    handlerContext: HandlerContext
+): StreamTools =>
+    createStreamTools(tools, {
+        headers: invocation.request.headers,
+        invoke: async (entry, parsed, params) =>
+            toolAnswer(
+                await invokeRoute({
+                    ...invocation,
+                    resolved: {
+                        routeKey: entry.routeKey,
+                        route: entry.route,
+                        params,
+                    },
+                    parsed,
+                    handler: entry.route[HANDLER],
+                    handlerContext: () => handlerContext,
+                })
+            ),
+        render: (failure) => {
+            const formatted = formatValidationError(failure);
+            return toolAnswer({
+                kind: 'validation-failed',
+                stage: failure.stage,
+                detail: formatted.detail,
+                issues: formatted.issues,
+            });
+        },
+    });
+
+const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
+    invocation: Invocation<NativeRequest, HandlerContext, ResponseContext>
+): Promise<AdapterResult> => {
+    const {
+        resolved,
+        parsed,
+        request,
+        routes,
+        definition,
+        guards,
+        schemes,
+        contextResolvers,
+        pluginExports,
+        jobRunner,
+        responseValidation,
+    } = invocation;
+    const { routeKey, route, params } = resolved;
+    const handler = invocation.handler;
     if (typeof handler !== 'function') {
         return {
             kind: 'no-handler',
@@ -1211,7 +1334,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
     }
 
     try {
-        const handlerContext = await definition.buildHandlerContext(request, responseContext);
+        const handlerContext = await invocation.handlerContext();
 
         const requestContext: Record<string, unknown> = {};
         if (contextResolvers) {
@@ -1219,7 +1342,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 requestContext[name] = await resolver({
                     ...(handlerContext as Record<string, unknown>),
                     params,
-                    headers: raw.headers as Record<string, string | string[] | undefined>,
+                    headers: request.headers as Record<string, string | string[] | undefined>,
                 } as Parameters<typeof resolver>[0]);
             }
         }
@@ -1288,15 +1411,21 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         const throwError = (response: { status: number; body: unknown; headers?: ResponseHeaders }): never => {
             throw new ResponseError(response);
         };
+        const tools = streamToolsOfRoute(route);
         const handlerResult = await (
             handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: ResponseHeaders } | RawResponse>
         )({
-            params: validation.parsed.params,
-            query: validation.parsed.query,
-            body: validation.parsed.body,
-            headers: validation.parsed.headers,
+            params: parsed.params,
+            query: parsed.query,
+            body: parsed.body,
+            headers: parsed.headers,
             throwError,
             ...handlerContext,
+            ...(tools
+                ? {
+                      tools: streamToolsFor(tools, invocation, handlerContext),
+                  }
+                : {}),
             ...(jobRunner ? { jobs: jobRunner } : {}),
             ...(hasRequestContext ? { requestContext } : {}),
             ...(Object.keys(securityContext).length > 0 ? { auth: securityContext } : {}),

@@ -43,6 +43,35 @@ describe('readToolCalls', () => {
         expect(tracked!.output).toBeUndefined();
     });
 
+    it('marks a call waiting for approval', () => {
+        const [tracked] = readToolCalls([
+            {
+                event: 'tool_call',
+                data: {
+                    id: 'toolu_01',
+                    name: 'reminders.add',
+                    needsApproval: true,
+                },
+            },
+        ]);
+        expect(tracked?.state).toBe('needs-approval');
+    });
+
+    it('moves an approved call on once it answers', () => {
+        const [tracked] = readToolCalls([
+            {
+                event: 'tool_call',
+                data: {
+                    id: 'toolu_01',
+                    name: 'reminders.add',
+                    needsApproval: true,
+                },
+            },
+            result('toolu_01', 'reminders.add'),
+        ]);
+        expect(tracked?.state).toBe('done');
+    });
+
     it('marks a failed call and carries its message', () => {
         const [tracked] = readToolCalls([
             call('toolu_01', 'weather.getForecast', { city: 'Atlantis' }),

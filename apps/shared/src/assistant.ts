@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 export async function* replyWords(prompt: string, signal: AbortSignal): AsyncGenerator<string> {
     const words = `You asked: ${prompt}. A streamed reply reaches the client one piece at a time, as this one does.`.split(' ');
     for (const [index, word] of words.entries()) {
@@ -53,4 +55,36 @@ export const signupsOverDays = (days: number): Array<{ date: string; signups: nu
             signups: ((index * 7 + 13) % 19) + 1,
         };
     });
+};
+
+/**
+ * A stand-in for a model, so the demo runs without an API key.
+ */
+export const noteCallFor = (prompt: string): { id: string; name: string; input?: unknown } => {
+    const remembered = /^remember (.+)$/i.exec(prompt.trim());
+    if (remembered) {
+        return {
+            id: `call_${randomUUID()}`,
+            name: 'notes_add',
+            input: {
+                body: {
+                    text: remembered[1],
+                },
+            },
+        };
+    }
+    return {
+        id: `call_${randomUUID()}`,
+        name: 'notes_list',
+    };
+};
+
+/**
+ * What the stand-in model says once the call answered.
+ */
+export const replyFor = (result: { state: string; body?: unknown }): string => {
+    if (result.state === 'declined') return 'Nothing was saved.';
+    const detail = (result.body as { detail?: unknown } | undefined)?.detail;
+    if (result.state === 'failed') return `That did not work: ${typeof detail === 'string' ? detail : 'the route refused'}.`;
+    return `The route answered ${JSON.stringify(result.body)}.`;
 };

@@ -511,6 +511,10 @@ public final class APIClient: Sendable {
         APIToolsClient(client: self)
     }
 
+    public var notes: APINotesClient {
+        APINotesClient(client: self)
+    }
+
     public var diagnostics: APIDiagnosticsClient {
         APIDiagnosticsClient(client: self)
     }
@@ -2057,14 +2061,14 @@ public final class APIClient: Sendable {
             case getForecast(ToolCallGetForecast)
             case plotSignups(ToolCallPlotSignups)
             case countWords(ToolCallCountWords)
-            public static func getForecast(id: String, input: APIClient.AssistantReply.ToolCallGetForecastInput) -> ToolCall {
-                .getForecast(ToolCallGetForecast(id: id, name: "getForecast", input: input))
+            public static func getForecast(id: String, needsApproval: Bool? = nil, input: APIClient.AssistantReply.ToolCallGetForecastInput) -> ToolCall {
+                .getForecast(ToolCallGetForecast(id: id, name: "getForecast", needsApproval: needsApproval, input: input))
             }
-            public static func plotSignups(id: String, input: APIClient.AssistantReply.ToolCallPlotSignupsInput) -> ToolCall {
-                .plotSignups(ToolCallPlotSignups(id: id, name: "plotSignups", input: input))
+            public static func plotSignups(id: String, needsApproval: Bool? = nil, input: APIClient.AssistantReply.ToolCallPlotSignupsInput) -> ToolCall {
+                .plotSignups(ToolCallPlotSignups(id: id, name: "plotSignups", needsApproval: needsApproval, input: input))
             }
-            public static func countWords(id: String, input: APIClient.AssistantReply.ToolCallCountWordsInput) -> ToolCall {
-                .countWords(ToolCallCountWords(id: id, name: "countWords", input: input))
+            public static func countWords(id: String, needsApproval: Bool? = nil, input: APIClient.AssistantReply.ToolCallCountWordsInput) -> ToolCall {
+                .countWords(ToolCallCountWords(id: id, name: "countWords", needsApproval: needsApproval, input: input))
             }
 
             public var id: String {
@@ -2080,6 +2084,14 @@ public final class APIClient: Sendable {
                 case .getForecast(let payload): return payload.name
                 case .plotSignups(let payload): return payload.name
                 case .countWords(let payload): return payload.name
+                }
+            }
+
+            public var needsApproval: Bool? {
+                switch self {
+                case .getForecast(let payload): return payload.needsApproval
+                case .plotSignups(let payload): return payload.needsApproval
+                case .countWords(let payload): return payload.needsApproval
                 }
             }
 
@@ -2119,15 +2131,18 @@ public final class APIClient: Sendable {
         public struct ToolCallGetForecast: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
+            public let needsApproval: Bool?
             public let input: ToolCallGetForecastInput
 
             public init(
                 id: String,
                 name: String,
+                needsApproval: Bool? = nil,
                 input: ToolCallGetForecastInput
             ) {
                 self.id = id
                 self.name = name
+                self.needsApproval = needsApproval
                 self.input = input
             }
         }
@@ -2169,15 +2184,18 @@ public final class APIClient: Sendable {
         public struct ToolCallPlotSignups: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
+            public let needsApproval: Bool?
             public let input: ToolCallPlotSignupsInput
 
             public init(
                 id: String,
                 name: String,
+                needsApproval: Bool? = nil,
                 input: ToolCallPlotSignupsInput
             ) {
                 self.id = id
                 self.name = name
+                self.needsApproval = needsApproval
                 self.input = input
             }
         }
@@ -2201,15 +2219,18 @@ public final class APIClient: Sendable {
         public struct ToolCallCountWords: Codable, Sendable, Equatable {
             public let id: String
             public let name: String
+            public let needsApproval: Bool?
             public let input: ToolCallCountWordsInput
 
             public init(
                 id: String,
                 name: String,
+                needsApproval: Bool? = nil,
                 input: ToolCallCountWordsInput
             ) {
                 self.id = id
                 self.name = name
+                self.needsApproval = needsApproval
                 self.input = input
             }
         }
@@ -2437,6 +2458,8 @@ public final class APIClient: Sendable {
             /// How far along the call is.
             public enum State: Sendable, Equatable {
                 case running
+                /// The call waits for the person to approve it.
+                case needsApproval
                 case done
                 case failed
             }
@@ -2468,6 +2491,9 @@ public final class APIClient: Sendable {
                 case .tool_call(let payload):
                     var tracked = at(payload.id, payload.name)
                     tracked.call = payload
+                    if payload.needsApproval == true, tracked.state == .running {
+                        tracked.state = .needsApproval
+                    }
                     calls[payload.id] = tracked
                 case .tool_result(let payload):
                     var tracked = at(payload.id, payload.name)
@@ -2503,6 +2529,417 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(API.ProblemDetails)
+            case validationError(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum AssistantChat {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let prompt: String
+            public let answer: InputAnswer?
+
+            public init(
+                prompt: String,
+                answer: InputAnswer? = nil
+            ) {
+                self.prompt = prompt
+                self.answer = answer
+            }
+        }
+
+        public struct InputAnswer: Codable, Sendable, Equatable {
+            public let call: InputAnswerCall
+            public let approved: Bool
+
+            public init(
+                call: InputAnswerCall,
+                approved: Bool
+            ) {
+                self.call = call
+                self.approved = approved
+            }
+        }
+
+        public struct InputAnswerCall: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let input: APIClient.JSONValue?
+
+            public init(
+                id: String,
+                name: String,
+                input: APIClient.JSONValue? = nil
+            ) {
+                self.id = id
+                self.name = name
+                self.input = input
+            }
+        }
+
+        public struct Delta: Codable, Sendable, Equatable {
+            public let text: String
+
+            public init(text: String) {
+                self.text = text
+            }
+        }
+
+        public enum ToolCall: Codable, Sendable, Equatable {
+            case notes_list(ToolCallNotesList)
+            case notes_add(ToolCallNotesAdd)
+            public static func notes_list(id: String, needsApproval: Bool? = nil) -> ToolCall {
+                .notes_list(ToolCallNotesList(id: id, name: "notes.list", needsApproval: needsApproval))
+            }
+            public static func notes_add(id: String, needsApproval: Bool? = nil, input: APIClient.AssistantChat.ToolCallNotesAddInput) -> ToolCall {
+                .notes_add(ToolCallNotesAdd(id: id, name: "notes.add", needsApproval: needsApproval, input: input))
+            }
+
+            public var id: String {
+                switch self {
+                case .notes_list(let payload): return payload.id
+                case .notes_add(let payload): return payload.id
+                }
+            }
+
+            public var name: String {
+                switch self {
+                case .notes_list(let payload): return payload.name
+                case .notes_add(let payload): return payload.name
+                }
+            }
+
+            public var needsApproval: Bool? {
+                switch self {
+                case .notes_list(let payload): return payload.needsApproval
+                case .notes_add(let payload): return payload.needsApproval
+                }
+            }
+
+            private enum DiscriminatorKey: String, CodingKey {
+                case discriminator = "name"
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: DiscriminatorKey.self)
+                let kind = try container.decode(String.self, forKey: .discriminator)
+                let single = try decoder.singleValueContainer()
+                switch kind {
+                case "notes.list":
+                    self = .notes_list(try single.decode(ToolCallNotesList.self))
+                case "notes.add":
+                    self = .notes_add(try single.decode(ToolCallNotesAdd.self))
+                default:
+                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                }
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var single = encoder.singleValueContainer()
+                switch self {
+                case .notes_list(let payload):
+                    try single.encode(payload)
+                case .notes_add(let payload):
+                    try single.encode(payload)
+                }
+            }
+        }
+
+        public struct ToolCallNotesList: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let needsApproval: Bool?
+
+            public init(
+                id: String,
+                name: String,
+                needsApproval: Bool? = nil
+            ) {
+                self.id = id
+                self.name = name
+                self.needsApproval = needsApproval
+            }
+        }
+
+        public struct ToolCallNotesAdd: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let needsApproval: Bool?
+            public let input: ToolCallNotesAddInput
+
+            public init(
+                id: String,
+                name: String,
+                needsApproval: Bool? = nil,
+                input: ToolCallNotesAddInput
+            ) {
+                self.id = id
+                self.name = name
+                self.needsApproval = needsApproval
+                self.input = input
+            }
+        }
+
+        public struct ToolCallNotesAddInput: Codable, Sendable, Equatable {
+            public let body: ToolCallNotesAddInputBody
+
+            public init(body: ToolCallNotesAddInputBody) {
+                self.body = body
+            }
+        }
+
+        public struct ToolCallNotesAddInputBody: Codable, Sendable, Equatable {
+            public let text: String
+
+            public init(text: String) {
+                self.text = text
+            }
+        }
+
+        public enum ToolResult: Codable, Sendable, Equatable {
+            case notes_list(ToolResultNotesList)
+            case notes_add(ToolResultNotesAdd)
+            public static func notes_list(id: String, output: APIClient.AssistantChat.ToolResultNotesListOutput) -> ToolResult {
+                .notes_list(ToolResultNotesList(id: id, name: "notes.list", output: output))
+            }
+            public static func notes_add(id: String, output: APIClient.AssistantChat.ToolResultNotesAddOutput) -> ToolResult {
+                .notes_add(ToolResultNotesAdd(id: id, name: "notes.add", output: output))
+            }
+
+            public var id: String {
+                switch self {
+                case .notes_list(let payload): return payload.id
+                case .notes_add(let payload): return payload.id
+                }
+            }
+
+            public var name: String {
+                switch self {
+                case .notes_list(let payload): return payload.name
+                case .notes_add(let payload): return payload.name
+                }
+            }
+
+            private enum DiscriminatorKey: String, CodingKey {
+                case discriminator = "name"
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: DiscriminatorKey.self)
+                let kind = try container.decode(String.self, forKey: .discriminator)
+                let single = try decoder.singleValueContainer()
+                switch kind {
+                case "notes.list":
+                    self = .notes_list(try single.decode(ToolResultNotesList.self))
+                case "notes.add":
+                    self = .notes_add(try single.decode(ToolResultNotesAdd.self))
+                default:
+                    throw DecodingError.dataCorruptedError(forKey: .discriminator, in: container, debugDescription: "Unknown discriminator: \(kind)")
+                }
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var single = encoder.singleValueContainer()
+                switch self {
+                case .notes_list(let payload):
+                    try single.encode(payload)
+                case .notes_add(let payload):
+                    try single.encode(payload)
+                }
+            }
+        }
+
+        public struct ToolResultNotesList: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultNotesListOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultNotesListOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultNotesListOutput: Codable, Sendable, Equatable {
+            public let notes: [ToolResultNotesListOutputNotesItem]
+
+            public init(notes: [ToolResultNotesListOutputNotesItem]) {
+                self.notes = notes
+            }
+        }
+
+        public struct ToolResultNotesListOutputNotesItem: Codable, Sendable, Equatable {
+            public let id: String
+            public let text: String
+
+            public init(
+                id: String,
+                text: String
+            ) {
+                self.id = id
+                self.text = text
+            }
+        }
+
+        public struct ToolResultNotesAdd: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: String
+            public let output: ToolResultNotesAddOutput
+
+            public init(
+                id: String,
+                name: String,
+                output: ToolResultNotesAddOutput
+            ) {
+                self.id = id
+                self.name = name
+                self.output = output
+            }
+        }
+
+        public struct ToolResultNotesAddOutput: Codable, Sendable, Equatable {
+            public let id: String
+            public let text: String
+
+            public init(
+                id: String,
+                text: String
+            ) {
+                self.id = id
+                self.text = text
+            }
+        }
+
+        public struct ToolError: Codable, Sendable, Equatable {
+            public let id: String
+            public let name: ToolErrorName
+            public let message: String
+
+            public init(
+                id: String,
+                name: ToolErrorName,
+                message: String
+            ) {
+                self.id = id
+                self.name = name
+                self.message = message
+            }
+        }
+
+        public enum ToolErrorName: String, Codable, Sendable {
+            case notesList = "notes.list"
+            case notesAdd = "notes.add"
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(
+                prompt: String,
+                answer: InputAnswer? = nil
+            ) -> Self {
+                .init(payload: Input(prompt: prompt, answer: answer))
+            }
+        }
+
+        public enum Event: Sendable, Equatable {
+            case delta(Delta)
+            case tool_call(ToolCall)
+            case tool_result(ToolResult)
+            case tool_error(ToolError)
+        }
+
+        public struct ToolCallRecord: Identifiable, Sendable, Equatable {
+            /// How far along the call is.
+            public enum State: Sendable, Equatable {
+                case running
+                /// The call waits for the person to approve it.
+                case needsApproval
+                case done
+                case failed
+            }
+
+            public let id: String
+            public let name: String
+            public var state: State
+            /// The call as it arrived, to read its input.
+            public var call: ToolCall?
+            /// The result once it answered, to read its output.
+            public var result: ToolResult?
+            /// What the tool reported when it failed.
+            public var message: String?
+        }
+
+        /// Fold a stream's events into one row per tool call, in the order the calls arrived.
+        public static func readToolCalls(_ events: [Event]) -> [ToolCallRecord] {
+            var order: [String] = []
+            var calls: [String: ToolCallRecord] = [:]
+
+            func at(_ id: String, _ name: String) -> ToolCallRecord {
+                if let existing = calls[id] { return existing }
+                order.append(id)
+                return ToolCallRecord(id: id, name: name, state: .running, call: nil, result: nil, message: nil)
+            }
+
+            for event in events {
+                switch event {
+                case .tool_call(let payload):
+                    var tracked = at(payload.id, payload.name)
+                    tracked.call = payload
+                    if payload.needsApproval == true, tracked.state == .running {
+                        tracked.state = .needsApproval
+                    }
+                    calls[payload.id] = tracked
+                case .tool_result(let payload):
+                    var tracked = at(payload.id, payload.name)
+                    tracked.state = .done
+                    tracked.result = payload
+                    calls[payload.id] = tracked
+                case .tool_error(let payload):
+                    var tracked = at(payload.id, payload.name.rawValue)
+                    tracked.state = .failed
+                    tracked.message = payload.message
+                    calls[payload.id] = tracked
+                default:
+                    continue
+                }
+            }
+
+            return order.compactMap { calls[$0] }
+        }
+
+        public struct Result: Sendable {
+            public let body: AsyncThrowingStream<Event, Swift.Error>
+
+            public init(body: AsyncThrowingStream<Event, Swift.Error>) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(API.ProblemDetails)
+            case unauthorized(API.GuardDenial)
+            case forbidden(API.GuardDenial)
             case validationError(APIClient.ValidationError)
 
             public var isCancelled: Bool {
@@ -2692,6 +3129,115 @@ public final class APIClient: Sendable {
             case invalidResponse
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum NotesList {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let notes: [ResponseNotesItem]
+
+            public init(notes: [ResponseNotesItem]) {
+                self.notes = notes
+            }
+        }
+
+        public struct ResponseNotesItem: Codable, Sendable, Equatable {
+            public let id: String
+            public let text: String
+
+            public init(
+                id: String,
+                text: String
+            ) {
+                self.id = id
+                self.text = text
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.GuardDenial)
+            case forbidden(API.GuardDenial)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum NotesAdd {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let text: String
+
+            public init(text: String) {
+                self.text = text
+            }
+        }
+
+        public struct Response201: Codable, Sendable, Equatable {
+            public let id: String
+            public let text: String
+
+            public init(
+                id: String,
+                text: String
+            ) {
+                self.id = id
+                self.text = text
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(text: String) -> Self {
+                .init(payload: Input(text: text))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response201
+
+            public init(body: Response201) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case unauthorized(API.GuardDenial)
+            case forbidden(API.GuardDenial)
             case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
@@ -3539,6 +4085,48 @@ public struct APIAssistantClient: Sendable {
             throw APIClient.AssistantReply.Failure.unexpectedStatus(statusCode, data)
         }
     }
+
+    /// Chat with an assistant that keeps notes for the signed-in user, exercises tools on a stream
+    public func chat(_ body: APIClient.AssistantChat.Body) async throws(APIClient.AssistantChat.Failure) -> APIClient.AssistantChat.Result {
+        let path = "/assistant/chat"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.AssistantChat.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.AssistantChat.Failure.self)
+        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, failure: APIClient.AssistantChat.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = Kizuna.events(bytes, using: client.decoder) { event, decoder -> APIClient.AssistantChat.Event? in
+                switch event.event {
+                case "delta": return .delta(try decoder.decode(APIClient.AssistantChat.Delta.self, from: Foundation.Data(event.data.utf8)))
+                case "tool_call": return .tool_call(try decoder.decode(APIClient.AssistantChat.ToolCall.self, from: Foundation.Data(event.data.utf8)))
+                case "tool_result": return .tool_result(try decoder.decode(APIClient.AssistantChat.ToolResult.self, from: Foundation.Data(event.data.utf8)))
+                case "tool_error": return .tool_error(try decoder.decode(APIClient.AssistantChat.ToolError.self, from: Foundation.Data(event.data.utf8)))
+                default: return nil
+                }
+            }
+            return APIClient.AssistantChat.Result(body: body)
+        case 400:
+            let data = try await Kizuna.collect(bytes, failure: APIClient.AssistantChat.Failure.self)
+            throw Kizuna.firstError(statusCode: statusCode, data: data, [
+                { (try? client.decoder.decode(API.ProblemDetails.self, from: data)).map(APIClient.AssistantChat.Failure.badRequest) },
+                { (try? client.decoder.decode(APIClient.ValidationError.self, from: data)).map(APIClient.AssistantChat.Failure.validationError) },
+            ])
+        case 401:
+            let data = try await Kizuna.collect(bytes, failure: APIClient.AssistantChat.Failure.self)
+            let payload = try Kizuna.decode(API.GuardDenial.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.AssistantChat.Failure.self)
+            throw APIClient.AssistantChat.Failure.unauthorized(payload)
+        case 403:
+            let data = try await Kizuna.collect(bytes, failure: APIClient.AssistantChat.Failure.self)
+            let payload = try Kizuna.decode(API.GuardDenial.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.AssistantChat.Failure.self)
+            throw APIClient.AssistantChat.Failure.forbidden(payload)
+        default:
+            let data = try await Kizuna.collect(bytes, failure: APIClient.AssistantChat.Failure.self)
+            throw APIClient.AssistantChat.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
 }
 
 public struct APIToolsClient: Sendable {
@@ -3612,6 +4200,65 @@ public struct APIToolsClient: Sendable {
             throw APIClient.ToolsCountWords.Failure.badRequest(payload)
         default:
             throw APIClient.ToolsCountWords.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct APINotesClient: Sendable {
+    private let client: APIClient
+
+    init(client: APIClient) {
+        self.client = client
+    }
+
+    /// List the notes the signed-in user has saved
+    public func list() async throws(APIClient.NotesList.Failure) -> APIClient.NotesList.Result {
+        let path = "/notes"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NotesList.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.NotesList.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.NotesList.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotesList.Failure.self)
+            return APIClient.NotesList.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.GuardDenial.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotesList.Failure.self)
+            throw APIClient.NotesList.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.GuardDenial.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotesList.Failure.self)
+            throw APIClient.NotesList.Failure.forbidden(payload)
+        default:
+            throw APIClient.NotesList.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Save a note for the signed-in user
+    public func add(_ body: APIClient.NotesAdd.Body) async throws(APIClient.NotesAdd.Failure) -> APIClient.NotesAdd.Result {
+        let path = "/notes"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NotesAdd.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.NotesAdd.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.NotesAdd.Failure.self)
+        switch statusCode {
+        case 201:
+            let body = try Kizuna.decode(APIClient.NotesAdd.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotesAdd.Failure.self)
+            return APIClient.NotesAdd.Result(body: body)
+        case 401:
+            let payload = try Kizuna.decode(API.GuardDenial.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotesAdd.Failure.self)
+            throw APIClient.NotesAdd.Failure.unauthorized(payload)
+        case 403:
+            let payload = try Kizuna.decode(API.GuardDenial.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotesAdd.Failure.self)
+            throw APIClient.NotesAdd.Failure.forbidden(payload)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NotesAdd.Failure.self)
+            throw APIClient.NotesAdd.Failure.badRequest(payload)
+        default:
+            throw APIClient.NotesAdd.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }
