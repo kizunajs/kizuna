@@ -1,0 +1,220 @@
+.panels {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.visual {
+    display: flex;
+    flex-direction: column;
+    height: 320px;
+    overflow: hidden;
+    border-radius: 10px;
+    background-color: var(--kizuna-window);
+    box-shadow: var(--kizuna-window-elevation);
+}
+
+.chat {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 12px 10px;
+}
+
+.prompt {
+    align-self: flex-end;
+    max-width: 85%;
+    margin: 0;
+    border-radius: 16px 16px 4px 16px;
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    padding: 9px 13px;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: var(--kizuna-ink);
+}
+
+.reply {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--kizuna-ink);
+}
+
+.caret {
+    display: inline-block;
+    width: 6px;
+    height: 1.05em;
+    margin-left: 3px;
+    vertical-align: text-bottom;
+    background-color: var(--kizuna-ink);
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--kizuna-muted);
+}
+
+.statusIcon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2;
+}
+
+.chartCard {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-radius: 12px;
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    padding: 12px 14px 10px;
+}
+
+.chartHead {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.chartTotal {
+    font-size: 1.375rem;
+    font-weight: var(--font-weight-600);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    color: var(--kizuna-ink);
+}
+
+.chartChange {
+    font-size: 0.75rem;
+    color: var(--kizuna-muted);
+}
+
+.chart {
+    display: flex;
+    height: 76px;
+    gap: 10px;
+}
+
+.bar {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+}
+
+.barFill {
+    width: 100%;
+    border-radius: 3px;
+    background-color: var(--kizuna-line-strong);
+}
+
+.barFillPeak {
+    background-color: var(--kizuna-ink);
+}
+
+.barDay {
+    font-size: 0.625rem;
+    line-height: 1;
+    color: var(--kizuna-muted);
+}
+
+.composer {
+    margin: auto 12px 12px;
+    overflow: hidden;
+    border-radius: 14px;
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+}
+
+.composerRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 13px;
+}
+
+.composerPlaceholder {
+    flex: 1;
+    font-size: 0.8125rem;
+    color: var(--kizuna-muted);
+}
+
+.composerSend {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: var(--kizuna-radius-pill);
+    background-color: var(--kizuna-ink);
+}
+
+.composerIcon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2.5;
+    color: var(--kizuna-canvas);
+}
+
+.dock {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-bottom: var(--kizuna-hairline) solid var(--kizuna-line-strong);
+    padding: 14px 14px 12px;
+}
+
+.dockTitle {
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-600);
+    color: var(--kizuna-ink);
+}
+
+.actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.button {
+    pointer-events: none;
+}
+
+.actions .buttonSecondary {
+    background-color: var(--kizuna-control-hover);
+}
+
+.actions .buttonPrimary {
+    /* Optical adjustment */
+    height: calc(var(--kizuna-control-height-small) - 1px);
+    background-origin: border-box;
+}
+
+.body {
+    flex: 1;
+}
+
+.code {
+    border-radius: 6px;
+    background-color: var(--kizuna-tint);
+    box-shadow: var(--kizuna-elevation-hover);
+    padding: 1px 6px;
+    font-family: var(--kizuna-mono);
+    font-size: 0.85em;
+    color: var(--kizuna-ink);
+}
+
+@media (max-width: 1023px) {
+    .panels {
+        grid-template-columns: 1fr;
+    }
+}

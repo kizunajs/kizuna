@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { HandlerExplorer } from '@/components/code/handler-explorer';
 import { Agents } from '@/components/landing-page/agents';
+import { Assistant } from '@/components/landing-page/assistant';
 import { Beta } from '@/components/landing-page/beta';
 import { BreakingChanges } from '@/components/landing-page/breaking-changes';
 import { ClosingCta } from '@/components/landing-page/closing-cta';
@@ -35,6 +36,8 @@ export default function HomePage() {
                 <Config />
 
                 <Agents />
+
+                <Assistant />
 
                 <HandlerExplorer />
 
