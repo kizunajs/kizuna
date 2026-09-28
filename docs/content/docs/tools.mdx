@@ -477,17 +477,24 @@ export function ToolCallView({ call }: { call: Call }) {
 <Tab value="SwiftUI">
 
 ```swift title="ChatModel.swift"
+import APIClient
+
 @Observable
 @MainActor
 final class ChatModel {
-    var messages: [AssistantReply.Event] = []
+    var messages: [APIClient.AssistantReply.Event] = []
+    var text = ""
 
     func send(_ prompt: String) async throws {
         messages = []
-        let result = try await client.assistantReply(body: .init(prompt: prompt))
+        text = ""
+        let result = try await client.assistant.reply(.body(prompt: prompt))
 
         for try await event in result.body {
             messages.append(event)
+            if case .delta(let delta) = event {
+                text += delta.text
+            }
         }
     }
 }
@@ -504,21 +511,22 @@ struct ChatView: View {
             ForEach(APIClient.AssistantReply.readToolCalls(model.messages)) { call in
                 ToolCallView(call: call)
             }
-            Text(model.messages.text)
+            Text(model.text)
         }
     }
 }
 ```
 
 ```swift title="ToolCallView.swift"
+import APIClient
+
 struct ToolCallView: View {
-    let call: ToolCallRecord
+    let call: APIClient.AssistantReply.ToolCallRecord
 
     var body: some View {
-        switch call.name {
-        case "charts.plotSignups":
-            SignupChart(points: call.points)
-        default:
+        if case .charts_plotSignups(let plotted) = call.result {
+            SignupChart(points: plotted.output.points)
+        } else {
             ToolPill(name: call.name, state: call.state)
         }
     }
@@ -530,13 +538,16 @@ struct ToolCallView: View {
 <Tab value="Compose">
 
 ```kotlin title="ChatViewModel.kt"
+import com.kizuna.demo.APIClient
+import com.kizuna.demo.APIClient.AssistantReply.Event
+
 class ChatViewModel(private val client: APIClient) : ViewModel() {
     private val _messages = MutableStateFlow(emptyList<Event>())
     val messages: StateFlow<List<Event>> = _messages.asStateFlow()
 
     fun send(prompt: String) = viewModelScope.launch {
         _messages.value = emptyList()
-        client.assistantReply(AssistantReplyBody(prompt)).body.collect { event ->
+        client.assistant.reply { body(prompt = prompt) }.body.collect { event ->
             _messages.update { it + event }
         }
     }
@@ -545,23 +556,28 @@ class ChatViewModel(private val client: APIClient) : ViewModel() {
 
 ```kotlin title="ChatScreen.kt"
 import com.kizuna.demo.APIClient
+import com.kizuna.demo.APIClient.AssistantReply.Event
 
 @Composable
 fun ChatScreen(model: ChatViewModel = viewModel()) {
     val messages by model.messages.collectAsStateWithLifecycle()
+    val text = messages.filterIsInstance<Event.Delta>().joinToString("") { delta -> delta.data.text }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         APIClient.AssistantReply.readToolCalls(messages).forEach { call -> ToolCallView(call) }
-        Text(messages.text())
+        Text(text)
     }
 }
 ```
 
 ```kotlin title="ToolCallView.kt"
+import com.kizuna.demo.APIClient.AssistantReply.ToolCallRecord
+import com.kizuna.demo.APIClient.AssistantReply.ToolResult
+
 @Composable
 fun ToolCallView(call: ToolCallRecord) {
-    when (call.name) {
-        "charts.plotSignups" -> SignupChart(call.points)
+    when (val result = call.result) {
+        is ToolResult.Charts_plotSignups -> SignupChart(result.value.output.points)
         else -> ToolPill(call.name, call.state)
     }
 }
@@ -632,6 +648,77 @@ is Event.ToolResult -> when (val result = event.data) {
 
 Rename a field on the route and every one of these stops compiling.
 
+## Running on the device
+
+An app on iOS 26 or macOS 26 has a language model of its own. Apple's [Foundation Models](https://developer.apple.com/documentation/foundationmodels) framework runs it on the device, with no bill per token, and makes the tool calls itself. The Swift client hands it your routes.
+
+### Give the session its tools
+
+`kizuna generate` writes a factory into the Swift client for every route that declares `tool`, beside its method:
+
+```swift title="APIClient.swift"
+public func listTool() -> APIClient.NotesList.LanguageModelTool
+```
+
+The tool carries the route's name, description and input schema, and makes the call through the client. The app picks which tools a conversation gets:
+
+```swift title="NotesAssistant.swift"
+import APIClient
+import FoundationModels
+
+let session = LanguageModelSession(
+    tools: [
+        client.notes.listTool(),
+    ],
+    instructions: "Help the person find their notes."
+)
+
+let reply = try await session.respond(to: "What did I write about the demo?")
+```
+
+The model reads `notes_list` and the route's `summary`, and the session calls the route when the model asks. The call goes through `client`, with its middleware and credentials, so it runs as the signed-in person through the same guards as any request. The server runs the route, and the model stays on the phone.
+
+### Name a few
+
+The on-device model reads every tool it is given inside a context of a few thousand tokens, and Apple advises three to five per session. Pass the ones this conversation needs, and keep each route's `summary` short, since every word of it spends that budget.
+
+### Wait for approval
+
+A route with `needsApproval` gets a factory that requires a closure to ask the person:
+
+```swift title="APIClient.swift"
+public func addTool(approve: @escaping @Sendable (APIClient.NotesAdd.ToolInput) async -> Bool) -> APIClient.NotesAdd.LanguageModelTool
+```
+
+The closure receives the call's input, typed to the route, and asking is up to the app:
+
+```swift title="NotesAssistant.swift"
+let session = LanguageModelSession(
+    tools: [
+        client.notes.listTool(),
+        client.notes.addTool(approve: { input in
+            await confirm("Save “\(input.body.text)” to your notes?")
+        }),
+    ]
+)
+```
+
+`confirm` is your own dialog or sheet. Return `true` and the note is saved. Return `false` and nothing runs, and the model reads `Declined, so nothing ran.`
+
+The session waits while the person decides, so the call runs the moment the closure answers.
+
+### What the model reads back
+
+A tool returns the `{ status, body }` the route answered with, as it does over MCP. A `4xx` comes back the same way, with its Problem Details, so the model reads why and can try again. A request that never reaches the server throws, and `respond` throws `LanguageModelSession.ToolCallError`.
+
+### Which inputs it takes
+
+The model fills in a route's `{ params, query, body }` against a schema built from the same JSON Schema MCP publishes. Strings, numbers, booleans, arrays, objects, string enums and discriminated unions all carry over, with their `.describe()` text and bounds.
+
+`z.record`, `z.unknown` and unions of plain values have no Foundation Models equivalent. A route that uses one keeps its method, and the generator leaves out its tool with a warning naming the field.
+
+The tools sit behind `#if canImport(FoundationModels)`, so the client still builds for iOS 16 and macOS 13.
+
 ## Publishing over MCP
 
 A route that declares `tool` already has a name, a description, an input schema, an output schema and a handler, which is what an MCP tool is. [`mcpPlugin`](/docs/reference/mcp-plugin) serves them:
@@ -669,7 +756,7 @@ Nothing here is a new transport. Every piece reduces to something Kizuna already
 
 ## What Kizuna.js leaves out
 
-- **Models.** Kizuna never calls one, holds a conversation, or runs an agent loop. It validates input, runs a handler, validates output. The loop lives in your route handler, the way a job's transport lives outside kizuna.
+- **Models.** Kizuna never calls one, holds a conversation, or runs an agent loop. It validates input, runs a handler, validates output. The loop lives in your route handler, the way a job's transport lives outside kizuna, and on the device Apple's session runs it.
 - **Provider wire shapes.** There is no `toAnthropicTools` or `toOpenAITools`, because those track a vendor changelog. `tools.definitions` hands you a name, a description and JSON Schema, and the `.map` to a provider is a few lines you can read.
 - **Progressive tool input.** A model streams a tool's arguments as partial JSON, which has no schema until it is whole. A half-parsed `{ city: "Os" }` would type-check as a finished value while being wrong, so Kizuna emits `tool_call` once the arguments are complete.
 

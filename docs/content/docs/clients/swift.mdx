@@ -220,6 +220,20 @@ for try await event in result.body {
 
 A stream of one schema yields that type directly, a `text/*` stream yields one `String` per line, and a binary stream yields `Data` chunks. The status and headers are checked before the method returns, so a `400` throws its `Failure` as on any route. Cancelling the task that reads the stream closes the connection. A route that mixes a streamed status with another `2xx` is left out of the client, with a warning.
 
+## On-device tools
+
+Every route that declares [`tool`](/docs/tools) gets a generated factory that returns a Foundation Models `Tool`, so an app can hand your routes to the model on the device:
+
+```swift title="NotesAssistant.swift"
+let session = LanguageModelSession(
+    tools: [
+        client.notes.listTool(),
+    ]
+)
+```
+
+See [running on the device](/docs/tools#running-on-the-device) for approval and what the model reads back.
+
 ## Keeping it current
 
 `kizuna generate` writes every client the config declares, so the Swift one is never generated on its own:
