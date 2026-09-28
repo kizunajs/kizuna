@@ -25,6 +25,10 @@ const navigation: NavigationItem[] = [
         href: '/docs',
     },
     {
+        label: 'Guides',
+        href: '/docs/guides',
+    },
+    {
         label: 'Reference',
         href: '/docs/reference',
     },

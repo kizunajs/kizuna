@@ -3,6 +3,8 @@ title: Breaking Changes
 description: Catch a change that breaks callers before it ships.
 ---
 
+<GuideNotice guide="keep-old-app-builds-working" />
+
 [`kizuna diff`](/docs/cli#kizuna-diff) compares two versions of your API and reports what each change costs the people already calling it. It reads the declarations, so route keys, MCP tool names and job keys are all in view, and every Zod schema is compared field by field.
 
 <Steps>

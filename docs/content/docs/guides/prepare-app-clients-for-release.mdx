@@ -1,0 +1,46 @@
+---
+title: Prepare your app clients for release
+description: The Swift and Kotlin client settings to fix before the first release, since changing them later renames code the app already uses.
+---
+
+## Configure the clients
+
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    clients: [
+        swiftClient({
+            output: '../ios/Example/Generated/APIClient.swift',
+            unknownEnumCase: true,
+            camelCaseProperties: true,
+        }),
+        kotlinClient({
+            output: '../android/app/src/main/kotlin/com/example/api/APIClient.kt',
+            package: 'com.example.api',
+            unknownEnumCase: true,
+            camelCaseProperties: true,
+        }),
+    ],
+});
+```
+
+`unknownEnumCase` decodes an enum value an old build has never seen to `unknown` instead of failing the response. `camelCaseProperties` makes `last_name` read as `lastName`. Turn both on before the first release, since switching later renames code the app already uses.
+
+## Tips
+
+- **Create one client** for the life of the app, so connections are reused between requests.
+- **Read the token per request** in Swift's `requestMiddleware` or Kotlin's `requestInterceptor`, so a refreshed token is picked up.
+- **Ignore cancellations** on Swift. A `.task` is cancelled when its view disappears, so check `isCancelled` before showing an error.
+- **Cache on the device** with a [cache policy](/docs/caching) and an `etag`. `URLSession` caches by default, while OkHttp needs a `Cache`:
+
+    ```kotlin title="APISetup.kt"
+    val client = APIClient(
+        baseUrl = "https://api.example.com",
+        client = OkHttpClient.Builder()
+            .cache(Cache(File(context.cacheDir, "http"), 10L * 1024 * 1024))
+            .build(),
+    )
+    ```
+
+- **Commit the generated client** into the app's source tree and run [`kizuna generate --check`](/docs/config#kizuna-generate---check) in CI.

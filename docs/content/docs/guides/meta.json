@@ -1,0 +1,4 @@
+{
+    "title": "Guides",
+    "pages": ["force-app-update", "keep-old-app-builds-working", "prepare-app-clients-for-release"]
+}

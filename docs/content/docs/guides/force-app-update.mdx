@@ -1,0 +1,327 @@
+---
+title: Force an app update
+description: Block builds below a minimum version with a screen that sends people to the store, and raise the minimum without an app release.
+---
+
+The app asks on launch whether its build may keep running. The server answers with one of four statuses:
+
+| Status               | The app shows                              |
+| -------------------- | ------------------------------------------ |
+| `supported`          | Nothing                                    |
+| `outdated`           | A dismissible prompt to update             |
+| `unsupported`        | A blocking screen with a link to the store |
+| `device-unsupported` | A blocking screen saying the OS is too old |
+
+The server decides, so changing the rules never needs an app release.
+
+<Steps>
+
+<Step>
+
+### Store your releases
+
+One row per platform in your database, so forcing an update is an edit to a row:
+
+| `platform` | `minimumVersion` | `latestVersion` | `minimumOsVersion` | `storeUrl`                                                      |
+| ---------- | ---------------- | --------------- | ------------------ | --------------------------------------------------------------- |
+| `ios`      | `3.0.0`          | `3.4.1`         | `16.0`             | `https://apps.apple.com/app/id1234567890`                       |
+| `android`  | `3.0.0`          | `3.4.0`         | `8.0`              | `https://play.google.com/store/apps/details?id=com.example.app` |
+
+```ts title="src/app-versions.ts"
+import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
+
+export const PlatformSchema = Kizuna.model({
+    title: 'Platform',
+    schema: z.enum(['ios', 'android']),
+});
+
+export const ReleaseSchema = Kizuna.model({
+    title: 'Release',
+    schema: z.object({
+        minimumVersion: z.string(),
+        latestVersion: z.string(),
+        minimumOsVersion: z.string(),
+        storeUrl: z.url(),
+    }),
+});
+```
+
+</Step>
+
+<Step>
+
+### Resolve the status
+
+```ts title="src/app-versions.ts"
+function compareVersions(left: string, right: string) {
+    const leftParts = left.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    const rightParts = right.split('.').map((part) => Number.parseInt(part, 10) || 0);
+    const length = Math.max(leftParts.length, rightParts.length);
+    for (let index = 0; index < length; index++) {
+        const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+        if (difference !== 0) return difference;
+    }
+    return 0;
+}
+
+export function resolveStatus(release: z.infer<typeof ReleaseSchema>, build: { version: string; osVersion: string }) {
+    if (compareVersions(build.version, release.minimumVersion) < 0) {
+        return compareVersions(build.osVersion, release.minimumOsVersion) < 0 ? 'device-unsupported' : 'unsupported';
+    }
+    if (compareVersions(build.version, release.latestVersion) < 0) return 'outdated';
+    return 'supported';
+}
+```
+
+</Step>
+
+<Step>
+
+### Add the check route
+
+Public, since the app asks before sign-in, and cached for five minutes:
+
+```ts title="src/routes/app-versions.ts"
+import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
+import { k } from '../k';
+import { PlatformSchema, resolveStatus } from '../app-versions';
+import { findRelease } from '../db';
+
+export const AppVersionSchema = Kizuna.model({
+    title: 'AppVersion',
+    schema: z.object({
+        status: z.enum(['supported', 'outdated', 'unsupported', 'device-unsupported']),
+        latestVersion: z.string(),
+        storeUrl: z.url(),
+    }),
+});
+
+export const appVersions = k.routes('appVersions', {
+    check: k
+        .route({
+            method: 'GET',
+            path: '/app-versions',
+            auth: false,
+            summary: 'Tells a native app whether it may run, before it boots',
+            query: z.object({
+                platform: PlatformSchema,
+                version: z.string(),
+                osVersion: z.string(),
+            }),
+            responses: {
+                200: {
+                    body: AppVersionSchema,
+                    cache: {
+                        scope: 'public',
+                        maxAge: 300,
+                    },
+                },
+            },
+        })
+        .handler(async ({ query }) => {
+            const release = await findRelease(query.platform);
+            return {
+                status: 200,
+                body: {
+                    status: resolveStatus(release, query),
+                    latestVersion: release.latestVersion,
+                    storeUrl: release.storeUrl,
+                },
+            };
+        }),
+});
+```
+
+Every build you ship calls this route forever, so only ever add fields to it.
+
+</Step>
+
+<Step>
+
+### Change a release from your API
+
+An admin route in front of the row, so raising the minimum is one call from your admin panel:
+
+```ts title="src/routes/app-versions.ts"
+export const appVersions = k.routes('appVersions', {
+    // check, above
+    updateRelease: k
+        .route({
+            method: 'PUT',
+            path: '/app-versions/:platform',
+            auth: 'admin',
+            summary: 'Replaces the release a platform is checked against',
+            pathParams: z.object({
+                platform: PlatformSchema,
+            }),
+            body: ReleaseSchema,
+            responses: {
+                200: ReleaseSchema,
+            },
+        })
+        .handler(async ({ params, body }) => {
+            await saveRelease(params.platform, body);
+            return {
+                status: 200,
+                body,
+            };
+        }),
+});
+```
+
+Apps see the change within the check's five minute `maxAge`.
+
+</Step>
+
+<Step>
+
+### Show the screen
+
+Check on launch and each time the app returns to the foreground. If the check fails, let the app run, so an offline launch never locks anyone out.
+
+<Tabs groupId="mobile-platform" items={['Swift', 'Kotlin', 'React Native']}>
+
+<Tab value="Swift">
+
+```swift title="AppVersionGate.swift"
+import SwiftUI
+
+extension API.AppVersion {
+    var blocksApp: Bool {
+        status == .unsupported || status == .deviceUnsupported
+    }
+}
+
+struct AppVersionGate<Content: View>: View {
+    let client: APIClient
+    @ViewBuilder let content: () -> Content
+
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var appVersion: API.AppVersion?
+
+    var body: some View {
+        Group {
+            if let appVersion, appVersion.blocksApp {
+                UpdateRequiredScreen(appVersion: appVersion)
+            } else {
+                content()
+            }
+        }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            let result = try? await client.appVersions.check(
+                .query(
+                    platform: .ios,
+                    version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0",
+                    osVersion: UIDevice.current.systemVersion
+                )
+            )
+            if let result {
+                appVersion = result.body
+            }
+        }
+    }
+}
+```
+
+</Tab>
+
+<Tab value="Kotlin">
+
+```kotlin title="AppVersionGate.kt"
+import android.os.Build
+import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
+import java.io.IOException
+
+val API.AppVersion.blocksApp: Boolean
+    get() = status == API.AppVersion.Status.UNSUPPORTED || status == API.AppVersion.Status.DEVICE_UNSUPPORTED
+
+suspend fun checkAppVersion(client: APIClient): API.AppVersion? =
+    try {
+        client.appVersions.check {
+            query(
+                platform = API.Platform.ANDROID,
+                version = BuildConfig.VERSION_NAME,
+                osVersion = Build.VERSION.RELEASE,
+            )
+        }.body
+    } catch (error: IOException) {
+        null
+    } catch (error: APIClient.AppVersionsCheck.Failure) {
+        null
+    }
+
+@Composable
+fun AppVersionGate(client: APIClient, content: @Composable () -> Unit) {
+    var appVersion by remember { mutableStateOf<API.AppVersion?>(null) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            checkAppVersion(client)?.let { appVersion = it }
+        }
+    }
+
+    val current = appVersion
+    if (current != null && current.blocksApp) {
+        UpdateRequiredScreen(appVersion = current)
+    } else {
+        content()
+    }
+}
+```
+
+</Tab>
+
+<Tab value="React Native">
+
+```ts title="src/hooks/use-app-version.ts"
+import { useEffect, useState } from 'react';
+import { AppState, Platform } from 'react-native';
+import * as Application from 'expo-application';
+import * as Device from 'expo-device';
+import { apiClient } from '@/lib/api-client';
+import type { API } from '@/lib/api-client.generated';
+
+export function useAppVersion() {
+    const [appVersion, setAppVersion] = useState<API.AppVersion | null>(null);
+
+    useEffect(() => {
+        const check = async () => {
+            const result = await apiClient.appVersions.check({
+                query: {
+                    platform: Platform.OS === 'ios' ? 'ios' : 'android',
+                    version: Application.nativeApplicationVersion ?? '0',
+                    osVersion: Device.osVersion ?? '0',
+                },
+            });
+            if (result.status === 200) setAppVersion(result.body);
+        };
+
+        check().catch(() => {});
+        const subscription = AppState.addEventListener('change', (state) => {
+            if (state === 'active') check().catch(() => {});
+        });
+        return () => subscription.remove();
+    }, []);
+
+    return appVersion;
+}
+```
+
+`nativeApplicationVersion` is the store build's version, which an EAS Update leaves unchanged.
+
+</Tab>
+
+</Tabs>
+
+</Step>
+
+</Steps>
+
+Turn on [`unknownEnumCase`](/docs/guides/prepare-app-clients-for-release) so a status you add later decodes as `unknown`, which `blocksApp` lets through.

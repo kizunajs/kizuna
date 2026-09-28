@@ -97,7 +97,7 @@ Declaring `public` on a route behind `security` throws when the config is assemb
 
 ## When it does nothing
 
-A React app on TanStack Query or SWR. Those keep their own cache with their own `staleTime` and do not make conditional requests, so neither `maxAge` nor `etag` reaches them. Your generated Swift and Kotlin clients are the opposite: `URLSession` and OkHttp honour all of this with no code on your side.
+A React app on TanStack Query or SWR. Those keep their own cache with their own `staleTime` and do not make conditional requests, so neither `maxAge` nor `etag` reaches them. Your generated Swift and Kotlin clients are the opposite: `URLSession` honours all of this with no code on your side, and OkHttp does once the client is given a [`Cache`](/docs/guides/prepare-app-clients-for-release#tips).
 
 ## Two policies, and the trap between them
 

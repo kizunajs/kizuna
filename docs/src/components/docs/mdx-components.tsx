@@ -10,6 +10,8 @@ import { AccessStyle, AccessStyleSwitch } from './access-style';
 import { ConfigExplorer } from '@/components/code/config-explorer';
 import { AlphaNotice } from './alpha-notice';
 import { BetaNotice } from './beta-notice';
+import { GuideList } from './guide-list';
+import { GuideNotice } from './guide-notice';
 import { InstallTabs } from './install-tabs';
 import { FeatureList } from './feature-list';
 import { ChangeCost } from './change-cost';
@@ -38,6 +40,8 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         ConfigExplorer: () => <ConfigExplorer className={blockStyles.block} />,
         AlphaNotice,
         BetaNotice,
+        GuideList,
+        GuideNotice,
         InstallTabs,
         FeatureList,
         ChangeCost,

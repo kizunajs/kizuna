@@ -1,0 +1,106 @@
+---
+title: Keep old app builds working
+description: Change your API while builds from months ago are still calling it, and know when the last one is gone.
+---
+
+Old app builds stay on phones for months, and every one of them still calls your API.
+
+## Know which build is calling
+
+A [request context](/docs/request-context) sends the build with every request:
+
+```ts title="src/request-context.ts"
+import { z } from 'zod';
+import { getHeaderValue } from 'kizunajs';
+import { k } from './k';
+
+export const appBuild = k
+    .requestContext({
+        headers: z.object({
+            'x-app-platform': z.string().optional(),
+            'x-app-version': z.string().optional(),
+        }),
+        context: z.object({
+            platform: z.string().nullable(),
+            version: z.string().nullable(),
+        }),
+    })
+    .handler(({ headers }) => ({
+        platform: getHeaderValue(headers['x-app-platform']) ?? null,
+        version: getHeaderValue(headers['x-app-version']) ?? null,
+    }));
+```
+
+The headers are optional because your website has no build to send. Each app sets them once:
+
+<Tabs groupId="mobile-platform" items={['Swift', 'Kotlin', 'React Native']}>
+
+<Tab value="Swift">
+
+```swift title="APISetup.swift"
+let client = APIClient(
+    baseURL: URL(string: "https://api.example.com")!,
+    requestContext: .init(
+        xAppPlatform: "ios",
+        xAppVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+    )
+)
+```
+
+</Tab>
+
+<Tab value="Kotlin">
+
+```kotlin title="APISetup.kt"
+val client = APIClient(
+    baseUrl = "https://api.example.com",
+    requestContext = APIClient.RequestContext(
+        xAppPlatform = "android",
+        xAppVersion = BuildConfig.VERSION_NAME,
+    ),
+)
+```
+
+</Tab>
+
+<Tab value="React Native">
+
+```ts title="src/lib/api-client.ts"
+import { Platform } from 'react-native';
+import * as Application from 'expo-application';
+import { createClient } from './api-client.generated';
+
+export const apiClient = createClient({
+    baseUrl: process.env.EXPO_PUBLIC_API_URL,
+    requestContext: {
+        'x-app-platform': Platform.OS,
+        'x-app-version': Application.nativeApplicationVersion ?? undefined,
+    },
+});
+```
+
+</Tab>
+
+</Tabs>
+
+Log it in a deprecated route, and you know when the last build calling it is gone:
+
+```ts title="src/routes/users.ts"
+.handler(({ params, requestContext }) => {
+    console.info('deleteUser called by', requestContext.appBuild);
+    // ...
+}),
+```
+
+## Which changes are safe
+
+| Change                                     | Old builds                                                                                     |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Add a response field                       | Ignore it                                                                                      |
+| Add an enum value                          | Decode it as `unknown`, with [`unknownEnumCase`](/docs/guides/prepare-app-clients-for-release) |
+| Add an optional request field              | Leave it out                                                                                   |
+| Add a required request field               | Get a `400`                                                                                    |
+| Remove or rename a response field          | Fail to decode                                                                                 |
+| Make a response field optional or nullable | Fail to decode when it is missing                                                              |
+
+Run [`kizuna diff`](/docs/breaking-changes) on every pull request to catch the breaking ones. To retire a route, [deprecate it](/docs/deprecations) with a `sunset` date, and [force an update](/docs/guides/force-app-update) past any build still calling it.
