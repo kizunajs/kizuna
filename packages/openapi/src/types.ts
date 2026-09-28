@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { RouteDefinition } from 'kizunajs/generator';
 
 /**
@@ -90,25 +91,56 @@ export interface OpenApiDocument {
     };
 }
 
-export interface GenerateOpenApiOptions {
+export const GenerateOpenApiOptionsSchema = z.object({
     /**
      * The OpenAPI Specification version to declare in the document's `openapi` field.
      *
      * Defaults to `'3.1.0'`.
      */
-    openApiVersion?: OpenApiVersion;
-    info: OpenApiInfo;
-    servers?: OpenApiServer[];
-    externalDocs?: OpenApiExternalDocs;
-    setOperationId?: boolean | 'concatenated-path';
-    operationMapper?: (operation: OpenApiOperation, route: RouteDefinition, operationId: string) => OpenApiOperation;
+    openApiVersion: z.literal('3.1.0').optional(),
+    info: z.object({
+        title: z.string(),
+        version: z.string(),
+        description: z.string().optional(),
+    }),
+    servers: z
+        .array(
+            z.object({
+                url: z.string(),
+                description: z.string().optional(),
+            })
+        )
+        .optional(),
+    externalDocs: z
+        .object({
+            url: z.string(),
+            description: z.string().optional(),
+        })
+        .optional(),
+    setOperationId: z.union([z.boolean(), z.literal('concatenated-path')]).optional(),
+    /**
+     * Document `hidden` routes too, for a document your own team reads.
+     *
+     * @default false
+     */
+    includeHidden: z.boolean().optional(),
+    operationMapper: z
+        .custom<(operation: OpenApiOperation, route: RouteDefinition, operationId: string) => OpenApiOperation>(
+            (value) => typeof value === 'function',
+            {
+                error: 'must be a function',
+            }
+        )
+        .optional(),
     /**
      * Document the derived `head` operation on every `GET` path without a declared one.
      *
      * @default false
      */
-    derivedHead?: boolean;
-}
+    derivedHead: z.boolean().optional(),
+});
+
+export type GenerateOpenApiOptions = z.output<typeof GenerateOpenApiOptionsSchema>;
 
 export interface OpenApiRenderer {
     (format: 'json'): OpenApiDocument;

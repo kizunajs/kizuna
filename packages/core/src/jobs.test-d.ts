@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 import type { JobHandlerArgs, JobHandlerReturn, JobHandlers } from './jobs.js';
+import { definePlugin } from './plugin.js';
 
 interface Config {
     auth: {
@@ -257,4 +258,30 @@ test('a handler may be async or sync', () => {
         },
     };
     expectTypeOf(handlers).toExtend<Handlers>();
+});
+
+test('a job handler receives the installed plugins, typed', () => {
+    const greeter = definePlugin({
+        slug: 'greeter',
+        setup: () => ({
+            exports: {
+                greet: (name: string): string => `Hello, ${name}`,
+            },
+        }),
+    });
+    const withPlugins = new Kizuna<{
+        plugins: [ReturnType<typeof greeter>];
+    }>();
+
+    withPlugins.job({}).handler(({ plugins }) => {
+        expectTypeOf(plugins.greeter.greet).toEqualTypeOf<(name: string) => string>();
+    });
+});
+
+test('a job handler has no plugins when the config installs none', () => {
+    const withoutPlugins = new Kizuna<Record<string, never>>();
+
+    withoutPlugins.job({}).handler((args) => {
+        expectTypeOf(args).not.toHaveProperty('plugins');
+    });
 });

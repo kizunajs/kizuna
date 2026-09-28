@@ -1,148 +1,293 @@
 ---
 title: Create a Plugin
-description: Write a plugin once and it runs on every adapter, because it never touches your framework.
+description: Package the code you reuse across projects, like email or push notifications, so any Kizuna app can install it.
 ---
 
 <AlphaNotice>
 
-The plugin API is new and still settling. `createPlugin` and the shape of what it returns may change while v2 is in beta, so pin your version if you depend on them.
+The plugin API is new and still settling. `definePlugin` and the shape of what it returns may change while v2 is in beta, so pin your version if you depend on them.
 
 </AlphaNotice>
 
-A plugin declares routes and hands back the handlers that answer them. The adapter mounts them exactly as it mounts yours, so a plugin imports no framework and works on all four.
+Once you build more than one project with Kizuna, a lot of the code repeats: sending email, push notifications, checking which tenant a request belongs to. A plugin packages that code once, so every project can install it.
 
-A plugin is one module. It is named on `kizuna.config.ts`, which stays on the server, so it may import anything your handlers may: Node built-ins, a database driver, a heavy SDK.
+A plugin hands your route and job handlers functions to call, and can bring routes of its own.
 
-## `createPlugin`
+## Your first plugin
 
-```ts title="@kizunajs/audit/src/plugin.ts"
+<Steps>
+
+<Step>
+
+### Describe what it sends
+
+Each plugin gets its own folder. Start with the shape of an email:
+
+```ts title="src/plugins/email/types.ts"
 import { z } from 'zod';
-import { createPlugin, type RoutePath, type WithSlug } from 'kizunajs/plugin';
 
-export interface AuditPluginProps<Slug extends string = 'audit'> {
-    /**
-     * The key this plugin installs at, and what handlers reach it under.
-     */
-    slug?: Slug;
-    path?: RoutePath;
-    store: AuditStore;
-}
+export const EmailSchema = z.object({
+    to: z.email(),
+    subject: z.string().min(1),
+    html: z.string(),
+});
 
-const declare = (slug: string, props: AuditPluginProps<string>) =>
-    createPlugin({
-        slug,
-        routes: {
-            recent: {
-                method: 'GET',
-                path: props.path ?? '/audit/recent',
-                summary: 'The most recent audit entries',
-                responses: {
-                    200: z.array(EntrySchema),
-                },
-            },
-        },
-        props,
-        serve: ({ store }) => ({
-            router: {
-                recent: async () => ({
-                    status: 200,
-                    body: await store.recent(),
-                }),
-            },
-            exports: {
-                record: (routeKey: string) => store.write(routeKey),
-            },
-        }),
-    });
-
-export function auditPlugin<const Slug extends string = 'audit'>(
-    props: AuditPluginProps<Slug>
-): WithSlug<ReturnType<typeof declare>, Slug> {
-    return declare(props.slug ?? 'audit', props as AuditPluginProps<string>) as never;
-}
+export type Email = z.infer<typeof EmailSchema>;
 ```
 
-| key      | what it is                                                                        |
-| -------- | --------------------------------------------------------------------------------- |
-| `slug`   | the key it installs at, and what handlers reach it under                          |
-| `routes` | the routes it serves                                                              |
-| `props`  | how the caller configured it, handed back to `serve` so the app never restates it |
-| `serve`  | what answers those routes, and what it hands handlers                             |
+</Step>
 
-`serve` returns two things:
+<Step>
 
-| key       | what it is                                         |
-| --------- | -------------------------------------------------- |
-| `router`  | one handler per declared route, typed against them |
-| `exports` | what every handler reaches at `plugins.<slug>`     |
+### Write it
 
-A plugin that adds routes and nothing else returns `router` alone.
+```ts title="src/plugins/email/index.ts"
+import { z } from 'zod';
+import { Resend } from 'resend';
+import { definePlugin } from 'kizunajs/plugin';
+import type { Email } from './types';
 
-## The slug wrapper
+export const emailPlugin = definePlugin({
+    slug: 'email',
+    options: z.object({
+        apiKey: z.string(),
+        from: z.string(),
+    }),
+    setup: ({ options }) => {
+        const resend = new Resend(options.apiKey);
 
-`createPlugin` takes a concrete slug, so the factory around it is what lets an app rename the plugin or install two of them. `WithSlug` carries the caller's literal slug through to the declaration, which is what types `plugins.internalAudit` on the handler side.
+        return {
+            exports: {
+                send: (email: Email) =>
+                    resend.emails.send({
+                        from: options.from,
+                        ...email,
+                    }),
+            },
+        };
+    },
+});
+```
 
-Default it to your plugin's own name and most apps never pass one:
+</Step>
+
+<Step>
+
+### Install it
+
+```ts title="kizuna.config.ts"
+import { emailPlugin } from './src/plugins/email';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    plugins: [
+        emailPlugin({
+            apiKey: process.env.RESEND_API_KEY,
+            from: 'Acme <hello@example.com>',
+        }),
+    ],
+});
+```
+
+</Step>
+
+<Step>
+
+### Use it
+
+Every route handler and every job handler receives it under `plugins`, typed:
+
+```ts title="src/routes/users.ts"
+createUser: k
+    .route({
+        method: 'POST',
+        path: '/users',
+        body: CreateUserSchema,
+        responses: {
+            201: UserSchema,
+        },
+    })
+    .handler(async ({ body, plugins }) => {
+        const user = await db.users.create(body);
+
+        await plugins.email.send({
+            to: user.email,
+            subject: 'Welcome',
+            html: `<p>Welcome, ${user.name}.</p>`,
+        });
+
+        return {
+            status: 201,
+            body: user,
+        };
+    }),
+```
+
+</Step>
+
+</Steps>
+
+## `definePlugin`
+
+| Field     | What it gives the plugin                                      |
+| --------- | ------------------------------------------------------------- |
+| `slug`    | What handlers reach it under: `plugins.email`                 |
+| `options` | A Zod schema for what the app passes in                       |
+| `setup`   | Builds the plugin from its options and returns what it brings |
+
+`setup` returns any of these:
+
+| Key          | What it is                                                                                    |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| `exports`    | Functions every route and job handler reaches at `plugins.<name>`                             |
+| `routes`     | Routes an outside system calls, like a webhook                                                |
+| `generators` | Files `kizuna generate` writes, built with [`defineGenerator`](/docs/extend/create-generator) |
+
+Everything `setup` returns shares what it creates, so the Resend client is made once and used by all of it.
+
+`setup` runs when the config assembles, which includes `kizuna generate`. So it creates clients, and leaves connections and file reads to the handlers, the same as [route modules](/docs/routes#nothing-runs-at-import).
+
+## Options
+
+Every plugin's options are validated. `options` has to be a Zod schema, so what the plugin reads is always what it declared, and you never write checks of your own. The app's options are validated once, when the config assembles, and typed from the schema everywhere the plugin reads them.
+
+```ts title="src/plugins/email/index.ts"
+options: z.object({
+    apiKey: z.string(),
+    from: z.string(),
+    replyTo: z.email().optional(),
+}),
+```
+
+A misconfigured plugin stops the app from starting, and the error names the plugin and the field. Secrets come in through options, so a missing environment variable is caught the same way:
+
+```text
+[kizuna] Plugin 'email' has invalid options: apiKey is required
+```
+
+### A type from an SDK
+
+An SDK's options usually come as a plain TypeScript type. Take it with `z.custom`, and the field is typed as the SDK declares it:
+
+```ts title="src/plugins/email/index.ts"
+import { Resend, type ResendOptions } from 'resend';
+
+export const emailPlugin = definePlugin({
+    slug: 'email',
+    options: z.object({
+        apiKey: z.string(),
+        from: z.string(),
+        resend: z.custom<ResendOptions>().optional(),
+    }),
+    setup: ({ options }) => {
+        const resend = new Resend(options.apiKey, options.resend);
+
+        // ...
+    },
+});
+```
+
+`z.custom` checks nothing unless you pass it a check, so the SDK validates that field when it reads it.
+
+## Exports
+
+Every handler reaches a plugin's `exports` at `plugins.<name>`. Take one object with named fields, like every other kizuna call:
+
+```ts
+await plugins.email.send({
+    to: user.email,
+    subject: 'Welcome',
+    html: `<p>Welcome, ${user.name}.</p>`,
+});
+```
+
+### Your routes and jobs call the exports
+
+A route your apps call is part of your API, so it lives with your routes and calls the plugin. A contact form:
+
+```ts title="src/routes/contact.ts"
+import { EmailSchema } from '@/plugins/email/types';
+
+export const contact = k.routes('contact', {
+    send: k
+        .route({
+            method: 'POST',
+            path: '/contact',
+            auth: false,
+            body: EmailSchema.pick({
+                subject: true,
+                html: true,
+            }),
+            responses: {
+                204: z.void(),
+            },
+        })
+        .handler(async ({ body, plugins }) => {
+            await plugins.email.send({
+                to: 'support@example.com',
+                ...body,
+            });
+
+            return {
+                status: 204,
+            };
+        }),
+});
+```
+
+The path, the body, `auth` and which clients get the route are yours to choose, and the plugin needs no option for any of it.
+
+The same goes for background work. To send with retries, queue a job of your own that calls the plugin, so you decide what's queued, when and how often it retries:
+
+```ts title="src/jobs.ts"
+sendWelcomeEmail: k
+    .job({
+        input: z.object({
+            userId: z.string(),
+        }),
+        retry: 5,
+    })
+    .handler(async ({ input, plugins }) => {
+        const user = await db.users.find(input.userId);
+
+        await plugins.email.send({
+            to: user.email,
+            subject: 'Welcome',
+            html: `<p>Welcome, ${user.name}.</p>`,
+        });
+    }),
+```
+
+## Routes
+
+A plugin brings routes of its own only when something outside your apps calls them, like a service's webhooks. Declare them with `route` from `kizunajs/plugin`, the plugin's `k.route`, and return them from `setup`. They run through the same pipeline as yours, with the same validation, guards and problem details.
+
+- **Every plugin route is [hidden](/docs/routes#hidden-routes).** It's served, and stays out of your generated clients, the OpenAPI document and MCP, since no app calls it.
+- **`auth: false`** for a caller with no credentials. A route that needs a caller takes `auth` as an option, because the plugin never knows your identities: `RouteAuthSchema` from `kizunajs/plugin` accepts exactly what a route's [`auth`](/docs/reference/k-route#auth) does.
+- **`path`** as an option on a plugin with one route, so an app can move it when it clashes with one of its own. `RoutePathSchema` from `kizunajs/plugin` accepts a path that starts with `/`.
+- **`rawBody: true`** on a webhook route to [check the sender's signature](/docs/routes#verifying-signed-requests).
+
+If a plugin claims a path your routes already use, `defineConfig` throws and names both.
+
+## Slugs
+
+A plugin's `slug` is what handlers reach it under. The plugin picks one, and the app can change it. When two plugins want the same slug, `defineConfig` throws, names both, and tells you to rename one:
 
 ```ts title="kizuna.config.ts"
 plugins: [
-    auditPlugin({
-        store,
-    }),
-    auditPlugin({
-        slug: 'securityAudit',
-        path: '/internal/security-audit',
-        store: securityStore,
+    pushNotificationsPlugin(),
+    webPushPlugin({
+        slug: 'webPush',
     }),
 ],
 ```
 
-## Reading the api
+Handlers then use `plugins.push` and `plugins.webPush`. A plugin that needs several configurations takes them in its own options.
 
-`serve` receives the assembled api as its second argument, so a plugin can read every route, tag, identity and schema the app declared:
+## Publishing
 
-```ts
-serve: (props, api) => ({
-    router: {
-        endpoint: async () => ({
-            status: 200,
-            body: summarize(api.routes),
-        }),
-    },
-}),
-```
-
-That is how [`mcpPlugin`](/docs/reference/mcp-plugin) finds the routes declaring `tool`, and how [`openApiPlugin`](/docs/reference/openapi-plugin) builds a document without being handed one.
-
-## Plugin routes
-
-A plugin's routes run through the same pipeline as yours, with the same validation, guards, access control and problem details. They never join `api.routes`, so they stay out of everything generated from it.
-
-|                           | your routes | a plugin's routes |
-| ------------------------- | ----------- | ----------------- |
-| declared with             | `k.routes`  | the plugin        |
-| served by `api.mount`     | yes         | yes               |
-| validated, guarded        | yes         | yes               |
-| in your fetch client      | yes         | **no**            |
-| in OpenAPI, Swift, Kotlin | yes         | **no**            |
-
-If a plugin claims a path your routes already use, `defineConfig` throws and names both.
-
-## Answering with something that is not JSON
-
-A plugin route can return `rawResponse` when its wire format is not a JSON body, which is how MCP serves JSON-RPC over server-sent events:
-
-```ts
-import { rawResponse } from 'kizunajs/adapter';
-
-endpoint: async ({ body, headers }) => rawResponse(await transport.handleRequest(body, headers)),
-```
-
-Kizuna skips validation and rendering, and each adapter writes the response out in its own terms. Ordinary route handlers cannot reach `rawResponse`.
-
-## Packaging
-
-One entry, and its own `package.json` says how far it reaches:
+A published plugin is the same module in its own package, with its reach declared:
 
 ```json title="package.json"
 {
@@ -157,10 +302,10 @@ One entry, and its own `package.json` says how far it reaches:
 }
 ```
 
-A plugin is always `server`, since it runs where the config does. `kizuna.entries` is what this repo's boundary test reads, and it holds every package to the reach it declares.
+A plugin is always `server`, since it runs where the config does.
 
 ## Reference
 
-- [Config](/docs/config) for installing one
-- [`mcpPlugin`](/docs/reference/mcp-plugin) for a worked example
+- [Config](/docs/config) for installing plugins
+- [`mcpPlugin`](/docs/reference/mcp-plugin) and [`openApiPlugin`](/docs/reference/openapi-plugin) for worked examples
 - [Create an Adapter](/docs/extend/create-adapter) if the runtime itself is missing

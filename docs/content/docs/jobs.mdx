@@ -61,7 +61,7 @@ export const jobs = k.jobs('scheduler', {
 });
 ```
 
-A handler receives `input`, `throwError`, and `jobs`. A job with no declared `result` can return nothing.
+A handler receives `input`, `throwError`, `jobs`, and the `plugins` your config installs. A job with no declared `result` can return nothing.
 
 A job with a `schedule` runs on a clock; one without is only ever queued. A job can have both.
 

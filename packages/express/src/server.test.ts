@@ -11,7 +11,6 @@ testAdapterFeatures({
     createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: expressAdapter() }).api as unknown as ExpressApi,
     mount: (api, { responseValidation }) => {
         const app = express();
-        app.use(express.json());
         api.mount(app, {
             responseValidation,
         });

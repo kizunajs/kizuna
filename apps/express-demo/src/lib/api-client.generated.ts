@@ -776,6 +776,17 @@ export namespace API {
                 userAgent: string | null;
             }; headers: Record<string, string> };
     }
+
+    export namespace ContactSendMessage {
+        export type Body = {
+            subject: string;
+            html: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
 }
 
 export interface Client {
@@ -1334,6 +1345,24 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.DiagnosticsWhoAmI.Result>;
     };
+    contact: {
+        /**
+         * Send a message to the team
+         *
+         * @example
+         * const result = await client.contact.sendMessage({
+         *     body: {
+         *         subject: 'string',
+         *         html: 'string',
+         *     },
+         * });
+         */
+        sendMessage: ClientMethod<'POST', false, {
+            body: API.ContactSendMessage.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.ContactSendMessage.Result>;
+    };
 }
 
 const routes: GeneratedRoutes = {
@@ -1668,6 +1697,15 @@ const routes: GeneratedRoutes = {
             path: '/diagnostics/caller',
             responses: {
                 200: {},
+            },
+        },
+    },
+    contact: {
+        sendMessage: {
+            method: 'POST',
+            path: '/contact',
+            responses: {
+                204: {},
             },
         },
     },

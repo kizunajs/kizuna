@@ -71,6 +71,8 @@ export const usersRoutes = k.routes('users', {
 | `tags`         | No       | OpenAPI tag keys (from the tag set), resolved to titles in the spec                                                          |
 | `deprecated`   | No       | `boolean \| string \| { message?, date?, link? }`, see [Deprecations](/docs/deprecations)                                    |
 | `sunset`       | No       | `string \| { date, link? }`, see [Deprecations](/docs/deprecations)                                                          |
+| `rawBody`      | No       | `true` to receive the unparsed body as `rawBody` beside `body`, see [Routes](/docs/routes#verifying-signed-requests)         |
+| `hidden`       | No       | `true` to leave it out of the generated clients and the OpenAPI document, see [Routes](/docs/routes#hidden-routes)           |
 
 Use the `{ body, headers?, contentType?, cache?, etag? }` form of a response to declare [typed response headers](/docs/routes#response-schemas), a [binary body](/docs/reference/binary-and-file-schemas), or a [cache policy and entity tag](/docs/caching). Use `{ stream, headers?, contentType? }` to send the response piece by piece, see [Streaming](/docs/streaming).
 

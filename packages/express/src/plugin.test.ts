@@ -5,7 +5,7 @@ import request from 'supertest';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
-import { createPlugin } from 'kizunajs/adapter';
+import { definePlugin, route } from 'kizunajs/plugin';
 
 interface Config {
     plugins: [ReturnType<typeof probePlugin>];
@@ -15,11 +15,14 @@ interface Config {
 
 const k = new Kizuna<Config>();
 
-const probePlugin = (settings: { label: string }) =>
-    createPlugin({
-        slug: 'probe',
+const probePlugin = definePlugin({
+    slug: 'probe',
+    options: z.object({
+        label: z.string(),
+    }),
+    setup: ({ options }) => ({
         routes: {
-            ping: {
+            ping: route({
                 method: 'GET',
                 path: '/probe/ping',
                 responses: {
@@ -27,22 +30,18 @@ const probePlugin = (settings: { label: string }) =>
                         pong: z.boolean(),
                     }),
                 },
-            },
+            }).handler(() => ({
+                status: 200,
+                body: {
+                    pong: true,
+                },
+            })),
         },
-        serve: () => ({
-            router: {
-                ping: () => ({
-                    status: 200 as const,
-                    body: {
-                        pong: true,
-                    },
-                }),
-            },
-            exports: {
-                queue: (id: string) => `${settings.label}:${id}`,
-            },
-        }),
-    });
+        exports: {
+            queue: (id: string) => `${options.label}:${id}`,
+        },
+    }),
+});
 
 const kTags = k.tags({
     api: 'API',
@@ -73,7 +72,11 @@ const routes = k.routes('api', {
 const contract = defineConfig({
     adapter: expressAdapter(),
     ...config,
-    plugins: [probePlugin({ label: 'probed' })],
+    plugins: [
+        probePlugin({
+            label: 'probed',
+        }),
+    ],
     routes,
 }).api;
 
@@ -107,29 +110,26 @@ describe('plugin lane', () => {
     });
 
     it('reports a path a plugin and the contract both claim', () => {
-        const collidingPlugin = createPlugin({
+        const collidingPlugin = definePlugin({
             slug: 'collide',
-            serve: () => ({
-                router: {
-                    clash: () => ({
-                        status: 200 as const,
+            setup: () => ({
+                routes: {
+                    clash: route({
+                        method: 'POST',
+                        path: '/users/:id/index',
+                        responses: {
+                            200: z.object({
+                                from: z.string(),
+                            }),
+                        },
+                    }).handler(() => ({
+                        status: 200,
                         body: {
                             from: 'plugin',
                         },
-                    }),
+                    })),
                 },
             }),
-            routes: {
-                clash: {
-                    method: 'POST',
-                    path: '/users/:id/index',
-                    responses: {
-                        200: z.object({
-                            from: z.string(),
-                        }),
-                    },
-                },
-            },
         });
 
         const collidingKTags = k.tags({
@@ -143,7 +143,7 @@ describe('plugin lane', () => {
             () =>
                 defineConfig({
                     ...collidingKConfig,
-                    plugins: [collidingPlugin],
+                    plugins: [collidingPlugin()],
                     routes,
                 }).api
         ).toThrow(/collides with/);

@@ -13,6 +13,7 @@ import {
     streamToolsContract,
     inferenceRoutes,
     pluginTypeContract,
+    rawBodyContract,
     requestContextContract,
     securedContract,
 } from '../../core/src/adapter-testing/type-testing.js';
@@ -194,6 +195,10 @@ test('conforms to the shared adapter type catalogue', () => {
                 .parameter(0)
                 .toMatchTypeOf<{ body: { name: string; email: string } }>();
             expectTypeOf<Handlers<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<{ body: undefined }>();
+        },
+        'handler.rawBody': () => {
+            expectTypeOf<Handlers<typeof rawBodyContract>['receiveSigned']>().parameter(0).toMatchTypeOf<{ rawBody: string }>();
+            expectTypeOf<Parameters<Handlers<typeof inferenceContract>['createUser']>[0]>().not.toHaveProperty('rawBody');
         },
         'handler.context': () => {
             expectTypeOf<Handlers<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<FastifyHandlerContext>();

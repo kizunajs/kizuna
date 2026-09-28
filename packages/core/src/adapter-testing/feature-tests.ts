@@ -14,6 +14,7 @@ import {
     responseShapeInput,
     securedInput,
     sessionAuthorization,
+    signedBodyText,
     subUserInput,
     userInput,
     pluginInput,
@@ -415,6 +416,21 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 nickname: 123,
             });
             expect(wrongType.status).toBe(400);
+        },
+
+        'body.rawBody': async () => {
+            const response = await usingShapes((shapes) =>
+                shapes.request({
+                    method: 'POST',
+                    path: '/signed',
+                    body: signedBodyText,
+                })
+            );
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                rawBody: signedBodyText,
+                name: 'Ada',
+            });
         },
 
         'errors.declaredProblemDetails': async () => {

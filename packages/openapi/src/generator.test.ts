@@ -4,7 +4,9 @@ import toBeAValidOpenAPIDefinition from 'jest-expect-openapi';
 import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
+import { definePlugin, route } from 'kizunajs/plugin';
 import { renderOpenApi } from './generator.js';
+import { openApiPlugin } from './plugin.js';
 import type { GenerateOpenApiOptions } from './types.js';
 
 interface Config {
@@ -2481,5 +2483,147 @@ describe('types JSON Schema has no keyword for', () => {
             format: 'date-time',
         });
         expect(body.properties.anything).toEqual({});
+    });
+});
+
+describe('OpenAPI: hidden routes', () => {
+    const statusPlugin = definePlugin({
+        slug: 'status',
+        setup: () => ({
+            routes: {
+                ping: route({
+                    method: 'GET',
+                    path: '/status/ping',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                }).handler(() => ({
+                    status: 200,
+                    body: {
+                        ok: true,
+                    },
+                })),
+            },
+        }),
+    });
+    const contract = defineConfig({
+        routes: {
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: z.array(z.string()),
+                },
+            },
+            healthCheck: {
+                method: 'GET',
+                path: '/health-check',
+                hidden: true,
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        },
+        plugins: [statusPlugin()],
+    }).api;
+    const info = {
+        title: 'Test',
+        version: '1.0.0',
+    };
+
+    it('leaves hidden routes and plugin routes out', () => {
+        const document = renderOpenApi(contract, {
+            info,
+        })('json');
+        expect(Object.keys(document.paths ?? {}).sort()).toEqual(['/users']);
+    });
+
+    it('documents hidden routes too with includeHidden', () => {
+        const document = renderOpenApi(contract, {
+            info,
+            includeHidden: true,
+        })('json');
+        expect(Object.keys(document.paths ?? {}).sort()).toEqual(['/health-check', '/status/ping', '/users']);
+    });
+});
+
+describe('OpenAPI: written documents', () => {
+    const routes = {
+        listUsers: {
+            method: 'GET',
+            path: '/users',
+            responses: {
+                200: z.array(z.string()),
+            },
+        },
+        healthCheck: {
+            method: 'GET',
+            path: '/health-check',
+            hidden: true,
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        },
+    } satisfies Record<string, unknown>;
+
+    it('writes the document to output', () => {
+        const { api, generators } = defineConfig({
+            routes: routes as never,
+            plugins: [
+                openApiPlugin({
+                    info: {
+                        title: 'Test',
+                        version: '1.0.0',
+                    },
+                    output: './openapi.json',
+                }),
+            ],
+        });
+
+        expect(generators.map((file) => file.output)).toEqual(['./openapi.json']);
+        const document = JSON.parse(generators[0]!.render(api)) as { paths: Record<string, unknown> };
+        expect(Object.keys(document.paths)).toEqual(['/users']);
+    });
+
+    it('writes nothing without output', () => {
+        const { generators } = defineConfig({
+            routes: routes as never,
+            plugins: [
+                openApiPlugin({
+                    info: {
+                        title: 'Test',
+                        version: '1.0.0',
+                    },
+                }),
+            ],
+        });
+
+        expect(generators).toEqual([]);
+    });
+});
+
+describe('OpenAPI: plugin options', () => {
+    it('rejects options its schema does not accept, naming the field', () => {
+        expect(() =>
+            defineConfig({
+                routes: {},
+                plugins: [
+                    openApiPlugin({
+                        info: {
+                            title: 'Test',
+                        } as never,
+                        jsonPath: '/openapi' as never,
+                    }),
+                ],
+            })
+        ).toThrow(
+            /\[kizuna\] Plugin 'openApi' has invalid options: info\.version is required; jsonPath: must start with \/ and end in \.json/
+        );
     });
 });

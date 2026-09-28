@@ -238,3 +238,36 @@ describe('reporting', () => {
         expect(hasBreakingChange([])).toBe(false);
     });
 });
+
+describe('hidden routes', () => {
+    it('reports a route becoming hidden as breaking', () => {
+        const after = contractOf({
+            getUser: { method: 'GET', path: '/users/:id', responses: { ...ok, 404: z.object({ detail: z.string() }) } },
+            listUsers: { method: 'GET', path: '/users', hidden: true, responses: ok },
+        });
+        const changes = diffApis(base, after);
+
+        expect(changes).toContainEqual(
+            expect.objectContaining({
+                level: 'breaking',
+                key: 'users.listUsers',
+                summary: 'GET /users is now hidden',
+            })
+        );
+    });
+
+    it('reports a route no longer hidden as added', () => {
+        const hidden = contractOf({
+            getUser: { method: 'GET', path: '/users/:id', responses: { ...ok, 404: z.object({ detail: z.string() }) } },
+            listUsers: { method: 'GET', path: '/users', hidden: true, responses: ok },
+        });
+        const changes = diffApis(hidden, base);
+
+        expect(changes).toContainEqual(
+            expect.objectContaining({
+                level: 'added',
+                key: 'users.listUsers',
+            })
+        );
+    });
+});

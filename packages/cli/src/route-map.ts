@@ -1,5 +1,5 @@
 import type { ApiDefinition, RouteAuth, RouteDefinition } from 'kizunajs';
-import { createGenerator, deriveToolNames, toToolName } from 'kizunajs/generator';
+import { deriveToolNames, walkApi, toToolName } from 'kizunajs/generator';
 
 /**
  * One route, flattened to what someone reading a terminal wants to know.
@@ -13,6 +13,10 @@ export interface RouteEntry {
     tool?: string;
     deprecated?: string;
     sunset?: string;
+    /**
+     * `true` when the route is `hidden`: served, but in no generated client.
+     */
+    hidden?: true;
 }
 
 const permissionList = (requires: unknown): string => {
@@ -45,12 +49,12 @@ const describeSunset = (sunset: RouteDefinition['sunset']): string | undefined =
 /**
  * Every route an api serves, in the order it declares them.
  */
-export const routeMap = createGenerator((_options: Record<string, never>, _api: ApiDefinition) => {
+export const routeMap = (api: ApiDefinition, _options: Record<string, never> = {}): RouteEntry[] => {
     const entries: RouteEntry[] = [];
     const toolKeys: Array<{ key: string; origin: 'route' }> = [];
 
-    return {
-        processRoute({ routeKey, route, routeTags, deprecated, deprecationMessage }) {
+    return walkApi(api, {
+        processRoute({ routeKey, route, routeTags, deprecated, deprecationMessage, hidden }) {
             if (route.tool) toolKeys.push({ key: routeKey, origin: 'route' });
             entries.push({
                 key: routeKey,
@@ -60,6 +64,11 @@ export const routeMap = createGenerator((_options: Record<string, never>, _api: 
                 tags: routeTags,
                 deprecated: deprecated ? (deprecationMessage ?? '') : undefined,
                 sunset: describeSunset(route.sunset),
+                ...(hidden
+                    ? {
+                          hidden: true as const,
+                      }
+                    : {}),
             });
         },
         finalize(): RouteEntry[] {
@@ -71,8 +80,8 @@ export const routeMap = createGenerator((_options: Record<string, never>, _api: 
                 tool: names.get(entry.key) ?? (toolKeys.some((tool) => tool.key === entry.key) ? toToolName(entry.key) : undefined),
             }));
         },
-    };
-});
+    });
+};
 
 const pad = (text: string, width: number): string => text + ' '.repeat(Math.max(0, width - text.length));
 
@@ -93,6 +102,7 @@ export const formatRoutes = (entries: readonly RouteEntry[]): string => {
                 entry.tool && `tool: ${entry.tool}`,
                 entry.deprecated !== undefined && `deprecated${entry.deprecated ? `, ${entry.deprecated}` : ''}`,
                 entry.sunset && `sunset ${entry.sunset}`,
+                entry.hidden && 'hidden',
             ].filter(Boolean);
             return `${pad(entry.method, methodWidth)}  ${pad(entry.path, pathWidth)}  ${pad(entry.key, keyWidth)}  ${notes.join('  ')}`.trimEnd();
         })

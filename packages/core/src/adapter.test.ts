@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ProblemDetailsSchema } from './schemas.js';
-import { createAdapter, renderJsonResult, ResponseValidationError, type AdapterRequest, type AdapterResult } from './adapter.js';
+import { defineAdapter, renderJsonResult, ResponseValidationError, type AdapterRequest, type AdapterResult } from './adapter.js';
 import { Kizuna } from './kizuna.js';
 
 interface Config {
@@ -42,7 +42,7 @@ const makeRequest = (path: string): AdapterRequest<null> => ({
 
 const makeAdapter = () => {
     const results: AdapterResult[] = [];
-    const adapter = createAdapter<null, void, Record<string, never>>({
+    const adapter = defineAdapter<null, void, Record<string, never>>({
         buildHandlerContext: () => ({}),
         respond: (result) => {
             results.push(result);
@@ -179,7 +179,7 @@ describe('responseValidation', () => {
 
     it('passes non-ResponseError to onError as before', async () => {
         const errors: unknown[] = [];
-        const adapter = createAdapter<null, void, Record<string, never>>({
+        const adapter = defineAdapter<null, void, Record<string, never>>({
             buildHandlerContext: () => ({}),
             respond: () => {},
             onError: async (error) => {

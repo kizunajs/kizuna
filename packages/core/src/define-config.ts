@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import { buildApiDefinition, type ApiDefinition } from './api-definition.js';
-import { pluginRouteTree, pluginsBySlug, type PluginArgs, type PluginList, type PluginsBySlug } from './plugin.js';
+import { pluginRouteTree, type PluginArgs, type PluginList, type PluginsBySlug } from './plugin.js';
+import { createApiReference, resolvePlugins } from './plugin-server.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { assertValidDeprecationDates } from './deprecation.js';
 import { assertValidCache } from './cache.js';
@@ -18,7 +19,7 @@ import { permissionNames } from './permissions.js';
 import { GUARD } from './identity-builder.js';
 import { RESOLVER } from './request-context-builder.js';
 import { buildApi, type Api } from './api.js';
-import type { ClientTarget, DiffSettings } from './config.js';
+import type { DiffSettings, GeneratedFile } from './config.js';
 
 /**
  * Kizuna sends the guard body itself when a route's `requires` turns a caller
@@ -250,7 +251,7 @@ export type KizunaConfigInput<
      *     }),
      * ],
      */
-    clients?: readonly ClientTarget[];
+    clients?: readonly GeneratedFile[];
     /**
      * What else `kizuna diff` treats as breaking.
      *
@@ -328,7 +329,8 @@ export const defineConfig = <
     options: KizunaConfigInput<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>
 ): {
     api: ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
-    clients: readonly ClientTarget[];
+    clients: readonly GeneratedFile[];
+    generators: readonly GeneratedFile[];
     typescript: { outputFile?: string } | undefined;
     diff: DiffSettings | undefined;
 } => {
@@ -338,15 +340,34 @@ export const defineConfig = <
     const routes = (options.routes ?? {}) as Routes;
     const jobs = options.jobs as Jobs | undefined;
     const identities = options.auth?.identities as Record<string, SecurityScheme> | undefined;
-    const plugins = pluginsBySlug(options.plugins);
+    const apiReference = createApiReference();
+    const plugins = resolvePlugins(options.plugins, apiReference.api);
+    const pluginRoutes = pluginRouteTree(plugins);
 
-    assertNoPathCollisions([
-        ...routeClaims(routes),
-        ...routeClaims(pluginRouteTree(plugins), 'Plugin route'),
-        ...jobClaims(jobs, options.jobRunner),
-    ]);
+    assertNoPathCollisions([...routeClaims(routes), ...routeClaims(pluginRoutes, 'Plugin route'), ...jobClaims(jobs, options.jobRunner)]);
     assertValidDeprecationDates(routes);
-    assertValidDeprecationDates(pluginRouteTree(plugins));
+    assertValidDeprecationDates(pluginRoutes);
+
+    for (const { route, routeKey } of flattenRoutes(pluginRoutes)) {
+        if (route.tool !== undefined && route.tool !== false) {
+            throw new Error(`Plugin route '${routeKey}' declares \`tool\`. Plugin routes are hidden, so they never publish.`);
+        }
+        // Plugin routes are for outside callers, so none reaches the clients, the OpenAPI document or MCP.
+        (route as { hidden?: boolean }).hidden = true;
+    }
+
+    for (const { route, routeKey } of [...flattenRoutes(routes), ...flattenRoutes(pluginRoutes)]) {
+        if (route.hidden === true && route.tool !== undefined && route.tool !== false) {
+            throw new Error(
+                `Route '${routeKey}' is \`hidden\` and declares \`tool\`. A hidden route never publishes, so remove one of them.`
+            );
+        }
+        if (route.rawBody === true && route.contentType === 'multipart/form-data') {
+            throw new Error(
+                `Route '${routeKey}' declares \`rawBody\` on a \`multipart/form-data\` body. A multipart body is read as a stream of parts, so kizuna cannot keep it as text. Remove \`rawBody\`, or take the body as JSON.`
+            );
+        }
+    }
 
     const declaresIdentities = Object.keys(identities ?? {}).length > 0;
     for (const { route, routeKey } of flattenRoutes(routes)) {
@@ -361,10 +382,19 @@ export const defineConfig = <
         }
         resolveRouteAuth(route, route.auth, identities, routeKey);
     }
+    // A plugin route with no `auth` is public: the plugin can't know the app's identities, so one it needs comes in through its options.
+    for (const { route, routeKey } of flattenRoutes(pluginRoutes)) {
+        if (route.auth === undefined) {
+            route.security = [];
+            continue;
+        }
+        resolveRouteAuth(route, route.auth, identities, routeKey);
+    }
     // After every route's `auth` resolves, so both of these can read `security`.
     injectGuardResponses(routes, identities, guardSchema);
+    injectGuardResponses(pluginRoutes, identities, guardSchema);
     assertValidCache(routes);
-    assertValidCache(pluginRouteTree(plugins));
+    assertValidCache(pluginRoutes);
 
     const contract = buildApiDefinition({
         routes,
@@ -374,7 +404,7 @@ export const defineConfig = <
         guardSchema,
         requestContext: options.requestContext as Record<string, RequestContextSchema> | undefined,
         validation: options.validation?.issueCodes ? { issueCodes: options.validation.issueCodes } : undefined,
-        plugins,
+        plugins: plugins as never,
         jobsConfig: options.jobRunner,
     }) as ApiDefinition;
 
@@ -396,10 +426,13 @@ export const defineConfig = <
         },
         options.adapter
     ) as unknown as ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
+    apiReference.bind(api);
+    for (const plugin of Object.values(plugins)) plugin.validate?.();
 
     return {
         api,
         clients: options.clients ?? [],
+        generators: Object.values(plugins).flatMap((plugin) => plugin.generators),
         diff: options.diff,
         typescript: options.typescript,
     };

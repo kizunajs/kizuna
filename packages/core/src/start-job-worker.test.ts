@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
-import { createJobTransport, type JobMessage, type JobWorkerContext } from './job-transport.js';
+import { defineJobTransport, type JobMessage, type JobWorkerContext } from './job-transport.js';
 import { JOBS_META } from './adapter.js';
 import { startJobWorker } from './start-job-worker.js';
 
@@ -37,7 +37,7 @@ const pulling = () => {
         deliver: (message: JobMessage) => context!.run(message),
         subscribed: () => context!.jobs,
         stop,
-        transport: createJobTransport({
+        transport: defineJobTransport({
             name: 'pulling',
             dispatch: () => {},
             start: (started) => {
@@ -129,7 +129,7 @@ describe('startJobWorker', () => {
     });
 
     it('returns undefined for a push transport, which needs no worker', async () => {
-        const push = createJobTransport({
+        const push = defineJobTransport({
             name: 'push',
             dispatch: () => {},
         });

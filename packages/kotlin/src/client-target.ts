@@ -1,52 +1,54 @@
-import type { ClientTarget, ApiDefinition } from 'kizunajs';
-import { generateKotlinClient } from './generator.js';
+import { z } from 'zod';
+import { defineClient, type GeneratedFileOptions } from 'kizunajs/generator';
+import { kotlinClientWalk } from './generator.js';
 
-/**
- * Where a generated Kotlin client is written, and what it is called there.
- */
-export interface KotlinClientOptions {
-    /**
-     * Path the generated file is written to.
-     */
-    output: string;
+const KotlinClientOptionsSchema = z.object({
     /**
      * Name of the generated namespace object.
      *
      * @default 'API'
      */
-    namespace?: string;
+    namespace: z.string().default('API'),
     /**
      * Package declaration for the generated file, e.g. `com.example.api`.
      */
-    package?: string;
+    package: z.string().optional(),
     /**
      * Convert wire field names to camelCase properties, mapping the wire name
      * back via `@SerialName`.
      *
      * @default false
      */
-    camelCaseProperties?: boolean;
+    camelCaseProperties: z.boolean().optional(),
     /**
      * Give every enum an `unknown` case, so a value the client has not been
      * generated for decodes instead of throwing.
      *
      * @default false
      */
-    unknownEnumCase?: boolean;
-}
+    unknownEnumCase: z.boolean().optional(),
+});
 
 /**
- * A Kotlin client target for `kizuna.config.ts`.
+ * Where a generated Kotlin client is written, and what it is called there.
+ */
+export type KotlinClientOptions = z.input<typeof KotlinClientOptionsSchema> & GeneratedFileOptions;
+
+/**
+ * A Kotlin client for `kizuna.config.ts`.
  *
  * @example
- * kotlinClient({ output: './api/APIClient.kt', package: 'com.example.api' });
+ * kotlinClient({
+ *     output: './api/APIClient.kt',
+ *     package: 'com.example.api',
+ * });
  */
-export const kotlinClient = (options: KotlinClientOptions): ClientTarget => ({
-    kind: 'kotlin',
-    output: options.output,
-    generate: (contract: ApiDefinition) =>
-        generateKotlinClient(contract, {
-            namespaceName: options.namespace ?? 'API',
+export const kotlinClient = defineClient({
+    target: 'kotlin',
+    options: KotlinClientOptionsSchema,
+    generate: ({ options, api }) =>
+        kotlinClientWalk(api, {
+            namespaceName: options.namespace,
             packageName: options.package,
             camelCaseProperties: options.camelCaseProperties,
             unknownEnumCase: options.unknownEnumCase,

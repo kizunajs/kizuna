@@ -127,16 +127,19 @@ Kizuna treats a breaking change as a decision you make, not one you discover in 
 Anything Kizuna ships, you can extend yourself with the same tools we used.
 
 <Cards>
-    <Card title="createAdapter" href="/docs/extend/create-adapter">
+    <Card title="definePlugin" href="/docs/extend/create-plugin">
+        Package code you reuse, with routes and jobs that reach every handler and client.
+    </Card>
+    <Card title="defineAdapter" href="/docs/extend/create-adapter">
         Serve on a runtime Kizuna has never heard of.
     </Card>
-    <Card title="createGenerator" href="/docs/extend/create-generator">
-        Walk your routes and write anything from them.
+    <Card title="defineClient" href="/docs/extend/create-client">
+        Generate a client for a language Kizuna doesn't ship.
     </Card>
-    <Card title="createPlugin" href="/docs/extend/create-plugin">
-        Add endpoints and helpers that reach every handler.
+    <Card title="defineGenerator" href="/docs/extend/create-generator">
+        Write documents and other files from your routes.
     </Card>
-    <Card title="createJobTransport" href="/docs/extend/create-job-transport">
+    <Card title="defineJobTransport" href="/docs/extend/create-job-transport">
         Put your jobs on any queue or scheduler.
     </Card>
 </Cards>

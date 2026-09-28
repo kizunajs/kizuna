@@ -117,82 +117,87 @@ const toolCallTarget = (
 };
 
 /**
- * What answers the MCP endpoint: the tool list built from the routes that
- * declared `tool`, and the calls a model makes against them.
+ * What answers one MCP endpoint: the tool list built from the routes that
+ * declared `tool`, and the calls a model makes against them. The OAuth setup
+ * reads the app's identities, so it's prepared once the api has assembled:
+ * `validate` prepares it at startup, and the handlers reuse it.
  */
-export const mcpServe = (props: McpPluginProps<string>, api: unknown) => {
+export const mcpEndpoint = (props: McpPluginProps, api: unknown) => {
     const serverApi = api as ApiWithRouter;
-    const enforcement = props.oauth === undefined ? undefined : prepareOAuth(props.oauth, props.path ?? '/mcp', serverApi);
+    let prepared: OAuthEnforcement | undefined;
+    const enforcementOf = (): OAuthEnforcement | undefined => {
+        if (props.oauth === undefined) return undefined;
+        prepared ??= prepareOAuth(props.oauth, props.path ?? '/mcp', serverApi);
+        return prepared;
+    };
 
     return {
-        router: {
-            endpoint: async (args: HandlerArgs) => {
-                let transportAuth: { scheme: string; context?: Record<string, unknown> } | undefined;
-                if (enforcement !== undefined) {
-                    const target = toolCallTarget(args.body, enforcement);
-                    const outcome = await enforceOAuth({
-                        scheme: enforcement.oauth.scheme,
-                        guard: enforcement.guard,
-                        schemeDefinition: enforcement.schemeDefinition,
-                        metadataUrl: enforcement.metadataUrl,
-                        scopesSupported: enforcement.scopesSupported,
-                        scopes: target.scopes,
-                        roles: target.roles,
-                        requires: target.requires,
-                        params: target.params,
-                        headers: args.headers,
-                        handlerContext: adapterContextOf(args),
-                        requestContext: args.requestContext,
-                    });
-                    if (!outcome.ok) return denialResponse(outcome.denial);
-                    transportAuth = {
-                        scheme: enforcement.oauth.scheme,
-                        ...(outcome.context === undefined
-                            ? {}
-                            : {
-                                  context: outcome.context,
-                              }),
-                    };
-                }
-
-                const handler = createMcpHandler(() =>
-                    createMcpServer(serverApi, {
-                        ...props,
-                        handlerContext: adapterContextOf(args),
-                        credentialHeaders: args.headers,
-                        ...(transportAuth === undefined
-                            ? {}
-                            : {
-                                  transportAuth,
-                              }),
-                    })
-                );
-
-                // Rebuilt from the inputs the pipeline already parsed, so
-                // the handler gets a web request on every adapter.
-                return rawResponse(
-                    await handler.fetch(
-                        new Request('http://mcp.local/', {
-                            method: 'POST',
-                            headers: toHeaders(args.headers),
-                            body: JSON.stringify(args.body),
-                        })
-                    )
-                );
-            },
-            ...(enforcement === undefined
-                ? {}
-                : {
-                      protectedResourceMetadata: () =>
-                          rawResponse(
-                              new Response(JSON.stringify(enforcement.metadata), {
-                                  status: 200,
-                                  headers: {
-                                      'content-type': 'application/json',
-                                  },
-                              })
-                          ),
-                  }),
+        validate: (): void => {
+            enforcementOf();
         },
+        handle: async (args: HandlerArgs) => {
+            const enforcement = enforcementOf();
+            let transportAuth: { scheme: string; context?: Record<string, unknown> } | undefined;
+            if (enforcement !== undefined) {
+                const target = toolCallTarget(args.body, enforcement);
+                const outcome = await enforceOAuth({
+                    scheme: enforcement.oauth.scheme,
+                    guard: enforcement.guard,
+                    schemeDefinition: enforcement.schemeDefinition,
+                    metadataUrl: enforcement.metadataUrl,
+                    scopesSupported: enforcement.scopesSupported,
+                    scopes: target.scopes,
+                    roles: target.roles,
+                    requires: target.requires,
+                    params: target.params,
+                    headers: args.headers,
+                    handlerContext: adapterContextOf(args),
+                    requestContext: args.requestContext,
+                });
+                if (!outcome.ok) return denialResponse(outcome.denial);
+                transportAuth = {
+                    scheme: enforcement.oauth.scheme,
+                    ...(outcome.context === undefined
+                        ? {}
+                        : {
+                              context: outcome.context,
+                          }),
+                };
+            }
+
+            const handler = createMcpHandler(() =>
+                createMcpServer(serverApi, {
+                    ...props,
+                    handlerContext: adapterContextOf(args),
+                    credentialHeaders: args.headers,
+                    ...(transportAuth === undefined
+                        ? {}
+                        : {
+                              transportAuth,
+                          }),
+                })
+            );
+
+            // Rebuilt from the inputs the pipeline already parsed, so
+            // the handler gets a web request on every adapter.
+            return rawResponse(
+                await handler.fetch(
+                    new Request('http://mcp.local/', {
+                        method: 'POST',
+                        headers: toHeaders(args.headers),
+                        body: JSON.stringify(args.body),
+                    })
+                )
+            );
+        },
+        protectedResourceMetadata: () =>
+            rawResponse(
+                new Response(JSON.stringify(enforcementOf()?.metadata), {
+                    status: 200,
+                    headers: {
+                        'content-type': 'application/json',
+                    },
+                })
+            ),
     };
 };

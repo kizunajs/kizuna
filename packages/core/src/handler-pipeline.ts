@@ -84,18 +84,32 @@ type ToolsArg<R extends RouteDefinition> = [StreamToolsOf<R>] extends [never]
           tools: StreamTools<StreamToolsOf<R>>;
       };
 
-export type HandlerArgs<R extends RouteDefinition> = ToolsArg<R> & {
-    params: R extends { pathParams: z.ZodType } ? z.output<R['pathParams']> : ExtractPathParams<R['path']>;
-    query: R extends { query: z.ZodType } ? z.output<R['query']> : undefined;
-    body: R extends { body: z.ZodType } ? z.output<R['body']> : undefined;
-    headers: R extends { headers: z.ZodType } ? z.output<R['headers']> : Record<string, string | string[] | undefined>;
-    /**
-     * Throws a typed error response. Takes the same `{ status, body }` shape as a handler return.
-     *
-     * This function throws internally and never returns.
-     */
-    throwError: (response: ThrowableReturn<R> | GuardAnswer<R>) => never;
-};
+/**
+ * The body as sent, for a route with `rawBody: true`, or nothing.
+ */
+type RawBodyArg<R> = R extends { rawBody: true }
+    ? {
+          /**
+           * The body exactly as it was sent, before any parsing. Check a
+           * sender's signature against this, not against `body`.
+           */
+          rawBody: string;
+      }
+    : unknown;
+
+export type HandlerArgs<R extends RouteDefinition> = ToolsArg<R> &
+    RawBodyArg<R> & {
+        params: R extends { pathParams: z.ZodType } ? z.output<R['pathParams']> : ExtractPathParams<R['path']>;
+        query: R extends { query: z.ZodType } ? z.output<R['query']> : undefined;
+        body: R extends { body: z.ZodType } ? z.output<R['body']> : undefined;
+        headers: R extends { headers: z.ZodType } ? z.output<R['headers']> : Record<string, string | string[] | undefined>;
+        /**
+         * Throws a typed error response. Takes the same `{ status, body }` shape as a handler return.
+         *
+         * This function throws internally and never returns.
+         */
+        throwError: (response: ThrowableReturn<R> | GuardAnswer<R>) => never;
+    };
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (
     args: HandlerArgs<R> & HandlerContext & BrandedHandlerContext<R>

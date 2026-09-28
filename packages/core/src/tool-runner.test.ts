@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createAdapter, routerFromRoutes, type AdapterRequest, type AdapterResult, type GuardMap } from './adapter.js';
+import { defineAdapter, routerFromRoutes, type AdapterRequest, type AdapterResult, type GuardMap } from './adapter.js';
 import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 import { readToolCalls } from './tool-records.js';
@@ -166,7 +166,7 @@ const reply = async (body: ReplyBody, headers: Record<string, string> = {}): Pro
     logged = [];
     results = [];
     const outcomes: AdapterResult[] = [];
-    const adapter = createAdapter<null, void, Record<string, never>>({
+    const adapter = defineAdapter<null, void, Record<string, never>>({
         buildHandlerContext: () => ({}),
         respond: (result) => {
             outcomes.push(result);
@@ -553,7 +553,7 @@ describe('tools.definitions', () => {
                     };
                 }),
         });
-        const adapter = createAdapter<null, void, Record<string, never>>({
+        const adapter = defineAdapter<null, void, Record<string, never>>({
             buildHandlerContext: () => ({}),
             respond: () => undefined,
         });

@@ -31,7 +31,7 @@ mcpPlugin(props?: McpPluginProps): PluginDeclaration
 
 | Option         | Default              | Description                                                                   |
 | -------------- | -------------------- | ----------------------------------------------------------------------------- |
-| `slug`         | `'mcp'`              | What handlers reach this plugin under, and the key it installs at             |
+| `slug`         | `'mcp'`              | What handlers reach this plugin under                                         |
 | `path`         | `'/mcp'`             | Path the endpoint is served from                                              |
 | `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                                    |
 | `version`      | `'1.0.0'`            | Semantic version string                                                       |
@@ -56,7 +56,7 @@ getForecast: k
     .handler(/* ... */),
 ```
 
-A route with no `tool` is an HTTP endpoint and nothing more. Two shapes never publish even with it: a route whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded`, because tool input is JSON, and a route whose response [streams](/docs/streaming), because a tool result is one value.
+A route with no `tool` is an HTTP endpoint and nothing more. Two shapes never publish even with it: a route whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded`, because tool input is JSON, and a route whose response [streams](/docs/streaming), because a tool result is one value. A [hidden](/docs/routes#hidden-routes) route can't say `tool`: the two together are a type error.
 
 ## Example
 
@@ -83,23 +83,6 @@ import kizuna from '../kizuna.config';
 kizuna.api.mount(app);
 ```
 
-## Two endpoints
-
-`slug` is what a plugin installs at, so give a second MCP endpoint its own:
-
-```ts title="kizuna.config.ts"
-plugins: [
-    mcpPlugin({
-        name: 'My API',
-    }),
-    mcpPlugin({
-        slug: 'internalMcp',
-        path: '/internal/mcp',
-        name: 'My API, internal',
-    }),
-],
-```
-
 ## Next.js
 
 The endpoint is served by the catch-all route file that already serves your routes, so `path` resolves under its `basePath`:
@@ -118,7 +101,7 @@ Each tool call runs the same [guard](/docs/reference/k-identity) pipeline as an 
 
 ## Plugin route
 
-The endpoint is a [plugin route](/docs/extend/create-plugin#plugin-routes): it lives outside `api.routes`, so your fetch client, the OpenAPI document, and the generated Swift and Kotlin clients never list it.
+The endpoint is a [plugin route](/docs/extend/create-plugin#routes), which is hidden, so your fetch client, the OpenAPI document, and the generated Swift and Kotlin clients never list it.
 
 ## See also
 

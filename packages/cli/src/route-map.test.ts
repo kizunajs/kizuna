@@ -101,3 +101,31 @@ describe('formatRoutes', () => {
         expect(formatRoutes([])).toBe('This config declares no routes.');
     });
 });
+
+describe('hidden routes', () => {
+    it('lists a hidden route, marked as hidden', () => {
+        const contract = defineConfig({
+            routes: {
+                health: {
+                    method: 'GET',
+                    path: '/health',
+                    hidden: true,
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                },
+            },
+        }).api;
+        const entries = routeMap(contract, {});
+
+        expect(entries).toEqual([
+            expect.objectContaining({
+                key: 'health',
+                hidden: true,
+            }),
+        ]);
+        expect(formatRoutes(entries)).toContain('hidden');
+    });
+});

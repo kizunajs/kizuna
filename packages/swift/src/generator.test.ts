@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna, type ApiDefinition } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
+import { definePlugin, route } from 'kizunajs/plugin';
 import { generateSwiftClient } from './generator.js';
 
 interface Config {
@@ -2184,5 +2185,76 @@ describe('Swift generator: shapes the mapper used to give up on', () => {
 
         expect(swift).toContain('[String: TestAPI.Money]');
         expect(swift).not.toContain('TestAPI.String');
+    });
+});
+
+const hiddenFixturePlugin = definePlugin({
+    slug: 'status',
+    setup: () => ({
+        routes: {
+            ping: route({
+                method: 'GET',
+                path: '/status/ping',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            }).handler(() => ({
+                status: 200,
+                body: {
+                    ok: true,
+                },
+            })),
+            internalProbe: route({
+                method: 'GET',
+                path: '/status/internal-probe',
+                hidden: true,
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            }).handler(() => ({
+                status: 200,
+                body: {
+                    ok: true,
+                },
+            })),
+        },
+    }),
+});
+
+const hiddenFixtureContract = () =>
+    defineConfig({
+        routes: {
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: z.array(z.string()),
+                },
+            },
+            healthCheck: {
+                method: 'GET',
+                path: '/health-check',
+                hidden: true,
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        },
+        plugins: [hiddenFixturePlugin()],
+    }).api;
+
+describe('Swift generator: hidden routes and plugin routes', () => {
+    it('leaves hidden routes and plugin routes out', () => {
+        const output = generateSwiftClient(hiddenFixtureContract(), baseConfig);
+        expect(output).toContain('listUsers');
+        expect(output).not.toContain('healthCheck');
+        expect(output).not.toContain('ping');
+        expect(output).not.toContain('internalProbe');
     });
 });

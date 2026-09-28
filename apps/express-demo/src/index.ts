@@ -4,7 +4,6 @@ import { startJobsDevRunner } from 'kizunajs/jobs';
 import kizuna from '../kizuna.config';
 
 const app = express();
-app.use(express.json());
 
 app.get('/', (_req, res) => {
     res.type('html').send(`<!doctype html>

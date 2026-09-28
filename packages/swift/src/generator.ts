@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import {
-    createGenerator,
+    walkApi,
+    type GeneratorWalk,
     isVoidSchema,
     isObjectSchema,
     isDiscriminatedUnionSchema,
@@ -349,7 +350,7 @@ const buildRouteMethod = (
     };
 };
 
-const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeRegistry }, _api: ApiDefinition) => {
+const swiftRoutesWalk = (options: SwiftConfig & { registry: TypeRegistry }): GeneratorWalk<RoutesPartition> => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
 
@@ -388,7 +389,7 @@ const swiftGenerator = createGenerator((options: SwiftConfig & { registry: TypeR
             return { flatMethods, groups };
         },
     };
-});
+};
 
 const SWIFT_KEYWORDS = new Set([
     'associatedtype',
@@ -2234,19 +2235,9 @@ const emitClient = (
     });
 };
 
-/**
- * Generate a Swift API client from a kizuna config.
- *
- *   - `namespaceName`: the actor class. Defaults to `APIClient`.
- */
-export const generateSwiftClient = (api: ApiDefinition, options: SwiftConfig): string => {
-    const { namespaceName, camelCaseProperties = false, unknownEnumCase = false } = options;
+const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, registry: TypeRegistry, options: SwiftConfig): string => {
+    const { namespaceName } = options;
 
-    const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);
-    const partition = swiftGenerator(api, {
-        namespaceName,
-        registry,
-    });
     const allMethods = [...partition.flatMethods, ...partition.groups.flatMap((group: RouteGroup) => group.methods)];
 
     const operationTypeMap = buildOperationTypeMap(allMethods, registry);
@@ -2348,3 +2339,28 @@ export const generateSwiftClient = (api: ApiDefinition, options: SwiftConfig): s
 
     return writer.toString();
 };
+
+/**
+ * The Swift client's walk: the routes into a partition, then the file.
+ */
+export const swiftClientWalk = (api: ApiDefinition, options: SwiftConfig): GeneratorWalk => {
+    const registry = new TypeRegistry(options.camelCaseProperties ?? false, options.unknownEnumCase ?? false);
+    const routes = swiftRoutesWalk({
+        namespaceName: options.namespaceName,
+        registry,
+    });
+    return {
+        processRoute: routes.processRoute,
+        finalize: () => renderSwiftClient(api, routes.finalize(), registry, options),
+    };
+};
+
+/**
+ * Generate a Swift API client from a kizuna config.
+ *
+ *   - `namespaceName`: the actor class. Defaults to `APIClient`.
+ */
+export const generateSwiftClient = (api: ApiDefinition, options: SwiftConfig): string =>
+    walkApi(api, swiftClientWalk(api, options), {
+        skipHidden: true,
+    });

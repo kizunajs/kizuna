@@ -1,21 +1,19 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative } from 'node:path';
-import type { ClientTarget, ApiDefinition } from 'kizunajs';
+import type { ApiDefinition, GeneratedFile } from 'kizunajs';
 
 /**
- * A client that was written, and whether it had to be.
+ * A file that was written, and whether it had to be.
  */
-export interface WrittenClient {
-    kind: string;
+export interface WrittenFile {
     output: string;
     changed: boolean;
 }
 
 /**
- * A generated client that does not match its api.
+ * A generated file that does not match its api.
  */
-export interface StaleClient {
-    kind: string;
+export interface StaleFile {
     output: string;
     /**
      * `missing` when nothing is there, `outdated` when what is there is old.
@@ -32,33 +30,35 @@ const currentContents = (output: string): string | undefined => {
 };
 
 /**
- * Writes every client an api declares, leaving a file alone when it already
- * matches so watchers and build tools see no change.
+ * Writes every generated file, the clients and what plugins generate, leaving
+ * a file alone when it already matches so watchers and build tools see no
+ * change.
  */
-export const writeClients = (contract: ApiDefinition, clients: readonly ClientTarget[]): WrittenClient[] =>
-    clients.map((client) => {
-        const rendered = client.generate(contract);
-        const changed = currentContents(client.output) !== rendered;
+export const writeFiles = (contract: ApiDefinition, files: readonly GeneratedFile[]): WrittenFile[] =>
+    files.map((file) => {
+        const rendered = file.render(contract);
+        const changed = currentContents(file.output) !== rendered;
 
         if (changed) {
-            mkdirSync(dirname(client.output), { recursive: true });
-            writeFileSync(client.output, rendered);
+            mkdirSync(dirname(file.output), { recursive: true });
+            writeFileSync(file.output, rendered);
         }
 
-        return { kind: client.kind, output: client.output, changed };
+        return { output: file.output, changed };
     });
 
 /**
- * Every client that no longer matches its api, without writing anything.
+ * Every generated file that no longer matches its api, without writing
+ * anything.
  *
  * This is what a pipeline runs: a generated client that has fallen behind is a
  * compile error waiting to happen in whatever imports it.
  */
-export const checkClients = (contract: ApiDefinition, clients: readonly ClientTarget[]): StaleClient[] =>
-    clients.flatMap((client): StaleClient[] => {
-        const current = currentContents(client.output);
-        if (current === undefined) return [{ kind: client.kind, output: client.output, reason: 'missing' }];
-        if (current !== client.generate(contract)) return [{ kind: client.kind, output: client.output, reason: 'outdated' }];
+export const checkFiles = (contract: ApiDefinition, files: readonly GeneratedFile[]): StaleFile[] =>
+    files.flatMap((file): StaleFile[] => {
+        const current = currentContents(file.output);
+        if (current === undefined) return [{ output: file.output, reason: 'missing' }];
+        if (current !== file.render(contract)) return [{ output: file.output, reason: 'outdated' }];
         return [];
     });
 
@@ -66,10 +66,10 @@ export const checkClients = (contract: ApiDefinition, clients: readonly ClientTa
  * What a pipeline prints when a check fails, naming the command that fixes it
  * rather than printing a diff nobody reads.
  */
-export const formatStale = (stale: readonly StaleClient[], command = 'kizuna generate'): string => {
-    const lines = stale.map((client) => {
-        const where = relative(process.cwd(), client.output);
-        return client.reason === 'missing' ? `  ${where} has not been generated` : `  ${where} is behind the config`;
+export const formatStale = (stale: readonly StaleFile[], command = 'kizuna generate'): string => {
+    const lines = stale.map((file) => {
+        const where = relative(process.cwd(), file.output);
+        return file.reason === 'missing' ? `  ${where} has not been generated` : `  ${where} is behind the config`;
     });
 
     return [

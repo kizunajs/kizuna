@@ -14,9 +14,9 @@ A transport carries a job from `jobs.indexUser.queue(...)` to the process that r
 Kizuna ships none, so you write one against the queue you run.
 
 ```ts title="job-transport.ts"
-import { createJobTransport } from 'kizunajs';
+import { defineJobTransport } from 'kizunajs';
 
-export const myQueue = createJobTransport({
+export const myQueue = defineJobTransport({
     name: 'my-queue',
     supports: {
         retry: true,
@@ -120,7 +120,7 @@ A message's `runAt`, `dedupeKey` and `retry` are honoured only where the transpo
 Every message goes to the same URL, the run endpoint, and names its job in the body.
 
 ```ts title="qstash.ts"
-import { createJobTransport, type JobMessage } from 'kizunajs';
+import { defineJobTransport, type JobMessage } from 'kizunajs';
 
 interface QstashOptions {
     token: string;
@@ -145,7 +145,7 @@ const delivery = (options: QstashOptions, retry?: number): Record<string, string
 });
 
 export const qstash = (options: QstashOptions) =>
-    createJobTransport({
+    defineJobTransport({
         name: 'qstash',
         supports: {
             retry: true,
@@ -241,12 +241,12 @@ export const scheduler = k.identity.bearer({}).guard(({ bearer, deny }) =>
 
 ```ts title="bullmq.ts"
 import { Queue, Worker, type ConnectionOptions } from 'bullmq';
-import { createJobTransport } from 'kizunajs';
+import { defineJobTransport } from 'kizunajs';
 
 export const bullmq = (connection: ConnectionOptions, queueName = 'jobs') => {
     const queue = new Queue(queueName, { connection });
 
-    return createJobTransport({
+    return defineJobTransport({
         name: 'bullmq',
         supports: {
             retry: true,

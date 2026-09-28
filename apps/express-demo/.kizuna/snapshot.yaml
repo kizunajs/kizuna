@@ -2226,6 +2226,73 @@ routes:
             optional: false
             schema:
               kind: string
+  diagnostics.ready:
+    method: GET
+    path: /diagnostics/ready
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    responses:
+      "200":
+        kind: object
+        fields:
+          ok:
+            optional: false
+            schema:
+              kind: boolean
+  contact.sendMessage:
+    method: POST
+    path: /contact
+    statuses:
+      - 204
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        subject:
+          optional: false
+          schema:
+            kind: string
+        html:
+          optional: false
+          schema:
+            kind: string
+    responses:
+      "204":
+        kind: void
+  mcp.endpoint:
+    method: POST
+    path: /mcp
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    body:
+      kind: unknown
+    responses:
+      "200":
+        kind: unknown
+  openApi.page:
+    method: GET
+    path: /docs
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    responses:
+      "200":
+        kind: string
+  openApi.json:
+    method: GET
+    path: /openapi.json
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    responses:
+      "200":
+        kind: unknown
 jobs:
   - users.indexUser
   - users.sendDigests

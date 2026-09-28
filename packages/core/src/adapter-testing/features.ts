@@ -48,6 +48,9 @@ export const ADAPTER_FEATURES = {
     'body.optionalFields': {
         summary: 'An optional body field may be omitted, but is validated when present.',
     },
+    'body.rawBody': {
+        summary: 'A route with `rawBody: true` receives the body exactly as sent, beside the validated body.',
+    },
     'errors.declaredProblemDetails': {
         summary: 'A declared error response is sent as `application/problem+json`.',
     },

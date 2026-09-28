@@ -1,0 +1,140 @@
+---
+title: Create a Client
+description: Generate a typed client for a language Kizuna doesn't ship, and publish it for every Kizuna API.
+---
+
+<BetaNotice>
+
+The client API is new and still settling. `defineClient` and the context it walks may change while v2 is in beta, so pin your version if you depend on them.
+
+</BetaNotice>
+
+Kizuna ships clients for TypeScript, Swift and Kotlin. For anything else, you write the client once with `defineClient`, and it works for every Kizuna API.
+
+The Swift and Kotlin clients are written with it too.
+
+Whether a client goes first-party comes down to demand, not age. If enough teams need a language, we will add it. What we will not take on is one a handful of people need, since we maintain everything we merge. The client API is public, so you can build and publish your own today.
+
+## `defineClient`
+
+A client is a program that walks the API's models and routes and returns the file it generates. Here's the shape of a Dart client:
+
+```ts title="@example/kizuna-dart/src/index.ts"
+import { z } from 'zod';
+import { defineClient } from 'kizunajs/generator';
+
+export const dartClient = defineClient({
+    target: 'dart',
+    options: z.object({
+        library: z.string().default('api'),
+    }),
+    generate: ({ options }) => {
+        const writer = new DartWriter(options.library);
+
+        return {
+            processModel: (model) => writer.model(model),
+            processRoute: (context) => writer.method(context),
+            finalize: () => writer.render(),
+        };
+    },
+});
+```
+
+| Field      | What it is                                                                         |
+| ---------- | ---------------------------------------------------------------------------------- |
+| `target`   | The language this client generates                                                 |
+| `options`  | A Zod schema for what the app passes in, beside `output`                           |
+| `generate` | Returns the walk: `processModel` and `processRoute` for each item, then `finalize` |
+
+`DartWriter` stands for your own code that turns a model or a route into Dart. `finalize` returns the file as one string. Kizuna writes it to `output`, and `kizuna generate --check` compares it byte for byte.
+
+## Installing it
+
+Apps name it under `clients` like any client. `output` comes with every client, so your `options` only hold what's particular to yours:
+
+```ts title="kizuna.config.ts"
+import { dartClient } from '@example/kizuna-dart';
+
+clients: [
+    dartClient({
+        output: '../app/lib/api.dart',
+        library: 'api',
+    }),
+],
+```
+
+Kizuna skips [hidden](/docs/routes#hidden-routes) routes, plugin routes included, so one never reaches your `processRoute`.
+
+## The walk
+
+### `processModel`
+
+Called once for every [`Kizuna.model`](/docs/reference/kizuna-model) the client's routes use:
+
+| Property      | Type                  | Description                                |
+| ------------- | --------------------- | ------------------------------------------ |
+| `name`        | `string`              | The model's title, e.g. `User`             |
+| `schema`      | `ZodType`             | The schema to generate a type from         |
+| `description` | `string \| undefined` | The model's description, for a doc comment |
+
+### `processRoute`
+
+Called once for every route in this client:
+
+| Property             | Type                  | Description                                                               |
+| -------------------- | --------------------- | ------------------------------------------------------------------------- |
+| `routeKey`           | `string`              | Dot-separated key path, e.g. `users.getUser`                              |
+| `route`              | `RouteDefinition`     | The full route definition                                                 |
+| `routeTags`          | `string[]`            | The tags of every `k.routes` group the route sits inside, outermost first |
+| `deprecated`         | `boolean`             | `true` when the route is deprecated                                       |
+| `deprecationMessage` | `string \| undefined` | The route's `deprecated` string, or the object form's `message`           |
+
+### `finalize`
+
+Called once, after the walk, and returns the file.
+
+## What a client does at runtime
+
+The generated code is what app developers live with, so match what the first-party clients do:
+
+- **Every declared status is a typed result**, so a `404` the route declares comes back as data the app can switch on. Undeclared statuses are errors.
+- **Problem details decode** into a typed error body, including validation issues on a `400`.
+- **Request context headers** are set once on the client and sent on every call.
+- **Request and response middleware**, so an app can add auth headers and log responses, the way Swift's `requestMiddleware` and Kotlin's `requestInterceptor` do.
+- **Route groups become groups**, like `api.users.getUser(...)`.
+
+## Deprecation
+
+Route deprecation arrives on the context. Fields declare theirs in Zod metadata, read with `readDeprecation`:
+
+```ts
+import { readDeprecation } from 'kizunajs/generator';
+
+const deprecation = readDeprecation(fieldSchema);
+if (deprecation) {
+    // deprecation.message is the string form's message, or undefined
+}
+```
+
+See [Deprecations](/docs/deprecations) for the authoring side.
+
+## Examples
+
+A schema's declared example values read with `readMetaExamples`. It takes `example` first and then `examples`, each of which holds one value or a list:
+
+```ts
+import { readMetaExamples } from 'kizunajs/generator';
+
+const [example] = readMetaExamples(fieldSchema);
+```
+
+## What `kizuna generate` expects
+
+- **The output is deterministic.** `--check` re-renders and compares byte for byte, so a timestamp or an unsorted map in the output fails every CI run after the first.
+- **One client, one file.** An app wanting two files installs your client twice, with two names.
+- **The walk is synchronous.** Read whatever you need before you return from `generate`.
+- **`output` resolves against the config's directory**, not the shell's, so `../app/lib/api.dart` writes into a sibling project wherever the command runs.
+
+## Something other than a client
+
+For a file that isn't a client, like a route manifest or a document, write a [generator](/docs/extend/create-generator). That's how the OpenAPI document is written.

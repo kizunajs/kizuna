@@ -50,7 +50,7 @@ See [`defineConfig`](/docs/reference/define-config) for every field it takes.
 | `auth`           | The identities a route's `auth` can require. Each carries its own guard, so this is all the config needs. An identity used without a guard refuses to assemble. See [Authentication](/docs/authentication). |
 | `requestContext` | Values every handler receives, resolved once per request. Resolvers run on every route, before the guards, and never deny. See [Request Context](/docs/request-context).                                    |
 | `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.                           |
-| `plugins`        | Routes and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                          |
+| `plugins`        | Routes, jobs and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                    |
 | `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                           |
 | `tags`           | The OpenAPI tags route groups sit under. See [`k.tags`](/docs/reference/k-tags).                                                                                                                            |
 
@@ -70,7 +70,11 @@ updateUser: k
     })
     .handler(async ({ params, body, plugins }) => {
         const user = await db.users.update(params.id, body);
-        plugins.audit.record('users.updateUser');
+        await plugins.email.send({
+            to: user.email,
+            subject: 'Your profile was updated',
+            html: '<p>Your profile was updated.</p>',
+        });
 
         return {
             status: 200,
@@ -82,66 +86,23 @@ updateUser: k
 Destructure it for the short form:
 
 ```ts
-.handler(async ({ params, body, plugins: { audit } }) => {
+.handler(async ({ params, body, plugins: { email } }) => {
 ```
 
-## Mounting
+Job handlers receive `plugins` the same way.
 
-Import the config and mount `kizuna.api`:
+### Renaming one
 
-**Express:**
+Each plugin picks the slug handlers reach it under. When two want the same one, `defineConfig` throws and names both, and you rename one:
 
-```ts title="src/index.ts"
-import express from 'express';
-import kizuna from '../kizuna.config';
-
-const app = express();
-app.use(express.json());
-
-kizuna.api.mount(app);
-
-app.listen(3000);
+```ts title="kizuna.config.ts"
+plugins: [
+    pushNotificationsPlugin(),
+    webPushPlugin({
+        slug: 'webPush',
+    }),
+],
 ```
-
-**Fastify:**
-
-```ts title="src/index.ts"
-import Fastify from 'fastify';
-import kizuna from '../kizuna.config';
-
-const app = Fastify();
-
-await kizuna.api.mount(app);
-
-app.listen({
-    port: 3000,
-});
-```
-
-**Hono:**
-
-```ts title="src/index.ts"
-import { Hono } from 'hono';
-import kizuna from '../kizuna.config';
-
-const app = new Hono();
-
-kizuna.api.mount(app);
-
-export default app;
-```
-
-**Next.js:**
-
-```ts title="src/app/api/[...kizuna]/route.ts"
-import kizuna from '../../../../kizuna.config';
-
-export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
-    basePath: '/api',
-});
-```
-
-Each [adapter page](/docs/adapters/express) covers its own options, error handling, and middleware.
 
 ## Middleware
 
@@ -149,25 +110,28 @@ Rate limiting, multipart parsing, and the rest go in your framework's own middle
 
 ## Clients
 
-Each client comes from the package that generates it, so its options are typed there and a generator you have not installed cannot be configured by accident. The list is not closed: any package exporting a [`ClientTarget`](/docs/extend/create-generator#shipping-a-clienttarget) factory drops into `clients` the same way.
+Each client comes from the package that generates it, so its options are typed there and a generator you have not installed cannot be configured by accident. The list is not closed: any package that exports a client built with [`defineClient`](/docs/extend/create-client) drops into `clients` the same way.
 
-| Target            | Import from         | Writes                        |
-| ----------------- | ------------------- | ----------------------------- |
-| `fetchClient`     | `@kizunajs/fetch`   | A typed TypeScript client     |
-| `swiftClient`     | `@kizunajs/swift`   | A native Swift client         |
-| `kotlinClient`    | `@kizunajs/kotlin`  | A native Kotlin client        |
-| `openApiDocument` | `@kizunajs/openapi` | The OpenAPI document, to disk |
+| Client         | Import from        | Writes                    |
+| -------------- | ------------------ | ------------------------- |
+| `fetchClient`  | `@kizunajs/fetch`  | A typed TypeScript client |
+| `swiftClient`  | `@kizunajs/swift`  | A native Swift client     |
+| `kotlinClient` | `@kizunajs/kotlin` | A native Kotlin client    |
 
 ```ts title="kizuna.config.ts"
 clients: [
     fetchClient({
-        output: './packages/api-client/src/generated.ts',
+        output: './web/src/api.generated.ts',
     }),
-    openApiDocument({
-        output: './openapi.yaml',
+    swiftClient({
+        output: '../ios/MyApp/Generated/APIClient.swift',
     }),
 ],
 ```
+
+Every route reaches every client. A route no app calls, like a health check or a webhook, is [hidden](/docs/routes#hidden-routes) and stays out of them.
+
+Files that aren't clients, like the OpenAPI document, come from plugins. [`openApiPlugin`](/docs/openapi) writes `openapi.yaml` when you give it an `output`.
 
 The generated client holds the route shapes and the schemas, and is what a browser imports. An `output` is resolved against the config's own directory, so in a repository holding both, `../ios/MyApp/Generated/APIClient.swift` writes into the app beside it.
 
@@ -180,8 +144,6 @@ The generated client holds the route shapes and the schemas, and is what a brows
 | `package`             | Kotlin               | Package the generated file declares                                       |
 | `camelCaseProperties` | Swift, Kotlin        | Convert wire field names to camelCase, mapping the wire name back         |
 | `unknownEnumCase`     | Swift, Kotlin        | Give every enum an `unknown` case, so an unrecognised value still decodes |
-
-`openApiDocument` takes the same overrides [`generateOpenApi`](/docs/reference/generate-openapi) does, and picks its format from the output extension: `.json` renders JSON, anything else renders YAML.
 
 ## Two clients of one language
 
@@ -305,7 +267,6 @@ import publicApi from '../kizuna.config';
 import adminApi from '../kizuna.admin.config';
 
 const app = express();
-app.use(express.json());
 
 publicApi.api.mount(app);
 
@@ -324,7 +285,7 @@ On Next.js each API is its own catch-all route file, and `mount({ basePath })` i
 kizuna generate
 ```
 
-It writes three things from `kizuna.config.ts`: the `Config` in `kizuna.types.ts`, every client under `clients`, and the `.kizuna/snapshot.yaml` that [`kizuna diff`](/docs/breaking-changes) compares. A file that already matches is left alone, so watchers and build tools see no change.
+It writes four things from `kizuna.config.ts`: the `Config` in `kizuna.types.ts`, every client under `clients`, the files plugins generate, like `openApiPlugin`'s `openapi.yaml`, and the `.kizuna/snapshot.yaml` that [`kizuna diff`](/docs/breaking-changes) compares. A file that already matches is left alone, so watchers and build tools see no change.
 
 | Option     | Default            | Description                                                                             |
 | ---------- | ------------------ | --------------------------------------------------------------------------------------- |

@@ -236,6 +236,21 @@ export type RouteAuth<Names extends string = string> =
       };
 
 /**
+ * Rejects a route that is both `hidden` and a `tool`: a hidden route is left out
+ * of everything that publishes routes, MCP included.
+ */
+export type RouteHiddenToolCheck<Route> = Route extends {
+    hidden: true;
+    tool: true | RouteToolOptions;
+}
+    ? {
+          tool: {
+              'kizuna: a hidden route cannot publish as a tool. Remove `tool`, or `hidden`': true;
+          };
+      }
+    : unknown;
+
+/**
  * Response headers keyed by name.
  */
 export type ResponseHeaders = Record<string, string>;
@@ -343,6 +358,59 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
      * },
      */
     tool?: boolean | RouteToolOptions;
+    /**
+     * Keep this route out of the generated clients, the OpenAPI document and
+     * MCP. It is still served.
+     *
+     * @example
+     * ```ts
+     * check: k
+     *     .route({
+     *         method: 'GET',
+     *         path: '/health',
+     *         hidden: true,
+     *         responses: {
+     *             200: HealthSchema,
+     *         },
+     *     })
+     *     .handler(() => ({
+     *         status: 200,
+     *         body: {
+     *             status: 'ok',
+     *         },
+     *     })),
+     * ```
+     */
+    hidden?: boolean;
+    /**
+     * Receive the body exactly as it was sent, as `rawBody`, beside the
+     * validated `body`. Check a sender's signature against `rawBody`, since
+     * re-serialising the JSON can change a byte and break it.
+     *
+     * @example
+     * ```ts
+     * resendEvents: k
+     *     .route({
+     *         method: 'POST',
+     *         path: '/webhooks/resend',
+     *         auth: false,
+     *         hidden: true,
+     *         rawBody: true,
+     *         body: ResendEventSchema,
+     *         responses: {
+     *             204: z.void(),
+     *         },
+     *     })
+     *     .handler(({ rawBody, headers }) => {
+     *         verifySignature(rawBody, headers);
+     *
+     *         return {
+     *             status: 204,
+     *         };
+     *     }),
+     * ```
+     */
+    rawBody?: true;
     /**
      * Deprecates the route. Pass a message to tell callers what to use instead,
      * or the object form to announce the deprecation in response headers.

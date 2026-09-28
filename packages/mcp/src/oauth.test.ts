@@ -7,6 +7,7 @@ import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { pluginRoutesOf } from 'kizunajs/adapter';
 import { mcpPlugin } from './plugin.js';
 import { assertCanonicalResource, protectedResourceMetadataPath, protectedResourceMetadataUrl } from './oauth.js';
 
@@ -517,15 +518,31 @@ describe('mcpPlugin: oauth', () => {
 
 describe('mcpPlugin: oauth declaration', () => {
     it('declares the metadata route only when oauth is configured', () => {
-        expect(Object.keys(mcpPlugin({}).routes)).toEqual(['endpoint']);
-        expect(
+        const routeNames = (plugin: ReturnType<typeof mcpPlugin>): string[] =>
             Object.keys(
+                (
+                    pluginRoutesOf(
+                        defineConfig({
+                            ...config,
+                            adapter: expressAdapter(),
+                            routes: {
+                                api: apiRoutes,
+                            },
+                            plugins: [plugin],
+                        }).api
+                    ) as Record<string, Record<string, unknown>>
+                ).mcp ?? {}
+            );
+
+        expect(routeNames(mcpPlugin({}))).toEqual(['endpoint']);
+        expect(
+            routeNames(
                 mcpPlugin({
                     oauth: {
                         resource: 'https://api.example.com/mcp',
                         scheme: 'user',
                     },
-                }).routes
+                })
             )
         ).toEqual(['endpoint', 'protectedResourceMetadata']);
     });

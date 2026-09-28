@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { stringify as stringifyYaml } from 'yaml';
 import {
-    createGenerator,
+    walkApi,
+    type GeneratorWalk,
     isFileSchema,
     isBinarySchema,
     isVoidSchema,
@@ -251,11 +252,12 @@ const deriveHeadOperation = (getOperation: OpenApiOperation): OpenApiOperation =
     return operation;
 };
 
-const openApiGenerator = createGenerator((options: GeneratorContext, api: ApiDefinition) => {
+const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWalk<OpenApiRenderer> => {
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
 
     return {
-        processRoute({ routeKey, route, routeTags, deprecated }) {
+        processRoute({ routeKey, route, routeTags, deprecated, hidden }) {
+            if (hidden && options.includeHidden !== true) return;
             const openApiPath = convertPath(route.path);
             const method = route.method.toLowerCase();
 
@@ -539,7 +541,7 @@ const openApiGenerator = createGenerator((options: GeneratorContext, api: ApiDef
             return renderer as OpenApiRenderer;
         },
     };
-});
+};
 
 /**
  * The permissions a route requires, as `x-kizuna-requires`: what is acted on,
@@ -633,8 +635,8 @@ const tagsFromApi = (api: ApiDefinition): OpenApiTag[] => {
  * So a build step does not restate the options and drift from what is served.
  */
 const optionsFromInstalledPlugin = (api: ApiDefinition): GenerateOpenApiOptions => {
-    for (const declaration of Object.values(api.plugins ?? {})) {
-        if (declaration.slug === OPENAPI_PLUGIN_SLUG) return declaration.props as unknown as GenerateOpenApiOptions;
+    for (const plugin of Object.values((api.plugins ?? {}) as Record<string, { definedSlug?: string; options?: unknown }>)) {
+        if (plugin.definedSlug === OPENAPI_PLUGIN_SLUG) return plugin.options as GenerateOpenApiOptions;
     }
     throw new Error("generateOpenApi reads its options from the config. Name `openApiPlugin` under `plugins` with the API's `info`.");
 };
@@ -643,10 +645,16 @@ const optionsFromInstalledPlugin = (api: ApiDefinition): GenerateOpenApiOptions 
  * Render from options held directly, for the plugin's own routes.
  */
 export function renderOpenApi(api: ApiDefinition, options: GenerateOpenApiOptions): OpenApiRenderer {
-    const renderer = openApiGenerator(api, {
-        ...options,
-        tagLookup: buildTagLookup(api),
-    });
+    const renderer = walkApi(
+        api,
+        openApiWalk(
+            {
+                ...options,
+                tagLookup: buildTagLookup(api),
+            },
+            api
+        )
+    );
     const tags = tagsFromApi(api);
     if (tags.length > 0) {
         (renderer('json') as OpenApiDocument).tags = tags;

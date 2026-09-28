@@ -41,7 +41,7 @@ Every GET route answers HEAD (RFC 9110 section 9.3.2): same status and headers, 
 Jobs (`k.jobs`) are the one non-HTTP-shaped concept. Settled; don't relitigate.
 
 - A job is a sibling of a route, never inside one. Nothing that walks `api.routes` sees a job.
-- A handler receives only `input` and `throwError`. Anything more it imports, as a route handler would.
+- A handler receives `input`, `throwError`, `jobs` and `plugins`. Anything more it imports, as a route handler would.
 - A job declares no path and no method. `schedule` is optional.
 - Two endpoints serve every job, both under the `jobs.path` namespace (default `/jobs`, which serves nothing itself): `POST /jobs/dispatch` runs whatever is due, `POST /jobs/run` runs the one job its `{ job, input }` body names. A job is addressed by its dotted key.
 - `run` and `queue`, never a bare call. `run` takes the input; `queue` takes a message (`input`, `runAt`, `dedupeKey`).
@@ -58,6 +58,7 @@ A tool is a route a model may call. Settled; don't relitigate.
 - The hints default from the method's RFC 9110 semantics. Declare one only to say what the method cannot.
 - A tool is addressed by its dotted key, `weather.getForecast`, and publishes as `weather_get_forecast`.
 - A route that streams, or that takes a form body, never publishes: a tool result is one value and tool input is JSON.
+- A `hidden` route never publishes, and `defineConfig` throws when one declares `tool`.
 - A streamed response names routes under `tools`, adding `tool_call`, `tool_result` and `tool_error` to the events it declares. Every route it names declares `tool`.
 - Its handler receives `tools`: `definitions` for the model, and `run`, which runs a call as the caller. The body delegates to it with `yield*`.
 - On a stream, a call that needs approval returns `needs-approval` and runs nothing. The client sends the call back as a `ToolAnswer`, and the handler runs `run(answer.call, answer)`.
@@ -139,16 +140,21 @@ First-party adapters (in `packages/`) always ship with:
 
 # Plugins
 
-A plugin is one module, built with `createPlugin` from `kizunajs/plugin`. It is named under `plugins` on `defineConfig`, as a list, and a config never reaches a browser, so a plugin may import anything a handler may.
+A plugin is one module, built with `definePlugin` from `kizunajs/plugin`. It is named under `plugins` on `defineConfig`, as a list, and a config never reaches a browser, so a plugin may import anything a handler may.
 
-- `slug` is the key it installs at and what handlers reach it under. Every plugin defaults its own; a factory taking `Slug` and returning `WithSlug<...>` is what lets an app rename one or install two.
-- `serve(props, api)` runs on the server and receives the assembled api, which is how a plugin reads the routes, tags and identities the app declared rather than being handed them.
-- It returns `router`, one handler per declared route, and optionally `exports`, which every handler reaches at `plugins.<slug>`.
-- A plugin route answers with `rawResponse` when its wire format is not a JSON body. Ordinary route handlers cannot.
+- `slug` is what handlers reach it under, `plugins.<slug>`. The app can pass another one, `emailPlugin({ slug: 'mail' })`, and two plugins on one slug make `defineConfig` throw.
+- `options` is a Zod schema. The app's options are validated once, when the config assembles, and a failure names the plugin and the field.
+- `setup({ options, api })` runs once, including during `kizuna generate`, and returns `exports`, `routes`, `generators` and `validate`, all optional. `api` is readable from handlers and `validate`, never during `setup` itself.
+- `exports` reach every route and job handler at `plugins.<slug>`.
+- `routes` are for outside callers, like a webhook, declared with the plugin's own `route(...).handler(...)`. Every plugin route is `hidden`, so none reaches the generated clients, the OpenAPI document or MCP, and one declaring `tool` makes `defineConfig` throw. A plugin route answers with `rawResponse` when its wire format is not a JSON body. Ordinary route handlers cannot.
+- `generators` are files `kizuna generate` writes and `--check` compares, built with `defineGenerator`. There is no `generators` key on the config.
+- Plugins declare no jobs, no hooks, and never call each other in this phase.
+
+`hidden: true` on any route keeps it out of the Swift, Kotlin and fetch clients, the OpenAPI document (unless `includeHidden`) and MCP. `kizuna routes` still lists it, and the snapshot records it.
 
 Every export subpath of every package under `packages/` declares its reach under `kizuna.entries` in its own `package.json`. `tests/client-safe.test.ts` enforces the boundary rather than documenting it: it generates a client from the demo config, bundles it for a browser target, fails on any Node built-in, and derives each entry's reach from that bundle's own import graph so a mislabelled entry is caught. It reads `dist`, so run `pnpm build` before it.
 
-Nothing else needs to know a plugin exists: its routes never join `api.routes`, so the client and the generators do not see them.
+Plugin routes never join `api.routes`. The generators walk them under the plugin's slug through `walkApi`.
 
 # Publishing
 

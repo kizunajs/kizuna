@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
-import { createPlugin } from 'kizunajs/adapter';
+import { definePlugin, route } from 'kizunajs/plugin';
 
 interface Config {
     tags: typeof kTags;
@@ -93,6 +93,25 @@ export const inferenceRoutes = k.routes('api', {
 export const inferenceContract = defineConfig({
     ...config,
     routes: inferenceRoutes,
+}).api;
+
+export const rawBodyContract = defineConfig({
+    ...config,
+    routes: k.routes('api', {
+        receiveSigned: k.route({
+            method: 'POST',
+            path: '/signed',
+            rawBody: true,
+            body: z.object({
+                name: z.string(),
+            }),
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        }),
+    }),
 }).api;
 
 export const streamInferenceRoutes = k.routes('api', {
@@ -368,27 +387,24 @@ export const requestContextContract = defineConfig({
     },
 }).api;
 
-const typedProbePlugin = createPlugin({
+const typedProbePlugin = definePlugin({
     slug: 'probe',
-    routes: {
-        ping: {
-            method: 'GET',
-            path: '/probe/ping',
-            responses: {
-                200: z.object({
-                    pong: z.boolean(),
-                }),
-            },
-        },
-    },
-    serve: () => ({
-        router: {
-            ping: () => ({
-                status: 200 as const,
+    setup: () => ({
+        routes: {
+            ping: route({
+                method: 'GET',
+                path: '/probe/ping',
+                responses: {
+                    200: z.object({
+                        pong: z.boolean(),
+                    }),
+                },
+            }).handler(() => ({
+                status: 200,
                 body: {
                     pong: true,
                 },
-            }),
+            })),
         },
         exports: {
             label: () => 'probe',
@@ -405,7 +421,7 @@ const pluginTypeKConfig = {
 
 export const pluginTypeContract = defineConfig({
     ...pluginTypeKConfig,
-    plugins: [typedProbePlugin],
+    plugins: [typedProbePlugin()],
     routes: pluginTypeK.routes('api', {
         whichLabel: pluginTypeK.route({
             method: 'GET',

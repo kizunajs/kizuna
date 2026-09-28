@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import {
-    createGenerator,
+    walkApi,
+    type GeneratorWalk,
     parsePath,
     resolveResponseBody,
     resolveResponseHeaders,
@@ -337,7 +338,7 @@ const buildRouteMethod = (
     };
 };
 
-const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: TypeRegistry }, _api: ApiDefinition) => {
+const kotlinRoutesWalk = (options: KotlinConfig & { registry: TypeRegistry }): GeneratorWalk<ApiPartition> => {
     const flatMethods: RouteMethod[] = [];
     const groupMap = new Map<string, RouteMethod[]>();
 
@@ -376,7 +377,7 @@ const kotlinGenerator = createGenerator((options: KotlinConfig & { registry: Typ
             return { flatMethods, groups };
         },
     };
-});
+};
 
 const KOTLIN_KEYWORDS = new Set([
     'as',
@@ -1847,22 +1848,9 @@ const emitClient = (
     );
 };
 
-/**
- * Generate a Kotlin API client from a Kizuna api.
- *
- * @param api - What `defineConfig` assembled.
- * @param config - Override the generated names:
- *   - `namespaceName`: the object wrapping shared types.
- *   - `packageName`: optional package declaration for the generated file.
- */
-export const generateKotlinClient = (api: ApiDefinition, config: KotlinConfig): string => {
-    const { namespaceName, packageName, camelCaseProperties = false, unknownEnumCase = false } = config;
+const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registry: TypeRegistry, config: KotlinConfig): string => {
+    const { namespaceName, packageName, camelCaseProperties = false } = config;
 
-    const registry = new TypeRegistry(camelCaseProperties, unknownEnumCase);
-    const partition = kotlinGenerator(api, {
-        namespaceName,
-        registry,
-    });
     const allMethods = [...partition.flatMethods, ...partition.groups.flatMap((group: RouteGroup) => group.methods)];
 
     const operationTypeMap = buildOperationTypeMap(allMethods, registry);
@@ -1978,3 +1966,31 @@ export const generateKotlinClient = (api: ApiDefinition, config: KotlinConfig): 
 
     return writer.toString();
 };
+
+/**
+ * The Kotlin client's walk: the routes into a partition, then the file.
+ */
+export const kotlinClientWalk = (api: ApiDefinition, config: KotlinConfig): GeneratorWalk => {
+    const registry = new TypeRegistry(config.camelCaseProperties ?? false, config.unknownEnumCase ?? false);
+    const routes = kotlinRoutesWalk({
+        namespaceName: config.namespaceName,
+        registry,
+    });
+    return {
+        processRoute: routes.processRoute,
+        finalize: () => renderKotlinClient(api, routes.finalize(), registry, config),
+    };
+};
+
+/**
+ * Generate a Kotlin API client from a Kizuna api.
+ *
+ * @param api - What `defineConfig` assembled.
+ * @param config - Override the generated names:
+ *   - `namespaceName`: the object wrapping shared types.
+ *   - `packageName`: optional package declaration for the generated file.
+ */
+export const generateKotlinClient = (api: ApiDefinition, config: KotlinConfig): string =>
+    walkApi(api, kotlinClientWalk(api, config), {
+        skipHidden: true,
+    });

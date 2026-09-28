@@ -171,6 +171,19 @@ export const diffSnapshots = (before: ApiSnapshot, after: ApiSnapshot, options: 
             }
         }
 
+        if (gone.hidden !== true && arrived.hidden === true) {
+            changes.push({
+                level: 'breaking',
+                key,
+                summary: `${httpLabel(arrived, key)} is now hidden`,
+                detail: 'the server still serves it, but it is no longer in the generated clients or the OpenAPI document',
+            });
+        }
+
+        if (gone.hidden === true && arrived.hidden !== true) {
+            changes.push({ level: 'added', key, summary: `${httpLabel(arrived, key)} is no longer hidden` });
+        }
+
         if (!gone.deprecated && arrived.deprecated) {
             changes.push({ level: 'changed', key, summary: `${httpLabel(arrived, key)} is now deprecated` });
         }

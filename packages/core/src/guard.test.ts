@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
-    createAdapter,
+    defineAdapter,
     extractCredential,
     renderJsonResult,
     resolveSecurityRequirements,
@@ -107,7 +107,7 @@ const makeRequest = (path: string, headers: Record<string, string> = {}): Adapte
 
 const makeAdapter = () => {
     const results: AdapterResult[] = [];
-    const adapter = createAdapter<null, void, Record<string, never>>({
+    const adapter = defineAdapter<null, void, Record<string, never>>({
         buildHandlerContext: () => ({}),
         respond: (result) => {
             results.push(result);

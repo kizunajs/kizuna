@@ -519,6 +519,10 @@ public final class APIClient: Sendable {
         APIDiagnosticsClient(client: self)
     }
 
+    public var contact: APIContactClient {
+        APIContactClient(client: self)
+    }
+
     public enum UsersListUsers {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -3293,6 +3297,52 @@ public final class APIClient: Sendable {
             }
         }
     }
+
+    public enum ContactSendMessage {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let subject: String
+            public let html: String
+
+            public init(
+                subject: String,
+                html: String
+            ) {
+                self.subject = subject
+                self.html = html
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(
+                subject: String,
+                html: String
+            ) -> Self {
+                .init(payload: Input(subject: subject, html: html))
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
 }
 
 public struct APIUsersClient: Sendable {
@@ -4284,6 +4334,35 @@ public struct APIDiagnosticsClient: Sendable {
             return APIClient.DiagnosticsWhoAmI.Result(body: body)
         default:
             throw APIClient.DiagnosticsWhoAmI.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct APIContactClient: Sendable {
+    private let client: APIClient
+
+    init(client: APIClient) {
+        self.client = client
+    }
+
+    /// Send a message to the team
+    public func sendMessage(_ body: APIClient.ContactSendMessage.Body) async throws(APIClient.ContactSendMessage.Failure) {
+        let path = "/contact"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.ContactSendMessage.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.ContactSendMessage.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.ContactSendMessage.Failure.self)
+        switch statusCode {
+        case 204:
+            return
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.ContactSendMessage.Failure.self)
+            throw APIClient.ContactSendMessage.Failure.badRequest(payload)
+        default:
+            throw APIClient.ContactSendMessage.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }

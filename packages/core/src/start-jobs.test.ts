@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
-import { createJobTransport, type JobMessage, type ScheduledJob } from './job-transport.js';
+import { defineJobTransport, type JobMessage, type ScheduledJob } from './job-transport.js';
 import { JOBS_META } from './adapter.js';
 import { occurrenceKey, startJobs } from './start-jobs.js';
 
@@ -50,7 +50,7 @@ const recording = () => {
     const sent: JobMessage[] = [];
     return {
         sent,
-        transport: createJobTransport({
+        transport: defineJobTransport({
             name: 'recording',
             supports: {
                 dedupe: true,
@@ -176,7 +176,7 @@ describe('startJobs', () => {
             const registered: ScheduledJob[][] = [];
             return {
                 registered,
-                transport: createJobTransport({
+                transport: defineJobTransport({
                     name: 'pg-boss-ish',
                     dispatch: () => {},
                     register: (schedules) => {

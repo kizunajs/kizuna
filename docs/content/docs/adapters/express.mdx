@@ -99,7 +99,6 @@ import express from 'express';
 import kizuna from '../kizuna.config';
 
 const app = express();
-app.use(express.json());
 
 kizuna.api.mount(app);
 
@@ -163,13 +162,17 @@ For request-scoped values handlers need, use [request context](/docs/request-con
 ```ts title="src/index.ts"
 kizuna.api.mount(app, {
     responseValidation: false,
+    json: {
+        limit: '5mb',
+    },
 });
 ```
 
-| Option               | Default | Description                                                                                                                                                                               |
-| -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `responseValidation` | `false` | Validate handler return values against response schemas, surfacing as 500 on mismatch. Enable in development.                                                                             |
-| `formatError`        | none    | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
+| Option               | Default            | Description                                                                                                                                                                               |
+| -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `responseValidation` | `false`            | Validate handler return values against response schemas, surfacing as 500 on mismatch. Enable in development.                                                                             |
+| `json`               | Express's defaults | The options for `express.json()`, like `limit` and `strict`, used for Kizuna's own routes. Leave it out if the app runs its own `express.json()`.                                         |
+| `formatError`        | none               | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
 
 ## Type-safe request properties
 
@@ -197,6 +200,45 @@ Both middleware and handlers are then typed:
 ## Method mismatches
 
 If a path is matched but the method is not declared, the adapter returns 405 with an `Allow` header listing the supported methods. This follows [RFC 9110 §15.5.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6).
+
+## Alongside your own Express routes
+
+An app with Express routes of its own usually runs `express.json()` for them. Kizuna works with that: its routes use the body `express.json()` already parsed. Set it up one of two ways.
+
+### Mount Kizuna first
+
+Kizuna's routes answer before `express.json()` runs, so it only parses for yours:
+
+```ts title="src/index.ts"
+const app = express();
+
+kizuna.api.mount(app);
+
+app.use(express.json());
+app.post('/legacy/import', importHandler);
+```
+
+### Or keep the raw body
+
+With `express.json()` registered first, pass `keepRawBody` as its `verify` option, so routes with [`rawBody: true`](/docs/routes#verifying-signed-requests) still get the body as it was sent:
+
+```ts title="src/index.ts"
+import express from 'express';
+import { keepRawBody } from '@kizunajs/express';
+import kizuna from '../kizuna.config';
+
+const app = express();
+app.use(
+    express.json({
+        verify: keepRawBody,
+    })
+);
+
+app.post('/legacy/import', importHandler);
+kizuna.api.mount(app);
+```
+
+Without either, a `rawBody` route answers `500`, and the log names the route and both fixes.
 
 ## Multipart / file uploads
 
