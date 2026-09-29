@@ -1,35 +1,32 @@
 import { expectTypeOf, test } from 'vitest';
-import type { z } from 'zod';
-import { createClient, toCenterId, type API } from './branded-client.generated.js';
-import type { CenterId } from './branded.fixture.js';
-
-type CenterIdValue = z.output<typeof CenterId>;
+import { createClient, toCenterId, type API } from './generated/api.js';
 
 const client = createClient({
     baseUrl: 'https://example.com',
 });
 
-test('the named brand is the type the server parses it to', () => {
-    expectTypeOf<API.CenterId>().toEqualTypeOf<CenterIdValue>();
+test('the named brand is a string that no plain string passes for', () => {
+    expectTypeOf<API.CenterId>().toExtend<string>();
+    expectTypeOf<string>().not.toExtend<API.CenterId>();
 });
 
 test('the constructor makes the brand from a plain string', () => {
     expectTypeOf(toCenterId('center_1')).toEqualTypeOf<API.CenterId>();
 });
 
-test('a branded path param is the type the server parses it to', () => {
-    expectTypeOf<API.CentersGetCenter.Params['centerId']>().toEqualTypeOf<CenterIdValue>();
+test('a branded path param is the named brand', () => {
+    expectTypeOf<API.CentersGetCenter.Params['centerId']>().toEqualTypeOf<API.CenterId>();
 });
 
-test('a branded field in a response model is the type the server parses it to', () => {
-    expectTypeOf<API.Center['id']>().toEqualTypeOf<CenterIdValue>();
-    expectTypeOf<API.Center['parentId']>().toEqualTypeOf<CenterIdValue | null>();
+test('a branded field in a response model is the named brand', () => {
+    expectTypeOf<API.Center['id']>().toEqualTypeOf<API.CenterId>();
+    expectTypeOf<API.Center['parentId']>().toEqualTypeOf<API.CenterId | null>();
 });
 
 test('a branded query, body and header field keep the brand', () => {
-    expectTypeOf<API.CentersListCenters.Query['parentId']>().toEqualTypeOf<CenterIdValue | undefined>();
-    expectTypeOf<API.CentersMoveCenter.Body['parentId']>().toEqualTypeOf<CenterIdValue>();
-    expectTypeOf<API.CentersMoveCenter.Headers['x-actor-center']>().toEqualTypeOf<CenterIdValue>();
+    expectTypeOf<API.CentersListCenters.Query['parentId']>().toEqualTypeOf<API.CenterId | undefined>();
+    expectTypeOf<API.CentersMoveCenter.Body['parentId']>().toEqualTypeOf<API.CenterId>();
+    expectTypeOf<API.CentersMoveCenter.Headers['x-actor-center']>().toEqualTypeOf<API.CenterId>();
 });
 
 test('a plain string is rejected where a branded param is expected', () => {

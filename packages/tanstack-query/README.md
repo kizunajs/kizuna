@@ -1,6 +1,6 @@
 # @kizunajs/tanstack-query
 
-`@kizunajs/tanstack-query` provides `new KizunaTanstackQuery()`, which builds TanStack Query options from a Kizuna api. Query keys, caching, and invalidation come from the routes you already wrote.
+`@kizunajs/tanstack-query` provides `new KizunaTanstackQuery()`, which builds TanStack Query options from a generated Kizuna fetch client. Query keys, caching, and invalidation come from the routes you already wrote.
 
 ## Installation
 
@@ -13,9 +13,13 @@ pnpm add @kizunajs/tanstack-query
 ```ts
 import { useQuery } from '@tanstack/react-query';
 import { KizunaTanstackQuery } from '@kizunajs/tanstack-query';
-import { apiClient } from './api-client';
+import { createClient } from './api-client.generated';
 
-const api = new KizunaTanstackQuery(apiClient);
+const api = new KizunaTanstackQuery(
+    createClient({
+        baseUrl: 'http://localhost:3000',
+    })
+);
 
 const { data } = useQuery(
     api.users.getUser.queryOptions({

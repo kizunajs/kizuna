@@ -11,12 +11,6 @@ const FetchClientOptionsSchema = z.object({
      */
     namespace: z.string().optional(),
     /**
-     * Module the generated file imports its runtime from.
-     *
-     * @default '@kizunajs/fetch'
-     */
-    runtimeModule: z.string().optional(),
-    /**
      * Command the file's header tells a reader to run.
      *
      * @default 'kizuna generate'

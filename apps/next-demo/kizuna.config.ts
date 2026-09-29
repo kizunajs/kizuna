@@ -1,5 +1,5 @@
 import { defineConfig } from 'kizunajs';
-import { fetchClient } from '@kizunajs/fetch/server';
+import { fetchClient } from '@kizunajs/fetch';
 import { nextAdapter } from '@kizunajs/next';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';

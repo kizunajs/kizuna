@@ -1,117 +1,53 @@
-import { describe, expect, it, vi } from 'vitest';
-import { z } from 'zod';
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { QueryClient, skipToken } from '@tanstack/query-core';
-import { Kizuna } from 'kizunajs';
-import { defineConfig } from 'kizunajs';
-import { CLIENT_ROUTE } from '@kizunajs/fetch';
 import { KizunaTanstackQuery } from './proxy.js';
 import { NonStreamResponseError, UndeclaredResponseError, isNonStreamResponseError, isUndeclaredResponseError } from './errors.js';
+import { createClient, type Client } from './generated/client.js';
 
-interface Config {
-    tags: typeof kTags;
-}
-
-const k = new Kizuna<Config>();
-
-const kTags = k.tags({
-    users: 'Users',
-});
-const config = {
-    tags: kTags,
-};
-
-const UserSchema = z.object({
-    id: z.string(),
-    name: z.string(),
-});
-
-const routes = k.routes('users', {
-    listUsers: k.route({
-        method: 'GET',
-        path: '/users',
-        responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-            }),
-        },
-    }),
-    getUser: k.route({
-        method: 'GET',
-        path: '/users/:id',
-        auth: 'user',
-        responses: {
-            200: UserSchema,
-            404: z.object({
-                title: z.string(),
-            }),
-        },
-    }),
-    searchUsers: k.route({
-        method: 'GET',
-        path: '/users/search',
-        query: z.object({
-            term: z.string(),
-            cursor: z.number().optional(),
-        }),
-        responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-                nextCursor: z.number().nullable(),
-            }),
-        },
-    }),
-    createUser: k.route({
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string(),
-        }),
-        responses: {
-            201: UserSchema,
-        },
-    }),
-    checkUser: k.route({
-        method: 'HEAD',
-        path: '/users/:id',
-        responses: {
-            200: z.object({}),
-        },
-    }),
-});
-
-const contract = defineConfig({
-    ...config,
-    routes: {
-        users: routes,
+const ok = {
+    status: 200,
+    body: {
+        id: '1',
+        name: 'Ada',
     },
-}).api;
-
-const ok = { status: 200, body: { id: '1', name: 'Ada' }, headers: {} };
-
-/**
- * A stand-in for the fetch client: the same nested shape, with every route a spy
- * resolving whatever the test needs.
- */
-/**
- * A real client carries the route each method answers, so a stand-in has to as
- * well: that is what the proxy walks.
- */
-const asRoute = (definition: unknown, fn: unknown) => Object.assign(fn as object, { [CLIENT_ROUTE]: definition });
-
-const buildClient = (result: unknown = ok) => {
-    const route = (definition: unknown) => asRoute(definition, vi.fn().mockResolvedValue(result));
-    const users = contract.routes.users as Record<string, unknown>;
-    return {
-        users: {
-            listUsers: route(users.listUsers),
-            getUser: route(users.getUser),
-            searchUsers: route(users.searchUsers),
-            createUser: route(users.createUser),
-            checkUser: route(users.checkUser),
-        },
-    };
+    headers: {},
 };
-const buildApi = (client: ReturnType<typeof buildClient>) => new KizunaTanstackQuery<typeof contract.routes>(client as never);
+
+/**
+ * A spy resolving whatever the test needs, carrying the `'~route'` of the
+ * generated method it stands in for, since that is what the proxy walks.
+ */
+const standIn = <Method extends object>(method: Method, result: unknown): Method & Mock =>
+    Object.defineProperty(vi.fn().mockResolvedValue(result), '~route', {
+        value: (method as { '~route'?: unknown })['~route'],
+    }) as unknown as Method & Mock;
+
+const generated = createClient({
+    baseUrl: 'http://api.test',
+});
+
+const buildClient = (result: unknown = ok) => ({
+    users: {
+        listUsers: standIn(generated.users.listUsers, result),
+        getUser: standIn(generated.users.getUser, result),
+        searchUsers: standIn(generated.users.searchUsers, result),
+        createUser: standIn(generated.users.createUser, result),
+        checkUser: standIn(generated.users.checkUser, result),
+    },
+});
+const buildApi = (client: ReturnType<typeof buildClient>) => new KizunaTanstackQuery<Pick<Client, 'users'>>(client);
+
+/**
+ * A fetch answering every request with `status` and a JSON `body`, for the
+ * tests that run the generated client itself.
+ */
+const answering = (status: number, body: unknown) => async () =>
+    new Response(JSON.stringify(body), {
+        status,
+        headers: {
+            'content-type': 'application/json',
+        },
+    });
 
 const runQueryFn = (options: { queryFn: unknown }, context: Record<string, unknown> = {}) =>
     (options.queryFn as (context: unknown) => Promise<unknown>)({ signal: undefined, ...context });
@@ -231,52 +167,60 @@ describe('declared statuses', () => {
     });
 
     it('treats the 401 the auth map added as declared, on a route that never declared it', async () => {
-        const guardedKUser = k.identity.bearer({
-            context: z.object({
-                userId: z.string(),
-            }),
-        });
-        const guardedKConfig = {
-            auth: {
-                identities: {
-                    user: guardedKUser,
-                },
-            },
-        };
-        const guardedK = new Kizuna<{
-            auth: {
-                identities: {
-                    user: typeof guardedKUser;
-                };
-            };
-        }>();
-        const guardedContract = defineConfig({
-            ...guardedKConfig,
-            routes: {
-                users: guardedK.routes({
-                    getUser: guardedK.route({
-                        method: 'GET',
-                        path: '/users/:id',
-                        auth: 'user',
-                        responses: {
-                            200: UserSchema,
-                        },
-                    }),
+        const api = new KizunaTanstackQuery(
+            createClient({
+                baseUrl: 'http://api.test',
+                fetch: answering(401, {
+                    detail: 'Unauthorized',
                 }),
-            },
-        }).api;
-        const api = new KizunaTanstackQuery<typeof guardedContract.routes>({
-            users: {
-                getUser: asRoute(
-                    (guardedContract.routes.users as Record<string, unknown>).getUser,
-                    vi.fn().mockResolvedValue({ status: 401, body: { detail: 'Unauthorized' }, headers: {} })
-                ),
-            },
-        } as never);
+            })
+        );
 
-        const result = await runQueryFn(api.users.getUser.queryOptions({ input: { params: { id: '1' } } }));
+        const result = await runQueryFn(
+            api.guarded.getUser.queryOptions({
+                input: {
+                    params: {
+                        id: '1',
+                    },
+                },
+            })
+        );
 
-        expect(result).toMatchObject({ status: 401 });
+        expect(result).toMatchObject({
+            status: 401,
+        });
+    });
+
+    it('returns the validation 400 of a generated client as data', async () => {
+        const api = new KizunaTanstackQuery(
+            createClient({
+                baseUrl: 'http://api.test',
+                fetch: answering(400, {
+                    type: 'about:blank',
+                    title: 'Bad Request',
+                    status: 400,
+                    detail: 'The query is invalid.',
+                    errors: [],
+                }),
+            })
+        );
+
+        const result = await runQueryFn(
+            api.users.searchUsers.queryOptions({
+                input: {
+                    query: {
+                        term: 'ada',
+                    },
+                },
+            })
+        );
+
+        expect(result).toMatchObject({
+            status: 400,
+            body: {
+                errors: [],
+            },
+        });
     });
 
     it('treats the automatic 400 as declared when the route has a query schema', async () => {
@@ -446,58 +390,17 @@ describe('passthrough', () => {
 
 describe('name collisions', () => {
     it('lets a route named like a factory win over it', () => {
-        const collidingRoutes = k.routes('users', {
-            key: k.route({
-                method: 'GET',
-                path: '/key',
-                responses: {
-                    200: z.object({ value: z.string() }),
-                },
-            }),
-        });
-        const collidingContract = defineConfig({
-            ...config,
-            routes: {
-                users: collidingRoutes,
-            },
-        }).api;
-        const client = {
-            users: { key: asRoute((collidingContract.routes.users as Record<string, unknown>).key, vi.fn().mockResolvedValue(ok)) },
-        };
-        const api = new KizunaTanstackQuery<typeof collidingContract.routes>(client as never);
+        const api = new KizunaTanstackQuery(
+            createClient({
+                baseUrl: 'http://api.test',
+            })
+        );
 
-        expect(api.users.key).toHaveProperty('queryOptions');
+        expect(api.collisions.key).toHaveProperty('queryOptions');
     });
 });
 
 describe('streams', () => {
-    const streamRoutes = k.routes('users', {
-        reply: k.route({
-            method: 'POST',
-            path: '/reply',
-            body: z.object({
-                prompt: z.string(),
-            }),
-            responses: {
-                200: {
-                    stream: {
-                        delta: z.object({
-                            text: z.string(),
-                        }),
-                    },
-                },
-                404: z.object({
-                    detail: z.string(),
-                }),
-            },
-        }),
-    });
-    const streamContract = defineConfig({
-        ...config,
-        routes: {
-            assistant: streamRoutes,
-        },
-    }).api;
     const messages = [
         { event: 'delta', data: { text: 'a' } },
         { event: 'delta', data: { text: 'b' } },
@@ -506,11 +409,11 @@ describe('streams', () => {
         for (const message of messages) yield message;
     };
     const buildStreamApi = (result: unknown) =>
-        new KizunaTanstackQuery<typeof streamContract.routes>({
+        new KizunaTanstackQuery<Pick<Client, 'assistant'>>({
             assistant: {
-                reply: asRoute((streamContract.routes.assistant as Record<string, unknown>).reply, vi.fn().mockResolvedValue(result)),
+                reply: standIn(generated.assistant.reply, result),
             },
-        } as any);
+        });
     const input = {
         body: {
             prompt: 'hi',
@@ -540,6 +443,34 @@ describe('streams', () => {
             .catch((caught: unknown) => caught);
         expect(isNonStreamResponseError(error)).toBe(true);
         expect((error as NonStreamResponseError).status).toBe(404);
+    });
+
+    it('rejects the validation 400 of a generated client with NonStreamResponseError', async () => {
+        const api = new KizunaTanstackQuery(
+            createClient({
+                baseUrl: 'http://api.test',
+                fetch: answering(400, {
+                    type: 'about:blank',
+                    title: 'Bad Request',
+                    status: 400,
+                    detail: 'The body is invalid.',
+                    errors: [],
+                }),
+            })
+        );
+        const queryClient = new QueryClient();
+
+        const error = await queryClient
+            .fetchQuery(
+                api.assistant.reply.streamOptions({
+                    input,
+                    retry: false,
+                })
+            )
+            .catch((caught: unknown) => caught);
+
+        expect(isNonStreamResponseError(error)).toBe(true);
+        expect((error as NonStreamResponseError).status).toBe(400);
     });
 
     it('honours skipToken', () => {

@@ -420,9 +420,6 @@ importers:
       '@kizunajs-demo/shared':
         specifier: workspace:*
         version: link:../shared
-      '@kizunajs/fetch':
-        specifier: workspace:*
-        version: link:../../packages/fetch
       '@kizunajs/tanstack-query':
         specifier: workspace:*
         version: link:../../packages/tanstack-query
@@ -445,6 +442,9 @@ importers:
       '@kizunajs/cli':
         specifier: workspace:*
         version: link:../../packages/cli
+      '@kizunajs/fetch':
+        specifier: workspace:*
+        version: link:../../packages/fetch
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18

@@ -42,6 +42,29 @@ export class TypeCollector {
     >();
 
     /**
+     * Which side of a pipe a schema is read from: the input a request sends, or
+     * the output a response carries.
+     */
+    private direction: 'input' | 'output' = 'output';
+
+    /**
+     * Reads the schemas `read` walks from the side a request sends.
+     */
+    readingInput<Result>(read: () => Result): Result {
+        const previous = this.direction;
+        this.direction = 'input';
+        try {
+            return read();
+        } finally {
+            this.direction = previous;
+        }
+    }
+
+    readsInput(): boolean {
+        return this.direction === 'input';
+    }
+
+    /**
      * Claims a name before its body is walked, so a model that refers to itself
      * resolves to its own name instead of recursing. Answers whether the caller
      * is the one that has to emit it.
@@ -57,7 +80,7 @@ export class TypeCollector {
     }
 
     /**
-     * Declares a brand as a named type, `UserId = string & $brand<"UserId">`,
+     * Declares a brand as a named type, `UserId = string & KizunaBrand<"UserId">`,
      * and answers the name.
      */
     addBrand(brand: string, base: string, example: string): string {
@@ -105,7 +128,7 @@ export class TypeCollector {
         const brands = [...this.brands].map(([name, { brand, base }]) => ({
             name,
             description: `A branded \`${base}\`. Responses hand one back, and \`to${name}\` makes one from a plain value.`,
-            body: `${base} & $brand<${quote(brand)}>`,
+            body: `${base} & KizunaBrand<${quote(brand)}>`,
         }));
         return [...this.named.values(), ...brands].sort((left, right) => left.name.localeCompare(right.name));
     }
@@ -192,7 +215,7 @@ export const sampleValue = (schema: z.core.$ZodType, depth = 0, key?: string): s
     const def = readDef(schema);
     if (def.type === 'default' && def.defaultValue !== undefined) return exampleLiteral(def.defaultValue);
     if (def.type === 'pipe') {
-        const side = def.out ?? def.in;
+        const side = def.in ?? def.out;
         return side ? sampleValue(side, depth, key) : 'undefined';
     }
     if (def.innerType && def.type !== 'object') return sampleValue(def.innerType, depth, key);
@@ -202,7 +225,7 @@ export const sampleValue = (schema: z.core.$ZodType, depth = 0, key?: string): s
         case 'int':
             return '1';
         case 'bigint':
-            return '1n';
+            return exampleLiteral('1');
         case 'boolean':
             return 'true';
         case 'date':
@@ -219,6 +242,8 @@ export const sampleValue = (schema: z.core.$ZodType, depth = 0, key?: string): s
             if (!def.element || depth >= SAMPLE_DEPTH) return '[]';
             return `[\n${indent(`${sampleValue(def.element, depth + 1, key)},`)}\n]`;
         }
+        case 'tuple':
+            return `[${(def.items ?? []).map((item) => sampleValue(item, depth + 1, key)).join(', ')}]`;
         case 'object':
             return sampleObject(schema, depth);
         case 'record':
@@ -316,7 +341,7 @@ const unbrandedTypeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint
     if (def.innerType && def.type !== 'object') return typeOf(def.innerType, collector, hint);
 
     if (def.type === 'pipe') {
-        const side = def.out ?? def.in;
+        const side = collector.readsInput() ? def.in : (def.out ?? def.in);
         return side ? typeOf(side, collector, hint) : 'unknown';
     }
 
@@ -373,6 +398,11 @@ const structuralType = (schema: z.core.$ZodType, collector: TypeCollector, hint:
         }
         case 'array':
             return def.element ? `Array<${typeOf(def.element, collector, `${hint}Item`)}>` : 'unknown[]';
+        case 'tuple': {
+            const items = (def.items ?? []).map((item, index) => typeOf(item, collector, `${hint}${index}`));
+            const rest = def.rest ? [`...Array<${typeOf(def.rest, collector, `${hint}Rest`)}>`] : [];
+            return `[${[...items, ...rest].join(', ')}]`;
+        }
         case 'object':
             return objectBody(schema, collector, hint);
         case 'record':

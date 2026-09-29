@@ -66,10 +66,10 @@ An object mirroring your route groups.
 
 ## Options
 
-| Option  | Type                      | Description                                                                                             |
-| ------- | ------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `input` | `ClientArgs \| SkipToken` | The route's `{ params, query, body, headers, fetchOptions }`. Optional when every argument is optional. |
-| …       | TanStack Query options    | Passed through untouched                                                                                |
+| Option  | Type                   | Description                                                                                                               |
+| ------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `input` | `Args \| SkipToken`    | What the client method takes: `{ params, query, body, headers, fetchOptions }`. Optional when every argument is optional. |
+| …       | TanStack Query options | Passed through untouched                                                                                                  |
 
 For `infiniteOptions`, `input` is a function of the page parameter. `skipToken` disables the query. `streamOptions` also takes `refetchMode`, `'reset'` (default), `'append'`, or `'replace'`.
 

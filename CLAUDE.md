@@ -154,7 +154,7 @@ A plugin is one module, built with `definePlugin` from `kizunajs/plugin`. It is 
 
 `hidden: true` on any route keeps it out of the Swift, Kotlin and fetch clients, the OpenAPI document (unless `includeHidden`) and MCP. `kizuna routes` still lists it, and the snapshot records it.
 
-Every export subpath of every package under `packages/` declares its reach under `kizuna.entries` in its own `package.json`. `tests/client-safe.test.ts` enforces the boundary rather than documenting it: it generates a client from the demo config, bundles it for a browser target, fails on any Node built-in, and derives each entry's reach from that bundle's own import graph so a mislabelled entry is caught. It reads `dist`, so run `pnpm build` before it.
+Every export subpath of every package under `packages/` declares its reach under `kizuna.entries` in its own `package.json`. `tests/client-safe.test.ts` enforces the boundary rather than documenting it: it bundles every `client` entry for a browser target and fails on any Node built-in, and it generates a fetch client from the demo config and checks that the file imports nothing and bundles on its own. It reads `dist`, so run `pnpm build` before it.
 
 Plugin routes never join `api.routes`. The generators walk them under the plugin's slug through `walkApi`.
 

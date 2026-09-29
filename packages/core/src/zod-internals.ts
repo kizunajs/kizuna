@@ -8,6 +8,8 @@ export interface ZodDef {
     coerce?: boolean;
     innerType?: z.core.$ZodType;
     element?: z.core.$ZodType;
+    items?: z.core.$ZodType[];
+    rest?: z.core.$ZodType | null;
     in?: z.core.$ZodType;
     out?: z.core.$ZodType;
     shape?: Record<string, z.core.$ZodType>;

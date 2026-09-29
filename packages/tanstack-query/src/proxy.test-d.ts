@@ -1,95 +1,17 @@
 import { expectTypeOf, test } from 'vitest';
-import { z } from 'zod';
-import { Kizuna } from 'kizunajs';
-import { defineConfig } from 'kizunajs';
-import { createGeneratedClient, type Client, type ClientConfig, type GeneratedRoutes } from '@kizunajs/fetch';
-import type { Routes } from 'kizunajs';
-
-/**
- * A client over an assembled api's routes, the same runtime the generated
- * client uses.
- */
-const apiClientFor = <T extends Routes>(api: { routes: T }, config: ClientConfig): Client<T> =>
-    createGeneratedClient(api.routes as unknown as GeneratedRoutes, config) as unknown as Client<T>;
-
 import { KizunaTanstackQuery } from './proxy.js';
+import { createClient } from './generated/client.js';
 
-interface Config {
-    tags: typeof kTags;
-}
-
-const k = new Kizuna<Config>();
-
-const kTags = k.tags({
-    users: 'Users',
-});
-const config = {
-    tags: kTags,
-};
-
-const UserSchema = z.object({
-    id: z.string(),
-    name: z.string(),
-});
-
-const routes = k.routes('users', {
-    listUsers: k.route({
-        method: 'GET',
-        path: '/users',
-        responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-            }),
-        },
-    }),
-    getUser: k.route({
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: UserSchema,
-            404: z.object({
-                title: z.string(),
-            }),
-        },
-    }),
-    searchUsers: k.route({
-        method: 'GET',
-        path: '/users/search',
-        query: z.object({
-            term: z.string(),
-            cursor: z.number().optional(),
-        }),
-        responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-                nextCursor: z.number().nullable(),
-            }),
-        },
-    }),
-    createUser: k.route({
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string(),
-        }),
-        responses: {
-            201: UserSchema,
-        },
-    }),
-});
-
-const contract = defineConfig({
-    ...config,
-    routes: {
-        users: routes,
-    },
-}).api;
-
-const apiClient = apiClientFor(contract, {
+const apiClient = createClient({
     baseUrl: 'http://localhost:8000',
 });
 
 const api = new KizunaTanstackQuery(apiClient);
+
+test('a route with a required argument demands input', () => {
+    // @ts-expect-error getUser requires `params`
+    api.users.getUser.queryOptions({});
+});
 
 test('a route with a required query demands input', () => {
     // @ts-expect-error searchUsers declares a required `term`
@@ -99,6 +21,18 @@ test('a route with a required query demands input', () => {
 test('path params are typed', () => {
     // @ts-expect-error `id` is a string, not a number
     api.users.getUser.queryOptions({ input: { params: { id: 1 } } });
+});
+
+test('a route with a query schema carries the validation 400 in its data', () => {
+    const options = api.users.searchUsers.queryOptions({
+        input: {
+            query: {
+                term: 'ada',
+            },
+        },
+    });
+    type Data = Awaited<ReturnType<Exclude<typeof options.queryFn, symbol>>>;
+    expectTypeOf<Data['status']>().toEqualTypeOf<200 | 400>();
 });
 
 test('a mutation route has no query factories', () => {
@@ -112,38 +46,6 @@ test('groups and routes both expose a partial key', () => {
 });
 
 test('a streamed route offers streamOptions with the messages as data, and no query or mutation factories', () => {
-    const streamRoutes = k.routes('users', {
-        reply: k.route({
-            method: 'POST',
-            path: '/reply',
-            body: z.object({
-                prompt: z.string(),
-            }),
-            responses: {
-                200: {
-                    stream: {
-                        delta: z.object({
-                            text: z.string(),
-                        }),
-                        done: z.object({
-                            count: z.int(),
-                        }),
-                    },
-                },
-            },
-        }),
-    });
-    const streamContract = defineConfig({
-        ...config,
-        routes: {
-            assistant: streamRoutes,
-        },
-    }).api;
-    const api = new KizunaTanstackQuery(
-        apiClientFor(streamContract, {
-            baseUrl: '',
-        })
-    );
     const options = api.assistant.reply.streamOptions({
         input: {
             body: {

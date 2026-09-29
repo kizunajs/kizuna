@@ -1,2 +1,2 @@
-export * from './client.js';
-export { isValidationError, isProblemDetails, type ValidationError } from 'kizunajs';
+export { generateFetchClient, type FetchClientOptions } from './generator.js';
+export { fetchClient, type FetchClientTargetOptions } from './client-target.js';

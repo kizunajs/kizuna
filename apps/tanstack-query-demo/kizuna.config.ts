@@ -1,5 +1,5 @@
 import { defineConfig } from 'kizunajs';
-import { fetchClient } from '@kizunajs/fetch/server';
+import { fetchClient } from '@kizunajs/fetch';
 import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
 
 export default defineConfig({

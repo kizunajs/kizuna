@@ -3,19 +3,16 @@ title: isValidationError
 description: Type guard to distinguish Kizuna validation errors from custom 400 responses on the client.
 ---
 
-Distinguish a Kizuna validation error from a route's own `400` body.
-
-<InstallTabs packageName="kizunajs" />
+Distinguish a Kizuna validation error from a route's own `400` body. Every generated fetch client exports it:
 
 ```ts
-import { isValidationError } from 'kizunajs';
-// also re-exported from @kizunajs/fetch
+import { isValidationError } from './api-client.generated';
 ```
 
 ## Parameters
 
 ```ts
-isValidationError(body: unknown): body is ValidationError
+isValidationError(body: unknown): body is API.ValidationError
 ```
 
 ## `ValidationError` shape
@@ -45,7 +42,7 @@ Common error codes: `invalid_type`, `too_small`, `too_big`, `invalid_string_form
 When a route declares its own `400` response, the client sees a union of your type and `ValidationError`. Use `isValidationError` to distinguish them:
 
 ```ts title="users.ts"
-import { isValidationError } from '@kizunajs/fetch';
+import { isValidationError } from './api-client.generated';
 
 const result = await client.users.createUser({
     body: {

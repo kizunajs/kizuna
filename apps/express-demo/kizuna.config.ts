@@ -1,5 +1,5 @@
 import { defineConfig } from 'kizunajs';
-import { fetchClient } from '@kizunajs/fetch/server';
+import { fetchClient } from '@kizunajs/fetch';
 import { kotlinClient } from '@kizunajs/kotlin';
 import { swiftClient } from '@kizunajs/swift';
 import { expressAdapter } from '@kizunajs/express';
