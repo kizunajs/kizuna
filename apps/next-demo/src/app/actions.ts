@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { apiClient } from '../lib/api-client';
-import { toUserId } from '../lib/api-client.generated';
+import { API } from '../lib/api-client.generated';
 
 export const createUserAction = async (formData: FormData) => {
     const name = String(formData.get('name') ?? '');
@@ -21,7 +21,7 @@ export const deleteUserAction = async (formData: FormData) => {
     if (!id) return;
     await apiClient.users.deleteUser({
         params: {
-            id: toUserId(id),
+            id: API.UserId.parse(id),
         },
     });
     revalidatePath('/');

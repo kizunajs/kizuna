@@ -1,6 +1,14 @@
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { z } from 'zod';
 import { k } from '../k';
+import { InviteToken } from '../invite-token';
+
+/**
+ * The `:token` of every route under `/invites/:token`.
+ */
+const InviteTokenParams = z.object({
+    token: InviteToken,
+});
 
 export const inviteRoutes = k.routes('invites', {
     getInvite: k
@@ -8,6 +16,7 @@ export const inviteRoutes = k.routes('invites', {
             method: 'GET',
             path: '/invites/:token',
             auth: 'inviteToken',
+            pathParams: InviteTokenParams,
             responses: {
                 200: z.object({
                     inviteId: z.string(),
@@ -29,6 +38,7 @@ export const inviteRoutes = k.routes('invites', {
             method: 'POST',
             path: '/invites/:token/accept',
             auth: 'inviteToken',
+            pathParams: InviteTokenParams,
             body: z.object({
                 name: z.string(),
             }),

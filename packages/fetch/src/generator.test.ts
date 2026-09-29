@@ -381,7 +381,7 @@ describe('a branded schema', () => {
     });
 
     it('exports a constructor for the brand', () => {
-        expect(branded).toContain('export const toCenterId = (value: string): API.CenterId => value as API.CenterId;');
+        expect(branded).toContain('parse: (value: string): API.CenterId => value as API.CenterId,');
     });
 
     it('refers to the brand by name wherever the schema appears', () => {
@@ -397,7 +397,36 @@ describe('a branded schema', () => {
         expect(source).not.toContain('$brand');
     });
 
+    it('checks a brand whose schema declares checks', () => {
+        expect(branded).toContain(
+            'isValid: (value: string): value is API.InviteCode => /^inv_[a-z0-9]+$/i.test(value) && value.length <= 20,'
+        );
+        expect(branded).toContain('isValid: (value: number): value is API.Seats => Number.isInteger(value) && value >= 1 && value <= 500,');
+        expect(branded).toContain("const inviteCode = API.InviteCode.parse('inv_k7f3q9');");
+    });
+
+    it('leaves a brand without checks unchecked', () => {
+        expect(branded).not.toContain('API.CenterId.isValid(');
+    });
+
     it('emits the client the type tests compile against', async () => {
         await expect(branded).toMatchFileSnapshot('./branded-client.generated.ts');
+    });
+});
+
+describe('a generated brand constructor', () => {
+    it('brands a value that passes the checks', async () => {
+        const { API } = await import('./branded-client.generated.js');
+        expect(API.InviteCode.isValid('INV_abc')).toBe(true);
+        expect(API.InviteCode.parse('inv_abc')).toBe('inv_abc');
+    });
+
+    it('rejects a value that fails them', async () => {
+        const { API } = await import('./branded-client.generated.js');
+        expect(API.InviteCode.isValid('usr_abc')).toBe(false);
+        expect(API.InviteCode.isValid('inv_abcdefghijklmnopqrstuvwxyz')).toBe(false);
+        expect(API.Seats.isValid(1.5)).toBe(false);
+        expect(() => API.InviteCode.parse('usr_abc')).toThrow('Not a valid InviteCode: usr_abc');
+        expect(() => API.Seats.parse(0)).toThrow(TypeError);
     });
 });

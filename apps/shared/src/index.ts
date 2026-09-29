@@ -7,6 +7,7 @@ export type { Config } from './kizuna.types';
 export { user, member, inviteToken, scheduler } from './identities';
 export { type User } from './types';
 export { UserId } from './user-id';
+export { InviteToken } from './invite-token';
 export { db, type Invite, type Note } from './db';
 export { permissions } from './permissions';
 export { roles } from './roles';

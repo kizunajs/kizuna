@@ -14,9 +14,25 @@ export namespace API {
     };
 
     /**
-     * A branded `string`. Responses hand one back, and `toCenterId` makes one from a plain value.
+     * A branded `string`.
+     *
+     * Brand a plain value with `API.CenterId.parse`.
      */
     export type CenterId = string & $brand<"CenterId">;
+
+    /**
+     * A validated, branded `string`.
+     *
+     * Validate a plain value with `API.InviteCode.isValid`, and brand it with `API.InviteCode.parse`.
+     */
+    export type InviteCode = string & $brand<"InviteCode">;
+
+    /**
+     * A validated, branded `number`.
+     *
+     * Validate a plain value with `API.Seats.isValid`, and brand it with `API.Seats.parse`.
+     */
+    export type Seats = number & $brand<"Seats">;
 
     /**
      * RFC 9457 Problem Details error response for validation failures.
@@ -49,6 +65,24 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: Array<Center>; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CentersRedeemInvite {
+        export type Params = {
+            /**
+             * @example
+             * 'inv_k7f3q9'
+             */
+            code: InviteCode;
+        };
+
+        export type Body = {
+            seats: Seats;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
@@ -97,6 +131,23 @@ export interface Client {
         }, API.CentersListCenters.Result>;
         /**
          * @example
+         * const result = await client.centers.redeemInvite({
+         *     params: {
+         *         code: 'inv_k7f3q9',
+         *     },
+         *     body: {
+         *         seats: 1,
+         *     },
+         * });
+         */
+        redeemInvite: ClientMethod<'POST', false, {
+            params: API.CentersRedeemInvite.Params;
+            body: API.CentersRedeemInvite.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CentersRedeemInvite.Result>;
+        /**
+         * @example
          * const result = await client.centers.moveCenter({
          *     params: {
          *         centerId: '1',
@@ -131,6 +182,13 @@ const routes: GeneratedRoutes = {
                 200: {},
             },
         },
+        redeemInvite: {
+            method: 'POST',
+            path: '/invites/:code/redeem',
+            responses: {
+                204: {},
+            },
+        },
         moveCenter: {
             method: 'POST',
             path: '/centers/:centerId/move',
@@ -142,12 +200,77 @@ const routes: GeneratedRoutes = {
 };
 
 /**
- * Brands a value from outside the API, like a URL segment, as `API.CenterId`. A value from a response is branded already.
+ * Brands plain values.
  *
- * @example
- * const id = toCenterId('1');
+ * A value from a response is branded already, so these are for one from outside the API, like a URL segment.
  */
-export const toCenterId = (value: string): API.CenterId => value as API.CenterId;
+export const API = {
+    CenterId: {
+        /**
+         * Brands a plain value as `API.CenterId`.
+         *
+         * For a value from outside the API, like a URL segment. One from a response is branded already.
+         *
+         * @example
+         * const centerId = API.CenterId.parse('1');
+         */
+        parse: (value: string): API.CenterId => value as API.CenterId,
+    },
+
+    InviteCode: {
+        /**
+         * Validates a plain value.
+         *
+         * Narrows it to `API.InviteCode` when it passes.
+         *
+         * @example
+         * if (API.InviteCode.isValid(value)) {
+         *     const inviteCode: API.InviteCode = value;
+         * }
+         */
+        isValid: (value: string): value is API.InviteCode => /^inv_[a-z0-9]+$/i.test(value) && value.length <= 20,
+
+        /**
+         * Brands a plain value as `API.InviteCode`.
+         *
+         * Throws a `TypeError` when it fails validation.
+         *
+         * @example
+         * const inviteCode = API.InviteCode.parse('inv_k7f3q9');
+         */
+        parse: (value: string): API.InviteCode => {
+            if (!API.InviteCode.isValid(value)) throw new TypeError('Not a valid InviteCode: ' + value);
+            return value;
+        },
+    },
+
+    Seats: {
+        /**
+         * Validates a plain value.
+         *
+         * Narrows it to `API.Seats` when it passes.
+         *
+         * @example
+         * if (API.Seats.isValid(value)) {
+         *     const seats: API.Seats = value;
+         * }
+         */
+        isValid: (value: number): value is API.Seats => Number.isInteger(value) && value >= 1 && value <= 500,
+
+        /**
+         * Brands a plain value as `API.Seats`.
+         *
+         * Throws a `TypeError` when it fails validation.
+         *
+         * @example
+         * const seats = API.Seats.parse(value);
+         */
+        parse: (value: number): API.Seats => {
+            if (!API.Seats.isValid(value)) throw new TypeError('Not a valid Seats: ' + value);
+            return value;
+        },
+    },
+};
 
 /**
  * A client for this API. Pass the base URL and anything else the runtime takes.

@@ -26,6 +26,7 @@ import {
     streamMode,
     routeStreams,
     soleStreamResponse,
+    type ScalarRules,
 } from 'kizunajs/generator';
 import type { ApiDefinition } from 'kizunajs';
 import { SwiftWriter, stringLiteral } from './emit.js';
@@ -771,28 +772,83 @@ const emitStruct = (
 };
 
 /**
- * A brand as a struct around its value, encoded as the bare value.
+ * The checks as one Swift expression over `value`. A length counts UTF-16 code
+ * units, the way the server's Zod counts it.
  */
-const emitBrand = (writer: SwiftWriter, brand: SwiftBrand): void => {
+const swiftCheck = (rules: ScalarRules, rawType: string): string => {
+    const integral = rawType === 'Int' || rawType === 'Int64';
+    const bound = (limit: number): string => (integral && !Number.isInteger(limit) ? `Double(value)` : 'value');
+    return [
+        ...rules.patterns.map(
+            (pattern) =>
+                `value.range(of: ${stringLiteral(pattern.source)}, options: [.regularExpression${pattern.ignoreCase ? ', .caseInsensitive' : ''}]) != nil`
+        ),
+        rules.minLength === undefined ? undefined : `value.utf16.count >= ${rules.minLength}`,
+        rules.maxLength === undefined ? undefined : `value.utf16.count <= ${rules.maxLength}`,
+        rules.minimum === undefined ? undefined : `${bound(rules.minimum)} >= ${rules.minimum}`,
+        rules.maximum === undefined ? undefined : `${bound(rules.maximum)} <= ${rules.maximum}`,
+        rules.exclusiveMinimum === undefined ? undefined : `${bound(rules.exclusiveMinimum)} > ${rules.exclusiveMinimum}`,
+        rules.exclusiveMaximum === undefined ? undefined : `${bound(rules.exclusiveMaximum)} < ${rules.exclusiveMaximum}`,
+    ]
+        .filter((check) => check !== undefined)
+        .join(' && ');
+};
+
+/**
+ * A brand as a struct around its value, encoded as the bare value. A brand
+ * whose schema declares checks gets failable initializers and `isValid`, and
+ * decoding a value that fails them throws.
+ */
+const emitBrand = (writer: SwiftWriter, brand: SwiftBrand, namespaceName: string): void => {
+    const check = brand.rules === undefined ? undefined : swiftCheck(brand.rules, brand.rawType);
+    const failable = check === undefined ? '' : '?';
+    const brandType = `${namespaceName}.${brand.name}`;
+    writer.docComment(
+        check === undefined
+            ? `A branded \`${brand.rawType}\`.\n\nBrand a plain value with \`${brandType}(value)\`.`
+            : `A validated, branded \`${brand.rawType}\`.\n\n\`${brandType}(value)\` returns \`nil\` when a value fails validation.`
+    );
     writer.block(`public struct ${brand.name}: RawRepresentable, Codable, Hashable, Sendable`, () => {
         writer.line(`public let rawValue: ${brand.rawType}`);
         writer.blank();
-        writer.block(`public init(rawValue: ${brand.rawType})`, () => {
+        writer.block(`public init${failable}(rawValue: ${brand.rawType})`, () => {
+            if (check !== undefined) writer.line('guard Self.isValid(rawValue) else { return nil }');
             writer.line('self.rawValue = rawValue');
         });
         writer.blank();
-        writer.block(`public init(_ rawValue: ${brand.rawType})`, () => {
-            writer.line('self.rawValue = rawValue');
+        writer.docComment(
+            check === undefined
+                ? 'Brands a plain value.\n\nFor a value from outside the API, like a deep link. One from a response is branded already.'
+                : 'Brands a plain value.\n\nReturns `nil` when it fails validation.'
+        );
+        writer.block(`public init${failable}(_ rawValue: ${brand.rawType})`, () => {
+            writer.line('self.init(rawValue: rawValue)');
         });
         writer.blank();
         writer.block('public init(from decoder: Decoder) throws', () => {
-            writer.line(`rawValue = try decoder.singleValueContainer().decode(${brand.rawType}.self)`);
+            writer.line('let container = try decoder.singleValueContainer()');
+            writer.line(`let value = try container.decode(${brand.rawType}.self)`);
+            if (check !== undefined) {
+                writer.block('guard Self.isValid(value) else', () => {
+                    writer.line(
+                        `throw DecodingError.dataCorruptedError(in: container, debugDescription: "Not a valid ${brand.name}: \\(value)")`
+                    );
+                });
+            }
+            writer.line('rawValue = value');
         });
         writer.blank();
         writer.block('public func encode(to encoder: Encoder) throws', () => {
             writer.line('var container = encoder.singleValueContainer()');
             writer.line('try container.encode(rawValue)');
         });
+        if (check !== undefined) {
+            writer.blank();
+            writer.docComment(`Validates a plain value.\n\nAnswers whether \`${brandType}(value)\` would succeed.`);
+            writer.block(`public static func isValid(_ value: ${brand.rawType}) -> Bool`, () => {
+                writer.line(check);
+            });
+        }
     });
 };
 
@@ -2345,7 +2401,7 @@ const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, regis
         emitTypes(writer, topLevelSharedTypes, context, ownedTypeMap, ownedTypeLookup);
         for (const brand of registry.allBrands()) {
             writer.blank();
-            emitBrand(writer, brand);
+            emitBrand(writer, brand, namespaceName);
         }
     });
 

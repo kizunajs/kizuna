@@ -41,7 +41,7 @@ Zod's `.brand()` exists only in the types, so the generators cannot see it. `Kiz
 
 ## Effect on generators
 
-- **TypeScript**: `export type UserId = string & $brand<"UserId">` in the `API` namespace, and a `toUserId('usr_k7f3q9')` function beside `createClient`
+- **TypeScript**: `export type UserId = string & $brand<"UserId">` in the `API` namespace, and `API.UserId.parse('usr_k7f3q9')` to make one
 - **Swift**: `public struct UserId: RawRepresentable, Codable, Hashable, Sendable`, encoded as the bare value
 - **Kotlin**: `@Serializable @JvmInline value class UserId(val value: String)`, serialized as the bare value
 - **OpenAPI**: `x-kizuna-brand: UserId` on the schema
@@ -53,4 +53,8 @@ A brand wraps a scalar, so `Kizuna.brand` throws on an object, an enum or a tran
 parentId: UserId.nullable(),
 ```
 
-See the [Zod guide](/docs/zod#branded-ids) for using one in each client.
+## Checks
+
+A schema's regex, string length, number range and `z.int()` run in every client before a raw value is branded. TypeScript gets an `API.InviteToken.isValid` type guard and a throwing `API.InviteToken.parse`, Swift a failable initializer, and Kotlin a throwing constructor with `orNull`. Decoding a response that fails them throws in Swift and Kotlin. See [Brands that check](/docs/zod#brands-that-check).
+
+See the [Zod guide](/docs/zod#branded-types) for using one in each client.

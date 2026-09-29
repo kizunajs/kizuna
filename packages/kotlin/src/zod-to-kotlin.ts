@@ -9,6 +9,7 @@ import {
     readDiscriminatorStringLiteral,
     readDeprecation,
     readMetaBrand,
+    readScalarRules,
     readMetaDescription,
     readMetaId,
     readObjectShape,
@@ -17,6 +18,7 @@ import {
     toCamelCase,
     sanitizeFieldName,
     sanitizeIdentifier,
+    type ScalarRules,
 } from 'kizunajs/generator';
 
 export interface KotlinField {
@@ -79,6 +81,10 @@ export type KotlinType = KotlinDataClass | KotlinEnumClass | KotlinSealedClass;
 export interface KotlinBrand {
     name: string;
     rawType: string;
+    /**
+     * The checks its constructor runs, when the schema declares any.
+     */
+    rules: ScalarRules | undefined;
 }
 
 export interface MapResult {
@@ -234,6 +240,7 @@ export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: s
     registry.addBrand({
         name,
         rawType: result.expression,
+        rules: readScalarRules(schema),
     });
     return {
         expression: name,

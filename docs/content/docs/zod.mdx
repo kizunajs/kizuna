@@ -46,7 +46,7 @@ We wanted every client to behave the same, whatever the language, and one deeply
 | ------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `deprecated` | `boolean \| string`                  | `deprecated: true` in the OpenAPI document, `@available(*, deprecated)` in Swift, `@Deprecated` in Kotlin. A string carries the message into outputs with a place for it. |
 | `example`    | The schema's type, or an array of it | JSON Schema `examples` in the OpenAPI document                                                                                                                            |
-| `brand`      | `string`                             | A named type in every client and `x-kizuna-brand` in the OpenAPI document. Set it with [`Kizuna.brand`](#branded-ids).                                                    |
+| `brand`      | `string`                             | A named type in every client and `x-kizuna-brand` in the OpenAPI document. Set it with [`Kizuna.brand`](#branded-types).                                                  |
 
 ```ts
 const UserSchema = z.object({
@@ -62,7 +62,7 @@ Routes deprecate too, with dates and sunset headers. See [Deprecations](/docs/de
 
 [`Kizuna.model`](/docs/reference/kizuna-model) registers a schema under a stable name, so the OpenAPI document emits `#/components/schemas/User` and the Swift and Kotlin clients emit a `User` type, instead of repeating the shape inline everywhere it appears. Only names registered through `Kizuna.model` reach the generators.
 
-## Branded IDs
+## Branded types
 
 A user ID and a workspace ID are both strings, so passing one where the other belongs compiles. [`Kizuna.brand`](/docs/reference/kizuna-brand) gives the ID its own type in the handler and in every client, so the swap stops compiling. The wire stays a plain string.
 
@@ -104,10 +104,10 @@ An ID from a response is already branded, so it passes straight into the next ca
 <Tab value="TypeScript">
 
 ```ts
-import { toUserId } from './api-client.generated';
+import { API } from './api-client.generated';
 
 const userId = new URLSearchParams(location.search).get('user') ?? '';
-const id = toUserId(userId);
+const id = API.UserId.parse(userId);
 ```
 
 </Tab>
@@ -131,6 +131,66 @@ val id = API.UserId(userId)
 </Tab>
 
 </Tabs>
+
+### Brands that check
+
+A brand whose schema declares checks runs them in every client before it brands a raw value, so a malformed token is caught before the request goes out:
+
+```ts
+export const InviteToken = Kizuna.brand('InviteToken', z.string().regex(/^inv_[a-z0-9]+$/));
+```
+
+<Tabs groupId="brand-client" items={['TypeScript', 'Swift', 'Kotlin']}>
+
+<Tab value="TypeScript">
+
+```ts
+import { API } from './api-client.generated';
+
+const token = new URLSearchParams(location.search).get('invite') ?? '';
+
+if (API.InviteToken.isValid(token)) {
+    await client.invites.getInvite({
+        params: {
+            token,
+        },
+    });
+}
+```
+
+`API.InviteToken.parse(token)` throws a `TypeError` instead.
+
+</Tab>
+
+<Tab value="Swift">
+
+```swift
+guard let token = API.InviteToken(url.lastPathComponent) else { return }
+
+let invite = try await client.invites.getInvite(.params(token: token))
+```
+
+</Tab>
+
+<Tab value="Kotlin">
+
+```kotlin
+val token = API.InviteToken.orNull(uri.lastPathSegment ?: return) ?: return
+
+val invite = client.invites.getInvite {
+    params(
+        token = token,
+    )
+}
+```
+
+`API.InviteToken(raw)` throws an `IllegalArgumentException` instead.
+
+</Tab>
+
+</Tabs>
+
+The clients run a regex, with its `i` flag, a string's length, and a number's range and `z.int()`. Anything else, like `.refine()`, stays on the server, which still validates every request.
 
 In the handler, `params.id` is a `UserId` and still a string, so it goes into a database call as it is, and a row's plain ID goes into a response body as it is.
 

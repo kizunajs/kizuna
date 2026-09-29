@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { db } from './db';
 import { k } from './k';
 import { roles } from './roles';
+import { InviteToken } from './invite-token';
 
 /**
  * A signed-in user, authenticated by a bearer session token. The guard resolves
@@ -68,7 +69,7 @@ export const inviteToken = k.identity
             email: z.email(),
         }),
         params: z.object({
-            token: z.string(),
+            token: InviteToken,
         }),
     })
     .guard(async ({ params, deny }) => {

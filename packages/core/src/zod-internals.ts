@@ -312,6 +312,92 @@ export const readMetaBrand = (schema: z.core.$ZodType): string | undefined => {
 };
 
 /**
+ * The checks on a string or number schema that every client can run: the
+ * regexes it must match, its length for a string, and its range for a number.
+ */
+export interface ScalarRules {
+    patterns: Array<{
+        source: string;
+        ignoreCase: boolean;
+    }>;
+    minLength?: number;
+    maxLength?: number;
+    minimum?: number;
+    maximum?: number;
+    exclusiveMinimum?: number;
+    exclusiveMaximum?: number;
+    integer: boolean;
+}
+
+interface CheckBag {
+    patterns?: Set<RegExp>;
+    format?: string;
+    minimum?: number;
+    maximum?: number;
+    exclusiveMinimum?: number;
+    exclusiveMaximum?: number;
+}
+
+/**
+ * Reads the checks a string or number schema declares, or undefined when it
+ * declares none. A regex with a flag other than `i` is left out, since no
+ * client could run it as the server does.
+ */
+export const readScalarRules = (schema: z.core.$ZodType): ScalarRules | undefined => {
+    const type = readDef(schema).type;
+    if (type !== 'string' && type !== 'number') return undefined;
+
+    const bag = (schema._zod as unknown as { bag: CheckBag }).bag;
+    const rules: ScalarRules = {
+        patterns: [],
+        integer: false,
+    };
+
+    if (type === 'string') {
+        for (const pattern of bag.patterns ?? []) {
+            if (pattern.flags.replace('i', '') !== '') continue;
+            rules.patterns.push({
+                source: pattern.source,
+                ignoreCase: pattern.flags.includes('i'),
+            });
+        }
+        rules.minLength = bag.minimum;
+        rules.maxLength = bag.maximum;
+    } else {
+        rules.integer = bag.format === 'safeint';
+        rules.minimum = bag.minimum === Number.MIN_SAFE_INTEGER ? undefined : bag.minimum;
+        rules.maximum = bag.maximum === Number.MAX_SAFE_INTEGER ? undefined : bag.maximum;
+        rules.exclusiveMinimum = bag.exclusiveMinimum;
+        rules.exclusiveMaximum = bag.exclusiveMaximum;
+    }
+
+    const bounded = [rules.minLength, rules.maxLength, rules.minimum, rules.maximum, rules.exclusiveMinimum, rules.exclusiveMaximum].some(
+        (bound) => bound !== undefined
+    );
+    return rules.patterns.length > 0 || bounded || rules.integer ? rules : undefined;
+};
+
+/**
+ * Whether a value passes the rules, the same test each client's constructor runs.
+ */
+export const satisfiesScalarRules = (value: unknown, rules: ScalarRules): boolean => {
+    if (typeof value === 'string') {
+        if (rules.minLength !== undefined && value.length < rules.minLength) return false;
+        if (rules.maxLength !== undefined && value.length > rules.maxLength) return false;
+        return rules.patterns.every((pattern) => new RegExp(pattern.source, pattern.ignoreCase ? 'i' : '').test(value));
+    }
+    if (typeof value === 'number') {
+        if (rules.integer && !Number.isInteger(value)) return false;
+        if (rules.minimum !== undefined && value < rules.minimum) return false;
+        if (rules.maximum !== undefined && value > rules.maximum) return false;
+        if (rules.exclusiveMinimum !== undefined && value <= rules.exclusiveMinimum) return false;
+        if (rules.exclusiveMaximum !== undefined && value >= rules.exclusiveMaximum) return false;
+        return true;
+    }
+    return false;
+};
+
+/**
  * The `Kizuna.model` schemas in the global registry, keyed by their `id`.
  */
 export const globalRegistrySchemas = (): Map<string, z.core.$ZodType> => {

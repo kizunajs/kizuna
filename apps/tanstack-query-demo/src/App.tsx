@@ -3,7 +3,7 @@ import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } fr
 import { isUndeclaredResponseError } from '@kizunajs/tanstack-query';
 import { readToolCalls, type ToolAnswer } from 'kizunajs';
 import { api } from './api.js';
-import { toUserId } from './api-client.generated';
+import { API } from './api-client.generated';
 import styles from './App.module.css';
 
 function CreateUserForm() {
@@ -153,7 +153,7 @@ function MissingUser() {
         api.users.getUser.queryOptions({
             input: {
                 params: {
-                    id: toUserId('does-not-exist'),
+                    id: API.UserId.parse('does-not-exist'),
                 },
                 headers: {
                     'x-request-id': 'tanstack-query-demo',

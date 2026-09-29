@@ -2220,3 +2220,44 @@ describe('Kotlin generator: brands', () => {
         expect(output).toContain('val parentId: TestAPI.CenterId?');
     });
 });
+
+describe('Kotlin generator: brands with checks', () => {
+    const InviteCode = Kizuna.brand(
+        'InviteCode',
+        z
+            .string()
+            .regex(/^inv_[a-z0-9]+$/i)
+            .max(20)
+    );
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: {
+                redeemInvite: k.route({
+                    method: 'POST',
+                    path: '/invites/:code/redeem',
+                    pathParams: z.object({
+                        code: InviteCode,
+                    }),
+                    responses: {
+                        204: z.void(),
+                    },
+                }),
+            },
+        }).api,
+        baseConfig
+    );
+
+    it('checks the value when it is constructed', () => {
+        expect(output).toContain('require(isValid(value)) { "Not a valid InviteCode: $value" }');
+    });
+
+    it('runs the checks in isValid, escaping the dollar for Kotlin', () => {
+        expect(output).toContain(
+            'fun isValid(value: String): Boolean = Regex("^inv_[a-z0-9]+\\$", RegexOption.IGNORE_CASE).containsMatchIn(value) && value.length <= 20'
+        );
+    });
+
+    it('offers orNull for a value that may fail', () => {
+        expect(output).toContain('fun orNull(value: String): InviteCode? = if (isValid(value)) InviteCode(value) else null');
+    });
+});

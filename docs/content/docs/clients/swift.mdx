@@ -137,9 +137,9 @@ struct UserList: View {
 
 </Steps>
 
-## Branded IDs
+## Branded types
 
-A [branded ID](/docs/zod#branded-ids) becomes a struct, `API.UserId`, encoded as the bare string. The parameter's type shows it, and passing a `String` does not compile.
+A [branded type](/docs/zod#branded-types) becomes a struct, `API.UserId`, encoded as the bare string. The parameter's type shows it, and passing a `String` does not compile.
 
 An ID from a response is already an `API.UserId`, so it passes into the next call as it is:
 
@@ -164,6 +164,12 @@ let userID = url.lastPathComponent
 let user = try await client.users.getUser(
     .params(id: API.UserId(userID))
 )
+```
+
+A brand whose schema [declares checks](/docs/zod#brands-that-check) gets a failable initializer, so a malformed value comes back as `nil`:
+
+```swift
+guard let token = API.InviteToken(url.lastPathComponent) else { return }
 ```
 
 `rawValue` reads the string back:

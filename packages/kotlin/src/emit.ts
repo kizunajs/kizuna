@@ -33,7 +33,7 @@ export class KotlinWriter {
         }
         this.line('/**');
         for (const segment of segments) {
-            this.line(` * ${segment}`);
+            this.line(` * ${segment}`.trimEnd());
         }
         this.line(' */');
     }
@@ -56,5 +56,5 @@ export class KotlinWriter {
 }
 
 export const stringLiteral = (value: string): string => {
-    return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+    return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$') + '"';
 };

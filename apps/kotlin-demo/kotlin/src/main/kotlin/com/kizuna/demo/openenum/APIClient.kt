@@ -215,10 +215,46 @@ object OpenEnumAPI {
         }
     }
 
+    /**
+     * A branded `String`.
+     *
+     * Brand a plain value with `OpenEnumAPI.UserId(value)`.
+     */
     @Serializable
     @JvmInline
     value class UserId(val value: String) {
         override fun toString(): String = value
+    }
+
+    /**
+     * A validated, branded `String`.
+     *
+     * `OpenEnumAPI.InviteToken(value)` throws an `IllegalArgumentException` when a value fails validation, and `OpenEnumAPI.InviteToken.orNull(value)` returns `null`.
+     */
+    @Serializable
+    @JvmInline
+    value class InviteToken(val value: String) {
+        init {
+            require(isValid(value)) { "Not a valid InviteToken: $value" }
+        }
+
+        override fun toString(): String = value
+
+        companion object {
+            /**
+             * Validates a plain value.
+             *
+             * Answers whether `OpenEnumAPI.InviteToken(value)` would succeed.
+             */
+            fun isValid(value: String): Boolean = Regex("^inv_[a-z0-9]+\$").containsMatchIn(value)
+
+            /**
+             * Brands a plain value.
+             *
+             * Returns `null` when it fails validation.
+             */
+            fun orNull(value: String): InviteToken? = if (isValid(value)) InviteToken(value) else null
+        }
     }
 }
 
@@ -1039,14 +1075,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
             val email: String
         )
 
-        data class Params(val token: String)
+        data class Params(val token: OpenEnumAPI.InviteToken)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(token: String): AfterParams = AfterParams(params = Params(token = token))
+            fun params(token: OpenEnumAPI.InviteToken): AfterParams = AfterParams(params = Params(token = token))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -1070,7 +1106,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class Response201(val userId: String)
 
-        data class Params(val token: String)
+        data class Params(val token: OpenEnumAPI.InviteToken)
 
         data class Body(val name: String)
 
@@ -1080,7 +1116,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
 
         object Scope {
-            fun params(token: String): AfterParams = AfterParams(params = Params(token = token))
+            fun params(token: OpenEnumAPI.InviteToken): AfterParams = AfterParams(params = Params(token = token))
         }
 
         class AfterParams internal constructor(internal val params: Params) {

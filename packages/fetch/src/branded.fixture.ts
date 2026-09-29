@@ -5,6 +5,18 @@ const k = new Kizuna();
 
 export const CenterId = Kizuna.brand('CenterId', z.string());
 
+export const InviteCode = Kizuna.brand(
+    'InviteCode',
+    z
+        .string()
+        .regex(/^inv_[a-z0-9]+$/i)
+        .max(20)
+).meta({
+    example: 'inv_k7f3q9',
+});
+
+export const Seats = Kizuna.brand('Seats', z.int().min(1).max(500));
+
 const CenterSchema = Kizuna.model({
     title: 'Center',
     schema: z.object({
@@ -33,6 +45,19 @@ const routes = k.routes('centers', {
         }),
         responses: {
             200: z.array(CenterSchema),
+        },
+    }),
+    redeemInvite: k.route({
+        method: 'POST',
+        path: '/invites/:code/redeem',
+        pathParams: z.object({
+            code: InviteCode,
+        }),
+        body: z.object({
+            seats: Seats,
+        }),
+        responses: {
+            204: z.void(),
         },
     }),
     moveCenter: k.route({

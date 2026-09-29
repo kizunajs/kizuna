@@ -2322,3 +2322,48 @@ describe('Swift generator: brands', () => {
         ).toThrow('brand "CenterId" wraps both String and Int');
     });
 });
+
+describe('Swift generator: brands with checks', () => {
+    const InviteCode = Kizuna.brand(
+        'InviteCode',
+        z
+            .string()
+            .regex(/^inv_[a-z0-9]+$/i)
+            .max(20)
+    );
+    const output = generateSwiftClient(
+        defineConfig({
+            ...config,
+            routes: k.routes('api', {
+                redeemInvite: k.route({
+                    method: 'POST',
+                    path: '/invites/:code/redeem',
+                    pathParams: z.object({
+                        code: InviteCode,
+                    }),
+                    responses: {
+                        204: z.void(),
+                    },
+                }),
+            }),
+        }).api,
+        baseConfig
+    );
+
+    it('makes the initializers failable', () => {
+        expect(output).toContain('public init?(rawValue: String)');
+        expect(output).toContain('public init?(_ rawValue: String)');
+    });
+
+    it('runs the checks in isValid, counting UTF-16 like the server', () => {
+        expect(output).toContain(
+            'value.range(of: "^inv_[a-z0-9]+$", options: [.regularExpression, .caseInsensitive]) != nil && value.utf16.count <= 20'
+        );
+    });
+
+    it('throws when a decoded value fails the checks', () => {
+        expect(output).toContain(
+            'throw DecodingError.dataCorruptedError(in: container, debugDescription: "Not a valid InviteCode: \\(value)")'
+        );
+    });
+});

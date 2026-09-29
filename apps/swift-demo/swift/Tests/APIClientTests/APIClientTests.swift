@@ -571,6 +571,17 @@ final class APIClientTests: XCTestCase {
             XCTAssertEqual((thrown as? any KizunaFailure)?.isCancelled, false)
         }
     }
+
+    func testBrandWithChecksRejectsAMalformedValue() {
+        XCTAssertNil(API.InviteToken("not-a-token"))
+        XCTAssertTrue(API.InviteToken.isValid("inv_9x2k7q"))
+    }
+
+    func testBrandWithChecksReachesTheServer() async throws {
+        let token = try XCTUnwrap(API.InviteToken("inv_9x2k7q"))
+        let invite = try await client.invites.getInvite(.params(token: token))
+        XCTAssertEqual(invite.body.email, "grace@example.com")
+    }
 }
 
 /// Accepts a request and never answers it, so a test can cancel a request that is really in flight.

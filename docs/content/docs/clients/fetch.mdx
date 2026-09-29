@@ -398,9 +398,9 @@ clients: [
 ],
 ```
 
-## Branded IDs
+## Branded types
 
-A [branded ID](/docs/zod#branded-ids) becomes a named type, `API.UserId`, and a `toUserId` function that makes one. The parameter's type shows it, and passing a plain `string` does not compile.
+A [branded type](/docs/zod#branded-types) becomes a named type, `API.UserId`, and `API.UserId.parse` makes one. The parameter's type shows it, and passing a plain `string` does not compile.
 
 An ID from a response is already an `API.UserId`, so it passes into the next call as it is:
 
@@ -424,16 +424,28 @@ if (created.status === 201) {
 A `string` from outside the API, like a URL, is wrapped once:
 
 ```ts
-import { toUserId } from './api-client.generated';
+import { API } from './api-client.generated';
 
 const user = await client.users.getUser({
     params: {
-        id: toUserId(searchParams.userId),
+        id: API.UserId.parse(searchParams.userId),
     },
 });
 ```
 
 It is still a `string`, so it renders and compares like one.
+
+A brand whose schema [declares checks](/docs/zod#brands-that-check) also gets `API.InviteToken.isValid`, a type guard, and its `API.InviteToken.parse` throws a `TypeError` on a value that fails them:
+
+```ts
+if (API.InviteToken.isValid(token)) {
+    await client.invites.getInvite({
+        params: {
+            token,
+        },
+    });
+}
+```
 
 ## Documentation in the client
 

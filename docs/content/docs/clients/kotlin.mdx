@@ -155,9 +155,9 @@ fun UserList(client: APIClient) {
 
 </Steps>
 
-## Branded IDs
+## Branded types
 
-A [branded ID](/docs/zod#branded-ids) becomes a value class, `API.UserId`, serialized as the bare string. The parameter's type shows it, and passing a `String` does not compile.
+A [branded type](/docs/zod#branded-types) becomes a value class, `API.UserId`, serialized as the bare string. The parameter's type shows it, and passing a `String` does not compile.
 
 An ID from a response is already an `API.UserId`, so it passes into the next call as it is:
 
@@ -186,6 +186,12 @@ val user = client.users.getUser {
         id = API.UserId(userId),
     )
 }
+```
+
+A brand whose schema [declares checks](/docs/zod#brands-that-check) throws an `IllegalArgumentException` on a malformed value, and `orNull` returns `null` instead:
+
+```kotlin
+val token = API.InviteToken.orNull(uri.lastPathSegment ?: return) ?: return
 ```
 
 `value` reads the string back:

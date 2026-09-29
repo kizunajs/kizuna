@@ -10,9 +10,12 @@ import {
     readMetaExamples,
     readMetaId,
     readObjectShape,
+    readScalarRules,
     sanitizeIdentifier,
+    satisfiesScalarRules,
     toPascalCase,
     unwrapOptionalWrappers,
+    type ScalarRules,
 } from 'kizunajs/generator';
 
 /**
@@ -37,7 +40,8 @@ export class TypeCollector {
         {
             brand: string;
             base: string;
-            example: string;
+            example: string | undefined;
+            rules: ScalarRules | undefined;
         }
     >();
 
@@ -60,7 +64,7 @@ export class TypeCollector {
      * Declares a brand as a named type, `UserId = string & $brand<"UserId">`,
      * and answers the name.
      */
-    addBrand(brand: string, base: string, example: string): string {
+    addBrand(brand: string, base: string, example: string | undefined, rules: ScalarRules | undefined): string {
         const name = sanitizeIdentifier(brand);
         const existing = this.brands.get(name);
         if (existing !== undefined && (existing.brand !== brand || existing.base !== base)) {
@@ -71,6 +75,7 @@ export class TypeCollector {
                 brand,
                 base,
                 example,
+                rules,
             });
         }
         return name;
@@ -81,30 +86,35 @@ export class TypeCollector {
     }
 
     /**
-     * Each brand's name, the type it wraps, and a value for its `@example`, for
-     * the constructors the file exports.
+     * Each brand's name, the type it wraps, a value for its `@example`, and the
+     * checks its constructor runs, for the functions the file exports.
      */
     allBrands(): Array<{
         name: string;
         base: string;
-        example: string;
+        example: string | undefined;
+        rules: ScalarRules | undefined;
     }> {
-        return [...this.brands].map(([name, { base, example }]) => ({
+        return [...this.brands].map(([name, { base, example, rules }]) => ({
             name,
             base,
             example,
+            rules,
         }));
     }
 
-    all(): NamedType[] {
+    all(namespaceName = 'API'): NamedType[] {
         for (const name of this.brands.keys()) {
             if (this.named.has(name)) {
                 throw new Error(`@kizunajs/fetch: brand ${quote(name)} has the same name as a model. Give each its own name.`);
             }
         }
-        const brands = [...this.brands].map(([name, { brand, base }]) => ({
+        const brands = [...this.brands].map(([name, { brand, base, rules }]) => ({
             name,
-            description: `A branded \`${base}\`. Responses hand one back, and \`to${name}\` makes one from a plain value.`,
+            description:
+                rules === undefined
+                    ? `A branded \`${base}\`.\n\nBrand a plain value with \`${namespaceName}.${name}.parse\`.`
+                    : `A validated, branded \`${base}\`.\n\nValidate a plain value with \`${namespaceName}.${name}.isValid\`, and brand it with \`${namespaceName}.${name}.parse\`.`,
             body: `${base} & $brand<${quote(brand)}>`,
         }));
         return [...this.named.values(), ...brands].sort((left, right) => left.name.localeCompare(right.name));
@@ -301,8 +311,37 @@ export const typeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: 
     const type = unbrandedTypeOf(schema, collector, hint);
     const brand = readMetaBrand(schema);
     if (brand === undefined || !BRANDABLE_BASES.has(type)) return type;
-    return collector.addBrand(brand, type, sampleValue(schema, 0, brand));
+    const rules = readScalarRules(schema);
+    return collector.addBrand(brand, type, brandExample(schema, brand, rules), rules);
 };
+
+/**
+ * The value a brand constructor's `@example` passes: the schema's own example,
+ * or a sample when nothing is checked. A brand with checks and no example that
+ * passes them gets none, since a made-up value would fail.
+ */
+const brandExample = (schema: z.core.$ZodType, brand: string, rules: ScalarRules | undefined): string | undefined => {
+    if (rules === undefined) return sampleValue(schema, 0, brand);
+    const [declared] = readMetaExamples(schema);
+    return declared !== undefined && satisfiesScalarRules(declared, rules) ? exampleLiteral(declared) : undefined;
+};
+
+/**
+ * The checks as one TypeScript expression over `value`.
+ */
+export const scalarCheck = (rules: ScalarRules): string =>
+    [
+        ...rules.patterns.map((pattern) => `/${pattern.source}/${pattern.ignoreCase ? 'i' : ''}.test(value)`),
+        rules.minLength === undefined ? undefined : `value.length >= ${rules.minLength}`,
+        rules.maxLength === undefined ? undefined : `value.length <= ${rules.maxLength}`,
+        rules.integer ? 'Number.isInteger(value)' : undefined,
+        rules.minimum === undefined ? undefined : `value >= ${rules.minimum}`,
+        rules.maximum === undefined ? undefined : `value <= ${rules.maximum}`,
+        rules.exclusiveMinimum === undefined ? undefined : `value > ${rules.exclusiveMinimum}`,
+        rules.exclusiveMaximum === undefined ? undefined : `value < ${rules.exclusiveMaximum}`,
+    ]
+        .filter((check) => check !== undefined)
+        .join(' && ');
 
 const unbrandedTypeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: string): string => {
     if (isFileSchema(schema)) return 'File | Blob';

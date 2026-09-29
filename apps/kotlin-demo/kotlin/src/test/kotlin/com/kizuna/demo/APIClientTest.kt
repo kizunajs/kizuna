@@ -470,4 +470,20 @@ class APIClientTest {
             }
         }
     }
+
+    @Test
+    fun testBrandWithChecksRejectsAMalformedValue() {
+        assertNull(API.InviteToken.orNull("not-a-token"))
+        assertFailsWith<IllegalArgumentException> { API.InviteToken("not-a-token") }
+    }
+
+    @Test
+    fun testBrandWithChecksReachesTheServer() = runTest {
+        val invite = client.invites.getInvite {
+            params(
+                token = API.InviteToken("inv_9x2k7q"),
+            )
+        }
+        assertEquals("grace@example.com", invite.body.email)
+    }
 }

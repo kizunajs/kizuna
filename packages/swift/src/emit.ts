@@ -27,7 +27,7 @@ export class SwiftWriter {
     docComment(text: string | undefined): void {
         if (!text) return;
         for (const segment of text.split('\n')) {
-            this.line(`/// ${segment}`);
+            this.line(`/// ${segment}`.trimEnd());
         }
     }
 

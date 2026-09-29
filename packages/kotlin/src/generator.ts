@@ -21,6 +21,7 @@ import {
     streamMode,
     routeStreams,
     soleStreamResponse,
+    type ScalarRules,
 } from 'kizunajs/generator';
 import type { ApiDefinition } from 'kizunajs';
 import { KotlinWriter, stringLiteral } from './emit.js';
@@ -840,13 +841,57 @@ const emitType = (
 /**
  * A brand as a value class that serializes and prints as the bare value.
  */
-const emitBrand = (writer: KotlinWriter, brand: KotlinBrand): void => {
+const emitBrand = (writer: KotlinWriter, brand: KotlinBrand, namespaceName: string): void => {
+    const check = brand.rules === undefined ? undefined : kotlinCheck(brand.rules);
+    const brandType = `${namespaceName}.${brand.name}`;
+    writer.docComment(
+        check === undefined
+            ? `A branded \`${brand.rawType}\`.\n\nBrand a plain value with \`${brandType}(value)\`.`
+            : `A validated, branded \`${brand.rawType}\`.\n\n\`${brandType}(value)\` throws an \`IllegalArgumentException\` when a value fails validation, and \`${brandType}.orNull(value)\` returns \`null\`.`
+    );
     writer.line('@Serializable');
     writer.line('@JvmInline');
     writer.block(`value class ${brand.name}(val value: ${brand.rawType})`, () => {
+        if (check !== undefined) {
+            writer.block('init', () => {
+                writer.line(`require(isValid(value)) { "Not a valid ${brand.name}: $value" }`);
+            });
+            writer.blank();
+        }
         writer.line(`override fun toString(): String = ${brand.rawType === 'String' ? 'value' : 'value.toString()'}`);
+        if (check !== undefined) {
+            writer.blank();
+            writer.block('companion object', () => {
+                writer.docComment(`Validates a plain value.\n\nAnswers whether \`${brandType}(value)\` would succeed.`);
+                writer.line(`fun isValid(value: ${brand.rawType}): Boolean = ${check}`);
+                writer.blank();
+                writer.docComment('Brands a plain value.\n\nReturns `null` when it fails validation.');
+                writer.line(`fun orNull(value: ${brand.rawType}): ${brand.name}? = if (isValid(value)) ${brand.name}(value) else null`);
+            });
+        }
     });
 };
+
+/**
+ * The checks as one Kotlin expression over `value`. `containsMatchIn` searches
+ * the way JavaScript's `test` does, so an unanchored regex behaves as it does on
+ * the server.
+ */
+const kotlinCheck = (rules: ScalarRules): string =>
+    [
+        ...rules.patterns.map(
+            (pattern) =>
+                `Regex(${stringLiteral(pattern.source)}${pattern.ignoreCase ? ', RegexOption.IGNORE_CASE' : ''}).containsMatchIn(value)`
+        ),
+        rules.minLength === undefined ? undefined : `value.length >= ${rules.minLength}`,
+        rules.maxLength === undefined ? undefined : `value.length <= ${rules.maxLength}`,
+        rules.minimum === undefined ? undefined : `value >= ${rules.minimum}`,
+        rules.maximum === undefined ? undefined : `value <= ${rules.maximum}`,
+        rules.exclusiveMinimum === undefined ? undefined : `value > ${rules.exclusiveMinimum}`,
+        rules.exclusiveMaximum === undefined ? undefined : `value < ${rules.exclusiveMaximum}`,
+    ]
+        .filter((check) => check !== undefined)
+        .join(' && ');
 
 const emitTypes = (
     writer: KotlinWriter,
@@ -1962,7 +2007,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
         emitTypes(writer, topLevelSharedTypes, ownedTypeMap, ownedTypeLookup, registry);
         for (const brand of registry.allBrands()) {
             writer.blank();
-            emitBrand(writer, brand);
+            emitBrand(writer, brand, namespaceName);
         }
     });
 

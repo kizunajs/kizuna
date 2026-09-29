@@ -1,6 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
 import type { z } from 'zod';
-import { createClient, toCenterId, type API } from './branded-client.generated.js';
+import { API, createClient } from './branded-client.generated.js';
 import type { CenterId } from './branded.fixture.js';
 
 type CenterIdValue = z.output<typeof CenterId>;
@@ -13,8 +13,8 @@ test('the named brand is the type the server parses it to', () => {
     expectTypeOf<API.CenterId>().toEqualTypeOf<CenterIdValue>();
 });
 
-test('the constructor makes the brand from a plain string', () => {
-    expectTypeOf(toCenterId('center_1')).toEqualTypeOf<API.CenterId>();
+test('parse brands a plain string', () => {
+    expectTypeOf(API.CenterId.parse('center_1')).toEqualTypeOf<API.CenterId>();
 });
 
 test('a branded path param is the type the server parses it to', () => {
@@ -44,7 +44,7 @@ test('a plain string is rejected where a branded param is expected', () => {
 test('a branded value from a response passes where a branded param is expected', async () => {
     const result = await client.centers.getCenter({
         params: {
-            centerId: toCenterId('center_1'),
+            centerId: API.CenterId.parse('center_1'),
         },
     });
     if (result.status !== 200) return;
@@ -60,4 +60,11 @@ test('a branded value from a response passes where a branded param is expected',
             parentId: result.body.id,
         },
     });
+});
+
+test('a check narrows a plain string to the brand', () => {
+    const raw: string = 'inv_k7f3q9';
+    if (API.InviteCode.isValid(raw)) {
+        expectTypeOf(raw).toEqualTypeOf<API.InviteCode>();
+    }
 });

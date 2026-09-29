@@ -354,6 +354,9 @@ public enum API {
         }
     }
 
+    /// A branded `String`.
+    ///
+    /// Brand a plain value with `API.UserId(value)`.
     public struct UserId: RawRepresentable, Codable, Hashable, Sendable {
         public let rawValue: String
 
@@ -361,17 +364,62 @@ public enum API {
             self.rawValue = rawValue
         }
 
+        /// Brands a plain value.
+        ///
+        /// For a value from outside the API, like a deep link. One from a response is branded already.
         public init(_ rawValue: String) {
-            self.rawValue = rawValue
+            self.init(rawValue: rawValue)
         }
 
         public init(from decoder: Decoder) throws {
-            rawValue = try decoder.singleValueContainer().decode(String.self)
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            rawValue = value
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
             try container.encode(rawValue)
+        }
+    }
+
+    /// A validated, branded `String`.
+    ///
+    /// `API.InviteToken(value)` returns `nil` when a value fails validation.
+    public struct InviteToken: RawRepresentable, Codable, Hashable, Sendable {
+        public let rawValue: String
+
+        public init?(rawValue: String) {
+            guard Self.isValid(rawValue) else { return nil }
+            self.rawValue = rawValue
+        }
+
+        /// Brands a plain value.
+        ///
+        /// Returns `nil` when it fails validation.
+        public init?(_ rawValue: String) {
+            self.init(rawValue: rawValue)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            guard Self.isValid(value) else {
+                throw DecodingError.dataCorruptedError(in: container, debugDescription: "Not a valid InviteToken: \(value)")
+            }
+            rawValue = value
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+
+        /// Validates a plain value.
+        ///
+        /// Answers whether `API.InviteToken(value)` would succeed.
+        public static func isValid(_ value: String) -> Bool {
+            value.range(of: "^inv_[a-z0-9]+$", options: [.regularExpression]) != nil
         }
     }
 }
@@ -1949,13 +1997,13 @@ public final class APIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let token: String
+            public let token: API.InviteToken
 
-            public init(token: String) {
+            public init(token: API.InviteToken) {
                 self.token = token
             }
 
-            public static func params(token: String) -> Self {
+            public static func params(token: API.InviteToken) -> Self {
                 .init(token: token)
             }
         }
@@ -2005,13 +2053,13 @@ public final class APIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let token: String
+            public let token: API.InviteToken
 
-            public init(token: String) {
+            public init(token: API.InviteToken) {
                 self.token = token
             }
 
-            public static func params(token: String) -> Self {
+            public static func params(token: API.InviteToken) -> Self {
                 .init(token: token)
             }
         }

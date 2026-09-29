@@ -61,6 +61,13 @@ export namespace API {
         code?: "unauthenticated" | "expired_token" | "forbidden" | "not_found";
     };
 
+    /**
+     * A validated, branded `string`.
+     *
+     * Validate a plain value with `API.InviteToken.isValid`, and brand it with `API.InviteToken.parse`.
+     */
+    export type InviteToken = string & $brand<"InviteToken">;
+
     export type NotificationEvent = EmailEvent | SmsEvent;
 
     /**
@@ -142,7 +149,9 @@ export namespace API {
     };
 
     /**
-     * A branded `string`. Responses hand one back, and `toUserId` makes one from a plain value.
+     * A branded `string`.
+     *
+     * Brand a plain value with `API.UserId.parse`.
      */
     export type UserId = string & $brand<"UserId">;
 
@@ -536,7 +545,11 @@ export namespace API {
 
     export namespace InvitesGetInvite {
         export type Params = {
-            token: string;
+            /**
+             * @example
+             * 'inv_9x2k7q'
+             */
+            token: InviteToken;
         };
 
         export type Result =
@@ -551,7 +564,11 @@ export namespace API {
 
     export namespace InvitesAcceptInvite {
         export type Params = {
-            token: string;
+            /**
+             * @example
+             * 'inv_9x2k7q'
+             */
+            token: InviteToken;
         };
 
         export type Body = {
@@ -1212,7 +1229,7 @@ export interface Client {
          * @example
          * const result = await client.invites.getInvite({
          *     params: {
-         *         token: '1',
+         *         token: 'inv_9x2k7q',
          *     },
          * });
          */
@@ -1227,7 +1244,7 @@ export interface Client {
          * @example
          * const result = await client.invites.acceptInvite({
          *     params: {
-         *         token: '1',
+         *         token: 'inv_9x2k7q',
          *     },
          *     body: {
          *         name: 'string',
@@ -1753,12 +1770,50 @@ const routes: GeneratedRoutes = {
 };
 
 /**
- * Brands a value from outside the API, like a URL segment, as `API.UserId`. A value from a response is branded already.
+ * Brands plain values.
  *
- * @example
- * const id = toUserId('usr_abc123');
+ * A value from a response is branded already, so these are for one from outside the API, like a URL segment.
  */
-export const toUserId = (value: string): API.UserId => value as API.UserId;
+export const API = {
+    UserId: {
+        /**
+         * Brands a plain value as `API.UserId`.
+         *
+         * For a value from outside the API, like a URL segment. One from a response is branded already.
+         *
+         * @example
+         * const userId = API.UserId.parse('usr_abc123');
+         */
+        parse: (value: string): API.UserId => value as API.UserId,
+    },
+
+    InviteToken: {
+        /**
+         * Validates a plain value.
+         *
+         * Narrows it to `API.InviteToken` when it passes.
+         *
+         * @example
+         * if (API.InviteToken.isValid(value)) {
+         *     const inviteToken: API.InviteToken = value;
+         * }
+         */
+        isValid: (value: string): value is API.InviteToken => /^inv_[a-z0-9]+$/.test(value),
+
+        /**
+         * Brands a plain value as `API.InviteToken`.
+         *
+         * Throws a `TypeError` when it fails validation.
+         *
+         * @example
+         * const inviteToken = API.InviteToken.parse('inv_9x2k7q');
+         */
+        parse: (value: string): API.InviteToken => {
+            if (!API.InviteToken.isValid(value)) throw new TypeError('Not a valid InviteToken: ' + value);
+            return value;
+        },
+    },
+};
 
 export interface RequestContext {
     "x-posthog-session-id"?: string;
