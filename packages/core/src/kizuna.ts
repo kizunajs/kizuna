@@ -9,6 +9,7 @@ import { createRequestContext, type RequestContextConfig } from './request-conte
 import { createRequestContextBuilder, type RequestContextBuilder } from './request-context-builder.js';
 import { identityFactories, type IdentityFactories } from './identity-builder.js';
 import { createModel } from './model.js';
+import { createBrand } from './brand.js';
 import { type GuardBody, type GuardOutput } from './problem-details.js';
 import type { Routes, AuthoredRoutes, AuthoredRouteDefinition, RouteHiddenToolCheck } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
@@ -350,6 +351,11 @@ export class Kizuna<Config extends KizunaConfigShape = Record<string, never>> im
      * the one type rather than inlining it.
      */
     static readonly model = createModel;
+    /**
+     * Brand a schema, so the server and every generated client type its values
+     * as that brand.
+     */
+    static readonly brand = createBrand;
     /**
      * Declare the permissions callers hold, as a catalog of resources and the
      * verbs each allows.

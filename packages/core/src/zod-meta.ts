@@ -1,7 +1,12 @@
-import type { $output } from 'zod/v4/core';
+import type { $input, $output } from 'zod/v4/core';
 
 declare module 'zod/v4/core' {
     interface GlobalMeta {
+        /**
+         * The brand generated clients give this schema's values. Set by
+         * `Kizuna.brand`.
+         */
+        brand?: string;
         /**
          * Deprecates the schema. Pass a message to tell callers what to use
          * instead.
@@ -16,7 +21,7 @@ declare module 'zod/v4/core' {
          *     example: 'ada@example.com',
          * });
          */
-        example?: $output | $output[];
+        example?: $input | $output | Array<$input | $output>;
     }
 }
 

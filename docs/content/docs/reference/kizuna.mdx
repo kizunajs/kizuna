@@ -33,11 +33,12 @@ export const k = new Kizuna<Config>();
 
 Some declarations are shared across APIs rather than bound to one, so they stay on the class:
 
-| Member               | Description                                                                    |
-| -------------------- | ------------------------------------------------------------------------------ |
-| `Kizuna.model`       | Name a [schema](/docs/reference/kizuna-model) so every client reuses one type. |
-| `Kizuna.permissions` | Declare a [permission catalog](/docs/reference/kizuna-permissions).            |
-| `Kizuna.roles`       | Declare the [roles](/docs/reference/kizuna-roles) callers hold.                |
+| Member               | Description                                                                         |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| `Kizuna.model`       | Name a [schema](/docs/reference/kizuna-model) so every client reuses one type.      |
+| `Kizuna.brand`       | [Brand](/docs/reference/kizuna-brand) a schema, so no other value stands in for it. |
+| `Kizuna.permissions` | Declare a [permission catalog](/docs/reference/kizuna-permissions).                 |
+| `Kizuna.roles`       | Declare the [roles](/docs/reference/kizuna-roles) callers hold.                     |
 
 ## What Config carries
 

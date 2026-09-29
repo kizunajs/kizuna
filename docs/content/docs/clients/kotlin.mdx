@@ -155,6 +155,45 @@ fun UserList(client: APIClient) {
 
 </Steps>
 
+## Branded IDs
+
+A [branded ID](/docs/zod#branded-ids) becomes a value class, `API.UserId`, serialized as the bare string. The parameter's type shows it, and passing a `String` does not compile.
+
+An ID from a response is already an `API.UserId`, so it passes into the next call as it is:
+
+```kotlin
+val created = client.users.createUser {
+    body(
+        name = "Ada Lovelace",
+        email = "ada@example.com",
+    )
+}
+
+client.users.deleteUser {
+    params(
+        id = created.body.id,
+    )
+}
+```
+
+A `String` from outside the API, like a deep link, is wrapped once:
+
+```kotlin
+val userId = uri.lastPathSegment ?: return
+
+val user = client.users.getUser {
+    params(
+        id = API.UserId(userId),
+    )
+}
+```
+
+`value` reads the string back:
+
+```kotlin
+Text(user.body.id.value)
+```
+
 ## Property naming
 
 By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. A `@file:Suppress(...)` header keeps the IDE green over the generated file.

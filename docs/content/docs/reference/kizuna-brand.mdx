@@ -1,0 +1,56 @@
+---
+title: Kizuna.brand
+description: Give a Zod schema a brand so the handler and every generated client type its values as that brand.
+---
+
+Give a Zod schema a brand, so the handler and every generated client type its values as that brand.
+
+<InstallTabs packageName="kizunajs" />
+
+```ts
+import { Kizuna } from 'kizunajs';
+```
+
+## Parameters
+
+```ts
+Kizuna.brand(brand: string, schema: ZodType): ZodType
+```
+
+| Parameter | Type      | Description                                              |
+| --------- | --------- | -------------------------------------------------------- |
+| `brand`   | `string`  | The name used in generated output (`UserId`, `CenterId`) |
+| `schema`  | `ZodType` | A string, number, bigint, boolean or date schema         |
+
+## Returns
+
+The schema with `.brand()` applied and the brand recorded in its metadata. It validates exactly as `schema` does.
+
+## Example
+
+```ts title="user-id.ts"
+import { Kizuna } from 'kizunajs';
+import { z } from 'zod';
+
+export const UserId = Kizuna.brand('UserId', z.string());
+```
+
+## Why not `.brand()`
+
+Zod's `.brand()` exists only in the types, so the generators cannot see it. `Kizuna.brand` also records the name in `.meta()`, which they read.
+
+## Effect on generators
+
+- **TypeScript**: `export type UserId = string & $brand<"UserId">` in the `API` namespace, and a `toUserId('usr_k7f3q9')` function beside `createClient`
+- **Swift**: `public struct UserId: RawRepresentable, Codable, Hashable, Sendable`, encoded as the bare value
+- **Kotlin**: `@Serializable @JvmInline value class UserId(val value: String)`, serialized as the bare value
+- **OpenAPI**: `x-kizuna-brand: UserId` on the schema
+- **MCP**: nothing, a tool's input stays a plain string
+
+A brand wraps a scalar, so `Kizuna.brand` throws on an object, an enum or a transform. Put `.optional()` or `.nullable()` on the brand rather than inside it:
+
+```ts
+parentId: UserId.nullable(),
+```
+
+See the [Zod guide](/docs/zod#branded-ids) for using one in each client.

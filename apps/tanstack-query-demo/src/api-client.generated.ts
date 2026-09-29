@@ -4,7 +4,7 @@
  *
  * Regenerate: kizuna generate
  */
-import { createGeneratedClient, type ClientConfig, type ClientMethod, type GeneratedRoutes } from '@kizunajs/fetch';
+import { createGeneratedClient, type $brand, type ClientConfig, type ClientMethod, type GeneratedRoutes } from '@kizunajs/fetch';
 
 export namespace API {
     export type CreateUserInput = {
@@ -89,7 +89,7 @@ export namespace API {
          * @example
          * 'usr_abc123'
          */
-        id: string;
+        id: UserId;
         /**
          * Display name
          *
@@ -140,6 +140,11 @@ export namespace API {
          */
         tags?: Array<string | null>;
     };
+
+    /**
+     * A branded `string`. Responses hand one back, and `toUserId` makes one from a plain value.
+     */
+    export type UserId = string & $brand<"UserId">;
 
     export type UserSessionEvent = {
         kind: "login";
@@ -200,7 +205,7 @@ export namespace API {
 
     export namespace UsersUserBadge {
         export type Params = {
-            id: string;
+            id: UserId;
         };
 
         export type Result =
@@ -210,7 +215,7 @@ export namespace API {
 
     export namespace UsersLastSessionEvent {
         export type Params = {
-            id: string;
+            id: UserId;
         };
 
         export type Result =
@@ -235,7 +240,7 @@ export namespace API {
 
     export namespace UsersGetUser {
         export type Params = {
-            id: string;
+            id: UserId;
         };
 
         export type Headers = {
@@ -251,13 +256,13 @@ export namespace API {
 
     export namespace UsersUserActivity {
         export type Params = {
-            id: string;
+            id: UserId;
             year: number;
         };
 
         export type Result =
             | { status: 200; body: {
-                userId: string;
+                userId: UserId;
                 year: number;
                 events: number;
             }; headers: Record<string, string> }
@@ -266,7 +271,7 @@ export namespace API {
 
     export namespace UsersUserProfile {
         export type Params = {
-            id: string;
+            id: UserId;
         };
 
         export type Result =
@@ -284,7 +289,7 @@ export namespace API {
 
     export namespace UsersDeleteUser {
         export type Params = {
-            id: string;
+            id: UserId;
         };
 
         export type Result =
@@ -296,17 +301,17 @@ export namespace API {
 
     export namespace UsersArchiveUser {
         export type Params = {
-            id: string;
+            id: UserId;
         };
 
         export type Result =
             | { status: 200; body: {
                 alreadyArchived: true;
-                userId: string;
+                userId: UserId;
             }; headers: Record<string, string> }
             | { status: 201; body: {
                 archivedAt: string;
-                userId: string;
+                userId: UserId;
             }; headers: Record<string, string> };
     }
 
@@ -326,7 +331,7 @@ export namespace API {
 
     export namespace UsersPingUser {
         export type Params = {
-            id: string;
+            id: UserId;
         };
 
         export type Result =
@@ -345,7 +350,7 @@ export namespace API {
 
     export namespace UsersCheckUser {
         export type Params = {
-            id: string;
+            id: UserId;
         };
 
         export type Result =
@@ -855,7 +860,7 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.UsersGetUser.Result>;
         /**
-         * Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response
+         * Get a year of user activity, exercising two typed path params (a branded id and a coerced int year) and a cache policy on both a success and an error response
          *
          * @example
          * const result = await client.users.userActivity({
@@ -1642,6 +1647,14 @@ const routes: GeneratedRoutes = {
         },
     },
 };
+
+/**
+ * Brands a value from outside the API, like a URL segment, as `API.UserId`. A value from a response is branded already.
+ *
+ * @example
+ * const id = toUserId('usr_abc123');
+ */
+export const toUserId = (value: string): API.UserId => value as API.UserId;
 
 export interface RequestContext {
     "x-posthog-session-id"?: string;

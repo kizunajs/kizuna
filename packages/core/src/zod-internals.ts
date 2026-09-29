@@ -304,6 +304,14 @@ export const readMetaDescription = (schema: z.core.$ZodType): string | undefined
 };
 
 /**
+ * Returns a schema's `brand` metadata, set by `Kizuna.brand`, or undefined.
+ */
+export const readMetaBrand = (schema: z.core.$ZodType): string | undefined => {
+    const brand = readMeta(schema)?.brand;
+    return typeof brand === 'string' ? brand : undefined;
+};
+
+/**
  * The `Kizuna.model` schemas in the global registry, keyed by their `id`.
  */
 export const globalRegistrySchemas = (): Map<string, z.core.$ZodType> => {

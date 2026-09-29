@@ -8,6 +8,7 @@
         "kizuna-permissions",
         "k-request-context",
         "kizuna-model",
+        "kizuna-brand",
         "k-route",
         "k-routes",
         "k-jobs",

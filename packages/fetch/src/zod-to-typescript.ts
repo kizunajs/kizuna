@@ -5,10 +5,12 @@ import {
     readDef,
     readDeprecation,
     readDiscriminatedUnion,
+    readMetaBrand,
     readMetaDescription,
     readMetaExamples,
     readMetaId,
     readObjectShape,
+    sanitizeIdentifier,
     toPascalCase,
     unwrapOptionalWrappers,
 } from 'kizunajs/generator';
@@ -30,6 +32,14 @@ export interface NamedType {
 export class TypeCollector {
     private readonly named = new Map<string, NamedType>();
     private readonly claimed = new Set<string>();
+    private readonly brands = new Map<
+        string,
+        {
+            brand: string;
+            base: string;
+            example: string;
+        }
+    >();
 
     /**
      * Claims a name before its body is walked, so a model that refers to itself
@@ -46,12 +56,67 @@ export class TypeCollector {
         this.named.set(type.name, type);
     }
 
+    /**
+     * Declares a brand as a named type, `UserId = string & $brand<"UserId">`,
+     * and answers the name.
+     */
+    addBrand(brand: string, base: string, example: string): string {
+        const name = sanitizeIdentifier(brand);
+        const existing = this.brands.get(name);
+        if (existing !== undefined && (existing.brand !== brand || existing.base !== base)) {
+            throw new Error(`@kizunajs/fetch: brand ${quote(brand)} wraps both ${existing.base} and ${base}. Give each its own name.`);
+        }
+        if (existing === undefined) {
+            this.brands.set(name, {
+                brand,
+                base,
+                example,
+            });
+        }
+        return name;
+    }
+
+    usesBrand(): boolean {
+        return this.brands.size > 0;
+    }
+
+    /**
+     * Each brand's name, the type it wraps, and a value for its `@example`, for
+     * the constructors the file exports.
+     */
+    allBrands(): Array<{
+        name: string;
+        base: string;
+        example: string;
+    }> {
+        return [...this.brands].map(([name, { base, example }]) => ({
+            name,
+            base,
+            example,
+        }));
+    }
+
     all(): NamedType[] {
-        return [...this.named.values()].sort((left, right) => left.name.localeCompare(right.name));
+        for (const name of this.brands.keys()) {
+            if (this.named.has(name)) {
+                throw new Error(`@kizunajs/fetch: brand ${quote(name)} has the same name as a model. Give each its own name.`);
+            }
+        }
+        const brands = [...this.brands].map(([name, { brand, base }]) => ({
+            name,
+            description: `A branded \`${base}\`. Responses hand one back, and \`to${name}\` makes one from a plain value.`,
+            body: `${base} & $brand<${quote(brand)}>`,
+        }));
+        return [...this.named.values(), ...brands].sort((left, right) => left.name.localeCompare(right.name));
     }
 }
 
 const quote = (value: string): string => JSON.stringify(value);
+
+/**
+ * What a brand wraps: the scalars, as the JSON carries them.
+ */
+const BRANDABLE_BASES = new Set(['string', 'number', 'boolean']);
 
 /**
  * A literal as the type the JSON carries, so `z.literal(true)` is `true`.
@@ -230,9 +295,16 @@ const objectBody = (schema: z.core.$ZodType, collector: TypeCollector, hint: str
 
 /**
  * The TypeScript type a schema describes. Named models are collected and
- * referenced; anonymous shapes are inlined.
+ * referenced; anonymous shapes are inlined. A brand is named like a model.
  */
 export const typeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: string): string => {
+    const type = unbrandedTypeOf(schema, collector, hint);
+    const brand = readMetaBrand(schema);
+    if (brand === undefined || !BRANDABLE_BASES.has(type)) return type;
+    return collector.addBrand(brand, type, sampleValue(schema, 0, brand));
+};
+
+const unbrandedTypeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: string): string => {
     if (isFileSchema(schema)) return 'File | Blob';
     if (isBinarySchema(schema)) return 'Uint8Array';
 

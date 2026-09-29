@@ -137,6 +137,41 @@ struct UserList: View {
 
 </Steps>
 
+## Branded IDs
+
+A [branded ID](/docs/zod#branded-ids) becomes a struct, `API.UserId`, encoded as the bare string. The parameter's type shows it, and passing a `String` does not compile.
+
+An ID from a response is already an `API.UserId`, so it passes into the next call as it is:
+
+```swift
+let created = try await client.users.createUser(
+    .body(
+        name: "Ada Lovelace",
+        email: "ada@example.com"
+    )
+)
+
+try await client.users.deleteUser(
+    .params(id: created.body.id)
+)
+```
+
+A `String` from outside the API, like a deep link, is wrapped once:
+
+```swift
+let userID = url.lastPathComponent
+
+let user = try await client.users.getUser(
+    .params(id: API.UserId(userID))
+)
+```
+
+`rawValue` reads the string back:
+
+```swift
+Text(user.body.id.rawValue)
+```
+
 ## Property naming
 
 By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type.

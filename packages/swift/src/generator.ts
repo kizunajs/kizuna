@@ -35,6 +35,7 @@ import {
     collectObjectFields,
     objectFieldCount,
     objectShapeKeys,
+    type SwiftBrand,
     type SwiftField,
     type SwiftType,
 } from './zod-to-swift.js';
@@ -766,6 +767,32 @@ const emitStruct = (
         emitMemberwiseInit(writer, adjustedFields, (field) =>
             field.deprecated ? deprecatedStorageName(field, type.fields) : escapeKeyword(field.name)
         );
+    });
+};
+
+/**
+ * A brand as a struct around its value, encoded as the bare value.
+ */
+const emitBrand = (writer: SwiftWriter, brand: SwiftBrand): void => {
+    writer.block(`public struct ${brand.name}: RawRepresentable, Codable, Hashable, Sendable`, () => {
+        writer.line(`public let rawValue: ${brand.rawType}`);
+        writer.blank();
+        writer.block(`public init(rawValue: ${brand.rawType})`, () => {
+            writer.line('self.rawValue = rawValue');
+        });
+        writer.blank();
+        writer.block(`public init(_ rawValue: ${brand.rawType})`, () => {
+            writer.line('self.rawValue = rawValue');
+        });
+        writer.blank();
+        writer.block('public init(from decoder: Decoder) throws', () => {
+            writer.line(`rawValue = try decoder.singleValueContainer().decode(${brand.rawType}.self)`);
+        });
+        writer.blank();
+        writer.block('public func encode(to encoder: Encoder) throws', () => {
+            writer.line('var container = encoder.singleValueContainer()');
+            writer.line('try container.encode(rawValue)');
+        });
     });
 };
 
@@ -2316,6 +2343,10 @@ const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, regis
 
     writer.block(`public enum ${namespaceName}`, () => {
         emitTypes(writer, topLevelSharedTypes, context, ownedTypeMap, ownedTypeLookup);
+        for (const brand of registry.allBrands()) {
+            writer.blank();
+            emitBrand(writer, brand);
+        }
     });
 
     emitClient(writer, { clientName, anyCodable: registry.usesAnyCodable }, partition, context, typesByOperation);

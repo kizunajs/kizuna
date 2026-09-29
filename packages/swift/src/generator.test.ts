@@ -2258,3 +2258,67 @@ describe('Swift generator: hidden routes and plugin routes', () => {
         expect(output).not.toContain('internalProbe');
     });
 });
+
+describe('Swift generator: brands', () => {
+    const CenterId = Kizuna.brand('CenterId', z.string());
+    const brandedRoutes = k.routes('api', {
+        getCenter: k.route({
+            method: 'GET',
+            path: '/centers/:centerId',
+            pathParams: z.object({
+                centerId: CenterId,
+            }),
+            responses: {
+                200: z.object({
+                    id: CenterId,
+                    parentId: CenterId.nullable(),
+                }),
+            },
+        }),
+    });
+    const output = generateSwiftClient(
+        defineConfig({
+            ...config,
+            routes: brandedRoutes,
+        }).api,
+        baseConfig
+    );
+
+    it('declares the brand once as a struct wrapping its value', () => {
+        expect(output.match(/public struct CenterId: RawRepresentable, Codable, Hashable, Sendable/g)).toHaveLength(1);
+        expect(output).toContain('public let rawValue: String');
+        expect(output).toContain('public init(_ rawValue: String)');
+    });
+
+    it('types a branded path param and response field as the brand', () => {
+        expect(output).toContain('public let centerId: TestAPI.CenterId');
+        expect(output).toContain('public let id: TestAPI.CenterId');
+        expect(output).toContain('public let parentId: TestAPI.CenterId?');
+    });
+
+    it('rejects one brand name on two types', () => {
+        const mismatched = k.routes('api', {
+            getCenter: k.route({
+                method: 'GET',
+                path: '/centers/:centerId',
+                pathParams: z.object({
+                    centerId: CenterId,
+                }),
+                responses: {
+                    200: z.object({
+                        rank: Kizuna.brand('CenterId', z.int()),
+                    }),
+                },
+            }),
+        });
+        expect(() =>
+            generateSwiftClient(
+                defineConfig({
+                    ...config,
+                    routes: mismatched,
+                }).api,
+                baseConfig
+            )
+        ).toThrow('brand "CenterId" wraps both String and Int');
+    });
+});
