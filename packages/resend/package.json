@@ -1,6 +1,6 @@
 {
   "name": "@kizunajs/resend",
-  "version": "2.0.0-beta.12",
+  "version": "2.0.0-beta.13",
   "description": "Resend plugin for Kizuna.js: send email, run newsletters and broadcasts, and receive webhooks",
   "keywords": [
     "kizunajs",
