@@ -5,10 +5,13 @@ import { swiftClient } from '@kizunajs/swift';
 import { expressAdapter } from '@kizunajs/express';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';
+import { resendPlugin } from '@kizunajs/resend';
 import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
 import { diagnostics } from './src/routes/diagnostics';
 import { contact } from './src/routes/contact';
+import { newsletter } from './src/routes/newsletter';
 import { emailPlugin } from './src/plugins/email';
+import { resendEvents } from './src/resend-events';
 
 /**
  * The shared routes every demo serves, plus the ones only this demo can answer.
@@ -17,6 +20,7 @@ const served = {
     ...routes,
     diagnostics,
     contact,
+    newsletter,
 };
 
 export default defineConfig({
@@ -82,6 +86,17 @@ export default defineConfig({
         }),
         emailPlugin({
             from: 'Kizuna demo <hello@example.com>',
+        }),
+        resendPlugin({
+            apiKey: process.env.RESEND_API_KEY ?? 're_demo',
+            from: 'Kizuna demo <hello@example.com>',
+            lists: {
+                weekly: {
+                    segmentId: process.env.RESEND_SEGMENT_ID ?? 'seg_demo',
+                },
+            },
+            webhookSecret: process.env.RESEND_WEBHOOK_SECRET ?? 'whsec_ZGVtbw==',
+            on: resendEvents,
         }),
     ],
 });

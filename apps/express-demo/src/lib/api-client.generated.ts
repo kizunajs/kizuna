@@ -787,6 +787,16 @@ export namespace API {
             | { status: 204; body: undefined; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
+
+    export namespace NewsletterSubscribe {
+        export type Body = {
+            email: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
 }
 
 export interface Client {
@@ -1363,6 +1373,23 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.ContactSendMessage.Result>;
     };
+    newsletter: {
+        /**
+         * Subscribe to the weekly newsletter
+         *
+         * @example
+         * const result = await client.newsletter.subscribe({
+         *     body: {
+         *         email: 'ada@example.com',
+         *     },
+         * });
+         */
+        subscribe: ClientMethod<'POST', false, {
+            body: API.NewsletterSubscribe.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.NewsletterSubscribe.Result>;
+    };
 }
 
 const routes: GeneratedRoutes = {
@@ -1704,6 +1731,15 @@ const routes: GeneratedRoutes = {
         sendMessage: {
             method: 'POST',
             path: '/contact',
+            responses: {
+                204: {},
+            },
+        },
+    },
+    newsletter: {
+        subscribe: {
+            method: 'POST',
+            path: '/newsletter/subscribers',
             responses: {
                 204: {},
             },

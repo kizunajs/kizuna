@@ -523,6 +523,10 @@ public final class APIClient: Sendable {
         APIContactClient(client: self)
     }
 
+    public var newsletter: APINewsletterClient {
+        APINewsletterClient(client: self)
+    }
+
     public enum UsersListUsers {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -3343,6 +3347,44 @@ public final class APIClient: Sendable {
             }
         }
     }
+
+    public enum NewsletterSubscribe {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let email: String
+
+            public init(email: String) {
+                self.email = email
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(email: String) -> Self {
+                .init(payload: Input(email: email))
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
 }
 
 public struct APIUsersClient: Sendable {
@@ -4363,6 +4405,35 @@ public struct APIContactClient: Sendable {
             throw APIClient.ContactSendMessage.Failure.badRequest(payload)
         default:
             throw APIClient.ContactSendMessage.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct APINewsletterClient: Sendable {
+    private let client: APIClient
+
+    init(client: APIClient) {
+        self.client = client
+    }
+
+    /// Subscribe to the weekly newsletter
+    public func subscribe(_ body: APIClient.NewsletterSubscribe.Body) async throws(APIClient.NewsletterSubscribe.Failure) {
+        let path = "/newsletter/subscribers"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NewsletterSubscribe.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.NewsletterSubscribe.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.NewsletterSubscribe.Failure.self)
+        switch statusCode {
+        case 204:
+            return
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.NewsletterSubscribe.Failure.self)
+            throw APIClient.NewsletterSubscribe.Failure.badRequest(payload)
+        default:
+            throw APIClient.NewsletterSubscribe.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }

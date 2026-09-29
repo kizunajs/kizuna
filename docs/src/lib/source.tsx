@@ -12,6 +12,7 @@ const badges: Record<string, Stage> = {
     '/docs/jobs': 'alpha',
     '/docs/caching': 'beta',
     '/docs/mcp': 'beta',
+    '/docs/resend': 'alpha',
     '/docs/streaming': 'alpha',
     '/docs/tools': 'alpha',
     '/docs/extend/create-adapter': 'beta',

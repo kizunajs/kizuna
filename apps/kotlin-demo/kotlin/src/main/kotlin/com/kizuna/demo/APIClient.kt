@@ -1655,6 +1655,30 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object NewsletterSubscribe {
+
+        @Serializable
+        data class Input(val email: String)
+
+        data class Body(val email: String)
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(email: String): AfterBody = AfterBody(body = Body(email = email))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
@@ -1676,6 +1700,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val contact = APIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val newsletter = APINewsletterClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 }
 
 class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -3297,6 +3323,41 @@ class APIContactClient(private val client: OkHttpClient, private val baseUrl: St
                     throw APIClient.ContactSendMessage.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.ContactSendMessage.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
+class APINewsletterClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** Subscribe to the weekly newsletter */
+    @Throws(APIClient.NewsletterSubscribe.Failure::class)
+    suspend fun subscribe(build: APIClient.NewsletterSubscribe.Scope.() -> APIClient.NewsletterSubscribe.Args) {
+        val args = APIClient.NewsletterSubscribe.Scope.build()
+        val body = args.body
+        val path = "/newsletter/subscribers"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = APIClient.NewsletterSubscribe.Input(email = body.email)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                204 -> {}
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.NewsletterSubscribe.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.NewsletterSubscribe.Failure.BadRequest(body = payload)
+                }
+                else -> throw APIClient.NewsletterSubscribe.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

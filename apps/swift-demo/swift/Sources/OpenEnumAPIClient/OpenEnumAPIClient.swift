@@ -610,6 +610,10 @@ public final class OpenEnumAPIClient: Sendable {
         OpenEnumAPIContactClient(client: self)
     }
 
+    public var newsletter: OpenEnumAPINewsletterClient {
+        OpenEnumAPINewsletterClient(client: self)
+    }
+
     public enum UsersListUsers {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -3625,6 +3629,44 @@ public final class OpenEnumAPIClient: Sendable {
             }
         }
     }
+
+    public enum NewsletterSubscribe {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let email: String
+
+            public init(email: String) {
+                self.email = email
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(email: String) -> Self {
+                .init(payload: Input(email: email))
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(OpenEnumAPIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
 }
 
 public struct OpenEnumAPIUsersClient: Sendable {
@@ -4645,6 +4687,35 @@ public struct OpenEnumAPIContactClient: Sendable {
             throw OpenEnumAPIClient.ContactSendMessage.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.ContactSendMessage.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+}
+
+public struct OpenEnumAPINewsletterClient: Sendable {
+    private let client: OpenEnumAPIClient
+
+    init(client: OpenEnumAPIClient) {
+        self.client = client
+    }
+
+    /// Subscribe to the weekly newsletter
+    public func subscribe(_ body: OpenEnumAPIClient.NewsletterSubscribe.Body) async throws(OpenEnumAPIClient.NewsletterSubscribe.Failure) {
+        let path = "/newsletter/subscribers"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.NewsletterSubscribe.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.NewsletterSubscribe.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NewsletterSubscribe.Failure.self)
+        switch statusCode {
+        case 204:
+            return
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.NewsletterSubscribe.Failure.self)
+            throw OpenEnumAPIClient.NewsletterSubscribe.Failure.badRequest(payload)
+        default:
+            throw OpenEnumAPIClient.NewsletterSubscribe.Failure.unexpectedStatus(statusCode, data)
         }
     }
 }

@@ -20,7 +20,9 @@
     "@kizunajs/fetch": "workspace:*",
     "@kizunajs/mcp": "workspace:*",
     "@kizunajs/openapi": "workspace:*",
+    "@kizunajs/resend": "workspace:*",
     "express": "catalog:",
+    "resend": "^6.30.0",
     "zod": "catalog:"
   },
   "devDependencies": {
