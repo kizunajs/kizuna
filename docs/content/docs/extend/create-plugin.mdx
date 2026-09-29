@@ -325,7 +325,7 @@ export type WebhookEventHandler<Config = unknown> = (context: ApiContext<Config>
 export const defineWebhookEvents = <Config = unknown>(handlers: Record<string, WebhookEventHandler<Config>>) => handlers;
 ```
 
-The route's handler passes `jobs` and `plugins` on from its own arguments.
+The route's handler passes `jobs` and `plugins` on from its own arguments. [`@kizunajs/resend`](/docs/resend) does this for Resend's events.
 
 ## Slugs
 

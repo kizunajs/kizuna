@@ -2261,6 +2261,22 @@ routes:
     responses:
       "204":
         kind: void
+  newsletter.subscribe:
+    method: POST
+    path: /newsletter/subscribers
+    statuses:
+      - 204
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        email:
+          optional: false
+          schema:
+            kind: string
+    responses:
+      "204":
+        kind: void
   mcp.endpoint:
     method: POST
     path: /mcp
@@ -2293,6 +2309,53 @@ routes:
     responses:
       "200":
         kind: unknown
+  resend.webhook:
+    method: POST
+    path: /resend/webhooks
+    statuses:
+      - 204
+      - 400
+    deprecated: false
+    hidden: true
+    body:
+      kind: unknown
+    headers:
+      kind: object
+      fields:
+        svix-id:
+          optional: false
+          schema:
+            kind: string
+        svix-timestamp:
+          optional: false
+          schema:
+            kind: string
+        svix-signature:
+          optional: false
+          schema:
+            kind: string
+    responses:
+      "204":
+        kind: void
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
 jobs:
   - users.indexUser
   - users.sendDigests

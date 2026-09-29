@@ -63,6 +63,7 @@ Follow the [quickstart](https://kizunajs.com/docs/quickstart), which goes from a
 | `@kizunajs/swift`          | Swift client generation                            |
 | `@kizunajs/kotlin`         | Kotlin client generation                           |
 | `@kizunajs/mcp`            | MCP endpoint for AI assistants                     |
+| `@kizunajs/resend`         | Email, newsletters and webhooks through Resend     |
 | `@kizunajs/eslint-plugin`  | ESLint rules                                       |
 | `@kizunajs/cli`            | Command line tooling                               |
 

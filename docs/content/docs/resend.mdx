@@ -1,0 +1,374 @@
+---
+title: Resend
+description: Send email and newsletters from your handlers, and act on what Resend reports back.
+---
+
+<AlphaNotice>
+
+The Resend plugin is new and still settling. Its options and exports may change while v2 is in beta, so pin your version if you depend on them.
+
+</AlphaNotice>
+
+<Supports items={['Resend 6.18+']} />
+
+`@kizunajs/resend` connects your API to [Resend](https://resend.com). Handlers send email and manage newsletters through `plugins.resend`, and Resend's webhook events reach functions you write.
+
+<InstallTabs packageName="@kizunajs/resend resend" />
+
+<Steps>
+
+<Step>
+
+## Install the plugin
+
+```ts title="kizuna.config.ts"
+import { resendPlugin } from '@kizunajs/resend';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    plugins: [
+        resendPlugin({
+            apiKey: process.env.RESEND_API_KEY,
+            from: 'Kizuna <hello@example.com>',
+        }),
+    ],
+});
+```
+
+A missing API key, or a `from` Resend wouldn't accept, stops the app at startup, naming the field. `from` is an address, or a name and an address like `Kizuna <hello@example.com>`.
+
+</Step>
+
+<Step>
+
+## Send an email
+
+Every route and job handler reaches the plugin at `plugins.resend`:
+
+```ts title="src/routes/users.ts"
+.handler(async ({ body, plugins }) => {
+    const user = await db.users.create(body);
+
+    await plugins.resend.sendEmail({
+        to: user.email,
+        subject: 'Welcome',
+        html: `<p>Welcome, ${user.name}.</p>`,
+    });
+
+    return {
+        status: 201,
+        body: user,
+    };
+}),
+```
+
+`from` comes from the plugin's options unless the email names its own.
+
+</Step>
+
+</Steps>
+
+## React Email
+
+Pass a component as `react` instead of `html`, and Resend renders it. Install `@react-email/render` too, which Resend's SDK loads when an email has `react`:
+
+<InstallTabs packageName="@react-email/render" />
+
+```tsx
+await plugins.resend.sendEmail({
+    to: user.email,
+    subject: 'Welcome',
+    react: <WelcomeEmail name={user.name} />,
+});
+```
+
+`sendBroadcast` takes `react` the same way.
+
+## Newsletters
+
+A list is a Resend segment, plus the topic its contacts opt in and out of. Name each one once, and handlers use the name:
+
+```ts title="kizuna.config.ts"
+resendPlugin({
+    apiKey: process.env.RESEND_API_KEY,
+    from: 'Kizuna <hello@example.com>',
+    lists: {
+        weekly: {
+            segmentId: 'seg_123',
+            topicId: 'top_456',
+        },
+    },
+}),
+```
+
+`subscribe` adds a contact to a list, creating the contact when it's new, and returns Resend's id for it:
+
+```ts title="src/routes/newsletter.ts"
+subscribe: k
+    .route({
+        method: 'POST',
+        path: '/newsletter/subscribers',
+        auth: 'user',
+        responses: {
+            204: z.void(),
+        },
+    })
+    .handler(async ({ auth, plugins }) => {
+        const user = await db.users.findById(auth.user.userId);
+
+        const { contactId } = await plugins.resend.subscribe({
+            email: user.email,
+            list: 'weekly',
+        });
+
+        await db.users.update(user.id, {
+            resendContactId: contactId,
+        });
+
+        return {
+            status: 204,
+            body: undefined,
+        };
+    }),
+```
+
+Contact events carry it back as `event.data.id`, which the [webhook example](#webhooks) uses to find the user.
+
+`unsubscribe` takes a contact off one list, or off everything when you leave `list` out:
+
+```ts
+await plugins.resend.unsubscribe({
+    email: 'ada@example.com',
+    list: 'weekly',
+});
+```
+
+When a user changes their email, `changeEmail` moves their contact to the new address, keeping its name, lists and topics:
+
+```ts title="src/routes/account.ts"
+changeEmail: k
+    .route({
+        method: 'PATCH',
+        path: '/account/email',
+        auth: 'user',
+        body: z.object({
+            email: z.email(),
+        }),
+        responses: {
+            204: z.void(),
+        },
+    })
+    .handler(async ({ auth, body, plugins }) => {
+        const user = await db.users.findById(auth.user.userId);
+
+        const { contactId } = await plugins.resend.changeEmail({
+            from: user.email,
+            to: body.email,
+        });
+
+        await db.users.update(user.id, {
+            email: body.email,
+            resendContactId: contactId,
+        });
+
+        return {
+            status: 204,
+            body: undefined,
+        };
+    }),
+```
+
+Resend can't change a contact's email, so this creates a new contact and removes the old one, which is why the id changes too.
+
+`sendBroadcast` sends to everyone on a list, now or at `scheduledAt`:
+
+```ts
+await plugins.resend.sendBroadcast({
+    list: 'weekly',
+    subject: 'This week',
+    html: newsletterHtml,
+    scheduledAt: 'in 2 days',
+});
+```
+
+Resend fills placeholders in a broadcast for each contact. Every newsletter needs the unsubscribe link:
+
+```ts
+await plugins.resend.sendBroadcast({
+    list: 'weekly',
+    subject: 'This week',
+    html: `
+        <p>Hi {{{FIRST_NAME|there}}},</p>
+        <p>${news}</p>
+        <a href="{{{RESEND_UNSUBSCRIBE_URL}}}">Unsubscribe</a>
+    `,
+});
+```
+
+The text after `|` is used when a contact has no first name. See [Resend's broadcast docs](https://resend.com/docs/api-reference/broadcasts/create) for every placeholder.
+
+To check a newsletter before it goes out, send it to yourself first with `sendEmail`. Resend only fills placeholders in broadcasts, so a test through `sendEmail` shows `{{{FIRST_NAME}}}` as it's written. Render the test with your own name instead:
+
+```ts
+const newsletter = (firstName: string) => `<p>Hi ${firstName},</p><p>${news}</p>`;
+
+await plugins.resend.sendEmail({
+    to: editor.email,
+    subject: 'This week',
+    html: newsletter(editor.firstName),
+});
+
+await plugins.resend.sendBroadcast({
+    list: 'weekly',
+    subject: 'This week',
+    html: newsletter('{{{FIRST_NAME|there}}}'),
+});
+```
+
+A list without a `topicId` works too. Unsubscribing from it removes the contact from its segment.
+
+## Webhooks
+
+Create a webhook in Resend pointing at `/resend/webhooks`, and pass its signing secret. The plugin checks each delivery's signature against the body as it was sent, then runs your function for the event's type:
+
+```ts title="kizuna.config.ts"
+import { resendEvents } from './src/resend-events';
+
+resendPlugin({
+    apiKey: process.env.RESEND_API_KEY,
+    from: 'Kizuna <hello@example.com>',
+    webhookSecret: process.env.RESEND_WEBHOOK_SECRET,
+    on: resendEvents,
+}),
+```
+
+Write the functions in a file of their own with `defineResendEvents`. Here, someone who unsubscribes through Resend's link loses their consent in your own database too. Give it your `Config`, the way you give it to `new Kizuna<Config>()`, and `jobs` and `plugins` are typed from your app:
+
+```ts title="src/resend-events.ts"
+import { defineResendEvents } from '@kizunajs/resend';
+import type { Config } from '../kizuna.types';
+import { db } from './db';
+
+export const resendEvents = defineResendEvents<Config>({
+    'contact.updated': async ({ event }) => {
+        const user = await db.users.findByResendContactId(event.data.id);
+        if (user === null) return;
+
+        await db.users.update(user.id, {
+            newsletterConsent: !event.data.unsubscribed,
+        });
+    },
+});
+```
+
+Each function receives:
+
+| Argument     | What it is                                        |
+| ------------ | ------------------------------------------------- |
+| `event`      | The event, typed from Resend's own types          |
+| `deliveryId` | The delivery's id, the same on every retry of it  |
+| `jobs`       | Your app's jobs, to queue work                    |
+| `plugins`    | Your installed plugins, `plugins.resend` included |
+
+Anything else it needs, like your database, it imports. An event with no function is acknowledged and dropped. A delivery whose signature doesn't match is answered with `400`, and nothing runs.
+
+The route is [hidden](/docs/routes#hidden-routes), so it stays out of your clients and the OpenAPI document.
+
+### Keep the functions quick
+
+Resend waits a few seconds for an answer, then sends the event again. For anything slow, queue a [job](/docs/jobs) from the function and return. On a serverless host like Vercel, work started after the response is sent can be cut off, so there it's the only reliable way.
+
+### Handle an event twice safely
+
+Resend can deliver the same event more than once. Skip a `deliveryId` you've already handled.
+
+### Tag emails with your own ids
+
+Tags you set when sending come back on every event for that email, in `event.data.tags`:
+
+```ts
+await plugins.resend.sendEmail({
+    to: user.email,
+    subject: 'Welcome',
+    html,
+    tags: [
+        {
+            name: 'orderId',
+            value: order.id,
+        },
+    ],
+});
+```
+
+Contact events carry no tags.
+
+## Moving the webhook route
+
+The plugin serves its routes under `/resend`. When that clashes with your own routes, pass another base path:
+
+```ts title="kizuna.config.ts"
+resendPlugin({
+    apiKey: process.env.RESEND_API_KEY,
+    from: 'Kizuna <hello@example.com>',
+    webhookSecret: process.env.RESEND_WEBHOOK_SECRET,
+    basePath: '/integrations/resend',
+}),
+```
+
+## In development
+
+`intercept` catches every email and forwards it to your own inbox instead of its real recipients:
+
+```ts title="kizuna.config.ts"
+resendPlugin({
+    apiKey: process.env.RESEND_API_KEY,
+    from: 'Kizuna <hello@example.com>',
+    intercept: {
+        enabled: process.env.NODE_ENV !== 'production',
+        forwardTo: process.env.EMAIL_FORWARD_TO,
+        deliverTo: ['@example.com'],
+        subjectPrefix: '[dev]',
+    },
+}),
+```
+
+`enabled` says whether it's on. When it is, `forwardTo` has to be set, so a missing `EMAIL_FORWARD_TO` stops the app at startup instead of emailing real people.
+
+| Option          | Default                         | Description                                                                                                    |
+| --------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `enabled`       | required                        | Whether emails are intercepted                                                                                 |
+| `forwardTo`     | required when `enabled` is true | Where every email is forwarded, one address or several                                                         |
+| `deliverTo`     | none                            | Addresses, or whole domains like `@example.com`, whose emails are delivered as normal, with `forwardTo` in bcc |
+| `subjectPrefix` | none                            | Put in front of every intercepted email's subject                                                              |
+
+Each intercepted email carries who it was for in `X-Intercepted-To`, `X-Intercepted-Cc` and `X-Intercepted-Bcc` headers. Use `delivered@resend.dev` as `forwardTo` when nobody should get anything.
+
+Broadcasts go to a segment, so `intercept` doesn't reach them. Point your `lists` at a test segment in development instead.
+
+## Errors
+
+Resend's SDK answers with `{ data, error }` instead of throwing. The plugin throws a `ResendRequestError` instead, so a failed call fails the handler that made it, and kizuna answers `500` and logs it.
+
+A call Resend rate-limits is tried again after the wait its `retry-after` header asks for, up to three times, before it fails.
+
+## Anything else
+
+`plugins.resend.client` is the Resend client itself, for anything the plugin doesn't cover:
+
+```ts
+await plugins.resend.client.domains.list();
+```
+
+## Options
+
+| Option          | Default   | Description                                                             |
+| --------------- | --------- | ----------------------------------------------------------------------- |
+| `apiKey`        | required  | The Resend API key                                                      |
+| `from`          | required  | The sender every email and broadcast uses unless it names its own       |
+| `lists`         | none      | Lists by name, each a `segmentId` and an optional `topicId`             |
+| `webhookSecret` | none      | The webhook's signing secret. Set it to serve the webhook route         |
+| `on`            | none      | A function per webhook event type. Needs `webhookSecret`                |
+| `intercept`     | none      | Catch every email in development, see [In development](#in-development) |
+| `resend`        | none      | Resend's own `ResendOptions`, passed to its client                      |
+| `basePath`      | `/resend` | Where the webhook route is served                                       |
