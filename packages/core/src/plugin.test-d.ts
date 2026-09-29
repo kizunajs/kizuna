@@ -91,6 +91,22 @@ describe('definePlugin', () => {
         emailPlugin();
     });
 
+    test('takes a basePath at install only when the plugin declares one', () => {
+        const webhooksPlugin = definePlugin({
+            slug: 'webhooks',
+            basePath: '/webhooks',
+            setup: () => ({}),
+        });
+
+        webhooksPlugin({
+            basePath: '/integrations',
+        });
+        statusPlugin({
+            // @ts-expect-error statusPlugin declares no basePath
+            basePath: '/status',
+        });
+    });
+
     test('takes no options when it declares none', () => {
         statusPlugin();
         statusPlugin({

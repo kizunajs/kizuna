@@ -159,15 +159,25 @@ const typeOfStringUnion = (expression: ts.Expression, key: ConfigKey): string =>
 };
 
 /**
- * Each plugin in order, as a tuple, so a handler reaches each one under its own
- * slug.
+ * The repo's Prettier `printWidth`. A line the generator writes longer than this
+ * is one `pnpm format` would rewrite, and `--check` would then report the file
+ * as behind.
  */
-const typeOfPluginList = (expression: ts.Expression, used: Set<string>): string => {
+const PRINT_WIDTH = 140;
+
+/**
+ * Each plugin in order, as a tuple, so a handler reaches each one under its own
+ * slug. It wraps one plugin per line when the line would run past
+ * {@link PRINT_WIDTH}, the way Prettier does.
+ */
+const typeOfPluginList = (expression: ts.Expression, used: Set<string>, prefix: string): string => {
     if (!ts.isArrayLiteralExpression(expression)) {
         throw new ConfigSyntaxError('`plugins` has to be an array, so each plugin keeps its place.');
     }
     const entries = expression.elements.map((element) => typeOfValue(element as ts.Expression, used, 'plugins'));
-    return `[${entries.join(', ')}]`;
+    const inline = `[${entries.join(', ')}]`;
+    if (`${prefix}${inline};`.length <= PRINT_WIDTH) return inline;
+    return `[\n${entries.map((entry) => `        ${entry},`).join('\n')}\n    ]`;
 };
 
 /**
@@ -293,7 +303,7 @@ export const generateConfigTypes = (configSource: string, fileName = 'kizuna.con
             const codes = issueCodesOf(value);
             if (codes !== undefined) lines.push(`    validation: {\n        issueCodes: ${codes};\n    };`);
         } else if (key === 'plugins') {
-            lines.push(`    ${key}: ${typeOfPluginList(value, used)};`);
+            lines.push(`    ${key}: ${typeOfPluginList(value, used, `    ${key}: `)};`);
         } else {
             lines.push(`    ${key}: ${typeOfValue(value, used, key)};`);
         }

@@ -147,6 +147,8 @@ A plugin is one module, built with `definePlugin` from `kizunajs/plugin`. It is 
 - `setup({ options, api })` runs once, including during `kizuna generate`, and returns `exports`, `routes`, `generators` and `validate`, all optional. `api` is readable from handlers and `validate`, never during `setup` itself.
 - `exports` reach every route and job handler at `plugins.<slug>`.
 - `routes` are for outside callers, like a webhook, declared with the plugin's own `route(...).handler(...)`. Every plugin route is `hidden`, so none reaches the generated clients, the OpenAPI document or MCP, and one declaring `tool` makes `defineConfig` throw. A plugin route answers with `rawResponse` when its wire format is not a JSON body. Ordinary route handlers cannot.
+- `basePath` is where a plugin with several routes serves them. Each route's `path` is relative to it, a route at `/` serves the base path itself, and the app can pass another one at install. A plugin with one route, like MCP, takes a `path` option instead.
+- A plugin that runs functions the app writes, like webhook event handlers, takes them as an option and hands them `jobs` and `plugins`. `ApiContext<Config>` types those from the app's `Config`, passed as a type parameter the way `new Kizuna<Config>()` takes it. There is no global registry, since a repo can hold several generated `Config`s in one program.
 - `generators` are files `kizuna generate` writes and `--check` compares, built with `defineGenerator`. There is no `generators` key on the config.
 - Plugins declare no jobs, no hooks, and never call each other in this phase.
 
