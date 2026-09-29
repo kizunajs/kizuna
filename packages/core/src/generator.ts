@@ -29,6 +29,7 @@ export {
     readMeta,
     readMetaId,
     readMetaDescription,
+    readMetaBrand,
     readMetaExamples,
     readDeprecation,
     readDiscriminatorLiteral,

@@ -2185,3 +2185,38 @@ describe('Kotlin generator: hidden routes and plugin routes', () => {
         expect(output).not.toContain('internalProbe');
     });
 });
+
+describe('Kotlin generator: brands', () => {
+    const CenterId = Kizuna.brand('CenterId', z.string());
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: {
+                getCenter: k.route({
+                    method: 'GET',
+                    path: '/centers/:centerId',
+                    pathParams: z.object({
+                        centerId: CenterId,
+                    }),
+                    responses: {
+                        200: z.object({
+                            id: CenterId,
+                            parentId: CenterId.nullable(),
+                        }),
+                    },
+                }),
+            },
+        }).api,
+        baseConfig
+    );
+
+    it('declares the brand once as a value class that prints as its value', () => {
+        expect(output.match(/value class CenterId\(val value: String\)/g)).toHaveLength(1);
+        expect(output).toContain('override fun toString(): String = value');
+    });
+
+    it('types a branded path param and response field as the brand', () => {
+        expect(output).toContain('val centerId: TestAPI.CenterId');
+        expect(output).toContain('val id: TestAPI.CenterId');
+        expect(output).toContain('val parentId: TestAPI.CenterId?');
+    });
+});

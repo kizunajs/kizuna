@@ -7,12 +7,13 @@ import { z } from 'zod';
 import { k } from '../k';
 import { PaginationQuery } from '../pagination';
 import { UserSessionEvent } from './notifications';
+import { UserId } from '../user-id';
 
 export const UserSchema = Kizuna.model({
     title: 'User',
     description: 'A user in the system',
     schema: z.object({
-        id: z.string().meta({
+        id: UserId.meta({
             description: 'Unique user identifier',
             example: 'usr_abc123',
         }),
@@ -104,6 +105,13 @@ export const CreateUserSchema = Kizuna.model({
 
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 
+/**
+ * The `:id` of every route under `/users/:id`.
+ */
+const UserPathParams = z.object({
+    id: UserId,
+});
+
 export const usersRoutes = k.routes('users', {
     listUsers: k
         .route({
@@ -163,6 +171,7 @@ export const usersRoutes = k.routes('users', {
             method: 'GET',
             path: '/users/:id/badge',
             auth: false,
+            pathParams: UserPathParams,
             responses: {
                 200: {
                     body: BinarySchema,
@@ -197,6 +206,7 @@ export const usersRoutes = k.routes('users', {
             method: 'GET',
             path: '/users/:id/last-session-event',
             auth: false,
+            pathParams: UserPathParams,
             responses: {
                 200: UserSessionEvent,
                 404: ProblemDetailsSchema,
@@ -254,6 +264,7 @@ export const usersRoutes = k.routes('users', {
             method: 'GET',
             path: '/users/:id',
             auth: false,
+            pathParams: UserPathParams,
             headers: z.object({
                 'x-request-id': z.string(),
             }),
@@ -292,13 +303,13 @@ export const usersRoutes = k.routes('users', {
             path: '/users/:id/activity/:year',
             auth: false,
             pathParams: z.object({
-                id: z.string(),
+                id: UserId,
                 year: z.int().min(2000).max(2100),
             }),
             responses: {
                 200: {
                     body: z.object({
-                        userId: z.string(),
+                        userId: UserId,
                         year: z.int(),
                         events: z.int(),
                     }),
@@ -316,7 +327,7 @@ export const usersRoutes = k.routes('users', {
                 },
             },
             summary:
-                'Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response',
+                'Get a year of user activity, exercising two typed path params (a branded id and a coerced int year) and a cache policy on both a success and an error response',
         })
         .handler(async ({ params }) => {
             const user = await db.users.findById(params.id);
@@ -342,6 +353,7 @@ export const usersRoutes = k.routes('users', {
             method: 'GET',
             path: '/users/:id/profile',
             auth: false,
+            pathParams: UserPathParams,
             responses: {
                 200: {
                     body: UserSchema,
@@ -404,6 +416,7 @@ export const usersRoutes = k.routes('users', {
             method: 'DELETE',
             path: '/users/:id',
             auth: false,
+            pathParams: UserPathParams,
             deprecated: {
                 message: 'use `archiveUser` instead',
                 date: '2026-03-01',
@@ -440,14 +453,15 @@ export const usersRoutes = k.routes('users', {
             method: 'POST',
             path: '/users/:id/archive',
             auth: false,
+            pathParams: UserPathParams,
             responses: {
                 200: z.object({
                     alreadyArchived: z.literal(true),
-                    userId: z.string(),
+                    userId: UserId,
                 }),
                 201: z.object({
                     archivedAt: z.iso.datetime(),
-                    userId: z.string(),
+                    userId: UserId,
                 }),
             },
             summary: 'Archive a user, first call returns 201, subsequent calls 200',
@@ -505,6 +519,7 @@ export const usersRoutes = k.routes('users', {
             method: 'POST',
             path: '/users/:id/ping',
             auth: false,
+            pathParams: UserPathParams,
             body: z.void(),
             responses: {
                 204: z.void(),
@@ -542,6 +557,7 @@ export const usersRoutes = k.routes('users', {
             method: 'HEAD',
             path: '/users/:id/check',
             auth: false,
+            pathParams: UserPathParams,
             responses: {
                 200: z.object({
                     exists: z.boolean(),

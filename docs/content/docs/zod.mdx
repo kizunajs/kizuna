@@ -46,6 +46,7 @@ We wanted every client to behave the same, whatever the language, and one deeply
 | ------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `deprecated` | `boolean \| string`                  | `deprecated: true` in the OpenAPI document, `@available(*, deprecated)` in Swift, `@Deprecated` in Kotlin. A string carries the message into outputs with a place for it. |
 | `example`    | The schema's type, or an array of it | JSON Schema `examples` in the OpenAPI document                                                                                                                            |
+| `brand`      | `string`                             | A named type in every client and `x-kizuna-brand` in the OpenAPI document. Set it with [`Kizuna.brand`](#branded-ids).                                                    |
 
 ```ts
 const UserSchema = z.object({
@@ -60,6 +61,80 @@ Routes deprecate too, with dates and sunset headers. See [Deprecations](/docs/de
 ## Named schemas
 
 [`Kizuna.model`](/docs/reference/kizuna-model) registers a schema under a stable name, so the OpenAPI document emits `#/components/schemas/User` and the Swift and Kotlin clients emit a `User` type, instead of repeating the shape inline everywhere it appears. Only names registered through `Kizuna.model` reach the generators.
+
+## Branded IDs
+
+A user ID and a workspace ID are both strings, so passing one where the other belongs compiles. [`Kizuna.brand`](/docs/reference/kizuna-brand) gives the ID its own type in the handler and in every client, so the swap stops compiling. The wire stays a plain string.
+
+```ts title="user-id.ts"
+export const UserId = Kizuna.brand('UserId', z.string());
+```
+
+Use it everywhere the ID appears. In a model:
+
+```ts
+export const UserSchema = Kizuna.model({
+    title: 'User',
+    schema: z.object({
+        id: UserId,
+        name: z.string(),
+    }),
+});
+```
+
+And in every route that takes one:
+
+```ts
+getUser: k.route({
+    method: 'GET',
+    path: '/users/:id',
+    pathParams: z.object({
+        id: UserId,
+    }),
+    responses: {
+        200: UserSchema,
+    },
+}),
+```
+
+An ID from a response is already branded, so it passes straight into the next call. You only wrap one yourself when it comes from outside the API, like a URL or a form:
+
+<Tabs groupId="brand-client" items={['TypeScript', 'Swift', 'Kotlin']}>
+
+<Tab value="TypeScript">
+
+```ts
+import { toUserId } from './api-client.generated';
+
+const userId = new URLSearchParams(location.search).get('user') ?? '';
+const id = toUserId(userId);
+```
+
+</Tab>
+
+<Tab value="Swift">
+
+```swift
+let userID = url.lastPathComponent
+let id = API.UserId(userID)
+```
+
+</Tab>
+
+<Tab value="Kotlin">
+
+```kotlin
+val userId = uri.lastPathSegment ?: return
+val id = API.UserId(userId)
+```
+
+</Tab>
+
+</Tabs>
+
+In the handler, `params.id` is a `UserId` and still a string, so it goes into a database call as it is, and a row's plain ID goes into a response body as it is.
+
+Brand the IDs that sit beside other IDs of the same shape, and leave other values plain. A swapped ID is a common mistake for people and coding agents alike, and a brand turns it into a compile error that names both types.
 
 ## Coercion
 

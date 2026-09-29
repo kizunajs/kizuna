@@ -34,7 +34,7 @@ public enum API {
             }
         }
         /// Unique user identifier
-        public let id: String
+        public let id: UserId
         /// Display name
         public let name: String
         private let _email: String
@@ -66,7 +66,7 @@ public enum API {
         }
 
         public init(
-            id: String,
+            id: UserId,
             name: String,
             email: String,
             email_address: String? = nil,
@@ -353,6 +353,27 @@ public enum API {
             self.code = code
         }
     }
+
+    public struct UserId: RawRepresentable, Codable, Hashable, Sendable {
+        public let rawValue: String
+
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
+
+        public init(_ rawValue: String) {
+            self.rawValue = rawValue
+        }
+
+        public init(from decoder: Decoder) throws {
+            rawValue = try decoder.singleValueContainer().decode(String.self)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+    }
 }
 
 public final class APIClient: Sendable {
@@ -614,13 +635,13 @@ public final class APIClient: Sendable {
     public enum UsersUserBadge {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: API.UserId
 
-            public init(id: String) {
+            public init(id: API.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: API.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -652,13 +673,13 @@ public final class APIClient: Sendable {
     public enum UsersLastSessionEvent {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: API.UserId
 
-            public init(id: String) {
+            public init(id: API.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: API.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -753,13 +774,13 @@ public final class APIClient: Sendable {
     public enum UsersGetUser {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: API.UserId
 
-            public init(id: String) {
+            public init(id: API.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: API.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -809,12 +830,12 @@ public final class APIClient: Sendable {
     public enum UsersUserActivity {
 
         public struct Response: Codable, Sendable, Equatable {
-            public let userId: String
+            public let userId: API.UserId
             public let year: Int
             public let events: Int
 
             public init(
-                userId: String,
+                userId: API.UserId,
                 year: Int,
                 events: Int
             ) {
@@ -825,11 +846,11 @@ public final class APIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: API.UserId
             public let year: Int
 
             public init(
-                id: String,
+                id: API.UserId,
                 year: Int
             ) {
                 self.id = id
@@ -837,7 +858,7 @@ public final class APIClient: Sendable {
             }
 
             public static func params(
-                id: String,
+                id: API.UserId,
                 year: Int
             ) -> Self {
                 .init(id: id, year: year)
@@ -871,13 +892,13 @@ public final class APIClient: Sendable {
     public enum UsersUserProfile {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: API.UserId
 
-            public init(id: String) {
+            public init(id: API.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: API.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -961,13 +982,13 @@ public final class APIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: API.UserId
 
-            public init(id: String) {
+            public init(id: API.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: API.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -1000,11 +1021,11 @@ public final class APIClient: Sendable {
 
         public struct Response: Codable, Sendable, Equatable {
             public let alreadyArchived: Bool
-            public let userId: String
+            public let userId: API.UserId
 
             public init(
                 alreadyArchived: Bool,
-                userId: String
+                userId: API.UserId
             ) {
                 self.alreadyArchived = alreadyArchived
                 self.userId = userId
@@ -1013,11 +1034,11 @@ public final class APIClient: Sendable {
 
         public struct Response201: Codable, Sendable, Equatable {
             public let archivedAt: Date
-            public let userId: String
+            public let userId: API.UserId
 
             public init(
                 archivedAt: Date,
-                userId: String
+                userId: API.UserId
             ) {
                 self.archivedAt = archivedAt
                 self.userId = userId
@@ -1025,13 +1046,13 @@ public final class APIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: API.UserId
 
-            public init(id: String) {
+            public init(id: API.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: API.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -1139,13 +1160,13 @@ public final class APIClient: Sendable {
     public enum UsersPingUser {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: API.UserId
 
-            public init(id: String) {
+            public init(id: API.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: API.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -1227,13 +1248,13 @@ public final class APIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: API.UserId
 
-            public init(id: String) {
+            public init(id: API.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: API.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -3523,7 +3544,7 @@ public struct APIUsersClient: Sendable {
         }
     }
 
-    /// Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response
+    /// Get a year of user activity, exercising two typed path params (a branded id and a coerced int year) and a cache policy on both a success and an error response
     public func userActivity(_ params: APIClient.UsersUserActivity.Params) async throws(APIClient.UsersUserActivity.Failure) -> APIClient.UsersUserActivity.Result {
         var path = "/users/:id/activity/:year"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))

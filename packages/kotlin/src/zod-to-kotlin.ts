@@ -8,6 +8,7 @@ import {
     readDiscriminatedUnion,
     readDiscriminatorStringLiteral,
     readDeprecation,
+    readMetaBrand,
     readMetaDescription,
     readMetaId,
     readObjectShape,
@@ -72,6 +73,14 @@ export interface KotlinSealedClass {
 
 export type KotlinType = KotlinDataClass | KotlinEnumClass | KotlinSealedClass;
 
+/**
+ * A `Kizuna.brand`, emitted as a value class wrapping the value it brands.
+ */
+export interface KotlinBrand {
+    name: string;
+    rawType: string;
+}
+
 export interface MapResult {
     expression: string;
     optional: boolean;
@@ -84,6 +93,7 @@ export class TypeRegistry {
     private readonly explicitIds = new Set<string>();
     private readonly sealedVariantPayloads = new Set<string>();
     private readonly sealedVariantPaths = new Map<string, string>();
+    private readonly brands = new Map<string, KotlinBrand>();
     public usesJsonElement = false;
 
     constructor(
@@ -138,6 +148,23 @@ export class TypeRegistry {
 
     sealedVariantPath(name: string): string | undefined {
         return this.sealedVariantPaths.get(name);
+    }
+
+    addBrand(brand: KotlinBrand): void {
+        const existing = this.brands.get(brand.name);
+        if (existing !== undefined && existing.rawType !== brand.rawType) {
+            throw new Error(
+                `@kizunajs/kotlin: brand ${stringify(brand.name)} wraps both ${existing.rawType} and ${brand.rawType}. Give each its own name.`
+            );
+        }
+        if (this.types.has(brand.name)) {
+            throw new Error(`@kizunajs/kotlin: brand ${stringify(brand.name)} has the same name as a model. Give each its own name.`);
+        }
+        this.brands.set(brand.name, brand);
+    }
+
+    allBrands(): KotlinBrand[] {
+        return Array.from(this.brands.values());
     }
 
     warnJsonElement(hint: string, reason: string): void {
@@ -197,7 +224,24 @@ const objectFields = (
 
 const stringify = (value: string): string => JSON.stringify(value);
 
+const BRANDABLE_TYPES = new Set(['String', 'Int', 'Long', 'Double', 'Boolean', 'Instant']);
+
 export const mapType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): MapResult => {
+    const result = mapUnbrandedType(schema, registry, hint);
+    const brand = readMetaBrand(schema);
+    if (brand === undefined || !BRANDABLE_TYPES.has(result.expression)) return result;
+    const name = sanitizeIdentifier(brand);
+    registry.addBrand({
+        name,
+        rawType: result.expression,
+    });
+    return {
+        expression: name,
+        optional: false,
+    };
+};
+
+const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): MapResult => {
     if (isFileSchema(schema)) {
         return {
             expression: 'MultipartFile',

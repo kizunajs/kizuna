@@ -398,6 +398,43 @@ clients: [
 ],
 ```
 
+## Branded IDs
+
+A [branded ID](/docs/zod#branded-ids) becomes a named type, `API.UserId`, and a `toUserId` function that makes one. The parameter's type shows it, and passing a plain `string` does not compile.
+
+An ID from a response is already an `API.UserId`, so it passes into the next call as it is:
+
+```ts
+const created = await client.users.createUser({
+    body: {
+        name: 'Ada Lovelace',
+        email: 'ada@example.com',
+    },
+});
+
+if (created.status === 201) {
+    await client.users.deleteUser({
+        params: {
+            id: created.body.id,
+        },
+    });
+}
+```
+
+A `string` from outside the API, like a URL, is wrapped once:
+
+```ts
+import { toUserId } from './api-client.generated';
+
+const user = await client.users.getUser({
+    params: {
+        id: toUserId(searchParams.userId),
+    },
+});
+```
+
+It is still a `string`, so it renders and compares like one.
+
 ## Documentation in the client
 
 Each method carries what the route declared, so an editor shows it at the call site: the route's `summary` and `description`, `@deprecated` with its migration message, and an `@example` of the call with the arguments it cannot be called without.

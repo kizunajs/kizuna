@@ -22,7 +22,7 @@ object API {
     /** A user in the system */
     @Serializable
     data class User(
-        val id: String,
+        val id: UserId,
         val name: String,
         @Deprecated("use `email_address` instead.") val email: String,
         val email_address: String? = null,
@@ -140,6 +140,12 @@ object API {
             @SerialName("not_found") NOT_FOUND("not_found")
         }
     }
+
+    @Serializable
+    @JvmInline
+    value class UserId(val value: String) {
+        override fun toString(): String = value
+    }
 }
 
 class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
@@ -224,14 +230,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
     object UsersUserBadge {
 
-        data class Params(val id: String)
+        data class Params(val id: API.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: API.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -247,14 +253,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
     object UsersLastSessionEvent {
 
-        data class Params(val id: String)
+        data class Params(val id: API.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: API.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -303,7 +309,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
     object UsersGetUser {
 
-        data class Params(val id: String)
+        data class Params(val id: API.UserId)
 
         data class Headers(val xRequestId: String)
 
@@ -313,7 +319,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: API.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(internal val params: Params) {
@@ -341,13 +347,13 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         @Serializable
         data class Response(
-            val userId: String,
+            val userId: API.UserId,
             val year: Int,
             val events: Int
         )
 
         data class Params(
-            val id: String,
+            val id: API.UserId,
             val year: Int
         )
 
@@ -356,7 +362,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
 
         object Scope {
-            fun params(id: String, year: Int): AfterParams = AfterParams(params = Params(id = id, year = year))
+            fun params(id: API.UserId, year: Int): AfterParams = AfterParams(params = Params(id = id, year = year))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -372,14 +378,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
     object UsersUserProfile {
 
-        data class Params(val id: String)
+        data class Params(val id: API.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: API.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -427,14 +433,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         @Serializable
         data class Response(val success: Boolean)
 
-        data class Params(val id: String)
+        data class Params(val id: API.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: API.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -453,23 +459,23 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         @Serializable
         data class Response(
             val alreadyArchived: Boolean,
-            val userId: String
+            val userId: API.UserId
         )
 
         @Serializable
         data class Response201(
             val archivedAt: Instant,
-            val userId: String
+            val userId: API.UserId
         )
 
-        data class Params(val id: String)
+        data class Params(val id: API.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: API.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -526,14 +532,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
     object UsersPingUser {
 
-        data class Params(val id: String)
+        data class Params(val id: API.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: API.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -579,14 +585,14 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         @Serializable
         data class Response(val exists: Boolean)
 
-        data class Params(val id: String)
+        data class Params(val id: API.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: API.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -1933,7 +1939,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         }
     }
 
-    /** Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response */
+    /** Get a year of user activity, exercising two typed path params (a branded id and a coerced int year) and a cache policy on both a success and an error response */
     @Throws(APIClient.UsersUserActivity.Failure::class)
     suspend fun userActivity(build: APIClient.UsersUserActivity.Scope.() -> APIClient.UsersUserActivity.Args): APIClient.UsersUserActivity.Result {
         val args = APIClient.UsersUserActivity.Scope.build()

@@ -51,12 +51,12 @@ class APIClientTest {
     fun testGetUserReturnsSeededUser() = runTest {
         val response = client.users.getUser {
             params(
-                id = "1",
+                id = API.UserId("1"),
             ).headers(
                 xRequestId = "test-1",
             )
         }
-        assertEquals("1", response.body.id)
+        assertEquals(API.UserId("1"), response.body.id)
         assertEquals("Ada Lovelace", response.body.name)
         assertEquals("ada@example.com", response.body.email)
     }
@@ -65,11 +65,11 @@ class APIClientTest {
     fun testTypedPathParamIsSentOnTheWire() = runTest {
         val response = client.users.userActivity {
             params(
-                id = "1",
+                id = API.UserId("1"),
                 year = 2024,
             )
         }
-        assertEquals("1", response.body.userId)
+        assertEquals(API.UserId("1"), response.body.userId)
         assertEquals(2024, response.body.year)
         assertEquals(24, response.body.events)
     }
@@ -79,7 +79,7 @@ class APIClientTest {
         val failure = assertFailsWith<APIClient.UsersGetUser.Failure.NotFound> {
             client.users.getUser {
                 params(
-                    id = "does-not-exist",
+                    id = API.UserId("does-not-exist"),
                 ).headers(
                     xRequestId = "test-2",
                 )
@@ -97,7 +97,7 @@ class APIClientTest {
                 last_name = "Hopper",
             )
         }
-        assertTrue(response.body.id.isNotEmpty())
+        assertTrue(response.body.id.value.isNotEmpty())
         assertEquals("Grace Hopper", response.body.name)
         assertEquals("Hopper", response.body.last_name)
     }
@@ -106,7 +106,7 @@ class APIClientTest {
     fun testSnakeCaseFieldDecodedFromSeed() = runTest {
         val response = client.users.getUser {
             params(
-                id = "1",
+                id = API.UserId("1"),
             ).headers(
                 xRequestId = "snake-decode",
             )
@@ -145,7 +145,7 @@ class APIClientTest {
     fun testResponseHeaderEchoedInResult() = runTest {
         val response = client.users.getUser {
             params(
-                id = "1",
+                id = API.UserId("1"),
             ).headers(
                 xRequestId = "trace-xyz-999",
             )
@@ -169,7 +169,7 @@ class APIClientTest {
     fun testLastSessionEventSealedVariants() = runTest {
         val login = client.users.lastSessionEvent {
             params(
-                id = "1",
+                id = API.UserId("1"),
             )
         }
         val loginEvent = login.body
@@ -179,7 +179,7 @@ class APIClientTest {
 
         val logout = client.users.lastSessionEvent {
             params(
-                id = "2",
+                id = API.UserId("2"),
             )
         }
         val logoutEvent = logout.body
@@ -364,7 +364,7 @@ class APIClientTest {
         assertFailsWith<APIClient.UsersCheckUser.Failure> {
             client.users.checkUser {
                 params(
-                    id = "does-not-exist",
+                    id = API.UserId("does-not-exist"),
                 )
             }
         }
@@ -463,7 +463,7 @@ class APIClientTest {
         assertFailsWith<APIClient.UsersGetUser.Failure.NotFound> {
             client.users.getUser {
                 params(
-                    id = "a/b",
+                    id = API.UserId("a/b"),
                 ).headers(
                     xRequestId = "test-5",
                 )

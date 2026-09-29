@@ -19,6 +19,8 @@ import type { ExtractPathParams, HasPathParams } from 'kizunajs';
 import { buildPath, isRouteDefinition } from 'kizunajs';
 import { parseServerSentEvents, readByteChunks, readTextChunks } from './sse.js';
 
+export type { $brand } from 'zod';
+
 type ResponseUnion<R extends RouteDefinition> = {
     [S in keyof R['responses']]: {
         status: S extends number ? S : never;

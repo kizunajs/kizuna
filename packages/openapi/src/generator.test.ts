@@ -1422,6 +1422,50 @@ describe('examples from metadata', () => {
     });
 });
 
+describe('brands from metadata', () => {
+    const CenterId = Kizuna.brand('CenterId', z.string());
+    const brandRoutes = k.routes('api', {
+        getCenter: k.route({
+            method: 'GET',
+            path: '/centers/:centerId',
+            pathParams: z.object({
+                centerId: CenterId,
+            }),
+            responses: {
+                200: z.object({
+                    id: CenterId,
+                }),
+            },
+        }),
+    });
+
+    const brandContract = defineConfig({
+        ...config,
+        routes: brandRoutes,
+    }).api;
+    const spec = generateJson(brandContract, baseConfig);
+    const operation = spec.paths['/centers/{centerId}']?.get;
+
+    it('emits the brand as an x-kizuna-brand extension', () => {
+        const parameter = operation?.parameters?.[0] as {
+            schema?: Record<string, unknown>;
+        };
+        expect(parameter.schema?.['x-kizuna-brand']).toBe('CenterId');
+        expect(parameter.schema?.['brand']).toBeUndefined();
+    });
+
+    it('emits the brand on a response field', () => {
+        const body = operation?.responses?.['200']?.content?.['application/json']?.schema as
+            | Record<string, Record<string, Record<string, unknown>>>
+            | undefined;
+        expect(body?.properties?.['id']?.['x-kizuna-brand']).toBe('CenterId');
+    });
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+});
+
 describe('deprecation and sunset headers', () => {
     const headerRoutes = k.routes('api', {
         deleteUser: k.route({

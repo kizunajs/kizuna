@@ -24,7 +24,7 @@ object OpenEnumAPI {
     /** A user in the system */
     @Serializable
     data class User(
-        val id: String,
+        val id: UserId,
         val name: String,
         @Deprecated("use `email_address` instead.") val email: String,
         val email_address: String? = null,
@@ -214,6 +214,12 @@ object OpenEnumAPI {
             }
         }
     }
+
+    @Serializable
+    @JvmInline
+    value class UserId(val value: String) {
+        override fun toString(): String = value
+    }
 }
 
 class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
@@ -298,14 +304,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
     object UsersUserBadge {
 
-        data class Params(val id: String)
+        data class Params(val id: OpenEnumAPI.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -321,14 +327,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
     object UsersLastSessionEvent {
 
-        data class Params(val id: String)
+        data class Params(val id: OpenEnumAPI.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -377,7 +383,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
     object UsersGetUser {
 
-        data class Params(val id: String)
+        data class Params(val id: OpenEnumAPI.UserId)
 
         data class Headers(val xRequestId: String)
 
@@ -387,7 +393,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(internal val params: Params) {
@@ -415,13 +421,13 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         @Serializable
         data class Response(
-            val userId: String,
+            val userId: OpenEnumAPI.UserId,
             val year: Int,
             val events: Int
         )
 
         data class Params(
-            val id: String,
+            val id: OpenEnumAPI.UserId,
             val year: Int
         )
 
@@ -430,7 +436,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
 
         object Scope {
-            fun params(id: String, year: Int): AfterParams = AfterParams(params = Params(id = id, year = year))
+            fun params(id: OpenEnumAPI.UserId, year: Int): AfterParams = AfterParams(params = Params(id = id, year = year))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -446,14 +452,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
     object UsersUserProfile {
 
-        data class Params(val id: String)
+        data class Params(val id: OpenEnumAPI.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -501,14 +507,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class Response(val success: Boolean)
 
-        data class Params(val id: String)
+        data class Params(val id: OpenEnumAPI.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -527,23 +533,23 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class Response(
             val alreadyArchived: Boolean,
-            val userId: String
+            val userId: OpenEnumAPI.UserId
         )
 
         @Serializable
         data class Response201(
             val archivedAt: Instant,
-            val userId: String
+            val userId: OpenEnumAPI.UserId
         )
 
-        data class Params(val id: String)
+        data class Params(val id: OpenEnumAPI.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -600,14 +606,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
     object UsersPingUser {
 
-        data class Params(val id: String)
+        data class Params(val id: OpenEnumAPI.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -680,14 +686,14 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class Response(val exists: Boolean)
 
-        data class Params(val id: String)
+        data class Params(val id: OpenEnumAPI.UserId)
 
         sealed interface Args {
             val params: Params
         }
 
         object Scope {
-            fun params(id: String): AfterParams = AfterParams(params = Params(id = id))
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
         }
 
         class AfterParams internal constructor(override val params: Params) : Args
@@ -2163,7 +2169,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
-    /** Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response */
+    /** Get a year of user activity, exercising two typed path params (a branded id and a coerced int year) and a cache policy on both a success and an error response */
     @Throws(OpenEnumAPIClient.UsersUserActivity.Failure::class)
     suspend fun userActivity(build: OpenEnumAPIClient.UsersUserActivity.Scope.() -> OpenEnumAPIClient.UsersUserActivity.Args): OpenEnumAPIClient.UsersUserActivity.Result {
         val args = OpenEnumAPIClient.UsersUserActivity.Scope.build()

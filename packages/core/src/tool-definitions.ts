@@ -138,6 +138,9 @@ const toJsonSchema = (route: RouteDefinition): Record<string, unknown> => {
     const { $schema: _, ...schema } = z.toJSONSchema(z.object(shape ?? {}), {
         io: 'input',
         unrepresentable: 'any',
+        override: ({ jsonSchema }) => {
+            delete jsonSchema.brand;
+        },
     }) as Record<string, unknown>;
     return schema;
 };

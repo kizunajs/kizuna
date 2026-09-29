@@ -44,19 +44,19 @@ final class APIClientTests: XCTestCase {
 
     func testGetUserReturnsSeededUser() async throws {
         let result = try await client.users.getUser(
-            .params(id: "1"),
+            .params(id: API.UserId("1")),
             .headers(xRequestId: "test-1")
         )
-        XCTAssertEqual(result.body.id, "1")
+        XCTAssertEqual(result.body.id, API.UserId("1"))
         XCTAssertEqual(result.body.name, "Ada Lovelace")
         XCTAssertEqual(result.body.email, "ada@example.com")
     }
 
     func testTypedPathParamIsSentOnTheWire() async throws {
         let response = try await client.users.userActivity(
-            .params(id: "1", year: 2024)
+            .params(id: API.UserId("1"), year: 2024)
         )
-        XCTAssertEqual(response.body.userId, "1")
+        XCTAssertEqual(response.body.userId, API.UserId("1"))
         XCTAssertEqual(response.body.year, 2024)
         XCTAssertEqual(response.body.events, 24)
     }
@@ -64,7 +64,7 @@ final class APIClientTests: XCTestCase {
     func testGetUserNotFoundThrowsTypedError() async throws {
         do {
             _ = try await client.users.getUser(
-                .params(id: "does-not-exist"),
+                .params(id: API.UserId("does-not-exist")),
                 .headers(xRequestId: "test-2")
             )
             XCTFail("expected .notFound to be thrown")
@@ -83,7 +83,7 @@ final class APIClientTests: XCTestCase {
                 last_name: "Hopper"
             )
         )
-        XCTAssertFalse(created.body.id.isEmpty)
+        XCTAssertFalse(created.body.id.rawValue.isEmpty)
         XCTAssertEqual(created.body.name, "Grace Hopper")
         XCTAssertEqual(created.body.email, "grace@example.com")
         XCTAssertEqual(created.body.last_name, "Hopper")
@@ -97,7 +97,7 @@ final class APIClientTests: XCTestCase {
 
     func testSnakeCaseFieldDecodedFromSeed() async throws {
         let result = try await client.users.getUser(
-            .params(id: "1"),
+            .params(id: API.UserId("1")),
             .headers(xRequestId: "snake-decode")
         )
         XCTAssertEqual(result.body.last_name, "Lovelace", "snake_case wire key 'last_name' must round-trip into Swift property 'last_name'")
@@ -133,7 +133,7 @@ final class APIClientTests: XCTestCase {
     func testDeleteUserNotFoundThrowsTypedError() async throws {
         do {
             _ = try await client.users.deleteUser(
-                .params(id: "missing-id")
+                .params(id: API.UserId("missing-id"))
             )
             XCTFail("expected .notFound to be thrown")
         } catch .notFound(let payload) {
@@ -145,7 +145,7 @@ final class APIClientTests: XCTestCase {
 
     func testResponseHeaderEchoedInResult() async throws {
         let result = try await client.users.getUser(
-            .params(id: "1"),
+            .params(id: API.UserId("1")),
             .headers(xRequestId: "trace-xyz-999")
         )
         XCTAssertEqual(result.headers.xRequestId, "trace-xyz-999", "server must echo x-request-id back and client must expose it on Result")
@@ -158,7 +158,7 @@ final class APIClientTests: XCTestCase {
             await captured.set(request: request)
         })
         _ = try await testClient.users.getUser(
-            .params(id: "1"),
+            .params(id: API.UserId("1")),
             .headers(xRequestId: "trace-abc-123")
         )
         let value = await captured.headerValue(for: "x-request-id")
@@ -210,7 +210,7 @@ final class APIClientTests: XCTestCase {
         // With encoding, the handler runs and returns the contract-shaped 404.
         do {
             _ = try await client.users.getUser(
-                .params(id: "a/b"),
+                .params(id: API.UserId("a/b")),
                 .headers(xRequestId: "test-5")
             )
             XCTFail("expected .notFound")
@@ -407,7 +407,7 @@ final class APIClientTests: XCTestCase {
     func testUserBadgeReturnsBinaryData() async throws {
         // userBadge declares `body: BinarySchema` with `application/octet-stream`, so the
         // client decodes the response as raw `Data` rather than JSON.
-        let result = try await client.users.userBadge(.params(id: "1"))
+        let result = try await client.users.userBadge(.params(id: API.UserId("1")))
         let text = String(decoding: result.body, as: UTF8.self)
         XCTAssertEqual(text, "BADGE:1:Ada Lovelace")
     }
@@ -416,7 +416,7 @@ final class APIClientTests: XCTestCase {
         // UserSessionEvent's inline variants nest under the union as UserSessionEvent.Login /
         // .Logout, matching the Kotlin client. Switching over both arms proves the enum references
         // the nested types rather than the flat synthesized names.
-        let login = try await client.users.lastSessionEvent(.params(id: "1"))
+        let login = try await client.users.lastSessionEvent(.params(id: API.UserId("1")))
         switch login.body {
         case .login(let payload):
             XCTAssertEqual(payload.ipAddress, "203.0.113.7")
@@ -425,7 +425,7 @@ final class APIClientTests: XCTestCase {
             XCTFail("user 1's last session event is a login")
         }
 
-        let logout = try await client.users.lastSessionEvent(.params(id: "2"))
+        let logout = try await client.users.lastSessionEvent(.params(id: API.UserId("2")))
         switch logout.body {
         case .login:
             XCTFail("user 2's last session event is a logout")
@@ -531,7 +531,7 @@ final class APIClientTests: XCTestCase {
         let request = Task { () -> (any Error)? in
             do {
                 _ = try await stalled.users.getUser(
-                    .params(id: "1"),
+                    .params(id: API.UserId("1")),
                     .headers(xRequestId: "cancel-1")
                 )
                 return nil
@@ -561,7 +561,7 @@ final class APIClientTests: XCTestCase {
     func testIsCancelledIsFalseForOtherFailures() async throws {
         do {
             _ = try await client.users.getUser(
-                .params(id: "does-not-exist"),
+                .params(id: API.UserId("does-not-exist")),
                 .headers(xRequestId: "cancel-2")
             )
             XCTFail("expected .notFound to be thrown")

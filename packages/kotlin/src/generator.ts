@@ -30,6 +30,7 @@ import {
     collectObjectFields,
     objectFieldCount,
     objectShapeKeys,
+    type KotlinBrand,
     type KotlinField,
     type KotlinType,
 } from './zod-to-kotlin.js';
@@ -834,6 +835,17 @@ const emitType = (
     } else if (registry) {
         emitSealedClass(writer, type, registry, ownedTypeMap, ownedTypeLookup);
     }
+};
+
+/**
+ * A brand as a value class that serializes and prints as the bare value.
+ */
+const emitBrand = (writer: KotlinWriter, brand: KotlinBrand): void => {
+    writer.line('@Serializable');
+    writer.line('@JvmInline');
+    writer.block(`value class ${brand.name}(val value: ${brand.rawType})`, () => {
+        writer.line(`override fun toString(): String = ${brand.rawType === 'String' ? 'value' : 'value.toString()'}`);
+    });
 };
 
 const emitTypes = (
@@ -1948,6 +1960,10 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
 
     writer.block(`object ${namespaceName}`, () => {
         emitTypes(writer, topLevelSharedTypes, ownedTypeMap, ownedTypeLookup, registry);
+        for (const brand of registry.allBrands()) {
+            writer.blank();
+            emitBrand(writer, brand);
+        }
     });
 
     emitClient(writer, { clientName }, partition, context, typesByOperation, registry);

@@ -34,7 +34,7 @@ public enum OpenEnumAPI {
             }
         }
         /// Unique user identifier
-        public let id: String
+        public let id: UserId
         /// Display name
         public let name: String
         private let _email: String
@@ -66,7 +66,7 @@ public enum OpenEnumAPI {
         }
 
         public init(
-            id: String,
+            id: UserId,
             name: String,
             email: String,
             email_address: String? = nil,
@@ -440,6 +440,27 @@ public enum OpenEnumAPI {
             self.code = code
         }
     }
+
+    public struct UserId: RawRepresentable, Codable, Hashable, Sendable {
+        public let rawValue: String
+
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
+
+        public init(_ rawValue: String) {
+            self.rawValue = rawValue
+        }
+
+        public init(from decoder: Decoder) throws {
+            rawValue = try decoder.singleValueContainer().decode(String.self)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(rawValue)
+        }
+    }
 }
 
 public final class OpenEnumAPIClient: Sendable {
@@ -701,13 +722,13 @@ public final class OpenEnumAPIClient: Sendable {
     public enum UsersUserBadge {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: OpenEnumAPI.UserId
 
-            public init(id: String) {
+            public init(id: OpenEnumAPI.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -739,13 +760,13 @@ public final class OpenEnumAPIClient: Sendable {
     public enum UsersLastSessionEvent {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: OpenEnumAPI.UserId
 
-            public init(id: String) {
+            public init(id: OpenEnumAPI.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -840,13 +861,13 @@ public final class OpenEnumAPIClient: Sendable {
     public enum UsersGetUser {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: OpenEnumAPI.UserId
 
-            public init(id: String) {
+            public init(id: OpenEnumAPI.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -896,12 +917,12 @@ public final class OpenEnumAPIClient: Sendable {
     public enum UsersUserActivity {
 
         public struct Response: Codable, Sendable, Equatable {
-            public let userId: String
+            public let userId: OpenEnumAPI.UserId
             public let year: Int
             public let events: Int
 
             public init(
-                userId: String,
+                userId: OpenEnumAPI.UserId,
                 year: Int,
                 events: Int
             ) {
@@ -912,11 +933,11 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: OpenEnumAPI.UserId
             public let year: Int
 
             public init(
-                id: String,
+                id: OpenEnumAPI.UserId,
                 year: Int
             ) {
                 self.id = id
@@ -924,7 +945,7 @@ public final class OpenEnumAPIClient: Sendable {
             }
 
             public static func params(
-                id: String,
+                id: OpenEnumAPI.UserId,
                 year: Int
             ) -> Self {
                 .init(id: id, year: year)
@@ -958,13 +979,13 @@ public final class OpenEnumAPIClient: Sendable {
     public enum UsersUserProfile {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: OpenEnumAPI.UserId
 
-            public init(id: String) {
+            public init(id: OpenEnumAPI.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -1048,13 +1069,13 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: OpenEnumAPI.UserId
 
-            public init(id: String) {
+            public init(id: OpenEnumAPI.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -1087,11 +1108,11 @@ public final class OpenEnumAPIClient: Sendable {
 
         public struct Response: Codable, Sendable, Equatable {
             public let alreadyArchived: Bool
-            public let userId: String
+            public let userId: OpenEnumAPI.UserId
 
             public init(
                 alreadyArchived: Bool,
-                userId: String
+                userId: OpenEnumAPI.UserId
             ) {
                 self.alreadyArchived = alreadyArchived
                 self.userId = userId
@@ -1100,11 +1121,11 @@ public final class OpenEnumAPIClient: Sendable {
 
         public struct Response201: Codable, Sendable, Equatable {
             public let archivedAt: Date
-            public let userId: String
+            public let userId: OpenEnumAPI.UserId
 
             public init(
                 archivedAt: Date,
-                userId: String
+                userId: OpenEnumAPI.UserId
             ) {
                 self.archivedAt = archivedAt
                 self.userId = userId
@@ -1112,13 +1133,13 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: OpenEnumAPI.UserId
 
-            public init(id: String) {
+            public init(id: OpenEnumAPI.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -1226,13 +1247,13 @@ public final class OpenEnumAPIClient: Sendable {
     public enum UsersPingUser {
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: OpenEnumAPI.UserId
 
-            public init(id: String) {
+            public init(id: OpenEnumAPI.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -1345,13 +1366,13 @@ public final class OpenEnumAPIClient: Sendable {
         }
 
         public struct Params: Sendable {
-            public let id: String
+            public let id: OpenEnumAPI.UserId
 
-            public init(id: String) {
+            public init(id: OpenEnumAPI.UserId) {
                 self.id = id
             }
 
-            public static func params(id: String) -> Self {
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
                 .init(id: id)
             }
         }
@@ -3805,7 +3826,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
-    /// Get a year of user activity, exercising two typed path params (a string id and a coerced int year) and a cache policy on both a success and an error response
+    /// Get a year of user activity, exercising two typed path params (a branded id and a coerced int year) and a cache policy on both a success and an error response
     public func userActivity(_ params: OpenEnumAPIClient.UsersUserActivity.Params) async throws(OpenEnumAPIClient.UsersUserActivity.Failure) -> OpenEnumAPIClient.UsersUserActivity.Result {
         var path = "/users/:id/activity/:year"
         path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))

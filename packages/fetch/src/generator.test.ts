@@ -5,6 +5,7 @@ import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
 import { generateFetchClient } from './generator.js';
 import { createGeneratedClient, type GeneratedRoutes } from './client.js';
+import { brandedContract } from './branded.fixture.js';
 
 const k = new Kizuna();
 
@@ -367,5 +368,36 @@ describe('generateFetchClient: hidden routes and plugin routes', () => {
         expect(output).not.toContain('healthCheck');
         expect(output).not.toContain('ping');
         expect(output).not.toContain('internalProbe');
+    });
+});
+
+describe('a branded schema', () => {
+    const branded = generateFetchClient(brandedContract, {
+        runtimeModule: './client.js',
+    });
+
+    it('declares the brand once as a named type', () => {
+        expect(branded.match(/export type CenterId = string & \$brand<"CenterId">;/g)).toHaveLength(1);
+    });
+
+    it('exports a constructor for the brand', () => {
+        expect(branded).toContain('export const toCenterId = (value: string): API.CenterId => value as API.CenterId;');
+    });
+
+    it('refers to the brand by name wherever the schema appears', () => {
+        expect(branded).toContain('centerId: CenterId;');
+        expect(branded).toContain('parentId?: CenterId;');
+        expect(branded).toContain('"x-actor-center": CenterId;');
+        expect(branded).toContain('id: CenterId;');
+        expect(branded).toContain('parentId: CenterId | null;');
+    });
+
+    it('imports $brand from the runtime only when a brand is used', () => {
+        expect(branded).toContain('import { createGeneratedClient, type $brand, type ClientConfig');
+        expect(source).not.toContain('$brand');
+    });
+
+    it('emits the client the type tests compile against', async () => {
+        await expect(branded).toMatchFileSnapshot('./branded-client.generated.ts');
     });
 });

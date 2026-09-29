@@ -159,10 +159,10 @@ const JSON_ENCODING: Record<string, Record<string, unknown>> = {
 };
 
 /**
- * kizuna's metadata widens JSON Schema: `deprecated` may carry a message and
- * `example` holds one value or several. Emit `deprecated: true` and an
- * `examples` array; the message stays in outputs with a place for it, like
- * Swift's `@available`.
+ * kizuna's metadata widens JSON Schema: `deprecated` may carry a message,
+ * `example` holds one value or several, and `brand` has no keyword. Emit
+ * `deprecated: true`, an `examples` array and `x-kizuna-brand`; the message
+ * stays in outputs with a place for it, like Swift's `@available`.
  */
 const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; jsonSchema: Record<string, unknown> }): void => {
     const encoding = JSON_ENCODING[readDef(zodSchema).type ?? ''];
@@ -174,6 +174,10 @@ const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; 
         const declared = Array.isArray(jsonSchema.examples) ? jsonSchema.examples : [];
         jsonSchema.examples = [...given, ...declared];
         delete jsonSchema.example;
+    }
+    if ('brand' in jsonSchema) {
+        jsonSchema['x-kizuna-brand'] = jsonSchema.brand;
+        delete jsonSchema.brand;
     }
 };
 
