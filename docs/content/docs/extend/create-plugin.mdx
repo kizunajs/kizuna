@@ -270,6 +270,63 @@ A plugin brings routes of its own only when something outside your apps calls th
 
 If a plugin claims a path your routes already use, `defineConfig` throws and names both.
 
+### Base path
+
+A plugin with several routes declares a `basePath`, and writes each route's `path` relative to it. A route at `/` serves the base path itself:
+
+```ts title="src/plugins/webhooks/index.ts"
+export const webhooksPlugin = definePlugin({
+    slug: 'webhooks',
+    basePath: '/webhooks',
+    setup: () => ({
+        routes: {
+            receive: route({
+                method: 'POST',
+                path: '/',
+                auth: false,
+                responses: {
+                    204: z.void(),
+                },
+            }).handler(receiveEvent),
+            status: route({
+                method: 'GET',
+                path: '/status',
+                auth: false,
+                responses: {
+                    200: StatusSchema,
+                },
+            }).handler(reportStatus),
+        },
+    }),
+});
+```
+
+That serves `/webhooks` and `/webhooks/status`. When those clash with your own routes, move them all at install:
+
+```ts title="kizuna.config.ts"
+plugins: [
+    webhooksPlugin({
+        basePath: '/integrations',
+    }),
+],
+```
+
+Only a plugin that declares a `basePath` takes one at install.
+
+### Running the app's own functions
+
+A plugin whose route runs code the app writes, like a webhook's event functions, takes those functions as an option and hands them the app's jobs and plugins. `ApiContext<Config>` from `kizunajs/plugin` types them from the app's `Config`, so a helper that takes `Config` as a type parameter gives the app typed `jobs` and `plugins` in a file of its own:
+
+```ts title="src/plugins/webhooks/events.ts"
+import type { ApiContext } from 'kizunajs/plugin';
+
+export type WebhookEventHandler<Config = unknown> = (context: ApiContext<Config> & { event: WebhookEvent }) => Promise<void> | void;
+
+export const defineWebhookEvents = <Config = unknown>(handlers: Record<string, WebhookEventHandler<Config>>) => handlers;
+```
+
+The route's handler passes `jobs` and `plugins` on from its own arguments.
+
 ## Slugs
 
 A plugin's `slug` is what handlers reach it under. The plugin picks one, and the app can change it. When two plugins want the same slug, `defineConfig` throws, names both, and tells you to rename one:

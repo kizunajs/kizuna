@@ -92,6 +92,30 @@ export default defineConfig({
         expect(types).toContain('plugins: [ReturnType<typeof mcpPlugin>, ReturnType<typeof openApiPlugin>];');
     });
 
+    it('writes one plugin per line when the tuple would run past the print width', () => {
+        const types = generateConfigTypes(`
+import { defineConfig } from 'kizunajs';
+import { mcpPlugin } from '@kizunajs/mcp';
+import { openApiPlugin } from '@kizunajs/openapi';
+import { webhooksPlugin } from './src/plugins/webhooks';
+import { emailPlugin } from './src/plugins/email';
+
+export default defineConfig({
+    plugins: [mcpPlugin(), openApiPlugin(), emailPlugin(), webhooksPlugin()],
+});
+`);
+        expect(types).toContain(
+            [
+                '    plugins: [',
+                '        ReturnType<typeof mcpPlugin>,',
+                '        ReturnType<typeof openApiPlugin>,',
+                '        ReturnType<typeof emailPlugin>,',
+                '        ReturnType<typeof webhooksPlugin>,',
+                '    ];',
+            ].join('\n')
+        );
+    });
+
     it('keeps an aliased import pointing at the name its module exports', () => {
         const types = generateConfigTypes(`
 import { defineConfig } from 'kizunajs';

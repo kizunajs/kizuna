@@ -609,6 +609,98 @@ describe('k.contract: plugins', () => {
     });
 });
 
+describe('a plugin base path', () => {
+    const webhooks = definePlugin({
+        slug: 'webhooks',
+        basePath: '/webhooks',
+        setup: () => ({
+            routes: {
+                receive: route({
+                    method: 'POST',
+                    path: '/',
+                    auth: false,
+                    responses: {
+                        204: z.void(),
+                    },
+                }).handler(() => ({
+                    status: 204,
+                    body: undefined,
+                })),
+                status: route({
+                    method: 'GET',
+                    path: '/status',
+                    auth: false,
+                    responses: {
+                        204: z.void(),
+                    },
+                }).handler(() => ({
+                    status: 204,
+                    body: undefined,
+                })),
+            },
+        }),
+    });
+
+    const pathsOf = (api: unknown, slug: string): string[] =>
+        Object.values((pluginRoutesOf(api) as Record<string, Record<string, RouteDefinition>>)[slug] ?? {}).map((route) => route.path);
+
+    it('serves the routes under the plugin base path, a route at / on the base path itself', () => {
+        const { api } = defineConfig({
+            routes: {},
+            plugins: [webhooks()],
+        });
+
+        expect(pathsOf(api, 'webhooks')).toEqual(['/webhooks', '/webhooks/status']);
+    });
+
+    it('serves them under the base path the app passes', () => {
+        const { api } = defineConfig({
+            routes: {},
+            plugins: [
+                webhooks(),
+                webhooks({
+                    slug: 'otherWebhooks',
+                    basePath: '/integrations',
+                }),
+            ],
+        });
+
+        expect(pathsOf(api, 'webhooks')).toEqual(['/webhooks', '/webhooks/status']);
+        expect(pathsOf(api, 'otherWebhooks')).toEqual(['/integrations', '/integrations/status']);
+    });
+
+    it('throws on a base path that ends with /', () => {
+        expect(() =>
+            defineConfig({
+                routes: {},
+                plugins: [
+                    webhooks({
+                        basePath: '/integrations/',
+                    }),
+                ],
+            })
+        ).toThrow(/Plugin 'webhooks' has the base path '\/integrations\/'/);
+    });
+
+    it('throws when the app moves a plugin that declares no base path', () => {
+        const status = definePlugin({
+            slug: 'status',
+            setup: () => ({}),
+        });
+
+        expect(() =>
+            defineConfig({
+                routes: {},
+                plugins: [
+                    status({
+                        basePath: '/status',
+                    } as never),
+                ],
+            })
+        ).toThrow(/Plugin 'status' declares no `basePath`/);
+    });
+});
+
 describe('rawBody', () => {
     const rawTags = k.tags({
         api: 'API',

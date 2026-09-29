@@ -8,6 +8,7 @@ import type { AuthoredRouteDefinition, RouteHiddenToolCheck, Routes, RouteDefini
 import type { RoutePath } from './types.js';
 
 export type { RoutePath };
+export type { ApiContext } from './configured.js';
 
 // Registry-global: adapters read these off the api, and a dual ESM/CJS install
 // would otherwise hold two different symbols.
@@ -73,11 +74,25 @@ type OptionsInput<Schema> = Schema extends z.ZodType ? z.input<Schema> : {};
 /**
  * What {@link definePlugin} takes.
  */
-export interface PluginDefinition<Slug extends string, Schema extends z.ZodType | undefined, Setup extends PluginSetup> {
+export interface PluginDefinition<
+    Slug extends string,
+    Schema extends z.ZodType | undefined,
+    Setup extends PluginSetup,
+    BasePath extends RoutePath | undefined = undefined,
+> {
     /**
      * Handlers reach the plugin at `plugins.<slug>`.
      */
     slug: Slug;
+    /**
+     * Where the plugin's routes are served. Each route's `path` is relative to
+     * it, and a route at `/` serves the base path itself. The app can pass
+     * another one when it clashes with its own routes.
+     *
+     * @example
+     * basePath: '/webhooks',
+     */
+    basePath?: BasePath;
     /**
      * A Zod schema for what the app passes in. It's validated once, when the
      * config assembles, and a failure names the plugin and the field.
@@ -97,7 +112,11 @@ export interface PluginDefinition<Slug extends string, Schema extends z.ZodType 
  */
 export interface PluginDeclaration<Slug extends string = string, Setup extends PluginSetup = PluginSetup> {
     readonly slug: Slug;
-    readonly definition: PluginDefinition<string, z.ZodType | undefined, PluginSetup>;
+    /**
+     * The base path the app passed, when it moved the plugin's routes.
+     */
+    readonly basePath?: string;
+    readonly definition: PluginDefinition<string, z.ZodType | undefined, PluginSetup, RoutePath | undefined>;
     readonly input: unknown;
     /**
      * Carries what `setup` returns, for the types. Never set at runtime.
@@ -113,30 +132,47 @@ export interface PluginDeclaration<Slug extends string = string, Setup extends P
  * `ReturnType<typeof emailPlugin>`, which `kizuna generate` writes, keeps the
  * plugin's own slug rather than widening it to `string`.
  */
-export type PluginFactory<DefaultSlug extends string, Schema extends z.ZodType | undefined, Setup extends PluginSetup> =
+export type PluginFactory<
+    DefaultSlug extends string,
+    Schema extends z.ZodType | undefined,
+    Setup extends PluginSetup,
+    BasePath extends RoutePath | undefined = undefined,
+> =
     {} extends OptionsInput<Schema>
         ? {
               <const Slug extends string>(
-                  options: OptionsInput<Schema> & {
-                      /**
-                       * Install the plugin under another slug, when two plugins want the same one.
-                       */
-                      slug: Slug;
-                  }
+                  options: OptionsInput<Schema> & InstallOptions<BasePath> & SlugOption<Slug>
               ): PluginDeclaration<Slug, Setup>;
-              (options?: OptionsInput<Schema>): PluginDeclaration<DefaultSlug, Setup>;
+              (options?: OptionsInput<Schema> & InstallOptions<BasePath>): PluginDeclaration<DefaultSlug, Setup>;
           }
         : {
               <const Slug extends string>(
-                  options: OptionsInput<Schema> & {
-                      /**
-                       * Install the plugin under another slug, when two plugins want the same one.
-                       */
-                      slug: Slug;
-                  }
+                  options: OptionsInput<Schema> & InstallOptions<BasePath> & SlugOption<Slug>
               ): PluginDeclaration<Slug, Setup>;
-              (options: OptionsInput<Schema>): PluginDeclaration<DefaultSlug, Setup>;
+              (options: OptionsInput<Schema> & InstallOptions<BasePath>): PluginDeclaration<DefaultSlug, Setup>;
           };
+
+export interface SlugOption<Slug extends string> {
+    /**
+     * Install the plugin under another slug, when two plugins want the same one.
+     */
+    slug: Slug;
+}
+
+/**
+ * `basePath` at install, offered only by a plugin that declares one.
+ */
+export type InstallOptions<BasePath> = BasePath extends RoutePath
+    ? {
+          /**
+           * Serve the plugin's routes somewhere else, when they clash with the
+           * app's own.
+           */
+          basePath?: RoutePath;
+      }
+    : {
+          basePath?: never;
+      };
 
 /**
  * Declare a plugin: its slug, the options an app passes it, and the `setup` that
@@ -164,14 +200,24 @@ export type PluginFactory<DefaultSlug extends string, Schema extends z.ZodType |
  *     },
  * });
  */
-export const definePlugin = <Slug extends string, Setup extends PluginSetup, Schema extends z.ZodType | undefined = undefined>(
-    definition: PluginDefinition<Slug, Schema, Setup>
-): PluginFactory<Slug, Schema, Setup> =>
+export const definePlugin = <
+    Slug extends string,
+    Setup extends PluginSetup,
+    Schema extends z.ZodType | undefined = undefined,
+    BasePath extends RoutePath | undefined = undefined,
+>(
+    definition: PluginDefinition<Slug, Schema, Setup, BasePath>
+): PluginFactory<Slug, Schema, Setup, BasePath> =>
     ((input?: Record<string, unknown>) => {
-        const { slug, ...options } = input ?? {};
+        const { slug, basePath, ...options } = input ?? {};
         return {
             slug: typeof slug === 'string' ? slug : definition.slug,
-            definition: definition as unknown as PluginDefinition<string, z.ZodType | undefined, PluginSetup>,
+            ...(typeof basePath === 'string'
+                ? {
+                      basePath,
+                  }
+                : {}),
+            definition: definition as unknown as PluginDefinition<string, z.ZodType | undefined, PluginSetup, RoutePath | undefined>,
             input: options,
         };
     }) as never;

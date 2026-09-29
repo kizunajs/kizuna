@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import { PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type PluginApi, type PluginDeclaration, type ResolvedPlugin } from './plugin.js';
-import type { Routes } from './types.js';
+import type { RoutePath, Routes } from './types.js';
 
 /**
  * The plugin routes `assembleApi` stashed on the api. Empty without plugins, so
@@ -46,6 +46,30 @@ export const describeIssue = (issue: z.core.$ZodIssue): string => {
 };
 
 /**
+ * A route's path under its plugin's base path. A route at `/` serves the base
+ * path itself, since `/webhooks` and `/webhooks/` are different paths.
+ */
+const underBasePath = (basePath: string, path: string): RoutePath => (path === '/' ? basePath : `${basePath}${path}`) as RoutePath;
+
+/**
+ * The base path a plugin's routes are served under: the app's, else the
+ * plugin's own. An app can only move a plugin that declares one.
+ */
+const basePathOf = (declaration: PluginDeclaration): string | undefined => {
+    const { definition, slug } = declaration;
+    if (declaration.basePath !== undefined && definition.basePath === undefined) {
+        throw new Error(`[kizuna] Plugin '${slug}' declares no \`basePath\`, so its routes can't be moved. Remove \`basePath\`.`);
+    }
+    const basePath = declaration.basePath ?? definition.basePath;
+    if (basePath !== undefined && (!basePath.startsWith('/') || basePath.endsWith('/'))) {
+        throw new Error(
+            `[kizuna] Plugin '${slug}' has the base path '${basePath}'. A base path starts with \`/\` and doesn't end with one.`
+        );
+    }
+    return basePath;
+};
+
+/**
  * Validate one installed plugin's options and run its `setup`.
  */
 const resolvePlugin = (declaration: PluginDeclaration, api: PluginApi): ResolvedPlugin => {
@@ -62,11 +86,24 @@ const resolvePlugin = (declaration: PluginDeclaration, api: PluginApi): Resolved
         options: options as never,
         api,
     });
+    const basePath = basePathOf(declaration);
+    const routes = setup.routes ?? {};
     return {
         slug,
         definedSlug: definition.slug,
         options,
-        routes: setup.routes ?? {},
+        routes:
+            basePath === undefined
+                ? routes
+                : Object.fromEntries(
+                      Object.entries(routes).map(([routeKey, route]) => [
+                          routeKey,
+                          {
+                              ...route,
+                              path: underBasePath(basePath, route.path),
+                          },
+                      ])
+                  ),
         exports: setup.exports,
         generators: setup.generators ?? [],
         validate: setup.validate,

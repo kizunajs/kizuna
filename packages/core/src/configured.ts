@@ -85,5 +85,9 @@ export type ConfiguredJobs<Config> = Config extends { jobs: infer Tree } ? { job
 export type ConfiguredPlugins<Config> = Config extends { plugins: infer Plugins extends PluginList }
     ? PluginArgs<PluginsBySlug<Plugins>>
     : {};
+/**
+ * The api's jobs and plugins, for a plugin that runs the app's own functions.
+ */
+export type ApiContext<Config> = ConfiguredJobs<Config> & ConfiguredPlugins<Config>;
 export type ConfiguredAdapterContext<Config> = HandlerContextOf<ConfiguredAdapterValue<Config>>;
 export type ConfiguredRequestContext<Config> = RequestContextValues<ConfiguredRequestContextSchemas<Config>>;
