@@ -18,7 +18,7 @@ import {
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
-    createAdapter,
+    defineAdapter,
     jobRoutes,
     jobRouter,
     jobRunnerFrom,
@@ -60,7 +60,7 @@ export interface HonoOptions {
     formatError?: ErrorFormatter<Request>;
 }
 
-const pipeline = createAdapter<
+const pipeline = defineAdapter<
     Request,
     Response,
     HonoHandlerContext<Env>,
@@ -133,6 +133,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                 query: Object.fromEntries(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),
                 readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
+                readRawBody: () => c.req.raw.text(),
             };
 
             return pipeline.handle({

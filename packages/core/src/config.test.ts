@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { apiEntries } from './config.js';
 import { defineConfig } from './define-config.js';
-import type { ClientTarget } from './config.js';
+import type { GeneratedFile } from './config.js';
 
 const k = new Kizuna();
 
@@ -19,10 +19,10 @@ const routes = k.routes('users', {
     }),
 });
 
-const swiftClient: ClientTarget = {
-    kind: 'swift',
+const swiftClient: GeneratedFile = {
+    target: 'swift',
     output: './APIClient.swift',
-    generate: () => '',
+    render: () => '',
 };
 
 describe('defineConfig', () => {

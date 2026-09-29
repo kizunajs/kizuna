@@ -11,6 +11,7 @@ import {
     toPascalCase,
     unwrapOptionalWrappers,
     type StreamMode,
+    listedRoutes,
 } from 'kizunajs/generator';
 import { TypeCollector, docComment, sampleObject, sampleValue, typeOf } from './zod-to-typescript.js';
 
@@ -305,7 +306,7 @@ const emitRequestContext = (contract: ApiDefinition, collector: TypeCollector): 
 export const generateFetchClient = (contract: ApiDefinition, options: FetchClientOptions = {}): string => {
     const { namespace: namespaceName = 'API', runtimeModule = '@kizunajs/fetch', regenerateCommand = 'kizuna generate', source } = options;
     const collector = new TypeCollector();
-    const tree = emitTree(contract.routes, '', collector, namespaceName);
+    const tree = emitTree(listedRoutes(contract), '', collector, namespaceName);
 
     const models = collector.all().map((model) => {
         const doc = model.description ? `/**\n * ${model.description}\n */\n` : '';

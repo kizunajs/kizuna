@@ -3,7 +3,8 @@ import { z } from 'zod';
 import type { RouteDefinition } from './types.js';
 import { Kizuna, type RouteAuthValue } from './kizuna.js';
 import { defineConfig } from './define-config.js';
-import { createPlugin } from './plugin.js';
+import { definePlugin, route } from './plugin.js';
+import { pluginExportsOf, pluginRoutesOf } from './plugin-server.js';
 
 interface Config {
     auth: {
@@ -310,11 +311,14 @@ describe('k.contract: plugins', () => {
         }),
     });
 
-    const probePlugin = (props: { skip?: Record<string, boolean> } = {}) =>
-        createPlugin({
-            slug: 'probe',
+    const probePlugin = definePlugin({
+        slug: 'probe',
+        options: z.object({
+            skip: z.record(z.string(), z.boolean()).default({}),
+        }),
+        setup: ({ options }) => ({
             routes: {
-                status: {
+                status: route({
                     method: 'GET',
                     path: '/probe/status',
                     responses: {
@@ -322,20 +326,15 @@ describe('k.contract: plugins', () => {
                             skipped: z.array(z.string()),
                         }),
                     },
-                },
+                }).handler(() => ({
+                    status: 200,
+                    body: {
+                        skipped: Object.keys(options.skip),
+                    },
+                })),
             },
-            props,
-            serve: (pluginProps) => ({
-                router: {
-                    status: () => ({
-                        status: 200 as const,
-                        body: {
-                            skipped: Object.keys(pluginProps.skip ?? {}),
-                        },
-                    }),
-                },
-            }),
-        });
+        }),
+    });
 
     it('carries every plugin onto the contract, keyed by its own name', () => {
         const contract = defineConfig({
@@ -366,5 +365,377 @@ describe('k.contract: plugins', () => {
                     plugins: [probePlugin()],
                 }).api
         ).toThrow(/probe\/status/);
+    });
+
+    const emailPlugin = definePlugin({
+        slug: 'email',
+        options: z.object({
+            apiKey: z.string(),
+            from: z.string(),
+        }),
+        setup: ({ options }) => ({
+            exports: {
+                sender: () => options.from,
+            },
+        }),
+    });
+
+    it('validates the options once, naming the plugin and the field', () => {
+        expect(() =>
+            defineConfig({
+                ...k5Config,
+                routes,
+                plugins: [
+                    emailPlugin({
+                        from: 'hello@example.com',
+                    } as never),
+                ],
+            })
+        ).toThrow("[kizuna] Plugin 'email' has invalid options: apiKey is required");
+    });
+
+    it('hands the validated options to setup, and its exports to handlers', () => {
+        const { api } = defineConfig({
+            ...k5Config,
+            routes,
+            plugins: [
+                emailPlugin({
+                    apiKey: 'key',
+                    from: 'hello@example.com',
+                }),
+            ],
+        });
+
+        const exported = pluginExportsOf(api) as {
+            email: {
+                sender: () => string;
+            };
+        };
+        expect(exported.email.sender()).toBe('hello@example.com');
+    });
+
+    it('installs a plugin under the slug the app gives it', () => {
+        const { api } = defineConfig({
+            ...k5Config,
+            routes,
+            plugins: [
+                emailPlugin({
+                    slug: 'mail',
+                    apiKey: 'key',
+                    from: 'hello@example.com',
+                }),
+            ],
+        });
+
+        expect(Object.keys(pluginExportsOf(api))).toEqual(['mail']);
+    });
+
+    it('throws when two plugins share a slug, naming both', () => {
+        const otherEmail = definePlugin({
+            slug: 'email',
+            setup: () => ({}),
+        });
+
+        expect(() =>
+            defineConfig({
+                ...k5Config,
+                routes,
+                plugins: [
+                    emailPlugin({
+                        apiKey: 'key',
+                        from: 'hello@example.com',
+                    }),
+                    otherEmail(),
+                ],
+            })
+        ).toThrow(/Two plugins are installed under the slug 'email'/);
+    });
+
+    it('runs setup once, and shares what it creates', () => {
+        let setups = 0;
+        const counter = definePlugin({
+            slug: 'counter',
+            setup: () => {
+                setups += 1;
+                const state = {
+                    count: 0,
+                };
+
+                return {
+                    routes: {
+                        increment: route({
+                            method: 'POST',
+                            path: '/counter',
+                            responses: {
+                                200: z.object({
+                                    count: z.number(),
+                                }),
+                            },
+                        }).handler(() => {
+                            state.count += 1;
+
+                            return {
+                                status: 200,
+                                body: {
+                                    count: state.count,
+                                },
+                            };
+                        }),
+                    },
+                    exports: {
+                        count: () => state.count,
+                    },
+                };
+            },
+        });
+
+        const { api } = defineConfig({
+            ...k5Config,
+            routes,
+            plugins: [counter()],
+        });
+
+        expect(setups).toBe(1);
+        expect(Object.keys(pluginRoutesOf(api))).toEqual(['counter']);
+    });
+
+    it('throws when setup reads the api before it has assembled', () => {
+        const eager = definePlugin({
+            slug: 'eager',
+            setup: ({ api }) => ({
+                exports: {
+                    routeCount: Object.keys(api.routes).length,
+                },
+            }),
+        });
+
+        expect(() =>
+            defineConfig({
+                ...k5Config,
+                routes,
+                plugins: [eager()],
+            })
+        ).toThrow(/read the api during `setup`/);
+    });
+
+    it('reads the api inside a handler, once it has assembled', () => {
+        const reader = definePlugin({
+            slug: 'reader',
+            setup: ({ api }) => ({
+                exports: {
+                    routeKeys: () => Object.keys(api.routes),
+                },
+            }),
+        });
+
+        const { api } = defineConfig({
+            ...k5Config,
+            routes,
+            plugins: [reader()],
+        });
+
+        const exported = pluginExportsOf(api) as {
+            reader: {
+                routeKeys: () => string[];
+            };
+        };
+        expect(exported.reader.routeKeys()).toEqual(['health']);
+    });
+
+    it('throws when a plugin route has no handler', () => {
+        const unanswered = definePlugin({
+            slug: 'unanswered',
+            setup: () => ({
+                routes: {
+                    status: {
+                        method: 'GET',
+                        path: '/unanswered',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    },
+                },
+            }),
+        });
+
+        expect(() =>
+            defineConfig({
+                ...k5Config,
+                routes,
+                plugins: [unanswered()],
+            })
+        ).toThrow(/declares the route 'status' without a handler/);
+    });
+
+    it('resolves auth on a plugin route against the app identities', () => {
+        const guarded = definePlugin({
+            slug: 'guarded',
+            setup: () => ({
+                routes: {
+                    status: route({
+                        method: 'GET',
+                        path: '/guarded',
+                        auth: 'user',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    }).handler(() => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    })),
+                },
+            }),
+        });
+
+        const { api } = defineConfig({
+            routes: {},
+            auth: {
+                identities: {
+                    user,
+                    member,
+                },
+            },
+            plugins: [guarded()],
+        });
+
+        const pluginRoute = (pluginRoutesOf(api) as Record<string, Record<string, RouteDefinition> | undefined>).guarded?.status;
+        expect(pluginRoute?.security).toEqual(['user']);
+    });
+});
+
+describe('rawBody', () => {
+    const rawTags = k.tags({
+        api: 'API',
+    });
+    const rawK = new Kizuna<{
+        tags: typeof rawTags;
+    }>();
+
+    it('throws when a multipart route declares rawBody', () => {
+        expect(() =>
+            defineConfig({
+                tags: rawTags,
+                routes: rawK.routes('api', {
+                    uploadAvatar: rawK.route({
+                        method: 'POST',
+                        path: '/avatar',
+                        rawBody: true,
+                        contentType: 'multipart/form-data',
+                        body: z.object({
+                            name: z.string(),
+                        }),
+                        responses: {
+                            204: z.void(),
+                        },
+                    }),
+                }),
+            })
+        ).toThrow(/Route 'uploadAvatar' declares `rawBody` on a `multipart\/form-data` body/);
+    });
+});
+
+describe('hidden routes', () => {
+    const hiddenTags = k.tags({
+        api: 'API',
+    });
+    const hiddenK = new Kizuna<{
+        tags: typeof hiddenTags;
+    }>();
+
+    it('throws when a hidden route declares tool', () => {
+        expect(() =>
+            defineConfig({
+                tags: hiddenTags,
+                routes: hiddenK.routes('api', {
+                    health: hiddenK.route({
+                        method: 'GET',
+                        path: '/health',
+                        summary: 'Check the service',
+                        hidden: true,
+                        tool: true,
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    } as never),
+                }),
+            })
+        ).toThrow(/Route 'health' is `hidden` and declares `tool`/);
+    });
+
+    it('hides every plugin route', () => {
+        const status = definePlugin({
+            slug: 'status',
+            setup: () => ({
+                routes: {
+                    check: route({
+                        method: 'GET',
+                        path: '/status',
+                        auth: false,
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    }).handler(() => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    })),
+                },
+            }),
+        });
+
+        const { api } = defineConfig({
+            tags: hiddenTags,
+            routes: {},
+            plugins: [status()],
+        });
+
+        const pluginRoute = (pluginRoutesOf(api) as Record<string, Record<string, RouteDefinition> | undefined>).status?.check;
+        expect(pluginRoute?.hidden).toBe(true);
+    });
+
+    it('throws when a plugin route declares tool', () => {
+        const status = definePlugin({
+            slug: 'status',
+            setup: () => ({
+                routes: {
+                    check: route({
+                        method: 'GET',
+                        path: '/status',
+                        auth: false,
+                        summary: 'Check the service',
+                        tool: true,
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    }).handler(() => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    })),
+                },
+            }),
+        });
+
+        expect(() =>
+            defineConfig({
+                tags: hiddenTags,
+                routes: {},
+                plugins: [status()],
+            })
+        ).toThrow(/Plugin route 'status.check' declares `tool`/);
     });
 });

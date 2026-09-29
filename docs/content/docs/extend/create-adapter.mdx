@@ -1,15 +1,15 @@
 ---
 title: Create an Adapter
-description: Build and ship your own Kizuna adapter for any HTTP runtime using createAdapter from kizunajs/adapter.
+description: Build and ship your own Kizuna adapter for any HTTP runtime using defineAdapter from kizunajs/adapter.
 ---
 
 <BetaNotice>
 
-The adapter API is new and still settling. `createAdapter` and the `AdapterResult` shape may change while v2 is in beta, so pin your version if you depend on them.
+The adapter API is new and still settling. `defineAdapter` and the `AdapterResult` shape may change while v2 is in beta, so pin your version if you depend on them.
 
 </BetaNotice>
 
-`kizunajs/adapter` exposes `createAdapter` so third parties can build and ship their own adapters independently. Kizuna ships Express, Fastify, Hono, and Next.js.
+`kizunajs/adapter` exposes `defineAdapter` so third parties can build and ship their own adapters independently. Kizuna ships Express, Fastify, Hono, and Next.js.
 
 Whether an adapter goes first-party comes down to adoption, not age. If a framework picks up real usage, we will very likely add it. What we will not take on is a framework a handful of people use, since we maintain everything we merge. The adapter API is public, so you can build and publish your own today.
 
@@ -21,17 +21,17 @@ An adapter translates between a native HTTP runtime (Bun, Cloudflare Workers, De
 - `respond` translates an `AdapterResult` to a native response
 - `onError` (optional) intercepts unhandled handler errors
 
-## `createAdapter`
+## `defineAdapter`
 
 ```ts title="adapter.ts"
-import { createAdapter, renderJsonResult, parseFetchBody, headersToObject, type AdapterRequest } from 'kizunajs/adapter';
+import { defineAdapter, renderJsonResult, parseFetchBody, headersToObject, type AdapterRequest } from 'kizunajs/adapter';
 ```
 
 ## Minimal example (fetch-based runtime)
 
 ```ts title="adapter.ts"
 import {
-    createAdapter,
+    defineAdapter,
     renderJsonResult,
     parseFetchBody,
     headersToObject,
@@ -44,7 +44,7 @@ export interface HandlerContext {
     request: Request;
 }
 
-const adapter = createAdapter<Request, Response, HandlerContext>({
+const adapter = defineAdapter<Request, Response, HandlerContext>({
     buildHandlerContext: (adapterRequest) => ({
         request: adapterRequest.request,
     }),

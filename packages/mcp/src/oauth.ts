@@ -1,20 +1,23 @@
+import { z } from 'zod';
 import { assertCanonicalResourceUri } from 'kizunajs';
 import type { RoutePath } from 'kizunajs/plugin';
 
-export interface McpOAuthProps {
+export const McpOAuthSchema = z.object({
     /**
      * Canonical URI of the MCP endpoint as clients reach it: absolute, no
      * fragment, ending in the endpoint's `path`. The RFC 9728 `resource`
      * value and the RFC 8707 audience your guard checks tokens against.
      */
-    resource: string;
+    resource: z.string(),
 
     /**
      * Name of the identity whose guard verifies the token on every request.
      * Its `issuer` and flow scopes become the metadata document.
      */
-    scheme: string;
-}
+    scheme: z.string(),
+});
+
+export type McpOAuthProps = z.output<typeof McpOAuthSchema>;
 
 export const protectedResourceMetadataPath = (endpointPath: RoutePath): RoutePath => `/.well-known/oauth-protected-resource${endpointPath}`;
 

@@ -27,8 +27,7 @@ import { problemDetails, problemFromBody, type ProblemDetails } from './problem-
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
-import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ApiPlugins } from './plugin.js';
-import { resolvePluginServers } from './plugin-server.js';
+import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ResolvedPlugin } from './plugin.js';
 import {
     resolveResponseBody,
     resolveResponseContentType,
@@ -60,7 +59,7 @@ export { rawResponse, isRawResponse, type RawResponse } from './raw-response.js'
 export { encodeStreamBody, type EncodeStreamOptions, type StreamContext } from './stream.js';
 export { isStreamResponse } from './generator-utils.js';
 export {
-    createPlugin,
+    definePlugin,
     pluginRouteTree,
     type PluginDeclaration,
     type PluginDefinition,
@@ -69,8 +68,8 @@ export {
     type PluginExportValues,
     type PluginArgs,
     type PluginRoutesOf,
-    type PluginPropsOf,
     type PluginExportsOf,
+    type ResolvedPlugin,
 } from './plugin.js';
 export type { CompiledJob, Jobs, JobHandler, JobHandlers, FlattenedJob } from './jobs.js';
 export { flattenJobs, isCompiledJob, jobAt } from './jobs.js';
@@ -84,7 +83,7 @@ export {
     type JobFnByKey,
 } from './job-runner.js';
 export {
-    createJobTransport,
+    defineJobTransport,
     JobDispatchError,
     type JobTransport,
     type JobMessage,
@@ -93,8 +92,7 @@ export {
     type JobWorker,
     type JobWorkerContext,
 } from './job-transport.js';
-export { pluginRoutesOf, pluginRouterOf, pluginExportsOf, resolvePluginServers } from './plugin-server.js';
-export { type PluginRouter } from './plugin.js';
+export { pluginRoutesOf, pluginRouterOf, pluginExportsOf, resolvePlugins, createApiReference } from './plugin-server.js';
 
 export class ResponseValidationError extends Error {
     readonly routeKey: string;
@@ -259,7 +257,18 @@ export const contractOf = <C = unknown>(api: unknown): C => (api as Record<symbo
 /**
  * What kizuna puts in handler args. Must agree with the spread in `runPipeline`.
  */
-export const HANDLER_ARG_KEYS = ['params', 'query', 'body', 'headers', 'throwError', 'auth', 'requestContext', 'plugins', 'tools'] as const;
+export const HANDLER_ARG_KEYS = [
+    'params',
+    'query',
+    'body',
+    'headers',
+    'throwError',
+    'auth',
+    'requestContext',
+    'plugins',
+    'tools',
+    'rawBody',
+] as const;
 
 /**
  * The adapter's own context, with kizuna's arguments removed.
@@ -286,6 +295,30 @@ export interface ApiParts {
 }
 
 /**
+ * Each plugin's router, built from the handlers its routes carry, and its
+ * exports. A plugin route without a handler throws, since nothing would answer
+ * it.
+ */
+const pluginServers = (
+    plugins: Record<string, ResolvedPlugin> | undefined
+): Record<string, { router: Record<string, unknown>; exports?: unknown }> => {
+    const servers: Record<string, { router: Record<string, unknown>; exports?: unknown }> = {};
+    for (const [slug, plugin] of Object.entries(plugins ?? {})) {
+        for (const [routeKey, route] of Object.entries(plugin.routes)) {
+            if (route[HANDLER] !== undefined) continue;
+            throw new Error(
+                `Plugin '${slug}' declares the route '${routeKey}' without a handler. Declare it with \`route(...).handler(...)\`.`
+            );
+        }
+        servers[slug] = {
+            router: routerFromRoutes(plugin.routes),
+            exports: plugin.exports,
+        };
+    }
+    return servers;
+};
+
+/**
  * Brand an api's routes with the parts that serve them, for the adapter to read back when mounting.
  */
 export const assembleApi = <const R extends Routes>(
@@ -293,7 +326,7 @@ export const assembleApi = <const R extends Routes>(
         routes: R;
         securitySchemes?: Record<string, SecurityScheme>;
         guardSchema?: z.ZodType;
-        plugins?: ApiPlugins;
+        plugins?: Record<string, ResolvedPlugin>;
     },
     parts: ApiParts
 ): ApiWithRouter<R> => {
@@ -314,8 +347,7 @@ export const assembleApi = <const R extends Routes>(
         [CONTRACT_META]: contract,
     } as Record<string | symbol, unknown>;
 
-    // Resolved after the api exists, because a plugin's server half receives it.
-    api[PLUGIN_SERVERS_META_KEY] = resolvePluginServers(contract.plugins, api);
+    api[PLUGIN_SERVERS_META_KEY] = pluginServers(contract.plugins);
 
     return api as unknown as ApiWithRouter<R>;
 };
@@ -640,6 +672,11 @@ export interface AdapterRequest<NativeRequest> {
     query: unknown;
     headers: unknown;
     readBody: (route: RouteDefinition) => Promise<unknown> | unknown;
+    /**
+     * The body as it was sent, for a route with `rawBody: true`, or `undefined`
+     * when it was already consumed.
+     */
+    readRawBody?: (route: RouteDefinition) => Promise<string | undefined> | string | undefined;
 }
 
 /**
@@ -853,7 +890,7 @@ export const extractCredential = (scheme: SecurityScheme, request: AdapterReques
 };
 
 /**
- * The request pipeline `createAdapter` builds: what matches a request to a
+ * The request pipeline `defineAdapter` builds: what matches a request to a
  * route, runs the guards and the handler, and hands the result back to the
  * framework.
  */
@@ -1170,6 +1207,23 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         body: undefined,
     };
 
+    let rawBody: string | undefined;
+    if (route.rawBody === true) {
+        rawBody = request.readRawBody === undefined ? undefined : await request.readRawBody(route);
+        if (rawBody === undefined) {
+            const error = new Error(
+                `[kizuna] ${routeKey} needs the raw body, but it was parsed before kizuna saw it. On Express, mount kizuna before express.json(), or pass \`verify: keepRawBody\` to it.`
+            );
+            console.error(error.message);
+            return {
+                kind: 'handler-error',
+                routeKey,
+                route,
+                error,
+            };
+        }
+    }
+
     const acceptHeader = (raw.headers as Record<string, string | undefined>)['accept'];
     if (!isAcceptable(acceptHeader, route)) {
         return {
@@ -1193,7 +1247,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
                 };
             }
             try {
-                raw.body = await request.readBody(route);
+                raw.body = rawBody !== undefined ? parseBodyText(rawBody, route) : await request.readBody(route);
             } catch {
                 return {
                     kind: 'invalid-body',
@@ -1228,12 +1282,17 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
         pluginExports,
         jobRunner,
         responseValidation,
+        rawBody,
     });
 };
 
 interface Invocation<NativeRequest, HandlerContext, ResponseContext> {
     resolved: ResolvedRoute;
     parsed: RawInputs;
+    /**
+     * The body as sent, for a route with `rawBody: true`.
+     */
+    rawBody?: string;
     handler: unknown;
     request: AdapterRequest<NativeRequest>;
     routes: Routes;
@@ -1419,6 +1478,11 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
             query: parsed.query,
             body: parsed.body,
             headers: parsed.headers,
+            ...(route.rawBody === true
+                ? {
+                      rawBody: invocation.rawBody,
+                  }
+                : {}),
             throwError,
             ...handlerContext,
             ...(tools
@@ -1481,7 +1545,7 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
     }
 };
 
-export const createAdapter = <NativeRequest, NativeResponse, HandlerContext, ResponseContext = Record<string, never>>(
+export const defineAdapter = <NativeRequest, NativeResponse, HandlerContext, ResponseContext = Record<string, never>>(
     definition: AdapterDefinition<NativeRequest, NativeResponse, HandlerContext, ResponseContext>
 ): RequestPipeline<NativeRequest, NativeResponse, HandlerContext, ResponseContext> => ({
     handle: async ({
@@ -1767,6 +1831,15 @@ const formDataToObject = (form: FormData): Record<string, unknown> => {
         }
     }
     return result;
+};
+
+/**
+ * Parse a body from its text, the way {@link parseFetchBody} would, for a route
+ * whose text core already read.
+ */
+export const parseBodyText = (text: string, route: RouteDefinition): unknown => {
+    if (route.contentType === 'application/x-www-form-urlencoded') return Object.fromEntries(new URLSearchParams(text));
+    return text.length > 0 ? JSON.parse(text) : undefined;
 };
 
 /**

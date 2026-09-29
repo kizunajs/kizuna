@@ -112,7 +112,7 @@ export class JobDispatchError extends Error {
  *
  * @example
  * export const pgBoss = (boss: PgBoss) =>
- *     createJobTransport({
+ *     defineJobTransport({
  *         name: 'pg-boss',
  *         supports: {
  *             retry: true,
@@ -141,8 +141,8 @@ export class JobDispatchError extends Error {
  *         },
  *     });
  */
-export const createJobTransport = (definition: JobTransportDefinition): JobTransport => {
-    if (!definition.name) throw new Error('createJobTransport needs a `name`.');
+export const defineJobTransport = (definition: JobTransportDefinition): JobTransport => {
+    if (!definition.name) throw new Error('defineJobTransport needs a `name`.');
     return {
         ...definition,
         supports: definition.supports ?? {},

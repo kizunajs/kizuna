@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import type { ClientTarget } from 'kizunajs';
+import type { GeneratedFile } from 'kizunajs';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ConfigSyntaxError, generateConfigTypes } from './generate-types.js';
-import { checkClients, formatStale, writeClients } from './generate-clients.js';
+import { checkFiles, formatStale, writeFiles } from './generate-clients.js';
 import { loadConfig } from './load-config.js';
 import { formatRoutes, routeMap } from './route-map.js';
 import { diffAgainst, readSnapshot } from './diff-against.js';
@@ -68,12 +68,15 @@ const loadOrDie = async (configPath: string) => {
 };
 
 /**
- * A client writes where its config says, not where the command was run from,
- * so `kizuna generate --config apps/api/kizuna.config.ts` lands the same files
+ * A file writes where its config says, not where the command was run from, so
+ * `kizuna generate --config apps/api/kizuna.config.ts` lands the same files
  * wherever it is invoked.
  */
-const besideConfig = (configPath: string, clients: readonly ClientTarget[]): ClientTarget[] =>
-    clients.map((client) => ({ ...client, output: resolve(dirname(configPath), client.output) }));
+const besideConfig = (configPath: string, files: readonly GeneratedFile[]): GeneratedFile[] =>
+    files.map((file) => ({
+        ...file,
+        output: resolve(dirname(configPath), file.output),
+    }));
 
 const runGenerate = async (values: { check?: boolean; config?: string; types?: string }): Promise<void> => {
     const configPath = configPathFrom(values.config);
@@ -101,7 +104,10 @@ const runGenerate = async (values: { check?: boolean; config?: string; types?: s
     const typesBehind = typesCurrent !== types;
 
     if (values.check) {
-        const stale = checkClients(config.api, [...besideConfig(configPath, config.clients), snapshotTarget(configPath)]);
+        const stale = checkFiles(config.api, [
+            ...besideConfig(configPath, [...config.clients, ...config.generators]),
+            snapshotTarget(configPath),
+        ]);
         if (!typesBehind && stale.length === 0) {
             process.stdout.write('Everything kizuna generates is up to date.\n');
             return;
@@ -114,11 +120,14 @@ const runGenerate = async (values: { check?: boolean; config?: string; types?: s
     }
 
     if (typesBehind) writeFileSync(typesPath, types);
-    const written = writeClients(config.api, [...besideConfig(configPath, config.clients), snapshotTarget(configPath)]);
+    const written = writeFiles(config.api, [
+        ...besideConfig(configPath, [...config.clients, ...config.generators]),
+        snapshotTarget(configPath),
+    ]);
 
     const changed = [
         ...(typesBehind ? [displayPath(typesPath)] : []),
-        ...written.filter((client) => client.changed).map((client) => displayPath(client.output)),
+        ...written.filter((file) => file.changed).map((file) => displayPath(file.output)),
     ];
     process.stdout.write(
         changed.length > 0 ? `Wrote:\n${changed.map((file) => `  ${file}`).join('\n')}\n` : 'Everything was already up to date.\n'

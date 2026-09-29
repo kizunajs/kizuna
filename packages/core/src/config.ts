@@ -1,25 +1,27 @@
 import type { ApiDefinition } from './api-definition.js';
 
 /**
- * A client generated from a config, created by its generator's own factory so
- * the options are typed where the generator lives.
+ * A file `kizuna generate` writes and `--check` compares, made by a client's
+ * factory, a generator's, or kizuna itself.
  *
  * @example
- * import { swiftClient } from '@kizunajs/swift';
+ * swiftClient({
+ *     output: './Sources/APIClient/APIClient.swift',
+ * });
  */
-export interface ClientTarget {
+export interface GeneratedFile {
     /**
-     * The generator that produced this target, for messages and reporting.
+     * The language a client generates, like `swift`. A generator has none.
      */
-    readonly kind: string;
+    readonly target?: string;
     /**
-     * Path the generated file is written to.
+     * Path the file is written to, resolved against the config's directory.
      */
     readonly output: string;
     /**
-     * Renders the file this target writes.
+     * Renders the file's contents.
      */
-    readonly generate: (contract: ApiDefinition) => string;
+    readonly render: (api: ApiDefinition) => string;
 }
 
 /**
@@ -57,7 +59,11 @@ export interface DiffSettings {
  */
 export interface ApiEntry {
     api: ApiDefinition;
-    clients?: readonly ClientTarget[];
+    clients?: readonly GeneratedFile[];
+    /**
+     * The files the config's plugins generate.
+     */
+    generators?: readonly GeneratedFile[];
     /**
      * Where `kizuna generate` writes the `Config`.
      */
@@ -83,6 +89,7 @@ export const apiEntries = (module: Record<string, unknown>): [string, ApiEntry][
             {
                 api: config.api,
                 clients: config.clients ?? [],
+                generators: config.generators ?? [],
                 typescript: config.typescript,
                 diff: config.diff,
             },

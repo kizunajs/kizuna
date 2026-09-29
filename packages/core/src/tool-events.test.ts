@@ -391,6 +391,41 @@ describe('expandStreamTools', () => {
         ).toThrow(/naming "tail", which cannot run as a tool: it streams/);
     });
 
+    it('throws when it names a hidden route', () => {
+        const hiddenTools = k.routes({
+            health: k.route({
+                method: 'GET',
+                path: '/health',
+                summary: 'Check the service',
+                hidden: true,
+                tool: true,
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            } as never),
+        });
+        expect(() =>
+            k.routes({
+                reply: k.route({
+                    method: 'POST',
+                    path: '/reply',
+                    responses: {
+                        200: {
+                            stream: {
+                                delta: z.object({
+                                    text: z.string(),
+                                }),
+                            },
+                            tools: hiddenTools,
+                        },
+                    },
+                }),
+            })
+        ).toThrow(/naming "health", which cannot run as a tool: it is hidden/);
+    });
+
     it('throws when two responses name tools', () => {
         expect(() =>
             k.routes({

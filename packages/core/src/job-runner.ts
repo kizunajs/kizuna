@@ -95,6 +95,10 @@ export interface JobRunnerOptions {
      */
     transport?: JobTransport;
     onError?: JobErrorHandler;
+    /**
+     * What each plugin exports, handed to every job handler as `plugins`.
+     */
+    plugins?: Record<string, unknown>;
 }
 
 /**
@@ -180,6 +184,7 @@ export const createJobRunner = <Jobs_ extends Jobs>(
                     throw new ResponseError(response);
                 },
                 jobs: tree,
+                plugins: options?.plugins ?? {},
             })
         );
     };

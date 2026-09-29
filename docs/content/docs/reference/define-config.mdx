@@ -29,7 +29,6 @@ import express from 'express';
 import kizuna from '../kizuna.config';
 
 const app = express();
-app.use(express.json());
 
 kizuna.api.mount(app);
 ```
@@ -45,10 +44,10 @@ kizuna.api.mount(app);
 | `validation`     | How a request is checked: `issueCodes`, the `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                     |
 | `jobs`           | Scheduled work, declared with [`k.jobs`](/docs/reference/k-jobs).                                                                                                             |
 | `jobRunner`      | How this deployment runs them: `path`, `method`, `transport`, `onError`. See [Jobs](/docs/jobs).                                                                              |
-| `plugins`        | What this API installs beside its own routes, as a list.                                                                                                                      |
+| `plugins`        | What this API installs beside its own routes, as a list. See [Create a Plugin](/docs/extend/create-plugin).                                                                   |
 | `tags`           | The OpenAPI tags routes are grouped under, from [`k.tags`](/docs/reference/k-tags).                                                                                           |
 | `typescript`     | Where `kizuna generate` writes the `Config`, as `{ outputFile }`.                                                                                                             |
-| `clients`        | What `kizuna generate` writes from this API, as a list of [`ClientTarget`](/docs/extend/create-generator#shipping-a-clienttarget).                                            |
+| `clients`        | The clients `kizuna generate` writes from this API, each built with [`defineClient`](/docs/extend/create-client).                                                             |
 
 `jobs` is what the jobs are, and `jobRunner` is how this deployment runs them: the first is shared by every config that serves these routes, the second differs between dev and production.
 
@@ -107,7 +106,7 @@ A job carries its own identity, so it declares no `auth`, and it stays out of `a
 
 ## Plugins
 
-Plugins go under `plugins`, as a list. Each carries the slug your handlers read it under:
+Plugins go under `plugins`, as a list. Each carries the name your handlers read it under:
 
 ```ts title="kizuna.config.ts"
 export default defineConfig({
@@ -127,4 +126,4 @@ export default defineConfig({
 });
 ```
 
-Their routes are served by `api.mount` and stay out of `api.routes`, so the client and the generators do not see them. See [Create a Plugin](/docs/extend/create-plugin).
+Their routes are served by `api.mount`, and reach the clients like your own unless they're marked `hidden`. See [Create a Plugin](/docs/extend/create-plugin).

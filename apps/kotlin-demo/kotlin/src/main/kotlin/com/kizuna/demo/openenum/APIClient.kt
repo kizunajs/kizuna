@@ -1855,6 +1855,36 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
+    object ContactSendMessage {
+
+        @Serializable
+        data class Input(
+            val subject: String,
+            val html: String
+        )
+
+        data class Body(
+            val subject: String,
+            val html: String
+        )
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(subject: String, html: String): AfterBody = AfterBody(body = Body(subject = subject, html = html))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     val users = OpenEnumAPIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val health = OpenEnumAPIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
@@ -1874,6 +1904,8 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
     val notes = OpenEnumAPINotesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val diagnostics = OpenEnumAPIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val contact = OpenEnumAPIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 }
 
 class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -3460,6 +3492,41 @@ class OpenEnumAPIDiagnosticsClient(private val client: OkHttpClient, private val
                     catch (error: Exception) { throw OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
+class OpenEnumAPIContactClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** Send a message to the team */
+    @Throws(OpenEnumAPIClient.ContactSendMessage.Failure::class)
+    suspend fun sendMessage(build: OpenEnumAPIClient.ContactSendMessage.Scope.() -> OpenEnumAPIClient.ContactSendMessage.Args) {
+        val args = OpenEnumAPIClient.ContactSendMessage.Scope.build()
+        val body = args.body
+        val path = "/contact"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = OpenEnumAPIClient.ContactSendMessage.Input(subject = body.subject, html = body.html)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                204 -> {}
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.ContactSendMessage.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.ContactSendMessage.Failure.BadRequest(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.ContactSendMessage.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

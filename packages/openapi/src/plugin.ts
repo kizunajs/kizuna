@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { createPlugin, type RoutePath, type WithSlug } from 'kizunajs/plugin';
-import { openApiServe } from './server.js';
-import type { DocsProvider } from './docs-html.js';
-import type { GenerateOpenApiOptions } from './types.js';
+import { definePlugin, RoutePathSchema, type RoutePath } from 'kizunajs/plugin';
+import { defineGenerator } from 'kizunajs/generator';
+import { openApiRoutes } from './server.js';
+import { renderOpenApi } from './generator.js';
+import { GenerateOpenApiOptionsSchema, type GenerateOpenApiOptions } from './types.js';
 
 export const OPENAPI_PLUGIN_SLUG = 'openApi';
 
@@ -10,56 +11,68 @@ export type JsonDocumentPath = `${RoutePath}.json`;
 
 export type YamlDocumentPath = `${RoutePath}.yaml`;
 
-export interface OpenApiPluginProps<Slug extends string = typeof OPENAPI_PLUGIN_SLUG> extends GenerateOpenApiOptions {
+const OpenApiPluginOptionsSchema = GenerateOpenApiOptionsSchema.extend({
     /**
-     * What handlers reach this plugin under. Give a second document its own.
+     * Where `kizuna generate` writes the document. `.json` renders JSON,
+     * anything else YAML.
      *
-     * @default 'openApi'
+     * @example
+     * output: './openapi.yaml',
      */
-    slug?: Slug;
+    output: z.string().optional(),
 
     /**
      * Where the reference UI is served.
      */
-    docsPath?: RoutePath;
+    docsPath: RoutePathSchema.optional(),
 
     /**
      * Where the document is served. The UI embeds it, so this is only for
      * publishing the file.
      */
-    jsonPath?: JsonDocumentPath;
+    jsonPath: z
+        .custom<JsonDocumentPath>((value) => typeof value === 'string' && value.startsWith('/') && value.endsWith('.json'), {
+            error: 'must start with / and end in .json',
+        })
+        .optional(),
 
     /**
      * Where the document is served as YAML.
      */
-    yamlPath?: YamlDocumentPath;
+    yamlPath: z
+        .custom<YamlDocumentPath>((value) => typeof value === 'string' && value.startsWith('/') && value.endsWith('.yaml'), {
+            error: 'must start with / and end in .yaml',
+        })
+        .optional(),
 
     /**
      * Which API reference UI to render.
      *
      * @default 'scalar'
      */
-    provider?: DocsProvider;
+    provider: z.enum(['scalar', 'swagger']).optional(),
 
     /**
      * Where to load the UI's assets from, for a self-hosted copy. The script
      * URL for `'scalar'`; the directory holding `swagger-ui.css` and
      * `swagger-ui-bundle.js` for `'swagger'`.
      */
-    cdnUrl?: string;
+    cdnUrl: z.string().optional(),
 
     /**
      * The page's `<title>`.
      *
      * @default the document's `info.title`
      */
-    pageTitle?: string;
+    pageTitle: z.string().optional(),
 
     /**
      * Merged into `Scalar.createApiReference` or `SwaggerUIBundle`.
      */
-    configuration?: Record<string, unknown>;
-}
+    configuration: z.record(z.string(), z.unknown()).optional(),
+});
+
+export type OpenApiPluginProps = z.output<typeof OpenApiPluginOptionsSchema>;
 
 /**
  * Serve an API reference UI for the OpenAPI document, and the document itself
@@ -78,58 +91,46 @@ export interface OpenApiPluginProps<Slug extends string = typeof OPENAPI_PLUGIN_
  *                 title: 'My API',
  *                 version: '1.0.0',
  *             },
+ *             docsPath: '/docs',
  *         }),
  *     ],
  * });
  * ```
  */
-const declare = (slug: string, props: OpenApiPluginProps<string>) =>
-    createPlugin({
-        slug,
-        routes: {
-            ...(props.docsPath === undefined
-                ? {}
-                : {
-                      page: {
-                          method: 'GET',
-                          path: props.docsPath,
-                          summary: 'API reference',
-                          responses: {
-                              200: z.string(),
-                          },
-                      },
-                  }),
-            ...(props.jsonPath === undefined
-                ? {}
-                : {
-                      json: {
-                          method: 'GET',
-                          path: props.jsonPath,
-                          summary: 'OpenAPI document',
-                          responses: {
-                              200: z.unknown(),
-                          },
-                      },
-                  }),
-            ...(props.yamlPath === undefined
-                ? {}
-                : {
-                      yaml: {
-                          method: 'GET',
-                          path: props.yamlPath,
-                          summary: 'OpenAPI document, as YAML',
-                          responses: {
-                              200: z.string(),
-                          },
-                      },
-                  }),
-        },
-        props,
-        serve: (pluginProps, api) => openApiServe(pluginProps, api),
-    });
+export const openApiPlugin = definePlugin({
+    slug: OPENAPI_PLUGIN_SLUG,
+    options: OpenApiPluginOptionsSchema,
+    setup: ({ options, api }) => {
+        const { output, ...document } = options;
 
-export function openApiPlugin<const Slug extends string = typeof OPENAPI_PLUGIN_SLUG>(
-    props: OpenApiPluginProps<Slug>
-): WithSlug<ReturnType<typeof declare>, Slug> {
-    return declare(props.slug ?? OPENAPI_PLUGIN_SLUG, props as OpenApiPluginProps<string>) as never;
-}
+        return {
+            routes: openApiRoutes(options, api),
+            generators:
+                output === undefined
+                    ? []
+                    : [
+                          openApiDocumentGenerator({
+                              output,
+                              json: output.endsWith('.json'),
+                              document,
+                          }),
+                      ],
+        };
+    },
+});
+
+/**
+ * Writes one document, in the format its `output` names.
+ */
+const openApiDocumentGenerator = defineGenerator({
+    options: z.object({
+        json: z.boolean(),
+        document: z.custom<GenerateOpenApiOptions>(),
+    }),
+    generate: ({ options, api }) => ({
+        finalize: () => {
+            const render = renderOpenApi(api, options.document);
+            return options.json ? `${JSON.stringify(render('json'), null, 4)}\n` : render('yaml');
+        },
+    }),
+});

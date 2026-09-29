@@ -181,8 +181,9 @@ export type JobHandlerReturn<Definition extends JobDefinition> = HandlerReturn<{
 }>;
 
 /**
- * The single object a job handler receives: its own input and `throwError`, and
- * nothing else. Anything more it imports, as a route handler would.
+ * The input and `throwError` every job handler receives. It also receives the
+ * api's `jobs` and, when the config installs any, the plugins' exports as
+ * `plugins`.
  */
 export type JobHandlerArgs<Definition extends JobDefinition> = {
     /**

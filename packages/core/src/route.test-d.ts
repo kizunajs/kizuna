@@ -213,3 +213,31 @@ test('tool rejects an option it does not know', () => {
         },
     });
 });
+
+test('a hidden route cannot declare tool', () => {
+    k.route({
+        method: 'GET',
+        path: '/health',
+        hidden: true,
+        // @ts-expect-error a hidden route never publishes, so it cannot be a tool
+        tool: true,
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    });
+});
+
+test('a hidden route that is not a tool is fine', () => {
+    k.route({
+        method: 'GET',
+        path: '/health',
+        hidden: true,
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    });
+});

@@ -4,8 +4,8 @@ import { DECLARATION, HANDLER } from './types.js';
 /**
  * A job's handler, typed against the job it answers.
  */
-export type JobHandlerFor<Definition extends AuthoredJobDefinition> = (
-    args: JobHandlerArgs<Definition>
+export type JobHandlerFor<Definition extends AuthoredJobDefinition, HandlerContext = unknown> = (
+    args: JobHandlerArgs<Definition> & HandlerContext
 ) => Promise<JobHandlerReturn<Definition> | JobVoidReturn<Definition>> | JobHandlerReturn<Definition> | JobVoidReturn<Definition>;
 
 /**
@@ -19,14 +19,16 @@ export type JobWithHandler<Definition extends AuthoredJobDefinition> = Definitio
  * What `k.job` returns: the job itself, and the `handler` that runs it. A job
  * nothing runs, one a generator reads, needs no handler.
  */
-export type JobBuilder<Definition extends AuthoredJobDefinition> = Definition & JobHandlerStep<Definition>;
+export type JobBuilder<Definition extends AuthoredJobDefinition, HandlerContext = unknown> = Definition &
+    JobHandlerStep<Definition, HandlerContext>;
 
-interface JobHandlerStep<Definition extends AuthoredJobDefinition> {
+interface JobHandlerStep<Definition extends AuthoredJobDefinition, HandlerContext> {
     /**
      * The handler that runs this job. `input` is typed from the job's schema,
-     * and the return is checked against its `result`.
+     * `plugins` from the config, and the return is checked against its
+     * `result`.
      */
-    handler(fn: JobHandlerFor<Definition>): JobWithHandler<Definition>;
+    handler(fn: JobHandlerFor<Definition, HandlerContext>): JobWithHandler<Definition>;
 }
 
 export const createJob = <const Definition extends AuthoredJobDefinition>(definition: Definition): JobBuilder<Definition> =>

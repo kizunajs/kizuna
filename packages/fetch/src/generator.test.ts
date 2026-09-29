@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
+import { definePlugin, route } from 'kizunajs/plugin';
 import { generateFetchClient } from './generator.js';
 import { createGeneratedClient, type GeneratedRoutes } from './client.js';
 
@@ -295,5 +296,76 @@ describe('a literal that is not a string', () => {
         expect(output).toContain('success: true;');
         expect(output).toContain('version: 1;');
         expect(output).toContain('kind: "full";');
+    });
+});
+
+const hiddenFixturePlugin = definePlugin({
+    slug: 'status',
+    setup: () => ({
+        routes: {
+            ping: route({
+                method: 'GET',
+                path: '/status/ping',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            }).handler(() => ({
+                status: 200,
+                body: {
+                    ok: true,
+                },
+            })),
+            internalProbe: route({
+                method: 'GET',
+                path: '/status/internal-probe',
+                hidden: true,
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            }).handler(() => ({
+                status: 200,
+                body: {
+                    ok: true,
+                },
+            })),
+        },
+    }),
+});
+
+const hiddenFixtureContract = () =>
+    defineConfig({
+        routes: {
+            listUsers: {
+                method: 'GET',
+                path: '/users',
+                responses: {
+                    200: z.array(z.string()),
+                },
+            },
+            healthCheck: {
+                method: 'GET',
+                path: '/health-check',
+                hidden: true,
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            },
+        },
+        plugins: [hiddenFixturePlugin()],
+    }).api;
+
+describe('generateFetchClient: hidden routes and plugin routes', () => {
+    it('leaves hidden routes and plugin routes out', () => {
+        const output = generateFetchClient(hiddenFixtureContract());
+        expect(output).toContain('listUsers');
+        expect(output).not.toContain('healthCheck');
+        expect(output).not.toContain('ping');
+        expect(output).not.toContain('internalProbe');
     });
 });

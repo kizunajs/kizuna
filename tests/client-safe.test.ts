@@ -238,7 +238,7 @@ describe('a generated client stays client-safe end to end', () => {
 });
 
 /**
- * Every package that declares a plugin, found by the `createPlugin` call that
+ * Every package that declares a plugin, found by the `definePlugin` call that
  * makes one. Read from source rather than from a list, so a new plugin is
  * covered the moment it exists.
  */
@@ -252,7 +252,7 @@ const pluginPackages = (): string[] => {
         const declaresPlugin = fs
             .readdirSync(sourceDir, { recursive: true })
             .filter((entry): entry is string => typeof entry === 'string' && entry.endsWith('.ts') && !entry.includes('.test.'))
-            .some((entry) => fs.readFileSync(path.join(sourceDir, entry), 'utf8').includes('createPlugin('));
+            .some((entry) => fs.readFileSync(path.join(sourceDir, entry), 'utf8').includes('definePlugin('));
         if (declaresPlugin) declaring.push(manifest.name);
     }
     return declaring;

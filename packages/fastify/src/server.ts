@@ -21,7 +21,7 @@ import {
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
-    createAdapter,
+    defineAdapter,
     renderJsonResult,
     type RenderedResult,
     jobRoutes,
@@ -56,6 +56,10 @@ export interface FastifyHandlerContext {
 declare module 'fastify' {
     interface FastifyRequest {
         kizunaRoute?: RouteDefinition;
+        /**
+         * The body as it was sent, kept for routes with `rawBody: true`.
+         */
+        kizunaRawBody?: string;
     }
 }
 
@@ -82,6 +86,24 @@ interface FastifyResponseContext {
     formatError?: ErrorFormatter<FastifyRequest>;
     responseValidation?: boolean;
 }
+
+/**
+ * Read a `rawBody` route's body once, keep the text, and hand Fastify a fresh
+ * stream to parse, so the route gets both the text and the parsed body.
+ */
+const keepRawBody = async (
+    request: FastifyRequest,
+    _reply: FastifyReply,
+    payload: NodeJS.ReadableStream
+): Promise<NodeJS.ReadableStream> => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of payload) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+    const buffer = Buffer.concat(chunks);
+    request.kizunaRawBody = buffer.toString('utf8');
+    const replay = Readable.from([buffer]) as Readable & { receivedEncodedLength?: number };
+    replay.receivedEncodedLength = buffer.length;
+    return replay;
+};
 
 const writeStream = (open: NonNullable<RenderedResult['stream']>, res: ServerResponse, validate: boolean | undefined): void => {
     const controller = new AbortController();
@@ -112,7 +134,7 @@ const writeWebResponse = async (response: unknown, reply: FastifyReply): Promise
     Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]).pipe(reply.raw);
 };
 
-const adapter = createAdapter<FastifyRequest, void, FastifyHandlerContext, FastifyResponseContext>({
+const adapter = defineAdapter<FastifyRequest, void, FastifyHandlerContext, FastifyResponseContext>({
     buildHandlerContext: (adapterRequest, { reply }) => ({
         request: adapterRequest.request,
         reply,
@@ -189,6 +211,11 @@ export const fastifyKizuna = fastifyPlugin(
                         request.kizunaRoute = route;
                     },
                 ],
+                ...(route.rawBody === true
+                    ? {
+                          preParsing: [keepRawBody],
+                      }
+                    : {}),
                 handler: async (request: FastifyRequest, reply: FastifyReply) => {
                     const adapterRequest: AdapterRequest<FastifyRequest> = {
                         request,
@@ -202,6 +229,7 @@ export const fastifyKizuna = fastifyPlugin(
                         query: (request.query ?? {}) as Record<string, string>,
                         headers: request.headers,
                         readBody: () => request.body,
+                        readRawBody: () => request.kizunaRawBody ?? '',
                     };
 
                     await adapter.handle({

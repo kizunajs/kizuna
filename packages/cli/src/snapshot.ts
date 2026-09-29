@@ -1,8 +1,8 @@
 import { basename, dirname, join } from 'node:path';
 import { stringify } from 'yaml';
-import type { ApiDefinition, ClientTarget, RouteDefinition } from 'kizunajs';
+import type { ApiDefinition, GeneratedFile, RouteDefinition } from 'kizunajs';
 import {
-    createGenerator,
+    walkApi,
     flattenJobs,
     readDef,
     readObjectShape,
@@ -28,6 +28,10 @@ export interface RouteSnapshot {
     path: string;
     statuses: number[];
     deprecated: boolean;
+    /**
+     * `true` when the route is `hidden`, so in no generated client.
+     */
+    hidden?: true;
     sunset?: string;
     body?: SchemaNode;
     query?: SchemaNode;
@@ -139,10 +143,10 @@ const sunsetOf = (route: RouteDefinition): string | undefined => {
     return typeof declared === 'string' ? declared : declared.date;
 };
 
-const routeSnapshots = createGenerator<Record<string, never>, Record<string, RouteSnapshot>>(() => {
+const routeSnapshots = (api: ApiDefinition): Record<string, RouteSnapshot> => {
     const routes: Record<string, RouteSnapshot> = {};
-    return {
-        processRoute({ routeKey, route, deprecated }) {
+    return walkApi(api, {
+        processRoute({ routeKey, route, deprecated, hidden }) {
             const sunset = sunsetOf(route);
             const responses: Record<string, SchemaNode | null> = {};
             for (const [status, response] of Object.entries(route.responses)) {
@@ -157,6 +161,11 @@ const routeSnapshots = createGenerator<Record<string, never>, Record<string, Rou
                     .map(Number)
                     .sort((a, b) => a - b),
                 deprecated,
+                ...(hidden
+                    ? {
+                          hidden: true as const,
+                      }
+                    : {}),
                 ...(sunset === undefined ? {} : { sunset }),
                 ...(route.body ? { body: toSchemaNode(route.body) } : {}),
                 ...(route.query ? { query: toSchemaNode(route.query) } : {}),
@@ -165,8 +174,8 @@ const routeSnapshots = createGenerator<Record<string, never>, Record<string, Rou
             };
         },
         finalize: () => routes,
-    };
-});
+    });
+};
 
 /**
  * Everything `kizuna diff` compares, as plain data.
@@ -190,7 +199,7 @@ export const toSnapshot = (api: ApiDefinition): ApiSnapshot => {
     );
 
     return {
-        routes: routeSnapshots(api, {}),
+        routes: routeSnapshots(api),
         jobs,
         tools,
     };
@@ -220,8 +229,7 @@ export const snapshotPathFor = (configPath: string): string => {
  * The snapshot as a client target, so `kizuna generate` writes it and
  * `kizuna generate --check` refuses to let it go stale.
  */
-export const snapshotTarget = (configPath: string): ClientTarget => ({
-    kind: 'snapshot',
+export const snapshotTarget = (configPath: string): GeneratedFile => ({
     output: snapshotPathFor(configPath),
-    generate: renderSnapshot,
+    render: renderSnapshot,
 });

@@ -1,7 +1,7 @@
 export { loadConfig, type LoadedApi } from './load-config.js';
 export { apiNotices, formatNotice, type Notice } from './api-notices.js';
 export { diffApis, formatChange, hasBreakingChange, type Change, type ChangeLevel } from './diff-apis.js';
-export { writeClients, checkClients, formatStale, type WrittenClient, type StaleClient } from './generate-clients.js';
+export { writeFiles, checkFiles, formatStale, type WrittenFile, type StaleFile } from './generate-clients.js';
 export { generateConfigTypes, ConfigSyntaxError } from './generate-types.js';
 export { diffSchemas, type Direction, type SchemaChange } from './diff-schemas.js';
 export { diffAgainst, type DiffAgainstOptions } from './diff-against.js';

@@ -1,5 +1,5 @@
 import { createJiti } from 'jiti';
-import { apiEntries, type ApiDefinition, type ClientTarget, type DiffSettings } from 'kizunajs';
+import { apiEntries, type ApiDefinition, type DiffSettings, type GeneratedFile } from 'kizunajs';
 
 /**
  * One api a config declares, with everything generated from it. A config that
@@ -8,7 +8,11 @@ import { apiEntries, type ApiDefinition, type ClientTarget, type DiffSettings } 
 export interface LoadedApi {
     name: string;
     api: ApiDefinition;
-    clients: readonly ClientTarget[];
+    clients: readonly GeneratedFile[];
+    /**
+     * The files the config's plugins generate.
+     */
+    generators: readonly GeneratedFile[];
     /**
      * Where `kizuna generate` writes the `Config`, when the config says.
      */
@@ -40,6 +44,7 @@ export const loadConfig = async (configPath: string): Promise<LoadedApi[]> => {
         name,
         api: entry.api,
         clients: entry.clients ?? [],
+        generators: entry.generators ?? [],
         typesOutput: entry.typescript?.outputFile,
         diff: entry.diff ?? {},
     }));

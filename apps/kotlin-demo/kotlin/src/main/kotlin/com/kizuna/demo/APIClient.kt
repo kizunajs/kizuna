@@ -1625,6 +1625,36 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object ContactSendMessage {
+
+        @Serializable
+        data class Input(
+            val subject: String,
+            val html: String
+        )
+
+        data class Body(
+            val subject: String,
+            val html: String
+        )
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(subject: String, html: String): AfterBody = AfterBody(body = Body(subject = subject, html = html))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
@@ -1644,6 +1674,8 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
     val notes = APINotesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+
+    val contact = APIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 }
 
 class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
@@ -3230,6 +3262,41 @@ class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl
                     catch (error: Exception) { throw APIClient.DiagnosticsWhoAmI.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.DiagnosticsWhoAmI.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+}
+
+class APIContactClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+
+    /** Send a message to the team */
+    @Throws(APIClient.ContactSendMessage.Failure::class)
+    suspend fun sendMessage(build: APIClient.ContactSendMessage.Scope.() -> APIClient.ContactSendMessage.Args) {
+        val args = APIClient.ContactSendMessage.Scope.build()
+        val body = args.body
+        val path = "/contact"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = APIClient.ContactSendMessage.Input(subject = body.subject, html = body.html)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                204 -> {}
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.ContactSendMessage.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.ContactSendMessage.Failure.BadRequest(body = payload)
+                }
+                else -> throw APIClient.ContactSendMessage.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

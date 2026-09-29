@@ -20,6 +20,7 @@ export const toolOptionsOf = (route: RouteDefinition): RouteToolOptions | undefi
  * Why a route cannot run as a tool, or `undefined` when it can.
  */
 export const toolRefusal = (route: RouteDefinition): string | undefined => {
+    if (route.hidden === true) return 'it is hidden, and a hidden route never publishes';
     if (route.contentType !== undefined && route.contentType !== 'application/json') {
         return `it takes a ${route.contentType} body, and tool input is JSON`;
     }

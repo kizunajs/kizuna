@@ -19,15 +19,18 @@ export {
     type GuardSchemaOf,
 } from './api-definition.js';
 export {
-    createPlugin,
+    definePlugin,
     type PluginDeclaration,
     type PluginDefinition,
+    type PluginFactory,
+    type PluginSetup,
+    type PluginSetupContext,
+    type PluginApi,
     type PluginRoutes,
     type ApiPlugins,
     type PluginExportValues,
     type PluginArgs,
     type PluginRoutesOf,
-    type PluginPropsOf,
     type PluginExportsOf,
 } from './plugin.js';
 export { type ModelOptions } from './model.js';
@@ -139,7 +142,7 @@ export { readToolCalls, type ToolCallRecord, type ToolCallState, type ToolCallMe
 export type { ModelToolCall, StreamTools, ToolAnswer, ToolEventYield, ToolRunCall, ToolRunOptions, ToolRunResult } from './tool-runner.js';
 export type { ToolDefinition } from './tool-definitions.js';
 export {
-    createJobTransport,
+    defineJobTransport,
     JobDispatchError,
     type JobTransport,
     type JobTransportDefinition,
@@ -242,7 +245,7 @@ export {
 } from './handler-pipeline.js';
 export { type HandlerContextBrand, HANDLER_CONTEXT_BRAND } from './types.js';
 export { type AutoResponsesBrand, AUTO_RESPONSES_BRAND, AUTO_GUARD_BRAND, AUTO_GUARD_WRITTEN_BRAND, type GuardStatus } from './types.js';
-export { apiEntries, type ApiEntry, type ClientTarget, type DiffSettings } from './config.js';
+export { apiEntries, type ApiEntry, type DiffSettings, type GeneratedFile } from './config.js';
 export { type AnyPlugin, type PluginList, type PluginsBySlug } from './plugin.js';
 export { RESOLVER, type RequestContextBuilder, type RequestContextWithHandler } from './request-context-builder.js';
 export { GUARD, type IdentityBuilder, type IdentityWithGuard, type GuardFor, type IdentityFactories } from './identity-builder.js';

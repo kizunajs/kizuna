@@ -7,7 +7,7 @@ import {
     type GuardMap,
     type RequestContextMap,
     type ApiWithRouter,
-    createAdapter,
+    defineAdapter,
     headersToObject,
     matchRoute,
     parseFetchBody,
@@ -106,7 +106,7 @@ export const handleNextRequest = async <T extends Routes>(
 ): Promise<NextResponse> => {
     const url = new URL(request.url);
 
-    const adapter = createAdapter<NextRequest, NextResponse, NextHandlerContext>({
+    const adapter = defineAdapter<NextRequest, NextResponse, NextHandlerContext>({
         buildHandlerContext: (adapterRequest) => ({
             request: adapterRequest.request,
         }),
@@ -157,6 +157,7 @@ export const handleNextRequest = async <T extends Routes>(
                 query: Object.fromEntries(url.searchParams),
                 headers: headersToObject(request.headers),
                 readBody: (route) => parseFetchBody(request, route),
+                readRawBody: () => request.text(),
             };
             return adapter.handle({
                 routes: jobs.routes,
@@ -207,6 +208,7 @@ export const handleNextRequest = async <T extends Routes>(
                 query: Object.fromEntries(url.searchParams),
                 headers: headersToObject(request.headers),
                 readBody: (route) => parseFetchBody(request, route),
+                readRawBody: () => request.text(),
             };
 
             return adapter.handle({
@@ -233,6 +235,7 @@ export const handleNextRequest = async <T extends Routes>(
         query: Object.fromEntries(url.searchParams),
         headers: headersToObject(request.headers),
         readBody: (route) => parseFetchBody(request, route),
+        readRawBody: () => request.text(),
     };
 
     return adapter.handle({

@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { ProblemDetailsSchema } from '../error-response.js';
 import { Kizuna } from '../kizuna.js';
 import { defineConfig } from '../define-config.js';
-import { createPlugin, rawResponse } from '../adapter.js';
+import { rawResponse } from '../adapter.js';
+import { definePlugin, route } from '../plugin.js';
 
 interface Config {
     tags: typeof kTags;
@@ -591,7 +592,35 @@ export const responseShapeRoutes = k.routes('api', {
                 id: '1',
             },
         })),
+    receiveSigned: k
+        .route({
+            method: 'POST',
+            path: '/signed',
+            rawBody: true,
+            body: z.object({
+                name: z.string(),
+            }),
+            responses: {
+                200: z.object({
+                    rawBody: z.string(),
+                    name: z.string(),
+                }),
+            },
+        })
+        .handler(({ rawBody, body }) => ({
+            status: 200,
+            body: {
+                rawBody,
+                name: body.name,
+            },
+        })),
 });
+
+/**
+ * Spaced the way no serializer would write it, so a re-serialized body cannot
+ * pass for the one that was sent.
+ */
+export const signedBodyText = '{ "name" :  "Ada" }';
 
 export const responseShapeInput = {
     ...config,
@@ -1000,11 +1029,14 @@ export const methodInput = {
 
 export const methodContract = defineConfig(methodInput).api;
 
-const probePlugin = (settings: { label: string }) =>
-    createPlugin({
-        slug: 'probe',
+const probePlugin = definePlugin({
+    slug: 'probe',
+    options: z.object({
+        label: z.string(),
+    }),
+    setup: ({ options }) => ({
         routes: {
-            ping: {
+            ping: route({
                 method: 'GET',
                 path: '/probe/ping',
                 responses: {
@@ -1012,8 +1044,13 @@ const probePlugin = (settings: { label: string }) =>
                         pong: z.boolean(),
                     }),
                 },
-            },
-            overlap: {
+            }).handler(() => ({
+                status: 200,
+                body: {
+                    pong: true,
+                },
+            })),
+            overlap: route({
                 method: 'GET',
                 path: '/which-label/:id',
                 responses: {
@@ -1021,8 +1058,13 @@ const probePlugin = (settings: { label: string }) =>
                         from: z.string(),
                     }),
                 },
-            },
-            stream: {
+            }).handler(() => ({
+                status: 200,
+                body: {
+                    from: 'plugin',
+                },
+            })),
+            stream: route({
                 method: 'GET',
                 path: '/probe/stream',
                 responses: {
@@ -1030,37 +1072,22 @@ const probePlugin = (settings: { label: string }) =>
                         never: z.boolean(),
                     }),
                 },
-            },
+            }).handler(() =>
+                rawResponse(
+                    new Response('not json at all', {
+                        status: 200,
+                        headers: {
+                            'Content-Type': 'text/plain',
+                        },
+                    })
+                )
+            ),
         },
-        serve: () => ({
-            router: {
-                ping: () => ({
-                    status: 200 as const,
-                    body: {
-                        pong: true,
-                    },
-                }),
-                overlap: () => ({
-                    status: 200 as const,
-                    body: {
-                        from: 'plugin',
-                    },
-                }),
-                stream: () =>
-                    rawResponse(
-                        new Response('not json at all', {
-                            status: 200,
-                            headers: {
-                                'Content-Type': 'text/plain',
-                            },
-                        })
-                    ),
-            },
-            exports: {
-                label: () => settings.label,
-            },
-        }),
-    });
+        exports: {
+            label: () => options.label,
+        },
+    }),
+});
 
 const pluginKTags = k.tags({
     api: 'API',

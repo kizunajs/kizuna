@@ -10,7 +10,7 @@ import { createRequestContextBuilder, type RequestContextBuilder } from './reque
 import { identityFactories, type IdentityFactories } from './identity-builder.js';
 import { createModel } from './model.js';
 import { type GuardBody, type GuardOutput } from './problem-details.js';
-import type { Routes, AuthoredRoutes, AuthoredRouteDefinition } from './types.js';
+import type { Routes, AuthoredRoutes, AuthoredRouteDefinition, RouteHiddenToolCheck } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { PathParamsCheck, RoutePathParamsCheck } from './path-params.js';
@@ -134,7 +134,10 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *     }));
      */
     route<const Definition extends AuthoredRouteDefinition<TagNamesOf<Spec>, IdentityNamesOf<Spec>>>(
-        definition: Definition & RoutePathParamsCheck<Definition> & RouteAuthCheck<Definition, Spec['identities']>
+        definition: Definition &
+            RoutePathParamsCheck<Definition> &
+            RouteAuthCheck<Definition, Spec['identities']> &
+            RouteHiddenToolCheck<Definition>
     ): RouteBuilder<
         Definition & RouteGuardBrandOf<Definition, GuardOutput<Spec['guardSchema']>, GuardBody<Spec['guardSchema']>>,
         HandlerContextFor<Spec, Definition>
@@ -169,7 +172,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *         },
      *     }));
      */
-    job<const Definition extends AuthoredJobDefinition>(definition: Definition): JobBuilder<Definition>;
+    job<const Definition extends AuthoredJobDefinition>(definition: Definition): JobBuilder<Definition, JobHandlerContextFor<Spec>>;
     /**
      * Declare scheduled jobs. Pass the identity every job requires, the one
      * credential your scheduler sends, then the jobs themselves.
@@ -294,6 +297,14 @@ export type HandlerContextFor<Spec extends KizunaSpec, Definition> = AuthContext
     ConfiguredJobs<Spec['config']> &
     ConfiguredPlugins<Spec['config']> &
     ConfiguredAdapterContext<Spec['config']>;
+
+/**
+ * What every job's handler receives beyond its input, typed: the installed
+ * plugins' exports. `jobs` reaches it at runtime too, but stays untyped here,
+ * since the generated `Config` holds `typeof jobs` and a job typed from it would
+ * depend on itself.
+ */
+export type JobHandlerContextFor<Spec extends KizunaSpec> = ConfiguredPlugins<Spec['config']>;
 
 const createSurface = <Config>(): K<SpecOf<Config>> => {
     type Spec = SpecOf<Config>;

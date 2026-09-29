@@ -30,7 +30,6 @@ import express from 'express';
 import kizuna from '../kizuna.config';
 
 const app = express();
-app.use(express.json());
 
 kizuna.api.mount(app);
 

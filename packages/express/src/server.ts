@@ -1,7 +1,7 @@
-import type { Request, Response, NextFunction, Router as ExpressRouter } from 'express';
-import { Router as createExpressRouter } from 'express';
+import type { Request, Response, NextFunction, RequestHandler, Router as ExpressRouter } from 'express';
+import { Router as createExpressRouter, json, urlencoded } from 'express';
 import { Readable, pipeline } from 'node:stream';
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
     type AdapterRequest,
     type RouteDefinition,
@@ -20,7 +20,7 @@ import {
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
-    createAdapter,
+    defineAdapter,
     renderJsonResult,
     type RenderedResult,
     jobRoutes,
@@ -54,9 +54,70 @@ declare global {
     namespace Express {
         interface Request {
             kizunaRoute?: RouteDefinition;
+            /**
+             * The body as it was sent, kept by {@link keepRawBody}.
+             */
+            rawBody?: Buffer;
+            /**
+             * Set when kizuna parsed this request's body itself.
+             */
+            kizunaParsedBody?: true;
         }
     }
 }
+
+/**
+ * Keep the body as it was sent, for routes with `rawBody: true`. Pass it as the
+ * `verify` option of an `express.json()` your app runs before kizuna.
+ *
+ * @example
+ * app.use(
+ *     express.json({
+ *         verify: keepRawBody,
+ *     })
+ * );
+ */
+export const keepRawBody = (req: IncomingMessage, _res: ServerResponse, buffer: Buffer): void => {
+    (req as Request).rawBody = buffer;
+};
+
+type JsonOptions = NonNullable<Parameters<typeof json>[0]>;
+
+/**
+ * Parse a kizuna route's body, unless the app already parsed it. The parser
+ * keeps the text as well, for routes with `rawBody: true`.
+ */
+const bodyParserFor = (route: RouteDefinition, jsonOptions: JsonOptions | undefined): RequestHandler | undefined => {
+    if (route.contentType === 'multipart/form-data') return undefined;
+    const parse: RequestHandler =
+        route.contentType === 'application/x-www-form-urlencoded'
+            ? urlencoded({
+                  extended: false,
+                  verify: keepRawBody,
+              })
+            : json({
+                  ...jsonOptions,
+                  verify: keepRawBody,
+              });
+    return (req, res, next) => {
+        if (req.body !== undefined) {
+            next();
+            return;
+        }
+        req.kizunaParsedBody = true;
+        parse(req, res, next);
+    };
+};
+
+/**
+ * The body text for a `rawBody` route: what the parser kept, an empty body when
+ * kizuna parsed and there was none, or `undefined` when the app's own parser
+ * consumed it without keeping it.
+ */
+const rawBodyOf = (req: Request): string | undefined => {
+    if (req.rawBody !== undefined) return req.rawBody.toString('utf8');
+    return req.kizunaParsedBody === true ? '' : undefined;
+};
 
 export interface ExpressOptions {
     /**
@@ -71,6 +132,17 @@ export interface ExpressOptions {
      * {@link ErrorFormatter}.
      */
     formatError?: ErrorFormatter<Request>;
+    /**
+     * The options for `express.json()`, like `limit` and `strict`, used to parse
+     * the bodies of kizuna's own routes. An `express.json()` your app runs
+     * first takes precedence, and kizuna uses the body it parsed.
+     *
+     * @example
+     * json: {
+     *     limit: '5mb',
+     * }
+     */
+    json?: JsonOptions;
 }
 
 export interface AppLike {
@@ -112,7 +184,7 @@ const writeWebResponse = async (response: unknown, res: Response): Promise<void>
     Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
 };
 
-const adapter = createAdapter<Request, void, ExpressHandlerContext, ExpressResponseContext>({
+const adapter = defineAdapter<Request, void, ExpressHandlerContext, ExpressResponseContext>({
     buildHandlerContext: (adapterRequest, { res }) => ({
         req: adapterRequest.request,
         res,
@@ -180,12 +252,14 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
         router: CoreRouter<Routes, ExpressHandlerContext>
     ): void => {
         const method = route.method.toLowerCase() as 'get' | 'head' | 'post' | 'put' | 'patch' | 'delete' | 'options';
+        const parseBody = bodyParserFor(route, options?.json);
         expressRouter[method](
             route.path,
             (req: Request, _res: Response, next: NextFunction) => {
                 req.kizunaRoute = route;
                 next();
             },
+            ...(parseBody === undefined ? [] : [parseBody]),
             async (req: Request, res: Response, next: NextFunction) => {
                 const adapterRequest: AdapterRequest<Request> = {
                     request: req,
@@ -199,6 +273,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                     query: req.query,
                     headers: req.headers,
                     readBody: () => req.body,
+                    readRawBody: () => rawBodyOf(req),
                 };
                 await adapter.handle({
                     routes,

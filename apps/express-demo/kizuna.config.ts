@@ -7,6 +7,8 @@ import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';
 import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
 import { diagnostics } from './src/routes/diagnostics';
+import { contact } from './src/routes/contact';
+import { emailPlugin } from './src/plugins/email';
 
 /**
  * The shared routes every demo serves, plus the ones only this demo can answer.
@@ -14,6 +16,7 @@ import { diagnostics } from './src/routes/diagnostics';
 const served = {
     ...routes,
     diagnostics,
+    contact,
 };
 
 export default defineConfig({
@@ -76,6 +79,9 @@ export default defineConfig({
             setOperationId: true,
             docsPath: '/docs',
             jsonPath: '/openapi.json',
+        }),
+        emailPlugin({
+            from: 'Kizuna demo <hello@example.com>',
         }),
     ],
 });

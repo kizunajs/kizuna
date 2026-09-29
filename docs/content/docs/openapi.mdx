@@ -9,7 +9,7 @@ description: Generate an OpenAPI 3.1.0 document from your routes, and serve it w
 
 ## Install it
 
-`openApiPlugin` serves the document and an API reference UI for it, on any adapter.
+`openApiPlugin` writes the document on `kizuna generate`, and serves it with an API reference UI on any adapter.
 
 <Steps>
 
@@ -52,17 +52,36 @@ Each prop serves one route, and serves nothing until you give it a path:
 
 ```ts
 openApiPlugin({
-    info,
+    info: {
+        title: 'My API',
+        version: '1.0.0',
+    },
     docsPath: '/docs',
     jsonPath: '/openapi.json',
 });
 ```
 
-The UI embeds the document, so `docsPath` alone is enough to browse the API. All three are [plugin routes](/docs/extend/create-plugin#plugin-routes), so they stay out of your fetch client and out of the document itself.
+The UI embeds the document, so `docsPath` alone is enough to browse the API. All three are [plugin routes](/docs/extend/create-plugin#routes), which are hidden, so they stay out of your clients and out of the document itself.
 
 The routes are public. Gate them with your framework's own middleware if that is not what you want.
 
 ### Writing it to disk
+
+Give the plugin an `output`, and `kizuna generate` writes the document there:
+
+```ts title="kizuna.config.ts"
+openApiPlugin({
+    info: {
+        title: 'My API',
+        version: '1.0.0',
+    },
+    output: './openapi.yaml',
+}),
+```
+
+It's the same document the plugin serves. The format comes from the extension, JSON for `.json` and YAML for anything else, and `kizuna generate --check` fails CI when the file falls behind your routes.
+
+To write it from a script of your own instead, like a build step in CI, render it with [`generateOpenApi`](#generateopenapi):
 
 ```ts title="scripts/generate-openapi.ts"
 import { writeFileSync } from 'node:fs';
@@ -78,7 +97,26 @@ writeFileSync('openapi.yaml', spec('yaml'));
 tsx scripts/generate-openapi.ts
 ```
 
-### Serving it yourself
+## Which routes it documents
+
+The document describes every route that isn't [hidden](/docs/routes#hidden-routes). A health check or a webhook route marked `hidden` isn't in it, so a document you serve publicly never maps out your internal routes.
+
+To document every route the server serves, opt in:
+
+```ts title="kizuna.config.ts"
+openApiPlugin({
+    info: {
+        title: 'My API',
+        version: '1.0.0',
+    },
+    output: './openapi.internal.yaml',
+    includeHidden: true,
+}),
+```
+
+That's the one for your own team, written to disk or served behind auth.
+
+## Serving it yourself
 
 [`generateOpenApi`](#generateopenapi) renders the document directly:
 
@@ -98,7 +136,10 @@ Mixing is the useful case: set `jsonPath` and leave `docsPath` unset, and the pl
 
 ```ts
 openApiPlugin({
-    info,
+    info: {
+        title: 'My API',
+        version: '1.0.0',
+    },
     provider: 'swagger',
 });
 ```
@@ -171,6 +212,8 @@ openApiPlugin({
 | Option            | Default  | Description                                                                             |
 | ----------------- | -------- | --------------------------------------------------------------------------------------- |
 | `info`            | required | OpenAPI `info` object                                                                   |
+| `output`          | none     | Where `kizuna generate` writes the document. `.json` for JSON, anything else for YAML   |
+| `includeHidden`   | `false`  | Document [hidden](/docs/routes#hidden-routes) routes too                                |
 | `servers`         | none     | Server URLs                                                                             |
 | `setOperationId`  | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
 | `operationMapper` | none     | Callback to transform each operation before it is added to the spec                     |

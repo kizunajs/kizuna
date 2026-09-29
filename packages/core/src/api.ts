@@ -1,4 +1,5 @@
 import { HANDLER } from './types.js';
+import { pluginExportsOf } from './plugin-server.js';
 import type { z } from 'zod';
 import type { ApiDefinition } from './api-definition.js';
 import { assembleApi, routerFromRoutes, warnUnsupportedJobOptions, JOBS_META, type ApiParts, type ApiWithRouter } from './adapter.js';
@@ -89,7 +90,9 @@ export const buildApi = (
         plugins: implementations.plugins,
     } as ApiParts;
 
-    const api = Object.assign(assembleApi(contract, parts) as Record<string | symbol, unknown>, contract, {
+    // At runtime the contract holds each plugin resolved, its options validated and `setup` run.
+    const assembled = assembleApi(contract as unknown as Parameters<typeof assembleApi>[0], parts) as Record<string | symbol, unknown>;
+    const api = Object.assign(assembled, contract, {
         [JOBS_META]: contract.jobs
             ? {
                   jobs: contract.jobs,
@@ -97,6 +100,7 @@ export const buildApi = (
                   config: contract.jobsConfig,
                   transport: implementations.jobTransport,
                   onError: implementations.onJobError,
+                  plugins: pluginExportsOf(assembled),
               }
             : undefined,
     }) as Record<string, unknown>;

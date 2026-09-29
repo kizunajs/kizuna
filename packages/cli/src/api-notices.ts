@@ -1,5 +1,5 @@
-import type { RouteDefinition } from 'kizunajs';
-import { createGenerator } from 'kizunajs/generator';
+import type { ApiDefinition, RouteDefinition } from 'kizunajs';
+import { walkApi, type GeneratorWalk } from 'kizunajs/generator';
 
 /**
  * A route that announces its own retirement.
@@ -34,14 +34,7 @@ const readSunset = (route: RouteDefinition): string | undefined => {
 
 const daysBetween = (from: Date, to: Date): number => Math.ceil((to.getTime() - from.getTime()) / 86_400_000);
 
-/**
- * Every route that is deprecated or has a sunset date, soonest first, with
- * undated deprecations last.
- *
- * Reads the same `deprecated` field the generated clients carry in an
- * editor, so a watcher and a hover agree.
- */
-export const apiNotices = createGenerator<{ now?: Date }, Notice[]>((options) => {
+const noticesWalk = (options: { now?: Date }): GeneratorWalk<Notice[]> => {
     const now = options.now ?? new Date();
     const notices: Notice[] = [];
 
@@ -71,7 +64,16 @@ export const apiNotices = createGenerator<{ now?: Date }, Notice[]>((options) =>
             });
         },
     };
-});
+};
+
+/**
+ * Every route that is deprecated or has a sunset date, soonest first, with
+ * undated deprecations last.
+ *
+ * Reads the same `deprecated` field the generated clients carry in an
+ * editor, so a watcher and a hover agree.
+ */
+export const apiNotices = (api: ApiDefinition, options: { now?: Date } = {}): Notice[] => walkApi(api, noticesWalk(options));
 
 /**
  * One line per notice, for a watcher to print.

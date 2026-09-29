@@ -1,78 +1,108 @@
 ---
 title: Create a Generator
-description: Build and ship your own code generator or client from a Kizuna API using createGenerator.
+description: Generate documents and other files from your routes, like the OpenAPI document, and keep them in step on every kizuna generate.
 ---
 
 <BetaNotice>
 
-The generator API is new and still settling. `createGenerator` and the walked route shape may change while v2 is in beta, so pin your version if you depend on them.
+The generator API is new and still settling. `defineGenerator` and the context it walks may change while v2 is in beta, so pin your version if you depend on them.
 
 </BetaNotice>
 
-`createGenerator` from `kizunajs/generator` lets you walk your api and produce any output, such as a typed client for another language, documentation, or a route manifest.
+A generator walks your routes and writes a file from them: a document, a manifest, a list for a gateway. The OpenAPI document is one. For code your apps call, write a [client](/docs/extend/create-client) instead.
 
-The Swift and Kotlin clients, the OpenAPI document, and `kizuna routes` are all written with it.
+## `defineGenerator`
 
-Whether a generator goes first-party comes down to demand, not age. If enough teams need a target, we will add it. What we will not take on is one a handful of people need, since we maintain everything we merge. The generator API is public, so you can build and publish your own today.
+A route manifest for an API gateway, listing every route it should forward:
 
-## How it works
+```ts title="@example/kizuna-gateway/src/index.ts"
+import { z } from 'zod';
+import { defineGenerator } from 'kizunajs/generator';
 
-You provide a factory function that receives your options and returns two methods:
+export const gatewayManifest = defineGenerator({
+    options: z.object({
+        includeDeprecated: z.boolean().default(false),
+    }),
+    generate: ({ options }) => {
+        const entries: Array<{ method: string; path: string }> = [];
 
-- `processRoute` is called once for every route in the api
-- `finalize` is called after all routes are processed and returns your output
+        return {
+            processRoute: ({ route, deprecated }) => {
+                if (deprecated && !options.includeDeprecated) {
+                    return;
+                }
 
-`createGenerator` handles walking the api, flattening nested route groups, and resolving each route's `deprecated` declaration automatically.
-
-## `createGenerator`
-
-```ts title="generator.ts"
-import { createGenerator, type GeneratorRouteContext } from 'kizunajs/generator';
-
-interface MyOptions {
-    prefix?: string;
-}
-
-export const generateRouteList = createGenerator((options: MyOptions) => {
-    const lines: string[] = [];
-
-    return {
-        processRoute({ routeKey, route, deprecated }: GeneratorRouteContext) {
-            const prefix = options.prefix ?? '';
-            const tag = deprecated ? ' (deprecated)' : '';
-            lines.push(`${prefix}${route.method} ${route.path}${tag}`);
-        },
-        finalize() {
-            return lines;
-        },
-    };
+                entries.push({
+                    method: route.method,
+                    path: route.path,
+                });
+            },
+            finalize: () => JSON.stringify(entries, null, 4),
+        };
+    },
 });
 ```
 
-```ts title="scripts/list-routes.ts"
-import kizuna from '../kizuna.config';
-import { generateRouteList } from './generator';
+| Field      | What it is                                                                         |
+| ---------- | ---------------------------------------------------------------------------------- |
+| `options`  | A Zod schema for what the plugin passes in, beside `output`                        |
+| `generate` | Returns the walk: `processModel` and `processRoute` for each item, then `finalize` |
 
-const list = generateRouteList(kizuna.api, {
-    prefix: '> ',
+`finalize` returns the file as one string. Kizuna writes it to `output`, and `kizuna generate --check` compares it byte for byte.
+
+## Installing it
+
+A plugin brings generators from its `setup`, the same way it brings routes and jobs. A package that only generates a file is a plugin with nothing else in it:
+
+```ts title="@example/kizuna-gateway/src/plugin.ts"
+import { z } from 'zod';
+import { definePlugin } from 'kizunajs/plugin';
+import { gatewayManifest } from './generator';
+
+export const gatewayPlugin = definePlugin({
+    slug: 'gateway',
+    options: z.object({
+        output: z.string(),
+    }),
+    setup: ({ options }) => ({
+        generators: [
+            gatewayManifest({
+                output: options.output,
+            }),
+        ],
+    }),
 });
 ```
 
-## `GeneratorRouteContext`
+```ts title="kizuna.config.ts"
+plugins: [
+    gatewayPlugin({
+        output: './gateway/routes.json',
+    }),
+],
+```
 
-Each `processRoute` call receives:
+`openApiPlugin` works the same way: its `output` option becomes a generator it returns, beside the routes that serve the document.
 
-| Property             | Type                  | Description                                                               |
-| -------------------- | --------------------- | ------------------------------------------------------------------------- |
-| `routeKey`           | `string`              | Dot-separated key path, e.g. `users.getUser`                              |
-| `route`              | `RouteDefinition`     | The full route definition                                                 |
-| `routeTags`          | `string[]`            | The tags of every `k.routes` group the route sits inside, outermost first |
-| `deprecated`         | `boolean`             | `true` when the route is deprecated                                       |
-| `deprecationMessage` | `string \| undefined` | The route's `deprecated` string, or the object form's `message`           |
+## The walk
+
+`processRoute` is called once for every route the server serves, plugin routes included. `processModel` is called once for every named [model](/docs/reference/kizuna-model), and is optional.
+
+| Property             | Type                    | Description                                                               |
+| -------------------- | ----------------------- | ------------------------------------------------------------------------- |
+| `routeKey`           | `string`                | Dot-separated key path, e.g. `users.getUser`                              |
+| `route`              | `RouteDefinition`       | The full route definition                                                 |
+| `routeTags`          | `string[]`              | The tags of every `k.routes` group the route sits inside, outermost first |
+| `hidden`             | `boolean`               | `true` when the route is [hidden](/docs/routes#hidden-routes)             |
+| `deprecated`         | `boolean`               | `true` when the route is deprecated                                       |
+| `deprecationMessage` | `string \| undefined`   | The route's `deprecated` string, or the object form's `message`           |
+| `plugin`             | `{ slug } \| undefined` | The plugin whose route this is, under the slug the app installed it at    |
+
+A generator sees every served route and decides what to include. The OpenAPI document leaves hidden routes out unless it's told otherwise.
 
 ## Deprecation
 
-Route deprecation arrives on the context, read from the route's `deprecated` declaration. Fields declare theirs in Zod metadata; read it off any schema you walk with `readDeprecation` from `kizunajs/generator`:
+Route deprecation arrives on the context. Fields declare theirs in Zod metadata, read with `readDeprecation`:
 
 ```ts
 import { readDeprecation } from 'kizunajs/generator';
@@ -87,7 +117,7 @@ See [Deprecations](/docs/deprecations) for the authoring side.
 
 ## Examples
 
-A schema's declared example values read off the same surface, with `readMetaExamples`. It takes `example` first and then `examples`, each of which holds one value or a list, and answers with them in order:
+A schema's declared example values read with `readMetaExamples`. It takes `example` first and then `examples`, each of which holds one value or a list:
 
 ```ts
 import { readMetaExamples } from 'kizunajs/generator';
@@ -95,50 +125,9 @@ import { readMetaExamples } from 'kizunajs/generator';
 const [example] = readMetaExamples(fieldSchema);
 ```
 
-## Shipping a `ClientTarget`
+## What `kizuna generate` expects
 
-A generator becomes something a config can name by wrapping it in a `ClientTarget`, which is the whole plug-in point:
-
-```ts
-export interface ClientTarget {
-    readonly kind: string;
-    readonly output: string;
-    readonly generate: (api: ApiDefinition) => string;
-}
-```
-
-Export a factory returning one, and `kizuna generate` writes the file while `kizuna generate --check` verifies it:
-
-```ts title="src/client-target.ts"
-import type { ApiDefinition, ClientTarget } from 'kizunajs';
-import { generateGoClient } from './generator.js';
-
-export const goClient = (options: { output: string; package?: string }): ClientTarget => ({
-    kind: 'go',
-    output: options.output,
-    generate: (api: ApiDefinition) => generateGoClient(api, options.package ?? 'api'),
-});
-```
-
-```ts title="kizuna.config.ts"
-import { goClient } from '@example/kizuna-go';
-
-export default defineConfig({
-    routes,
-    clients: [
-        goClient({
-            output: '../cmd/client/api_client.go',
-            package: 'api',
-        }),
-    ],
-});
-```
-
-Four things the contract asks of you:
-
-- **`generate` must be deterministic.** `kizuna generate --check` re-renders and compares byte for byte, so a timestamp or a sorted-by-`Map`-insertion-order header fails every CI run after the first.
-- **One string, one file.** There is no multi-file target. Export several `ClientTarget`s instead, as the Swift generator does for its open-enum variant.
-- **`generate` is synchronous.** It returns `string`, not `Promise<string>`, so read whatever you need before you build the target.
-- **`output` resolves against the config's directory**, not the shell's working directory, so `../ios/MyApp/Generated/APIClient.swift` writes into a sibling project and the result does not move with the caller.
-
-`kind` is yours to choose and appears only in what the CLI prints. Nothing validates it and nothing minds two targets sharing one.
+- **The output is deterministic.** `--check` re-renders and compares byte for byte, so a timestamp or an unsorted map in the output fails every CI run after the first.
+- **One generator, one file.** For two files, install it twice with two outputs.
+- **The walk is synchronous.** Read whatever you need before you return from `generate`.
+- **`output` resolves against the config's directory**, not the shell's, so `./gateway/routes.json` lands in the same place wherever the command runs.

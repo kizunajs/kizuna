@@ -13,5 +13,4 @@ export type {
 } from './types.js';
 export type { DocsProvider } from './docs-html.js';
 export { generateOpenApi, renderOpenApi } from './generator.js';
-export { openApiDocument, type OpenApiDocumentOptions } from './document-target.js';
 export { renderDocsHtml, type DocsHtmlOptions } from './docs-html.js';

@@ -4,6 +4,8 @@ import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 import { isCompiledJob, isJobDefinition } from './jobs.js';
 import { cron } from './schedule.js';
+import { definePlugin } from './plugin.js';
+import { JOBS_META, jobRunnerFrom, jobFnAt, type JobsMeta } from './adapter.js';
 
 interface Config {
     auth: {
@@ -397,5 +399,58 @@ describe('a job endpoint colliding with a route', () => {
                     }),
                 }).api
         ).not.toThrow();
+    });
+});
+
+describe('job handlers and plugins', () => {
+    const greeter = definePlugin({
+        slug: 'greeter',
+        options: z.object({
+            greeting: z.string(),
+        }),
+        setup: ({ options }) => ({
+            exports: {
+                greet: (name: string) => `${options.greeting}, ${name}`,
+            },
+        }),
+    });
+
+    it('hands every job handler the installed plugins', async () => {
+        const received: string[] = [];
+        const jobs = k.jobs('scheduler', {
+            welcome: k
+                .job({
+                    input: z.object({
+                        name: z.string(),
+                    }),
+                })
+                .handler((args) => {
+                    const { plugins } = args as unknown as {
+                        plugins: {
+                            greeter: {
+                                greet: (name: string) => string;
+                            };
+                        };
+                    };
+                    received.push(plugins.greeter.greet(args.input.name));
+                }),
+        });
+        const { api } = defineConfig({
+            ...config,
+            routes: {},
+            jobs,
+            plugins: [
+                greeter({
+                    greeting: 'Hello',
+                }),
+            ],
+        });
+
+        const runner = jobRunnerFrom((api as unknown as Record<typeof JOBS_META, JobsMeta>)[JOBS_META]);
+        await jobFnAt(runner, 'welcome')?.run({
+            name: 'Alice',
+        });
+
+        expect(received).toEqual(['Hello, Alice']);
     });
 });

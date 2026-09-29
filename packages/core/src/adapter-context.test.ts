@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
-import { HANDLER_ARG_KEYS, adapterContextOf, assembleApi, createAdapter, type AdapterRequest } from './adapter.js';
+import { HANDLER_ARG_KEYS, adapterContextOf, assembleApi, defineAdapter, type AdapterRequest } from './adapter.js';
 
 interface Config {
     tags: typeof kTags;
@@ -65,6 +65,7 @@ const contract = defineConfig({
             method: 'POST',
             path: '/everything/:id',
             auth: 'user',
+            rawBody: true,
             query: z.object({
                 page: z.number(),
             }),
@@ -95,7 +96,7 @@ const contract = defineConfig({
 const captureHandlerArgs = async (): Promise<Record<string, unknown>> => {
     let seen: Record<string, unknown> = {};
 
-    const adapter = createAdapter<Request, unknown, { native: string }>({
+    const adapter = defineAdapter<Request, unknown, { native: string }>({
         buildHandlerContext: () => ({
             native: 'from-the-adapter',
         }),
@@ -122,6 +123,8 @@ const captureHandlerArgs = async (): Promise<Record<string, unknown>> => {
             Promise.resolve({
                 name: 'Ada',
             }),
+
+        readRawBody: () => '{"name":"Ada"}',
     };
 
     const router = {

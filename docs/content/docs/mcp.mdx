@@ -76,6 +76,8 @@ Two shapes never publish, even when they say `tool`:
 - A route whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded`, because tool input is JSON.
 - A route whose response [streams](/docs/streaming), because a tool result is one value.
 
+A [hidden](/docs/routes#hidden-routes) route can't say `tool` at all: the two together are a type error.
+
 ### What to leave unpublished
 
 Every published tool's name, description, and input schema sits in the model's context on every turn, called or not, and the more tools there are the more often the model picks the wrong one. So publish deliberately:
@@ -239,14 +241,13 @@ The guard runs once per request, its context reaches handlers under `auth.<schem
 
 ## Options
 
-| Option         | Default              | Description                                                           |
-| -------------- | -------------------- | --------------------------------------------------------------------- |
-| `slug`         | `'mcp'`              | What handlers reach this plugin under. Give a second endpoint its own |
-| `path`         | `'/mcp'`             | Path the endpoint is served from                                      |
-| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                            |
-| `version`      | `'1.0.0'`            | Semantic version string                                               |
-| `instructions` | built from your tags | Appended to the generated overview                                    |
-| `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth))  |
+| Option         | Default              | Description                                                          |
+| -------------- | -------------------- | -------------------------------------------------------------------- |
+| `path`         | `'/mcp'`             | Path the endpoint is served from                                     |
+| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                           |
+| `version`      | `'1.0.0'`            | Semantic version string                                              |
+| `instructions` | built from your tags | Appended to the generated overview                                   |
+| `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth)) |
 
 ## Connecting clients
 

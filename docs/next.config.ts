@@ -21,6 +21,7 @@ const movedDocs: Array<[string, string]> = [
     ['/docs/reference/server-request-context', '/docs/reference/k-request-context'],
     ['/docs/reference/server-router', '/docs/routes'],
     ['/docs/vscode', '/docs/deprecations'],
+    ['/docs/extend/create-ts-client', '/docs/extend/wrap-fetch-client'],
 ];
 
 const config: NextConfig = {

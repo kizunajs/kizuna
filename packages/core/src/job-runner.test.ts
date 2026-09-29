@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 import { createJobRunner, JobInputError } from './job-runner.js';
-import { createJobTransport, JobDispatchError, type JobMessage } from './job-transport.js';
+import { defineJobTransport, JobDispatchError, type JobMessage } from './job-transport.js';
 import { ResponseError } from './response-error.js';
 
 interface Config {
@@ -75,7 +75,7 @@ const recordingTransport = () => {
     const sent: JobMessage[] = [];
     return {
         sent,
-        transport: createJobTransport({
+        transport: defineJobTransport({
             name: 'recording',
             supports: {
                 retry: true,
@@ -130,7 +130,7 @@ describe('createJobRunner', () => {
             });
         });
 
-        it('gives the handler nothing but input, jobs, and throwError', async () => {
+        it('gives the handler input, jobs, plugins and throwError', async () => {
             const seen = vi.fn();
             const runner = createJobRunner(contract, {
                 indexPost: (args) => {
@@ -140,7 +140,7 @@ describe('createJobRunner', () => {
                 cleanup: noop,
             });
             await runner.indexPost.run({ postId: 'post-1' });
-            expect(seen).toHaveBeenCalledWith(['input', 'jobs', 'throwError']);
+            expect(seen).toHaveBeenCalledWith(['input', 'jobs', 'plugins', 'throwError']);
         });
 
         it('validates the input, so an in-process call cannot skip a check', async () => {
@@ -356,7 +356,7 @@ describe('createJobRunner', () => {
         });
 
         it('names the transport and the job when delivery fails', async () => {
-            const transport = createJobTransport({
+            const transport = defineJobTransport({
                 name: 'flaky',
                 dispatch: () => {
                     throw new Error('connection refused');
@@ -393,7 +393,7 @@ describe('createJobRunner', () => {
 
     describe('an option the transport drops', () => {
         const plainTransport = () =>
-            createJobTransport({
+            defineJobTransport({
                 name: 'plain',
                 dispatch: () => {},
             });
@@ -445,7 +445,7 @@ describe('createJobRunner', () => {
         it('queues it anyway, because a dropped hint is not a failure', async () => {
             const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
             const dispatch = vi.fn();
-            const transport = createJobTransport({
+            const transport = defineJobTransport({
                 name: 'plain',
                 dispatch,
             });

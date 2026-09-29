@@ -248,4 +248,19 @@ describe('mcpPlugin: the routes that publish', () => {
             ok: true,
         });
     });
+
+    it('rejects options its schema does not accept, naming the field', () => {
+        expect(() =>
+            defineConfig({
+                adapter: expressAdapter(),
+                ...config,
+                plugins: [
+                    mcpPlugin({
+                        path: 'mcp' as never,
+                    }),
+                ],
+                routes,
+            })
+        ).toThrow(/\[kizuna\] Plugin 'mcp' has invalid options: path: must start with \//);
+    });
 });
