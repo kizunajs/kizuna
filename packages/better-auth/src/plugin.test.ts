@@ -10,7 +10,7 @@ import { defineConfig, Kizuna } from 'kizunajs';
 import { definePlugin } from 'kizunajs/plugin';
 import { expressAdapter } from '@kizunajs/express';
 import { defineBetterAuthPlugin } from './plugin.js';
-import { createForwarder, kizuna } from './client.js';
+import { kizuna, type KizunaOptions } from './client.js';
 import type { BetterAuthEventHandlers } from './webhooks.js';
 
 interface Config {
@@ -162,10 +162,33 @@ describe('betterAuthPlugin options', () => {
     });
 });
 
-describe('forwarding a callback to the webhook route', () => {
+/**
+ * A `forward()` named the way the kizuna plugin names it when Better Auth
+ * starts, here held by a plugin `probe` at `notify`.
+ */
+const namedForward = (options: KizunaOptions) => {
+    const kizunaApi = kizuna(options);
+    const notify = kizunaApi.forward<(data: Record<string, unknown>, request?: Request) => Promise<void>>();
+    void kizunaApi.init?.({
+        options: {
+            plugins: [
+                {
+                    id: 'probe',
+                    options: {
+                        notify,
+                    },
+                },
+            ],
+        },
+        logger: console,
+    } as never);
+    return notify;
+};
+
+describe('forward()', () => {
     it('hands the function the event, its data, jobs and plugins', async () => {
         const url = await serve({
-            sendResetPassword: async ({ event, data, ...context }) => {
+            '*': async ({ event, data, ...context }) => {
                 const { jobs: appJobs, plugins } = context as unknown as {
                     jobs: {
                         recordReset: {
@@ -178,133 +201,74 @@ describe('forwarding a callback to the webhook route', () => {
                         };
                     };
                 };
+                const { user } = data as {
+                    user: {
+                        id: string;
+                        email: string;
+                    };
+                };
                 plugins.mailer.send({
-                    to: data.user.email,
-                    subject: `${event} ${data.url} ${data.token}`,
+                    to: user.email,
+                    subject: `${event} ${String(data.url)}`,
                 });
                 await appJobs.recordReset.run({
-                    userId: data.user.id,
+                    userId: user.id,
                 });
             },
         });
-        const forward = createForwarder({
+
+        await namedForward({
             url,
             headers: appHeaders,
+        })({
+            user: ada,
+            url: 'https://auth.example.com/reset/tok_1',
         });
-
-        await forward('sendResetPassword')(
-            {
-                user: ada,
-                url: 'https://auth.example.com/reset/tok_1',
-                token: 'tok_1',
-            },
-            new Request('https://auth.example.com/api/auth/request-password-reset')
-        );
 
         expect(sent).toEqual([
             {
                 to: 'ada@example.com',
-                subject: 'sendResetPassword https://auth.example.com/reset/tok_1 tok_1',
+                subject: 'probe.notify https://auth.example.com/reset/tok_1',
             },
         ]);
         expect(resets).toEqual(['user_1']);
     });
 
-    it('carries an invitation, with its dates as ISO strings', async () => {
+    it('sends dates as ISO strings, and leaves out functions and undefined fields', async () => {
         let received: unknown;
         const url = await serve({
-            sendInvitationEmail: ({ data }) => {
+            '*': ({ data }) => {
                 received = data;
             },
         });
-        const createdAt = new Date('2026-09-01T10:00:00.000Z');
-        const expiresAt = new Date('2026-09-08T10:00:00.000Z');
 
-        await createForwarder({
+        await namedForward({
             url,
             headers: appHeaders,
-        })('sendInvitationEmail')({
-            id: 'inv_1',
-            email: 'grace@example.com',
-            role: 'member',
-            organization: {
-                id: 'org_1',
-                name: 'Kizuna',
-                slug: 'kizuna',
-                createdAt,
-            },
-            inviter: {
-                id: 'mem_1',
-                organizationId: 'org_1',
-                userId: 'user_1',
-                role: 'owner',
-                createdAt,
-                user: ada,
-            },
-            invitation: {
-                id: 'inv_1',
-                organizationId: 'org_1',
-                email: 'grace@example.com',
-                role: 'member',
-                status: 'pending',
-                inviterId: 'user_1',
-                expiresAt,
-                createdAt,
-            },
-        });
-
-        expect(received).toMatchObject({
-            email: 'grace@example.com',
-            organization: {
-                slug: 'kizuna',
-                createdAt: '2026-09-01T10:00:00.000Z',
-            },
-            inviter: {
-                user: {
-                    email: 'ada@example.com',
-                },
-            },
-            invitation: {
-                expiresAt: '2026-09-08T10:00:00.000Z',
-            },
-        });
-    });
-
-    it('leaves out functions and undefined fields, and keeps the rest of the user', async () => {
-        let received: unknown;
-        const url = await serve({
-            sendVerificationEmail: ({ data }) => {
-                received = data.user;
-            },
-        });
-
-        await createForwarder({
-            url,
-            headers: appHeaders,
-        })('sendVerificationEmail')({
+        })({
             user: {
                 ...ada,
                 plan: 'pro',
                 greet: () => 'hello',
                 missing: undefined,
-            } as typeof ada,
-            url: 'https://auth.example.com/verify/tok_2',
-            token: 'tok_2',
+            },
         });
 
         expect(received).toEqual({
-            id: 'user_1',
-            email: 'ada@example.com',
-            name: 'Ada',
-            emailVerified: true,
-            image: null,
-            createdAt: '2026-09-01T10:00:00.000Z',
-            updatedAt: '2026-09-01T10:00:00.000Z',
-            plan: 'pro',
+            user: {
+                id: 'user_1',
+                email: 'ada@example.com',
+                name: 'Ada',
+                emailVerified: true,
+                image: null,
+                createdAt: '2026-09-01T10:00:00.000Z',
+                updatedAt: '2026-09-01T10:00:00.000Z',
+                plan: 'pro',
+            },
         });
     });
 
-    it('sends only the payload, never the request', async () => {
+    it('sends only what it is handed, never the request', async () => {
         const bodies: unknown[] = [];
         vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
             bodies.push(JSON.parse(String(init?.body)));
@@ -313,12 +277,10 @@ describe('forwarding a callback to the webhook route', () => {
             });
         });
 
-        await createForwarder({
+        await namedForward({
             url: 'https://api.example.com/better-auth/webhooks',
-        })('sendDeleteAccountVerification')(
+        })(
             {
-                user: ada,
-                url: 'https://auth.example.com/delete/tok_3',
                 token: 'tok_3',
             },
             new Request('https://auth.example.com/api/auth/delete-user')
@@ -326,72 +288,56 @@ describe('forwarding a callback to the webhook route', () => {
 
         expect(bodies).toEqual([
             {
-                event: 'sendDeleteAccountVerification',
+                event: 'probe.notify',
                 data: {
-                    user: {
-                        ...ada,
-                        createdAt: '2026-09-01T10:00:00.000Z',
-                        updatedAt: '2026-09-01T10:00:00.000Z',
-                    },
-                    url: 'https://auth.example.com/delete/tok_3',
                     token: 'tok_3',
                 },
             },
         ]);
     });
 
-    it('asks for the headers before every call', async () => {
+    it('asks for the headers before every event', async () => {
         const url = await serve({});
         const headers = vi.fn(async () => appHeaders);
-        const forward = createForwarder({
+        const notify = namedForward({
             url,
             headers,
         });
 
-        await forward('sendResetPassword')({
-            user: ada,
-            url: 'https://auth.example.com/reset/tok_1',
-            token: 'tok_1',
-        });
-        await forward('sendResetPassword')({
-            user: ada,
-            url: 'https://auth.example.com/reset/tok_1',
-            token: 'tok_1',
-        });
+        await notify({});
+        await notify({});
 
         expect(headers).toHaveBeenCalledTimes(2);
     });
 
-    it('throws when the API refuses the call', async () => {
+    it('throws when the API refuses the event', async () => {
         const ran = vi.fn();
         const url = await serve({
-            sendResetPassword: ran,
+            '*': ran,
         });
 
         await expect(
-            createForwarder({
+            namedForward({
                 url,
                 headers: {
                     authorization: 'Bearer wrong-token',
                 },
-            })('sendResetPassword')({
-                user: ada,
-                url: 'https://auth.example.com/reset/tok_1',
-                token: 'tok_1',
-            })
-        ).rejects.toThrow('[kizuna/better-auth] Forwarding sendResetPassword failed: the API answered 401.');
+            })({})
+        ).rejects.toThrow('[kizuna/better-auth] Sending probe.notify failed: the API answered 401.');
         expect(ran).not.toHaveBeenCalled();
+    });
+
+    it('throws when the kizuna plugin never named it', async () => {
+        const notify = kizuna({
+            url: 'https://api.example.com/better-auth/webhooks',
+        }).forward<(data: Record<string, unknown>) => Promise<void>>();
+
+        await expect(notify({})).rejects.toThrow('[kizuna/better-auth] A forward() was never named.');
     });
 });
 
-const post = (app: express.Express, body: unknown, headers: Record<string, string> = appHeaders) => {
-    let call = request(app).post('/better-auth/webhooks').set('content-type', 'application/json');
-    for (const [name, value] of Object.entries(headers)) call = call.set(name, value);
-    return call.send(JSON.stringify(body));
-};
-
 const resetBody = {
-    event: 'sendResetPassword',
+    event: 'emailAndPassword.sendResetPassword',
     data: {
         user: {
             ...ada,
@@ -403,63 +349,17 @@ const resetBody = {
     },
 };
 
-describe('codes sent by phone and for two-factor', () => {
-    it('carries a phone number code', async () => {
-        let received: unknown;
-        const url = await serve({
-            sendPhoneNumberOTP: ({ data }) => {
-                received = data;
-            },
-        });
-
-        await createForwarder({
-            url,
-            headers: appHeaders,
-        })('sendPhoneNumberOTP')({
-            phoneNumber: '+4712345678',
-            code: '123456',
-        });
-
-        expect(received).toEqual({
-            phoneNumber: '+4712345678',
-            code: '123456',
-        });
-    });
-
-    it('carries a two-factor code with its user', async () => {
-        let received: unknown;
-        const url = await serve({
-            sendTwoFactorOTP: ({ data }) => {
-                received = data;
-            },
-        });
-
-        await createForwarder({
-            url,
-            headers: appHeaders,
-        })('sendTwoFactorOTP')({
-            user: {
-                ...ada,
-                twoFactorEnabled: true,
-            },
-            otp: '654321',
-        });
-
-        expect(received).toMatchObject({
-            user: {
-                email: 'ada@example.com',
-                twoFactorEnabled: true,
-            },
-            otp: '654321',
-        });
-    });
-});
+const post = (app: express.Express, body: unknown, headers: Record<string, string> = appHeaders) => {
+    let call = request(app).post('/better-auth/webhooks').set('content-type', 'application/json');
+    for (const [name, value] of Object.entries(headers)) call = call.set(name, value);
+    return call.send(JSON.stringify(body));
+};
 
 describe('the webhook route', () => {
     it('answers 401 without the identity, and runs nothing', async () => {
         const ran = vi.fn();
         const app = appOf({
-            sendResetPassword: ran,
+            'emailAndPassword.sendResetPassword': ran,
         });
 
         const response = await post(app, resetBody, {});
@@ -471,11 +371,11 @@ describe('the webhook route', () => {
     it('answers 400 for a body that is not an event, and runs nothing', async () => {
         const ran = vi.fn();
         const app = appOf({
-            sendResetPassword: ran,
+            'emailAndPassword.sendResetPassword': ran,
         });
 
         const response = await post(app, {
-            event: 'sendResetPassword',
+            event: 'emailAndPassword.sendResetPassword',
         });
 
         expect(response.status).toBe(400);
@@ -524,7 +424,7 @@ describe('the kizuna Better Auth plugin', () => {
     it('forwards a password reset Better Auth starts', async () => {
         const received: string[] = [];
         const url = await serve({
-            sendResetPassword: ({ data }) => {
+            'emailAndPassword.sendResetPassword': ({ data }) => {
                 received.push(`${data.user.email} ${data.token}`);
             },
         });
@@ -630,14 +530,14 @@ describe('the kizuna Better Auth plugin', () => {
                 email: 'ada@example.com',
             },
         });
-        expect(logged).toEqual(expect.arrayContaining([expect.stringContaining('userCreated did not reach the API')]));
+        expect(logged).toEqual(expect.arrayContaining([expect.stringContaining('databaseHooks.user.create.after did not reach the API')]));
     });
 
     it('leaves a callback the app sets itself alone', async () => {
         const forwarded = vi.fn();
         const own = vi.fn(async () => undefined);
         const url = await serve({
-            sendResetPassword: forwarded,
+            'emailAndPassword.sendResetPassword': forwarded,
         });
         const auth = createAuth({
             emailAndPassword: {

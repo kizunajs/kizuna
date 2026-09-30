@@ -1,95 +1,65 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { betterAuth } from 'better-auth';
-import { organization } from 'better-auth/plugins/organization';
 import { emailOTP, magicLink, phoneNumber, twoFactor } from 'better-auth/plugins';
-import { Kizuna } from 'kizunajs';
+import { organization } from 'better-auth/plugins/organization';
 import { createAuthClient } from 'better-auth/client';
-import { inferAdditionalFields, organizationClient } from 'better-auth/client/plugins';
-import { defineBetterAuthPlugin } from './plugin.js';
+import { organizationClient } from 'better-auth/client/plugins';
+import { Kizuna } from 'kizunajs';
+import { betterAuthApp, defineBetterAuthPlugin } from './plugin.js';
 import { defineBetterAuthEvents } from './webhooks.js';
-import { createForwarder, kizuna } from './client.js';
-import type { BetterAuthEventPayloads } from './events.js';
+import { kizuna } from './client.js';
 
-const forward = createForwarder({
+const kizunaApi = kizuna({
     url: 'https://api.example.com/better-auth/webhooks',
 });
 
-test("fits each callback into Better Auth's own options", () => {
-    betterAuth({
-        emailAndPassword: {
-            enabled: true,
-            sendResetPassword: forward('sendResetPassword'),
-        },
-        emailVerification: {
-            sendVerificationEmail: forward('sendVerificationEmail'),
-        },
-        user: {
-            additionalFields: {
-                plan: {
-                    type: 'string',
-                },
+/**
+ * The Better Auth app, as its own repository would hold it.
+ */
+const auth = betterAuth({
+    emailAndPassword: {
+        enabled: true,
+    },
+    user: {
+        additionalFields: {
+            plan: {
+                type: 'string',
             },
-            changeEmail: {
+        },
+    },
+    plugins: [
+        magicLink({
+            sendMagicLink: kizunaApi.forward(),
+        }),
+        organization({
+            teams: {
                 enabled: true,
-                sendChangeEmailConfirmation: forward('sendChangeEmailConfirmation'),
             },
-            deleteUser: {
-                enabled: true,
-                sendDeleteAccountVerification: forward('sendDeleteAccountVerification'),
+            sendInvitationEmail: kizunaApi.forward(),
+        }),
+        emailOTP({
+            sendVerificationOTP: kizunaApi.forward(),
+        }),
+        phoneNumber({
+            sendOTP: kizunaApi.forward(),
+            sendPasswordResetOTP: kizunaApi.forward(),
+        }),
+        twoFactor({
+            otpOptions: {
+                sendOTP: kizunaApi.forward(),
             },
-        },
-        plugins: [
-            organization({
-                sendInvitationEmail: forward('sendInvitationEmail'),
-            }),
-            magicLink({
-                sendMagicLink: forward('sendMagicLink'),
-            }),
-            emailOTP({
-                sendVerificationOTP: forward('sendVerificationOTP'),
-            }),
-            phoneNumber({
-                sendOTP: forward('sendPhoneNumberOTP'),
-                sendPasswordResetOTP: forward('sendPasswordResetOTP'),
-            }),
-            twoFactor({
-                otpOptions: {
-                    sendOTP: forward('sendTwoFactorOTP'),
-                },
-            }),
-            kizuna({
-                url: 'https://api.example.com/better-auth/webhooks',
-            }),
-        ],
-    });
+        }),
+        kizunaApi,
+    ],
 });
 
-test('refuses a callback in the wrong option, and an event it does not know', () => {
-    betterAuth({
-        emailAndPassword: {
-            enabled: true,
-            // @ts-expect-error an invitation callback is not a reset callback
-            sendResetPassword: forward('sendInvitationEmail'),
-        },
+test('forward() fits a callback that reports, and nothing that has to return a value', () => {
+    magicLink({
+        sendMagicLink: kizunaApi.forward(),
+        // @ts-expect-error generateToken returns the token, which forward() cannot
+        generateToken: kizunaApi.forward(),
     });
-
-    // @ts-expect-error not a forwarded callback
-    forward('sendCarrierPigeon');
-});
-
-test("takes each payload from Better Auth's own types, as JSON", () => {
-    expectTypeOf<BetterAuthEventPayloads['sendResetPassword']['url']>().toEqualTypeOf<string>();
-    expectTypeOf<BetterAuthEventPayloads['sendVerificationOTP']['type']>().toEqualTypeOf<
-        'sign-in' | 'email-verification' | 'forget-password' | 'change-email'
-    >();
-    expectTypeOf<BetterAuthEventPayloads['sendPhoneNumberOTP']>().toEqualTypeOf<{
-        phoneNumber: string;
-        code: string;
-    }>();
-    expectTypeOf<BetterAuthEventPayloads['sendInvitationEmail']['invitation']['expiresAt']>().toEqualTypeOf<string>();
-    expectTypeOf<BetterAuthEventPayloads['userCreated']['user']['createdAt']>().toEqualTypeOf<string>();
-    expectTypeOf<BetterAuthEventPayloads['sessionCreated']['session']>().not.toHaveProperty('token');
 });
 
 const authClient = createAuthClient({
@@ -99,6 +69,7 @@ const authClient = createAuthClient({
 
 const betterAuthPlugin = defineBetterAuthPlugin({
     client: authClient,
+    app: betterAuthApp<typeof auth>(),
 });
 
 const k = new Kizuna();
@@ -116,57 +87,73 @@ interface Config {
     plugins: [ReturnType<typeof betterAuthPlugin>];
 }
 
-test('types an event function from the Config', () => {
+test("types every event from the Better Auth app's own type, named by where it sits", () => {
     defineBetterAuthEvents<Config>({
-        sendResetPassword: async ({ event, data, jobs: appJobs }) => {
-            expectTypeOf(event).toEqualTypeOf<'sendResetPassword'>();
-            expectTypeOf(data.user.email).toEqualTypeOf<string>();
+        'magic-link.sendMagicLink': ({ event, data }) => {
+            expectTypeOf(event).toEqualTypeOf<'magic-link.sendMagicLink'>();
+            expectTypeOf(data.email).toEqualTypeOf<string>();
+            expectTypeOf(data.url).toEqualTypeOf<string>();
+        },
+        'organization.sendInvitationEmail': ({ data }) => {
+            expectTypeOf(data.invitation.expiresAt).toEqualTypeOf<string>();
+            expectTypeOf(data.inviter.user.email).toEqualTypeOf<string>();
+        },
+        'email-otp.sendVerificationOTP': ({ data }) => {
+            expectTypeOf(data.type).toEqualTypeOf<'sign-in' | 'email-verification' | 'forget-password' | 'change-email'>();
+        },
+        'phone-number.sendOTP': ({ data }) => {
+            expectTypeOf(data.phoneNumber).toEqualTypeOf<string>();
+        },
+        'two-factor.otpOptions.sendOTP': ({ data }) => {
+            expectTypeOf(data.otp).toEqualTypeOf<string>();
+        },
+        'emailAndPassword.sendResetPassword': ({ data, jobs: appJobs }) => {
+            expectTypeOf(data.url).toEqualTypeOf<string>();
+            expectTypeOf(data.user.plan).toEqualTypeOf<string>();
             expectTypeOf(appJobs.recordReset.queue).toBeFunction();
         },
-        sendInvitationEmail: ({ data }) => {
-            expectTypeOf(data.invitation.expiresAt).toEqualTypeOf<string>();
+        'databaseHooks.user.create.after': ({ data }) => {
+            expectTypeOf(data.plan).toEqualTypeOf<string>();
+            expectTypeOf(data.createdAt).toEqualTypeOf<string>();
+        },
+        'databaseHooks.session.create.after': ({ data }) => {
+            expectTypeOf(data.userId).toEqualTypeOf<string>();
+            expectTypeOf(data).not.toHaveProperty('token');
         },
     });
 });
 
-const clientWithFields = createAuthClient({
-    baseURL: 'https://auth.example.com',
-    plugins: [
-        inferAdditionalFields({
-            user: {
-                plan: {
-                    type: 'string',
-                },
-            },
-        }),
-    ],
+const plainPlugin = defineBetterAuthPlugin({
+    client: createAuthClient({
+        baseURL: 'https://auth.example.com',
+    }),
 });
 
-const pluginWithFields = defineBetterAuthPlugin({
-    client: clientWithFields,
-});
-
-interface ConfigWithFields {
-    plugins: [ReturnType<typeof pluginWithFields>];
+interface PlainConfig {
+    plugins: [ReturnType<typeof plainPlugin>];
 }
 
-test("types the user from the app's client, its own fields included", () => {
-    defineBetterAuthEvents<ConfigWithFields>({
-        userCreated: ({ data }) => {
-            expectTypeOf(data.user.plan).toEqualTypeOf<string>();
-            expectTypeOf(data.user.createdAt).toEqualTypeOf<string>();
+test("types the core events without the app's type, and hands any other event to '*'", () => {
+    defineBetterAuthEvents<PlainConfig>({
+        'emailAndPassword.sendResetPassword': ({ data }) => {
+            expectTypeOf(data.url).toEqualTypeOf<string>();
         },
-        sendResetPassword: ({ data }) => {
-            expectTypeOf(data.user.plan).toEqualTypeOf<string>();
+        '*': ({ event, data }) => {
+            expectTypeOf(event).toEqualTypeOf<string>();
+            expectTypeOf(data).toEqualTypeOf<Record<string, unknown>>();
         },
+    });
+
+    defineBetterAuthEvents<PlainConfig>({
+        // @ts-expect-error the types don't know this event without the app's type
+        'magic-link.sendMagicLink': () => undefined,
     });
 });
 
-test("hands handlers the app's Better Auth client, every endpoint typed", () => {
+test("hands handlers the API's Better Auth client, every endpoint typed", () => {
     defineBetterAuthEvents<Config>({
-        sendResetPassword: async ({ plugins }) => {
+        'emailAndPassword.sendResetPassword': async ({ plugins }) => {
             expectTypeOf(plugins.betterAuth.changeEmail).toBeFunction();
-            expectTypeOf(plugins.betterAuth.listSessions).toBeFunction();
             expectTypeOf(plugins.betterAuth.organization.inviteMember).toBeFunction();
             // @ts-expect-error not a Better Auth endpoint
             void plugins.betterAuth.notAnEndpoint;
@@ -178,16 +165,16 @@ test('fits the plugin options', () => {
     betterAuthPlugin({
         auth: 'betterAuthApp',
         on: defineBetterAuthEvents<Config>({
-            sendVerificationEmail: ({ data }) => {
+            'emailVerification.sendVerificationEmail': ({ data }) => {
                 expectTypeOf(data.url).toEqualTypeOf<string>();
             },
         }),
     });
 });
 
-test('types the event without a Config, and gives no jobs', () => {
+test('types the core events without a Config, and gives no jobs', () => {
     defineBetterAuthEvents({
-        sendResetPassword: (context) => {
+        'emailAndPassword.sendResetPassword': (context) => {
             expectTypeOf(context.data.token).toEqualTypeOf<string>();
             // @ts-expect-error jobs needs a Config
             void context.jobs;

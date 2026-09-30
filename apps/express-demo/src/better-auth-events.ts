@@ -5,7 +5,7 @@ import type { Config } from '../kizuna.types';
  * What the demo does with the Better Auth app's callbacks.
  */
 export const betterAuthEvents = defineBetterAuthEvents<Config>({
-    sendResetPassword: async ({ data, plugins }) => {
+    'emailAndPassword.sendResetPassword': async ({ data, plugins }) => {
         await plugins.resend.sendEmail({
             to: data.user.email,
             subject: 'Reset your password',

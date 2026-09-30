@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import type { RouteDefinition } from 'kizunajs';
 import { route, type ApiContext } from 'kizunajs/plugin';
-import type { BetterAuthEvent, BetterAuthEventPayloads, BetterAuthUser, Jsonify } from './events.js';
+import type { AppUserOf, BetterAuthAppType, BetterAuthEventPayloads, BetterAuthUser, Jsonify } from './events.js';
 import type { BetterAuthRouteAuth } from './options.js';
 
 /**
- * The Better Auth client the app built its plugin around, read from `Config`.
+ * What the app's plugin was built with, read from `Config`.
  */
-type BetterAuthClientOf<Config> = Config extends {
+type SetupOf<Config> = Config extends {
     plugins: infer Plugins extends readonly unknown[];
 }
     ? Extract<
@@ -18,36 +18,49 @@ type BetterAuthClientOf<Config> = Config extends {
       > extends {
           setupType?: infer Setup;
       }
-        ? NonNullable<Setup> extends {
-              exports: infer Client;
-          }
-            ? Client
-            : never
+        ? NonNullable<Setup>
         : never
     : never;
 
 /**
- * The user as the app's client knows it, `additionalFields` included, or
- * Better Auth's own without a `Config`.
+ * The Better Auth app's type, when the plugin names it with `betterAuthApp`.
  */
-type AppUserOf<Config> = [BetterAuthClientOf<Config>] extends [never]
-    ? BetterAuthUser
-    : BetterAuthClientOf<Config> extends {
-            $Infer: {
-                Session: {
-                    user: infer AppUser;
-                };
-            };
-        }
-      ? Jsonify<AppUser>
-      : BetterAuthUser;
+type AppOf<Config> =
+    SetupOf<Config> extends {
+        app?: BetterAuthAppType<infer App>;
+    }
+        ? App
+        : undefined;
+
+/**
+ * The user as the Better Auth app knows it, or as the API's client does, or
+ * Better Auth's own.
+ */
+type UserOf<Config> = [AppOf<Config>] extends [undefined]
+    ? SetupOf<Config> extends {
+          exports: {
+              $Infer: {
+                  Session: {
+                      user: infer ClientUser;
+                  };
+              };
+          };
+      }
+        ? Jsonify<ClientUser>
+        : BetterAuthUser
+    : AppUserOf<AppOf<Config>>;
+
+/**
+ * Every event the app can receive, typed.
+ */
+export type BetterAuthEventsOf<Config> = BetterAuthEventPayloads<AppOf<Config>, UserOf<Config>>;
 
 /**
  * What an event's function receives.
  */
-export type BetterAuthEventContext<Event extends BetterAuthEvent, Config = unknown> = ApiContext<Config> & {
+export type BetterAuthEventContext<Event extends string, Data, Config = unknown> = ApiContext<Config> & {
     event: Event;
-    data: BetterAuthEventPayloads<AppUserOf<Config>>[Event];
+    data: Data;
 };
 
 /**
@@ -58,20 +71,25 @@ type EventHandler<Context> = {
 }['handle'];
 
 /**
- * What runs for each event, keyed by its name.
+ * What runs for each event, keyed by where it sits in Better Auth's options.
+ * `'*'` runs for an event the types don't know, like one from a plugin in a
+ * Better Auth app whose type the API can't see.
  */
 export type BetterAuthEventHandlers<Config = unknown> = {
-    [Event in BetterAuthEvent]?: EventHandler<BetterAuthEventContext<Event, Config>>;
+    [Event in keyof BetterAuthEventsOf<Config> & string]?: EventHandler<
+        BetterAuthEventContext<Event, BetterAuthEventsOf<Config>[Event], Config>
+    >;
+} & {
+    '*'?: EventHandler<BetterAuthEventContext<string, Record<string, unknown>, Config>>;
 };
 
 /**
- * The event functions, with `jobs`, `plugins` and the user typed from
- * `Config`. The user carries the fields the app's Better Auth client knows,
- * like those from `inferAdditionalFields`.
+ * The event functions, with `jobs`, `plugins`, every event and the user typed
+ * from `Config`.
  *
  * @example
  * export const betterAuthEvents = defineBetterAuthEvents<Config>({
- *     sendResetPassword: async ({ data, plugins }) => {
+ *     'emailAndPassword.sendResetPassword': async ({ data, plugins }) => {
  *         await plugins.resend.sendEmail({
  *             to: data.user.email,
  *             subject: 'Reset your password',
@@ -107,7 +125,8 @@ export const webhookRoute = (auth: BetterAuthRouteAuth, on: BetterAuthEventHandl
         },
     }).handler(async (args) => {
         const { body } = args;
-        const handle = (on as Record<string, ((context: Record<string, unknown>) => Promise<void> | void) | undefined>)[body.event];
+        const handlers = on as Record<string, ((context: Record<string, unknown>) => Promise<void> | void) | undefined>;
+        const handle = handlers[body.event] ?? handlers['*'];
         const { jobs, plugins } = args as unknown as Record<string, unknown>;
         await handle?.({
             event: body.event,

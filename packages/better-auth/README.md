@@ -18,12 +18,13 @@ pnpm add @kizunajs/better-auth
 
 ## Usage
 
-In your API, build the plugin around your Better Auth client:
+In your API, build the plugin around your Better Auth client, and name your Better Auth app's type so every event it sends is typed:
 
 ```ts
 // src/better-auth.ts
 import { createAuthClient } from 'better-auth/client';
-import { defineBetterAuthPlugin } from '@kizunajs/better-auth';
+import { betterAuthApp, defineBetterAuthPlugin } from '@kizunajs/better-auth';
+import type { auth } from '../../auth/src/auth';
 
 export const authClient = createAuthClient({
     baseURL: 'https://auth.example.com',
@@ -31,6 +32,7 @@ export const authClient = createAuthClient({
 
 export const betterAuthPlugin = defineBetterAuthPlugin({
     client: authClient,
+    app: betterAuthApp<typeof auth>(),
 });
 ```
 
@@ -47,23 +49,29 @@ await plugins.betterAuth.changeEmail({
 });
 ```
 
-In your Better Auth app, send its callbacks to your API:
+In your Better Auth app, add the `kizuna` plugin, and place `forward()` in the callbacks other plugins take:
 
 ```ts
 import { betterAuth } from 'better-auth';
+import { magicLink } from 'better-auth/plugins';
 import { kizuna } from '@kizunajs/better-auth/client';
+
+const kizunaApi = kizuna({
+    url: 'https://api.example.com/better-auth/webhooks',
+    headers: {
+        authorization: `Bearer ${process.env.KIZUNA_SERVICE_TOKEN}`,
+    },
+});
 
 export const auth = betterAuth({
     emailAndPassword: {
         enabled: true,
     },
     plugins: [
-        kizuna({
-            url: 'https://api.example.com/better-auth/webhooks',
-            headers: {
-                authorization: `Bearer ${process.env.KIZUNA_SERVICE_TOKEN}`,
-            },
+        magicLink({
+            sendMagicLink: kizunaApi.forward(),
         }),
+        kizunaApi,
     ],
 });
 ```

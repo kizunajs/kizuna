@@ -1,11 +1,12 @@
-export { defineBetterAuthPlugin } from './plugin.js';
+export { defineBetterAuthPlugin, betterAuthApp } from './plugin.js';
 export { BetterAuthPluginOptionsSchema, type BetterAuthPluginProps, type BetterAuthRouteAuth } from './options.js';
-export { defineBetterAuthEvents, type BetterAuthEventContext, type BetterAuthEventHandlers } from './webhooks.js';
+export { defineBetterAuthEvents, type BetterAuthEventContext, type BetterAuthEventHandlers, type BetterAuthEventsOf } from './webhooks.js';
 export type {
-    BetterAuthCallbacks,
-    BetterAuthEvent,
+    BetterAuthAppType,
     BetterAuthEventBody,
     BetterAuthEventPayloads,
     BetterAuthUser,
-    BetterAuthSessionInfo,
+    CoreCallbacks,
+    CoreEventPayloads,
+    PluginEventPayloads,
 } from './events.js';

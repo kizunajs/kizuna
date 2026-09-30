@@ -13,10 +13,8 @@ import { bearer, emailOTP, magicLink } from 'better-auth/plugins';
 import { organization } from 'better-auth/plugins/organization';
 import { defineConfig, Kizuna } from 'kizunajs';
 import { expressAdapter } from '@kizunajs/express';
-import { defineBetterAuthPlugin } from './plugin.js';
-import { createForwarder, kizuna } from './client.js';
-import type { BetterAuthEvent } from './events.js';
-import type { BetterAuthEventHandlers } from './webhooks.js';
+import { betterAuthApp, defineBetterAuthPlugin } from './plugin.js';
+import { kizuna } from './client.js';
 
 type Handler = (req: IncomingMessage, res: ServerResponse) => void;
 
@@ -50,13 +48,14 @@ const authClient = createAuthClient({
 
 const betterAuthPlugin = defineBetterAuthPlugin({
     client: authClient,
+    app: betterAuthApp<typeof auth>(),
 });
 
 interface Config {
     adapter: ReturnType<typeof expressAdapter>;
     auth: {
         identities: {
-            betterAuthApp: typeof betterAuthApp;
+            authService: typeof authService;
             member: typeof member;
         };
     };
@@ -65,7 +64,7 @@ interface Config {
 
 const k = new Kizuna<Config>();
 
-const betterAuthApp = k.identity.bearer({}).guard(({ bearer: credential, deny }) => {
+const authService = k.identity.bearer({}).guard(({ bearer: credential, deny }) => {
     if (credential?.token === 'app-token') return;
     return deny({
         status: 401,
@@ -325,44 +324,23 @@ const routes = k.routes('account', {
 });
 
 interface Received {
-    event: BetterAuthEvent;
+    event: string;
     data: Record<string, unknown>;
 }
 
 let received: Received[] = [];
 
-const record = (context: { event: BetterAuthEvent; data: unknown }) => {
+const record = (context: { event: string; data: unknown }) => {
     received.push({
         event: context.event,
         data: context.data as Record<string, unknown>,
     });
 };
 
-const events: BetterAuthEvent[] = [
-    'sendResetPassword',
-    'sendVerificationEmail',
-    'sendChangeEmailConfirmation',
-    'sendDeleteAccountVerification',
-    'sendInvitationEmail',
-    'sendMagicLink',
-    'sendVerificationOTP',
-    'sendPhoneNumberOTP',
-    'sendPasswordResetOTP',
-    'sendTwoFactorOTP',
-    'userCreated',
-    'userUpdated',
-    'userDeleted',
-    'emailVerified',
-    'passwordReset',
-    'sessionCreated',
-];
-
-const recordEverything = Object.fromEntries(events.map((event) => [event, record])) as BetterAuthEventHandlers;
-
 /**
  * What arrived for one event, in order.
  */
-const dataOf = (event: BetterAuthEvent) => received.filter((candidate) => candidate.event === event).map((candidate) => candidate.data);
+const dataOf = (event: string) => received.filter((candidate) => candidate.event === event).map((candidate) => candidate.data);
 
 const db: Record<string, Record<string, unknown>[]> = {
     user: [],
@@ -374,12 +352,12 @@ const db: Record<string, Record<string, unknown>[]> = {
     invitation: [],
 };
 
-const forwarding = {
+const kizunaApi = kizuna({
     url: `${apiServer.origin}/better-auth/webhooks`,
     headers: {
         authorization: 'Bearer app-token',
     },
-};
+});
 
 const auth = betterAuth({
     baseURL: authServer.origin,
@@ -397,15 +375,15 @@ const auth = betterAuth({
     plugins: [
         bearer(),
         organization({
-            sendInvitationEmail: createForwarder(forwarding)('sendInvitationEmail'),
+            sendInvitationEmail: kizunaApi.forward(),
         }),
         magicLink({
-            sendMagicLink: createForwarder(forwarding)('sendMagicLink'),
+            sendMagicLink: kizunaApi.forward(),
         }),
         emailOTP({
-            sendVerificationOTP: createForwarder(forwarding)('sendVerificationOTP'),
+            sendVerificationOTP: kizunaApi.forward(),
         }),
-        kizuna(forwarding),
+        kizunaApi,
     ],
 });
 
@@ -418,14 +396,16 @@ beforeAll(() => {
         routes,
         auth: {
             identities: {
-                betterAuthApp,
+                authService,
                 member,
             },
         },
         plugins: [
             betterAuthPlugin({
-                auth: 'betterAuthApp',
-                on: recordEverything,
+                auth: 'authService',
+                on: {
+                    '*': record,
+                },
             }),
         ],
     }).api.mount(api);
@@ -483,7 +463,7 @@ describe('an API that owns the user flows', () => {
         });
 
         expect(response.status).toBe(204);
-        expect(dataOf('sendChangeEmailConfirmation')).toMatchObject([
+        expect(dataOf('user.changeEmail.sendChangeEmailConfirmation')).toMatchObject([
             {
                 user: {
                     email,
@@ -502,7 +482,7 @@ describe('an API that owns the user flows', () => {
         const reset = await request(api)
             .put('/account/password')
             .send({
-                token: String(dataOf('sendResetPassword')[0]?.token),
+                token: String(dataOf('emailAndPassword.sendResetPassword')[0]?.token),
                 newPassword: 'battery-staple-horse',
             });
 
@@ -520,7 +500,7 @@ describe('an API that owns the user flows', () => {
                 email,
             },
         });
-        expect(dataOf('passwordReset')).toMatchObject([
+        expect(dataOf('emailAndPassword.onPasswordReset')).toMatchObject([
             {
                 user: {
                     email,
@@ -535,28 +515,26 @@ describe('an API that owns the user flows', () => {
         const response = await request(api).delete('/account').set('authorization', `Bearer ${token}`);
 
         expect(response.status).toBe(204);
-        expect(dataOf('sendDeleteAccountVerification')).toMatchObject([
+        expect(dataOf('user.deleteUser.sendDeleteAccountVerification')).toMatchObject([
             {
                 url: expect.stringContaining('/delete-user/callback?token='),
             },
         ]);
         expect(db.user!.some((candidate) => candidate.id === userId)).toBe(true);
-        expect(dataOf('userDeleted')).toEqual([]);
+        expect(dataOf('databaseHooks.user.delete.after')).toEqual([]);
 
         const confirmed = await request(api)
             .post('/account/deletion-confirmations')
             .set('authorization', `Bearer ${token}`)
             .send({
-                token: String(dataOf('sendDeleteAccountVerification')[0]?.token),
+                token: String(dataOf('user.deleteUser.sendDeleteAccountVerification')[0]?.token),
             });
 
         expect(confirmed.status).toBe(204);
         expect(db.user!.some((candidate) => candidate.id === userId)).toBe(false);
-        expect(dataOf('userDeleted')).toMatchObject([
+        expect(dataOf('databaseHooks.user.delete.after')).toMatchObject([
             {
-                user: {
-                    id: userId,
-                },
+                id: userId,
             },
         ]);
     });
@@ -577,7 +555,7 @@ describe('an API that owns the user flows', () => {
             });
 
         expect(response.status).toBe(204);
-        expect(dataOf('sendInvitationEmail')).toMatchObject([
+        expect(dataOf('organization.sendInvitationEmail')).toMatchObject([
             {
                 email: 'grace@example.com',
                 organization: {
@@ -595,19 +573,17 @@ describe('an API that owns the user flows', () => {
     it('hears about a sign-up and its session, without the session token', async () => {
         const { userId } = await signUp();
 
-        expect(dataOf('userCreated')).toMatchObject([
+        expect(dataOf('databaseHooks.user.create.after')).toMatchObject([
             {
-                user: {
-                    id: userId,
-                    email,
-                },
+                id: userId,
+                email,
             },
         ]);
-        const [created] = dataOf('sessionCreated') as Array<{ session: Record<string, unknown> }>;
-        expect(created?.session).toMatchObject({
+        const [session] = dataOf('databaseHooks.session.create.after');
+        expect(session).toMatchObject({
             userId,
         });
-        expect(created?.session).not.toHaveProperty('token');
+        expect(session).not.toHaveProperty('token');
     });
 
     it('hears when a user verifies their email', async () => {
@@ -620,23 +596,19 @@ describe('an API that owns the user flows', () => {
 
         await auth.api.verifyEmail({
             query: {
-                token: String(dataOf('sendVerificationEmail')[0]?.token),
+                token: String(dataOf('emailVerification.sendVerificationEmail')[0]?.token),
             },
         });
 
-        expect(dataOf('emailVerified')).toMatchObject([
+        expect(dataOf('emailVerification.afterEmailVerification')).toMatchObject([
             {
-                user: {
-                    email,
-                },
+                email,
             },
         ]);
-        expect(dataOf('userUpdated')).toMatchObject([
+        expect(dataOf('databaseHooks.user.update.after')).toMatchObject([
             {
-                user: {
-                    email,
-                    emailVerified: true,
-                },
+                email,
+                emailVerified: true,
             },
         ]);
     });
@@ -649,7 +621,7 @@ describe('an API that owns the user flows', () => {
         });
 
         expect(response.status).toBe(204);
-        expect(dataOf('sendMagicLink')).toMatchObject([
+        expect(dataOf('magic-link.sendMagicLink')).toMatchObject([
             {
                 email,
                 url: expect.stringContaining('/magic-link/verify?token='),
@@ -665,7 +637,7 @@ describe('an API that owns the user flows', () => {
         });
 
         expect(response.status).toBe(204);
-        expect(dataOf('sendVerificationOTP')).toMatchObject([
+        expect(dataOf('email-otp.sendVerificationOTP')).toMatchObject([
             {
                 email,
                 otp: expect.stringMatching(/^\d{6}$/),
