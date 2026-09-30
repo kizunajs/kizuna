@@ -9,8 +9,6 @@ import type {
     QueryObserverOptions,
     SkipToken,
 } from '@tanstack/query-core';
-import type { RouteDefinition, Routes, StreamResponseDefinition } from 'kizunajs';
-import type { Client, ClientArgs, ClientMethod, ClientResponse } from '@kizunajs/fetch';
 
 export type KizunaQueryKeyType = 'query' | 'infinite' | 'stream';
 
@@ -190,11 +188,19 @@ export interface StreamProcedure<Args, Result> {
     call: CallFn<Args, Result>;
 }
 
-type HasStream<R extends RouteDefinition> = {
-    [Status in keyof R['responses']]: R['responses'][Status] extends StreamResponseDefinition ? true : never;
-}[keyof R['responses']] extends never
-    ? false
-    : true;
+/**
+ * A method on a client `@kizunajs/fetch` generates. Its `'~route'` names the
+ * HTTP method it sends and whether its response streams, which is all the
+ * proxy needs to choose its factories.
+ */
+type ClientMethod<Method extends string, Streams extends boolean, Args, Result> = ({} extends Args
+    ? (args?: Args) => Promise<Result>
+    : (args: Args) => Promise<Result>) & {
+    readonly '~route': {
+        readonly method: Method;
+        readonly streams: Streams;
+    };
+};
 
 /**
  * Which factories a route gets: a streamed response takes `streamOptions`, a
@@ -206,42 +212,22 @@ type ProcedureFor<Method, Streams, Args, Result> = Streams extends true
       ? QueryProcedure<Args, Result>
       : MutationProcedure<Args, Result>;
 
-type Procedure<R extends RouteDefinition, Codes extends string> = ProcedureFor<
-    R['method'],
-    HasStream<R>,
-    ClientArgs<R>,
-    ClientResponse<R, Codes>
->;
-
 /**
- * The route tree, each route carrying its query or mutation factories.
+ * The client's tree, each method carrying its query, mutation, or stream
+ * factories and each group its partial key.
  */
-export type KizunaQueryProxy<T extends Routes, Codes extends string = never> = {
-    [K in keyof T as K extends string ? K : never]: T[K] extends RouteDefinition
-        ? Procedure<T[K], Codes>
-        : T[K] extends Routes
-          ? KizunaQueryProxy<T[K], Codes> & PathProcedures
-          : never;
-};
-
-/**
- * The same tree, read off a generated client instead of off the routes. Each of
- * its methods carries the method it calls and whether that response streams, so
- * the client alone says which factories every route gets.
- */
-export type GeneratedQueryProxy<C> = {
+export type KizunaQueryProxy<C> = {
     [K in keyof C as K extends string ? K : never]: C[K] extends ClientMethod<infer Method, infer Streams, infer Args, infer Result>
         ? ProcedureFor<Method, Streams, Args, Result>
         : C[K] extends object
-          ? GeneratedQueryProxy<C[K]> & PathProcedures
+          ? KizunaQueryProxy<C[K]> & PathProcedures
           : never;
 };
 
 export interface KizunaTanstackQueryConstructor {
     /**
-     * The client is the only argument: each of its methods carries the route it
-     * answers, so nothing has to hand over the api a second time.
+     * The generated client is the only argument: each of its methods carries
+     * the route it answers.
      */
-    new <T extends Routes, Codes extends string = never>(client: Client<T, Codes>): KizunaQueryProxy<T, Codes> & PathProcedures;
-    new <C extends object>(client: C): GeneratedQueryProxy<C> & PathProcedures;
+    new <C extends object>(client: C): KizunaQueryProxy<C> & PathProcedures;
 }

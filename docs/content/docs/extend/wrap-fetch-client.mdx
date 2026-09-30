@@ -1,11 +1,11 @@
 ---
 title: Wrap the Fetch Client
-description: Build and ship your own TypeScript client wrapper using the types and the route metadata @kizunajs/fetch carries.
+description: Build and ship your own TypeScript client wrapper using the types and the route metadata a generated fetch client carries.
 ---
 
 <BetaNotice>
 
-The wrapper surface is new and still settling. The types `@kizunajs/fetch` exports may change while v2 is in beta, so pin your version if you depend on it.
+The wrapper surface is new and still settling. The shape of `'~route'` and the types the generated file exports may change while v2 is in beta, so pin your version if you depend on them.
 
 </BetaNotice>
 
@@ -36,28 +36,42 @@ export function createMyClient() {
 
 ## Reading the route off a method
 
-A wrapper that treats routes generically, rather than naming each one, needs to know what each method answers: its method, its path, which statuses it declares. Every client method carries its own route, and `routeOf` reads it:
+A wrapper that treats routes generically, rather than naming each one, needs to know what each method answers: its method, its path, which statuses it declares. Every client method carries its route under `'~route'`:
 
 ```ts
-import { routeOf } from '@kizunajs/fetch';
+const route = apiClient.users.getUser['~route'];
 
-const route = routeOf(apiClient.users.getUser);
-
-route?.method; // 'GET'
-route?.path; // '/users/:id'
+route.method; // 'GET'
+route.path; // '/users/:id'
+route.streams; // false
+Object.keys(route.responses); // ['200', '404']
 ```
 
-This is what lets a wrapper take the client alone. A `GET` gets query semantics, anything else gets mutation semantics, and the declared statuses say which responses are data. `routeOf` answers `undefined` for anything that is not a client method, so a group or a stray value is easy to skip while walking the client.
+This is what lets a wrapper take the client alone. A `GET` gets query semantics, anything else gets mutation semantics, and the declared statuses say which responses are data. `responses` lists every status the method's `Result` type does, the automatic `400`, `401` and `403` included. A group has no `'~route'`, so it is easy to skip while walking the client.
+
+The property is not enumerable, so it stays out of `Object.keys` and spreads.
 
 ## Types
 
-The types from `@kizunajs/fetch`:
+The generated file exports what a wrapper types itself with:
 
-| Type                           | Description                                                           |
-| ------------------------------ | --------------------------------------------------------------------- |
-| `Client<T, Codes>`             | The full typed client shape for a set of routes                       |
-| `ClientArgs<Route>`            | What one route's method accepts: `params`, `query`, `body`, `headers` |
-| `ClientResponse<Route, Codes>` | The discriminated union one route's method resolves to                |
-| `ClientConfig`                 | What `createClient` takes                                             |
+| Type                                                  | Description                                                                       |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `Client`                                              | The client `createClient` returns                                                 |
+| `ClientConfig`                                        | What `createClient` takes                                                         |
+| `ClientMethod<Method, Streams, Args, Result>`         | One method, with the HTTP method and whether it streams carried on its `'~route'` |
+| `API.UsersGetUser.Params`, `Query`, `Body`, `Headers` | What one route's method accepts                                                   |
+| `API.UsersGetUser.Result`                             | The discriminated union one route's method resolves to                            |
 
-These are generic over a route or a set of routes, so pass `typeof route` to type a single wrapper method and `typeof routes` to type a whole surface.
+A wrapper published as a package cannot import a file each app generates, so it reads a method's types off the method itself. `ClientMethod` is matched by shape, so a package can declare its own copy and infer `Method`, `Streams`, `Args` and `Result` from any generated client:
+
+```ts
+type ClientMethod<Method extends string, Streams extends boolean, Args, Result> = ({} extends Args
+    ? (args?: Args) => Promise<Result>
+    : (args: Args) => Promise<Result>) & {
+    readonly '~route': {
+        readonly method: Method;
+        readonly streams: Streams;
+    };
+};
+```

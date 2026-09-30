@@ -1,6 +1,4 @@
 import { experimental_streamedQuery as streamedQuery, skipToken } from '@tanstack/query-core';
-import { routeStreams, streamStatuses, type RouteDefinition } from 'kizunajs';
-import { routeOf } from '@kizunajs/fetch';
 import { NonStreamResponseError, UndeclaredResponseError } from './errors.js';
 import { buildPathKey, buildQueryKey } from './keys.js';
 import type { KizunaTanstackQueryConstructor } from './types.js';
@@ -13,13 +11,23 @@ interface ClientResult {
     headers: Record<string, string>;
 }
 
-// A `body` or `query` schema adds 400, matching `HasValidation` in the client.
-const declaresStatus = (route: RouteDefinition, status: number): boolean => {
-    if (Object.hasOwn(route.responses, String(status))) {
-        return true;
-    }
-    return status === 400 && ('body' in route || 'query' in route);
-};
+/**
+ * What a generated client method carries under `'~route'`. Its `responses`
+ * lists every status the client's types list, the validation `400` and the
+ * auth map's `401` and `403` included.
+ */
+interface ClientRoute {
+    method: string;
+    responses: Record<number, { stream?: true }>;
+    streams: boolean;
+}
+
+const routeOf = (value: unknown): ClientRoute | undefined =>
+    typeof value === 'function' ? (value as { '~route'?: ClientRoute })['~route'] : undefined;
+
+const declaresStatus = (route: ClientRoute, status: number): boolean => Object.hasOwn(route.responses, status);
+
+const streamsStatus = (route: ClientRoute, status: number): boolean => route.responses[status]?.stream === true;
 
 const withSignal = (args: unknown, signal: AbortSignal | undefined): unknown => {
     if (signal === undefined) {
@@ -38,7 +46,7 @@ const withSignal = (args: unknown, signal: AbortSignal | undefined): unknown => 
 
 const runRoute = async (
     clientFn: ClientNode,
-    route: RouteDefinition,
+    route: ClientRoute,
     routeKey: string,
     args: unknown,
     signal: AbortSignal | undefined
@@ -52,15 +60,15 @@ const runRoute = async (
     return result;
 };
 
-const isQueryMethod = (route: RouteDefinition): boolean => route.method === 'GET' || route.method === 'HEAD';
+const isQueryMethod = (route: ClientRoute): boolean => route.method === 'GET' || route.method === 'HEAD';
 
 type StreamRefetchMode = 'append' | 'reset' | 'replace';
 
-const buildProcedure = (segments: readonly string[], route: RouteDefinition, clientFn: ClientNode): Record<string, unknown> => {
+const buildProcedure = (segments: readonly string[], route: ClientRoute, clientFn: ClientNode): Record<string, unknown> => {
     const routeKey = segments.join('.');
     const call = (args?: unknown) => clientFn(args);
 
-    if (routeStreams(route)) {
+    if (route.streams) {
         return {
             streamOptions: (options: Record<string, unknown>) => {
                 const { input, refetchMode, ...rest } = options;
@@ -72,7 +80,7 @@ const buildProcedure = (segments: readonly string[], route: RouteDefinition, cli
                         : streamedQuery({
                               streamFn: async ({ signal }: { signal: AbortSignal }) => {
                                   const result = (await runRoute(clientFn, route, routeKey, input, signal)) as ClientResult;
-                                  if (!streamStatuses(route).includes(result.status)) {
+                                  if (!streamsStatus(route, result.status)) {
                                       throw new NonStreamResponseError(routeKey, result.status, result.body, result.headers);
                                   }
                                   return result.body as AsyncIterable<unknown>;
@@ -160,15 +168,19 @@ function buildQueryProxy(client: Record<string, unknown>): unknown {
 }
 
 /**
- * Builds TanStack Query options from a fetch client. Every client method
- * carries the route it answers, so the client is the only argument.
+ * Builds TanStack Query options from a generated fetch client. Every client
+ * method carries the route it answers, so the client is the only argument.
  *
  * ```ts
  * import { useQuery } from '@tanstack/react-query';
  * import { KizunaTanstackQuery } from '@kizunajs/tanstack-query';
- * import { apiClient } from './api-client.js';
+ * import { createClient } from './api-client.generated.js';
  *
- * const api = new KizunaTanstackQuery(apiClient);
+ * const api = new KizunaTanstackQuery(
+ *     createClient({
+ *         baseUrl: 'http://localhost:3000',
+ *     })
+ * );
  *
  * useQuery(
  *     api.users.listUsers.queryOptions({

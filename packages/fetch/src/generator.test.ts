@@ -4,8 +4,7 @@ import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { definePlugin, route } from 'kizunajs/plugin';
 import { generateFetchClient } from './generator.js';
-import { createGeneratedClient, type GeneratedRoutes } from './client.js';
-import { brandedContract } from './branded.fixture.js';
+import { apiContract } from './api.fixture.js';
 
 const k = new Kizuna();
 
@@ -101,8 +100,16 @@ describe('generateFetchClient', () => {
         expect(source).toContain("contentType: 'multipart/form-data'");
     });
 
+    it('lists the validation 400 in the table, as the types do', () => {
+        expect(source).toMatch(/listUsers: \{\n\s+method: 'GET',\n\s+path: '\/users',\n\s+responses: \{\n\s+200: \{\},\n\s+400: \{\},/);
+    });
+
+    it('imports nothing', () => {
+        expect(source).not.toMatch(/^import /m);
+    });
+
     it('tells the runtime which responses stream, and how', () => {
-        expect(source).toContain("200: { stream: { contentType: 'text/event-stream' } }");
+        expect(source).toContain("200: { stream: true, contentType: 'text/event-stream' }");
     });
 
     it('carries the method and whether the response streams into each method type', () => {
@@ -159,50 +166,6 @@ describe('the namespace the generated types live in', () => {
         expect(named).toContain('body: MyAPI.UsersUploadAvatar.Body');
         expect(named).toContain('MyAPI.UsersGetUser.Result>');
         expect(named).not.toMatch(/\bAPI\.UsersGetUser/);
-    });
-});
-
-describe('the generated table drives real requests', () => {
-    const table: GeneratedRoutes = {
-        users: {
-            getUser: {
-                method: 'GET',
-                path: '/users/:id',
-                responses: {
-                    200: {},
-                },
-            },
-        },
-    };
-
-    it('builds the URL from the path and params', async () => {
-        const calls: string[] = [];
-        const client = createGeneratedClient(table, {
-            baseUrl: 'https://api.example.com',
-            fetch: async (url) => {
-                calls.push(String(url));
-                return new Response(JSON.stringify({ id: '1' }), {
-                    status: 200,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
-            },
-        }) as {
-            users: {
-                getUser: (args: { params: { id: string } }) => Promise<{ status: number; body: { id: string } }>;
-            };
-        };
-
-        const result = await client.users.getUser({
-            params: {
-                id: '1',
-            },
-        });
-
-        expect(calls).toEqual(['https://api.example.com/users/1']);
-        expect(result.status).toBe(200);
-        expect(result.body).toEqual({ id: '1' });
     });
 });
 
@@ -372,12 +335,10 @@ describe('generateFetchClient: hidden routes and plugin routes', () => {
 });
 
 describe('a branded schema', () => {
-    const branded = generateFetchClient(brandedContract, {
-        runtimeModule: './client.js',
-    });
+    const branded = generateFetchClient(apiContract);
 
     it('declares the brand once as a named type', () => {
-        expect(branded.match(/export type CenterId = string & \$brand<"CenterId">;/g)).toHaveLength(1);
+        expect(branded.match(/export type CenterId = string & KizunaBrand<"CenterId">;/g)).toHaveLength(1);
     });
 
     it('exports a constructor for the brand', () => {
@@ -392,12 +353,8 @@ describe('a branded schema', () => {
         expect(branded).toContain('parentId: CenterId | null;');
     });
 
-    it('imports $brand from the runtime only when a brand is used', () => {
-        expect(branded).toContain('import { createGeneratedClient, type $brand, type ClientConfig');
-        expect(source).not.toContain('$brand');
-    });
-
-    it('emits the client the type tests compile against', async () => {
-        await expect(branded).toMatchFileSnapshot('./branded-client.generated.ts');
+    it('declares the brand helper only when a brand is used', () => {
+        expect(branded).toContain('declare const kizunaBrand: unique symbol;');
+        expect(source).not.toContain('KizunaBrand');
     });
 });

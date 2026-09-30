@@ -189,10 +189,6 @@ describe('the client-safe boundary', () => {
  */
 const DEMO_CONFIG = path.join(ROOT, 'apps/express-demo/kizuna.config.ts');
 
-/**
- * Written inside the repository, so `@kizunajs/fetch` resolves the way it
- * would in a consumer rather than from a temp directory.
- */
 const generatedClient = (): string => {
     const file = path.join(ROOT, `tests/.generated-client-${process.pid}.ts`);
     fs.writeFileSync(file, generateFetchClient(kizuna.api as never));
@@ -210,30 +206,24 @@ describe('a generated client stays client-safe end to end', () => {
         fs.rmSync(clientFile, { force: true });
     });
 
-    test('the generated client bundles for the browser', async () => {
+    test('the generated client imports nothing', () => {
+        expect(fs.readFileSync(clientFile, 'utf8')).not.toMatch(/^import /m);
+    });
+
+    /**
+     * Bundled with nothing external, so a package the file reached would show up
+     * as an input or fail to resolve.
+     */
+    test('the generated client bundles for the browser on its own', async () => {
         const failures = await bundleFailures(
             {
                 file: clientFile,
-                external: ['zod'],
+                external: [],
             },
             'browser'
         );
-        expect(failures, `the generated client reaches a Node built-in:\n${failures.join('\n')}`).toEqual([]);
-    }, 60_000);
-
-    /**
-     * Derived rather than declared, so labelling a client entry `server` to
-     * quiet a failure is caught by the graph itself.
-     */
-    test('every entry the generated client reaches is classified client', async () => {
-        const byFile = new Map(entries.map((entry) => [fs.realpathSync(entry.file), entry.specifier]));
-        const reached = (await bundleInputs(clientFile, ['zod']))
-            .map((input) => byFile.get(input))
-            .filter((specifier): specifier is string => specifier !== undefined);
-
-        const reachOf = new Map(entries.map((entry) => [entry.specifier, entry.reach]));
-        const mislabelled = [...new Set(reached)].filter((specifier) => reachOf.get(specifier) !== 'client');
-        expect(mislabelled, 'a generated client reaches these, so they cannot be server-only').toEqual([]);
+        expect(failures, `the generated client failed to bundle:\n${failures.join('\n')}`).toEqual([]);
+        expect(await bundleInputs(clientFile, [])).toEqual([fs.realpathSync(clientFile)]);
     }, 60_000);
 });
 

@@ -5,7 +5,7 @@ description: Create a fully typed HTTP client from the file kizuna generate writ
 
 Every generated fetch client exports `createClient`. See the [fetch client guide](/docs/clients/fetch) for usage.
 
-<InstallTabs packageName="@kizunajs/fetch" />
+The generated file imports nothing, so calling it needs no package installed.
 
 ```ts
 import { createClient } from './api-client.generated';
@@ -25,7 +25,7 @@ createClient(config: ClientConfig): Client
 | `baseHeaders`    | `Record<string, string>`                              | No       | Headers merged into every request                                                                                                                                   |
 | `credentials`    | `RequestCredentials`                                  | No       | Passed as `credentials` to every `fetch` call                                                                                                                       |
 | `fetch`          | `typeof fetch`                                        | No       | Custom fetch implementation (e.g. for testing or a polyfill)                                                                                                        |
-| `onRequest`      | `(request: OutgoingRequest) => void \| Promise<void>` | No       | Callback before each request, receiving the request about to be sent as `{ url, method, headers, route }`. May be async.                                            |
+| `onRequest`      | `(request: OutgoingRequest) => void \| Promise<void>` | No       | Callback before each request, receiving the request about to be sent as `{ url, method, headers, route }`, where `route` is the route's table entry. May be async.  |
 | `requestContext` | `RequestContext`                                      | \*       | Header values for your API's [request context](/docs/reference/k-request-context). Present only when your API declares one, and required when any of its headers is |
 
 `requestContext` values are typed from the declared header schemas, so an optional header stays optional and a coerced one takes the schema's input type. The generated file exports that type as `RequestContext`.
@@ -34,7 +34,7 @@ createClient(config: ClientConfig): Client
 
 `createClient` returns the `Client`, mirroring your route groups. Each route becomes a function accepting `{ params?, query?, body?, headers?, fetchOptions? }` and returning a `Promise` resolving to `{ status, body, headers }`.
 
-`params` is typed from the route's `pathParams` schema output when one is declared, matching the server-side handler, otherwise from the `:param` placeholders in the path.
+`params` is typed from the route's `pathParams` schema when one is declared, otherwise from the `:param` placeholders in the path. A request type reads what the caller sends, so a schema that transforms its value takes the value before the transform.
 
 The response is a discriminated union over the route's declared status codes. Narrow on `status` to reach the correctly typed `body`.
 

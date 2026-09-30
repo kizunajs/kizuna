@@ -1,158 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { z } from 'zod';
-import { Kizuna } from 'kizunajs';
-import { defineConfig } from 'kizunajs';
-import { createGeneratedClient, type Client, type ClientConfig, type ContextHeaderInputs, type GeneratedRoutes } from './client.js';
-import type { ApiDefinition, RequestContextSchema, Routes, SecurityScheme, TagOptions } from 'kizunajs';
-
-/**
- * A client over an assembled api's routes. The generated client hands the same
- * runtime its own table; the fields that runtime reads are the same either way.
- */
-const apiClientFor = <
-    T extends Routes,
-    Codes extends string = never,
-    Schemes extends Record<string, SecurityScheme> = Record<string, never>,
-    RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
->(
-    api: ApiDefinition<T, Record<string, TagOptions>, Codes, Schemes, RequestContext>,
-    config: ClientConfig &
-        ({} extends ContextHeaderInputs<RequestContext>
-            ? { requestContext?: ContextHeaderInputs<RequestContext> }
-            : { requestContext: ContextHeaderInputs<RequestContext> })
-): Client<T, Codes> => createGeneratedClient(api.routes as unknown as GeneratedRoutes, config) as unknown as Client<T, Codes>;
-
-interface Config {
-    tags: typeof kTags;
-}
-
-const k = new Kizuna<Config>();
-
-const kTags = k.tags({
-    api: 'API',
-});
-const config = {
-    tags: kTags,
-};
-
-const contractRoutes = k.routes('api', {
-    getUser: k.route({
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: {
-                body: z.object({
-                    id: z.string(),
-                    name: z.string(),
-                }),
-                headers: z.object({
-                    'x-request-id': z.string().optional(),
-                }),
-            },
-        },
-    }),
-    createUser: k.route({
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string(),
-        }),
-        responses: {
-            201: z.object({
-                id: z.string(),
-                name: z.string(),
-            }),
-        },
-    }),
-    listUsers: k.route({
-        method: 'GET',
-        path: '/users',
-        query: z.object({
-            page: z.number().optional(),
-        }),
-        responses: {
-            200: z.object({
-                users: z.array(z.string()),
-            }),
-        },
-    }),
-    uploadAvatar: k.route({
-        method: 'POST',
-        path: '/avatar',
-        contentType: 'multipart/form-data',
-        body: z.object({
-            file: z.instanceof(File),
-            userId: z.string(),
-        }),
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    }),
-    submitForm: k.route({
-        method: 'POST',
-        path: '/form',
-        contentType: 'application/x-www-form-urlencoded',
-        body: z.object({
-            email: z.string(),
-        }),
-        responses: {
-            200: z.object({
-                ok: z.boolean(),
-            }),
-        },
-    }),
-});
-
-const contract = defineConfig({
-    ...config,
-    routes: contractRoutes,
-}).api;
-
-const nestedContractRoutes = k.routes('api', {
-    users: {
-        getUser: k.route({
-            method: 'GET',
-            path: '/users/:id',
-            responses: {
-                200: z.object({
-                    id: z.string(),
-                    name: z.string(),
-                }),
-            },
-        }),
-        createUser: k.route({
-            method: 'POST',
-            path: '/users',
-            body: z.object({
-                name: z.string(),
-            }),
-            responses: {
-                201: z.object({
-                    id: z.string(),
-                    name: z.string(),
-                }),
-            },
-        }),
-    },
-    posts: {
-        listPosts: k.route({
-            method: 'GET',
-            path: '/posts',
-            responses: {
-                200: z.object({
-                    posts: z.array(z.string()),
-                }),
-            },
-        }),
-    },
-});
-
-const nestedContract = defineConfig({
-    ...config,
-    routes: nestedContractRoutes,
-}).api;
+import { createClient } from './generated/api.js';
 
 const stubFetch = (status: number, body: unknown, headers: Record<string, string> = {}) =>
     vi.fn().mockResolvedValue({
@@ -175,12 +22,12 @@ describe('KizunaClient', () => {
             id: '123',
             name: 'Alice',
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
 
-        await client.getUser({
+        await client.users.getUser({
             params: {
                 id: '123',
             },
@@ -196,12 +43,12 @@ describe('KizunaClient', () => {
         const fetchMock = stubFetch(200, {
             users: [],
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000/api/v1',
             fetch: fetchMock,
         });
 
-        await client.listUsers({
+        await client.users.listUsers({
             query: {},
         });
 
@@ -214,14 +61,15 @@ describe('KizunaClient', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
 
-        await client.createUser({
+        await client.users.createUser({
             body: {
                 name: 'Alice',
+                email: 'alice@example.com',
             },
         });
 
@@ -229,6 +77,7 @@ describe('KizunaClient', () => {
         expect(options.method).toBe('POST');
         expect(JSON.parse(options.body)).toEqual({
             name: 'Alice',
+            email: 'alice@example.com',
         });
         expect(options.headers.get('Content-Type')).toBe('application/json');
     });
@@ -237,12 +86,12 @@ describe('KizunaClient', () => {
         const fetchMock = stubFetch(200, {
             users: [],
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
 
-        await client.listUsers({
+        await client.users.listUsers({
             query: {
                 page: 2,
             },
@@ -257,12 +106,12 @@ describe('KizunaClient', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
 
-        const result = await client.getUser({
+        const result = await client.users.getUser({
             params: {
                 id: '1',
             },
@@ -277,12 +126,12 @@ describe('KizunaClient', () => {
 
     it('returns response headers from the fetch response', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' }, { 'x-request-id': 'trace-123' });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
 
-        const result = await client.getUser({
+        const result = await client.users.getUser({
             params: {
                 id: '1',
             },
@@ -296,7 +145,7 @@ describe('KizunaClient', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             baseHeaders: {
                 Authorization: 'Bearer token123',
@@ -304,7 +153,7 @@ describe('KizunaClient', () => {
             fetch: fetchMock,
         });
 
-        await client.getUser({
+        await client.users.getUser({
             params: {
                 id: '1',
             },
@@ -318,7 +167,7 @@ describe('KizunaClient', () => {
         const fetchMock = stubFetch(200, {
             ok: true,
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -326,7 +175,7 @@ describe('KizunaClient', () => {
         const file = new File(['hello world'], 'avatar.txt', {
             type: 'text/plain',
         });
-        await client.uploadAvatar({
+        await client.forms.uploadAvatar({
             body: {
                 file,
                 userId: 'u1',
@@ -348,12 +197,12 @@ describe('KizunaClient', () => {
         const fetchMock = stubFetch(200, {
             ok: true,
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
 
-        await client.submitForm({
+        await client.forms.submitForm({
             body: {
                 email: 'alice@example.com',
             },
@@ -370,14 +219,15 @@ describe('KizunaClient', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
 
-        await client.createUser({
+        await client.users.createUser({
             body: {
                 name: 'Alice',
+                email: 'alice@example.com',
             },
         });
 
@@ -394,7 +244,7 @@ describe('KizunaClient: onRequest', () => {
 
     it('adds headers via onRequest before the fetch call', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
             onRequest: ({ headers }) => {
@@ -402,7 +252,7 @@ describe('KizunaClient: onRequest', () => {
             },
         });
 
-        await client.getUser({ params: { id: '1' } });
+        await client.users.getUser({ params: { id: '1' } });
 
         const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { headers: Headers }];
         expect(options.headers.get('Authorization')).toBe('Bearer my-token');
@@ -410,7 +260,7 @@ describe('KizunaClient: onRequest', () => {
 
     it('supports async onRequest', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
             onRequest: async ({ headers }) => {
@@ -419,7 +269,7 @@ describe('KizunaClient: onRequest', () => {
             },
         });
 
-        await client.getUser({ params: { id: '1' } });
+        await client.users.getUser({ params: { id: '1' } });
 
         const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { headers: Headers }];
         expect(options.headers.get('Authorization')).toBe('Bearer async-token');
@@ -428,7 +278,7 @@ describe('KizunaClient: onRequest', () => {
     it('receives route metadata in onRequest', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' });
         const receivedRoutes: string[] = [];
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
             onRequest: ({ route, method }) => {
@@ -436,14 +286,14 @@ describe('KizunaClient: onRequest', () => {
             },
         });
 
-        await client.getUser({ params: { id: '1' } });
+        await client.users.getUser({ params: { id: '1' } });
 
         expect(receivedRoutes).toEqual(['GET /users/:id']);
     });
 
     it('merges onRequest headers with baseHeaders', async () => {
         const fetchMock = stubFetch(200, { id: '1', name: 'Alice' });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             baseHeaders: { 'X-App': 'test' },
             fetch: fetchMock,
@@ -452,7 +302,7 @@ describe('KizunaClient: onRequest', () => {
             },
         });
 
-        await client.getUser({ params: { id: '1' } });
+        await client.users.getUser({ params: { id: '1' } });
 
         const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { headers: Headers }];
         expect(options.headers.get('X-App')).toBe('test');
@@ -470,7 +320,7 @@ describe('KizunaClient: nested routers', () => {
             id: '42',
             name: 'Bob',
         });
-        const client = apiClientFor(nestedContract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -491,7 +341,7 @@ describe('KizunaClient: nested routers', () => {
             id: '1',
             name: 'Carol',
         });
-        const client = apiClientFor(nestedContract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -499,6 +349,7 @@ describe('KizunaClient: nested routers', () => {
         await client.users.createUser({
             body: {
                 name: 'Carol',
+                email: 'carol@example.com',
             },
         });
 
@@ -506,6 +357,7 @@ describe('KizunaClient: nested routers', () => {
         expect(options.method).toBe('POST');
         expect(JSON.parse(options.body)).toEqual({
             name: 'Carol',
+            email: 'carol@example.com',
         });
         expect(options.headers.get('Content-Type')).toBe('application/json');
     });
@@ -514,7 +366,7 @@ describe('KizunaClient: nested routers', () => {
         const fetchMock = stubFetch(200, {
             posts: ['hello', 'world'],
         });
-        const client = apiClientFor(nestedContract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: fetchMock,
         });
@@ -541,12 +393,12 @@ describe('KizunaClient: relative baseUrl', () => {
             id: '123',
             name: 'Alice',
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: '/api',
             fetch: fetchMock,
         });
 
-        await client.getUser({
+        await client.users.getUser({
             params: {
                 id: '123',
             },
@@ -560,12 +412,12 @@ describe('KizunaClient: relative baseUrl', () => {
         const fetchMock = stubFetch(200, {
             users: [],
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: '/api',
             fetch: fetchMock,
         });
 
-        await client.listUsers({
+        await client.users.listUsers({
             query: {
                 page: 2,
             },
@@ -580,12 +432,12 @@ describe('KizunaClient: relative baseUrl', () => {
             id: '1',
             name: 'Alice',
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: '',
             fetch: fetchMock,
         });
 
-        await client.getUser({
+        await client.users.getUser({
             params: {
                 id: '1',
             },
@@ -600,12 +452,12 @@ describe('KizunaClient: relative baseUrl', () => {
             id: '42',
             name: 'Bob',
         });
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: '/api/v1',
             fetch: fetchMock,
         });
 
-        await client.getUser({
+        await client.users.getUser({
             params: {
                 id: '42',
             },
@@ -621,7 +473,7 @@ describe('KizunaClient: relative baseUrl', () => {
             name: 'Alice',
         });
         let receivedUrl = '';
-        const client = apiClientFor(contract, {
+        const client = createClient({
             baseUrl: '/api',
             fetch: fetchMock,
             onRequest: ({ url }) => {
@@ -629,7 +481,7 @@ describe('KizunaClient: relative baseUrl', () => {
             },
         });
 
-        await client.getUser({
+        await client.users.getUser({
             params: {
                 id: '1',
             },
@@ -640,46 +492,9 @@ describe('KizunaClient: relative baseUrl', () => {
 });
 
 describe('requestContext on the client initializer', () => {
-    const analytics = k.requestContext({
-        headers: z.object({
-            'x-session-id': z.string().optional(),
-        }),
-        context: z.object({
-            sessionId: z.string().nullable(),
-        }),
-    });
-
-    const ctxKConfig = {
-        requestContext: {
-            analytics,
-        },
-    };
-    const ctxK = new Kizuna<{
-        requestContext: {
-            analytics: typeof analytics;
-        };
-    }>();
-
-    const ctxContract = defineConfig({
-        ...ctxKConfig,
-        routes: {
-            users: ctxK.routes({
-                listUsers: ctxK.route({
-                    method: 'GET',
-                    path: '/users',
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
-                }),
-            }),
-        },
-    }).api;
-
     it('sends requestContext values as headers on every request', async () => {
         const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
-        const ctxClient = apiClientFor(ctxContract, {
+        const ctxClient = createClient({
             baseUrl: 'https://api.example.com',
             fetch: fetchMock as unknown as typeof fetch,
             requestContext: {
@@ -693,7 +508,7 @@ describe('requestContext on the client initializer', () => {
 
     it('omits undefined values', async () => {
         const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
-        const ctxClient = apiClientFor(ctxContract, {
+        const ctxClient = createClient({
             baseUrl: 'https://api.example.com',
             fetch: fetchMock as unknown as typeof fetch,
             requestContext: {
@@ -706,42 +521,9 @@ describe('requestContext on the client initializer', () => {
     });
 });
 
-const activityRoutes = k.routes('api', {
-    getActivity: k.route({
-        method: 'GET',
-        path: '/activity',
-        responses: {
-            200: Kizuna.model({
-                title: 'UserActivityEvent',
-                schema: z.discriminatedUnion('kind', [
-                    Kizuna.model({
-                        title: 'UserActivityEventStarted',
-                        schema: z.object({
-                            kind: z.literal('started'),
-                            at: z.string(),
-                        }),
-                    }),
-                    Kizuna.model({
-                        title: 'UserActivityEventDone',
-                        schema: z.object({
-                            kind: z.literal('done'),
-                            ok: z.boolean(),
-                        }),
-                    }),
-                ]),
-            }),
-        },
-    }),
-});
-
-const activityContract = defineConfig({
-    ...config,
-    routes: activityRoutes,
-}).api;
-
 describe('discriminated union response built from named models', () => {
     it('switches over the response body and narrows the started branch', async () => {
-        const client = apiClientFor(activityContract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: stubFetch(200, {
                 kind: 'started',
@@ -749,7 +531,7 @@ describe('discriminated union response built from named models', () => {
             }),
         });
 
-        const result = await client.getActivity();
+        const result = await client.activity.getActivity();
         expect(result.status).toBe(200);
         if (result.status !== 200) throw new Error('expected 200');
 
@@ -771,7 +553,7 @@ describe('discriminated union response built from named models', () => {
     });
 
     it('switches over the response body and narrows the done branch', async () => {
-        const client = apiClientFor(activityContract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: stubFetch(200, {
                 kind: 'done',
@@ -779,7 +561,7 @@ describe('discriminated union response built from named models', () => {
             }),
         });
 
-        const result = await client.getActivity();
+        const result = await client.activity.getActivity();
         if (result.status !== 200) throw new Error('expected 200');
 
         let summary: string;
@@ -800,7 +582,7 @@ describe('discriminated union response built from named models', () => {
     });
 
     it('types the discriminator as a closed literal union, not string', async () => {
-        const client = apiClientFor(activityContract, {
+        const client = createClient({
             baseUrl: 'http://localhost:3000',
             fetch: stubFetch(200, {
                 kind: 'done',
@@ -808,7 +590,7 @@ describe('discriminated union response built from named models', () => {
             }),
         });
 
-        const result = await client.getActivity();
+        const result = await client.activity.getActivity();
         if (result.status !== 200) throw new Error('expected 200');
 
         switch (result.body.kind) {
@@ -822,59 +604,6 @@ describe('discriminated union response built from named models', () => {
 });
 
 describe('streams', () => {
-    const streamRoutes = k.routes('api', {
-        reply: k.route({
-            method: 'POST',
-            path: '/reply',
-            body: z.object({
-                prompt: z.string(),
-            }),
-            responses: {
-                200: {
-                    stream: {
-                        delta: z.object({
-                            text: z.string(),
-                        }),
-                        done: z.object({
-                            count: z.int(),
-                        }),
-                    },
-                },
-                400: z.object({
-                    type: z.string(),
-                    title: z.string(),
-                    status: z.number(),
-                    detail: z.string(),
-                }),
-            },
-        }),
-        ticks: k.route({
-            method: 'GET',
-            path: '/ticks',
-            responses: {
-                200: {
-                    stream: z.object({
-                        tick: z.int(),
-                    }),
-                },
-            },
-        }),
-        lines: k.route({
-            method: 'GET',
-            path: '/lines',
-            responses: {
-                200: {
-                    stream: z.string(),
-                    contentType: 'text/plain',
-                },
-            },
-        }),
-    });
-    const streamContract = defineConfig({
-        ...config,
-        routes: streamRoutes,
-    }).api;
-
     const streamOf = (chunks: string[]): ReadableStream<Uint8Array> => {
         const encoder = new TextEncoder();
         return new ReadableStream({
@@ -886,7 +615,7 @@ describe('streams', () => {
     };
 
     const clientFor = (chunks: string[], status = 200, contentType = 'text/event-stream') =>
-        apiClientFor(streamContract, {
+        createClient({
             baseUrl: 'http://api',
             fetch: async () =>
                 new Response(streamOf(chunks), {
@@ -907,7 +636,7 @@ describe('streams', () => {
         const result = await clientFor([
             'event: delta\ndata: {"te',
             'xt":"a"}\n\n: keep-alive\n\nevent: done\r\ndata: {"count":1}\r\nid: evt-1\r\nretry: 5000\r\n\r\n',
-        ]).reply({
+        ]).streams.reply({
             body: {
                 prompt: 'hi',
             },
@@ -933,7 +662,7 @@ describe('streams', () => {
     });
 
     it('joins multi-line data and discards an incomplete trailing event', async () => {
-        const result = await clientFor(['data: {"tick":\ndata: 1}\n\ndata: {"tick":2}']).ticks();
+        const result = await clientFor(['data: {"tick":\ndata: 1}\n\ndata: {"tick":2}']).streams.ticks();
         if (result.status !== 200) return;
         expect(await collect(result.body)).toEqual([
             {
@@ -945,9 +674,15 @@ describe('streams', () => {
     });
 
     it('reads a text stream as string chunks', async () => {
-        const result = await clientFor(['one\n', 'two\n'], 200, 'text/plain').lines();
+        const result = await clientFor(['one\n', 'two\n'], 200, 'text/plain').streams.lines();
         if (result.status !== 200) return;
         expect(await collect(result.body)).toEqual(['one\n', 'two\n']);
+    });
+
+    it('reads a binary stream as byte chunks', async () => {
+        const result = await clientFor(['ab'], 200, 'application/octet-stream').streams.bytes();
+        if (result.status !== 200) return;
+        expect(await collect(result.body)).toEqual([new TextEncoder().encode('ab')]);
     });
 
     it('buffers a non-stream status as before', async () => {
@@ -955,7 +690,7 @@ describe('streams', () => {
             ['{"type":"about:blank","title":"Bad Request","status":400,"detail":"nope"}'],
             400,
             'application/problem+json'
-        ).reply({
+        ).streams.reply({
             body: {
                 prompt: 'hi',
             },
@@ -972,7 +707,7 @@ describe('streams', () => {
                 controller.error(new Error('terminated'));
             },
         });
-        const client = apiClientFor(streamContract, {
+        const client = createClient({
             baseUrl: 'http://api',
             fetch: async () =>
                 new Response(failing, {
@@ -982,8 +717,86 @@ describe('streams', () => {
                     },
                 }),
         });
-        const result = await client.ticks();
+        const result = await client.streams.ticks();
         if (result.status !== 200) return;
         await expect(collect(result.body)).rejects.toThrow('terminated');
+    });
+});
+
+describe('what a wrapper reads off a method', () => {
+    const client = createClient({
+        baseUrl: 'http://api',
+    });
+
+    it('names the method it sends and whether its response streams', () => {
+        expect(client.streams.ticks['~route']).toMatchObject({
+            method: 'GET',
+            path: '/ticks',
+            streams: true,
+        });
+        expect(
+            createClient({
+                baseUrl: 'http://api',
+            }).users.createUser['~route']
+        ).toMatchObject({
+            method: 'POST',
+            streams: false,
+        });
+    });
+
+    it('keeps it out of the method keys', () => {
+        expect(Object.keys(client.streams.ticks)).toEqual([]);
+    });
+});
+
+describe('headers', () => {
+    it('leaves out a header whose value is undefined', async () => {
+        const fetchMock = stubFetch(200, {
+            id: '1',
+            name: 'Alice',
+        });
+        const client = createClient({
+            baseUrl: 'http://api',
+            fetch: fetchMock,
+        });
+
+        await client.users.getUser({
+            params: {
+                id: '1',
+            },
+            headers: {
+                'x-trace': undefined as unknown as string,
+            },
+        });
+
+        const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { headers: Headers }];
+        expect(options.headers.has('x-trace')).toBe(false);
+    });
+
+    it('lets a call override a base header whatever its case', async () => {
+        const fetchMock = stubFetch(201, {
+            id: '1',
+            name: 'Alice',
+        });
+        const client = createClient({
+            baseUrl: 'http://api',
+            fetch: fetchMock,
+            baseHeaders: {
+                'content-type': 'application/vnd.base+json',
+            },
+        });
+
+        await client.users.createUser({
+            body: {
+                name: 'Alice',
+                email: 'alice@example.com',
+            },
+            headers: {
+                'Content-Type': 'application/vnd.call+json',
+            },
+        });
+
+        const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { headers: Headers }];
+        expect(options.headers.get('content-type')).toBe('application/vnd.call+json');
     });
 });

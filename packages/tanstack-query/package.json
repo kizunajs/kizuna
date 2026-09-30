@@ -56,14 +56,11 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external kizunajs --external @kizunajs/fetch --external @tanstack/query-core --external zod",
+    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external @tanstack/query-core",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@tanstack/query-core": "^5.69.0",
-    "kizunajs": "workspace:*",
-    "@kizunajs/fetch": "workspace:*",
-    "zod": "^4.0.0"
+    "@tanstack/query-core": "^5.69.0"
   },
   "devDependencies": {
     "@tanstack/query-core": "catalog:",

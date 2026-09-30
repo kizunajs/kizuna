@@ -53,7 +53,7 @@ Follow the [quickstart](https://kizunajs.com/docs/quickstart), which goes from a
 | Package                    | Description                                        |
 | -------------------------- | -------------------------------------------------- |
 | `kizunajs`                 | Route declaration, validation, and the adapter API |
-| `@kizunajs/fetch`          | Typed fetch-based client                           |
+| `@kizunajs/fetch`          | Fetch client generation                            |
 | `@kizunajs/tanstack-query` | TanStack Query client                              |
 | `@kizunajs/express`        | Express adapter                                    |
 | `@kizunajs/fastify`        | Fastify adapter                                    |

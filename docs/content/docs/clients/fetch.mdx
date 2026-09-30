@@ -3,9 +3,9 @@ title: Fetch
 description: A fully typed HTTP client for consuming Kizuna routes in the browser, on the server, or in React Native.
 ---
 
-`@kizunajs/fetch` is the typed client for your routes, a wrapper around the native `fetch` API. It runs anywhere `fetch` does, [React Native](#react-native) included.
+`@kizunajs/fetch` writes a typed client for your routes, a wrapper around the native `fetch` API. The client runs anywhere `fetch` does, [React Native](#react-native) included.
 
-You generate it from your routes. The generated file carries named types and a table of methods and paths, and imports nothing else.
+The generated file carries named types, a table of methods and paths, and the code that sends the requests. It imports nothing, so the app that calls your API installs nothing. `@kizunajs/fetch` goes beside `kizuna.config.ts`:
 
 <InstallTabs packageName="@kizunajs/fetch" />
 
@@ -18,7 +18,7 @@ You generate it from your routes. The generated file carries named types and a t
 Point `fetchClient` at the file you want written:
 
 ```ts title="kizuna.config.ts"
-import { fetchClient } from '@kizunajs/fetch/server';
+import { fetchClient } from '@kizunajs/fetch';
 
 export default defineConfig({
     adapter: expressAdapter(),
@@ -50,8 +50,6 @@ kizuna generate
  *
  * Regenerate: kizuna generate
  */
-import { createGeneratedClient, type ClientConfig, type GeneratedRoutes } from '@kizunajs/fetch';
-
 export namespace API {
     /**
      * A user in the system
@@ -74,7 +72,7 @@ export namespace API {
 }
 ```
 
-Every model keeps the title you gave `Kizuna.model`, and is declared once however many routes use it.
+Every model keeps the title you gave `Kizuna.model`, and is declared once however many routes use it. Below the types come the route table, `createClient`, and the code that sends requests.
 
 </Step>
 
@@ -140,13 +138,13 @@ const { status, body } = await apiClient.users.getUser({
 
 `params` is required when the path contains `:param` placeholders, and rejected when it does not.
 
-When the route declares a `pathParams` schema, `params` is typed by that schema's output type instead of the path template, the same typing the server-side handler receives. Refinements like `.brand()` flow to the caller:
+When the route declares a `pathParams` schema, `params` is typed by that schema instead of the path template. A [branded ID](#branded-ids) reaches the caller:
 
 ```ts title="users.ts"
-// the route declares: pathParams: z.object({ id: z.string().brand<'UserId'>() })
+// the route declares: pathParams: z.object({ id: UserId }), where UserId = Kizuna.brand('UserId', z.string())
 const { body } = await apiClient.users.getUser({
     params: {
-        id: userId, // must be a UserId, a plain string is a type error
+        id: userId, // must be an API.UserId, a plain string is a type error
     },
 });
 ```
@@ -249,7 +247,7 @@ type ListUsersResponse = {
 };
 ```
 
-`ClientArgs<Route>` and `ClientResponse<Route>` are exported for building on top of the client, as [`@kizunajs/tanstack-query`](/docs/clients/tanstack-query) does. Reach for them when writing your own wrapper; calling routes needs neither.
+Every route's types are in the namespace, so `API.UsersListUsers.Query` is what `listUsers` takes as `query`, and `API.UsersListUsers.Result` is what it resolves to. [Wrapping the client](/docs/extend/wrap-fetch-client) builds on them.
 
 ## Streams
 
@@ -297,8 +295,10 @@ A route with neither takes no `400` in its response type.
 
 If your routes also declares a `400` response on the same route, the body becomes a union of your type and `ValidationError`. Use the `isValidationError` type guard to distinguish them:
 
+The generated file exports it:
+
 ```ts title="users.ts"
-import { isValidationError } from '@kizunajs/fetch';
+import { isValidationError } from './lib/api-client.generated';
 
 if (result.status === 400) {
     if (isValidationError(result.body)) {
@@ -470,7 +470,7 @@ The same metadata is what the OpenAPI document publishes as its examples, so the
 
 ## What ships
 
-The generated file imports `@kizunajs/fetch` and nothing else. No schema library, no handlers, no server code. The table it carries is method, path, content type, and which responses stream:
+The generated file imports nothing. It carries no schema library, no handlers and no server code. The table it carries is method, path, content type, and each status the route answers with, marking the ones that stream:
 
 ```ts
 const routes: GeneratedRoutes = {
@@ -487,7 +487,9 @@ const routes: GeneratedRoutes = {
 };
 ```
 
-That is all the runtime reads. The types above it are erased at build time.
+That is all the code below it reads. The types above it are erased at build time.
+
+`kizuna generate` writes the table and the code that reads it into one file, so the two always come from the same release. Upgrading kizuna changes the client only when you regenerate it.
 
 ## Keeping it current
 

@@ -1,6 +1,6 @@
-import { isValidationError } from '@kizunajs/fetch';
 import { readToolCalls, type ToolAnswer } from 'kizunajs';
 import { apiClient } from '../lib/api-client';
+import { isValidationError } from '../lib/api-client.generated';
 
 const collect = async <Message>(stream: AsyncIterable<Message>): Promise<Message[]> => {
     const messages: Message[] = [];

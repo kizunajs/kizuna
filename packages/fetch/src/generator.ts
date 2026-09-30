@@ -8,15 +8,17 @@ import {
     resolveResponseBody,
     resolveResponseHeaders,
     streamContentType,
+    streamMode,
     toPascalCase,
     unwrapOptionalWrappers,
     type StreamMode,
     listedRoutes,
 } from 'kizunajs/generator';
+import { runtimeSource } from './runtime.js';
 import { TypeCollector, docComment, sampleObject, sampleValue, typeOf } from './zod-to-typescript.js';
 
 /**
- * What a generated client is called and where its runtime comes from.
+ * What a generated client is called, and what its header says.
  */
 export interface FetchClientOptions {
     /**
@@ -26,12 +28,6 @@ export interface FetchClientOptions {
      * @default 'API'
      */
     namespace?: string;
-    /**
-     * Module the generated file imports its runtime from.
-     *
-     * @default '@kizunajs/fetch'
-     */
-    runtimeModule?: string;
     /**
      * Command the file's header tells a reader to run.
      *
@@ -109,6 +105,7 @@ const exampleCall = (routeKey: string, route: RouteDefinition): string => {
     if (route.body && !isVoidSchema(route.body) && requiresArgument(route.body)) {
         entries.push(`body: ${sampleValue(route.body)},`);
     }
+    if (route.headers && requiresArgument(route.headers)) entries.push(`headers: ${sampleObject(route.headers)},`);
 
     const args = entries.length > 0 ? `{\n${indent(entries.join('\n'))}\n}` : '';
     return `const result = await client.${routeKey}(${args});`;
@@ -158,27 +155,28 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
     const args: string[] = [];
 
     const params = pathParamNames(route.path);
+    const { pathParams, query, body, headers } = route;
     if (params.length > 0) {
-        const body = route.pathParams
-            ? typeOf(route.pathParams, collector, `${namespace}Params`)
+        const paramsType = pathParams
+            ? collector.readingInput(() => typeOf(pathParams, collector, `${namespace}Params`))
             : `{\n${indent(params.map((name) => `${name}: string;`).join('\n'))}\n}`;
-        members.push(`export type Params = ${body};`);
+        members.push(`export type Params = ${paramsType};`);
         args.push(`params: ${namespaceName}.${namespace}.Params`);
     }
 
-    if (route.query) {
-        members.push(`export type Query = ${typeOf(route.query, collector, `${namespace}Query`)};`);
-        args.push(`query?: ${namespaceName}.${namespace}.Query`);
+    if (query) {
+        members.push(`export type Query = ${collector.readingInput(() => typeOf(query, collector, `${namespace}Query`))};`);
+        args.push(`query${requiresArgument(query) ? '' : '?'}: ${namespaceName}.${namespace}.Query`);
     }
 
-    if (route.body && !isVoidSchema(route.body)) {
-        members.push(`export type Body = ${typeOf(route.body, collector, `${namespace}Body`)};`);
+    if (body && !isVoidSchema(body)) {
+        members.push(`export type Body = ${collector.readingInput(() => typeOf(body, collector, `${namespace}Body`))};`);
         args.push(`body: ${namespaceName}.${namespace}.Body`);
     }
 
-    if (route.headers) {
-        members.push(`export type Headers = ${typeOf(route.headers, collector, `${namespace}Headers`)};`);
-        args.push(`headers?: ${namespaceName}.${namespace}.Headers`);
+    if (headers) {
+        members.push(`export type Headers = ${collector.readingInput(() => typeOf(headers, collector, `${namespace}Headers`))};`);
+        args.push(`headers${requiresArgument(headers) ? '' : '?'}: ${namespaceName}.${namespace}.Headers`);
     } else {
         args.push('headers?: Record<string, string>');
     }
@@ -195,11 +193,7 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
         const headerType = headers ? typeOf(headers, collector, `${namespace}${status}Headers`) : 'Record<string, string>';
 
         if (isStreamResponse(response)) {
-            const mode: StreamMode = streamContentType(response).includes('event-stream')
-                ? 'events'
-                : streamContentType(response).startsWith('text/')
-                  ? 'text'
-                  : 'binary';
+            const mode = streamMode(response);
             return `{ status: ${status}; body: ${streamBody(mode, (response as { stream?: unknown }).stream, collector, `${namespace}${status}`)}; headers: ${headerType} }`;
         }
 
@@ -220,8 +214,10 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
     const tableEntries = [`method: '${route.method}'`, `path: '${route.path}'`];
     if (route.contentType) tableEntries.push(`contentType: '${route.contentType}'`);
     const responses = Object.entries(route.responses).map(([status, response]) =>
-        isStreamResponse(response) ? `${status}: { stream: { contentType: '${streamContentType(response)}' } }` : `${status}: {}`
+        isStreamResponse(response) ? `${status}: { stream: true, contentType: '${streamContentType(response)}' }` : `${status}: {}`
     );
+    // The runtime and its wrappers read the table alone, so it lists the 400 the types add.
+    if (validationBody && !declaredBadRequest) responses.push('400: {}');
     tableEntries.push(`responses: {\n${indent(responses.map((entry) => `${entry},`).join('\n'))}\n}`);
 
     const streams = Object.values(route.responses).some((response) => isStreamResponse(response));
@@ -283,13 +279,15 @@ const emitTree = (routes: Routes, prefix: string, collector: TypeCollector, name
  * The headers a request context declares, as one interface the caller fills
  * once. Absent when the API declares no request context that reads headers.
  */
-const emitRequestContext = (contract: ApiDefinition, collector: TypeCollector): string | undefined => {
+const emitRequestContext = (contract: ApiDefinition, collector: TypeCollector): { declaration: string; required: boolean } | undefined => {
     const declarations = Object.values(contract.requestContext ?? {});
     const fields: string[] = [];
+    let required = false;
     for (const declaration of declarations) {
-        const headers = (declaration as { headers?: unknown }).headers;
+        const headers = (declaration as { headers?: z.core.$ZodType }).headers;
         if (!headers) continue;
-        const rendered = typeOf(headers as never, collector, 'RequestContext');
+        required ||= requiresArgument(headers);
+        const rendered = collector.readingInput(() => typeOf(headers, collector, 'RequestContext'));
         const inner = rendered
             .trim()
             .replace(/^\{/, '')
@@ -300,7 +298,11 @@ const emitRequestContext = (contract: ApiDefinition, collector: TypeCollector): 
             .join('\n');
         if (inner !== '') fields.push(inner);
     }
-    return fields.length > 0 ? `export interface RequestContext {\n${indent(fields.join('\n'))}\n}` : undefined;
+    if (fields.length === 0) return undefined;
+    return {
+        declaration: `export interface RequestContext {\n${indent(fields.join('\n'))}\n}`,
+        required,
+    };
 };
 
 /**
@@ -322,8 +324,39 @@ ${docComment([
         )
         .join('');
 
+/**
+ * Tells kizuna's validation error from a 400 the route declares itself.
+ */
+const emitValidationGuard = (namespaceName: string): string => `
+${docComment([
+    `Whether a \`400\` body is the validation error kizuna sends, rather than a \`400\` the route declares itself.`,
+    '',
+    '@example',
+    'if (result.status === 400 && isValidationError(result.body)) {',
+    '    console.log(result.body.errors);',
+    '}',
+])}export const isValidationError = (body: unknown): body is ${namespaceName}.ValidationError =>
+    typeof body === 'object' && body !== null && 'errors' in body && Array.isArray(body.errors);
+`;
+
+/**
+ * Declared in the file, so a brand needs nothing installed.
+ */
+const BRAND_DECLARATION = `declare const kizunaBrand: unique symbol;
+
+/**
+ * Tells one branded type from another with the same base.
+ */
+type KizunaBrand<Name extends string> = {
+    readonly [kizunaBrand]: {
+        readonly [Key in Name]: true;
+    };
+};
+
+`;
+
 export const generateFetchClient = (contract: ApiDefinition, options: FetchClientOptions = {}): string => {
-    const { namespace: namespaceName = 'API', runtimeModule = '@kizunajs/fetch', regenerateCommand = 'kizuna generate', source } = options;
+    const { namespace: namespaceName = 'API', regenerateCommand = 'kizuna generate', source } = options;
     const collector = new TypeCollector();
     const tree = emitTree(listedRoutes(contract), '', collector, namespaceName);
     const requestContext = emitRequestContext(contract, collector);
@@ -335,6 +368,7 @@ export const generateFetchClient = (contract: ApiDefinition, options: FetchClien
 
     const api = [...models, ...tree.declarations].join('\n\n');
     const brands = emitBrandConstructors(collector, namespaceName);
+    const guards = collector.all().some((model) => model.name === 'ValidationError') ? emitValidationGuard(namespaceName) : '';
 
     const header = [
         ' * Generated by @kizunajs/fetch. Do not edit.',
@@ -347,9 +381,7 @@ export const generateFetchClient = (contract: ApiDefinition, options: FetchClien
 /**
 ${header}
  */
-import { createGeneratedClient, ${collector.usesBrand() ? 'type $brand, ' : ''}type ClientConfig, type ClientMethod, type GeneratedRoutes } from '${runtimeModule}';
-
-export namespace ${namespaceName} {
+${collector.usesBrand() ? BRAND_DECLARATION : ''}export namespace ${namespaceName} {
 ${indent(api)}
 }
 
@@ -360,21 +392,22 @@ ${indent(tree.signatures)}
 const routes: GeneratedRoutes = {
 ${indent(tree.table)}
 };
-${brands}
+${brands}${guards}
 ${
     requestContext === undefined
         ? `/**
  * A client for this API. Pass the base URL and anything else the runtime takes.
  */
-export const createClient = (config: ClientConfig): Client => createGeneratedClient(routes, config) as unknown as Client;`
-        : `${requestContext}
+export const createClient = (config: ClientConfig): Client => buildClient(routes, config) as unknown as Client;`
+        : `${requestContext.declaration}
 
 /**
  * A client for this API. Pass the base URL, the request context headers this
  * API declares, and anything else the runtime takes.
  */
-export const createClient = (config: ClientConfig & { requestContext?: RequestContext }): Client =>
-    createGeneratedClient(routes, config) as unknown as Client;`
+export const createClient = (config: ClientConfig & { requestContext${requestContext.required ? '' : '?'}: RequestContext }): Client =>
+    buildClient(routes, config) as unknown as Client;`
 }
-`;
+
+${runtimeSource}`;
 };

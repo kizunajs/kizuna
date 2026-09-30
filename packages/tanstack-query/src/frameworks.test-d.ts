@@ -1,94 +1,11 @@
 import { expectTypeOf, test } from 'vitest';
-import { z } from 'zod';
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { useInfiniteQuery as useVueInfiniteQuery, useMutation as useVueMutation, useQuery as useVueQuery } from '@tanstack/vue-query';
 import { createInfiniteQuery, createMutation, createQuery } from '@tanstack/svelte-query';
-import { Kizuna } from 'kizunajs';
-import { defineConfig } from 'kizunajs';
-import { createGeneratedClient, type Client, type ClientConfig, type GeneratedRoutes } from '@kizunajs/fetch';
-import type { Routes } from 'kizunajs';
-
-/**
- * A client over an assembled api's routes, the same runtime the generated
- * client uses.
- */
-const apiClientFor = <T extends Routes>(api: { routes: T }, config: ClientConfig): Client<T> =>
-    createGeneratedClient(api.routes as unknown as GeneratedRoutes, config) as unknown as Client<T>;
-
 import { KizunaTanstackQuery } from './proxy.js';
+import { createClient } from './generated/client.js';
 
-interface Config {
-    tags: typeof kTags;
-}
-
-const k = new Kizuna<Config>();
-
-const kTags = k.tags({
-    users: 'Users',
-});
-const config = {
-    tags: kTags,
-};
-
-const UserSchema = z.object({
-    id: z.string(),
-    name: z.string(),
-});
-
-const routes = k.routes('users', {
-    listUsers: k.route({
-        method: 'GET',
-        path: '/users',
-        responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-            }),
-        },
-    }),
-    getUser: k.route({
-        method: 'GET',
-        path: '/users/:id',
-        responses: {
-            200: UserSchema,
-            404: z.object({
-                title: z.string(),
-            }),
-        },
-    }),
-    searchUsers: k.route({
-        method: 'GET',
-        path: '/users/search',
-        query: z.object({
-            term: z.string(),
-            cursor: z.number().optional(),
-        }),
-        responses: {
-            200: z.object({
-                users: z.array(UserSchema),
-                nextCursor: z.number().nullable(),
-            }),
-        },
-    }),
-    createUser: k.route({
-        method: 'POST',
-        path: '/users',
-        body: z.object({
-            name: z.string(),
-        }),
-        responses: {
-            201: UserSchema,
-        },
-    }),
-});
-
-const contract = defineConfig({
-    ...config,
-    routes: {
-        users: routes,
-    },
-}).api;
-
-const apiClient = apiClientFor(contract, {
+const apiClient = createClient({
     baseUrl: 'http://localhost:8000',
 });
 
@@ -219,6 +136,11 @@ test('vue: select transforms data and types its parameter', () => {
     expectTypeOf(query.data.value).toEqualTypeOf<200 | 404 | undefined>();
 });
 
+test('vue: a route with a required argument demands input', () => {
+    // @ts-expect-error getUser requires `params`
+    useVueQuery(api.users.getUser.queryOptions({}));
+});
+
 test('vue: a route with a required query demands input', () => {
     // @ts-expect-error searchUsers declares a required `term`
     useVueQuery(api.users.searchUsers.queryOptions({}));
@@ -278,6 +200,11 @@ test('svelte: select transforms data and types its parameter', () => {
     );
 
     expectTypeOf(query.data).toEqualTypeOf<200 | 404 | undefined>();
+});
+
+test('svelte: a route with a required argument demands input', () => {
+    // @ts-expect-error getUser requires `params`
+    createQuery(() => api.users.getUser.queryOptions({}));
 });
 
 test('svelte: a route with a required query demands input', () => {

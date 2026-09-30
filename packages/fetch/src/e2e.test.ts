@@ -1,122 +1,20 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { expressAdapter } from '@kizunajs/express';
 import express from 'express';
-import { z } from 'zod';
 import type { Server, AddressInfo } from 'node:net';
-import { Kizuna } from 'kizunajs';
-import { defineConfig } from 'kizunajs';
-import { ProblemDetailsSchema } from 'kizunajs/schemas';
-import { createGeneratedClient, type Client, type ClientConfig, type GeneratedRoutes } from '@kizunajs/fetch';
-import type { Routes } from 'kizunajs';
-
-/**
- * A client over an assembled api's routes, the same runtime the generated
- * client uses.
- */
-const apiClientFor = <T extends Routes>(api: { routes: T }, config: ClientConfig): Client<T> =>
-    createGeneratedClient(api.routes as unknown as GeneratedRoutes, config) as unknown as Client<T>;
-
-interface Config {
-    adapter: ReturnType<typeof expressAdapter>;
-    tags: typeof kTags;
-}
-
-interface SecuredKConfig {
-    auth: {
-        identities: {
-            user: typeof userIdentity;
-        };
-        guardSchema: typeof securedKGuardSchema;
-    };
-}
-
-const k = new Kizuna<Config>();
-const securedK = new Kizuna<SecuredKConfig>();
-
-const kTags = k.tags({
-    api: 'API',
-});
-const config = {
-    tags: kTags,
-};
-
-const contractRoutes = k.routes('api', {
-    createUser: k
-        .route({
-            method: 'POST',
-            path: '/users',
-            body: z.object({
-                name: z.string(),
-                email: z.email(),
-            }),
-            responses: {
-                201: z.object({
-                    id: z.string(),
-                    name: z.string(),
-                    email: z.string(),
-                }),
-            },
-        })
-        .handler(({ body }) => {
-            const id = String(users.size + 1);
-            const user = {
-                id,
-                name: body.name,
-                email: body.email,
-            };
-            users.set(id, user);
-            return {
-                status: 201,
-                body: user,
-            };
-        }),
-    getUser: k
-        .route({
-            method: 'GET',
-            path: '/users/:id',
-            responses: {
-                200: z.object({
-                    id: z.string(),
-                    name: z.string(),
-                    email: z.string(),
-                }),
-                404: ProblemDetailsSchema,
-            },
-        })
-        .handler(({ params }) => {
-            const user = users.get(params.id);
-            if (!user) {
-                return {
-                    status: 404,
-                    body: {
-                        detail: 'Not found',
-                    },
-                };
-            }
-            return {
-                status: 200,
-                body: user,
-            };
-        }),
-});
-
-const users = new Map<string, { id: string; name: string; email: string }>();
-
-const contract = defineConfig({
-    adapter: expressAdapter(),
-    ...config,
-    routes: contractRoutes,
-}).api;
+import { apiContract } from './api.fixture.js';
+import { securedContract } from './secured.fixture.js';
+import { createClient, type Client } from './generated/api.js';
+import { createClient as createSecuredClient } from './generated/secured.js';
 
 describe('end-to-end: typed client → Express server', () => {
     let server: Server;
-    let client: Client<typeof contract.routes>;
+    let client: Client;
 
     beforeAll(async () => {
         const app = express();
         app.use(express.json());
 
-        const api = contract;
+        const api = apiContract;
 
         api.mount(app);
 
@@ -125,7 +23,7 @@ describe('end-to-end: typed client → Express server', () => {
         });
 
         const address = server.address() as AddressInfo;
-        client = apiClientFor(contract, {
+        client = createClient({
             baseUrl: `http://localhost:${address.port}`,
         });
     });
@@ -135,7 +33,7 @@ describe('end-to-end: typed client → Express server', () => {
     });
 
     it('creates and fetches a user with full type safety', async () => {
-        const created = await client.createUser({
+        const created = await client.users.createUser({
             body: {
                 name: 'Alice',
                 email: 'alice@test.com',
@@ -148,7 +46,7 @@ describe('end-to-end: typed client → Express server', () => {
         expect(created.body.email).toBe('alice@test.com');
         expect(created.body.id).toBeDefined();
 
-        const fetched = await client.getUser({
+        const fetched = await client.users.getUser({
             params: {
                 id: created.body.id,
             },
@@ -160,7 +58,7 @@ describe('end-to-end: typed client → Express server', () => {
     });
 
     it('returns typed 404 for a missing user', async () => {
-        const result = await client.getUser({
+        const result = await client.users.getUser({
             params: {
                 id: 'nonexistent',
             },
@@ -172,52 +70,15 @@ describe('end-to-end: typed client → Express server', () => {
     });
 });
 
-const contractWithResponseHeadersRoutes = k.routes('api', {
-    getUser: k
-        .route({
-            method: 'GET',
-            path: '/users/:id',
-            responses: {
-                200: {
-                    body: z.object({
-                        id: z.string(),
-                        name: z.string(),
-                    }),
-                    headers: z.object({
-                        'x-request-id': z.string().optional(),
-                    }),
-                },
-                404: ProblemDetailsSchema,
-            },
-        })
-        .handler(({ params, headers, res }) => {
-            const requestId = headers['x-request-id'];
-            if (requestId) res.setHeader('x-request-id', requestId);
-            return {
-                status: 200,
-                body: {
-                    id: params.id,
-                    name: 'Alice',
-                },
-            };
-        }),
-});
-
-const contractWithResponseHeaders = defineConfig({
-    adapter: expressAdapter(),
-    ...config,
-    routes: contractWithResponseHeadersRoutes,
-}).api;
-
 describe('end-to-end: response headers', () => {
     let server: Server;
-    let client: Client<typeof contractWithResponseHeaders.routes>;
+    let client: Client;
 
     beforeAll(async () => {
         const app = express();
         app.use(express.json());
 
-        const api = contractWithResponseHeaders;
+        const api = apiContract;
 
         api.mount(app);
 
@@ -226,7 +87,7 @@ describe('end-to-end: response headers', () => {
         });
 
         const address = server.address() as AddressInfo;
-        client = apiClientFor(contractWithResponseHeaders, {
+        client = createClient({
             baseUrl: `http://localhost:${address.port}`,
         });
     });
@@ -236,10 +97,7 @@ describe('end-to-end: response headers', () => {
     });
 
     it('client exposes response headers echoed by the server', async () => {
-        const result = await client.getUser({
-            params: {
-                id: '1',
-            },
+        const result = await client.tracing.echoRequestId({
             headers: {
                 'x-request-id': 'trace-e2e-999',
             },
@@ -248,66 +106,6 @@ describe('end-to-end: response headers', () => {
         expect(result.headers['x-request-id']).toBe('trace-e2e-999');
     });
 });
-
-const userIdentity = securedK.identity
-    .bearer({
-        context: z.object({
-            userId: z.string(),
-        }),
-    })
-    .guard(({ bearer, deny }) => {
-        if (bearer?.token !== 'tok_ada')
-            return deny({
-                status: 401,
-                body: {
-                    detail: 'Unauthorized',
-                    code: 'expired_token',
-                },
-            });
-        return {
-            userId: '1',
-        };
-    });
-
-const securedKGuardSchema = ProblemDetailsSchema.extend({
-    code: z.enum(['expired_token', 'forbidden']).default('forbidden'),
-});
-const securedKConfig = {
-    auth: {
-        identities: {
-            user: userIdentity,
-        },
-        guardSchema: securedKGuardSchema,
-    },
-};
-
-const securedRoutes = securedK.routes({
-    whoAmI: securedK
-        .route({
-            method: 'GET',
-            path: '/who-am-i',
-            auth: 'user',
-            responses: {
-                200: z.object({
-                    userId: z.string(),
-                }),
-            },
-        })
-        .handler(({ auth }) => ({
-            status: 200,
-            body: {
-                userId: auth.user.userId,
-            },
-        })),
-});
-
-const securedContract = defineConfig({
-    adapter: expressAdapter(),
-    ...securedKConfig,
-    routes: {
-        api: securedRoutes,
-    },
-}).api;
 
 describe('end-to-end: typed client → secured Express route', () => {
     let server: Server;
@@ -333,13 +131,13 @@ describe('end-to-end: typed client → secured Express route', () => {
     });
 
     it('round-trips with the credential in baseHeaders', async () => {
-        const client = apiClientFor(securedContract, {
+        const client = createSecuredClient({
             baseUrl,
             baseHeaders: {
                 authorization: 'Bearer tok_ada',
             },
         });
-        const response = await client.api.whoAmI();
+        const response = await client.account.whoAmI();
         expect(response.status).toBe(200);
         if (response.status === 200) {
             expect(response.body.userId).toBe('1');
@@ -347,10 +145,10 @@ describe('end-to-end: typed client → secured Express route', () => {
     });
 
     it('surfaces the 401 the auth map put on the route, which it never declared', async () => {
-        const client = apiClientFor(securedContract, {
+        const client = createSecuredClient({
             baseUrl,
         });
-        const response = await client.api.whoAmI();
+        const response = await client.account.whoAmI();
         expect(response.status).toBe(401);
         if (response.status === 401) {
             expect(response.body.detail).toBe('Unauthorized');
