@@ -248,6 +248,19 @@ const pluginPackages = (): string[] => {
     return declaring;
 };
 
+/**
+ * The config's source and the local modules it imports, since a plugin built
+ * around an app's own client is defined in a module of its own.
+ */
+const configAndLocalImports = (configFile: string): string => {
+    const source = fs.readFileSync(configFile, 'utf8');
+    const local = [...source.matchAll(/from '(\.[^']+)'/g)]
+        .map((match) => path.resolve(path.dirname(configFile), `${match[1]}.ts`))
+        .filter((file) => fs.existsSync(file))
+        .map((file) => fs.readFileSync(file, 'utf8'));
+    return [source, ...local].join('\n');
+};
+
 describe('every plugin is covered', () => {
     const plugins = pluginPackages();
 
@@ -269,7 +282,7 @@ describe('every plugin is covered', () => {
      * be mounted, guarded or bundled by the cases above.
      */
     test('the demo config installs every plugin', () => {
-        const installed = fs.readFileSync(DEMO_CONFIG, 'utf8');
+        const installed = configAndLocalImports(DEMO_CONFIG);
         const missing = plugins.filter((name) => !installed.includes(`from '${name}'`));
         expect(missing, 'install these on apps/express-demo/kizuna.config.ts').toEqual([]);
     });

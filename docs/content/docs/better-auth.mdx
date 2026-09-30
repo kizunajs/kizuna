@@ -1,0 +1,637 @@
+---
+title: Better Auth
+description: Run Better Auth as its own app and own every user flow in your API, from checking who's signed in to invitations, with the emails sent from your API.
+---
+
+<AlphaNotice>
+
+The Better Auth plugin is new and still settling. Its options and exports may change while v2 is in beta, so pin your version if you depend on them.
+
+</AlphaNotice>
+
+<Supports items={['Better Auth 1.7+']} />
+
+[Better Auth](https://better-auth.com) often runs as its own app, next to your API. `@kizunajs/better-auth` lets your API own every user flow while Better Auth does the work. Your routes call any Better Auth endpoint, typed, and the emails Better Auth needs sent come back to your API, where `plugins.resend` or anything else sends them.
+
+That gets you:
+
+- **Every Better Auth endpoint in your handlers**, typed, including the ones its plugins add, like organizations.
+- **One API for your apps.** "Change my email" is a route of your own, so it's in your OpenAPI document and your Swift, Kotlin and fetch clients.
+- **Emails from your API**, with its templates, its jobs and its dev interception.
+- **Nothing to keep up with.** `plugins.betterAuth` is Better Auth's own client, so a new endpoint is yours the day you upgrade Better Auth.
+
+Changing an email shows the whole loop:
+
+1. Your app calls your route, `PATCH /account/email`.
+2. The route calls `plugins.betterAuth.changeEmail`, passing on the user's credential.
+3. Better Auth creates the token and calls `sendChangeEmailConfirmation`, which comes back to your API.
+4. Your function sends the email with `plugins.resend`.
+
+## In your API
+
+<InstallTabs packageName="@kizunajs/better-auth better-auth" />
+
+<Steps>
+
+<Step>
+
+### Create the client and the plugin
+
+Create Better Auth's client for your Better Auth app, and build the plugin around it. Add a client plugin for each Better Auth plugin your app runs, the way Better Auth's own [client docs](https://better-auth.com/docs/concepts/client) describe, and its endpoints are typed too:
+
+```ts title="src/better-auth.ts"
+import { createAuthClient } from 'better-auth/client';
+import { organizationClient } from 'better-auth/client/plugins';
+import { defineBetterAuthPlugin } from '@kizunajs/better-auth';
+
+export const authClient = createAuthClient({
+    baseURL: 'https://auth.example.com',
+    plugins: [organizationClient()],
+});
+
+export const betterAuthPlugin = defineBetterAuthPlugin({
+    client: authClient,
+});
+```
+
+Keep it in a module of its own. `kizuna generate` types `plugins.betterAuth` from `betterAuthPlugin`, so it needs a name to import.
+
+</Step>
+
+<Step>
+
+### Know who's calling
+
+An identity whose guard asks Better Auth for the session. Better Auth checks the token, and the guard hands your handlers the user:
+
+```ts title="src/identities.ts"
+import { authClient } from './better-auth';
+
+export const member = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+            token: z.string(),
+        }),
+    })
+    .guard(async ({ bearer, deny }) => {
+        if (bearer === null) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Sign in first',
+                },
+            });
+        }
+
+        const { data } = await authClient.getSession({
+            fetchOptions: {
+                headers: {
+                    authorization: `Bearer ${bearer.token}`,
+                },
+            },
+        });
+        if (data === null) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Sign in first',
+                },
+            });
+        }
+
+        return {
+            userId: data.user.id,
+            token: bearer.token,
+        };
+    });
+```
+
+The token rides along in the context, so routes can pass it on to Better Auth. The Better Auth app needs its [`bearer`](https://better-auth.com/docs/plugins/bearer) plugin to accept it. For browsers that sign in with cookies, see [Passing the user's credential](#passing-the-users-credential).
+
+</Step>
+
+<Step>
+
+### Write what each callback does
+
+Write the functions in a file of their own with `defineBetterAuthEvents`. Give it your `Config`, the way you give it to `new Kizuna<Config>()`, and `jobs` and `plugins` are typed from your app:
+
+```ts title="src/better-auth-events.ts"
+import { defineBetterAuthEvents } from '@kizunajs/better-auth';
+import type { Config } from '../kizuna.types';
+
+export const betterAuthEvents = defineBetterAuthEvents<Config>({
+    sendChangeEmailConfirmation: async ({ data, plugins }) => {
+        await plugins.resend.sendEmail({
+            to: data.user.email,
+            subject: 'Confirm your new email',
+            html: `<p>Change your email to ${data.newEmail}?</p><a href="${data.url}">Confirm</a>`,
+        });
+    },
+    sendResetPassword: async ({ data, plugins }) => {
+        await plugins.resend.sendEmail({
+            to: data.user.email,
+            subject: 'Reset your password',
+            html: `<a href="${data.url}">Reset your password</a>`,
+        });
+    },
+});
+```
+
+</Step>
+
+<Step>
+
+### Install the plugin
+
+The route Better Auth calls back on needs a caller too, so `auth` names the identity your Better Auth app signs in as, like a service token:
+
+```ts title="kizuna.config.ts"
+import { betterAuthPlugin } from './src/better-auth';
+import { betterAuthEvents } from './src/better-auth-events';
+
+export default defineConfig({
+    adapter: expressAdapter(),
+    routes,
+    auth: {
+        identities: {
+            member,
+            service,
+        },
+    },
+    plugins: [
+        resendPlugin({
+            apiKey: process.env.RESEND_API_KEY,
+            from: 'Kizuna <hello@example.com>',
+        }),
+        betterAuthPlugin({
+            auth: 'service',
+            on: betterAuthEvents,
+        }),
+    ],
+});
+```
+
+That serves `POST /better-auth/webhooks` for Better Auth's callbacks. A call without the identity is answered by its guard, and nothing runs. `auth: false` stops the app at startup, since an open route would let anyone send your emails.
+
+</Step>
+
+</Steps>
+
+## In your Better Auth app
+
+<InstallTabs packageName="@kizunajs/better-auth" />
+
+The `kizuna` plugin sends every callback to your API:
+
+```ts title="auth.ts"
+import { betterAuth } from 'better-auth';
+import { bearer } from 'better-auth/plugins';
+import { kizuna } from '@kizunajs/better-auth/client';
+
+export const auth = betterAuth({
+    emailAndPassword: {
+        enabled: true,
+    },
+    plugins: [
+        bearer(),
+        kizuna({
+            url: 'https://api.example.com/better-auth/webhooks',
+            headers: {
+                authorization: `Bearer ${process.env.KIZUNA_SERVICE_TOKEN}`,
+            },
+        }),
+    ],
+});
+```
+
+It sends your API everything Better Auth's core does:
+
+- **The emails:** `sendResetPassword`, `sendVerificationEmail`, `sendChangeEmailConfirmation` and `sendDeleteAccountVerification`.
+- **What happened:** `userCreated`, `userUpdated`, `userDeleted`, `emailVerified`, `passwordReset` and `sessionCreated`.
+
+It also turns on changing email and deleting accounts, since your API starts those. Anything you set yourself wins, `enabled: false` included.
+
+A Better Auth plugin's callbacks are that plugin's own options, so pass each one `forward` from `createForwarder`:
+
+```ts title="auth.ts"
+import { emailOTP, magicLink, organization } from 'better-auth/plugins';
+import { createForwarder, kizuna } from '@kizunajs/better-auth/client';
+
+const forwarding = {
+    url: 'https://api.example.com/better-auth/webhooks',
+    headers: {
+        authorization: `Bearer ${process.env.KIZUNA_SERVICE_TOKEN}`,
+    },
+};
+
+const forward = createForwarder(forwarding);
+
+export const auth = betterAuth({
+    plugins: [
+        organization({
+            sendInvitationEmail: forward('sendInvitationEmail'),
+        }),
+        magicLink({
+            sendMagicLink: forward('sendMagicLink'),
+        }),
+        emailOTP({
+            sendVerificationOTP: forward('sendVerificationOTP'),
+        }),
+        kizuna(forwarding),
+    ],
+});
+```
+
+The phone number plugin takes `forward('sendPhoneNumberOTP')` as `sendOTP` and `forward('sendPasswordResetOTP')`, and the two-factor plugin takes `forward('sendTwoFactorOTP')` as `otpOptions.sendOTP`. `forward` works for the core callbacks too, when you'd rather set them one at a time. When the credential changes, like a token that expires, pass `headers` as a function, and it runs before every call.
+
+`@kizunajs/better-auth/client` never imports `kizunajs`, so the Better Auth app installs nothing from your API.
+
+## What your routes can do
+
+`plugins.betterAuth` is your Better Auth client, so a route calls whatever Better Auth offers, passing on the user's credential in `fetchOptions`. The examples use this helper:
+
+```ts title="src/better-auth.ts"
+export const asUser = (token: string) => ({
+    fetchOptions: {
+        headers: {
+            authorization: `Bearer ${token}`,
+        },
+    },
+});
+```
+
+### Change an email
+
+```ts title="src/routes/account.ts"
+changeEmail: k
+    .route({
+        method: 'PATCH',
+        path: '/account/email',
+        auth: 'member',
+        body: z.object({
+            email: z.email(),
+        }),
+        responses: {
+            204: z.void(),
+        },
+    })
+    .handler(async ({ auth, body, plugins }) => {
+        await plugins.betterAuth.changeEmail({
+            newEmail: body.email,
+            ...asUser(auth.member.token),
+        });
+
+        return {
+            status: 204,
+            body: undefined,
+        };
+    }),
+```
+
+A verified user confirms from their current address through `sendChangeEmailConfirmation`, before Better Auth verifies the new one.
+
+### Reset a password
+
+Two routes that need no sign-in. The first emails the link through `sendResetPassword`, and the second sets the password with the token from it:
+
+```ts title="src/routes/account.ts"
+requestPasswordReset: k
+    .route({
+        method: 'POST',
+        path: '/account/password-reset',
+        auth: false,
+        body: z.object({
+            email: z.email(),
+        }),
+        responses: {
+            204: z.void(),
+        },
+    })
+    .handler(async ({ body, plugins }) => {
+        await plugins.betterAuth.requestPasswordReset({
+            email: body.email,
+            redirectTo: 'https://app.example.com/reset-password',
+        });
+
+        return {
+            status: 204,
+            body: undefined,
+        };
+    }),
+resetPassword: k
+    .route({
+        method: 'PUT',
+        path: '/account/password',
+        auth: false,
+        body: z.object({
+            token: z.string(),
+            newPassword: z.string(),
+        }),
+        responses: {
+            204: z.void(),
+        },
+    })
+    .handler(async ({ body, plugins }) => {
+        await plugins.betterAuth.resetPassword(body);
+
+        return {
+            status: 204,
+            body: undefined,
+        };
+    }),
+```
+
+`redirectTo` has to be one of Better Auth's `trustedOrigins`.
+
+### Delete an account
+
+```ts title="src/routes/account.ts"
+.handler(async ({ auth, plugins }) => {
+    await plugins.betterAuth.deleteUser(asUser(auth.member.token));
+
+    return {
+        status: 204,
+        body: undefined,
+    };
+}),
+```
+
+The account is deleted when the user follows the link `sendDeleteAccountVerification` sent, not before. To keep that step in your API too, send your own link with the `token`, and let a route pass it back:
+
+```ts title="src/routes/account.ts"
+await plugins.betterAuth.deleteUser({
+    token: body.token,
+    ...asUser(auth.member.token),
+});
+```
+
+Once it's gone, `userDeleted` tells your API, so it can clean up the user's data.
+
+### Invite to an organization
+
+Every endpoint a Better Auth plugin adds is there too, typed once its client plugin is on your client:
+
+```ts title="src/routes/organizations.ts"
+invite: k
+    .route({
+        method: 'POST',
+        path: '/organizations/:organizationId/invitations',
+        auth: 'member',
+        body: z.object({
+            email: z.email(),
+        }),
+        responses: {
+            204: z.void(),
+        },
+    })
+    .handler(async ({ auth, params, body, plugins }) => {
+        await plugins.betterAuth.organization.inviteMember({
+            organizationId: params.organizationId,
+            email: body.email,
+            role: 'member',
+            ...asUser(auth.member.token),
+        });
+
+        return {
+            status: 204,
+            body: undefined,
+        };
+    }),
+```
+
+The invitation email comes back to your `sendInvitationEmail` function.
+
+### Sign in with a magic link or a code
+
+With the magic link and email OTP plugins on your client, sign-in starts at your routes too, and the email goes out from your API:
+
+```ts title="src/routes/sign-in.ts"
+sendMagicLink: k
+    .route({
+        method: 'POST',
+        path: '/sign-in/magic-link',
+        auth: false,
+        body: z.object({
+            email: z.email(),
+        }),
+        responses: {
+            204: z.void(),
+        },
+    })
+    .handler(async ({ body, plugins }) => {
+        await plugins.betterAuth.signIn.magicLink({
+            email: body.email,
+        });
+
+        return {
+            status: 204,
+            body: undefined,
+        };
+    }),
+```
+
+A code works the same way through `plugins.betterAuth.emailOtp.sendVerificationOtp({ email, type: 'sign-in' })`, and arrives at your `sendVerificationOTP` function.
+
+### Anything else Better Auth does
+
+A "signed-in devices" screen is two routes over Better Auth's session endpoints:
+
+```ts title="src/routes/account.ts"
+.handler(async ({ auth, plugins }) => {
+    const { data } = await plugins.betterAuth.listSessions(asUser(auth.member.token));
+
+    return {
+        status: 200,
+        body: (data ?? []).map((session) => ({
+            id: session.id,
+            userAgent: session.userAgent ?? null,
+        })),
+    };
+}),
+```
+
+`plugins.betterAuth.revokeSession` signs one of them out. Whatever plugins your Better Auth app runs, your routes can call, once their client plugin is on your client.
+
+### Better Auth's errors
+
+Better Auth's client answers with `{ data, error }` instead of throwing. Turn an `error` into one of your route's declared responses, here a `422`:
+
+```ts title="src/routes/account.ts"
+const { error } = await plugins.betterAuth.changeEmail({
+    newEmail: body.email,
+    ...asUser(auth.member.token),
+});
+if (error) {
+    return throwError({
+        status: 422,
+        body: {
+            detail: error.message ?? 'The email could not be changed.',
+        },
+    });
+}
+```
+
+## React to what users do
+
+Better Auth tells your API what happened, after it has happened, so your API keeps its own data in step. Create a profile and queue the welcome email when someone signs up:
+
+```ts title="src/better-auth-events.ts"
+export const betterAuthEvents = defineBetterAuthEvents<Config>({
+    userCreated: async ({ data, jobs }) => {
+        await db.profiles.create({
+            userId: data.user.id,
+            displayName: data.user.name,
+        });
+
+        await jobs.users.sendWelcomeEmail.queue({
+            input: {
+                userId: data.user.id,
+            },
+        });
+    },
+    userDeleted: async ({ data }) => {
+        await db.profiles.delete(data.user.id);
+    },
+});
+```
+
+`sessionCreated` arrives on each sign-in, with the session's `ipAddress` and `userAgent`, for a "new sign-in to your account" email. Its token stays with Better Auth.
+
+These arrive from the `kizuna` plugin. A delivery your API doesn't take is logged in the Better Auth app and not sent again, and the user's sign-up or sign-in goes through as usual. If you set your own `afterEmailVerification` or `onPasswordReset`, yours wins, so call `forward('emailVerified')` or `forward('passwordReset')` inside it.
+
+## Passing the user's credential
+
+Better Auth checks every call against the credential it carries, so a route passes on the one its user sent.
+
+- **A bearer token**, the way the Swift and Kotlin clients send it, goes in `authorization`. The Better Auth app runs its `bearer` plugin.
+- **A browser's cookie** goes in `cookie`, together with the request's `origin`. Better Auth refuses a call that carries a cookie unless its `origin` is one of its `trustedOrigins`, so pass the browser's own:
+
+    ```ts
+    fetchOptions: {
+        headers: {
+            cookie: headers.cookie,
+            origin: headers.origin,
+        },
+    },
+    ```
+
+Better Auth rate-limits by IP address, and every call from your API arrives from the API's address. See Better Auth's [`advanced.ipAddress`](https://better-auth.com/docs/reference/options) options for passing the user's address along.
+
+## The events
+
+Each function receives:
+
+| Argument  | What it is                                            |
+| --------- | ----------------------------------------------------- |
+| `event`   | The event's name, like `sendResetPassword`            |
+| `data`    | What Better Auth passed the callback, as JSON         |
+| `jobs`    | Your app's jobs, to queue work                        |
+| `plugins` | Your installed plugins, `plugins.betterAuth` included |
+
+Better Auth asks your API to send something:
+
+| Event                           | Better Auth option                              | `data`                                                         |
+| ------------------------------- | ----------------------------------------------- | -------------------------------------------------------------- |
+| `sendResetPassword`             | `emailAndPassword.sendResetPassword`            | `user`, `url`, `token`                                         |
+| `sendVerificationEmail`         | `emailVerification.sendVerificationEmail`       | `user`, `url`, `token`                                         |
+| `sendChangeEmailConfirmation`   | `user.changeEmail.sendChangeEmailConfirmation`  | `user`, `newEmail`, `url`, `token`                             |
+| `sendDeleteAccountVerification` | `user.deleteUser.sendDeleteAccountVerification` | `user`, `url`, `token`                                         |
+| `sendInvitationEmail`           | `organization({ sendInvitationEmail })`         | `id`, `email`, `role`, `organization`, `inviter`, `invitation` |
+| `sendMagicLink`                 | `magicLink({ sendMagicLink })`                  | `email`, `url`, `token`, `metadata`                            |
+| `sendVerificationOTP`           | `emailOTP({ sendVerificationOTP })`             | `email`, `otp`, `type`                                         |
+| `sendPhoneNumberOTP`            | `phoneNumber({ sendOTP })`                      | `phoneNumber`, `code`                                          |
+| `sendPasswordResetOTP`          | `phoneNumber({ sendPasswordResetOTP })`         | `phoneNumber`, `code`                                          |
+| `sendTwoFactorOTP`              | `twoFactor({ otpOptions: { sendOTP } })`        | `user`, `otp`                                                  |
+
+Better Auth tells your API what happened:
+
+| Event            | When                                   | `data`    |
+| ---------------- | -------------------------------------- | --------- |
+| `userCreated`    | Someone signed up                      | `user`    |
+| `userUpdated`    | A user changed, like their name        | `user`    |
+| `userDeleted`    | A user was deleted                     | `user`    |
+| `emailVerified`  | A user verified their email            | `user`    |
+| `passwordReset`  | A user set a new password from a reset | `user`    |
+| `sessionCreated` | A user signed in                       | `session` |
+
+`data` is what Better Auth handed the callback, typed from Better Auth's own types, so a field Better Auth adds reaches your functions typed when you upgrade. It travels as JSON: dates arrive as ISO strings, and anything JSON can't carry, like functions, is left out. Better Auth's `request` argument is never sent. The route checks that the body is an event, and one with no function is acknowledged and dropped.
+
+### Your own user fields
+
+`data.user` is the user as your Better Auth client knows it. Add your `additionalFields` to the client with Better Auth's `inferAdditionalFields`, and they're typed in every event too:
+
+```ts title="src/better-auth.ts"
+import { inferAdditionalFields } from 'better-auth/client/plugins';
+
+export const authClient = createAuthClient({
+    baseURL: 'https://auth.example.com',
+    plugins: [
+        inferAdditionalFields({
+            user: {
+                plan: {
+                    type: 'string',
+                },
+            },
+        }),
+    ],
+});
+```
+
+```ts title="src/better-auth-events.ts"
+export const betterAuthEvents = defineBetterAuthEvents<Config>({
+    sendVerificationEmail: async ({ data, plugins }) => {
+        await plugins.resend.sendEmail({
+            to: data.user.email,
+            subject: data.user.plan === 'pro' ? 'Welcome to Pro' : 'Verify your email',
+            html: `<a href="${data.url}">Verify your email</a>`,
+        });
+    },
+});
+```
+
+In a monorepo, `inferAdditionalFields<typeof auth>()` reads the fields from your Better Auth app's own type instead.
+
+### When an event fails
+
+An email event your API doesn't answer with `2xx` throws in the Better Auth app, naming the event and the status. Better Auth logs what a callback throws and answers the request as usual, so a user asking for a password reset never learns whether the email went out. Watch the Better Auth app's logs.
+
+Better Auth waits for the callback before it answers, so keep your functions quick. For anything slow, queue a [job](/docs/jobs) and return.
+
+## Moving the route
+
+The plugin serves its callback route under `/better-auth`. When that clashes with your own routes, pass another base path, and point the Better Auth app at it:
+
+```ts title="kizuna.config.ts"
+betterAuthPlugin({
+    auth: 'service',
+    on: betterAuthEvents,
+    basePath: '/integrations/better-auth',
+}),
+```
+
+The route is [hidden](/docs/routes#hidden-routes), so it stays out of your clients and the OpenAPI document.
+
+## Options
+
+`defineBetterAuthPlugin`:
+
+| Option   | Default  | Description                                                                                 |
+| -------- | -------- | ------------------------------------------------------------------------------------------- |
+| `client` | required | Your Better Auth client, from `createAuthClient`. Handlers reach it at `plugins.betterAuth` |
+
+The plugin it returns:
+
+| Option     | Default        | Description                                                              |
+| ---------- | -------------- | ------------------------------------------------------------------------ |
+| `auth`     | required       | The identity the Better Auth app calls with, written as a route's `auth` |
+| `on`       | required       | A function per callback, built with `defineBetterAuthEvents`             |
+| `basePath` | `/better-auth` | Where the callback route is served                                       |
+
+`kizuna` and `createForwarder`:
+
+| Option    | Default  | Description                                                                        |
+| --------- | -------- | ---------------------------------------------------------------------------------- |
+| `url`     | required | The callback route's full URL, like `https://api.example.com/better-auth/webhooks` |
+| `headers` | none     | Sent with every call, or a function that returns them before each one              |

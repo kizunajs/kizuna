@@ -64,6 +64,7 @@ Follow the [quickstart](https://kizunajs.com/docs/quickstart), which goes from a
 | `@kizunajs/kotlin`         | Kotlin client generation                           |
 | `@kizunajs/mcp`            | MCP endpoint for AI assistants                     |
 | `@kizunajs/resend`         | Email, newsletters and webhooks through Resend     |
+| `@kizunajs/better-auth`    | User flows in your API, run by Better Auth         |
 | `@kizunajs/eslint-plugin`  | ESLint rules                                       |
 | `@kizunajs/cli`            | Command line tooling                               |
 

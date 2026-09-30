@@ -1,0 +1,96 @@
+{
+  "name": "@kizunajs/better-auth",
+  "version": "2.0.0-beta.15",
+  "private": true,
+  "description": "Better Auth plugin for Kizuna.js",
+  "keywords": [
+    "kizunajs",
+    "typescript",
+    "zod",
+    "openapi",
+    "spec-driven",
+    "type-safe",
+    "rest",
+    "api",
+    "better-auth",
+    "auth",
+    "email"
+  ],
+  "license": "MIT",
+  "homepage": "https://kizunajs.com/docs/better-auth",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
+    "directory": "packages/better-auth"
+  },
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./client": {
+      "import": {
+        "types": "./dist/client.d.mts",
+        "default": "./dist/client.mjs"
+      },
+      "require": {
+        "types": "./dist/client.d.cts",
+        "default": "./dist/client.cjs"
+      }
+    }
+  },
+  "kizuna": {
+    "entries": {
+      ".": "server",
+      "./client": "client"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts src/client.ts --format esm,cjs --dts --clean --external kizunajs --external zod --external better-auth",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "better-auth": "^1.0.0",
+    "kizunajs": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "kizunajs": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@kizunajs/express": "workspace:*",
+    "@types/express": "catalog:",
+    "better-auth": "^1.7.6",
+    "express": "catalog:",
+    "kizunajs": "workspace:*",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

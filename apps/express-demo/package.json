@@ -21,7 +21,9 @@
     "@kizunajs/mcp": "workspace:*",
     "@kizunajs/openapi": "workspace:*",
     "@kizunajs/resend": "workspace:*",
+    "@kizunajs/better-auth": "workspace:*",
     "express": "catalog:",
+    "better-auth": "^1.7.6",
     "resend": "^6.30.0",
     "zod": "catalog:"
   },

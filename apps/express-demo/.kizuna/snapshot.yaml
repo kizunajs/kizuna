@@ -2356,6 +2356,85 @@ routes:
             optional: false
             schema:
               kind: string
+  betterAuth.webhook:
+    method: POST
+    path: /better-auth/webhooks
+    statuses:
+      - 204
+      - 401
+      - 403
+    deprecated: false
+    hidden: true
+    body:
+      kind: object
+      fields:
+        event:
+          optional: false
+          schema:
+            kind: string
+        data:
+          optional: false
+          schema:
+            kind: record
+    responses:
+      "204":
+        kind: void
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
 jobs:
   - users.indexUser
   - users.sendDigests

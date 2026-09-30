@@ -25,6 +25,7 @@
         "openapi",
         "mcp",
         "resend",
+        "better-auth",
         "---Tooling---",
         "cli",
         "eslint",

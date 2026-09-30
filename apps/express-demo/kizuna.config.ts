@@ -12,6 +12,8 @@ import { contact } from './src/routes/contact';
 import { newsletter } from './src/routes/newsletter';
 import { emailPlugin } from './src/plugins/email';
 import { resendEvents } from './src/resend-events';
+import { betterAuthPlugin } from './src/better-auth';
+import { betterAuthEvents } from './src/better-auth-events';
 
 /**
  * The shared routes every demo serves, plus the ones only this demo can answer.
@@ -100,6 +102,10 @@ export default defineConfig({
             },
             webhookSecret: process.env.RESEND_WEBHOOK_SECRET ?? 'whsec_ZGVtbw==',
             on: resendEvents,
+        }),
+        betterAuthPlugin({
+            auth: 'scheduler',
+            on: betterAuthEvents,
         }),
     ],
 });

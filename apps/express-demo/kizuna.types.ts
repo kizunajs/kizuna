@@ -9,6 +9,7 @@ import type { openApiPlugin } from '@kizunajs/openapi';
 import type { resendPlugin } from '@kizunajs/resend';
 import type { GuardSchema, analytics, jobs, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
 import type { emailPlugin } from './src/plugins/email';
+import type { betterAuthPlugin } from './src/better-auth';
 
 export interface Config {
     adapter: ReturnType<typeof expressAdapter>;
@@ -34,5 +35,6 @@ export interface Config {
         ReturnType<typeof openApiPlugin>,
         ReturnType<typeof emailPlugin>,
         ReturnType<typeof resendPlugin>,
+        ReturnType<typeof betterAuthPlugin>,
     ];
 }
