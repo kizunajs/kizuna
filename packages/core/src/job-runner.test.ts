@@ -53,6 +53,9 @@ const contract = defineConfig({
             },
         }),
     }),
+    jobRunner: {
+        mode: 'http',
+    },
     jobs,
 }).api;
 
@@ -229,6 +232,9 @@ describe('createJobRunner', () => {
         const nestedContract = defineConfig({
             ...config,
             routes: k.routes({}),
+            jobRunner: {
+                mode: 'http',
+            },
             jobs: nested,
         }).api;
         const runner = createJobRunner(nestedContract, {

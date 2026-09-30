@@ -115,6 +115,9 @@ const contract = defineConfig({
             },
         }),
     }),
+    jobRunner: {
+        mode: 'http',
+    },
     jobs,
 }).api;
 
@@ -187,6 +190,9 @@ test('a nested job tree keeps its shape', () => {
     const nestedContract = defineConfig({
         ...config,
         routes: k.routes({}),
+        jobRunner: {
+            mode: 'http',
+        },
         jobs: nested,
     }).api;
     type NestedHandlers = JobHandlers<NonNullable<(typeof nestedContract)['jobs']>>;
@@ -221,11 +227,31 @@ test('jobs declared without an identity still get a runner', () => {
         ...bareConfig,
         routes: bare.routes({}),
         jobs: publicJobs,
+        jobRunner: {
+            mode: 'in-process',
+        },
     }).api;
     type BareHandlers = JobHandlers<NonNullable<(typeof bareContract)['jobs']>>;
     type Args = Parameters<BareHandlers['cleanup']>[0];
     expectTypeOf<Args>().not.toHaveProperty('auth');
     expectTypeOf<Args>().toHaveProperty('jobs');
+});
+
+test('jobs that run in process take none of the endpoint options', () => {
+    defineConfig({
+        ...config,
+        routes: k.routes({}),
+        jobs: k.jobs('scheduler', {
+            cleanup: k.job({
+                schedule: '0 3 * * *',
+            }),
+        }),
+        jobRunner: {
+            mode: 'in-process',
+            // @ts-expect-error `path` shapes the endpoints, which in process are not served
+            path: '/jobs',
+        },
+    });
 });
 
 test('a handler may be async or sync', () => {

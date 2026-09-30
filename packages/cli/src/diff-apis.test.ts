@@ -198,6 +198,9 @@ describe('what a document cannot carry', () => {
                 input: z.object({ month: z.string() }),
             },
         }),
+        jobRunner: {
+            mode: 'in-process',
+        },
     }).api;
 
     const withoutJob = defineConfig({

@@ -99,6 +99,9 @@ const contract = defineConfig({
     ...config,
     adapter: nextAdapter(),
     routes,
+    jobRunner: {
+        mode: 'http',
+    },
     jobs,
 }).api;
 
@@ -160,6 +163,35 @@ describe('the dispatch endpoint', () => {
 
     it('404s a path that is neither a route nor the dispatch endpoint', async () => {
         const response = await GET(new NextRequest('http://localhost:3000/api/nope'));
+        expect(response.status).toBe(404);
+    });
+});
+
+describe('jobs that run in process', () => {
+    const closed = defineConfig({
+        ...config,
+        adapter: nextAdapter(),
+        routes,
+        jobs: k.jobs({
+            sendDigests: k
+                .job({
+                    schedule: '* * * * *',
+                })
+                .handler(() => {}),
+        }),
+        jobRunner: {
+            mode: 'in-process',
+        },
+    }).api.mount({
+        basePath: '/api',
+    });
+
+    it.each([['/api/jobs/dispatch'], ['/api/jobs/run']])('mounts nothing at %s', async (path) => {
+        const response = await closed.POST(
+            new NextRequest(`http://localhost:3000${path}`, {
+                method: 'POST',
+            })
+        );
         expect(response.status).toBe(404);
     });
 });

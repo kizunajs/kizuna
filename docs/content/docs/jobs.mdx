@@ -98,6 +98,9 @@ export default defineConfig({
     adapter: expressAdapter(),
     routes,
     jobs,
+    jobRunner: {
+        mode: 'http',
+    },
     auth: {
         identities: {
             scheduler,
@@ -106,7 +109,7 @@ export default defineConfig({
 });
 ```
 
-The identity `k.jobs` names carries its own guard, so nothing else is wired here.
+The identity `k.jobs` names carries its own guard, so nothing else is wired here. `mode` says how the jobs run, and [Setting it up](#setting-it-up) walks through each.
 
 </Step>
 
@@ -213,7 +216,21 @@ A job's handler receives the same runner, so a scheduled job can queue one job p
 
 No queue. `startJobs` watches the clock, and a queued job runs right here.
 
-A job that fails after the response has gone needs somewhere to report:
+Nothing outside the process calls the [job endpoints](#the-two-job-endpoints), so the jobs take no identity:
+
+```ts title="src/jobs.ts"
+export const jobs = k.jobs({
+    sendDigests: k
+        .job({
+            schedule: cron.daily('05:00'),
+        })
+        .handler(async () => {
+            await mailer.sendDigests();
+        }),
+});
+```
+
+`mode: 'in-process'` leaves the endpoints unmounted. A job that fails after the response has gone needs somewhere to report:
 
 ```ts title="kizuna.config.ts"
 export default defineConfig({
@@ -221,6 +238,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
+        mode: 'in-process',
         onError: (job, error) => Sentry.captureException(error, { tags: { job } }),
     },
 });
@@ -250,6 +268,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
+        mode: 'in-process',
         transport: bullmq(connection),
     },
 });
@@ -270,7 +289,7 @@ const worker = await startJobWorker(kizuna.api);
 process.on('SIGTERM', () => void worker?.stop());
 ```
 
-More than one instance is fine, as long as the queue drops repeated keys. You can also drop `startJobs` and hand the schedules to the queue's own scheduler with [`register`](/docs/extend/create-job-transport#register).
+A queue that calls your job's URL instead delivers to `/jobs/run`, so it needs `mode: 'http'` and an identity. More than one instance is fine, as long as the queue drops repeated keys. You can also drop `startJobs` and hand the schedules to the queue's own scheduler with [`register`](/docs/extend/create-job-transport#register).
 
 </Tab>
 
@@ -289,6 +308,7 @@ export default defineConfig({
         },
     },
     jobRunner: {
+        mode: 'http',
         method: 'GET',
     },
 });
@@ -315,6 +335,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
+        mode: 'http',
         transport: qstash({
             token: process.env.QSTASH_TOKEN,
             baseUrl: 'https://api.example.com',
@@ -338,6 +359,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
+        mode: 'http',
         transport: myQueue,
     },
 });
@@ -371,15 +393,18 @@ A job is addressed by its dotted key, so a transport carries the name and the in
 
 Configure both under `jobRunner` on [`defineConfig`](/docs/reference/define-config), beside the `transport` and `onError` above:
 
-| Option     | Default | Description                                        |
-| ---------- | ------- | -------------------------------------------------- |
-| `path`     | `/jobs` | The namespace both are mounted under               |
-| `method`   | `POST`  | `/jobs/dispatch`'s method. `'GET'` for Vercel Cron |
-| `windowMs` | `60000` | How far back a tick looks for due jobs             |
-| `only`     | none    | Dispatch only these jobs                           |
-| `exclude`  | none    | Never dispatch these                               |
+| Option     | Default  | Description                                        |
+| ---------- | -------- | -------------------------------------------------- |
+| `mode`     | required | `'http'` serves both, `'in-process'` neither       |
+| `path`     | `/jobs`  | The namespace both are mounted under               |
+| `method`   | `POST`   | `/jobs/dispatch`'s method. `'GET'` for Vercel Cron |
+| `windowMs` | `60000`  | How far back a tick looks for due jobs             |
+| `only`     | none     | Dispatch only these jobs                           |
+| `exclude`  | none     | Never dispatch these                               |
 
 `method` moves `/jobs/dispatch` only: `/jobs/run` takes a body, so it is always `POST`. Nothing is served on `/jobs` itself.
+
+`mode: 'in-process'` serves neither, for a long-running server whose schedules `startJobs` ticks. It takes none of the options below `mode`, and its jobs need no identity. Served endpoints do need one, so `defineConfig` throws when jobs without an identity would be reachable. Use `'http'` when a transport delivers to `/jobs/run` or platform cron ticks `/jobs/dispatch`.
 
 A tick runs each due job inline, in the request the scheduler made, so the function's timeout is the budget for all of them. Keep the tick short by having a scheduled job queue one job per unit of work:
 

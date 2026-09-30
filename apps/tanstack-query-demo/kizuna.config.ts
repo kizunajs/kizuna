@@ -23,6 +23,9 @@ export default defineConfig({
         issueCodes: ['invalid_phone_number'],
     },
     routes,
+    jobRunner: {
+        mode: 'http',
+    },
     jobs,
     clients: [
         fetchClient({

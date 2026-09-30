@@ -43,7 +43,7 @@ kizuna.api.mount(app);
 | `requestContext` | What every route resolves before its guards run, declared with [`k.requestContext`](/docs/reference/k-request-context).                                                       |
 | `validation`     | How a request is checked: `issueCodes`, the `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                     |
 | `jobs`           | Scheduled work, declared with [`k.jobs`](/docs/reference/k-jobs).                                                                                                             |
-| `jobRunner`      | How this deployment runs them: `path`, `method`, `transport`, `onError`. See [Jobs](/docs/jobs).                                                                              |
+| `jobRunner`      | How this deployment runs them: `mode`, `path`, `method`, `transport`, `onError`. See [Jobs](/docs/jobs).                                                                      |
 | `plugins`        | What this API installs beside its own routes, as a list. See [Create a Plugin](/docs/extend/create-plugin).                                                                   |
 | `tags`           | The OpenAPI tags routes are grouped under, from [`k.tags`](/docs/reference/k-tags).                                                                                           |
 | `typescript`     | Where `kizuna generate` writes the `Config`, as `{ outputFile }`.                                                                                                             |
@@ -99,10 +99,13 @@ export default defineConfig({
     adapter: expressAdapter(),
     routes,
     jobs,
+    jobRunner: {
+        mode: 'http',
+    },
 });
 ```
 
-A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin and MCP surfaces. See [Jobs](/docs/jobs).
+`jobRunner` is required once `jobs` declares one, and its `mode` says how they run: `'http'` serves the two job endpoints, `'in-process'` leaves them unmounted for `startJobs` to tick. A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin and MCP surfaces. See [Jobs](/docs/jobs).
 
 ## Plugins
 

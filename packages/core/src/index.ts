@@ -95,6 +95,8 @@ export {
     type JobHandlerReturn,
     type JobsArg,
     type JobsConfig,
+    type HttpJobsConfig,
+    type InProcessJobsConfig,
     type CompiledJobs,
     type FlattenedJob,
     type NoJobs,

@@ -433,6 +433,9 @@ export const pluginTypeContract = defineConfig({
             },
         }),
     }),
+    jobRunner: {
+        mode: 'http',
+    },
     jobs: pluginTypeK.jobs({
         reindex: pluginTypeK.job({
             summary: 'Re-index one record',

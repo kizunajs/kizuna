@@ -102,6 +102,9 @@ const contract = defineConfig({
     ...config,
     adapter: fastifyAdapter(),
     routes,
+    jobRunner: {
+        mode: 'http',
+    },
     jobs,
 }).api;
 
@@ -186,5 +189,39 @@ describe('the dispatch endpoint', () => {
         });
         expect(response.statusCode).toBe(200);
         expect(response.json()).toEqual(['ada']);
+    });
+});
+
+describe('jobs that run in process', () => {
+    const buildClosedApp = async () => {
+        const { api } = defineConfig({
+            ...config,
+            adapter: fastifyAdapter(),
+            routes,
+            jobs: k.jobs({
+                sendDigests: k
+                    .job({
+                        schedule: '* * * * *',
+                    })
+                    .handler(() => {}),
+            }),
+            jobRunner: {
+                mode: 'in-process',
+            },
+        });
+        const app = Fastify();
+        await api.mount(app);
+        await app.ready();
+        return app;
+    };
+
+    it.each([['/jobs/dispatch'], ['/jobs/run']])('mounts nothing at %s', async (path) => {
+        const response = await (
+            await buildClosedApp()
+        ).inject({
+            method: 'POST',
+            url: path,
+        });
+        expect(response.statusCode).toBe(404);
     });
 });
