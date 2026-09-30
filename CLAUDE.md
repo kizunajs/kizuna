@@ -31,6 +31,12 @@ Kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RFCs 
 
 Every GET route answers HEAD (RFC 9110 section 9.3.2): same status and headers, `Content-Length`, no body. A declared HEAD route takes the path instead, and HEAD joins GET in every `Allow` header. The derived route stays out of the OpenAPI document and the clients; the generator's `derivedHead` option opts it in. Express, Fastify, and Hono discard HEAD content themselves; Next passes the request method to `renderJsonResult`, which strips it.
 
+### Validation
+
+Kizuna owns 400. A route declaring one makes `defineConfig` throw. Plugin routes included: the Resend webhook answers a bad signature with `throwValidation`, which is the 400 Svix's and Stripe's receiver samples answer. Every 400 is a `ValidationError`: the schema's failures, a body that is not JSON (`invalid_json`), and what a handler raises with `throwValidation` for input only it can judge. A clash with stored state is a declared `409: ValidationErrorSchema`, thrown with `throwError`, same body. Issue codes are kizuna's own vocabulary (`packages/core/src/validation-error.ts`), never Zod's, and the rule's values sit flat on the issue. The app writes the words; the API translates nothing.
+
+The body keeps `type: about:blank` beside `errors`. RFC 9457 says extension members belong to a defined problem type and that `about:blank` carries no semantics beyond the status. This is a deliberate deviation: no response names the framework, nobody hosts problem pages for an internal API, and consumers must never dereference `type` anyway. A handler may set its own `type` on a problem body it writes.
+
 ### Deliberate omissions
 
 - **TRACE**: excluded from `Method`. Universally disabled in production and unsupported by modern frameworks. Do not add it.

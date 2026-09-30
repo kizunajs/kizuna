@@ -41,6 +41,22 @@ export {
 } from './zod-internals.js';
 
 export { deprecationHeaders } from './deprecation.js';
+export {
+    readRequestRules,
+    readSchemaRules,
+    validatesRequest,
+    type RequestRules,
+    type RuleNode,
+    type RuleMessages,
+} from './request-rules.js';
+export {
+    BUILTIN_VALIDATION_ISSUE_CODES,
+    VALIDATION_ISSUE_FIELDS,
+    ValidationIssueSchema,
+    type BuiltinIssueCode,
+    type IssueFieldType,
+    type IssueLiteral,
+} from './validation-error.js';
 export { toToolName, deriveToolNames, type ToolOrigin, type ToolNameEntry } from './tool-name.js';
 export {
     streamMode,

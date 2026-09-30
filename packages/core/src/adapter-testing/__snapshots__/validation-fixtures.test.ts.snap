@@ -1,0 +1,303 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`validation fixtures > body-every-rule 1`] = `
+{
+  "detail": "Invalid request body",
+  "errors": [
+    {
+      "code": "too_short",
+      "message": "Name is required",
+      "minimum": 1,
+      "path": [
+        "name",
+      ],
+    },
+    {
+      "code": "invalid_format",
+      "format": "email",
+      "message": "Enter a valid mail address",
+      "path": [
+        "mail",
+      ],
+    },
+    {
+      "code": "pattern_mismatch",
+      "message": "Four digits",
+      "path": [
+        "postalCode",
+      ],
+      "pattern": "^\\d{4}$",
+    },
+    {
+      "code": "too_small",
+      "inclusive": true,
+      "message": "Too small: expected number to be >=18",
+      "minimum": 18,
+      "path": [
+        "age",
+      ],
+    },
+    {
+      "code": "not_multiple_of",
+      "divisor": 0.5,
+      "message": "Invalid number: must be a multiple of 0.5",
+      "path": [
+        "price",
+      ],
+    },
+    {
+      "code": "not_one_of",
+      "message": "Invalid option: expected one of "admin"|"member"",
+      "path": [
+        "role",
+      ],
+      "values": [
+        "admin",
+        "member",
+      ],
+    },
+    {
+      "code": "too_few",
+      "message": "Too small: expected array to have >=1 items",
+      "minimum": 1,
+      "path": [
+        "tags",
+      ],
+    },
+    {
+      "code": "required",
+      "message": "Invalid input: expected boolean, received undefined",
+      "path": [
+        "newsletter",
+      ],
+    },
+    {
+      "code": "wrong_length",
+      "length": 4,
+      "message": "Too small: expected string to have >=4 characters",
+      "path": [
+        "address",
+        "zip",
+      ],
+    },
+    {
+      "code": "unknown_key",
+      "keys": [
+        "extra",
+      ],
+      "message": "Unrecognized key: "extra"",
+      "path": [
+        "address",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`validation fixtures > body-nested-and-indexed 1`] = `
+{
+  "detail": "Invalid request body",
+  "errors": [
+    {
+      "code": "wrong_length",
+      "length": 4,
+      "message": "Too small: expected string to have >=4 characters",
+      "path": [
+        "address",
+        "zip",
+      ],
+    },
+    {
+      "code": "invalid_format",
+      "format": "email",
+      "message": "Invalid email address",
+      "path": [
+        "members",
+        "1",
+        "email",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`validation fixtures > body-wrong-types 1`] = `
+{
+  "detail": "Invalid request body",
+  "errors": [
+    {
+      "code": "invalid_type",
+      "expected": "string",
+      "message": "Invalid input: expected string, received number",
+      "path": [
+        "name",
+      ],
+    },
+    {
+      "code": "invalid_type",
+      "expected": "string",
+      "message": "Enter a valid mail address",
+      "path": [
+        "mail",
+      ],
+    },
+    {
+      "code": "invalid_type",
+      "expected": "string",
+      "message": "Invalid input: expected string, received null",
+      "path": [
+        "postalCode",
+      ],
+    },
+    {
+      "code": "invalid_type",
+      "expected": "number",
+      "message": "Invalid input: expected number, received string",
+      "path": [
+        "age",
+      ],
+    },
+    {
+      "code": "invalid_type",
+      "expected": "number",
+      "message": "Invalid input: expected number, received string",
+      "path": [
+        "price",
+      ],
+    },
+    {
+      "code": "not_one_of",
+      "message": "Invalid option: expected one of "admin"|"member"",
+      "path": [
+        "role",
+      ],
+      "values": [
+        "admin",
+        "member",
+      ],
+    },
+    {
+      "code": "invalid_type",
+      "expected": "array",
+      "message": "Invalid input: expected array, received string",
+      "path": [
+        "tags",
+      ],
+    },
+    {
+      "code": "invalid_type",
+      "expected": "boolean",
+      "message": "Invalid input: expected boolean, received string",
+      "path": [
+        "newsletter",
+      ],
+    },
+    {
+      "code": "invalid_type",
+      "expected": "object",
+      "message": "Invalid input: expected object, received array",
+      "path": [
+        "address",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`validation fixtures > coerced-param-too-small 1`] = `
+{
+  "detail": "Invalid path parameters",
+  "errors": [
+    {
+      "code": "too_small",
+      "inclusive": true,
+      "message": "Too small: expected number to be >=1",
+      "minimum": 1,
+      "path": [
+        "id",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`validation fixtures > coerced-query-invalid-type 1`] = `
+{
+  "detail": "Invalid query parameters",
+  "errors": [
+    {
+      "code": "invalid_type",
+      "expected": "number",
+      "message": "Invalid input: expected number, received string",
+      "path": [
+        "page",
+      ],
+    },
+    {
+      "code": "too_big",
+      "inclusive": true,
+      "maximum": 100,
+      "message": "Too big: expected number to be <=100",
+      "path": [
+        "limit",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`validation fixtures > first-failing-stage-only 1`] = `
+{
+  "detail": "Invalid query parameters",
+  "errors": [
+    {
+      "code": "invalid_type",
+      "expected": "boolean",
+      "message": "Invalid input: expected boolean, received string",
+      "path": [
+        "dryRun",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`validation fixtures > header-required 1`] = `
+{
+  "detail": "Invalid headers",
+  "errors": [
+    {
+      "code": "required",
+      "message": "Invalid input: expected string, received undefined",
+      "path": [
+        "x-trace",
+      ],
+    },
+  ],
+}
+`;
+
+exports[`validation fixtures > urlencoded-body-coerced 1`] = `
+{
+  "detail": "Invalid request body",
+  "errors": [
+    {
+      "code": "too_small",
+      "inclusive": true,
+      "message": "Too small: expected number to be >=18",
+      "minimum": 18,
+      "path": [
+        "age",
+      ],
+    },
+    {
+      "code": "invalid_type",
+      "expected": "boolean",
+      "message": "Invalid input: expected boolean, received string",
+      "path": [
+        "newsletter",
+      ],
+    },
+  ],
+}
+`;

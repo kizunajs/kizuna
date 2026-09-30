@@ -519,3 +519,50 @@ describe('body is not coerced', () => {
         expect(result.ok).toBe(false);
     });
 });
+
+describe('form body coercion', () => {
+    it('converts a form body the way it converts query values', () => {
+        const route = makeRoute({
+            method: 'POST',
+            contentType: 'application/x-www-form-urlencoded',
+            body: z.object({
+                age: z.number(),
+                newsletter: z.boolean(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                age: '42',
+                newsletter: 'true',
+            },
+            headers: {},
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.parsed.body).toEqual({
+                age: 42,
+                newsletter: true,
+            });
+        }
+    });
+
+    it('leaves a JSON body as sent', () => {
+        const route = makeRoute({
+            method: 'POST',
+            body: z.object({
+                age: z.number(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                age: '42',
+            },
+            headers: {},
+        });
+        expect(result.ok).toBe(false);
+    });
+});

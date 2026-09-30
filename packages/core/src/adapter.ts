@@ -23,6 +23,7 @@ import { deprecationHeaders } from './deprecation.js';
 import { cacheHeaders } from './cache.js';
 import { computeEtag, etagMatches } from './etag.js';
 import { ResponseError } from './response-error.js';
+import { HandlerValidationError, type HandlerIssue, type ValidationIssue } from './validation-error.js';
 import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
@@ -263,6 +264,7 @@ export const HANDLER_ARG_KEYS = [
     'body',
     'headers',
     'throwError',
+    'throwValidation',
     'auth',
     'requestContext',
     'plugins',
@@ -706,9 +708,12 @@ export type AdapterResult =
       }
     | {
           kind: 'validation-failed';
-          stage: ValidationStage;
+          /**
+           * The part that failed, or `handler` for issues raised with `throwValidation`.
+           */
+          stage: ValidationStage | 'handler';
           detail: string;
-          issues: z.core.$ZodIssue[];
+          issues: ValidationIssue<string>[];
           headers?: ResponseHeaders;
       }
     | {
@@ -1251,7 +1256,7 @@ const routedPipeline = async <NativeRequest, HandlerContext, ResponseContext>(
             } catch {
                 return {
                     kind: 'invalid-body',
-                    detail: 'Bad Request',
+                    detail: 'Invalid request body',
                 };
             }
         }
@@ -1470,6 +1475,9 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
         const throwError = (response: { status: number; body: unknown; headers?: ResponseHeaders }): never => {
             throw new ResponseError(response);
         };
+        const throwValidation = (issues: HandlerIssue[]): never => {
+            throw new HandlerValidationError(issues);
+        };
         const tools = streamToolsOfRoute(route);
         const handlerResult = await (
             handler as (args: unknown) => Promise<{ status: number; body: unknown; headers?: ResponseHeaders } | RawResponse>
@@ -1484,6 +1492,7 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
                   }
                 : {}),
             throwError,
+            throwValidation,
             ...handlerContext,
             ...(tools
                 ? {
@@ -1526,6 +1535,14 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
                 status: error.status,
                 body: error.body,
                 headers: error.headers ?? {},
+            };
+        }
+        if (error instanceof HandlerValidationError) {
+            return {
+                kind: 'validation-failed',
+                stage: 'handler',
+                detail: error.message,
+                issues: error.issues,
             };
         }
         if (definition.onError) {
@@ -1786,17 +1803,26 @@ const renderResult = (
                 }
             );
         case 'invalid-body':
-            return renderError(400, result.detail, undefined, result.headers);
+            return renderError(
+                400,
+                result.detail,
+                {
+                    errors: [
+                        {
+                            code: 'invalid_json',
+                            path: [],
+                            message: 'The request body is not valid JSON.',
+                        },
+                    ],
+                },
+                result.headers
+            );
         case 'validation-failed':
             return renderError(
                 400,
                 result.detail,
                 {
-                    errors: result.issues.map((issue) => ({
-                        code: issue.code ?? 'custom',
-                        path: issue.path,
-                        message: issue.message,
-                    })),
+                    errors: result.issues,
                 },
                 result.headers
             );

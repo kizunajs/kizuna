@@ -528,6 +528,11 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
      */
     responses: {
         [status: number]: ResponseDefinition;
+        /**
+         * Never declared: kizuna answers 400 itself, with a `ValidationError`, whenever a
+         * request fails the route's schemas or a handler calls `throwValidationError`.
+         */
+        400?: never;
     };
     /**
      * The handler that answers this route. Attach it with

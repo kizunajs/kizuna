@@ -76,11 +76,17 @@ export {
 } from './security-scheme.js';
 export { type CodedIssue, type RegisteredIssue } from './coded-issue.js';
 export {
-    isValidationError,
+    BUILTIN_VALIDATION_ISSUE_CODES,
+    toValidationIssue,
+    toValidationIssues,
     type ValidationError,
-    type ValidationErrorFor,
+    type ValidationIssue,
+    type BuiltinValidationIssue,
+    type CustomValidationIssue,
+    type HandlerIssue,
     type ValidationIssueCode,
     type BuiltinIssueCode,
+    type IssueLiteral,
 } from './validation-error.js';
 export { isProblemDetails } from './error-response.js';
 export {

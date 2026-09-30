@@ -423,3 +423,27 @@ describe('k.routes structured path params', () => {
         ).not.toThrow();
     });
 });
+
+describe('a declared 400', () => {
+    it('is rejected, since kizuna answers 400 itself', () => {
+        expect(() =>
+            k.routes('users', {
+                createUser: k.route({
+                    method: 'POST',
+                    path: '/users',
+                    body: z.object({
+                        name: z.string(),
+                    }),
+                    responses: {
+                        201: z.object({
+                            id: z.string(),
+                        }),
+                        400: z.object({
+                            detail: z.string(),
+                        }),
+                    },
+                }),
+            })
+        ).toThrowError('Route "createUser" declares a 400 response');
+    });
+});

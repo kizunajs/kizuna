@@ -222,3 +222,25 @@ test('a pathParams schema without a known key set switches the check off', () =>
         },
     });
 });
+
+test('a route cannot declare a 400, kizuna answers it', () => {
+    tagRoutes({
+        createThing: {
+            method: 'POST',
+            path: '/things',
+            body: z.object({
+                name: z.string(),
+            }),
+            responses: {
+                201: z.object({
+                    id: z.string(),
+                }),
+                // @ts-expect-error 400 is kizuna's validation error
+                400: z.object({
+                    detail: z.string(),
+                }),
+            },
+        },
+    });
+    expectTypeOf(routes).toBeObject();
+});

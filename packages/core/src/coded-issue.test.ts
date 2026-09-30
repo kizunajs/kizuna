@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { addCodedIssue } from './coded-issue.js';
 import { renderJsonResult } from './adapter.js';
+import { toValidationIssues } from './validation-error.js';
 
 /**
  * Map Zod issues through the adapter's `validation-failed` rendering exactly as
@@ -12,7 +13,7 @@ const renderErrors = (issues: z.core.$ZodIssue[]): Array<{ code: string; path: s
         kind: 'validation-failed',
         stage: 'body',
         detail: 'Validation failed',
-        issues,
+        issues: toValidationIssues(issues),
     });
     return (rendered.body as { errors: Array<{ code: string; path: string[]; message: string }> }).errors;
 };
@@ -58,7 +59,7 @@ describe('addCodedIssue', () => {
 });
 
 describe('validation-failed code mapping', () => {
-    it('leaves built-in Zod issue codes unchanged', () => {
+    it("renders built-in issues in kizuna's vocabulary with the rule's values", () => {
         const schema = z.object({
             name: z.string(),
             age: z.number().min(18),
@@ -70,11 +71,14 @@ describe('validation-failed code mapping', () => {
                 code: 'invalid_type',
                 path: ['name'],
                 message: expect.any(String),
+                expected: 'string',
             },
             {
                 code: 'too_small',
                 path: ['age'],
                 message: expect.any(String),
+                minimum: 18,
+                inclusive: true,
             },
         ]);
     });

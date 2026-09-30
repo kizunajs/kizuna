@@ -2,7 +2,6 @@ import { z } from 'zod';
 import type { Resend, WebhookEvent, WebhookEventPayload } from 'resend';
 import type { RouteDefinition } from 'kizunajs';
 import { route, type ApiContext } from 'kizunajs/plugin';
-import { ProblemDetailsSchema } from 'kizunajs/schemas';
 
 /**
  * What a webhook event's function receives.
@@ -63,10 +62,9 @@ export const webhookRoute = (resend: Resend, webhookSecret: string, on: ResendEv
         body: z.unknown(),
         responses: {
             204: z.void(),
-            400: ProblemDetailsSchema,
         },
     }).handler(async (args) => {
-        const { rawBody, headers, throwError } = args;
+        const { rawBody, headers, throwValidation } = args;
         let event: WebhookEventPayload;
         try {
             event = resend.webhooks.verify({
@@ -79,12 +77,13 @@ export const webhookRoute = (resend: Resend, webhookSecret: string, on: ResendEv
                 webhookSecret,
             });
         } catch {
-            return throwError({
-                status: 400,
-                body: {
-                    detail: "The webhook signature doesn't match its body.",
+            return throwValidation([
+                {
+                    code: 'invalid_signature',
+                    path: [],
+                    message: "The webhook signature doesn't match its body.",
                 },
-            });
+            ]);
         }
 
         const handle = on[event.type] as ((context: Record<string, unknown>) => Promise<void> | void) | undefined;

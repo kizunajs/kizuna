@@ -1,5 +1,4 @@
 import { Kizuna } from 'kizunajs';
-import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { z } from 'zod';
 import { k } from '../k';
 
@@ -163,7 +162,6 @@ export const notificationsRoutes = k.routes('notifications', {
                     .meta({
                         description: 'Validation result',
                     }),
-                400: ProblemDetailsSchema,
                 401: z.void(),
             },
             summary: 'Validate schemas, exercises generator bug coverage',

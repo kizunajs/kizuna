@@ -1,6 +1,5 @@
 import type { z } from 'zod';
 import type { ApiDefinition, RouteDefinition, Routes } from 'kizunajs';
-import { ValidationErrorSchema } from 'kizunajs/schemas';
 import {
     isStreamResponse,
     isVoidSchema,
@@ -13,6 +12,14 @@ import {
     unwrapOptionalWrappers,
     type StreamMode,
     listedRoutes,
+    readMetaId,
+    readRequestRules,
+    validatesRequest,
+    BUILTIN_VALIDATION_ISSUE_CODES,
+    VALIDATION_ISSUE_FIELDS,
+    type IssueFieldType,
+    type RequestRules,
+    type RuleNode,
 } from 'kizunajs/generator';
 import { runtimeSource } from './runtime.js';
 import { TypeCollector, docComment, sampleObject, sampleValue, typeOf } from './zod-to-typescript.js';
@@ -149,6 +156,88 @@ const routeDoc = (routeKey: string, route: RouteDefinition): string => {
     return docComment(lines);
 };
 
+const quoteSingle = (text: string): string => `'${text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n')}'`;
+
+const renderKey = (key: string): string => (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : quoteSingle(key));
+
+/**
+ * A value as an object literal in the generated file, one property per line.
+ */
+const renderLiteral = (value: unknown): string => {
+    if (Array.isArray(value)) return value.length === 0 ? '[]' : `[${value.map(renderLiteral).join(', ')}]`;
+    if (value !== null && typeof value === 'object') {
+        const entries = Object.entries(value).filter(([, entry]) => entry !== undefined);
+        if (entries.length === 0) return '{}';
+        return `{\n${indent(entries.map(([key, entry]) => `${renderKey(key)}: ${renderLiteral(entry)},`).join('\n'))}\n}`;
+    }
+    if (typeof value === 'string') return quoteSingle(value);
+    return String(value);
+};
+
+/**
+ * The type of one node of the rules tree, so a field's name is checked where
+ * it is read.
+ */
+const rulesTypeOf = (node: RuleNode): string => {
+    switch (node.kind) {
+        case 'object': {
+            const fields = Object.entries(node.fields).map(([key, field]) => `${renderKey(key)}: ${rulesTypeOf(field)};`);
+            return fields.length === 0 ? 'ObjectRules<{}>' : `ObjectRules<{\n${indent(fields.join('\n'))}\n}>`;
+        }
+        case 'array':
+            return `ArrayRules<${rulesTypeOf(node.items)}>`;
+        case 'string':
+            return 'StringRules';
+        case 'number':
+            return 'NumberRules';
+        case 'boolean':
+            return 'BooleanRules';
+        case 'enum':
+            return 'EnumRules';
+        default:
+            return 'UnknownRules';
+    }
+};
+
+const ISSUE_FIELD_TYPES: Record<IssueFieldType, string> = {
+    number: 'number',
+    boolean: 'boolean',
+    string: 'string',
+    'string[]': 'string[]',
+    'literal[]': 'Array<string | number | boolean | null>',
+};
+
+/**
+ * One arm per code: the built-in ones with their values, and the ones the API
+ * declares with their params beside them.
+ */
+const issueUnion = (declaredCodes: readonly string[]): string => {
+    const arms = BUILTIN_VALIDATION_ISSUE_CODES.map((code) => {
+        const values = Object.entries(VALIDATION_ISSUE_FIELDS[code]).map(([name, type]) => `${name}: ${ISSUE_FIELD_TYPES[type]}`);
+        return `{ code: ${quoteSingle(code)}; path: string[]; message: string${values.length > 0 ? `; ${values.join('; ')}` : ''} }`;
+    });
+    for (const code of declaredCodes) {
+        arms.push(`{ code: ${quoteSingle(code)}; path: string[]; message: string; [param: string]: unknown }`);
+    }
+    return `\n${indent(arms.map((arm) => `| ${arm}`).join('\n'))}`;
+};
+
+/**
+ * Whether the file needs the validation types: a route that can fail
+ * validation, or one that declares the `ValidationError` model itself.
+ */
+const usesValidation = (routes: Routes): boolean =>
+    Object.values(routes).some((node) => {
+        if (isRoute(node)) {
+            if (validatesRequest(node)) return true;
+            return Object.values(node.responses).some((response) => {
+                const schema = resolveResponseBody(response);
+                return schema !== undefined && readMetaId(schema) === 'ValidationError';
+            });
+        }
+        return node !== null && typeof node === 'object' && usesValidation(node as Routes);
+    });
+
 const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collector: TypeCollector, namespaceName: string): RouteEmit => {
     const namespace = routeKey.split('.').map(toPascalCase).join('');
     const members: string[] = [];
@@ -169,9 +258,9 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
         args.push(`query${requiresArgument(query) ? '' : '?'}: ${namespaceName}.${namespace}.Query`);
     }
 
-    if (body && !isVoidSchema(body)) {
+    const takesBody = body !== undefined && !isVoidSchema(body);
+    if (takesBody) {
         members.push(`export type Body = ${collector.readingInput(() => typeOf(body, collector, `${namespace}Body`))};`);
-        args.push(`body: ${namespaceName}.${namespace}.Body`);
     }
 
     if (headers) {
@@ -184,9 +273,8 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
     args.push('fetchOptions?: RequestInit');
 
     // The route tree never carries the automatic 400, so the union adds it here.
-    const validates = route.body !== undefined || route.query !== undefined;
-    const declaredBadRequest = Object.keys(route.responses).includes('400');
-    const validationBody = validates ? typeOf(ValidationErrorSchema, collector, 'ValidationError') : undefined;
+    const validates = validatesRequest(route);
+    const rules = validates ? readRequestRules(route) : undefined;
 
     const results = Object.entries(route.responses).map(([status, response]) => {
         const headers = resolveResponseHeaders(response);
@@ -199,17 +287,33 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
 
         const schema = resolveResponseBody(response);
         const body = schema ? typeOf(schema, collector, `${namespace}${status}`) : 'undefined';
-        const widened = status === '400' && validationBody ? `${body} | ${validationBody}` : body;
-        return `{ status: ${status}; body: ${widened}; headers: ${headerType} }`;
+        return `{ status: ${status}; body: ${body}; headers: ${headerType} }`;
     });
 
-    if (validationBody && !declaredBadRequest) {
-        results.push(`{ status: 400; body: ${validationBody}; headers: Record<string, string> }`);
-    }
+    if (validates) results.push(`{ status: 400; body: ValidationError; headers: Record<string, string> }`);
 
     members.push(`export type Result =\n${indent(results.map((result) => `| ${result}`).join('\n'))};`);
 
-    const argsType = `{\n${indent(args.map((arg) => `${arg};`).join('\n'))}\n}`;
+    const objectType = (fields: string[]): string => `{\n${indent(fields.map((field) => `${field};`).join('\n'))}\n}`;
+    // A body route takes the body, or a form the client reads into it.
+    const argsType = takesBody
+        ? `${objectType([...args, `body: ${namespaceName}.${namespace}.Body`])} | ${objectType([...args, 'form: FormData'])}`
+        : objectType(args);
+
+    const extras: string[] = [];
+    if (rules !== undefined) {
+        const parts = Object.entries(rules).map(([part, node]) => `${part}: ${rulesTypeOf(node as RuleNode)};`);
+        members.push(`export type Rules = {\n${indent(parts.join('\n'))}\n};`);
+        const checkArgs: string[] = [];
+        if (rules.params) checkArgs.push(`params?: ${namespaceName}.${namespace}.Params`);
+        if (rules.query) checkArgs.push(`query?: ${namespaceName}.${namespace}.Query`);
+        if (rules.headers) checkArgs.push(`headers?: ${namespaceName}.${namespace}.Headers`);
+        if (rules.body) checkArgs.push(`body?: ${namespaceName}.${namespace}.Body`);
+        extras.push(
+            `readonly rules: ${namespaceName}.${namespace}.Rules`,
+            `readonly check: (args: ${objectType(checkArgs)}) => ${namespaceName}.ValidationError | undefined`
+        );
+    }
 
     const tableEntries = [`method: '${route.method}'`, `path: '${route.path}'`];
     if (route.contentType) tableEntries.push(`contentType: '${route.contentType}'`);
@@ -217,14 +321,16 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
         isStreamResponse(response) ? `${status}: { stream: true, contentType: '${streamContentType(response)}' }` : `${status}: {}`
     );
     // The runtime and its wrappers read the table alone, so it lists the 400 the types add.
-    if (validationBody && !declaredBadRequest) responses.push('400: {}');
+    if (validates) responses.push('400: {}');
     tableEntries.push(`responses: {\n${indent(responses.map((entry) => `${entry},`).join('\n'))}\n}`);
+    if (rules !== undefined) tableEntries.push(`rules: ${renderLiteral(rules)}`);
 
     const streams = Object.values(route.responses).some((response) => isStreamResponse(response));
+    const method = `ClientMethod<'${route.method}', ${streams}, ${argsType}, ${namespaceName}.${namespace}.Result>`;
 
     return {
         namespace,
-        signature: `${routeDoc(routeKey, route)}${key}: ClientMethod<'${route.method}', ${streams}, ${argsType}, ${namespaceName}.${namespace}.Result>;`,
+        signature: `${routeDoc(routeKey, route)}${key}: ${extras.length > 0 ? `${method} & {\n${indent(extras.map((extra) => `${extra};`).join('\n'))}\n}` : method};`,
         declaration: `export namespace ${namespace} {\n${indent(members.join('\n\n'))}\n}`,
         table: `${key}: {\n${indent(tableEntries.map((entry) => `${entry},`).join('\n'))}\n},`,
     };
@@ -325,21 +431,6 @@ ${docComment([
         .join('');
 
 /**
- * Tells kizuna's validation error from a 400 the route declares itself.
- */
-const emitValidationGuard = (namespaceName: string): string => `
-${docComment([
-    `Whether a \`400\` body is the validation error kizuna sends, rather than a \`400\` the route declares itself.`,
-    '',
-    '@example',
-    'if (result.status === 400 && isValidationError(result.body)) {',
-    '    console.log(result.body.errors);',
-    '}',
-])}export const isValidationError = (body: unknown): body is ${namespaceName}.ValidationError =>
-    typeof body === 'object' && body !== null && 'errors' in body && Array.isArray(body.errors);
-`;
-
-/**
  * Declared in the file, so a brand needs nothing installed.
  */
 const BRAND_DECLARATION = `declare const kizunaBrand: unique symbol;
@@ -358,7 +449,22 @@ type KizunaBrand<Name extends string> = {
 export const generateFetchClient = (contract: ApiDefinition, options: FetchClientOptions = {}): string => {
     const { namespace: namespaceName = 'API', regenerateCommand = 'kizuna generate', source } = options;
     const collector = new TypeCollector();
-    const tree = emitTree(listedRoutes(contract), '', collector, namespaceName);
+    const routes = listedRoutes(contract);
+    if (usesValidation(routes)) {
+        collector.claim('ValidationIssue');
+        collector.add({
+            name: 'ValidationIssue',
+            description: "One failed rule, typed by its code, with the rule's values beside it.",
+            body: issueUnion(contract.validation?.issueCodes ?? []),
+        });
+        collector.claim('ValidationError');
+        collector.add({
+            name: 'ValidationError',
+            description: 'RFC 9457 Problem Details error response for validation failures.',
+            body: `{\n${indent(['type: string;', 'title: string;', 'status: number;', 'detail: string;', 'errors: ValidationIssue[];'].join('\n'))}\n}`,
+        });
+    }
+    const tree = emitTree(routes, '', collector, namespaceName);
     const requestContext = emitRequestContext(contract, collector);
 
     const models = collector.all().map((model) => {
@@ -368,7 +474,6 @@ export const generateFetchClient = (contract: ApiDefinition, options: FetchClien
 
     const api = [...models, ...tree.declarations].join('\n\n');
     const brands = emitBrandConstructors(collector, namespaceName);
-    const guards = collector.all().some((model) => model.name === 'ValidationError') ? emitValidationGuard(namespaceName) : '';
 
     const header = [
         ' * Generated by @kizunajs/fetch. Do not edit.',
@@ -392,7 +497,7 @@ ${indent(tree.signatures)}
 const routes: GeneratedRoutes = {
 ${indent(tree.table)}
 };
-${brands}${guards}
+${brands}
 ${
     requestContext === undefined
         ? `/**

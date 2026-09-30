@@ -20,6 +20,7 @@ import type { GuardHoldings, IdentityRole } from './identity.js';
 import { applyCoercion, coercionPlanFor } from './coercion.js';
 import type { ProblemDetails, StripProblemEnvelope } from './problem-details.js';
 import type { StreamTools } from './tool-runner.js';
+import { toValidationIssues, type HandlerIssue, type ValidationIssue } from './validation-error.js';
 
 /**
  * True when a literal status key is in the 4xx/5xx range. Widened `number` keys (no
@@ -109,6 +110,15 @@ export type HandlerArgs<R extends RouteDefinition> = ToolsArg<R> &
          * This function throws internally and never returns.
          */
         throwError: (response: ThrowableReturn<R> | GuardAnswer<R>) => never;
+        /**
+         * Answers 400 with one issue per field, for input only the handler can
+         * judge: a reference to something that does not exist, a value not
+         * allowed given what is stored. A rule about the input itself belongs
+         * in the schema, and a clash with stored state is a declared `409`.
+         *
+         * This function throws internally and never returns.
+         */
+        throwValidation: (issues: HandlerIssue[]) => never;
     };
 
 export type RouteHandler<R extends RouteDefinition, HandlerContext = unknown> = (
@@ -355,10 +365,16 @@ const STAGE_MESSAGES: Record<ValidationStage, string> = {
     body: 'Invalid request body',
 };
 
-export const formatValidationError = (failure: ValidationFailure): { detail: string; issues: z.core.$ZodIssue[] } => ({
+/**
+ * The 400's `detail` and `errors`, with each Zod issue mapped to kizuna's
+ * vocabulary.
+ */
+export const formatValidationError = (failure: ValidationFailure): { detail: string; issues: ValidationIssue<string>[] } => ({
     detail: STAGE_MESSAGES[failure.stage],
-    issues: failure.issues,
+    issues: toValidationIssues(failure.issues),
 });
+
+const FORM_CONTENT_TYPES: ReadonlySet<string> = new Set(['application/x-www-form-urlencoded', 'multipart/form-data']);
 
 export const validateRequest = (
     route: RouteDefinition,
@@ -387,7 +403,8 @@ export const validateRequest = (
             stage: 'body',
             schema: route.body,
             input: raw.body,
-            coerced: false,
+            // A form sends every field as a string, so a form body converts the way path, query and headers do.
+            coerced: route.contentType !== undefined && FORM_CONTENT_TYPES.has(route.contentType),
         },
     ];
 
@@ -401,7 +418,10 @@ export const validateRequest = (
     for (const step of order) {
         if (!step.schema) continue;
         const input = step.coerced ? applyCoercion(step.input, coercionPlanFor(step.schema)) : step.input;
-        const result = step.schema.safeParse(input);
+        // `reportInput` is what tells a missing field from one of the wrong type.
+        const result = step.schema.safeParse(input, {
+            reportInput: true,
+        });
         if (!result.success) {
             return {
                 ok: false,

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { problemDetails } from 'kizunajs';
 import { McpServer, acceptedContent, inputRequired, type CallToolResult, type InputRequiredResult } from '@modelcontextprotocol/server';
-import { flattenRoutes, validateRequest } from 'kizunajs/adapter';
+import { flattenRoutes, formatValidationError, validateRequest } from 'kizunajs/adapter';
 import {
     ResponseError,
     type AdapterRequest,
@@ -436,8 +436,8 @@ const executeToolCall = async (
                         {
                             status: 400,
                             body: {
-                                detail: `Validation failed: ${validation.error.stage}`,
-                                errors: validation.error.issues,
+                                detail: formatValidationError(validation.error).detail,
+                                errors: formatValidationError(validation.error).issues,
                             },
                         },
                         null,

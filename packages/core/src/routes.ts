@@ -51,6 +51,21 @@ const assertNoCoercion = (route: RouteDefinition, routeKey: string): void => {
 };
 
 /**
+ * Throws when a route declares a `400`. Kizuna answers 400 itself whenever a
+ * request fails the route's schemas, and a second body on the same status is
+ * what breaks every client's decoder. Plugin routes included: a webhook
+ * answers a bad signature with `throwValidationError` like any other handler.
+ */
+export const assertNoDeclaredBadRequest = (route: RouteDefinition, routeKey: string): void => {
+    if (!('400' in route.responses)) return;
+    throw new Error(
+        `Route "${routeKey}" declares a 400 response. kizuna answers 400 itself, with a ValidationError, whenever a request fails the route's schemas.\n` +
+            'Put a rule about the input in the schema, use `throwValidationError` in the handler for input only it can judge, ' +
+            'and declare `409: ValidationErrorSchema` for input that clashes with what is stored.'
+    );
+};
+
+/**
  * Throws when a route's `pathParams` keys and its path's `:param` placeholders
  * disagree. Unchecked, the stray key is dropped from the OpenAPI document and
  * the handler validates params the request never carries.
@@ -116,6 +131,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             assertPathParamsMatchPath(value, fullKey);
             assertPathParamsAreScalar(value, fullKey);
             assertNoCoercion(value, fullKey);
+            assertNoDeclaredBadRequest(value, fullKey);
             assertValidStreams(value, fullKey);
             assertToolDescribed(value, fullKey);
             resolveCoercionPlans(value);

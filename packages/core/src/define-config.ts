@@ -3,6 +3,7 @@ import { buildApiDefinition, type ApiDefinition } from './api-definition.js';
 import { pluginRouteTree, type PluginArgs, type PluginList, type PluginsBySlug } from './plugin.js';
 import { createApiReference, resolvePlugins } from './plugin-server.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
+import { assertNoDeclaredBadRequest } from './routes.js';
 import { assertValidDeprecationDates } from './deprecation.js';
 import { assertValidCache } from './cache.js';
 import { injectGuardResponses } from './guard-responses.js';
@@ -349,6 +350,7 @@ export const defineConfig = <
     assertValidDeprecationDates(pluginRoutes);
 
     for (const { route, routeKey } of flattenRoutes(pluginRoutes)) {
+        assertNoDeclaredBadRequest(route, routeKey);
         if (route.tool !== undefined && route.tool !== false) {
             throw new Error(`Plugin route '${routeKey}' declares \`tool\`. Plugin routes are hidden, so they never publish.`);
         }

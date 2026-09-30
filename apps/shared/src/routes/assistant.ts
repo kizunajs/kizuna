@@ -1,6 +1,6 @@
 import { countWords, noteCallFor, replyFor, replyWords } from '../assistant';
 import { z } from 'zod';
-import { ProblemDetailsSchema, ToolAnswerSchema } from 'kizunajs/schemas';
+import { ToolAnswerSchema } from 'kizunajs/schemas';
 import { k } from '../k';
 import { assistantTools } from './assistant-tools';
 import { noteRoutes } from './notes';
@@ -27,7 +27,6 @@ export const assistantRoutes = k.routes('assistant', {
                     },
                     tools: assistantTools,
                 },
-                400: ProblemDetailsSchema,
             },
             summary: 'Stream an assistant reply, exercises a server-sent events response',
         })
@@ -73,7 +72,6 @@ export const assistantRoutes = k.routes('assistant', {
                         notes: noteRoutes,
                     },
                 },
-                400: ProblemDetailsSchema,
             },
             summary: 'Chat with an assistant that keeps notes for the signed-in user, exercises tools on a stream',
         })

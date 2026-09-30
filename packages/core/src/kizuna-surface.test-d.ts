@@ -18,8 +18,8 @@ test('issueCodes literal is preserved, not widened to string', () => {
         k.issue(ctx, { code: 'invalid_phone_number', message: 'nope', input: value });
         // @ts-expect-error 'not_registered' is not a declared issue code
         k.issue(ctx, { code: 'not_registered', message: 'nope', input: value });
-        // built-in Zod codes stay allowed
-        k.issue(ctx, { code: 'custom', message: 'nope', input: value });
+        // kizuna's built-in codes stay allowed
+        k.issue(ctx, { code: 'invalid', message: 'nope', input: value });
     });
     expectTypeOf(schema).toExtend<z.ZodType>();
 });

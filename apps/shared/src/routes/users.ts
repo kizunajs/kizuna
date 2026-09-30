@@ -390,7 +390,6 @@ export const usersRoutes = k.routes('users', {
             body: CreateUserSchema,
             responses: {
                 201: UserSchema,
-                400: ProblemDetailsSchema,
             },
             summary: 'Create a user',
         })

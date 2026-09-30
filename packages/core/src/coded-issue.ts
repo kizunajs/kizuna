@@ -23,6 +23,10 @@ export interface CodedIssue<Input> {
      * The value that failed validation.
      */
     input: Input;
+    /**
+     * Values the app reads beside the code, sent flat on the issue.
+     */
+    params?: Record<string, unknown>;
 }
 
 /**
@@ -44,6 +48,10 @@ export interface RegisteredIssue<Codes extends string, Input> {
      * The value that failed validation.
      */
     input: Input;
+    /**
+     * Values the app reads beside the code, sent flat on the issue.
+     */
+    params?: Record<string, unknown>;
 }
 
 /**
