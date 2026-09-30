@@ -36,7 +36,7 @@ export default defineConfig({
 });
 ```
 
-A missing API key, or a `from` Resend wouldn't accept, stops the app at startup, naming the field. `from` is an address, or a name and an address like `Kizuna <hello@example.com>`.
+A missing API key, or a `from` Resend wouldn't accept, stops the app at startup, naming the field. `from` is an address, or a name and an address like `Kizuna <hello@example.com>`. To run without a key, see [Development without a key](#development-without-a-key).
 
 </Step>
 
@@ -346,6 +346,37 @@ Each intercepted email carries who it was for in `X-Intercepted-To`, `X-Intercep
 
 Broadcasts go to a segment, so `intercept` doesn't reach them. Point your `lists` at a test segment in development instead.
 
+## Development without a key
+
+The plugin checks its options when your config is imported, so a missing `RESEND_API_KEY` stops local development, test runs and `kizuna generate` as well as production. `dryRun` skips Resend and logs each email instead:
+
+```ts title="kizuna.config.ts"
+resendPlugin({
+    apiKey: process.env.RESEND_API_KEY,
+    from: 'Kizuna <hello@example.com>',
+    dryRun: process.env.NODE_ENV !== 'production',
+}),
+```
+
+While `dryRun` is on, `apiKey` can be missing. While it's off, a missing key still stops the app at startup, so production can't start without one by accident.
+
+`sendEmail` applies `intercept` first, then logs the sender, the recipients and the subject. To receive each email yourself, as it would have been sent, pass a function instead of `true`. In a test, that lets you check what went out:
+
+```ts
+const sentEmails: ResendEmail[] = [];
+
+resendPlugin({
+    from: 'Kizuna <hello@example.com>',
+    dryRun: (email) => {
+        sentEmails.push(email);
+    },
+}),
+```
+
+`sendBroadcast`, `subscribe`, `unsubscribe` and `changeEmail` log what they skipped as well. The ids they return start with `dry-run-`, so the code around them runs as usual. A list missing from `lists` still throws.
+
+Without an `apiKey`, `plugins.resend.client` is built with a placeholder key, so calling it directly fails.
+
 ## Errors
 
 Resend's SDK answers with `{ data, error }` instead of throwing. The plugin throws a `ResendRequestError` instead, so a failed call fails the handler that made it, and kizuna answers `500` and logs it.
@@ -360,15 +391,39 @@ A call Resend rate-limits is tried again after the wait its `retry-after` header
 await plugins.resend.client.domains.list();
 ```
 
+## Outside a Kizuna app
+
+Another server in the same repo, like a Next.js app that sends sign-in emails, can use the same sending code. `createResend` from `@kizunajs/resend/client` takes the plugin's options, apart from `webhookSecret` and `on`, and returns what handlers reach at `plugins.resend`:
+
+```ts title="lib/resend.ts"
+import { createResend } from '@kizunajs/resend/client';
+
+export const resend = createResend({
+    apiKey: process.env.RESEND_API_KEY,
+    from: 'Kizuna <hello@example.com>',
+});
+```
+
+```ts
+await resend.sendEmail({
+    to: user.email,
+    subject: 'Your sign-in link',
+    html: `<a href="${signInUrl}">Sign in</a>`,
+});
+```
+
+It retries rate-limited calls, applies `intercept` and `dryRun`, and throws `ResendRequestError`, the same as the plugin. Invalid options throw when `createResend` runs, naming the field. `@kizunajs/resend/client` never imports `kizunajs`, so the app only needs `@kizunajs/resend`, `resend` and `zod` installed.
+
 ## Options
 
 | Option          | Default   | Description                                                             |
 | --------------- | --------- | ----------------------------------------------------------------------- |
-| `apiKey`        | required  | The Resend API key                                                      |
+| `apiKey`        | required  | The Resend API key. Can be missing while `dryRun` is on                 |
 | `from`          | required  | The sender every email and broadcast uses unless it names its own       |
 | `lists`         | none      | Lists by name, each a `segmentId` and an optional `topicId`             |
 | `webhookSecret` | none      | The webhook's signing secret. Set it to serve the webhook route         |
 | `on`            | none      | A function per webhook event type. Needs `webhookSecret`                |
 | `intercept`     | none      | Catch every email in development, see [In development](#in-development) |
+| `dryRun`        | `false`   | Skip Resend and log each email, or pass it to a function                |
 | `resend`        | none      | Resend's own `ResendOptions`, passed to its client                      |
 | `basePath`      | `/resend` | Where the webhook route is served                                       |

@@ -1,8 +1,11 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
+import type { PluginExportsOf } from 'kizunajs/plugin';
+import { createResend } from './client.js';
 import { resendPlugin } from './plugin.js';
 import { defineResendEvents } from './webhooks.js';
+import type { ResendEmail } from './requests.js';
 
 const k = new Kizuna();
 
@@ -50,5 +53,23 @@ test('types the event without a Config, and gives no jobs', () => {
             // @ts-expect-error jobs needs a Config
             void context.jobs;
         },
+    });
+});
+
+test('createResend returns what handlers reach at plugins.resend', () => {
+    expectTypeOf<ReturnType<typeof createResend>>().toEqualTypeOf<PluginExportsOf<ReturnType<typeof resendPlugin>>>();
+});
+
+test('takes no API key when dryRun is set', () => {
+    resendPlugin({
+        from: 'Kizuna <hello@example.com>',
+        dryRun: (email) => {
+            expectTypeOf(email).toEqualTypeOf<ResendEmail>();
+        },
+    });
+    createResend({
+        apiKey: process.env.RESEND_API_KEY,
+        from: 'Kizuna <hello@example.com>',
+        dryRun: true,
     });
 });

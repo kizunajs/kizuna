@@ -1,5 +1,5 @@
-import type { CreateBroadcastOptions, CreateEmailOptions, ErrorResponse, Resend } from 'resend';
-import type { ResendList, ResendPluginProps } from './options.js';
+import { Resend, type CreateBroadcastOptions, type CreateEmailOptions, type ErrorResponse } from 'resend';
+import type { ResendClientProps, ResendList } from './options.js';
 
 /**
  * A call to Resend that answered with an error.
@@ -70,7 +70,7 @@ const listOf = (addresses: string | string[] | undefined): string[] =>
  * The email as `intercept` sends it: to the `deliverTo` addresses it names, and
  * to `forwardTo` in their place or in bcc. Headers keep who it was for.
  */
-const intercepted = (email: ResendEmail, intercept: NonNullable<ResendPluginProps['intercept']>): ResendEmail => {
+const intercepted = (email: ResendEmail, intercept: NonNullable<ResendClientProps['intercept']>): ResendEmail => {
     if (!intercept.enabled) return email;
     const forwardTo = listOf(intercept.forwardTo);
 
@@ -171,9 +171,42 @@ export interface ResendUnsubscriber {
 }
 
 /**
- * What handlers reach at `plugins.resend`.
+ * The key a dry run builds the Resend client with when there's no `apiKey`,
+ * since Resend's constructor throws without one.
  */
-export const resendExports = (resend: Resend, options: ResendPluginProps) => {
+const DRY_RUN_API_KEY = 're_dry_run';
+
+/**
+ * The Resend client the options describe.
+ */
+export const resendClientOf = (options: ResendClientProps): Resend => new Resend(options.apiKey || DRY_RUN_API_KEY, options.resend);
+
+/**
+ * Log what a dry run skipped, and make up the id Resend would have answered with.
+ */
+const skipped = (action: string, details: Record<string, unknown>): string => {
+    console.info(`[kizuna/resend] Dry run, skipped ${action}`, details);
+    return `dry-run-${crypto.randomUUID()}`;
+};
+
+/**
+ * The email as `dryRun: true` logs it.
+ */
+const logEmail = (email: ResendEmail): void => {
+    skipped('sending the email', {
+        from: email.from,
+        to: email.to,
+        cc: email.cc,
+        bcc: email.bcc,
+        subject: email.subject,
+    });
+};
+
+/**
+ * What handlers reach at `plugins.resend`, and what `createResend` returns.
+ */
+export const resendExports = (resend: Resend, options: ResendClientProps) => {
+    const { dryRun } = options;
     const listNamed = (name: string): ResendList => {
         const list = options.lists?.[name];
         if (list === undefined) throw new Error(`[kizuna/resend] No list is named '${name}'. Declare it under \`lists\`.`);
@@ -182,21 +215,27 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
 
     return {
         /**
-         * The Resend client, for anything the plugin doesn't cover.
+         * The Resend client, for anything the plugin doesn't cover. Without an
+         * `apiKey` it holds a placeholder, so calling it in a dry run fails.
          */
         client: resend,
 
         /**
          * Send one email.
          */
-        sendEmail: (email: ResendEmail): Promise<{ id: string }> => {
+        sendEmail: async (email: ResendEmail): Promise<{ id: string }> => {
             const addressed = options.intercept === undefined ? email : intercepted(email, options.intercept);
-            return call('Sending the email', () =>
-                resend.emails.send({
-                    from: options.from,
-                    ...addressed,
-                } as CreateEmailOptions)
-            );
+            const sent = {
+                from: options.from,
+                ...addressed,
+            } as ResendEmail;
+            if (dryRun) {
+                await (dryRun === true ? logEmail : dryRun)(sent);
+                return {
+                    id: `dry-run-${crypto.randomUUID()}`,
+                };
+            }
+            return call('Sending the email', () => resend.emails.send(sent as CreateEmailOptions));
         },
 
         /**
@@ -204,6 +243,14 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
          */
         subscribe: async ({ email, list: name, firstName, lastName }: ResendSubscriber): Promise<{ contactId: string }> => {
             const list = listNamed(name);
+            if (dryRun) {
+                return {
+                    contactId: skipped('subscribing the contact', {
+                        email,
+                        list: name,
+                    }),
+                };
+            }
             const topics: TopicSubscription[] =
                 list.topicId === undefined
                     ? []
@@ -270,6 +317,14 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
          * contact and removes the old one.
          */
         changeEmail: async ({ from, to }: ResendEmailChange): Promise<{ contactId: string }> => {
+            if (dryRun) {
+                return {
+                    contactId: skipped('changing the contact email', {
+                        from,
+                        to,
+                    }),
+                };
+            }
             const contact = await call('Looking up the contact', () =>
                 resend.contacts.get({
                     email: from,
@@ -327,7 +382,15 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
          * Take a contact off one list, or off everything.
          */
         unsubscribe: async ({ email, list: name }: ResendUnsubscriber): Promise<void> => {
-            if (name === undefined) {
+            const list = name === undefined ? undefined : listNamed(name);
+            if (dryRun) {
+                skipped('unsubscribing the contact', {
+                    email,
+                    list: name,
+                });
+                return;
+            }
+            if (list === undefined) {
                 await call('Unsubscribing the contact', () =>
                     resend.contacts.update({
                         email,
@@ -336,7 +399,7 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
                 );
                 return;
             }
-            const { segmentId, topicId } = listNamed(name);
+            const { segmentId, topicId } = list;
             if (topicId === undefined) {
                 await call('Removing the contact from the segment', () =>
                     resend.contacts.segments.remove({
@@ -362,8 +425,16 @@ export const resendExports = (resend: Resend, options: ResendPluginProps) => {
         /**
          * Send a broadcast to a list, now or at `scheduledAt`.
          */
-        sendBroadcast: ({ list: name, from, scheduledAt, ...content }: ResendBroadcast): Promise<{ id: string }> => {
+        sendBroadcast: async ({ list: name, from, scheduledAt, ...content }: ResendBroadcast): Promise<{ id: string }> => {
             const list = listNamed(name);
+            if (dryRun) {
+                return {
+                    id: skipped('sending the broadcast', {
+                        list: name,
+                        subject: content.subject,
+                    }),
+                };
+            }
             return call('Sending the broadcast', () =>
                 resend.broadcasts.create({
                     ...content,

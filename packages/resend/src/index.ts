@@ -1,5 +1,7 @@
 export { resendPlugin } from './plugin.js';
-export { ResendPluginOptionsSchema, ResendListSchema, type ResendPluginProps, type ResendList } from './options.js';
+export { createResend } from './client.js';
+export { ResendClientOptionsSchema, ResendListSchema, type ResendClientProps, type ResendList } from './options.js';
+export { ResendPluginOptionsSchema, type ResendPluginProps } from './plugin-options.js';
 export {
     ResendRequestError,
     type ResendEmail,

@@ -42,11 +42,22 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./client": {
+      "import": {
+        "types": "./dist/client.d.mts",
+        "default": "./dist/client.mjs"
+      },
+      "require": {
+        "types": "./dist/client.d.cts",
+        "default": "./dist/client.cjs"
+      }
     }
   },
   "kizuna": {
     "entries": {
-      ".": "server"
+      ".": "server",
+      "./client": "server"
     }
   },
   "files": [
@@ -56,13 +67,18 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts --format esm,cjs --dts --clean --external kizunajs --external zod --external resend",
+    "build": "tsdown src/index.ts src/client.ts --format esm,cjs --dts --clean --external kizunajs --external zod --external resend",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "kizunajs": "workspace:*",
     "resend": "^6.18.0",
     "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "kizunajs": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@kizunajs/express": "workspace:*",

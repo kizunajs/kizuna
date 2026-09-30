@@ -6,10 +6,12 @@ import { defineConfig } from 'kizunajs';
 import { pluginExportsOf } from 'kizunajs/adapter';
 import { expressAdapter } from '@kizunajs/express';
 import { resendPlugin } from './plugin.js';
+import { createResend } from './client.js';
+import { ResendClientOptionsSchema } from './options.js';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import type { ResendEventHandlers } from './webhooks.js';
-import type { ResendPluginProps } from './options.js';
+import type { ResendPluginProps } from './plugin-options.js';
 
 interface RecordedCall {
     method: string;
@@ -104,17 +106,33 @@ const resendOf = (api: unknown) => pluginExportsOf(api).resend as ReturnType<typ
 
 describe('resendPlugin options', () => {
     it('stops the app without an API key, naming the field', () => {
+        for (const apiKey of [undefined, '']) {
+            expect(() =>
+                defineConfig({
+                    routes: {},
+                    plugins: [
+                        resendPlugin({
+                            apiKey,
+                            from: 'Kizuna <hello@example.com>',
+                        }),
+                    ],
+                })
+            ).toThrow("[kizuna] Plugin 'resend' has invalid options: apiKey: is required unless `dryRun` is set");
+        }
+    });
+
+    it('stops the app without an API key when dryRun is false', () => {
         expect(() =>
             defineConfig({
                 routes: {},
                 plugins: [
                     resendPlugin({
-                        apiKey: undefined as never,
                         from: 'Kizuna <hello@example.com>',
+                        dryRun: false,
                     }),
                 ],
             })
-        ).toThrow(/\[kizuna\] Plugin 'resend' has invalid options: apiKey is required/);
+        ).toThrow('apiKey: is required unless `dryRun` is set');
     });
 
     it('stops the app on a sender Resend would refuse', () => {
@@ -527,6 +545,147 @@ describe('plugins.resend', () => {
                 list: 'monthly',
             })
         ).rejects.toThrow("[kizuna/resend] No list is named 'monthly'.");
+    });
+});
+
+const installDryRun = (dryRun: ResendPluginProps['dryRun'], intercept?: ResendPluginProps['intercept']) =>
+    defineConfig({
+        routes: {},
+        plugins: [
+            resendPlugin({
+                from: 'Kizuna <hello@example.com>',
+                lists: {
+                    weekly: {
+                        segmentId: 'seg_weekly',
+                        topicId: 'top_weekly',
+                    },
+                },
+                dryRun,
+                intercept,
+            }),
+        ],
+    }).api;
+
+describe('dryRun', () => {
+    it('reaches Resend for nothing, and answers with made-up ids', async () => {
+        const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+        const resend = resendOf(installDryRun(true));
+
+        const sent = await resend.sendEmail({
+            to: 'ada@example.com',
+            subject: 'Welcome',
+            html: '<p>Welcome.</p>',
+        });
+        const subscribed = await resend.subscribe({
+            email: 'ada@example.com',
+            list: 'weekly',
+        });
+        const moved = await resend.changeEmail({
+            from: 'ada@example.com',
+            to: 'ada@lovelace.dev',
+        });
+        await resend.unsubscribe({
+            email: 'ada@lovelace.dev',
+        });
+        const broadcast = await resend.sendBroadcast({
+            list: 'weekly',
+            subject: 'This week',
+            html: '<p>News.</p>',
+        });
+
+        expect(calls).toEqual([]);
+        for (const id of [sent.id, subscribed.contactId, moved.contactId, broadcast.id]) {
+            expect(id).toMatch(/^dry-run-[0-9a-f-]{36}$/);
+        }
+        expect(info).toHaveBeenCalledTimes(5);
+        expect(info).toHaveBeenCalledWith('[kizuna/resend] Dry run, skipped sending the email', {
+            from: 'Kizuna <hello@example.com>',
+            to: 'ada@example.com',
+            cc: undefined,
+            bcc: undefined,
+            subject: 'Welcome',
+        });
+    });
+
+    it('hands a dryRun function the email as intercept addressed it', async () => {
+        const received: unknown[] = [];
+
+        await resendOf(
+            installDryRun(
+                (email) => {
+                    received.push(email);
+                },
+                {
+                    enabled: true,
+                    forwardTo: 'dev@example.com',
+                    subjectPrefix: '[dev]',
+                }
+            )
+        ).sendEmail({
+            to: 'ada@example.com',
+            subject: 'Welcome',
+            html: '<p>Welcome.</p>',
+        });
+
+        expect(calls).toEqual([]);
+        expect(received).toEqual([
+            {
+                from: 'Kizuna <hello@example.com>',
+                to: ['dev@example.com'],
+                cc: [],
+                bcc: [],
+                subject: '[dev] Welcome',
+                html: '<p>Welcome.</p>',
+                headers: {
+                    'X-Intercepted-To': 'ada@example.com',
+                },
+            },
+        ]);
+    });
+
+    it('still refuses a list the plugin was not given', async () => {
+        vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+        await expect(
+            resendOf(installDryRun(true)).subscribe({
+                email: 'ada@example.com',
+                list: 'monthly',
+            })
+        ).rejects.toThrow("[kizuna/resend] No list is named 'monthly'.");
+    });
+});
+
+describe('createResend', () => {
+    it('sends the same request as plugins.resend', async () => {
+        const email = {
+            to: 'ada@example.com',
+            subject: 'Welcome',
+            html: '<p>Welcome.</p>',
+        };
+
+        await resendOf(install()).sendEmail(email);
+        const fromPlugin = calls;
+        calls = [];
+        await createResend({
+            apiKey: 're_test',
+            from: 'Kizuna <hello@example.com>',
+        }).sendEmail(email);
+
+        expect(fromPlugin).toHaveLength(1);
+        expect(calls).toEqual(fromPlugin);
+    });
+
+    it('throws on invalid options, naming the field', () => {
+        expect(() =>
+            createResend({
+                from: 'Kizuna <hello@example.com>',
+            })
+        ).toThrow('[kizuna/resend] invalid options: apiKey: is required unless `dryRun` is set');
+    });
+
+    it('takes no webhook options', () => {
+        expect(ResendClientOptionsSchema.shape).not.toHaveProperty('webhookSecret');
+        expect(ResendClientOptionsSchema.shape).not.toHaveProperty('on');
     });
 });
 

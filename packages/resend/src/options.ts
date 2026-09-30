@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ResendOptions } from 'resend';
-import type { ResendEventHandlers } from './webhooks.js';
+import type { ResendEmail } from './requests.js';
 
 /**
  * A list an app sends to: the Resend segment its contacts sit in, and the topic
@@ -39,12 +39,15 @@ export const SenderSchema = z.string().refine(isSender, {
     error: 'must be an address, or a name and an address like `Kizuna <hello@example.com>`',
 });
 
-export const ResendPluginOptionsSchema = z
+/**
+ * The options `createResend` takes, and the plugin's own apart from its webhook.
+ */
+export const ResendClientOptionsSchema = z
     .object({
         /**
-         * The Resend API key.
+         * The Resend API key. Required unless `dryRun` is set.
          */
-        apiKey: z.string(),
+        apiKey: z.string().optional(),
         /**
          * The sender every email and broadcast uses unless it names its own.
          *
@@ -65,18 +68,6 @@ export const ResendPluginOptionsSchema = z
          * },
          */
         lists: z.record(z.string(), ResendListSchema).optional(),
-        /**
-         * The webhook's signing secret. The webhook route is served when it's set.
-         */
-        webhookSecret: z.string().optional(),
-        /**
-         * What runs for each webhook event, keyed by its type.
-         */
-        on: z
-            .custom<ResendEventHandlers>((value) => typeof value === 'object' && value !== null, {
-                error: 'must map event types to functions',
-            })
-            .optional(),
         /**
          * Catch every email outside production and forward it to `forwardTo`
          * instead of its real recipients.
@@ -121,12 +112,27 @@ export const ResendPluginOptionsSchema = z
          * Passed to the Resend client as it is.
          */
         resend: z.custom<ResendOptions>().optional(),
+        /**
+         * Skip Resend and log each email instead, for local development and tests.
+         * Pass a function to receive each email yourself, as it would have been sent.
+         *
+         * @example
+         * dryRun: process.env.NODE_ENV !== 'production',
+         */
+        dryRun: z
+            .union([
+                z.boolean(),
+                z.custom<(email: ResendEmail) => void | Promise<void>>((value) => typeof value === 'function', {
+                    error: 'must be a boolean or a function',
+                }),
+            ])
+            .optional(),
     })
-    .refine((options) => options.on === undefined || options.webhookSecret !== undefined, {
-        error: 'is required when `on` is set',
-        path: ['webhookSecret'],
+    .refine((options) => Boolean(options.dryRun) || (options.apiKey !== undefined && options.apiKey !== ''), {
+        error: 'is required unless `dryRun` is set',
+        path: ['apiKey'],
     });
 
-export type ResendPluginProps = z.output<typeof ResendPluginOptionsSchema>;
+export type ResendClientProps = z.output<typeof ResendClientOptionsSchema>;
 
 export type ResendList = z.output<typeof ResendListSchema>;

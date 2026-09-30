@@ -1,7 +1,6 @@
-import { Resend } from 'resend';
 import { definePlugin, type PluginRoutes } from 'kizunajs/plugin';
-import { ResendPluginOptionsSchema } from './options.js';
-import { resendExports } from './requests.js';
+import { ResendPluginOptionsSchema } from './plugin-options.js';
+import { resendClientOf, resendExports } from './requests.js';
 import { webhookRoute } from './webhooks.js';
 
 /**
@@ -26,7 +25,7 @@ export const resendPlugin = definePlugin({
     basePath: '/resend',
     options: ResendPluginOptionsSchema,
     setup: ({ options }) => {
-        const resend = new Resend(options.apiKey, options.resend);
+        const resend = resendClientOf(options);
         const routes: PluginRoutes = {};
         if (options.webhookSecret !== undefined) {
             routes.webhook = webhookRoute(resend, options.webhookSecret, options.on ?? {});
