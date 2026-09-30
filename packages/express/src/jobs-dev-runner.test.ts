@@ -82,6 +82,9 @@ const contract = defineConfig({
     ...config,
     adapter: expressAdapter(),
     routes,
+    jobRunner: {
+        mode: 'http',
+    },
     jobs,
 }).api;
 
@@ -183,6 +186,24 @@ describe('startJobsDevRunner', () => {
             vi.stubEnv('NODE_ENV', previous ?? 'test');
         }
         expect(logger.warn.mock.calls.flat().join(' ')).toContain('Use your platform scheduler in production');
+    });
+
+    it('refuses an api that mounts no job endpoints', () => {
+        const { api } = defineConfig({
+            ...config,
+            adapter: expressAdapter(),
+            jobRunner: {
+                mode: 'in-process',
+            },
+            routes,
+            jobs,
+        });
+        expect(() =>
+            startJobsDevRunner(api as unknown as ApiDefinition, {
+                baseUrl: 'http://localhost:8000',
+                logger: silentLogger,
+            })
+        ).toThrow('Run the schedules in this process with `startJobs` instead.');
     });
 
     it('ticks on the interval', async () => {

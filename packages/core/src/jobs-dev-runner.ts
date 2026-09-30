@@ -70,6 +70,12 @@ export const startJobsDevRunner = (contract: ApiDefinition, options: JobsDevRunn
         );
     }
 
+    if (contract.jobsConfig?.mode === 'in-process') {
+        throw new Error(
+            "[kizuna/schedule] startJobsDevRunner ticks the dispatch endpoint, which `mode: 'in-process'` does not serve. " +
+                'Run the schedules in this process with `startJobs` instead.'
+        );
+    }
     const method = contract.jobsConfig?.method ?? 'POST';
     const path = `${options.basePath ?? ''}${contract.jobsConfig?.path ?? DEFAULT_JOBS_PATH}/dispatch`;
     const url = `${stripTrailingSlash(options.baseUrl)}${path}`;

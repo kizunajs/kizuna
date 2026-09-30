@@ -5,7 +5,7 @@ import { defineConfig } from './define-config.js';
 import { isCompiledJob, isJobDefinition } from './jobs.js';
 import { cron } from './schedule.js';
 import { definePlugin } from './plugin.js';
-import { JOBS_META, jobRunnerFrom, jobFnAt, type JobsMeta } from './adapter.js';
+import { JOBS_META, jobRoutes, jobRunnerFrom, jobFnAt, type JobsMeta } from './adapter.js';
 
 interface Config {
     auth: {
@@ -287,6 +287,9 @@ describe('k.contract with jobs', () => {
         const contract = defineConfig({
             ...config,
             routes,
+            jobRunner: {
+                mode: 'http',
+            },
             jobs,
         }).api;
         expect(Object.keys(contract.jobs ?? {})).toEqual(['sendDigests']);
@@ -312,6 +315,9 @@ describe('k.contract with jobs', () => {
                 defineConfig({
                     ...config,
                     routes,
+                    jobRunner: {
+                        mode: 'http',
+                    },
                     jobs,
                 }).api
         ).not.toThrow();
@@ -343,6 +349,9 @@ describe('a job endpoint colliding with a route', () => {
                 defineConfig({
                     ...config,
                     routes: routesAt(path),
+                    jobRunner: {
+                        mode: 'http',
+                    },
                     jobs: scheduled,
                 }).api
         ).toThrow('which already serves it');
@@ -354,21 +363,20 @@ describe('a job endpoint colliding with a route', () => {
                 defineConfig({
                     ...config,
                     routes: routesAt('/jobs'),
+                    jobRunner: {
+                        mode: 'http',
+                    },
                     jobs: scheduled,
                 }).api
         ).not.toThrow();
     });
 
     it('accepts the same route once the endpoints are moved', () => {
-        const movedPath: `/${string}` = '/internal/tick';
         const movedConfig = {
             auth: {
                 identities: {
                     scheduler,
                 },
-            },
-            jobRunner: {
-                path: movedPath,
             },
         };
         const moved = new Kizuna<{
@@ -382,6 +390,10 @@ describe('a job endpoint colliding with a route', () => {
             () =>
                 defineConfig({
                     ...movedConfig,
+                    jobRunner: {
+                        mode: 'http',
+                        path: '/internal/tick',
+                    },
                     routes: moved.routes({
                         listJobs: moved.route({
                             method: 'POST',
@@ -399,6 +411,111 @@ describe('a job endpoint colliding with a route', () => {
                     }),
                 }).api
         ).not.toThrow();
+    });
+
+    it('claims nothing for jobs that run in process', () => {
+        expect(
+            () =>
+                defineConfig({
+                    ...config,
+                    jobRunner: {
+                        mode: 'in-process',
+                    },
+                    routes: routesAt('/jobs/dispatch'),
+                    jobs: scheduled,
+                }).api
+        ).not.toThrow();
+    });
+});
+
+describe('how jobs run', () => {
+    const scheduled = k.jobs('scheduler', {
+        sendDigests: k.job({
+            schedule: '0 5 * * *',
+        }),
+    });
+
+    const unguarded = k.jobs({
+        sendDigests: k.job({
+            schedule: '0 5 * * *',
+        }),
+    });
+
+    it('must be said once jobs are declared', () => {
+        expect(
+            () =>
+                // @ts-expect-error `jobRunner` is required once `jobs` declares one
+                defineConfig({
+                    ...config,
+                    routes: {},
+                    jobs: scheduled,
+                }).api
+        ).toThrow('The jobs do not say how they run.');
+    });
+
+    it('rejects jobs served over HTTP with no identity', () => {
+        expect(
+            () =>
+                defineConfig({
+                    ...config,
+                    routes: {},
+                    jobs: unguarded,
+                    jobRunner: {
+                        mode: 'http',
+                    },
+                }).api
+        ).toThrow('would let anyone trigger them');
+    });
+
+    it('accepts jobs with no identity in process', () => {
+        expect(
+            () =>
+                defineConfig({
+                    ...config,
+                    routes: {},
+                    jobs: unguarded,
+                    jobRunner: {
+                        mode: 'in-process',
+                    },
+                }).api
+        ).not.toThrow();
+    });
+
+    it('needs no jobRunner when no jobs are declared', () => {
+        expect(
+            () =>
+                defineConfig({
+                    ...config,
+                    routes: {},
+                }).api
+        ).not.toThrow();
+    });
+});
+
+describe('the job endpoints', () => {
+    const scheduled = k.jobs({
+        sendDigests: k.job({
+            schedule: '0 5 * * *',
+        }),
+    });
+
+    it('serve dispatch and run under the namespace', () => {
+        const served = jobRoutes({
+            jobs: scheduled,
+            handlers: {},
+        });
+        expect(Object.values(served).map((route) => route.path)).toEqual(['/jobs/dispatch', '/jobs/run']);
+    });
+
+    it('are not built for jobs that run in process', () => {
+        const served = jobRoutes({
+            jobs: scheduled,
+            handlers: {},
+            config: {
+                mode: 'in-process',
+            },
+        });
+        expect(served).toEqual({});
     });
 });
 
@@ -438,6 +555,9 @@ describe('job handlers and plugins', () => {
         const { api } = defineConfig({
             ...config,
             routes: {},
+            jobRunner: {
+                mode: 'http',
+            },
             jobs,
             plugins: [
                 greeter({

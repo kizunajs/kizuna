@@ -42,7 +42,7 @@ export interface ApiDefinition<
      */
     jobs?: Jobs_;
     /**
-     * The job settings named in `defineConfig` under `jobsConfig`.
+     * The job settings named in `defineConfig` under `jobRunner`.
      */
     jobsConfig?: JobsConfig;
     /**

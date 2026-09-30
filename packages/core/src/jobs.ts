@@ -8,16 +8,28 @@ import type { JobTransport } from './job-transport.js';
 import type { PathClaim } from './path-claims.js';
 
 /**
- * The namespace the job endpoints are mounted under when `jobs.path` says
+ * The namespace the job endpoints are mounted under when `jobRunner.path` says
  * nothing.
  */
 export const DEFAULT_JOBS_PATH = '/jobs';
 
 /**
- * Settings shared by every job, named in `defineConfig` under `jobsConfig`. The jobs
+ * Settings shared by every job, named in `defineConfig` under `jobRunner`. The jobs
  * themselves are declared with `k.jobs`.
  */
-export interface JobsConfig {
+export type JobsConfig = HttpJobsConfig | InProcessJobsConfig;
+
+/**
+ * Jobs triggered over HTTP, by platform cron ticking `/jobs/dispatch` or a
+ * transport delivering to `/jobs/run`.
+ */
+export interface HttpJobsConfig {
+    /**
+     * `'http'` serves `/jobs/dispatch` and `/jobs/run`, guarded by the jobs'
+     * identity. `'in-process'` is for a long-running server whose schedules
+     * `startJobs` ticks, and serves neither.
+     */
+    mode: 'http';
     /**
      * The namespace both job endpoints are mounted under, `dispatch` and `run`
      * beneath it. Nothing is served on the namespace itself.
@@ -49,11 +61,30 @@ export interface JobsConfig {
 }
 
 /**
- * How a deployment runs the jobs it declares: where the two endpoints sit, what
+ * Jobs a long-running server runs itself, its schedules ticked by `startJobs`.
+ * No job endpoint is served, so the jobs need no identity.
+ */
+export interface InProcessJobsConfig {
+    mode: 'in-process';
+    path?: never;
+    method?: never;
+    windowMs?: never;
+    only?: never;
+    exclude?: never;
+}
+
+/**
+ * How a deployment runs the jobs it declares: how they are triggered, what
  * carries queued work out of the process, and where a failure that happened
  * after the response went out is reported.
  */
-export interface JobRunnerConfig extends JobsConfig {
+export type JobRunnerConfig = JobsConfig & JobDeliveryConfig;
+
+/**
+ * Where queued work goes and where a late failure is reported, whichever way
+ * the jobs are triggered.
+ */
+export interface JobDeliveryConfig {
     /**
      * Carries a queued job to whatever runs it. Without one, `queue` runs the
      * job in this process and it is lost on a crash.
@@ -403,8 +434,29 @@ export const isCompiledJob = (value: unknown): value is CompiledJob => {
  * Throws when either job endpoint lands on a path an API route already serves.
  * Called by `defineConfig`, the one place that sees both.
  */
+/**
+ * Throw when declared jobs do not say how they run, or when the job endpoints
+ * would be served with no identity guarding them.
+ */
+export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | undefined): void => {
+    const flattened = jobs ? flattenJobs(jobs) : [];
+    if (flattened.length === 0) return;
+    if (config?.mode === undefined) {
+        throw new Error(
+            "The jobs do not say how they run. Set `jobRunner: { mode: 'http' }` to serve `/jobs/dispatch` and `/jobs/run`, " +
+                "or `jobRunner: { mode: 'in-process' }` when `startJobs` ticks them in this process."
+        );
+    }
+    if (config.mode === 'in-process' || flattened.some(({ job }) => job.identity !== undefined)) return;
+    const base = config.path ?? DEFAULT_JOBS_PATH;
+    throw new Error(
+        `The jobs declare no identity, so \`${base}/dispatch\` and \`${base}/run\` would let anyone trigger them. ` +
+            "Pass an identity to `k.jobs`, or set `jobRunner: { mode: 'in-process' }` when the jobs run in this process with `startJobs`."
+    );
+};
+
 export const jobClaims = (jobs: Jobs | undefined, config: JobsConfig | undefined): PathClaim[] => {
-    if (!jobs || flattenJobs(jobs).length === 0) return [];
+    if (!jobs || config?.mode === 'in-process' || flattenJobs(jobs).length === 0) return [];
     const base = config?.path ?? DEFAULT_JOBS_PATH;
     return [
         {

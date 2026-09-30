@@ -45,14 +45,14 @@ See [`defineConfig`](/docs/reference/define-config) for every field it takes.
 
 ## What each key brings
 
-| Key              | What it brings                                                                                                                                                                                              |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `auth`           | The identities a route's `auth` can require. Each carries its own guard, so this is all the config needs. An identity used without a guard refuses to assemble. See [Authentication](/docs/authentication). |
-| `requestContext` | Values every handler receives, resolved once per request. Resolvers run on every route, before the guards, and never deny. See [Request Context](/docs/request-context).                                    |
-| `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints), and every handler receives a typed `jobs` runner so a route can run one in process.                           |
-| `plugins`        | Routes, jobs and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                    |
-| `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                           |
-| `tags`           | The OpenAPI tags route groups sit under. See [`k.tags`](/docs/reference/k-tags).                                                                                                                            |
+| Key              | What it brings                                                                                                                                                                                                              |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth`           | The identities a route's `auth` can require. Each carries its own guard, so this is all the config needs. An identity used without a guard refuses to assemble. See [Authentication](/docs/authentication).                 |
+| `requestContext` | Values every handler receives, resolved once per request. Resolvers run on every route, before the guards, and never deny. See [Request Context](/docs/request-context).                                                    |
+| `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints) unless `jobRunner.mode` is `'in-process'`, and every handler receives a typed `jobs` runner so a route can run one in process. |
+| `plugins`        | Routes, jobs and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                                    |
+| `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                                           |
+| `tags`           | The OpenAPI tags route groups sit under. See [`k.tags`](/docs/reference/k-tags).                                                                                                                                            |
 
 ## Using what a plugin offers
 

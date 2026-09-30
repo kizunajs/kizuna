@@ -100,6 +100,9 @@ const contract = defineConfig({
     ...config,
     adapter: honoAdapter(),
     routes,
+    jobRunner: {
+        mode: 'http',
+    },
     jobs,
 }).api;
 
@@ -169,5 +172,35 @@ describe('the dispatch endpoint', () => {
         const response = await buildApp().request('/users');
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual(['ada']);
+    });
+});
+
+describe('jobs that run in process', () => {
+    const buildClosedApp = () => {
+        const { api } = defineConfig({
+            ...config,
+            adapter: honoAdapter(),
+            routes,
+            jobs: k.jobs({
+                sendDigests: k
+                    .job({
+                        schedule: '* * * * *',
+                    })
+                    .handler(() => {}),
+            }),
+            jobRunner: {
+                mode: 'in-process',
+            },
+        });
+        const app = new Hono();
+        api.mount(app);
+        return app;
+    };
+
+    it.each([['/jobs/dispatch'], ['/jobs/run']])('mounts nothing at %s', async (path) => {
+        const response = await buildClosedApp().request(path, {
+            method: 'POST',
+        });
+        expect(response.status).toBe(404);
     });
 });

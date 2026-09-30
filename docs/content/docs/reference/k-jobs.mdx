@@ -36,7 +36,15 @@ export const jobs = k.jobs('scheduler', {
 
 Jobs nest to any depth. Because a job carries its own identity, it declares no `auth` of its own.
 
-Omitting the identity argument declares the jobs public, which leaves anyone who can reach `/jobs/run` able to trigger them. Pass an identity unless the endpoints are unreachable from outside your network.
+Omit the identity argument only for jobs that run in process, with `jobRunner: { mode: 'in-process' }`. Otherwise `/jobs/run` would let anyone trigger them, so `defineConfig` throws.
+
+```ts title="jobs.ts"
+export const jobs = k.jobs({
+    sendDigests: {
+        schedule: cron.daily('05:00'),
+    },
+});
+```
 
 See the [Scheduled jobs guide](/docs/jobs) for handlers, triggering, and local development.
 

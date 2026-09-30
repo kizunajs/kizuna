@@ -83,6 +83,9 @@ const install = (on?: ResendEventHandlers, intercept?: ResendPluginProps['interc
         adapter: expressAdapter(),
         routes: {},
         jobs,
+        jobRunner: {
+            mode: 'in-process',
+        },
         plugins: [
             resendPlugin({
                 apiKey: 're_test',

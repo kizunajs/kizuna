@@ -34,6 +34,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
+        mode: 'http',
         transport: myQueue,
     },
 });
@@ -194,6 +195,7 @@ export default defineConfig({
     routes,
     jobs,
     jobRunner: {
+        mode: 'http',
         transport: qstash({
             token: process.env.QSTASH_TOKEN,
             baseUrl: 'https://api.example.com',

@@ -137,6 +137,9 @@ const contract = defineConfig({
     ...config,
     adapter: expressAdapter(),
     routes,
+    jobRunner: {
+        mode: 'http',
+    },
     jobs,
 }).api;
 
@@ -300,6 +303,9 @@ describe('a job outside a tick', () => {
             ...config,
             adapter: expressAdapter(),
             routes,
+            jobRunner: {
+                mode: 'http',
+            },
             jobs: k.jobs('scheduler', {
                 sendDigests: k.job({
                     schedule: '* * * * *',
@@ -357,6 +363,7 @@ describe('onJobError', () => {
                     .handler(() => {}),
             }),
             jobRunner: {
+                mode: 'http',
                 onError: onJobError,
             },
         });
@@ -381,5 +388,45 @@ describe('onJobError', () => {
         await vi.waitFor(() => expect(error).toHaveBeenCalled());
         expect(error.mock.calls[0]?.[0]).toContain('reconcile');
         error.mockRestore();
+    });
+});
+
+describe('jobs that run in process', () => {
+    const buildClosedApp = () => {
+        const { api } = defineConfig({
+            ...config,
+            adapter: expressAdapter(),
+            routes,
+            jobs: k.jobs({
+                reconcile: k
+                    .job({
+                        input: z.object({
+                            since: z.string(),
+                        }),
+                    })
+                    .handler(({ input }) => {
+                        reconcileRan(input.since.length);
+                    }),
+            }),
+            jobRunner: {
+                mode: 'in-process',
+            },
+        });
+        const app = express();
+        app.use(express.json());
+        api.mount(app);
+        return app;
+    };
+
+    it.each([['/jobs/dispatch'], ['/jobs/run']])('mounts nothing at %s', async (path) => {
+        const response = await request(buildClosedApp()).post(path).send({ job: 'reconcile' });
+        expect(response.status).toBe(404);
+        expect(reconcileRan).not.toHaveBeenCalled();
+    });
+
+    it('still runs a job a route handler queues', async () => {
+        const response = await request(buildClosedApp()).post('/users').send({ name: 'yesterday' });
+        expect(response.status).toBe(201);
+        await vi.waitFor(() => expect(reconcileRan).toHaveBeenCalledWith(9));
     });
 });

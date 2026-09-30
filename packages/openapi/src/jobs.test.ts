@@ -55,6 +55,9 @@ const jobs = k.jobs('scheduler', {
 const contract = defineConfig({
     ...config,
     routes,
+    jobRunner: {
+        mode: 'http',
+    },
     jobs,
 }).api as unknown as ApiDefinition;
 

@@ -7,7 +7,7 @@ import { assertValidDeprecationDates } from './deprecation.js';
 import { assertValidCache } from './cache.js';
 import { injectGuardResponses } from './guard-responses.js';
 import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline.js';
-import { jobClaims, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
+import { assertJobRunner, jobClaims, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
 import type { TagOptions, TagSet } from './tags.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
@@ -223,13 +223,6 @@ export type KizunaConfigInput<
         issueCodes?: readonly Codes[];
     };
     /**
-     * How this deployment runs the jobs it declares: where the two endpoints
-     * sit, what carries queued work out of the process, and where a failure is
-     * reported. The jobs themselves are declared with `k.jobs` and go under
-     * `jobs`.
-     */
-    jobRunner?: JobRunnerConfig;
-    /**
      * What `kizuna generate` writes the `Config` to.
      *
      * @example
@@ -261,7 +254,24 @@ export type KizunaConfigInput<
      * }
      */
     diff?: DiffSettings;
-};
+} & JobRunnerInput<J>;
+
+/**
+ * `jobRunner`, required once `jobs` declares one.
+ */
+type JobRunnerInput<J extends Jobs> = string extends keyof J
+    ? {
+          jobRunner?: JobRunnerConfig;
+      }
+    : {
+          /**
+           * How this deployment runs the jobs it declares: over HTTP or in
+           * process, what carries queued work out of the process, and where a
+           * failure is reported. The jobs themselves are declared with
+           * `k.jobs` and go under `jobs`.
+           */
+          jobRunner: JobRunnerConfig;
+      };
 
 /**
  * The api `defineConfig` assembles: the routes it declares, and the `mount`
@@ -345,6 +355,7 @@ export const defineConfig = <
     const pluginRoutes = pluginRouteTree(plugins);
 
     assertNoPathCollisions([...routeClaims(routes), ...routeClaims(pluginRoutes, 'Plugin route'), ...jobClaims(jobs, options.jobRunner)]);
+    assertJobRunner(jobs, options.jobRunner);
     assertValidDeprecationDates(routes);
     assertValidDeprecationDates(pluginRoutes);
 

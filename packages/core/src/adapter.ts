@@ -354,12 +354,15 @@ export const assembleApi = <const R extends Routes>(
 
 /**
  * The endpoints jobs are served on, in the {@link Routes} shape the request
- * pipeline takes.
+ * pipeline takes. None when the jobs run in process.
  */
-export const jobRoutes = (meta: JobsMeta): Routes => ({
-    [DISPATCH_ROUTE_KEY]: dispatchRoute(meta),
-    [RUN_ROUTE_KEY]: runRoute(meta),
-});
+export const jobRoutes = (meta: JobsMeta): Routes =>
+    meta.config?.mode === 'in-process'
+        ? {}
+        : {
+              [DISPATCH_ROUTE_KEY]: dispatchRoute(meta),
+              [RUN_ROUTE_KEY]: runRoute(meta),
+          };
 
 /**
  * Their handlers, in the {@link Router} shape the request pipeline takes.
