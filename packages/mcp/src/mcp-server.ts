@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { problemDetails } from 'kizunajs';
-import { McpServer, acceptedContent, inputRequired, type CallToolResult, type InputRequiredResult } from '@modelcontextprotocol/server';
+import { McpServer, inputRequired, inputResponse, type CallToolResult, type InputRequiredResult } from '@modelcontextprotocol/server';
 import { flattenRoutes, validateRequest } from 'kizunajs/adapter';
 import {
     ResponseError,
@@ -21,7 +21,7 @@ import {
     guardDenyFor,
     isGuardDenial,
 } from 'kizunajs/adapter';
-import { contractOf } from 'kizunajs/adapter';
+import { contractOf, jobRunnerFrom, pluginExportsOf, JOBS_META, type JobsMeta } from 'kizunajs/adapter';
 import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from 'kizunajs';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from 'kizunajs/generator';
@@ -121,8 +121,8 @@ interface McpToolContext {
 const approval = (route: RouteDefinition, context: McpToolContext): CallToolResult | InputRequiredResult | undefined => {
     if (toolOptionsOf(route)?.needsApproval !== true) return undefined;
 
-    const answer = acceptedContent<{ approved?: boolean }>(context.mcpReq?.inputResponses as never, APPROVAL_KEY);
-    if (answer === undefined) {
+    const answer = inputResponse(context.mcpReq?.inputResponses as never, APPROVAL_KEY);
+    if (answer.kind === 'missing') {
         return inputRequired({
             inputRequests: {
                 [APPROVAL_KEY]: inputRequired.elicit({
@@ -142,7 +142,7 @@ const approval = (route: RouteDefinition, context: McpToolContext): CallToolResu
         });
     }
 
-    if (answer.approved === true) return undefined;
+    if (answer.kind === 'elicit' && answer.action === 'accept' && answer.content?.[APPROVAL_KEY] === true) return undefined;
     return {
         content: [
             {
@@ -414,7 +414,8 @@ const executeToolCall = async (
     credentialHeaders?: Record<string, string | string[] | undefined>,
     contextResolvers?: RequestContextMap,
     transportAuth?: McpServerOptions['transportAuth'],
-    guardSchema?: z.ZodType
+    guardSchema?: z.ZodType,
+    apiArgs?: Record<string, unknown>
 ): Promise<ToolCallResult> => {
     const params = (args.params ?? {}) as Record<string, string>;
     const query = (args.query ?? {}) as Record<string, unknown>;
@@ -503,6 +504,7 @@ const executeToolCall = async (
             headers: validation.parsed.headers,
             throwError,
             ...handlerContext,
+            ...apiArgs,
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),
         });
@@ -555,6 +557,13 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     const contextResolvers = (api as unknown as Record<typeof REQUEST_CONTEXT_META, RequestContextMap | undefined>)[REQUEST_CONTEXT_META];
 
     const contract = contractOf<ApiDefinition | undefined>(api);
+    const pluginExports = pluginExportsOf(api);
+    const jobRunner = jobRunnerFrom((api as unknown as Record<typeof JOBS_META, JobsMeta | undefined>)[JOBS_META]);
+    // What every handler receives from the api itself, as the HTTP pipeline hands it.
+    const apiArgs = {
+        ...(jobRunner === undefined ? {} : { jobs: jobRunner }),
+        ...(Object.keys(pluginExports).length === 0 ? {} : { plugins: pluginExports }),
+    };
 
     const definitions = buildMcpTools(api.routes);
 
@@ -596,7 +605,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     options?.credentialHeaders,
                     contextResolvers,
                     options?.transportAuth,
-                    guardSchema
+                    guardSchema,
+                    apiArgs
                 );
             }
         );

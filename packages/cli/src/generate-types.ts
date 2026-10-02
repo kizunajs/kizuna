@@ -94,14 +94,46 @@ const findConfigObject = (source: ts.SourceFile): ts.ObjectLiteralExpression => 
 };
 
 /**
+ * The `const`s the config declares before exporting, by name. A value rooted at
+ * one is typed as the const's own initializer, since the generated file can
+ * import nothing from the config module itself.
+ */
+let localInitializers = new Map<string, ts.Expression>();
+
+const collectLocalInitializers = (source: ts.SourceFile): Map<string, ts.Expression> => {
+    const locals = new Map<string, ts.Expression>();
+    for (const statement of source.statements) {
+        if (!ts.isVariableStatement(statement)) continue;
+        for (const declaration of statement.declarationList.declarations) {
+            if (ts.isIdentifier(declaration.name) && declaration.initializer) locals.set(declaration.name.text, declaration.initializer);
+        }
+    }
+    return locals;
+};
+
+/**
  * The identifier a value is rooted at, so the generated file imports it. A call
  * is rooted at what it calls, which is how `expressAdapter()` reaches
- * `expressAdapter`.
+ * `expressAdapter`, and a local const at what made it.
  */
 const rootIdentifier = (expression: ts.Expression): ts.Identifier | undefined => {
-    if (ts.isIdentifier(expression)) return expression;
+    if (ts.isIdentifier(expression)) {
+        const local = localInitializers.get(expression.text);
+        return local === undefined ? expression : rootIdentifier(local);
+    }
     if (ts.isCallExpression(expression)) return rootIdentifier(expression.expression as ts.Expression);
     return undefined;
+};
+
+/**
+ * Whether the value is a call once local consts are followed, so a config that
+ * names `const cms = cmsPlugin(...)` under `plugins` types as the call's return.
+ */
+const isCallOnceResolved = (expression: ts.Expression): boolean => {
+    if (ts.isCallExpression(expression)) return true;
+    if (!ts.isIdentifier(expression)) return false;
+    const local = localInitializers.get(expression.text);
+    return local === undefined ? false : isCallOnceResolved(local);
 };
 
 /**
@@ -116,7 +148,7 @@ const typeOfValue = (expression: ts.Expression, used: Set<string>, key: ConfigKe
         );
     }
     used.add(root.text);
-    return ts.isCallExpression(expression) ? `ReturnType<typeof ${root.text}>` : `typeof ${root.text}`;
+    return isCallOnceResolved(expression) ? `ReturnType<typeof ${root.text}>` : `typeof ${root.text}`;
 };
 
 /**
@@ -276,6 +308,7 @@ const renderImports = (imports: Map<string, ImportedName>, used: Set<string>, re
 export const generateConfigTypes = (configSource: string, fileName = 'kizuna.config.ts', outputPath?: string): string => {
     const source = ts.createSourceFile(fileName, configSource, ts.ScriptTarget.Latest, true);
     const imports = collectImports(source);
+    localInitializers = collectLocalInitializers(source);
     const configObject = findConfigObject(source);
 
     const declared = new Map<string, ts.Expression>();

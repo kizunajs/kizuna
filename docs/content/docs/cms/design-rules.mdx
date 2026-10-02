@@ -1,0 +1,44 @@
+---
+title: Design rules
+description: For designers. The limits in a schema are what keep a page looking as you designed it, a year of edits later.
+---
+
+A page looks right because the heading fits one line, the card has one image, the grid holds at most six products. Once a client can edit, each of those is a rule someone has to keep. Here the rule is the schema, so the editor, the agent and the API meet the same limit and nothing ships past it.
+
+You do not need to write Zod to set these. Tell the developer what you want; this is what it becomes, and what the editor sees.
+
+| You want                                   | The schema says                    | The editor sees                                              |
+| ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------ |
+| A heading that fits one line               | `z.string().max(60)`               | A text input with a counter that refuses the 61st letter     |
+| A short paragraph                          | `z.string().max(300)`              | A textarea with a counter                                    |
+| One of a few looks                         | `z.enum(['light', 'dark'])`        | A select with those options                                  |
+| Two to six products                        | `z.array(ProductId).min(2).max(6)` | A sortable list that stops adding at six                     |
+| A link that is https                       | `z.url({ protocol: /^https$/ })`   | A URL input that says https only                             |
+| An image with a crop and alt text          | `ImageSchema`                      | Upload, crop and alt text, with the focal point on the image |
+| A field only the client's admin may change | `auth: { roles: 'admin' }`         | The field, greyed out                                        |
+| A field nobody edits                       | `readOnly: true`                   | The value, read only                                         |
+
+## Say why
+
+`.describe()` text sits under the input and is what the agent reads before writing. Brief it like a copywriter:
+
+```ts
+export const HeadingSchema = z.string().min(1).max(60).describe('Under 8 words. No full stop.');
+```
+
+A limit with a reason gets kept.
+
+## Keep each rule in one place
+
+When the design changes, the rule changes once:
+
+```ts title="src/cms/schemas.ts"
+export const CtaSchema = z.object({
+    label: z.string().min(1).max(24).describe('Two or three words.'),
+    href: z.url({
+        protocol: /^https$/,
+    }),
+});
+```
+
+With these in place the client changes every word, picture and product pick through the preview or an agent, as a draft they publish when ready. Adding a field, moving a section or changing a layout is a code change you make with the developers, reviewed and shipped like any other.

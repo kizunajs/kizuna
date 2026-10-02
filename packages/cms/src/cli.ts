@@ -1,0 +1,371 @@
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { pluginExportsOf } from 'kizunajs/adapter';
+import type { CmsExports } from './plugin.js';
+import type { CmsService } from './cms.js';
+import type { EnvironmentOptions } from './options.js';
+import { CMS_MIGRATION_SQL } from './storage/migration.js';
+import { discoverPages, findAppDir } from './discovery.js';
+import { mediaIdsOf } from './media/resolve.js';
+import { refsOf } from './content.js';
+import type { MediaRecord } from './media/media.js';
+
+/**
+ * What the kizuna CLI hands a plugin's commands.
+ */
+export interface PluginCliContext {
+    cwd: string;
+    configPath: string;
+    /**
+     * Loads the config and returns its api, or `undefined` when there is none.
+     */
+    loadApi: () => Promise<unknown>;
+    stdout: (line: string) => void;
+    stderr: (line: string) => void;
+}
+
+const USAGE = `Usage: kizuna cms <command> [options]
+
+Commands:
+  migrate    Write the CMS tables as a migration into the migrations folder.
+  pages      List every page's path and name.
+  push       Copy one page into another environment as a draft, with its media.
+  pull       Copy published content and media from an environment into local.
+
+Options:
+  --json             Print machine-readable output.
+  --out <dir>        migrate: the migrations folder. Default: ./drizzle
+  --app <dir>        pages: the app directory. Default: src/app or app
+  --to <env>         push: the target environment. pull: the destination. Default: local
+  --from <env>       push: the source environment. Default: local. pull: the source, required.
+`;
+
+class CliError extends Error {}
+
+type Flags = Record<string, string | boolean>;
+
+const parse = (argv: readonly string[]): { command: string | undefined; positional: string[]; flags: Flags } => {
+    const flags: Flags = {};
+    const positional: string[] = [];
+    for (let index = 0; index < argv.length; index += 1) {
+        const argument = argv[index]!;
+        if (!argument.startsWith('--')) {
+            positional.push(argument);
+            continue;
+        }
+        const name = argument.slice(2);
+        const next = argv[index + 1];
+        if (next === undefined || next.startsWith('--') || name === 'json') {
+            flags[name] = true;
+            continue;
+        }
+        flags[name] = next;
+        index += 1;
+    }
+    return {
+        command: positional.shift(),
+        positional,
+        flags,
+    };
+};
+
+const serviceOf = async (context: PluginCliContext): Promise<CmsService> => {
+    const api = await context.loadApi();
+    if (api === undefined) throw new CliError(`No config found at ${context.configPath}.`);
+    const exported = Object.values(pluginExportsOf(api)).find(
+        (candidate): candidate is CmsExports => typeof candidate === 'object' && candidate !== null && 'service' in candidate
+    );
+    if (exported === undefined) throw new CliError('The config installs no cmsPlugin.');
+    return exported.service;
+};
+
+const environmentOf = (service: CmsService, name: string): EnvironmentOptions => {
+    const environment = service.options.environments?.[name];
+    if (environment === undefined) {
+        const known = Object.keys(service.options.environments ?? {});
+        throw new CliError(
+            `No environment named '${name}'. ${known.length === 0 ? 'Name environments under `environments` on cmsPlugin.' : `Known: ${known.join(', ')}.`}`
+        );
+    }
+    return environment;
+};
+
+interface Answer {
+    status: number;
+    body: any;
+}
+
+interface Remote {
+    call: (method: string, path: string, body?: unknown) => Promise<Answer>;
+    bytes: (path: string) => Promise<Uint8Array<ArrayBuffer>>;
+}
+
+const remote = (environment: EnvironmentOptions, basePath: string): Remote => ({
+    bytes: async (path) => {
+        const response = await fetch(`${environment.url.replace(/\/$/, '')}${basePath}${path}`, {
+            headers: environment.headers,
+        });
+        if (!response.ok) throw new CliError(`Reading ${path} answered ${response.status}.`);
+        return new Uint8Array(await response.arrayBuffer());
+    },
+    call: async (method, path, body) => {
+        const response = await fetch(`${environment.url.replace(/\/$/, '')}${basePath}${path}`, {
+            method,
+            headers: {
+                ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+                ...environment.headers,
+            },
+            body: body === undefined ? undefined : JSON.stringify(body),
+        });
+        const text = await response.text();
+        let parsed: unknown;
+        try {
+            parsed = text === '' ? undefined : JSON.parse(text);
+        } catch {
+            parsed = text;
+        }
+        return {
+            status: response.status,
+            body: parsed,
+        };
+    },
+});
+
+const expectStatus = (answer: Answer, expected: number, what: string): void => {
+    if (answer.status === expected) return;
+    const detail = typeof answer.body === 'object' && answer.body !== null && 'detail' in answer.body ? String(answer.body.detail) : '';
+    throw new CliError(`${what} answered ${answer.status}. ${detail}`.trim());
+};
+
+/**
+ * Copies every media item a document refers to that the target lacks, and
+ * returns the ids copied. Ids are content hashes, so the target names each
+ * file the same.
+ */
+const copyMedia = async (ids: readonly string[], source: Remote, target: Remote): Promise<string[]> => {
+    const copied: string[] = [];
+    for (const id of ids) {
+        const existing = await target.call('GET', `/media/${encodeURIComponent(id)}`);
+        if (existing.status === 200) continue;
+        const record = await source.call('GET', `/media/${encodeURIComponent(id)}`);
+        expectStatus(record, 200, `Reading media ${id} from the source`);
+        const media = record.body as MediaRecord;
+        const bytes = await source.bytes(`/media/${encodeURIComponent(id)}/file`);
+        const created = await target.call('POST', '/media/uploads', {
+            filename: media.filename,
+            contentType: media.contentType,
+            size: bytes.byteLength,
+        });
+        expectStatus(created, 201, `Starting the upload of ${id} on the target`);
+        const put = await fetch(created.body.url, {
+            method: 'PUT',
+            headers: created.body.headers,
+            body: bytes,
+        });
+        if (!put.ok) throw new CliError(`Uploading ${id} to the target storage answered ${put.status}.`);
+        const completed = await target.call('POST', `/media/uploads/${encodeURIComponent(created.body.uploadId)}`);
+        expectStatus(completed, 201, `Finishing the upload of ${id} on the target`);
+        if (completed.body.id !== id) {
+            throw new CliError(`The target stored ${id} as ${completed.body.id}; the bytes differ between environments.`);
+        }
+        if (media.alt !== '' || media.focalPoint !== undefined) {
+            await target.call('PATCH', `/media/${encodeURIComponent(id)}`, {
+                alt: media.alt,
+                focalPoint: media.focalPoint,
+            });
+        }
+        copied.push(id);
+    }
+    return copied;
+};
+
+interface MissingId {
+    brand: string;
+    id: string;
+    fieldPath: string;
+}
+
+const missingBrandIds = async (
+    service: CmsService,
+    refs: ReturnType<typeof refsOf>,
+    warn: (line: string) => void
+): Promise<MissingId[]> => {
+    const missing: MissingId[] = [];
+    const byBrand = new Map<string, typeof refs>();
+    for (const ref of refs) byBrand.set(ref.brand, [...(byBrand.get(ref.brand) ?? []), ref]);
+    for (const [brand, brandRefs] of byBrand) {
+        const exists = service.options.brands?.[brand]?.exists;
+        if (exists === undefined) {
+            warn(`warning: the brand '${brand}' registers no \`exists\`, so its ids were not checked.`);
+            continue;
+        }
+        const found = new Set(await exists([...new Set(brandRefs.map((ref) => ref.refId))]));
+        for (const ref of brandRefs) {
+            if (!found.has(ref.refId)) {
+                missing.push({
+                    brand,
+                    id: ref.refId,
+                    fieldPath: ref.fieldPath,
+                });
+            }
+        }
+    }
+    return missing;
+};
+
+const runMigrate = (context: PluginCliContext, flags: Flags): Record<string, unknown> => {
+    const out = resolve(context.cwd, typeof flags['out'] === 'string' ? flags['out'] : 'drizzle');
+    mkdirSync(out, {
+        recursive: true,
+    });
+    const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
+    const file = join(out, `${stamp}_kizuna_cms.sql`);
+    if (existsSync(file)) throw new CliError(`${file} already exists.`);
+    writeFileSync(file, CMS_MIGRATION_SQL);
+    return {
+        file,
+        tables: ['cms_documents', 'cms_versions', 'cms_refs'],
+    };
+};
+
+const runPages = (context: PluginCliContext, flags: Flags): Array<{ name: string; path: string; file: string }> => {
+    const appDir = typeof flags['app'] === 'string' ? resolve(context.cwd, flags['app']) : findAppDir(context.cwd);
+    if (appDir === undefined) throw new CliError('No app directory found. Pass --app.');
+    return discoverPages(appDir);
+};
+
+const runPush = async (context: PluginCliContext, positional: string[], flags: Flags): Promise<Record<string, unknown>> => {
+    const name = positional[0];
+    if (name === undefined) throw new CliError('Name the page to push: kizuna cms push <page> --to <env>.');
+    if (typeof flags['to'] !== 'string') throw new CliError('Pass --to <env>.');
+    const from = typeof flags['from'] === 'string' ? flags['from'] : 'local';
+    const service = await serviceOf(context);
+    const entry = service.pages[name];
+    if (entry === undefined) throw new CliError(`No page named '${name}'. Known: ${Object.keys(service.pages).join(', ')}.`);
+    const source = remote(environmentOf(service, from), service.basePath);
+    const target = remote(environmentOf(service, flags['to']), service.basePath);
+
+    const draft = await source.call('GET', `/pages/${encodeURIComponent(name)}/draft`);
+    expectStatus(draft, 200, `Reading the draft of '${name}' from the source`);
+    const content = draft.body.content as Record<string, unknown> | null;
+    if (content === null) throw new CliError(`The source has no draft of '${name}'.`);
+
+    const media = await copyMedia(mediaIdsOf(entry.page, content), source, target);
+    const missing = await missingBrandIds(service, refsOf(entry.page, content), context.stderr);
+
+    const written = await target.call('PATCH', `/pages/${encodeURIComponent(name)}/draft`, {
+        changes: content,
+        summary: `Pushed from ${from}`,
+    });
+    expectStatus(written, 200, `Writing the draft of '${name}' on the target`);
+    return {
+        page: name,
+        to: flags['to'],
+        version: written.body.version,
+        complete: written.body.complete,
+        mediaCopied: media,
+        missingIds: missing,
+    };
+};
+
+const runPull = async (context: PluginCliContext, flags: Flags): Promise<Record<string, unknown>> => {
+    if (typeof flags['from'] !== 'string') throw new CliError('Pass --from <env>.');
+    const service = await serviceOf(context);
+    const destinationName = typeof flags['to'] === 'string' ? flags['to'] : 'local';
+    const destination = environmentOf(service, destinationName);
+    if (destination.production === true) {
+        throw new CliError(`'${destinationName}' is marked production. pull only writes into a local or staging environment.`);
+    }
+    const source = remote(environmentOf(service, flags['from']), service.basePath);
+    const target = remote(destination, service.basePath);
+    const pulled: Array<{ page: string; version: number; mediaCopied: string[] }> = [];
+    const skipped: string[] = [];
+    for (const [name, entry] of Object.entries(service.pages)) {
+        const published = await source.call('GET', `/pages/${encodeURIComponent(name)}`);
+        if (published.status === 404) {
+            skipped.push(name);
+            continue;
+        }
+        expectStatus(published, 200, `Reading '${name}' from the source`);
+        const content = published.body.content as Record<string, unknown>;
+        const media = await copyMedia(mediaIdsOf(entry.page, content), source, target);
+        const written = await target.call('PATCH', `/pages/${encodeURIComponent(name)}/draft`, {
+            changes: content,
+            summary: `Pulled from ${flags['from']}`,
+        });
+        expectStatus(written, 200, `Writing '${name}' on the destination`);
+        const release = await target.call('POST', `/pages/${encodeURIComponent(name)}/publish`, {});
+        expectStatus(release, 200, `Publishing '${name}' on the destination`);
+        pulled.push({
+            page: name,
+            version: written.body.version,
+            mediaCopied: media,
+        });
+    }
+    return {
+        from: flags['from'],
+        to: destinationName,
+        pulled,
+        skipped,
+    };
+};
+
+/**
+ * `kizuna cms …`, as the kizuna CLI delegates it. Returns the exit code.
+ */
+export const run = async (argv: readonly string[], context: PluginCliContext): Promise<number> => {
+    const { command, positional, flags } = parse(argv);
+    const json = flags['json'] === true;
+    try {
+        switch (command) {
+            case 'migrate': {
+                const result = runMigrate(context, flags);
+                context.stdout(json ? JSON.stringify(result, null, 2) : `Wrote ${result['file']}`);
+                return 0;
+            }
+            case 'pages': {
+                const pages = runPages(context, flags);
+                context.stdout(
+                    json ? JSON.stringify(pages, null, 2) : pages.map((entry) => `${entry.path.padEnd(32)} ${entry.name}`).join('\n')
+                );
+                return 0;
+            }
+            case 'push': {
+                const result = await runPush(context, positional, flags);
+                const missing = result['missingIds'] as MissingId[];
+                context.stdout(
+                    json
+                        ? JSON.stringify(result, null, 2)
+                        : [
+                              `Pushed ${result['page']} to ${result['to']} as draft version ${result['version']}.`,
+                              ...(missing.length === 0
+                                  ? []
+                                  : [
+                                        'Missing on the target:',
+                                        ...missing.map((entry) => `  ${entry.brand} ${entry.id} at ${entry.fieldPath}`),
+                                    ]),
+                          ].join('\n')
+                );
+                return missing.length === 0 ? 0 : 2;
+            }
+            case 'pull': {
+                const result = await runPull(context, flags);
+                context.stdout(
+                    json
+                        ? JSON.stringify(result, null, 2)
+                        : `Pulled ${(result['pulled'] as unknown[]).length} pages from ${result['from']} into ${result['to']}.`
+                );
+                return 0;
+            }
+            default:
+                context.stdout(USAGE);
+                return command === undefined ? 0 : 1;
+        }
+    } catch (error) {
+        if (error instanceof CliError) {
+            context.stderr(json ? JSON.stringify({ error: error.message }) : error.message);
+            return 1;
+        }
+        throw error;
+    }
+};

@@ -11,5 +11,8 @@
         "**/__fixtures__",
         "apps/next-demo",
         "apps/express-demo"
-    ]
+    ],
+    "compilerOptions": {
+        "jsx": "react-jsx"
+    }
 }

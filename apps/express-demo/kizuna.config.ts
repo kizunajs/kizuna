@@ -6,12 +6,14 @@ import { expressAdapter } from '@kizunajs/express';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';
 import { resendPlugin } from '@kizunajs/resend';
+import { cmsPlugin } from '@kizunajs/cms';
 import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
 import { diagnostics } from './src/routes/diagnostics';
 import { contact } from './src/routes/contact';
 import { newsletter } from './src/routes/newsletter';
 import { emailPlugin } from './src/plugins/email';
 import { resendEvents } from './src/resend-events';
+import { cmsDatabase } from './src/cms-database';
 
 /**
  * The shared routes every demo serves, plus the ones only this demo can answer.
@@ -100,6 +102,14 @@ export default defineConfig({
             },
             webhookSecret: process.env.RESEND_WEBHOOK_SECRET ?? 'whsec_ZGVtbw==',
             on: resendEvents,
+        }),
+        cmsPlugin({
+            db: cmsDatabase,
+            pages: {},
+            auth: {
+                identity: 'member',
+                roles: ['admin', 'owner'],
+            },
         }),
     ],
 });

@@ -25,6 +25,7 @@
         "openapi",
         "mcp",
         "resend",
+        "cms",
         "---Tooling---",
         "cli",
         "eslint",

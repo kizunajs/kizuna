@@ -1,0 +1,112 @@
+---
+title: Content
+description: Declare what editors may change with pages, blocks and plain Zod fields, and change the shape later without losing content.
+---
+
+A page is a list of fields. A block is a list of fields several pages share. Each field is a name, a Zod schema, and who may edit it.
+
+## Fields
+
+```ts
+{
+    name: 'subheading',
+    schema: z.string().max(200).describe('One sentence under the heading.'),
+    auth: {
+        roles: 'admin',
+    },
+},
+```
+
+| Option        | What it is                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `name`        | The key the value is stored under. An identifier, since fields form paths like `hero.heading`.  |
+| `schema`      | Any Zod schema. Its limits hold in the API, the tools and the inline editor alike.              |
+| `description` | Guidance under the input, for editors and the agent. Overrides the schema's `.describe()` here. |
+| `auth`        | Who may write the field, in a route's own words: `roles`, or `requires` for permissions.        |
+| `readOnly`    | Visible to editors and the agent, writable by nobody.                                           |
+
+A field listed twice fails to compile. A role the editor identity does not declare fails when the config assembles, naming the page, the field and the role.
+
+## Blocks
+
+Build a block once and use it as a field wherever it belongs. Its field rules and descriptions travel with it:
+
+```ts title="src/cms/blocks.ts"
+import { z } from 'zod';
+import { block } from '@kizunajs/cms';
+import { ImageSchema } from '@kizunajs/cms/schemas';
+import { CtaSchema, HeadingSchema } from './schemas';
+
+export const HeroBlockSchema = block({
+    slug: 'hero',
+    fields: [
+        {
+            name: 'heading',
+            schema: HeadingSchema,
+        },
+        {
+            name: 'subheading',
+            schema: z.string().max(200),
+        },
+        {
+            name: 'image',
+            schema: ImageSchema,
+        },
+        {
+            name: 'cta',
+            schema: CtaSchema,
+        },
+    ],
+});
+```
+
+`block()` returns a Zod object schema, and `Output<T>` is that schema with media resolved, so the component is typed from the block:
+
+```tsx title="src/components/Hero.tsx"
+import type { Output } from '@kizunajs/cms';
+import type { HeroBlockSchema } from '../cms/blocks';
+
+export function Hero(props: Output<typeof HeroBlockSchema>) {
+    return (
+        <section>
+            <img src={props.image.url} alt={props.image.alt} width={props.image.width} height={props.image.height} />
+            <h1>{props.heading}</h1>
+        </section>
+    );
+}
+```
+
+Shared limits live in exported schemas, `HeadingSchema`, `CtaSchema`, `ProductId`, and every field that needs one uses it.
+
+## Pages
+
+```ts
+export default page({
+    name: 'springPage',
+    fields: [
+        // ...
+    ],
+    labels: {
+        featured: 'Featured products',
+    },
+});
+```
+
+`name` is how the page is read, `cms.pages.springPage`, and how tools address it: camelCase, a `Page` suffix, unique across the site, written as a literal so discovery can read it from the source. `labels` names fields for the inline editor; a field without one shows its name.
+
+## Changing the shape
+
+Content outlives the code that declared it, so a new field says what already-stored documents get.
+
+Give it a `.default()`, and stored content reads the default. Or add a `migrate` step keyed by the next version number; a document runs it once on its next read and saves the result as a new version:
+
+```ts
+migrate: {
+    1: (document) => ({
+        ...document,
+        subheading: '',
+    }),
+},
+```
+
+A new required field with neither makes stored content fail its schema. The reader then treats the page as unpublished rather than hand a component something invalid, and `kizuna diff` fails CI on it. A rename is a removal and an addition, so write a step that moves the value.

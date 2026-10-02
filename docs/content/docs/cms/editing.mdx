@@ -1,0 +1,48 @@
+---
+title: Editing
+description: Drafts, versions and publishing, the click-to-edit preview, and the tools an agent uses over MCP.
+---
+
+Every write goes to the draft. Publishing is a separate step someone takes on purpose, so neither an editor nor an agent can change what visitors see by accident.
+
+## Drafts and versions
+
+Every save is a version with the author and an optional summary. Changes are merged into the stored draft and the whole page is validated, so one field's change never leaves another invalid.
+
+An incomplete draft is kept, but never reaches the page component. In draft mode the preview shows the setup screen instead, with the missing fields and a prompt to hand an agent, such as "Fill in the spring page."
+
+Two people on one page cannot overwrite each other. The draft carries an `ETag`, a write sends it back as `If-Match`, and a write behind the latest version answers `409` instead of applying.
+
+Rollback restores an earlier version as a new draft, which you publish separately.
+
+## The preview
+
+`KizunaPreview` renders in draft mode only. The reader marks every string with its field path as invisible characters, the way Vercel's stega does, and every image URL with a fragment. Click text or an image, and an input for that field opens beside it. Save, and the page refreshes with the draft.
+
+The input comes from the schema:
+
+| Schema                  | Input                                                                         |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `z.string()`            | Text, or a textarea above 120 characters, with a counter when `.max()` is set |
+| `z.number()`, `z.int()` | Number, within `min` and `max`                                                |
+| `z.boolean()`           | Toggle                                                                        |
+| `z.enum()`              | Select                                                                        |
+| `z.url()`               | URL, saying which protocols are allowed                                       |
+| `z.iso.date()`          | Date picker                                                                   |
+| `z.object()`            | Grouped fields                                                                |
+| `z.array()`             | Sortable list with add and remove, within `min` and `max`                     |
+| `ImageSchema`           | Upload, crop and alt text                                                     |
+| A `Kizuna.brand` id     | A picker over the brand's search route                                        |
+| Anything else           | Read only, with a note to change it through the agent                         |
+
+The bar shows the page's status and version, opens every field in a panel, and publishes. Outside draft mode the overlay and the encoding are gone, so production HTML carries neither.
+
+## Agents
+
+Every editing route declares `tool`, so an MCP client signed in as an editor can do what the preview does. An agent starts from `cms_describe_page`: give it the URL someone is looking at, and it answers with the page, every field's path and JSON Schema, whether the caller may write it, and the current draft. A branded field's description names the brand and the tool that finds ids, "an array of ProductId; find ids with products_list_products."
+
+Then `cms_update_draft` with changes keyed by path, and `cms_publish` when the person says so. Publish and rollback declare `needsApproval`, so the client asks first. The rest are reads: pages, drafts, missing fields, history, where a branded id is used, and media, where an agent sets alt text and focal points on files the preview uploaded.
+
+A rule holds whoever asks. A write to a field the caller may not change answers `403`, from the route, with Problem Details.
+
+See [Tools](/docs/tools) for how a route publishes and [MCP](/docs/mcp) for the endpoint.

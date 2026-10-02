@@ -14,14 +14,17 @@
     "kizuna:check": "kizuna generate --check"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@kizunajs-demo/shared": "workspace:*",
-    "kizunajs": "workspace:*",
+    "@kizunajs/cms": "workspace:*",
     "@kizunajs/express": "workspace:*",
     "@kizunajs/fetch": "workspace:*",
     "@kizunajs/mcp": "workspace:*",
     "@kizunajs/openapi": "workspace:*",
     "@kizunajs/resend": "workspace:*",
+    "drizzle-orm": "^0.45.3",
     "express": "catalog:",
+    "kizunajs": "workspace:*",
     "resend": "^6.30.0",
     "zod": "catalog:"
   },

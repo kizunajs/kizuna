@@ -5,12 +5,14 @@ import express from 'express';
 import type { Server } from 'node:http';
 import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
+import { definePlugin } from 'kizunajs/plugin';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';
 
 interface Config {
     tags: typeof kTags;
+    plugins: [ReturnType<typeof mcpPlugin>, ReturnType<typeof greetingPlugin>];
 }
 
 const k = new Kizuna<Config>();
@@ -22,7 +24,59 @@ const config = {
     tags: kTags,
 };
 
+const greetingPlugin = definePlugin({
+    slug: 'greeting',
+    setup: () => ({
+        exports: {
+            greet: (name: string) => `Hello, ${name}`,
+        },
+    }),
+});
+
+const deleted: string[] = [];
+
 const routes = k.routes('api', {
+    deleteUser: k
+        .route({
+            method: 'DELETE',
+            path: '/users/:id',
+            summary: 'Delete a user',
+            tool: {
+                needsApproval: true,
+            },
+            responses: {
+                200: z.object({
+                    deleted: z.string(),
+                }),
+            },
+        })
+        .handler(({ params }) => {
+            deleted.push(params.id);
+            return {
+                status: 200,
+                body: {
+                    deleted: params.id,
+                },
+            };
+        }),
+    greetUser: k
+        .route({
+            method: 'GET',
+            path: '/greetings/:name',
+            tool: true,
+            summary: 'Greet someone through a plugin',
+            responses: {
+                200: z.object({
+                    greeting: z.string(),
+                }),
+            },
+        })
+        .handler(({ params, plugins }) => ({
+            status: 200,
+            body: {
+                greeting: plugins.greeting.greet(params.name),
+            },
+        })),
     getUser: k
         .route({
             method: 'GET',
@@ -52,6 +106,7 @@ const contract = defineConfig({
         mcpPlugin({
             name: 'Test API',
         }),
+        greetingPlugin(),
     ],
     routes,
 }).api;
@@ -124,8 +179,94 @@ describe('mcpPlugin', () => {
         });
     });
 
+    it('hands a tool call the plugins an HTTP request gets', async () => {
+        const connected = await connect();
+        const result = await connected.callTool({
+            name: 'greet_user',
+            arguments: {
+                params: {
+                    name: 'Ada',
+                },
+            },
+        });
+
+        const content = result.content as Array<{ text: string }>;
+        expect(JSON.parse(content[0]!.text)).toEqual({
+            status: 200,
+            body: {
+                greeting: 'Hello, Ada',
+            },
+        });
+    });
+
+    const connectAnswering = async (approved: boolean | 'decline') => {
+        const started = await start();
+        running = started.server;
+        const connected = new Client(
+            {
+                name: 'test-client',
+                version: '1.0.0',
+            },
+            {
+                capabilities: {
+                    elicitation: {},
+                },
+                versionNegotiation: {
+                    mode: 'auto',
+                },
+            }
+        );
+        connected.setRequestHandler('elicitation/create', async () =>
+            approved === 'decline'
+                ? {
+                      action: 'decline' as const,
+                  }
+                : {
+                      action: 'accept' as const,
+                      content: {
+                          approved,
+                      },
+                  }
+        );
+        await connected.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${started.port}/mcp`)));
+        client = connected;
+        return connected;
+    };
+
+    const deleteUser = (connected: Client) =>
+        connected.callTool({
+            name: 'delete_user',
+            arguments: {
+                params: {
+                    id: '7',
+                },
+            },
+        });
+
+    it('runs a call that needs approval once the person approves', async () => {
+        deleted.length = 0;
+        const result = await deleteUser(await connectAnswering(true));
+        expect(result.isError).toBeFalsy();
+        expect(deleted).toEqual(['7']);
+    });
+
+    it('runs nothing when the person declines, and asks only once', async () => {
+        deleted.length = 0;
+        const result = await deleteUser(await connectAnswering('decline'));
+        expect(result.isError).toBe(true);
+        expect((result.content as Array<{ text: string }>)[0]!.text).toBe('Declined, so nothing ran.');
+        expect(deleted).toEqual([]);
+    });
+
+    it('runs nothing when the person answers no', async () => {
+        deleted.length = 0;
+        const result = await deleteUser(await connectAnswering(false));
+        expect(result.isError).toBe(true);
+        expect(deleted).toEqual([]);
+    });
+
     it('leaves the endpoint out of the contract, so clients never see it', () => {
-        expect(Object.keys(contract.routes)).toEqual(['getUser']);
+        expect(Object.keys(contract.routes)).toEqual(['deleteUser', 'greetUser', 'getUser']);
     });
 
     it('still serves the contract routes over HTTP', async () => {

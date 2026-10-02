@@ -27,3 +27,7 @@ build/
 # planning notes
 plans/
 tests/.generated-client-*.ts
+
+# CMS demo database and uploads
+.pglite/
+.media/

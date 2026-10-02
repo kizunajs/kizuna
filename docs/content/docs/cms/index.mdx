@@ -1,0 +1,198 @@
+---
+title: CMS
+description: Make a Next.js site's copy, images and product picks editable from day one, by clicking on the page or by asking an agent.
+---
+
+<AlphaNotice>
+
+The CMS is new. Its routes, options and generated files may change while v2 is in beta, so pin your version if you depend on them.
+
+</AlphaNotice>
+
+<Supports items={['Next.js 16+', 'Postgres through Drizzle']} />
+
+You are building a site, and the client will want to change the copy. With `@kizunajs/cms`, each page declares its editable fields next to its route, the content lives in your own database, and editing works the day the site goes live.
+
+The schema is code. Editors change content, never its shape, so the design holds through a year of edits, and `kizuna generate --check` catches a mismatch before it ships.
+
+<InstallTabs packageName="@kizunajs/cms drizzle-orm" />
+
+<Steps>
+
+<Step>
+
+## Create the tables
+
+The CMS owns three tables and never runs DDL itself. Write them into your migrations folder and run them with the rest:
+
+```sh
+kizuna cms migrate --out drizzle
+```
+
+</Step>
+
+<Step>
+
+## Install the plugin and its routes
+
+The plugin holds the database, the pages and the rules. `cmsRoutes` are the routes editors and agents call, mounted beside your own so they reach the OpenAPI document, the clients and MCP like any other route:
+
+```ts title="kizuna.config.ts"
+import { cmsPlugin, cmsRoutes } from '@kizunajs/cms';
+import { nextRevalidate } from '@kizunajs/cms/next';
+import { pages } from './src/cms.pages';
+import { db } from './src/db';
+
+const cms = cmsPlugin({
+    db,
+    pages,
+    auth: {
+        identity: 'editor',
+        roles: ['editor', 'admin'],
+    },
+    revalidate: nextRevalidate,
+});
+
+export default defineConfig({
+    adapter: nextAdapter(),
+    routes: {
+        ...routes,
+        cms: cmsRoutes(cms),
+    },
+    auth: {
+        identities: {
+            editor,
+        },
+    },
+    plugins: [cms],
+});
+```
+
+`editor` is an identity of yours, with the roles editors hold. See [Access control](/docs/access-control).
+
+</Step>
+
+<Step>
+
+## Declare a page
+
+A `content.ts` beside the route says what editors may change. Every field is plain Zod:
+
+```ts title="src/app/lp/spring/content.ts"
+import { z } from 'zod';
+import { page } from '@kizunajs/cms';
+import { HeroBlockSchema } from '../../../cms/blocks';
+import { ProductId, SeoSchema } from '../../../cms/schemas';
+
+export default page({
+    name: 'springPage',
+    fields: [
+        {
+            name: 'hero',
+            schema: HeroBlockSchema,
+        },
+        {
+            name: 'featured',
+            schema: z.array(ProductId).max(6),
+            description: 'Products shown in the grid, in this order. Up to six.',
+        },
+        {
+            name: 'seo',
+            schema: SeoSchema,
+            auth: {
+                roles: 'admin',
+            },
+        },
+    ],
+});
+```
+
+</Step>
+
+<Step>
+
+## Let Next find the pages
+
+`withKizunaCms` finds every `content.ts` under `app/` and writes `src/cms.pages.ts`, the module the config imports, before Next compiles anything:
+
+```ts title="next.config.ts"
+import { withKizunaCms } from '@kizunajs/cms/next/config';
+
+export default withKizunaCms({
+    typedRoutes: true,
+});
+```
+
+`kizuna generate` writes the same file. Commit it.
+
+</Step>
+
+<Step>
+
+## Read it in the page
+
+`createCms` gives server components a reader typed from the fields, with every image resolved to `{ id, url, alt, width, height }`:
+
+```ts title="src/cms.ts"
+import { createCms } from '@kizunajs/cms/next';
+import kizuna from '../kizuna.config';
+
+export const cms = createCms(kizuna.api);
+```
+
+```tsx title="src/app/lp/spring/page.tsx"
+import { cms } from '../../../cms';
+
+export default async function SpringPage() {
+    const content = await cms.pages.springPage.get();
+    const featured = await getProductsInOrder(content.featured);
+
+    return (
+        <main>
+            <Hero {...content.hero} />
+            <ProductGrid products={featured} />
+        </main>
+    );
+}
+```
+
+Outside draft mode that is the published content, cached. A page nobody has published calls `notFound()`.
+
+</Step>
+
+<Step>
+
+## Add the preview
+
+`KizunaPreview` renders only in draft mode, and the draft route is how an editor gets there:
+
+```tsx title="src/app/layout.tsx"
+import { KizunaPreview } from '@kizunajs/cms/next';
+
+<body>
+    {children}
+    <KizunaPreview />
+</body>;
+```
+
+```ts title="src/app/api/draft/route.ts"
+export { GET } from '@kizunajs/cms/next/draft';
+```
+
+Open a page's preview from the [content overview](/docs/cms/next#the-content-overview), click any text, and change it.
+
+</Step>
+
+</Steps>
+
+## Where to go next
+
+- [Content](/docs/cms/content): fields, blocks and changing the shape later
+- [Design rules](/docs/cms/design-rules): for designers, the limits that keep a page looking as designed
+- [Editing](/docs/cms/editing): drafts, publishing, the preview and the agent tools
+- [Next.js](/docs/cms/next): caching, draft mode and the site identity
+- [Media](/docs/cms/media), [References](/docs/cms/references), [CLI](/docs/cms/cli), [Security](/docs/cms/security)
+
+The CMS owns editorial content and media. Products, orders and users stay in your tables and routes; pages reference them by branded id and fetch them themselves.
+
+The package ships three Agent Skills under `skills/`, for a coding agent that adds a page, a block or a reference.

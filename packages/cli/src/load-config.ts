@@ -49,3 +49,27 @@ export const loadConfig = async (configPath: string): Promise<LoadedApi[]> => {
         diff: entry.diff ?? {},
     }));
 };
+
+/**
+ * What a plugin's `cli` entry exports.
+ */
+export interface PluginCli {
+    run: (argv: readonly string[], context: unknown) => Promise<number>;
+}
+
+/**
+ * The `cli` entry of a plugin installed in the project, or `undefined` when the
+ * project has no such package.
+ */
+export const resolvePluginCli = async (specifier: string): Promise<PluginCli | undefined> => {
+    const jiti = createJiti(`${process.cwd()}/`, {
+        interopDefault: true,
+    });
+    try {
+        const loaded = (await jiti.import(specifier)) as Partial<PluginCli>;
+        return typeof loaded.run === 'function' ? (loaded as PluginCli) : undefined;
+    } catch (error) {
+        if (/Cannot find (module|package)|ERR_MODULE_NOT_FOUND/.test(String(error))) return undefined;
+        throw error;
+    }
+};

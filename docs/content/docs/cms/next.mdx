@@ -1,0 +1,115 @@
+---
+title: Next.js
+description: Read content in server components, keep drafts out of every cache, and give cached renders an identity of their own.
+---
+
+The CMS targets the App Router with Kizuna mounted through `@kizunajs/next` in the same app. Reads happen in process, so a static build needs no server to call.
+
+## The reader
+
+```ts title="src/cms.ts"
+import { createCms } from '@kizunajs/cms/next';
+import kizuna from '../kizuna.config';
+
+export const cms = createCms(kizuna.api);
+```
+
+`createCms` reads the pages off the api's type, so `cms.pages.<name>.get()` is typed per page.
+
+| Situation                                | `get()`                                                        |
+| ---------------------------------------- | -------------------------------------------------------------- |
+| Published, outside draft mode            | The published content, cached and tagged                       |
+| Not published, outside draft mode        | Calls `notFound()`                                             |
+| Draft mode, draft passes the schema      | The draft, marked for the preview                              |
+| Draft mode, no draft or incomplete draft | Calls `notFound()`, and `KizunaPreview` shows the setup screen |
+
+Outside draft mode the reader uses nobody's credentials. Published content is public.
+
+## Caching
+
+A published read runs inside Next's cache, tagged with the page. Publishing revalidates the tag in process, and `plugins.cms.invalidate(ProductId, id)` revalidates every page whose references hold the id. Hand the plugin `nextRevalidate` to connect the two:
+
+```ts title="kizuna.config.ts"
+import { nextRevalidate } from '@kizunajs/cms/next';
+
+const cms = cmsPlugin({
+    db,
+    pages,
+    auth: {
+        identity: 'editor',
+    },
+    revalidate: nextRevalidate,
+});
+```
+
+Draft-mode reads skip the cache, and draft mode makes the render dynamic, so a draft never lands in a cached response.
+
+## Draft mode
+
+An editor enters draft mode through a token the API mints. `POST /cms/preview` answers one for a signed-in editor, and the draft route turns it into Next's draft mode:
+
+```ts title="src/app/api/draft/route.ts"
+export { GET } from '@kizunajs/cms/next/draft';
+```
+
+`GET /api/draft?token=…&redirect=/lp/spring` enables it and redirects; `?disable=1` turns it off. Tokens are signed with `KIZUNA_CMS_PREVIEW_SECRET` and last ten minutes. If the plugin takes `previewSecret` instead, build the route with `createDraftRoute({ secret })`.
+
+## The overlay
+
+```tsx title="src/app/layout.tsx"
+import { KizunaPreview } from '@kizunajs/cms/next';
+
+<body>
+    {children}
+    <KizunaPreview />
+</body>;
+```
+
+A server component that checks draft mode and renders the overlay only when it is on. The overlay calls the `cms` routes from the browser with the editor's cookies; pass `headers` when editors sign in with a bearer token. `apiPath` and `basePath` default to `/api` and `/cms`.
+
+## The content overview
+
+```tsx title="src/app/cms/page.tsx"
+import { CmsOverview } from '@kizunajs/cms/next';
+import kizuna from '../../../kizuna.config';
+
+export default function ContentPage() {
+    return <CmsOverview api={kizuna.api} />;
+}
+```
+
+Every page with its status and recent versions, the media, and a preview link per page. It is a page of your app, so it sits behind your sign-in like any other.
+
+## Site identity
+
+A cached render must never run with a person's credentials. Published content needs none, since `getPublished` is public. App data that is not public needs a caller, so the site's server calls the API as an identity of its own: an API key with a read-only role, from a server-only environment variable.
+
+```ts title="src/identities.ts"
+export const site = k.identity
+    .apiKey({
+        name: 'x-site-key',
+        in: 'header',
+        roles: Kizuna.roles(['site']),
+    })
+    .guard(({ apiKey, deny }) => {
+        if (apiKey?.value !== process.env.SITE_API_KEY) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                },
+            });
+        }
+        return {
+            role: 'site' as const,
+        };
+    });
+```
+
+Routes opt in with `auth: ['site', 'editor']`, and the site's client sends the header from the server. A leaked key can read what the site reads and nothing more.
+
+## Discovery
+
+`withKizunaCms` in `next.config.ts` finds every `content.ts` under `app/` and writes `src/cms.pages.ts` before Next compiles. A page's path is its folder, with route groups and parallel slots dropped the way Next drops them. `kizuna generate` writes the same file, `--check` fails when it is behind, and `kizuna cms pages` prints the list.
+
+It lives at `@kizunajs/cms/next/config` because `next.config.ts` runs outside Next's bundler, where `next/headers` cannot load.

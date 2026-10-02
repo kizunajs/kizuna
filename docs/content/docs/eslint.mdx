@@ -153,3 +153,15 @@ export const users = k.routes('users', {
         .handler(/* ... */),
 });
 ```
+
+## `no-cms-html`
+
+Flags `dangerouslySetInnerHTML` fed from CMS content: a value read with `cms.pages.<name>.get()`, a component whose props are an `Output`, or anything in a file that imports `@kizunajs/cms`. A CMS string renders as text.
+
+```tsx
+// flagged
+<div dangerouslySetInnerHTML={{ __html: content.hero.heading }} />;
+
+// fine
+<h1>{content.hero.heading}</h1>;
+```

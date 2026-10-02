@@ -5,7 +5,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ConfigSyntaxError, generateConfigTypes } from './generate-types.js';
 import { checkFiles, formatStale, writeFiles } from './generate-clients.js';
-import { loadConfig } from './load-config.js';
+import { loadConfig, resolvePluginCli } from './load-config.js';
 import { formatRoutes, routeMap } from './route-map.js';
 import { diffAgainst, readSnapshot } from './diff-against.js';
 import { diffSnapshots, formatChange, hasBreakingChange } from './diff-apis.js';
@@ -17,6 +17,8 @@ Commands:
   generate   Write kizuna.types.ts and every client the config declares.
   routes     Print every route the config serves.
   diff       Compare the config against the same config at a git ref.
+  <plugin>   Run a plugin's own commands, like \`kizuna cms pages\`, resolved
+             from @kizunajs/<plugin>/cli in the current project.
 
 Options:
   --config <path>   Path to the config. Default: kizuna.config.ts
@@ -163,11 +165,48 @@ const runDiff = async (values: { config?: string; json?: boolean; against?: stri
     if (hasBreakingChange(changes)) process.exit(1);
 };
 
+/**
+ * A command kizuna does not know is offered to the plugin of that name: the
+ * `run` export of `@kizunajs/<command>/cli`, resolved from the project rather
+ * than from this package, so a plugin's commands ship with the plugin.
+ */
+const runPluginCommand = async (command: string, argv: string[]): Promise<void> => {
+    const resolved = await resolvePluginCli(`@kizunajs/${command}/cli`);
+    if (resolved === undefined) die(usage, 1);
+    const { values } = parseArgs({
+        args: argv,
+        options: {
+            config: {
+                type: 'string',
+            },
+        },
+        strict: false,
+    });
+    const configPath = resolve(process.cwd(), typeof values.config === 'string' ? values.config : 'kizuna.config.ts');
+    const code = await resolved.run(
+        argv.filter((argument, index) => argument !== '--config' && argv[index - 1] !== '--config'),
+        {
+            cwd: process.cwd(),
+            configPath,
+            loadApi: async () => {
+                if (!existsSync(configPath)) return undefined;
+                const [config] = await loadConfig(configPath);
+                return config?.api;
+            },
+            stdout: (line: string) => process.stdout.write(`${line}\n`),
+            stderr: (line: string) => process.stderr.write(`${line}\n`),
+        }
+    );
+    process.exit(code);
+};
+
 const main = async (): Promise<void> => {
     const argv = process.argv.slice(2);
     const command = argv[0];
-    if (command === undefined || !COMMANDS.includes(command)) {
-        die(usage, command === undefined || command === '--help' || command === '-h' ? 0 : 1);
+    if (command === undefined || command === '--help' || command === '-h') die(usage, 0);
+    if (!COMMANDS.includes(command)) {
+        if (/^[a-z][a-z0-9-]*$/.test(command)) return runPluginCommand(command, argv.slice(1));
+        die(usage, 1);
     }
 
     const { values } = parseArgs({
@@ -203,7 +242,11 @@ const main = async (): Promise<void> => {
     return runGenerate(values);
 };
 
-main().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    die(`Error: ${message}`);
-});
+// A config may hold open handles of its own, a database for one, so the process ends when the command does.
+main().then(
+    () => process.exit(0),
+    (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        die(`Error: ${message}`);
+    }
+);

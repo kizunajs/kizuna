@@ -1,0 +1,72 @@
+import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
+import { k } from '../k';
+import { auth } from '../auth';
+
+/**
+ * An editor changes copy and media; an admin also changes the fields a page
+ * marks `auth: { roles: 'admin' }`.
+ */
+export const editorRoles = Kizuna.roles(['editor', 'admin']);
+
+const isEditorRole = (role: unknown): role is 'editor' | 'admin' => role === 'editor' || role === 'admin';
+
+/**
+ * A signed-in editor. better-auth reads the session from the browser's cookie,
+ * or from the bearer an MCP client or the CLI sends.
+ */
+export const editor = k.identity
+    .bearer({
+        context: z.object({
+            userId: z.string(),
+            name: z.string(),
+        }),
+        roles: editorRoles,
+    })
+    .guard(async ({ request, deny }) => {
+        const found = await auth.api.getSession({
+            headers: request.headers,
+        });
+        if (found === null || !isEditorRole(found.user.role)) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Sign in as an editor.',
+                    code: 'unauthenticated',
+                },
+            });
+        }
+        return {
+            userId: found.user.email,
+            name: found.user.name,
+            role: found.user.role,
+        };
+    });
+
+export const siteRoles = Kizuna.roles(['site']);
+
+/**
+ * The site's own server, for cached renders that read app data no visitor may.
+ * The key lives in a server-only environment variable, and the role reads
+ * only.
+ */
+export const site = k.identity
+    .apiKey({
+        name: 'x-site-key',
+        in: 'header',
+        roles: siteRoles,
+    })
+    .guard(({ apiKey, deny }) => {
+        if (apiKey?.value !== (process.env.SITE_API_KEY ?? 'dev-site-key')) {
+            return deny({
+                status: 401,
+                body: {
+                    detail: 'Unauthorized',
+                    code: 'unauthenticated',
+                },
+            });
+        }
+        return {
+            role: 'site' as const,
+        };
+    });

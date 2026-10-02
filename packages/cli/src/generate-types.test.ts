@@ -116,6 +116,29 @@ export default defineConfig({
         );
     });
 
+    it('types a plugin named as a local const as the return of what made it', () => {
+        const types = generateConfigTypes(`
+import { defineConfig } from 'kizunajs';
+import { cmsPlugin, cmsRoutes } from '@kizunajs/cms';
+import { routes } from './src/routes';
+
+const cms = cmsPlugin({
+    pages: {},
+});
+
+export default defineConfig({
+    routes: {
+        ...routes,
+        cms: cmsRoutes(cms),
+    },
+    plugins: [cms],
+});
+`);
+        expect(types).toContain("import type { cmsPlugin } from '@kizunajs/cms';");
+        expect(types).toContain('plugins: [ReturnType<typeof cmsPlugin>];');
+        expect(types).not.toContain('typeof cms;');
+    });
+
     it('keeps an aliased import pointing at the name its module exports', () => {
         const types = generateConfigTypes(`
 import { defineConfig } from 'kizunajs';

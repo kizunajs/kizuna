@@ -16,6 +16,226 @@ type KizunaBrand<Name extends string> = {
 };
 
 export namespace API {
+    export type CmsCreateUpload = {
+        filename: string;
+        contentType: string;
+        size: number;
+    };
+
+    export type CmsDescribedPage = {
+        name: string;
+        path: string;
+        url: string;
+        status: "empty" | "draft" | "published" | "changed";
+        version: number;
+        complete: boolean;
+        missing: Array<string>;
+        fields: Array<CmsField>;
+        draft: Record<string, unknown> | null;
+    };
+
+    export type CmsDraftPage = {
+        name: string;
+        path: string;
+        status: "empty" | "draft" | "published" | "changed";
+        version: number;
+        publishedVersion: number | null;
+        content: Record<string, unknown> | null;
+        /**
+         * Whether the draft passes the page schema and may be rendered.
+         */
+        complete: boolean;
+        /**
+         * The fields the draft is missing or fails.
+         */
+        missing: Array<string>;
+        updatedAt: string | null;
+        updatedBy: string | null;
+    };
+
+    export type CmsField = {
+        /**
+         * The dotted path a change is keyed by.
+         */
+        path: string;
+        name: string;
+        label?: string;
+        description?: string;
+        /**
+         * The block slug, when the field is a block.
+         */
+        block?: string;
+        /**
+         * The path of the block field this one sits in.
+         */
+        parent?: string;
+        readOnly: boolean;
+        /**
+         * Whether the caller may write this field.
+         */
+        writable: boolean;
+        /**
+         * The roles that may write it, when narrowed.
+         */
+        roles?: Array<string>;
+        /**
+         * The brand of the ids this field holds.
+         */
+        brand?: string;
+        /**
+         * The tool that finds ids for the brand.
+         */
+        searchTool?: string;
+        /**
+         * The JSON Schema of the value.
+         */
+        schema: Record<string, unknown>;
+        /**
+         * The current draft value.
+         */
+        value?: unknown;
+    };
+
+    export type CmsMedia = {
+        id: string;
+        url: string;
+        contentType: string;
+        size: number;
+        width: number;
+        height: number;
+        filename: string;
+        /**
+         * The default alt text, used where a field sets none.
+         */
+        alt: string;
+        focalPoint?: {
+            /**
+             * Across, from the left edge, as a fraction of the width.
+             */
+            x: number;
+            /**
+             * Down, from the top edge, as a fraction of the height.
+             */
+            y: number;
+        };
+        uploadedAt: string;
+        uploadedBy: string;
+    };
+
+    export type CmsMediaList = {
+        media: Array<CmsMedia>;
+    };
+
+    export type CmsMissingFields = {
+        name: string;
+        complete: boolean;
+        missing: Array<string>;
+        /**
+         * Something to ask an agent, like "Fill in the spring page."
+         */
+        prompt: string;
+    };
+
+    export type CmsPageSummary = {
+        name: string;
+        path: string;
+        status: "empty" | "draft" | "published" | "changed";
+        /**
+         * The latest version saved, 0 before the first.
+         */
+        version: number;
+        publishedVersion: number | null;
+        updatedAt: string | null;
+        updatedBy: string | null;
+    };
+
+    export type CmsPreview = {
+        token: string;
+        /**
+         * Seconds until the token stops working.
+         */
+        expiresIn: number;
+    };
+
+    export type CmsPublishedPage = {
+        name: string;
+        path: string;
+        version: number;
+        content: Record<string, unknown>;
+        updatedAt: string;
+    };
+
+    export type CmsRollback = {
+        /**
+         * The version to restore as a new draft.
+         */
+        version: number;
+    };
+
+    export type CmsUpdateDraft = {
+        /**
+         * New values keyed by field path, like "hero.heading". Only fields the caller may write.
+         */
+        changes: Record<string, unknown>;
+        /**
+         * What changed, in a sentence, for the history.
+         */
+        summary?: string;
+    };
+
+    export type CmsUpdateMedia = {
+        alt?: string;
+        focalPoint?: {
+            /**
+             * Across, from the left edge, as a fraction of the width.
+             */
+            x: number;
+            /**
+             * Down, from the top edge, as a fraction of the height.
+             */
+            y: number;
+        };
+    };
+
+    export type CmsUpload = {
+        uploadId: string;
+        /**
+         * Where the browser sends the file with PUT.
+         */
+        url: string;
+        /**
+         * Headers the PUT has to carry.
+         */
+        headers: Record<string, string>;
+        maxBytes: number;
+    };
+
+    export type CmsVersion = {
+        version: number;
+        summary: string | null;
+        createdAt: string;
+        createdBy: string;
+        /**
+         * Whether this is the version readers see.
+         */
+        published: boolean;
+    };
+
+    export type CmsVersionList = {
+        name: string;
+        versions: Array<CmsVersion>;
+    };
+
+    export type CmsWhereUsed = {
+        brand: string;
+        id: string;
+        pages: Array<{
+            name: string;
+            path: string;
+            fieldPaths: Array<string>;
+        }>;
+    };
+
     export type CreateUserInput = {
         /**
          * Display name
@@ -81,6 +301,18 @@ export namespace API {
         status: number;
         detail: string;
     };
+
+    export type Product = {
+        id: ProductId;
+        name: string;
+        price: number;
+        imageUrl: string;
+    };
+
+    /**
+     * A branded `string`. Responses hand one back, and `toProductId` makes one from a plain value.
+     */
+    export type ProductId = string & KizunaBrand<"ProductId">;
 
     export type SmsEvent = {
         channel: "sms";
@@ -790,6 +1022,363 @@ export namespace API {
                 userAgent: string | null;
             }; headers: Record<string, string> };
     }
+
+    export namespace ProductsListProducts {
+        export type Query = {
+            q?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                products: Array<Product>;
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace ProductsGetProduct {
+        export type Params = {
+            id: ProductId;
+        };
+
+        export type Result =
+            | { status: 200; body: Product; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate"?: string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
+    }
+
+    export namespace ProductsUpdateProduct {
+        export type Params = {
+            id: ProductId;
+        };
+
+        export type Body = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 200; body: Product; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace ContactSend {
+        export type Body = {
+            name: string;
+            email: string;
+            message: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsGetPublished {
+        export type Params = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsPublishedPage; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace CmsListPages {
+        export type Result =
+            | { status: 200; body: {
+                pages: Array<CmsPageSummary>;
+            }; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
+    }
+
+    export namespace CmsDescribePage {
+        export type Query = {
+            /**
+             * The page URL or path, like https://example.com/lp/spring or /lp/spring.
+             */
+            url: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsDescribedPage; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsGetDraft {
+        export type Params = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsDraftPage; headers: {
+                etag: string;
+            } }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace CmsMissingFields {
+        export type Params = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsMissingFields; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace CmsHistory {
+        export type Params = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsVersionList; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace CmsWhereUsed {
+        export type Params = {
+            brand: string;
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsWhereUsed; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
+    }
+
+    export namespace CmsUpdateDraft {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = CmsUpdateDraft;
+
+        export type Headers = {
+            /**
+             * The ETag read with the draft. A stale one is refused.
+             */
+            "if-match"?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsDraftPage; headers: {
+                etag: string;
+            } }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsPublish {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = {
+            summary?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsDraftPage; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsRollback {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = CmsRollback;
+
+        export type Result =
+            | { status: 200; body: CmsDraftPage; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsListMedia {
+        export type Result =
+            | { status: 200; body: CmsMediaList; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
+    }
+
+    export namespace CmsGetMedia {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsMedia; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace CmsGetMediaFile {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: Uint8Array; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace CmsGetImage {
+        export type Params = {
+            id: string;
+        };
+
+        export type Query = {
+            crop?: string;
+            focal?: string;
+            /**
+             * The width to render at.
+             */
+            w?: number;
+            /**
+             * The height to render at; with w, the image is cropped to fit around the focal point.
+             */
+            h?: number;
+        };
+
+        export type Result =
+            | { status: 200; body: Uint8Array; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsUpdateMedia {
+        export type Params = {
+            id: string;
+        };
+
+        export type Body = CmsUpdateMedia;
+
+        export type Result =
+            | { status: 200; body: CmsMedia; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsCreateUpload {
+        export type Body = CmsCreateUpload;
+
+        export type Result =
+            | { status: 201; body: CmsUpload; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsCompleteUpload {
+        export type Params = {
+            uploadId: string;
+        };
+
+        export type Result =
+            | { status: 201; body: CmsMedia; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsSearchItems {
+        export type Params = {
+            brand: string;
+        };
+
+        export type Query = {
+            q?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                items: Array<{
+                    id: string;
+                    label: string;
+                    image?: string;
+                }>;
+            }; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 502; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace CmsCreatePreview {
+        export type Result =
+            | { status: 201; body: CmsPreview; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
+    }
 }
 
 export interface Client {
@@ -1351,6 +1940,368 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.DiagnosticsWhoAmI.Result>;
     };
+    products: {
+        /**
+         * List products, optionally matching a search
+         *
+         * @example
+         * const result = await client.products.listProducts();
+         */
+        listProducts: ClientMethod<'GET', false, {
+            query?: API.ProductsListProducts.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.ProductsListProducts.Result>;
+        /**
+         * Read one product, as the site or an editor
+         *
+         * @example
+         * const result = await client.products.getProduct({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
+        getProduct: ClientMethod<'GET', false, {
+            params: API.ProductsGetProduct.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.ProductsGetProduct.Result>;
+        /**
+         * Rename a product and refresh every page featuring it
+         *
+         * @example
+         * const result = await client.products.updateProduct({
+         *     params: {
+         *         id: '1',
+         *     },
+         *     body: {
+         *         name: 'string',
+         *     },
+         * });
+         */
+        updateProduct: ClientMethod<'PATCH', false, {
+            params: API.ProductsUpdateProduct.Params;
+            body: API.ProductsUpdateProduct.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.ProductsUpdateProduct.Result>;
+    };
+    contact: {
+        /**
+         * Send a message from the contact form
+         *
+         * @example
+         * const result = await client.contact.send({
+         *     body: {
+         *         name: 'string',
+         *         email: 'ada@example.com',
+         *         message: 'string',
+         *     },
+         * });
+         */
+        send: ClientMethod<'POST', false, {
+            body: API.ContactSend.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.ContactSend.Result>;
+    };
+    cms: {
+        /**
+         * Read the published content of a page
+         *
+         * @example
+         * const result = await client.cms.getPublished({
+         *     params: {
+         *         name: 'string',
+         *     },
+         * });
+         */
+        getPublished: ClientMethod<'GET', false, {
+            params: API.CmsGetPublished.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsGetPublished.Result>;
+        /**
+         * List every page with its status
+         *
+         * @example
+         * const result = await client.cms.listPages();
+         */
+        listPages: ClientMethod<'GET', false, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsListPages.Result>;
+        /**
+         * Describe the page at a URL: its fields, what the caller may write, and the draft
+         *
+         * Start here when working from the page someone is looking at. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it.
+         *
+         * @example
+         * const result = await client.cms.describePage({
+         *     query: {
+         *         url: 'string',
+         *     },
+         * });
+         */
+        describePage: ClientMethod<'GET', false, {
+            query: API.CmsDescribePage.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsDescribePage.Result>;
+        /**
+         * Read the draft of a page
+         *
+         * @example
+         * const result = await client.cms.getDraft({
+         *     params: {
+         *         name: 'string',
+         *     },
+         * });
+         */
+        getDraft: ClientMethod<'GET', false, {
+            params: API.CmsGetDraft.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsGetDraft.Result>;
+        /**
+         * List the fields a draft still needs before it can publish
+         *
+         * @example
+         * const result = await client.cms.missingFields({
+         *     params: {
+         *         name: 'string',
+         *     },
+         * });
+         */
+        missingFields: ClientMethod<'GET', false, {
+            params: API.CmsMissingFields.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsMissingFields.Result>;
+        /**
+         * List the versions of a page, newest first
+         *
+         * @example
+         * const result = await client.cms.history({
+         *     params: {
+         *         name: 'string',
+         *     },
+         * });
+         */
+        history: ClientMethod<'GET', false, {
+            params: API.CmsHistory.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsHistory.Result>;
+        /**
+         * List the pages that hold one branded id
+         *
+         * @example
+         * const result = await client.cms.whereUsed({
+         *     params: {
+         *         brand: 'string',
+         *         id: '1',
+         *     },
+         * });
+         */
+        whereUsed: ClientMethod<'GET', false, {
+            params: API.CmsWhereUsed.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsWhereUsed.Result>;
+        /**
+         * Change fields on the draft of a page
+         *
+         * Changes are keyed by field path and merged into the draft, which is then checked against the whole page schema. Describe the page first to learn the paths, the schemas and which fields you may write. Nothing goes live until the page is published.
+         *
+         * @example
+         * const result = await client.cms.updateDraft({
+         *     params: {
+         *         name: 'string',
+         *     },
+         *     body: {
+         *         changes: {},
+         *     },
+         * });
+         */
+        updateDraft: ClientMethod<'PATCH', false, {
+            params: API.CmsUpdateDraft.Params;
+            body: API.CmsUpdateDraft.Body;
+            headers?: API.CmsUpdateDraft.Headers;
+            fetchOptions?: RequestInit;
+        }, API.CmsUpdateDraft.Result>;
+        /**
+         * Publish the draft of a page
+         *
+         * Makes the current draft what every visitor sees. The person confirms before this runs.
+         *
+         * @example
+         * const result = await client.cms.publish({
+         *     params: {
+         *         name: 'string',
+         *     },
+         *     body: {},
+         * });
+         */
+        publish: ClientMethod<'POST', false, {
+            params: API.CmsPublish.Params;
+            body: API.CmsPublish.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsPublish.Result>;
+        /**
+         * Restore an earlier version of a page as a new draft
+         *
+         * Nothing is published by this. The restored content becomes the draft, which is published separately.
+         *
+         * @example
+         * const result = await client.cms.rollback({
+         *     params: {
+         *         name: 'string',
+         *     },
+         *     body: {
+         *         version: 1,
+         *     },
+         * });
+         */
+        rollback: ClientMethod<'POST', false, {
+            params: API.CmsRollback.Params;
+            body: API.CmsRollback.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsRollback.Result>;
+        /**
+         * List uploaded media
+         *
+         * @example
+         * const result = await client.cms.listMedia();
+         */
+        listMedia: ClientMethod<'GET', false, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsListMedia.Result>;
+        /**
+         * Read one media item
+         *
+         * @example
+         * const result = await client.cms.getMedia({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
+        getMedia: ClientMethod<'GET', false, {
+            params: API.CmsGetMedia.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsGetMedia.Result>;
+        /**
+         * The stored file of a media item, as uploaded, for copying between environments
+         *
+         * @example
+         * const result = await client.cms.getMediaFile({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
+        getMediaFile: ClientMethod<'GET', false, {
+            params: API.CmsGetMediaFile.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsGetMediaFile.Result>;
+        /**
+         * The image as a page shows it, cropped and sized by sharp
+         *
+         * @example
+         * const result = await client.cms.getImage({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
+        getImage: ClientMethod<'GET', false, {
+            params: API.CmsGetImage.Params;
+            query?: API.CmsGetImage.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsGetImage.Result>;
+        /**
+         * Set the alt text or focal point of a media item
+         *
+         * @example
+         * const result = await client.cms.updateMedia({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
+        updateMedia: ClientMethod<'PATCH', false, {
+            params: API.CmsUpdateMedia.Params;
+            body: API.CmsUpdateMedia.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsUpdateMedia.Result>;
+        /**
+         * Start an upload: a presigned URL the browser sends the file to
+         *
+         * @example
+         * const result = await client.cms.createUpload({
+         *     body: {
+         *         filename: 'string',
+         *         contentType: 'string',
+         *         size: 1,
+         *     },
+         * });
+         */
+        createUpload: ClientMethod<'POST', false, {
+            body: API.CmsCreateUpload.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsCreateUpload.Result>;
+        /**
+         * Finish an upload: check the file and create the media item
+         *
+         * @example
+         * const result = await client.cms.completeUpload({
+         *     params: {
+         *         uploadId: '1',
+         *     },
+         * });
+         */
+        completeUpload: ClientMethod<'POST', false, {
+            params: API.CmsCompleteUpload.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsCompleteUpload.Result>;
+        /**
+         * Find items a page can reference, through the brand's registered search route
+         *
+         * @example
+         * const result = await client.cms.searchItems({
+         *     params: {
+         *         brand: 'string',
+         *     },
+         * });
+         */
+        searchItems: ClientMethod<'GET', false, {
+            params: API.CmsSearchItems.Params;
+            query?: API.CmsSearchItems.Query;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsSearchItems.Result>;
+        /**
+         * Mint a short-lived token that opens draft mode on the site
+         *
+         * @example
+         * const result = await client.cms.createPreview();
+         */
+        createPreview: ClientMethod<'POST', false, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.CmsCreatePreview.Result>;
+    };
 }
 
 const routes: GeneratedRoutes = {
@@ -1702,6 +2653,241 @@ const routes: GeneratedRoutes = {
             },
         },
     },
+    products: {
+        listProducts: {
+            method: 'GET',
+            path: '/products',
+            responses: {
+                200: {},
+                400: {},
+            },
+        },
+        getProduct: {
+            method: 'GET',
+            path: '/products/:id',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+            },
+        },
+        updateProduct: {
+            method: 'PATCH',
+            path: '/products/:id',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                400: {},
+            },
+        },
+    },
+    contact: {
+        send: {
+            method: 'POST',
+            path: '/contact',
+            responses: {
+                204: {},
+                400: {},
+            },
+        },
+    },
+    cms: {
+        getPublished: {
+            method: 'GET',
+            path: '/cms/pages/:name',
+            responses: {
+                200: {},
+                404: {},
+            },
+        },
+        listPages: {
+            method: 'GET',
+            path: '/cms/pages',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+            },
+        },
+        describePage: {
+            method: 'GET',
+            path: '/cms/describe',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                400: {},
+            },
+        },
+        getDraft: {
+            method: 'GET',
+            path: '/cms/pages/:name/draft',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+            },
+        },
+        missingFields: {
+            method: 'GET',
+            path: '/cms/pages/:name/missing',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+            },
+        },
+        history: {
+            method: 'GET',
+            path: '/cms/pages/:name/versions',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+            },
+        },
+        whereUsed: {
+            method: 'GET',
+            path: '/cms/refs/:brand/:id',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+            },
+        },
+        updateDraft: {
+            method: 'PATCH',
+            path: '/cms/pages/:name/draft',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                409: {},
+                422: {},
+                400: {},
+            },
+        },
+        publish: {
+            method: 'POST',
+            path: '/cms/pages/:name/publish',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                409: {},
+                400: {},
+            },
+        },
+        rollback: {
+            method: 'POST',
+            path: '/cms/pages/:name/rollback',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                400: {},
+            },
+        },
+        listMedia: {
+            method: 'GET',
+            path: '/cms/media',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+            },
+        },
+        getMedia: {
+            method: 'GET',
+            path: '/cms/media/:id',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+            },
+        },
+        getMediaFile: {
+            method: 'GET',
+            path: '/cms/media/:id/file',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+            },
+        },
+        getImage: {
+            method: 'GET',
+            path: '/cms/media/:id/image',
+            responses: {
+                200: {},
+                404: {},
+                400: {},
+            },
+        },
+        updateMedia: {
+            method: 'PATCH',
+            path: '/cms/media/:id',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                400: {},
+            },
+        },
+        createUpload: {
+            method: 'POST',
+            path: '/cms/media/uploads',
+            responses: {
+                201: {},
+                401: {},
+                403: {},
+                422: {},
+                400: {},
+            },
+        },
+        completeUpload: {
+            method: 'POST',
+            path: '/cms/media/uploads/:uploadId',
+            responses: {
+                201: {},
+                401: {},
+                403: {},
+                422: {},
+            },
+        },
+        searchItems: {
+            method: 'GET',
+            path: '/cms/items/:brand',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                502: {},
+                400: {},
+            },
+        },
+        createPreview: {
+            method: 'POST',
+            path: '/cms/preview',
+            responses: {
+                201: {},
+                401: {},
+                403: {},
+            },
+        },
+    },
 };
 
 /**
@@ -1711,6 +2897,14 @@ const routes: GeneratedRoutes = {
  * const id = toUserId('usr_abc123');
  */
 export const toUserId = (value: string): API.UserId => value as API.UserId;
+
+/**
+ * Brands a value from outside the API, like a URL segment, as `API.ProductId`. A value from a response is branded already.
+ *
+ * @example
+ * const id = toProductId('1');
+ */
+export const toProductId = (value: string): API.ProductId => value as API.ProductId;
 
 /**
  * Whether a `400` body is the validation error kizuna sends, rather than a `400` the route declares itself.

@@ -1,3 +1,5 @@
+import { KizunaPreview } from '@kizunajs/cms/next';
+
 export const metadata = {
     title: 'Kizuna Next.js Demo',
 };
@@ -11,6 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     fontFamily: 'system-ui',
                 }}>
                 {children}
+                <KizunaPreview />
             </body>
         </html>
     );

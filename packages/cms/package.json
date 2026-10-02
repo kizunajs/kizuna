@@ -1,0 +1,168 @@
+{
+  "name": "@kizunajs/cms",
+  "private": true,
+  "version": "2.0.0-beta.16",
+  "description": "Content layer for Next.js sites on Kizuna.js: pages and blocks declared with Zod, drafts and publishing, edited by agents or on the page",
+  "keywords": [
+    "kizunajs",
+    "typescript",
+    "zod",
+    "openapi",
+    "spec-driven",
+    "type-safe",
+    "rest",
+    "api",
+    "cms",
+    "content",
+    "nextjs",
+    "drafts",
+    "mcp"
+  ],
+  "license": "MIT",
+  "homepage": "https://kizunajs.com/docs/cms",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kizunajs/kizuna.git",
+    "directory": "packages/cms"
+  },
+  "bugs": "https://github.com/kizunajs/kizuna/issues",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./schemas": {
+      "import": {
+        "types": "./dist/schemas.d.mts",
+        "default": "./dist/schemas.mjs"
+      },
+      "require": {
+        "types": "./dist/schemas.d.cts",
+        "default": "./dist/schemas.cjs"
+      }
+    },
+    "./next": {
+      "import": {
+        "types": "./dist/next.d.mts",
+        "default": "./dist/next.mjs"
+      },
+      "require": {
+        "types": "./dist/next.d.cts",
+        "default": "./dist/next.cjs"
+      }
+    },
+    "./next/preview": {
+      "import": {
+        "types": "./dist/next-preview.d.mts",
+        "default": "./dist/next-preview.mjs"
+      },
+      "require": {
+        "types": "./dist/next-preview.d.cts",
+        "default": "./dist/next-preview.cjs"
+      }
+    },
+    "./next/draft": {
+      "import": {
+        "types": "./dist/next-draft.d.mts",
+        "default": "./dist/next-draft.mjs"
+      },
+      "require": {
+        "types": "./dist/next-draft.d.cts",
+        "default": "./dist/next-draft.cjs"
+      }
+    },
+    "./cli": {
+      "import": {
+        "types": "./dist/cli.d.mts",
+        "default": "./dist/cli.mjs"
+      },
+      "require": {
+        "types": "./dist/cli.d.cts",
+        "default": "./dist/cli.cjs"
+      }
+    },
+    "./next/config": {
+      "import": {
+        "types": "./dist/next-config.d.mts",
+        "default": "./dist/next-config.mjs"
+      },
+      "require": {
+        "types": "./dist/next-config.d.cts",
+        "default": "./dist/next-config.cjs"
+      }
+    }
+  },
+  "kizuna": {
+    "entries": {
+      ".": "server",
+      "./schemas": "client",
+      "./next": "server",
+      "./next/preview": "client",
+      "./next/draft": "server",
+      "./cli": "server",
+      "./next/config": "server"
+    }
+  },
+  "files": [
+    "dist",
+    "skills"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown src/index.ts src/schemas.ts src/next.tsx src/next-preview.tsx src/next-draft.ts src/next-config.ts src/cli.ts --format esm,cjs --dts --clean --external kizunajs --external zod --external drizzle-orm --external next --external react --external react-dom --external @kizunajs/cms/next/preview --external next/headers --external next/navigation --external next/cache --external next/server --external sharp --external @aws-sdk/client-s3 --external @aws-sdk/s3-request-presigner --external @vercel/stega",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
+    "@vercel/stega": "^1.1.0",
+    "sharp": "^0.35.5"
+  },
+  "peerDependencies": {
+    "drizzle-orm": ">=0.44.0",
+    "kizunajs": "workspace:*",
+    "next": ">=16.0.0",
+    "react": ">=19.0.0",
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@kizunajs/express": "workspace:*",
+    "@types/express": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "drizzle-orm": "^0.45.3",
+    "express": "catalog:",
+    "kizunajs": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

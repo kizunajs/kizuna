@@ -50,22 +50,23 @@ Follow the [quickstart](https://kizunajs.com/docs/quickstart), which goes from a
 
 ## Packages
 
-| Package                    | Description                                        |
-| -------------------------- | -------------------------------------------------- |
-| `kizunajs`                 | Route declaration, validation, and the adapter API |
-| `@kizunajs/fetch`          | Fetch client generation                            |
-| `@kizunajs/tanstack-query` | TanStack Query client                              |
-| `@kizunajs/express`        | Express adapter                                    |
-| `@kizunajs/fastify`        | Fastify adapter                                    |
-| `@kizunajs/hono`           | Hono adapter                                       |
-| `@kizunajs/next`           | Next.js App Router adapter                         |
-| `@kizunajs/openapi`        | OpenAPI generation                                 |
-| `@kizunajs/swift`          | Swift client generation                            |
-| `@kizunajs/kotlin`         | Kotlin client generation                           |
-| `@kizunajs/mcp`            | MCP endpoint for AI assistants                     |
-| `@kizunajs/resend`         | Email, newsletters and webhooks through Resend     |
-| `@kizunajs/eslint-plugin`  | ESLint rules                                       |
-| `@kizunajs/cli`            | Command line tooling                               |
+| Package                    | Description                                                  |
+| -------------------------- | ------------------------------------------------------------ |
+| `kizunajs`                 | Route declaration, validation, and the adapter API           |
+| `@kizunajs/fetch`          | Fetch client generation                                      |
+| `@kizunajs/tanstack-query` | TanStack Query client                                        |
+| `@kizunajs/express`        | Express adapter                                              |
+| `@kizunajs/fastify`        | Fastify adapter                                              |
+| `@kizunajs/hono`           | Hono adapter                                                 |
+| `@kizunajs/next`           | Next.js App Router adapter                                   |
+| `@kizunajs/openapi`        | OpenAPI generation                                           |
+| `@kizunajs/swift`          | Swift client generation                                      |
+| `@kizunajs/kotlin`         | Kotlin client generation                                     |
+| `@kizunajs/mcp`            | MCP endpoint for AI assistants                               |
+| `@kizunajs/resend`         | Email, newsletters and webhooks through Resend               |
+| `@kizunajs/cms`            | Content for Next.js sites, edited on the page or by an agent |
+| `@kizunajs/eslint-plugin`  | ESLint rules                                                 |
+| `@kizunajs/cli`            | Command line tooling                                         |
 
 ## License
 

@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "jsx": "react-jsx",
+    "types": ["node", "react"],
+    "paths": {
+      "@kizunajs/cms/next/preview": ["./src/next-preview.tsx"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.fixture.ts", "src/**/*.test.ts", "src/**/*.test-d.ts"]
+}

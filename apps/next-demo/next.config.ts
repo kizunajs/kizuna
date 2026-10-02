@@ -1,5 +1,5 @@
-import type { NextConfig } from 'next';
+import { withKizunaCms } from '@kizunajs/cms/next/config';
 
-const config: NextConfig = {};
-
-export default config;
+export default withKizunaCms({
+    typedRoutes: true,
+});
