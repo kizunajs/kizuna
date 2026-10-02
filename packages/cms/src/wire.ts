@@ -12,14 +12,41 @@ export const PageSummarySchema = Kizuna.model({
     title: 'CmsPageSummary',
     schema: z.object({
         name: z.string(),
+        site: z.string().describe('The site the page belongs to, default unless several apps share the CMS.'),
+        ref: z
+            .string()
+            .describe(
+                'page:<name>, page:<site>:<name> on a site of its own, or item:<collection>:<id> for an item a page shows at its address.'
+            ),
         path: z.string(),
         status: PageStatusSchema,
+        group: z.string().nullable(),
         version: z.int().describe('The latest version saved, 0 before the first.'),
         publishedVersion: z.int().nullable(),
         updatedAt: z.string().nullable(),
         updatedBy: z.string().nullable(),
     }),
 });
+
+export const EditorItemSchema = Kizuna.model({
+    title: 'CmsEditorItem',
+    schema: z.object({
+        id: z.string(),
+        ref: z.string(),
+        label: z.string().describe('The first text field of the item, or Untitled.'),
+        path: z.string().nullable().describe('Where a page shows the item, once its address fields are filled; null when no page does.'),
+        status: PageStatusSchema,
+        complete: z.boolean(),
+        updatedAt: z.string(),
+        updatedBy: z.string(),
+    }),
+});
+
+export const CreateItemBodySchema = z
+    .object({
+        values: z.record(z.string(), z.unknown()).optional().describe('Field values for the new item, keyed by field path.'),
+    })
+    .optional();
 
 export const PublishedPageSchema = Kizuna.model({
     title: 'CmsPublishedPage',
@@ -33,10 +60,14 @@ export const PublishedPageSchema = Kizuna.model({
 });
 
 export const DraftPageSchema = Kizuna.model({
-    title: 'CmsDraftPage',
+    title: 'CmsDraft',
     schema: z.object({
+        ref: z.string().describe('The document: page:<name>, page:<site>:<name>, global:<name> or item:<collection>:<id>.'),
         name: z.string(),
-        path: z.string(),
+        path: z
+            .string()
+            .nullable()
+            .describe("Where it is served: a page's path, or an item's address on the page that shows it. Null otherwise."),
         status: PageStatusSchema,
         version: z.int(),
         publishedVersion: z.int().nullable(),
@@ -45,6 +76,18 @@ export const DraftPageSchema = Kizuna.model({
         missing: z.array(z.string()).describe('The fields the draft is missing or fails.'),
         updatedAt: z.string().nullable(),
         updatedBy: z.string().nullable(),
+    }),
+});
+
+export const StoredContentSchema = Kizuna.model({
+    title: 'CmsStoredContent',
+    schema: z.object({
+        ref: z.string(),
+        version: z.int(),
+        updatedAt: z.string(),
+        content: z
+            .record(z.string(), z.unknown())
+            .describe('The content as stored: images are references with their crop and focal point.'),
     }),
 });
 
@@ -71,12 +114,26 @@ export const DescribedFieldSchema = Kizuna.model({
     }),
 });
 
+export const UsedOnSchema = z
+    .object({
+        everywhere: z.boolean().describe('A global, which every page may show.'),
+        pages: z.array(
+            z.object({
+                name: z.string(),
+                path: z.string(),
+            })
+        ),
+    })
+    .describe('Where else the document appears, to say before changing shared content.');
+
 export const DescribedPageSchema = Kizuna.model({
-    title: 'CmsDescribedPage',
+    title: 'CmsDescribed',
     schema: z.object({
+        ref: z.string(),
+        kind: z.enum(['page', 'global', 'item']),
         name: z.string(),
-        path: z.string(),
-        url: z.string(),
+        path: z.string().nullable(),
+        usedOn: UsedOnSchema,
         status: PageStatusSchema,
         version: z.int(),
         complete: z.boolean(),
@@ -92,7 +149,7 @@ export const MissingFieldsSchema = Kizuna.model({
         name: z.string(),
         complete: z.boolean(),
         missing: z.array(z.string()),
-        prompt: z.string().describe('Something to ask an agent, like "Fill in the spring page."'),
+        prompt: z.string().describe('Something to ask an agent, like "Fill in the front page."'),
     }),
 });
 
@@ -123,6 +180,7 @@ export const WhereUsedSchema = Kizuna.model({
         pages: z.array(
             z.object({
                 name: z.string(),
+                site: z.string(),
                 path: z.string(),
                 fieldPaths: z.array(z.string()),
             })
@@ -137,6 +195,10 @@ export const UpdateDraftBodySchema = Kizuna.model({
             .record(z.string(), z.unknown())
             .describe('New values keyed by field path, like "hero.heading". Only fields the caller may write.'),
         summary: z.string().max(200).optional().describe('What changed, in a sentence, for the history.'),
+        autosave: z
+            .boolean()
+            .optional()
+            .describe('Fold into your own recent unpublished version instead of adding one, as the live preview does while you type.'),
     }),
 });
 
@@ -245,4 +307,9 @@ export const ImageQuerySchema = z.object({
         .optional(),
     w: z.int().min(1).max(4096).optional().describe('The width to render at.'),
     h: z.int().min(1).max(4096).optional().describe('The height to render at; with w, the image is cropped to fit around the focal point.'),
+});
+
+export const InvalidateBodySchema = z.object({
+    brand: z.string().min(1).describe('The brand the id carries, like ProductId.'),
+    id: z.string().min(1).describe('The id of the thing that changed.'),
 });

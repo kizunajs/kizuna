@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, max, sql } from 'drizzle-orm';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
 import { cmsDocuments, cmsRefs, cmsVersions } from './schema.js';
-import { CMS_MIGRATION_SQL } from './migration.js';
+import { CMS_MIGRATION_SQL, likePrefix, type IndexType } from './migration.js';
 
 /**
  * Any Drizzle Postgres database: node-postgres, postgres.js, Neon, PGlite.
@@ -10,9 +10,10 @@ import { CMS_MIGRATION_SQL } from './migration.js';
 export type CmsDatabase = PgDatabase<PgQueryResultHKT, any, any>;
 
 /**
- * What a document is: a page's content, or a media item's metadata.
+ * What a document is: a page, a global, an item of a collection, or a media
+ * item's metadata.
  */
-export type DocumentKind = 'page' | 'media';
+export type DocumentKind = 'page' | 'global' | 'item' | 'media';
 
 /**
  * Content as stored: one value per field.
@@ -22,14 +23,61 @@ export type Content = Record<string, unknown>;
 export interface DocumentRow {
     id: string;
     kind: DocumentKind;
+    /**
+     * The site a page belongs to; `default` for everything else.
+     */
+    site: string;
     key: string;
     published: Content | null;
     draft: Content | null;
     publishedVersion: number | null;
+    publishedAt: Date | null;
     migrationVersion: number;
     updatedAt: Date;
     updatedBy: string;
 }
+
+/**
+ * One filter, sort or cursor field of a list, read out of the stored JSON.
+ */
+export interface ListField {
+    field: string;
+    type: IndexType;
+}
+
+export interface ListQuery {
+    kind: DocumentKind;
+    keyPrefix: string;
+    /**
+     * `published` lists published documents only; `draft` lists every document
+     * by its draft where it has one.
+     */
+    copy: 'published' | 'draft';
+    where?: ReadonlyArray<ListField & { value: unknown }>;
+    orderBy?: ListField | 'publishedAt' | 'updatedAt';
+    direction?: 'asc' | 'desc';
+    limit: number;
+    cursor?: string;
+}
+
+/**
+ * Where a page of results ends, opaque to callers.
+ */
+interface Cursor {
+    value: unknown;
+    id: string;
+}
+
+const encodeCursor = (cursor: Cursor): string => Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+
+const decodeCursor = (value: string): Cursor | undefined => {
+    try {
+        const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Cursor;
+        return typeof parsed.id === 'string' ? parsed : undefined;
+    } catch {
+        return undefined;
+    }
+};
 
 export interface VersionRow {
     version: number;
@@ -63,16 +111,18 @@ export class VersionConflictError extends Error {
 const SITE = 'default';
 const LOCALE = 'default';
 
-const identity = (kind: DocumentKind, key: string) =>
-    and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, SITE), eq(cmsDocuments.locale, LOCALE), eq(cmsDocuments.key, key));
+const identity = (kind: DocumentKind, key: string, site = SITE) =>
+    and(eq(cmsDocuments.kind, kind), eq(cmsDocuments.site, site), eq(cmsDocuments.locale, LOCALE), eq(cmsDocuments.key, key));
 
 const toRow = (row: typeof cmsDocuments.$inferSelect): DocumentRow => ({
     id: row.id,
     kind: row.kind as DocumentKind,
+    site: row.site,
     key: row.key,
     published: row.published as Content | null,
     draft: row.draft as Content | null,
     publishedVersion: row.publishedVersion,
+    publishedAt: row.publishedAt,
     migrationVersion: row.migrationVersion,
     updatedAt: row.updatedAt,
     updatedBy: row.updatedBy,
@@ -97,8 +147,12 @@ export class DocumentStore {
         }
     }
 
-    async get(kind: DocumentKind, key: string): Promise<DocumentRow | undefined> {
-        const [row] = await this.db.select().from(cmsDocuments).where(identity(kind, key)).limit(1);
+    async get(kind: DocumentKind, key: string, site = SITE): Promise<DocumentRow | undefined> {
+        const [row] = await this.db
+            .select()
+            .from(cmsDocuments)
+            .where(identity(kind, key, site))
+            .limit(1);
         return row === undefined ? undefined : toRow(row);
     }
 
@@ -152,32 +206,60 @@ export class DocumentStore {
     }
 
     /**
-     * Writes the draft and records a version. `ifMatch` is the version the
-     * writer read; when it is behind, nothing is written.
+     * Writes the draft and records a version. `ifMatch` is the version and save
+     * time the writer read; when either is behind, nothing is written. With
+     * `fold`, a save by the same author within that many milliseconds of their
+     * own unpublished version rewrites it instead of adding one.
      */
     async saveDraft(input: {
         kind: DocumentKind;
         key: string;
+        site?: string;
         draft: Content;
         author: string;
         summary?: string;
-        ifMatch?: number;
+        ifMatch?: {
+            version: number;
+            savedAt?: number;
+        };
+        fold?: number;
         refs?: readonly Ref[];
         migrationVersion?: number;
     }): Promise<{ document: DocumentRow; version: number }> {
         return this.db.transaction(async (tx) => {
             const now = new Date();
-            const [existing] = await tx.select().from(cmsDocuments).where(identity(input.kind, input.key)).for('update');
+            const [existing] = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(identity(input.kind, input.key, input.site))
+                .for('update');
             const id = existing?.id ?? randomUUID();
             const latest = existing === undefined ? 0 : await this.latestVersionIn(tx, id);
-            if (input.ifMatch !== undefined && input.ifMatch !== latest) {
-                throw new VersionConflictError(input.ifMatch, latest);
+            const stale =
+                input.ifMatch !== undefined &&
+                (input.ifMatch.version !== latest ||
+                    (input.ifMatch.savedAt !== undefined &&
+                        existing !== undefined &&
+                        existing.updatedAt.getTime() !== input.ifMatch.savedAt));
+            if (stale) {
+                throw new VersionConflictError(input.ifMatch!.version, latest);
             }
-            const version = latest + 1;
+            const [previous] =
+                input.fold === undefined || existing === undefined || existing.publishedVersion === latest
+                    ? []
+                    : await tx
+                          .select()
+                          .from(cmsVersions)
+                          .where(and(eq(cmsVersions.documentId, id), eq(cmsVersions.version, latest)))
+                          .limit(1);
+            const folds =
+                previous !== undefined && previous.createdBy === input.author && now.getTime() - previous.createdAt.getTime() < input.fold!;
+            const version = folds ? latest : latest + 1;
             if (existing === undefined) {
                 await tx.insert(cmsDocuments).values({
                     id,
                     kind: input.kind,
+                    site: input.site ?? SITE,
                     key: input.key,
                     draft: input.draft,
                     migrationVersion: input.migrationVersion ?? 0,
@@ -199,14 +281,29 @@ export class DocumentStore {
                     })
                     .where(eq(cmsDocuments.id, id));
             }
-            await tx.insert(cmsVersions).values({
-                documentId: id,
-                version,
-                data: input.draft,
-                summary: input.summary ?? null,
-                createdAt: now,
-                createdBy: input.author,
-            });
+            if (folds) {
+                await tx
+                    .update(cmsVersions)
+                    .set({
+                        data: input.draft,
+                        createdAt: now,
+                        ...(input.summary === undefined
+                            ? {}
+                            : {
+                                  summary: input.summary,
+                              }),
+                    })
+                    .where(and(eq(cmsVersions.documentId, id), eq(cmsVersions.version, version)));
+            } else {
+                await tx.insert(cmsVersions).values({
+                    documentId: id,
+                    version,
+                    data: input.draft,
+                    summary: input.summary ?? null,
+                    createdAt: now,
+                    createdBy: input.author,
+                });
+            }
             if (input.refs !== undefined) await this.replaceRefsIn(tx, id, input.refs);
             const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, id)).limit(1);
             return {
@@ -219,9 +316,13 @@ export class DocumentStore {
     /**
      * Points `published` at the current draft and its version.
      */
-    async publish(kind: DocumentKind, key: string, author: string): Promise<DocumentRow | undefined> {
+    async publish(kind: DocumentKind, key: string, author: string, site = SITE): Promise<DocumentRow | undefined> {
         return this.db.transaction(async (tx) => {
-            const [existing] = await tx.select().from(cmsDocuments).where(identity(kind, key)).for('update');
+            const [existing] = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(identity(kind, key, site))
+                .for('update');
             if (existing === undefined || existing.draft === null) return undefined;
             const latest = await this.latestVersionIn(tx, existing.id);
             await tx
@@ -229,6 +330,7 @@ export class DocumentStore {
                 .set({
                     published: existing.draft,
                     publishedVersion: latest,
+                    publishedAt: new Date(),
                     updatedAt: new Date(),
                     updatedBy: author,
                 })
@@ -351,6 +453,88 @@ export class DocumentStore {
             });
             const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, id)).limit(1);
             return toRow(row!);
+        });
+    }
+
+    /**
+     * Documents under a key prefix, filtered and sorted by indexed fields, a
+     * page at a time. Sorting breaks ties on the document id, so a cursor is
+     * stable while the list changes.
+     */
+    async query(input: ListQuery): Promise<{ rows: DocumentRow[]; next: string | undefined }> {
+        const copy =
+            input.copy === 'published' ? sql`${cmsDocuments.published}` : sql`coalesce(${cmsDocuments.draft}, ${cmsDocuments.published})`;
+        const read = (field: ListField) =>
+            field.type === 'text'
+                ? sql`(${copy} ->> ${field.field})`
+                : field.type === 'numeric'
+                  ? sql`((${copy} ->> ${field.field})::numeric)`
+                  : sql`((${copy} ->> ${field.field})::boolean)`;
+        const sortExpression =
+            input.orderBy === undefined || input.orderBy === 'publishedAt'
+                ? sql`${cmsDocuments.publishedAt}`
+                : input.orderBy === 'updatedAt'
+                  ? sql`${cmsDocuments.updatedAt}`
+                  : read(input.orderBy);
+        const direction = input.direction ?? (input.orderBy === undefined || typeof input.orderBy === 'string' ? 'desc' : 'asc');
+        const conditions = [
+            eq(cmsDocuments.kind, input.kind),
+            sql`${cmsDocuments.key} like ${likePrefix(input.keyPrefix)}`,
+            input.copy === 'published'
+                ? sql`${cmsDocuments.published} is not null`
+                : sql`(${cmsDocuments.draft} is not null or ${cmsDocuments.published} is not null)`,
+            ...(input.where ?? []).map((filter) => sql`${read(filter)} = ${filter.type === 'text' ? String(filter.value) : filter.value}`),
+        ];
+        const cursor = input.cursor === undefined ? undefined : decodeCursor(input.cursor);
+        if (cursor !== undefined) {
+            const value = cursor.value === null ? null : cursor.value;
+            conditions.push(
+                direction === 'desc'
+                    ? sql`(${sortExpression}, ${cmsDocuments.id}) < (${value}, ${cursor.id})`
+                    : sql`(${sortExpression}, ${cmsDocuments.id}) > (${value}, ${cursor.id})`
+            );
+        }
+        const rows = await this.db
+            .select({
+                document: cmsDocuments,
+                sortValue: sql<unknown>`${sortExpression}`,
+            })
+            .from(cmsDocuments)
+            .where(and(...conditions))
+            .orderBy(
+                direction === 'desc' ? sql`${sortExpression} desc nulls last` : sql`${sortExpression} asc nulls last`,
+                direction === 'desc' ? desc(cmsDocuments.id) : asc(cmsDocuments.id)
+            )
+            .limit(input.limit + 1);
+        const page = rows.slice(0, input.limit);
+        const last = page[page.length - 1];
+        return {
+            rows: page.map((row) => toRow(row.document)),
+            next:
+                rows.length > input.limit && last !== undefined
+                    ? encodeCursor({
+                          value: last.sortValue instanceof Date ? last.sortValue.toISOString() : last.sortValue,
+                          id: last.document.id,
+                      })
+                    : undefined,
+        };
+    }
+
+    /**
+     * Removes a document with its versions and references.
+     */
+    async delete(kind: DocumentKind, key: string, site = SITE): Promise<boolean> {
+        return this.db.transaction(async (tx) => {
+            const [existing] = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(identity(kind, key, site))
+                .for('update');
+            if (existing === undefined) return false;
+            await tx.delete(cmsRefs).where(eq(cmsRefs.documentId, existing.id));
+            await tx.delete(cmsVersions).where(eq(cmsVersions.documentId, existing.id));
+            await tx.delete(cmsDocuments).where(eq(cmsDocuments.id, existing.id));
+            return true;
         });
     }
 

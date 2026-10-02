@@ -33,13 +33,17 @@ kizuna cms migrate --out drizzle
 
 <Step>
 
-## Install the plugin and its routes
+## Give the CMS its own API
 
-The plugin holds the database, the pages and the rules. `cmsRoutes` are the routes editors and agents call, mounted beside your own so they reach the OpenAPI document, the clients and MCP like any other route:
+The CMS lives in a config of its own, so editors, content tools and the CMS client never mix with the app's. The plugin holds the database, the pages and the rules, and `cmsRoutes` are the routes editors and agents call:
 
-```ts title="kizuna.config.ts"
+```ts title="kizuna.cms.config.ts"
+import { defineConfig } from 'kizunajs';
+import { nextAdapter } from '@kizunajs/next';
+import { mcpPlugin } from '@kizunajs/mcp';
 import { cmsPlugin, cmsRoutes } from '@kizunajs/cms';
 import { nextRevalidate } from '@kizunajs/cms/next';
+import { editor } from './src/cms/identities';
 import { pages } from './src/cms.pages';
 import { db } from './src/db';
 
@@ -51,24 +55,38 @@ const cms = cmsPlugin({
         roles: ['editor', 'admin'],
     },
     revalidate: nextRevalidate,
+    path: '/',
+    apiPath: '/cms-api',
 });
 
 export default defineConfig({
     adapter: nextAdapter(),
-    routes: {
-        ...routes,
-        cms: cmsRoutes(cms),
+    typescript: {
+        outputFile: './src/cms/kizuna.types.ts',
     },
     auth: {
         identities: {
             editor,
         },
     },
-    plugins: [cms],
+    routes: {
+        cms: cmsRoutes(cms),
+    },
+    plugins: [mcpPlugin(), cms],
 });
 ```
 
-`editor` is an identity of yours, with the roles editors hold. See [Access control](/docs/access-control).
+Mount it beside the app API:
+
+```ts title="src/app/cms-api/[...kizuna-cms]/route.ts"
+import kizuna from '../../../../kizuna.cms.config';
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
+    basePath: '/cms-api',
+});
+```
+
+`editor` is an identity of yours, with the roles editors hold. See [Access control](/docs/access-control), and [Its own API](/docs/cms/api) for what stays apart and how the two APIs talk.
 
 </Step>
 
@@ -78,14 +96,14 @@ export default defineConfig({
 
 A `content.ts` beside the route says what editors may change. Every field is plain Zod:
 
-```ts title="src/app/lp/spring/content.ts"
+```ts title="src/app/(front-page)/content.ts"
 import { z } from 'zod';
-import { page } from '@kizunajs/cms';
-import { HeroBlockSchema } from '../../../cms/blocks';
-import { ProductId, SeoSchema } from '../../../cms/schemas';
+import { definePage } from '@kizunajs/cms';
+import { HeroBlockSchema } from '../../cms/blocks';
+import { ProductId, SeoSchema } from '../../cms/schemas';
 
-export default page({
-    name: 'springPage',
+export default definePage({
+    name: 'frontPage',
     fields: [
         {
             name: 'hero',
@@ -135,16 +153,16 @@ export default withKizunaCms({
 
 ```ts title="src/cms.ts"
 import { createCms } from '@kizunajs/cms/next';
-import kizuna from '../kizuna.config';
+import kizuna from '../kizuna.cms.config';
 
 export const cms = createCms(kizuna.api);
 ```
 
-```tsx title="src/app/lp/spring/page.tsx"
-import { cms } from '../../../cms';
+```tsx title="src/app/(front-page)/page.tsx"
+import { cms } from '../../cms';
 
-export default async function SpringPage() {
-    const content = await cms.pages.springPage.get();
+export default async function FrontPage() {
+    const content = await cms.pages.frontPage.get();
     const featured = await getProductsInOrder(content.featured);
 
     return (
@@ -164,16 +182,25 @@ Outside draft mode that is the published content, cached. A page nobody has publ
 
 ## Add the preview
 
-`KizunaPreview` renders only in draft mode, and the draft route is how an editor gets there:
+`KizunaPreview` renders only in draft mode. It goes in the root layout and in `not-found.tsx`, where a page with no content yet shows its setup screen:
 
 ```tsx title="src/app/layout.tsx"
 import { KizunaPreview } from '@kizunajs/cms/next';
 
 <body>
     {children}
-    <KizunaPreview />
+    <KizunaPreview apiPath="/cms-api" basePath="/" />
 </body>;
 ```
+
+```tsx title="src/app/not-found.tsx"
+<main>
+    <h1>Not found</h1>
+    <KizunaPreview apiPath="/cms-api" basePath="/" />
+</main>
+```
+
+The draft route is how an editor gets into draft mode:
 
 ```ts title="src/app/api/draft/route.ts"
 export { GET } from '@kizunajs/cms/next/draft';
@@ -187,10 +214,12 @@ Open a page's preview from the [content overview](/docs/cms/next#the-content-ove
 
 ## Where to go next
 
-- [Content](/docs/cms/content): fields, blocks and changing the shape later
+- [Content](/docs/cms/content): fields, blocks, globals, collections and changing the shape later
 - [Design rules](/docs/cms/design-rules): for designers, the limits that keep a page looking as designed
 - [Editing](/docs/cms/editing): drafts, publishing, the preview and the agent tools
 - [Next.js](/docs/cms/next): caching, draft mode and the site identity
+- [Its own API](/docs/cms/api): the CMS beside the app API, and how they talk
+- [Monorepos](/docs/cms/monorepos): one CMS for several Next.js apps
 - [Media](/docs/cms/media), [References](/docs/cms/references), [CLI](/docs/cms/cli), [Security](/docs/cms/security)
 
 The CMS owns editorial content and media. Products, orders and users stay in your tables and routes; pages reference them by branded id and fetch them themselves.

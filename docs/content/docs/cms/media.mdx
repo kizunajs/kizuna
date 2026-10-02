@@ -31,7 +31,7 @@ The bucket can stay private: images reach the browser through the image route, n
 
 ## Uploads
 
-The preview handles uploading. Underneath it is three calls: `POST /cms/media/uploads` with the name, type and size answers a presigned URL, the browser `PUT`s the file there, and `POST /cms/media/uploads/:uploadId` checks the file and creates the media item.
+The preview handles uploading. Underneath it is three calls: `POST /media/uploads` with the name, type and size answers a presigned URL, the browser `PUT`s the file there, and `POST /media/uploads/:uploadId` checks the file and creates the media item. Paths here are relative to where the CMS routes are served.
 
 The check reads the bytes with sharp, never the name or the declared type. SVG is refused, since it is a document that can carry script. A file with EXIF, where a camera writes the location, is re-encoded without it; a file without metadata is stored as uploaded. Files over the limit, ten megabytes unless `media.maxBytes` says otherwise, are refused before the upload starts.
 
@@ -55,10 +55,10 @@ The media id is a hash of the stored bytes, so the same file uploaded twice is o
 `Output` turns the reference into `{ id, url, alt, width, height }`. `width` and `height` are the size the crop leaves, and `url` is the image route with the crop and focal point as its query:
 
 ```text
-/api/cms/media/med_3f2a9c1e8b7d4a5f6c0e1d2b/image?crop=0.1,0,0.8,1&focal=0.5,0.3
+/cms-api/media/med_3f2a9c1e8b7d4a5f6c0e1d2b/image?crop=0.1,0,0.8,1&focal=0.5,0.3
 ```
 
-`GET /cms/media/:id/image` is public, renders the stored file with sharp, and answers WebP with a year of `immutable` caching, since the id names the bytes and the query names the crop. It also takes `w` and `h`; with both, the image is cut to that shape around the focal point. `next/image` takes the URL as it is.
+The image route, `GET /media/:id/image`, is public, renders the stored file with sharp, and answers WebP with a year of `immutable` caching, since the id names the bytes and the query names the crop. It also takes `w` and `h`; with both, the image is cut to that shape around the focal point. `next/image` takes the URL as it is.
 
 Set `media.publicPath` when the api is mounted somewhere other than `/api`.
 

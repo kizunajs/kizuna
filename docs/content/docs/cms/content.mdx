@@ -1,9 +1,9 @@
 ---
 title: Content
-description: Declare what editors may change with pages, blocks and plain Zod fields, and change the shape later without losing content.
+description: Declare what editors may change with pages, blocks, globals, collections and plain Zod fields, and change the shape later without losing content.
 ---
 
-A page is a list of fields. A block is a list of fields several pages share. Each field is a name, a Zod schema, and who may edit it.
+A page is a list of fields. A block is a list of fields several pages share. A global is one set of fields every page shows, and a collection holds many items of one shape, which a page at a dynamic route can show one of per address. Each field is a name, a Zod schema, and who may edit it.
 
 ## Fields
 
@@ -33,11 +33,11 @@ Build a block once and use it as a field wherever it belongs. Its field rules an
 
 ```ts title="src/cms/blocks.ts"
 import { z } from 'zod';
-import { block } from '@kizunajs/cms';
+import { defineBlock } from '@kizunajs/cms';
 import { ImageSchema } from '@kizunajs/cms/schemas';
 import { CtaSchema, HeadingSchema } from './schemas';
 
-export const HeroBlockSchema = block({
+export const HeroBlockSchema = defineBlock({
     slug: 'hero',
     fields: [
         {
@@ -60,7 +60,7 @@ export const HeroBlockSchema = block({
 });
 ```
 
-`block()` returns a Zod object schema, and `Output<T>` is that schema with media resolved, so the component is typed from the block:
+`defineBlock()` returns a Zod object schema, and `Output<T>` is that schema with media resolved, so the component is typed from the block:
 
 ```tsx title="src/components/Hero.tsx"
 import type { Output } from '@kizunajs/cms';
@@ -78,11 +78,37 @@ export function Hero(props: Output<typeof HeroBlockSchema>) {
 
 Shared limits live in exported schemas, `HeadingSchema`, `CtaSchema`, `ProductId`, and every field that needs one uses it.
 
+## Rich text
+
+`RichTextSchema` is a field for formatted text, like an article body:
+
+```ts
+import { RichTextSchema } from '@kizunajs/cms/schemas';
+
+{
+    name: 'body',
+    schema: RichTextSchema,
+},
+```
+
+It stores [Portable Text](https://www.portabletext.org), structured JSON that never holds HTML, and Zod checks it like any other field. A body has paragraphs, three levels of heading, quotes, bulleted and numbered lists, bold, italic, code and underline, links and images. Links go to `https://`, `http://`, `mailto:`, `tel:`, a path on the site or an `#anchor`, so a `javascript:` link fails the schema wherever it comes from. Images are `ImageSchema` references, cropped and resolved like any other.
+
+To turn a text field into rich text, give it a `migrate` step. `richTextFromPlain` makes one paragraph of each run of text between blank lines:
+
+```ts
+migrate: {
+    1: (document) => ({
+        ...document,
+        body: richTextFromPlain(String(document['body'] ?? '')),
+    }),
+},
+```
+
 ## Pages
 
 ```ts
-export default page({
-    name: 'springPage',
+export default definePage({
+    name: 'frontPage',
     fields: [
         // ...
     ],
@@ -92,7 +118,114 @@ export default page({
 });
 ```
 
-`name` is how the page is read, `cms.pages.springPage`, and how tools address it: camelCase, a `Page` suffix, unique across the site, written as a literal so discovery can read it from the source. `labels` names fields for the inline editor; a field without one shows its name.
+`name` is how the page is read, `cms.pages.frontPage`, and how tools address it: camelCase, a `Page` suffix, unique across the site, written as a literal so discovery can read it from the source. `labels` names fields for the inline editor; a field without one shows its name.
+
+## Globals
+
+Content every page shows, like a footer or the contact details, is a global. It has no route of its own, and one copy serves the whole site:
+
+```ts title="src/cms/content.ts"
+import { z } from 'zod';
+import { defineGlobal } from '@kizunajs/cms';
+
+export const site = defineGlobal({
+    name: 'site',
+    fields: [
+        {
+            name: 'footerText',
+            schema: z.string().min(1).max(160),
+        },
+        {
+            name: 'contactEmail',
+            schema: z.email(),
+        },
+    ],
+});
+```
+
+Editing it from any page changes it on all of them, and the preview says so before you type.
+
+## Collections
+
+A collection holds many items of one shape, like the people on a team. Each item's id is a brand of its own, so a page references items the way it references products:
+
+```ts title="src/cms/content.ts"
+import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
+import { defineCollection } from '@kizunajs/cms';
+import { ImageSchema } from '@kizunajs/cms/schemas';
+
+export const EmployeeId = Kizuna.brand('EmployeeId', z.string());
+
+export const employees = defineCollection({
+    name: 'employees',
+    id: EmployeeId,
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().min(1).max(60),
+        },
+        {
+            name: 'department',
+            schema: z.enum(['Design', 'Engineering', 'Sales', 'Support']),
+        },
+        {
+            name: 'photo',
+            schema: ImageSchema.optional(),
+        },
+        {
+            name: 'order',
+            schema: z.int().min(0).default(0),
+        },
+    ],
+    indexes: ['department', 'order'],
+});
+```
+
+An item starts as a draft with a generated id and publishes like a page. `indexes` names the fields a list may filter and sort by. `kizuna cms migrate` writes an index for each, and a list that filters on any other field answers `400`, so no list scans the table.
+
+A page picks items by id, and editors choose them by name in the preview:
+
+```ts
+{
+    name: 'contacts',
+    schema: z.array(EmployeeId).max(3).default([]),
+},
+```
+
+Where-used knows which pages show an item, so publishing a change to it refreshes them.
+
+Hand both to the plugin, beside the pages. `group` on either sorts it under a heading in the content overview:
+
+```ts title="kizuna.cms.config.ts"
+const cms = cmsPlugin({
+    db,
+    pages,
+    globals: [site],
+    collections: [employees],
+    auth: {
+        identity: 'editor',
+    },
+});
+```
+
+## Pages that show a collection
+
+A blog post is content, so it lives in a collection, and the route only decides where each one is shown. A `content.ts` at a dynamic route names the collection instead of fields:
+
+```ts title="src/app/blog/[slug]/content.ts"
+import { definePage } from '@kizunajs/cms';
+import { articles } from '../../../cms/content';
+
+export default definePage({
+    name: 'articlePage',
+    collection: articles,
+});
+```
+
+Each route param reads the item field it names, so `[slug]` reads `slug`. That field has to be text, it is indexed, and no two items may share a value, since it is the address. An item's draft can move to a new address before it publishes, and the preview finds it at either.
+
+Editors create and edit articles as items of the collection. The page gives each one its address, so the editor offers to open it, the agent finds it by URL, and other pages feature articles by `ArticleId`. Copy every article's page shares, like a newsletter box, belongs in a global.
 
 ## Changing the shape
 

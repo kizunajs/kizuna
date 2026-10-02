@@ -1,8 +1,8 @@
-import { page } from '../../../../page.js';
+import { definePage } from '../../page.js';
 import { z } from 'zod';
 
-export default page({
-    name: 'springPage',
+export default definePage({
+    name: 'frontPage',
     fields: [
         {
             name: 'heading',

@@ -11,7 +11,7 @@ The CMS has no relationship concept of its own. A `Kizuna.brand` id inside a pag
 export const ProductId = Kizuna.brand('ProductId', z.string());
 ```
 
-```ts title="src/app/lp/spring/content.ts"
+```ts title="src/app/(front-page)/content.ts"
 {
     name: 'featured',
     schema: z.array(ProductId).max(6),
@@ -25,10 +25,10 @@ Brand names are unique; `kizuna generate` fails when two different schemas share
 
 The page fetches through the generated client and keeps the stored order. `inStoredOrder` drops ids that found nothing, so a deleted product leaves the grid instead of breaking it:
 
-```tsx title="src/app/lp/spring/page.tsx"
+```tsx title="src/app/(front-page)/page.tsx"
 import { inStoredOrder } from '@kizunajs/cms/next';
 
-const content = await cms.pages.springPage.get();
+const content = await cms.pages.frontPage.get();
 const result = await apiClient.products.listProducts({
     query: {},
 });
@@ -37,36 +37,47 @@ const featured = inStoredOrder(content.featured, result.status === 200 ? result.
 
 ## The registry
 
-Tell the CMS what it may know about a brand under `brands`. Every entry is optional:
+Tell the CMS what it may know about a brand under `brands`. Every entry is optional, and each is a function, so it can call the app API through its client:
 
-```ts title="kizuna.config.ts"
+```ts title="kizuna.cms.config.ts"
 brands: {
     ProductId: {
-        search: products.listProducts,
+        search: async (query) => {
+            const result = await apiClient.products.listProducts({
+                query: {
+                    q: query,
+                },
+            });
+            return result.status === 200 ? result.body.products : [];
+        },
         label: (product) => product.name,
         image: (product) => product.imageUrl,
-        exists: findExistingProductIds,
     },
 },
 ```
 
-| Option   | Used by                                                                       |
-| -------- | ----------------------------------------------------------------------------- |
-| `search` | A route marked `tool: true`. Powers the picker, and the agent's hint names it |
-| `label`  | Picker rows and history                                                       |
-| `image`  | Picker thumbnails                                                             |
-| `exists` | `kizuna cms push`, which lists ids the target lacks                           |
+| Option   | Used by                                                                                 |
+| -------- | --------------------------------------------------------------------------------------- |
+| `search` | The picker, and the agent through `cms_search_items`. A route of the same API works too |
+| `label`  | Picker rows and history                                                                 |
+| `image`  | Picker thumbnails                                                                       |
+| `exists` | `kizuna cms push`, which lists ids the target lacks                                     |
 
-Without an entry a branded field still works: the preview shows a plain id input, and push skips the check with a warning. The picker runs the search route in process with the search text as `q` and shows the first array in its answer.
+Without an entry a branded field still works: the preview shows a plain id input, and push skips the check with a warning. The ids of a collection need no entry, since the CMS lists its own items.
 
 ## Where-used and invalidation
 
-Every save rebuilds the page's rows in `cms_refs` from its branded fields, and `GET /cms/refs/:brand/:id` lists the pages holding an id. The route that changes an item tells the CMS, and every page featuring it refreshes, no other:
+Every save rebuilds the page's rows in `cms_refs` from its branded fields, and the `whereUsed` route lists the pages holding an id. When the app changes an item, it calls the CMS API's `invalidate` route through the CMS client, and every page featuring it refreshes, no other:
 
 ```ts title="src/routes/products.ts"
-.handler(async ({ params, body, plugins }) => {
+.handler(async ({ params, body }) => {
     const product = await renameProduct(params.id, body.name);
-    await plugins.cms.invalidate(ProductId, params.id);
+    await cmsClient.cms.invalidate({
+        body: {
+            brand: 'ProductId',
+            id: params.id,
+        },
+    });
 
     return {
         status: 200,
@@ -74,3 +85,5 @@ Every save rebuilds the page's rows in `cms_refs` from its branded fields, and `
     };
 }),
 ```
+
+The route answers the identity `auth.invalidate` names on `cmsPlugin`, such as an API key only the app's server holds. See [Its own API](/docs/cms/api#crossing-the-boundary).

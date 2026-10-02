@@ -202,6 +202,7 @@ When changing any exported function, type, or option in `packages/*/src/`, check
 - `pnpm typecheck:tests` typechecks every package's `src`, test files included. Each package's own tsconfig excludes them, so this is the only check that sees a type error in a test.
 - `pnpm build` rebuilds all packages. Required before typechecking after changing cross-package exports.
 - `pnpm --filter @kizunajs-demo/kotlin test` runs Kotlin end-to-end (starts express-demo, compiles the generated client, runs `./gradlew test`). Not part of `pnpm test`.
+- `pnpm --filter @kizunajs-demo/next e2e` runs the CMS preview in Playwright. It starts its own `next dev` on port 3031 with a fresh PGlite database on 5498 and its own `.next-e2e` folder, so it runs beside `pnpm dev` without touching its content. Not part of `pnpm test`.
 
 ## Compiling the Kotlin demo
 

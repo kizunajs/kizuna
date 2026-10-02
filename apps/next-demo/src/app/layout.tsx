@@ -1,4 +1,5 @@
 import { KizunaPreview } from '@kizunajs/cms/next';
+import { Footer } from '../components/Footer';
 
 export const metadata = {
     title: 'Kizuna Next.js Demo',
@@ -13,7 +14,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     fontFamily: 'system-ui',
                 }}>
                 {children}
-                <KizunaPreview />
+                <Footer />
+                <KizunaPreview apiPath="/cms-api" basePath="/" signInPath="/login" />
             </body>
         </html>
     );

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
-import { k } from '../k';
+import { k } from './k';
 import { auth } from '../auth';
 
 /**
@@ -32,7 +32,6 @@ export const editor = k.identity
                 status: 401,
                 body: {
                     detail: 'Sign in as an editor.',
-                    code: 'unauthenticated',
                 },
             });
         }
@@ -43,30 +42,28 @@ export const editor = k.identity
         };
     });
 
-export const siteRoles = Kizuna.roles(['site']);
+export const appRoles = Kizuna.roles(['app']);
 
 /**
- * The site's own server, for cached renders that read app data no visitor may.
- * The key lives in a server-only environment variable, and the role reads
- * only.
+ * The app API's server, calling the CMS API to refresh the pages that show a
+ * product it changed. The key lives in a server-only environment variable.
  */
-export const site = k.identity
+export const app = k.identity
     .apiKey({
-        name: 'x-site-key',
+        name: 'x-cms-key',
         in: 'header',
-        roles: siteRoles,
+        roles: appRoles,
     })
     .guard(({ apiKey, deny }) => {
-        if (apiKey?.value !== (process.env.SITE_API_KEY ?? 'dev-site-key')) {
+        if (apiKey?.value !== (process.env.CMS_APP_KEY ?? 'dev-cms-app-key')) {
             return deny({
                 status: 401,
                 body: {
                     detail: 'Unauthorized',
-                    code: 'unauthenticated',
                 },
             });
         }
         return {
-            role: 'site' as const,
+            role: 'app',
         };
     });

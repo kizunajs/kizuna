@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { block, readBlock } from './block.js';
+import { defineBlock, readBlock } from './block.js';
 import { ImageSchema } from './image.js';
 
-const HeroBlockSchema = block({
+const HeroBlockSchema = defineBlock({
     slug: 'hero',
     fields: [
         {
@@ -50,7 +50,7 @@ describe('block', () => {
 
     it('throws on a slug that is not kebab-case', () => {
         expect(() =>
-            block({
+            defineBlock({
                 slug: 'Hero',
                 fields: [
                     {
@@ -59,12 +59,12 @@ describe('block', () => {
                     },
                 ],
             })
-        ).toThrow("block() has the slug 'Hero'");
+        ).toThrow("defineBlock() has the slug 'Hero'");
     });
 
     it('throws on a field listed twice', () => {
         expect(() =>
-            block({
+            defineBlock({
                 slug: 'hero',
                 // @ts-expect-error heading is listed twice
                 fields: [
@@ -78,12 +78,12 @@ describe('block', () => {
                     },
                 ],
             })
-        ).toThrow("block('hero') lists the field 'heading' twice.");
+        ).toThrow("defineBlock('hero') lists the field 'heading' twice.");
     });
 
     it('throws on a field name that is not an identifier', () => {
         expect(() =>
-            block({
+            defineBlock({
                 slug: 'hero',
                 fields: [
                     {
@@ -92,21 +92,21 @@ describe('block', () => {
                     },
                 ],
             })
-        ).toThrow("block('hero') has a field named 'cta.label'");
+        ).toThrow("defineBlock('hero') has a field named 'cta.label'");
     });
 
     it('throws without fields', () => {
         expect(() =>
-            block({
+            defineBlock({
                 slug: 'hero',
                 fields: [],
             })
-        ).toThrow("block('hero') lists no fields.");
+        ).toThrow("defineBlock('hero') lists no fields.");
     });
 
     it('throws on a field whose schema is not Zod', () => {
         expect(() =>
-            block({
+            defineBlock({
                 slug: 'hero',
                 fields: [
                     {

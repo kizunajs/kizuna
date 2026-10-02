@@ -2,21 +2,29 @@ import { z } from 'zod';
 import { route, type PluginDeclaration } from 'kizunajs/plugin';
 import { BinarySchema, ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import type { RouteAuth } from 'kizunajs';
-import { CmsHttpError, type CmsService } from './cms.js';
-import type { CmsPluginOptions } from './options.js';
+import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
+import { addressOf, CmsHttpError, type CmsService, type DraftState } from './cms.js';
+import { DEFAULT_SITE, routePrefix, sitesOf, type CmsPluginOptions, type PageMap } from './options.js';
+import type { ContentDefinition } from './definitions.js';
+import { servesCollection } from './page.js';
+import { addressFieldsOf } from './dynamic.js';
+import { formatRef, parseRef, type DocumentRef } from './refs.js';
+import { resolvedSchema } from './content-schema.js';
 import {
+    CreateItemBodySchema,
     CreateUploadBodySchema,
     DescribedPageSchema,
     DraftHeadersSchema,
     DraftPageSchema,
+    EditorItemSchema,
     MediaListSchema,
     MediaSchema,
     MissingFieldsSchema,
     PageSummarySchema,
     PreviewSchema,
     PublishBodySchema,
-    PublishedPageSchema,
     RollbackBodySchema,
+    StoredContentSchema,
     UpdateDraftBodySchema,
     UpdateDraftHeadersSchema,
     UpdateMediaBodySchema,
@@ -25,7 +33,7 @@ import {
     WhereUsedSchema,
 } from './wire.js';
 import { UploadRejectedError } from './media/media.js';
-import { ImageQuerySchema } from './wire.js';
+import { ImageQuerySchema, InvalidateBodySchema } from './wire.js';
 
 interface Args {
     params: Record<string, string>;
@@ -39,17 +47,24 @@ interface Args {
 
 type Handler = (args: Args) => Promise<{ status: number; body?: unknown; headers?: Record<string, string> }>;
 
-const pageName = (name: string): string => name.replace(/^-/, '');
-
-const promptFor = (name: string): string =>
-    `Fill in the ${name
+const words = (name: string): string =>
+    name
         .replace(/Page$/, '')
         .replace(/([a-z])([A-Z])/g, '$1 $2')
-        .toLowerCase()} page.`;
+        .toLowerCase();
 
-const draftBody = (state: Awaited<ReturnType<CmsService['draftState']>>) => ({
-    name: state.entry.page.name,
-    path: state.entry.path,
+const nameOf = (ref: DocumentRef): string => (ref.type === 'item' ? ref.id : ref.name);
+
+const promptFor = (ref: DocumentRef): string => {
+    if (ref.type === 'page') return `Fill in the ${words(ref.name)} page.`;
+    if (ref.type === 'global') return `Fill in the ${words(ref.name)} settings.`;
+    return `Fill in this ${words(ref.collection)} item.`;
+};
+
+const draftBody = (state: DraftState) => ({
+    ref: formatRef(state.target.ref),
+    name: nameOf(state.target.ref),
+    path: addressOf(state.target, state.row?.draft ?? state.row?.published) ?? null,
     status: state.status,
     version: state.version,
     publishedVersion: state.row?.publishedVersion ?? null,
@@ -61,23 +76,59 @@ const draftBody = (state: Awaited<ReturnType<CmsService['draftState']>>) => ({
 });
 
 /**
- * The routes the CMS answers, for the app to mount beside its own:
+ * Where an editing route finds its document, and what its paths and tool
+ * descriptions call it.
+ */
+interface Scope {
+    prefix: `/${string}`;
+    params: z.ZodObject;
+    refOf: (params: Record<string, string>) => DocumentRef;
+    noun: string;
+}
+
+/**
+ * The query a list takes: one optional filter per index, and how to sort and
+ * page.
+ */
+const listQueryOf = (definition: ContentDefinition, indexes: readonly string[]) => {
+    const shape: Record<string, z.ZodType> = {};
+    for (const index of indexes) {
+        const field = definition.fields.find((candidate) => candidate.name === index)!;
+        const inner = unwrapOptionalWrappers(field.schema).inner as z.ZodType;
+        const type = readDef(inner).type;
+        shape[index] = (
+            type === 'string' || type === 'enum' || type === 'number' || type === 'int' || type === 'boolean' ? inner : z.string()
+        ).optional();
+    }
+    return z
+        .object({
+            ...shape,
+            orderBy: z.enum([...indexes, 'publishedAt', 'updatedAt']).optional(),
+            direction: z.enum(['asc', 'desc']).optional(),
+            limit: z.int().min(1).max(200).optional(),
+            cursor: z.string().optional().describe('The `next` of the previous page.'),
+        })
+        .strict();
+};
+
+/**
+ * The routes the CMS answers, for the CMS API's config to mount:
  *
  * ```ts
  * routes: {
- *     ...routes,
  *     cms: cmsRoutes(cms),
  * },
  * ```
  *
  * They are ordinary routes, so they reach the OpenAPI document, the generated
  * clients and MCP like any other, behind the identity the plugin names. The
- * handlers reach the plugin at `plugins.<slug>`.
+ * reads under `content` are typed from each page, global and collection, so
+ * other frontends read content through the generated client.
  */
 export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     const options = declaration.input as CmsPluginOptions;
     const slug = declaration.slug;
-    const base = options.basePath ?? '/cms';
+    const base = routePrefix(options.path);
     const editor: RouteAuth =
         options.auth.roles === undefined
             ? options.auth.identity
@@ -127,40 +178,631 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         url: cms.imageUrl(record.id),
     });
 
-    return {
-        getPublished: route({
+    const editing = (scope: Scope) => ({
+        getDraft: route({
             method: 'GET',
-            path: `${base}/pages/:name`,
-            auth: false,
-            summary: 'Read the published content of a page',
-            pathParams: z.object({
-                name: z.string(),
-            }),
+            path: `${base}${scope.prefix}/draft`,
+            auth: editor,
+            summary: `Read the draft of ${scope.noun}`,
+            tool: true,
+            pathParams: scope.params,
             responses: {
                 200: {
-                    body: PublishedPageSchema,
-                    etag: true,
-                    cache: {
-                        scope: 'public',
-                        maxAge: 0,
-                        staleWhileRevalidate: 60,
-                    },
+                    body: DraftPageSchema,
+                    headers: DraftHeadersSchema,
+                    cache: 'no-store',
                 },
                 404: ProblemDetailsSchema,
             },
         }).handler(
             guarded(async (cms, args) => {
-                const name = pageName(args.params['name']!);
-                const published = await cms.published(name);
-                if (published === undefined) throw new CmsHttpError(404, { detail: `The page '${name}' is not published.` });
+                const state = await cms.draftState(scope.refOf(args.params));
+                return {
+                    status: 200,
+                    body: draftBody(state),
+                    headers: {
+                        etag: state.etag,
+                    },
+                };
+            }) as never
+        ),
+
+        updateDraft: route({
+            method: 'PATCH',
+            path: `${base}${scope.prefix}/draft`,
+            auth: editor,
+            summary: `Change fields on the draft of ${scope.noun}`,
+            description:
+                'Changes are keyed by field path and merged into the draft, which is then checked against the whole schema. Describe the document first to learn the paths, the schemas and which fields you may write. Nothing goes live until it is published.',
+            tool: true,
+            pathParams: scope.params,
+            headers: UpdateDraftHeadersSchema,
+            body: UpdateDraftBodySchema,
+            responses: {
+                200: {
+                    body: DraftPageSchema,
+                    headers: DraftHeadersSchema,
+                    cache: 'no-store',
+                },
+                404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
+                422: ValidationErrorSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const body = args.body as z.output<typeof UpdateDraftBodySchema>;
+                const state = await cms.update({
+                    ref: scope.refOf(args.params),
+                    changes: body.changes,
+                    caller: cms.caller(args.auth),
+                    author: authorOf(cms, args),
+                    summary: body.summary,
+                    ifMatch: args.headers['if-match'],
+                    autosave: body.autosave,
+                });
+                return {
+                    status: 200,
+                    body: draftBody(state),
+                    headers: {
+                        etag: state.etag,
+                    },
+                };
+            }) as never
+        ),
+
+        missingFields: route({
+            method: 'GET',
+            path: `${base}${scope.prefix}/missing`,
+            auth: editor,
+            summary: `List the fields the draft of ${scope.noun} still needs before it can publish`,
+            tool: true,
+            pathParams: scope.params,
+            responses: {
+                200: MissingFieldsSchema,
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const ref = scope.refOf(args.params);
+                const state = await cms.draftState(ref);
                 return {
                     status: 200,
                     body: {
-                        name,
-                        path: cms.entry(name).path,
-                        version: published.version,
-                        content: published.content,
-                        updatedAt: published.updatedAt.toISOString(),
+                        name: nameOf(ref),
+                        complete: state.complete,
+                        missing: state.missing,
+                        prompt: promptFor(ref),
+                    },
+                };
+            }) as never
+        ),
+
+        getPublished: route({
+            method: 'GET',
+            path: `${base}${scope.prefix}/published`,
+            auth: editor,
+            summary: `Read the published content of ${scope.noun} as stored, for copying it elsewhere`,
+            pathParams: scope.params,
+            responses: {
+                200: {
+                    body: StoredContentSchema,
+                    cache: 'no-store',
+                },
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const ref = scope.refOf(args.params);
+                const stored = await cms.publishedAsStored(ref);
+                if (stored === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' is not published.` });
+                return {
+                    status: 200,
+                    body: {
+                        ref: formatRef(ref),
+                        version: stored.version,
+                        updatedAt: stored.updatedAt.toISOString(),
+                        content: stored.content,
+                    },
+                };
+            }) as never
+        ),
+
+        history: route({
+            method: 'GET',
+            path: `${base}${scope.prefix}/versions`,
+            auth: editor,
+            summary: `List the versions of ${scope.noun}, newest first`,
+            tool: true,
+            pathParams: scope.params,
+            responses: {
+                200: VersionListSchema,
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const ref = scope.refOf(args.params);
+                return {
+                    status: 200,
+                    body: {
+                        name: nameOf(ref),
+                        versions: await cms.history(ref),
+                    },
+                };
+            }) as never
+        ),
+
+        publish: route({
+            method: 'POST',
+            path: `${base}${scope.prefix}/publish`,
+            auth: editor,
+            summary: `Publish the draft of ${scope.noun}`,
+            description: 'Makes the current draft what every visitor sees. The person confirms before this runs.',
+            tool: {
+                needsApproval: true,
+                destructiveHint: false,
+                idempotentHint: true,
+            },
+            pathParams: scope.params,
+            body: PublishBodySchema,
+            responses: {
+                200: DraftPageSchema,
+                404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => ({
+                status: 200,
+                body: draftBody(await cms.publish(scope.refOf(args.params), authorOf(cms, args))),
+            })) as never
+        ),
+
+        rollback: route({
+            method: 'POST',
+            path: `${base}${scope.prefix}/rollback`,
+            auth: editor,
+            summary: `Restore an earlier version of ${scope.noun} as a new draft`,
+            description: 'Nothing is published by this. The restored content becomes the draft, which is published separately.',
+            tool: {
+                needsApproval: true,
+                destructiveHint: false,
+            },
+            pathParams: scope.params,
+            body: RollbackBodySchema,
+            responses: {
+                200: DraftPageSchema,
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => ({
+                status: 200,
+                body: draftBody(
+                    await cms.rollback(
+                        scope.refOf(args.params),
+                        (args.body as z.output<typeof RollbackBodySchema>).version,
+                        authorOf(cms, args)
+                    )
+                ),
+            })) as never
+        ),
+    });
+
+    const publicCache = {
+        etag: true,
+        cache: {
+            scope: 'public',
+            maxAge: 0,
+            staleWhileRevalidate: 60,
+        },
+    } as never;
+
+    /**
+     * The public list and get of a collection's items.
+     */
+    const listingReads = (input: {
+        definition: ContentDefinition;
+        indexes: readonly string[];
+        path: `/${string}`;
+        collection: string;
+        refOf: (id: string) => DocumentRef;
+        plural: string;
+        single: string;
+    }) => {
+        const item = (resolvedSchema(input.definition.schema) as z.ZodObject).extend({
+            id: z.string(),
+        });
+        return {
+            list: route({
+                method: 'GET',
+                path: input.path,
+                auth: false,
+                summary: `List the published ${input.plural}`,
+                query: listQueryOf(input.definition, input.indexes),
+                responses: {
+                    200: {
+                        body: z.object({
+                            items: z.array(item),
+                            next: z.string().nullable(),
+                        }),
+                        ...(publicCache as object),
+                    },
+                    400: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const { orderBy, direction, limit, cursor, ...where } = (args.query ?? {}) as Record<string, unknown>;
+                    const result = await cms.listItems(input.collection, {
+                        draft: false,
+                        where: Object.fromEntries(Object.entries(where).filter(([, value]) => value !== undefined)),
+                        ...(typeof orderBy === 'string' ? { orderBy } : {}),
+                        ...(direction === 'asc' || direction === 'desc' ? { direction } : {}),
+                        ...(typeof limit === 'number' ? { limit } : {}),
+                        ...(typeof cursor === 'string' ? { cursor } : {}),
+                    });
+                    return {
+                        status: 200,
+                        body: {
+                            items: result.items,
+                            next: result.next ?? null,
+                        },
+                    };
+                }) as never
+            ),
+            get: route({
+                method: 'GET',
+                path: `${input.path}/:id`,
+                auth: false,
+                summary: `Read one published ${input.single}`,
+                pathParams: z.object({
+                    id: z.string(),
+                }),
+                responses: {
+                    200: {
+                        body: item,
+                        ...(publicCache as object),
+                    },
+                    404: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms, args) => {
+                    const published = await cms.published(input.refOf(args.params['id']!));
+                    if (published === undefined)
+                        throw new CmsHttpError(404, { detail: `No published ${input.single} '${args.params['id']}'.` });
+                    return {
+                        status: 200,
+                        body: published.content,
+                    };
+                }) as never
+            ),
+        };
+    };
+
+    /**
+     * The public read of each page a site serves at a path of its own.
+     */
+    const pageReadsOf = (pages: PageMap, site: string) =>
+        Object.fromEntries(
+            Object.entries(pages)
+                .filter(([, entry]) => !servesCollection(entry.page))
+                .map(([name, entry]) => [
+                    name,
+                    route({
+                        method: 'GET',
+                        path: site === DEFAULT_SITE ? `${base}/content/pages/${name}` : `${base}/content/sites/${site}/pages/${name}`,
+                        auth: false,
+                        summary:
+                            site === DEFAULT_SITE
+                                ? `Read the published content of ${entry.path}`
+                                : `Read the published content of ${entry.path} on the ${site} site`,
+                        responses: {
+                            200: {
+                                body: z.object({
+                                    version: z.int(),
+                                    updatedAt: z.string(),
+                                    content: resolvedSchema(entry.page.schema),
+                                }),
+                                ...(publicCache as object),
+                            },
+                            404: ProblemDetailsSchema,
+                        },
+                    }).handler(
+                        guarded(async (cms) => {
+                            const published = await cms.published({
+                                type: 'page',
+                                name,
+                                ...(site === DEFAULT_SITE
+                                    ? {}
+                                    : {
+                                          site,
+                                      }),
+                            });
+                            if (published === undefined) throw new CmsHttpError(404, { detail: `${entry.path} is not published.` });
+                            return {
+                                status: 200,
+                                body: {
+                                    version: published.version,
+                                    updatedAt: published.updatedAt.toISOString(),
+                                    content: published.content,
+                                },
+                            };
+                        }) as never
+                    ),
+                ])
+        );
+
+    const sites = sitesOf(options);
+    const pageReads = pageReadsOf(sites[DEFAULT_SITE]?.pages ?? {}, DEFAULT_SITE);
+    const namedSites = Object.entries(sites).filter(([site]) => site !== DEFAULT_SITE);
+    const siteReads = Object.fromEntries(namedSites.map(([site, declared]) => [site, pageReadsOf(declared.pages, site)]));
+
+    const globalReads = Object.fromEntries(
+        (options.globals ?? []).map((definition) => [
+            definition.name,
+            route({
+                method: 'GET',
+                path: `${base}/content/globals/${definition.name}`,
+                auth: false,
+                summary: `Read the published ${words(definition.name)} global`,
+                responses: {
+                    200: {
+                        body: z.object({
+                            version: z.int(),
+                            updatedAt: z.string(),
+                            content: resolvedSchema(definition.schema),
+                        }),
+                        ...(publicCache as object),
+                    },
+                    404: ProblemDetailsSchema,
+                },
+            }).handler(
+                guarded(async (cms) => {
+                    const published = await cms.published({
+                        type: 'global',
+                        name: definition.name,
+                    });
+                    if (published === undefined) throw new CmsHttpError(404, { detail: `The ${definition.name} global is not published.` });
+                    return {
+                        status: 200,
+                        body: {
+                            version: published.version,
+                            updatedAt: published.updatedAt.toISOString(),
+                            content: published.content,
+                        },
+                    };
+                }) as never
+            ),
+        ])
+    );
+
+    const collectionReads = Object.fromEntries(
+        (options.collections ?? []).map((definition) => [
+            definition.name,
+            listingReads({
+                definition,
+                indexes: [
+                    ...new Set([
+                        ...Object.values(sites).flatMap((declared) => addressFieldsOf(definition.name, declared.pages)),
+                        ...(definition.indexes ?? []),
+                    ]),
+                ],
+                path: `${base}/content/collections/${definition.name}`,
+                collection: definition.name,
+                refOf: (id) => ({
+                    type: 'item',
+                    collection: definition.name,
+                    id,
+                }),
+                plural: words(definition.name),
+                single: `item of ${words(definition.name)}`,
+            }),
+        ])
+    );
+
+    const pageScope: Scope = {
+        prefix: '/pages/:name',
+        params: z.object({
+            name: z.string(),
+        }),
+        refOf: (params) => ({
+            type: 'page',
+            name: params['name']!,
+        }),
+        noun: 'a page',
+    };
+    const sitePageScope: Scope = {
+        prefix: '/sites/:site/pages/:name',
+        params: z.object({
+            site: z.string(),
+            name: z.string(),
+        }),
+        refOf: (params) => ({
+            type: 'page',
+            name: params['name']!,
+            site: params['site']!,
+        }),
+        noun: 'a page of one site, when several apps share the CMS',
+    };
+    const globalScope: Scope = {
+        prefix: '/globals/:name',
+        params: z.object({
+            name: z.string(),
+        }),
+        refOf: (params) => ({
+            type: 'global',
+            name: params['name']!,
+        }),
+        noun: 'a global, which every page may show',
+    };
+    /**
+     * Listing, adding and deleting the items of a collection.
+     */
+    const itemRoutes = () => ({
+        listItems: route({
+            method: 'GET',
+            path: `${base}/collections/:name/items`,
+            auth: editor,
+            summary: 'List every item of a collection, drafts included, with its status and address',
+            tool: true,
+            pathParams: z.object({
+                name: z.string(),
+            }),
+            responses: {
+                200: z.object({
+                    items: z.array(EditorItemSchema),
+                }),
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => ({
+                status: 200,
+                body: {
+                    items: await cms.editorItems(args.params['name']!),
+                },
+            })) as never
+        ),
+
+        createItem: route({
+            method: 'POST',
+            path: `${base}/collections/:name/items`,
+            auth: editor,
+            summary: 'Add an item to a collection, as a draft',
+            tool: true,
+            pathParams: z.object({
+                name: z.string(),
+            }),
+            body: CreateItemBodySchema,
+            responses: {
+                201: DraftPageSchema,
+                404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
+                422: ValidationErrorSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => ({
+                status: 201,
+                body: draftBody(
+                    await cms.createItem(
+                        args.params['name']!,
+                        (args.body as z.output<typeof CreateItemBodySchema>)?.values ?? {},
+                        cms.caller(args.auth),
+                        authorOf(cms, args)
+                    )
+                ),
+            })) as never
+        ),
+
+        deleteItem: route({
+            method: 'DELETE',
+            path: `${base}/collections/:name/items/:id`,
+            auth: editor,
+            summary: 'Delete an item of a collection, with its history',
+            description: 'Its address stops answering, and pages that reference it stop showing it. The person confirms before this runs.',
+            tool: {
+                needsApproval: true,
+            },
+            pathParams: z.object({
+                name: z.string(),
+                id: z.string(),
+            }),
+            responses: {
+                204: z.void(),
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                await cms.deleteItem(args.params['name']!, args.params['id']!);
+                return {
+                    status: 204,
+                    body: undefined,
+                };
+            }) as never
+        ),
+    });
+
+    const itemScope: Scope = {
+        prefix: '/collections/:name/items/:id',
+        params: z.object({
+            name: z.string(),
+            id: z.string(),
+        }),
+        refOf: (params) => ({
+            type: 'item',
+            collection: params['name']!,
+            id: params['id']!,
+        }),
+        noun: 'an item of a collection',
+    };
+
+    return {
+        content: {
+            pages: pageReads,
+            ...(namedSites.length === 0
+                ? {}
+                : {
+                      sites: siteReads,
+                  }),
+            globals: globalReads,
+            collections: collectionReads,
+        },
+
+        describe: route({
+            method: 'GET',
+            path: `${base}/describe`,
+            auth: editor,
+            summary: 'Describe what is shown at a URL, or any document by its ref: its fields, what the caller may write, and the draft',
+            description:
+                'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it.',
+            tool: true,
+            query: z.object({
+                url: z
+                    .string()
+                    .optional()
+                    .describe('The page URL or path, like https://example.com/blog/spring-sale or /blog/spring-sale.'),
+                site: z.string().optional().describe('The site the URL belongs to, when several apps share the CMS.'),
+                ref: z.string().optional().describe('A document: page:<name>, global:<name> or item:<collection>:<id>.'),
+            }),
+            responses: {
+                200: DescribedPageSchema,
+                400: ProblemDetailsSchema,
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const query = (args.query ?? {}) as { url?: string; ref?: string; site?: string };
+                let ref: DocumentRef | undefined;
+                if (query.ref !== undefined) {
+                    ref = parseRef(query.ref);
+                    if (ref === undefined) throw new CmsHttpError(400, { detail: `'${query.ref}' is not a ref.` });
+                } else if (query.url !== undefined) {
+                    let path: string;
+                    try {
+                        path = new URL(query.url, 'http://cms.local').pathname;
+                    } catch {
+                        throw new CmsHttpError(404, { detail: `'${query.url}' is not a URL or a path.` });
+                    }
+                    ref = await cms.pageAt(path, query.site);
+                    if (ref === undefined) throw new CmsHttpError(404, { detail: `No page is served at '${path}'.` });
+                } else {
+                    throw new CmsHttpError(400, { detail: 'Pass a url or a ref.' });
+                }
+                const state = await cms.draftState(ref);
+                const draft = state.row?.draft ?? state.row?.published ?? null;
+                return {
+                    status: 200,
+                    body: {
+                        ref: formatRef(ref),
+                        kind: state.target.kind,
+                        name: nameOf(ref),
+                        path: addressOf(state.target, draft) ?? null,
+                        usedOn: await cms.usedOn(ref),
+                        status: state.status,
+                        version: state.version,
+                        complete: state.complete,
+                        missing: state.missing,
+                        fields: cms.describe(ref, draft, cms.caller(args.auth)),
+                        draft,
+                    },
+                    headers: {
+                        etag: state.etag,
                     },
                 };
             }) as never
@@ -184,139 +826,6 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     pages: await cms.summaries(),
                 },
             })) as never
-        ),
-
-        describePage: route({
-            method: 'GET',
-            path: `${base}/describe`,
-            auth: editor,
-            summary: 'Describe the page at a URL: its fields, what the caller may write, and the draft',
-            description:
-                'Start here when working from the page someone is looking at. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it.',
-            tool: true,
-            query: z.object({
-                url: z.string().describe('The page URL or path, like https://example.com/lp/spring or /lp/spring.'),
-            }),
-            responses: {
-                200: DescribedPageSchema,
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const given = String((args.query as { url: string }).url);
-                let path: string;
-                try {
-                    path = new URL(given, 'http://cms.local').pathname;
-                } catch {
-                    throw new CmsHttpError(404, { detail: `'${given}' is not a URL or a path.` });
-                }
-                const entry = cms.entryAt(path);
-                if (entry === undefined) throw new CmsHttpError(404, { detail: `No page is served at '${path}'.` });
-                const state = await cms.draftState(entry.page.name);
-                const caller = cms.caller(args.auth);
-                return {
-                    status: 200,
-                    body: {
-                        name: entry.page.name,
-                        path: entry.path,
-                        url: given,
-                        status: state.status,
-                        version: state.version,
-                        complete: state.complete,
-                        missing: state.missing,
-                        fields: cms.describe(entry.page.name, given, state.row?.draft ?? null, caller),
-                        draft: state.row?.draft ?? null,
-                    },
-                    headers: {
-                        etag: state.etag,
-                    },
-                };
-            }) as never
-        ),
-
-        getDraft: route({
-            method: 'GET',
-            path: `${base}/pages/:name/draft`,
-            auth: editor,
-            summary: 'Read the draft of a page',
-            tool: true,
-            pathParams: z.object({
-                name: z.string(),
-            }),
-            responses: {
-                200: {
-                    body: DraftPageSchema,
-                    headers: DraftHeadersSchema,
-                    cache: 'no-store',
-                },
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const state = await cms.draftState(pageName(args.params['name']!));
-                return {
-                    status: 200,
-                    body: draftBody(state),
-                    headers: {
-                        etag: state.etag,
-                    },
-                };
-            }) as never
-        ),
-
-        missingFields: route({
-            method: 'GET',
-            path: `${base}/pages/:name/missing`,
-            auth: editor,
-            summary: 'List the fields a draft still needs before it can publish',
-            tool: true,
-            pathParams: z.object({
-                name: z.string(),
-            }),
-            responses: {
-                200: MissingFieldsSchema,
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const name = pageName(args.params['name']!);
-                const state = await cms.draftState(name);
-                return {
-                    status: 200,
-                    body: {
-                        name,
-                        complete: state.complete,
-                        missing: state.missing,
-                        prompt: promptFor(name),
-                    },
-                };
-            }) as never
-        ),
-
-        history: route({
-            method: 'GET',
-            path: `${base}/pages/:name/versions`,
-            auth: editor,
-            summary: 'List the versions of a page, newest first',
-            tool: true,
-            pathParams: z.object({
-                name: z.string(),
-            }),
-            responses: {
-                200: VersionListSchema,
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const name = pageName(args.params['name']!);
-                return {
-                    status: 200,
-                    body: {
-                        name,
-                        versions: await cms.history(name),
-                    },
-                };
-            }) as never
         ),
 
         whereUsed: route({
@@ -343,107 +852,20 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             })) as never
         ),
 
-        updateDraft: route({
-            method: 'PATCH',
-            path: `${base}/pages/:name/draft`,
-            auth: editor,
-            summary: 'Change fields on the draft of a page',
-            description:
-                'Changes are keyed by field path and merged into the draft, which is then checked against the whole page schema. Describe the page first to learn the paths, the schemas and which fields you may write. Nothing goes live until the page is published.',
-            tool: true,
-            pathParams: z.object({
-                name: z.string(),
-            }),
-            headers: UpdateDraftHeadersSchema,
-            body: UpdateDraftBodySchema,
-            responses: {
-                200: {
-                    body: DraftPageSchema,
-                    headers: DraftHeadersSchema,
-                    cache: 'no-store',
-                },
-                404: ProblemDetailsSchema,
-                409: ProblemDetailsSchema,
-                422: ValidationErrorSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => {
-                const body = args.body as z.output<typeof UpdateDraftBodySchema>;
-                const state = await cms.update({
-                    name: pageName(args.params['name']!),
-                    changes: body.changes,
-                    caller: cms.caller(args.auth),
-                    author: authorOf(cms, args),
-                    summary: body.summary,
-                    ifMatch: args.headers['if-match'],
-                });
-                return {
-                    status: 200,
-                    body: draftBody(state),
-                    headers: {
-                        etag: state.etag,
-                    },
-                };
-            }) as never
-        ),
+        pages: editing(pageScope),
 
-        publish: route({
-            method: 'POST',
-            path: `${base}/pages/:name/publish`,
-            auth: editor,
-            summary: 'Publish the draft of a page',
-            description: 'Makes the current draft what every visitor sees. The person confirms before this runs.',
-            tool: {
-                needsApproval: true,
-                destructiveHint: false,
-                idempotentHint: true,
-            },
-            pathParams: z.object({
-                name: z.string(),
-            }),
-            body: PublishBodySchema,
-            responses: {
-                200: DraftPageSchema,
-                404: ProblemDetailsSchema,
-                409: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => ({
-                status: 200,
-                body: draftBody(await cms.publish(pageName(args.params['name']!), authorOf(cms, args))),
-            })) as never
-        ),
+        ...(namedSites.length === 0
+            ? {}
+            : {
+                  sitePages: editing(sitePageScope),
+              }),
 
-        rollback: route({
-            method: 'POST',
-            path: `${base}/pages/:name/rollback`,
-            auth: editor,
-            summary: 'Restore an earlier version of a page as a new draft',
-            description: 'Nothing is published by this. The restored content becomes the draft, which is published separately.',
-            tool: {
-                needsApproval: true,
-                destructiveHint: false,
-            },
-            pathParams: z.object({
-                name: z.string(),
-            }),
-            body: RollbackBodySchema,
-            responses: {
-                200: DraftPageSchema,
-                404: ProblemDetailsSchema,
-            },
-        }).handler(
-            guarded(async (cms, args) => ({
-                status: 200,
-                body: draftBody(
-                    await cms.rollback(
-                        pageName(args.params['name']!),
-                        (args.body as z.output<typeof RollbackBodySchema>).version,
-                        authorOf(cms, args)
-                    )
-                ),
-            })) as never
-        ),
+        globals: editing(globalScope),
+
+        collections: {
+            ...itemRoutes(),
+            ...editing(itemScope),
+        },
 
         listMedia: route({
             method: 'GET',
@@ -628,7 +1050,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             method: 'GET',
             path: `${base}/items/:brand`,
             auth: editor,
-            summary: "Find items a page can reference, through the brand's registered search route",
+            summary: 'Find the ids a branded field may hold, by brand and an optional search term',
+            description:
+                "A collection's brand lists its items; any other brand runs the search the CMS has registered for it. Each result has the id to store and a label to show.",
+            tool: true,
             pathParams: z.object({
                 brand: z.string(),
             }),
@@ -659,6 +1084,31 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     ),
                 },
             })) as never
+        ),
+
+        invalidate: route({
+            method: 'POST',
+            path: `${base}/invalidate`,
+            auth: options.auth.invalidate ?? editor,
+            summary: 'Refresh every page that shows a branded id',
+            description:
+                'For the app API: call it when a product, a person or anything else pages reference by id changes, so the pages showing it render fresh. Answers with the pages it refreshed.',
+            body: InvalidateBodySchema,
+            responses: {
+                200: z.object({
+                    pages: z.array(z.string()),
+                }),
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const body = args.body as z.output<typeof InvalidateBodySchema>;
+                return {
+                    status: 200,
+                    body: {
+                        pages: await cms.invalidate(body.brand, body.id),
+                    },
+                };
+            }) as never
         ),
 
         createPreview: route({

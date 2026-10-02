@@ -1,0 +1,81 @@
+---
+title: Monorepos
+description: One CMS for several Next.js apps, with each app's pages kept next to its routes and shared content defined once.
+---
+
+A single Next.js app configures nothing extra. When several apps share one CMS, like a main site and a campaign site, each keeps its pages next to its own routes, and the CMS stores them under a site name.
+
+```text
+apps/
+    web/                    → Next.js site
+        src/app/
+            (front-page)/content.ts
+            blog/[slug]/content.ts
+    campaign/               → Next.js site
+        src/app/(front-page)/content.ts
+packages/
+    models/                 → brands both APIs use: ProductId, ArticleId
+    api/                    → app API: kizuna.config.ts, routes
+    content/                → CMS API: kizuna.cms.config.ts, blocks, globals, collections
+```
+
+Collections, globals, blocks and shared schemas live in the content package, so every app uses the same ones. Brands live in the models package, so the app API, the CMS and mobile clients agree on every id.
+
+## Name the sites
+
+The CMS config lists each app under `sites`, with the pages module generated into it and where its `app` directory is:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+import { pages as webPages } from '../../apps/web/src/cms.pages';
+import { pages as campaignPages } from '../../apps/campaign/src/cms.pages';
+
+const cms = cmsPlugin({
+    db,
+    sites: {
+        web: {
+            pages: webPages,
+            app: '../../apps/web/src/app',
+        },
+        campaign: {
+            pages: campaignPages,
+            app: '../../apps/campaign/src/app',
+        },
+    },
+    globals: [footer],
+    collections: [articles, employees],
+    auth: {
+        identity: 'editor',
+    },
+});
+```
+
+Each site's pages are stored apart, so both apps can have a `frontPage` at `/`. Page names are unique within a site. Globals and collections are shared, and an article shows on every site that has a page for it.
+
+## In each app
+
+An app reads its own site's pages, and its preview says which site it is:
+
+```ts title="apps/web/src/cms.ts"
+import { createCms } from '@kizunajs/cms/next';
+import kizuna from '@acme/content/kizuna.cms.config';
+
+export const cms = createCms(kizuna.api, {
+    site: 'web',
+});
+```
+
+```tsx title="apps/web/src/app/layout.tsx"
+<KizunaPreview apiPath="/cms-api" basePath="/" site="web" />
+```
+
+`cms.pages` holds that site's pages alone, typed from its module, and `CmsOverview` takes the same `site`. In routes and tools, a page of a named site is `page:web:frontPage`, edited under `/sites/web/pages/frontPage`.
+
+## Generating
+
+`withKizunaCms` in each app's `next.config.ts` writes that app's `src/cms.pages.ts` before Next compiles, as in a single app. `kizuna generate --config kizuna.cms.config.ts` writes every site's module, and `--check` fails when one is behind.
+
+After moving a `content.ts` in an app, rewrite its module before generating anything else, since the CMS config imports it:
+
+```sh
+kizuna cms pages --write --app ../../apps/web/src/app
+```

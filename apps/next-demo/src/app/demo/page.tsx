@@ -1,4 +1,4 @@
-import { apiClient } from '../lib/api-client';
+import { apiClient } from '../../lib/api-client';
 import { createUserAction, deleteUserAction } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -40,8 +40,7 @@ export default async function Home() {
                     Express demo page (:8000) →
                 </a>
                 <a href="/cms">Content (sign in) →</a>
-                <a href="/lp/spring">Spring page →</a>
-                <a href="/contact">Contact page →</a>
+                <a href="/">Shop home →</a>
             </nav>
 
             <h2>Users</h2>

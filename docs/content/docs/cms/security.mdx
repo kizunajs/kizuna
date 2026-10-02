@@ -19,19 +19,23 @@ Every version records its author from the editor identity's context. The identit
 
 ## Drafts stay drafts
 
-`GET /cms/pages/:name` answers published content only. The reader returns a draft in draft mode alone, Next never caches a draft-mode render, and the encoding the preview reads appears there alone, so production HTML carries none of it. A test in the package fails if a draft value reaches a cached response.
+The public content routes answer published content only. The reader returns a draft in draft mode alone, Next never caches a draft-mode render, and the encoding the preview reads appears there alone, so production HTML carries none of it. A test in the package fails if a draft value reaches a cached response.
 
 ## Content is text
 
-A CMS string renders as text. Rich text, when it comes, is structured data a component renders. `@kizunajs/eslint-plugin` ships [`no-cms-html`](/docs/eslint#no-cms-html), which flags `dangerouslySetInnerHTML` fed from a page read or an `Output` value. Links in content are `z.url({ protocol: /^https$/ })`, since a plain `z.url()` accepts `javascript:` too.
+A CMS string renders as text. Rich text is Portable Text that `<RichText>` renders, never HTML, and its links are checked against a list of safe schemes. `@kizunajs/eslint-plugin` ships [`no-cms-html`](/docs/eslint#no-cms-html), which flags `dangerouslySetInnerHTML` fed from a page read or an `Output` value. Links in content are `z.url({ protocol: /^https$/ })`, since a plain `z.url()` accepts `javascript:` too.
 
 ## Media
 
 Files are checked by their bytes, SVG is refused, location metadata is stripped, and the bucket's credentials stay on the server: the browser uploads through a presigned URL and reads through the image route.
 
+## Its own API
+
+The CMS runs in [its own API](/docs/cms/api), so editor credentials work nowhere in the app API, and an editor's agent sees content tools alone. The app reaches the CMS through one route, `invalidate`, with a key the CMS checks and nothing else accepts.
+
 ## Least privilege
 
-Connect the CMS through a Drizzle instance on a role limited to its tables, so a CMS bug cannot reach app data:
+The CMS shares the app's database. Connect it as a role limited to its tables, through a Drizzle instance of its own, so a CMS bug cannot reach app data:
 
 ```sql
 create role cms_editor login password '…';

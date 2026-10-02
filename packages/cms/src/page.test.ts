@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
-import { block } from './block.js';
+import { defineBlock } from './block.js';
 import { fieldDescription, undeclaredFieldRoles } from './field.js';
-import { isPage, page } from './page.js';
+import { isPage, definePage } from './page.js';
 
 const ProductId = Kizuna.brand('ProductId', z.string());
 
-const HeroBlockSchema = block({
+const HeroBlockSchema = defineBlock({
     slug: 'hero',
     fields: [
         {
@@ -17,8 +17,8 @@ const HeroBlockSchema = block({
     ],
 });
 
-const springPage = page({
-    name: 'springPage',
+const frontPage = definePage({
+    name: 'frontPage',
     fields: [
         {
             name: 'hero',
@@ -52,14 +52,14 @@ const springPage = page({
 
 describe('page', () => {
     it('keeps the definition and marks it as a page', () => {
-        expect(springPage.name).toBe('springPage');
-        expect(springPage.fields.map((field) => field.name)).toEqual(['hero', 'featured', 'seo']);
-        expect(isPage(springPage)).toBe(true);
+        expect(frontPage.name).toBe('frontPage');
+        expect(frontPage.fields.map((field) => field.name)).toEqual(['hero', 'featured', 'seo']);
+        expect(isPage(frontPage)).toBe(true);
         expect(isPage(HeroBlockSchema)).toBe(false);
     });
 
     it('builds a schema the whole page is checked against', () => {
-        const result = springPage.schema.safeParse({
+        const result = frontPage.schema.safeParse({
             hero: {
                 heading: 'Spring',
             },
@@ -74,8 +74,8 @@ describe('page', () => {
 
     it('throws on a name that is not an identifier', () => {
         expect(() =>
-            page({
-                name: 'spring-page',
+            definePage({
+                name: 'front-page',
                 fields: [
                     {
                         name: 'heading',
@@ -83,12 +83,13 @@ describe('page', () => {
                     },
                 ],
             })
-        ).toThrow("page() has the name 'spring-page'");
+        ).toThrow("definePage() has the name 'front-page'");
     });
 
     it('throws on a label for a field it does not have', () => {
         expect(() =>
-            page({
+            // @ts-expect-error title is not a field
+            definePage({
                 name: 'aboutPage',
                 fields: [
                     {
@@ -97,16 +98,15 @@ describe('page', () => {
                     },
                 ],
                 labels: {
-                    // @ts-expect-error not a field
                     title: 'Title',
                 },
             })
-        ).toThrow("page('aboutPage') labels 'title', which is not one of its fields.");
+        ).toThrow("definePage('aboutPage') labels 'title', which is not one of its fields.");
     });
 
     it('throws on a migrate step that is not a version number', () => {
         expect(() =>
-            page({
+            definePage({
                 name: 'aboutPage',
                 fields: [
                     {
@@ -118,13 +118,13 @@ describe('page', () => {
                     0: (document) => document,
                 },
             })
-        ).toThrow("page('aboutPage') has a migrate step '0'");
+        ).toThrow("definePage('aboutPage') has a migrate step '0'");
     });
 });
 
 describe('fieldDescription', () => {
     it('prefers the field description over the schema text', () => {
-        expect(fieldDescription(springPage.fields[1])).toBe('Products shown in the grid, in this order.');
+        expect(fieldDescription(frontPage.fields[1])).toBe('Products shown in the grid, in this order.');
     });
 
     it('falls back to .describe(), through .optional()', () => {
@@ -137,18 +137,18 @@ describe('fieldDescription', () => {
     });
 
     it('is undefined when neither says anything', () => {
-        expect(fieldDescription(springPage.fields[0])).toBeUndefined();
+        expect(fieldDescription(frontPage.fields[0])).toBeUndefined();
     });
 });
 
 describe('undeclaredFieldRoles', () => {
     it('names every role the identity does not declare', () => {
-        expect(undeclaredFieldRoles(springPage.fields, ['editor'])).toEqual([
+        expect(undeclaredFieldRoles(frontPage.fields, ['editor'])).toEqual([
             {
                 field: 'seo',
                 role: 'admin',
             },
         ]);
-        expect(undeclaredFieldRoles(springPage.fields, ['editor', 'admin'])).toEqual([]);
+        expect(undeclaredFieldRoles(frontPage.fields, ['editor', 'admin'])).toEqual([]);
     });
 });

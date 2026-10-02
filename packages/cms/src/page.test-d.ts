@@ -1,14 +1,14 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
-import { block } from './block.js';
+import { defineBlock } from './block.js';
 import { ImageSchema } from './image.js';
-import { page } from './page.js';
+import { definePage } from './page.js';
 import type { Output } from './output.js';
 
 const ProductId = Kizuna.brand('ProductId', z.string());
 
-const HeroBlockSchema = block({
+const HeroBlockSchema = defineBlock({
     slug: 'hero',
     fields: [
         {
@@ -26,8 +26,8 @@ const HeroBlockSchema = block({
     ],
 });
 
-const springPage = page({
-    name: 'springPage',
+const frontPage = definePage({
+    name: 'frontPage',
     fields: [
         {
             name: 'hero',
@@ -57,9 +57,9 @@ const springPage = page({
 });
 
 test('a page name and its field names infer as literals without as const', () => {
-    expectTypeOf(springPage.name).toEqualTypeOf<'springPage'>();
-    expectTypeOf(springPage.fields[0].name).toEqualTypeOf<'hero'>();
-    expectTypeOf(springPage.fields[3].auth).toEqualTypeOf<{
+    expectTypeOf(frontPage.name).toEqualTypeOf<'frontPage'>();
+    expectTypeOf(frontPage.fields[0].name).toEqualTypeOf<'hero'>();
+    expectTypeOf(frontPage.fields[3].auth).toEqualTypeOf<{
         readonly roles: 'admin';
     }>();
 });
@@ -70,11 +70,11 @@ test('a block is a Zod object typed from its fields', () => {
 });
 
 test('the page schema has one property per field', () => {
-    expectTypeOf<keyof z.output<typeof springPage.schema>>().toEqualTypeOf<'hero' | 'featured' | 'gallery' | 'seo'>();
+    expectTypeOf<keyof z.output<typeof frontPage.schema>>().toEqualTypeOf<'hero' | 'featured' | 'gallery' | 'seo'>();
 });
 
 test('Output resolves every image, in a block, in an array, and keeps brands and optionality', () => {
-    type Spring = Output<typeof springPage>;
+    type Spring = Output<typeof frontPage>;
     expectTypeOf<Spring['hero']['image']>().toEqualTypeOf<{
         id: string;
         url: string;
@@ -92,11 +92,11 @@ test('Output resolves every image, in a block, in an array, and keeps brands and
 });
 
 test('Output of a block is the same as the field that holds it', () => {
-    expectTypeOf<Output<typeof HeroBlockSchema>>().toEqualTypeOf<Output<typeof springPage>['hero']>();
+    expectTypeOf<Output<typeof HeroBlockSchema>>().toEqualTypeOf<Output<typeof frontPage>['hero']>();
 });
 
 test('a field listed twice fails to compile', () => {
-    page({
+    definePage({
         name: 'aboutPage',
         // @ts-expect-error heading is listed twice
         fields: [
@@ -113,7 +113,8 @@ test('a field listed twice fails to compile', () => {
 });
 
 test('a label for a field the page does not have fails to compile', () => {
-    page({
+    // @ts-expect-error title is not a field
+    definePage({
         name: 'aboutPage',
         fields: [
             {
@@ -122,7 +123,6 @@ test('a label for a field the page does not have fails to compile', () => {
             },
         ],
         labels: {
-            // @ts-expect-error not a field
             title: 'Title',
         },
     });
@@ -130,17 +130,17 @@ test('a label for a field the page does not have fails to compile', () => {
 
 test('fields is required', () => {
     // @ts-expect-error fields is required
-    page({
+    definePage({
         name: 'aboutPage',
     });
     // @ts-expect-error fields is required
-    block({
+    defineBlock({
         slug: 'hero',
     });
 });
 
 test('a field option outside the five is rejected', () => {
-    page({
+    definePage({
         name: 'aboutPage',
         // @ts-expect-error there is no initial option
         fields: [

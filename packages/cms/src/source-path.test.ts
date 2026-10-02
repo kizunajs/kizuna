@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { block } from './block.js';
+import { Kizuna } from 'kizunajs';
+import { defineBlock } from './block.js';
 import { ImageSchema } from './image.js';
-import { page } from './page.js';
+import { definePage } from './page.js';
 import { decodePath, encodeSourcePaths, stripPaths, withSourcePath } from './source-path.js';
 
-const springPage = page({
-    name: 'springPage',
+const frontPage = definePage({
+    name: 'frontPage',
     fields: [
         {
             name: 'hero',
-            schema: block({
+            schema: defineBlock({
                 slug: 'hero',
                 fields: [
                     {
@@ -49,7 +50,7 @@ describe('source paths', () => {
     });
 
     it('mark strings and images, and leave other values alone', () => {
-        const encoded = encodeSourcePaths(springPage, {
+        const encoded = encodeSourcePaths(frontPage, {
             hero: {
                 heading: 'Spring',
                 image: {
@@ -81,5 +82,58 @@ describe('source paths', () => {
         expect(decodePath(encoded.tags[1]!)).toBe('tags.1');
         expect(encoded.count).toBe(3);
         expect(stripPaths(encoded).hero.heading).toBe('Spring');
+    });
+
+    it('leave ids, URLs, emails, patterned values and plain fields unmarked, since code compares and links with them', () => {
+        const EmployeeId = Kizuna.brand('EmployeeId', z.string());
+        const articlePage = definePage({
+            name: 'articlePage',
+            fields: [
+                {
+                    name: 'title',
+                    schema: z.string(),
+                },
+                {
+                    name: 'slug',
+                    schema: z.string(),
+                },
+                {
+                    name: 'code',
+                    schema: z.string().regex(/^[A-Z]{3}$/),
+                },
+                {
+                    name: 'author',
+                    schema: EmployeeId.optional(),
+                },
+                {
+                    name: 'contacts',
+                    schema: z.array(EmployeeId),
+                },
+                {
+                    name: 'website',
+                    schema: z.url(),
+                },
+                {
+                    name: 'email',
+                    schema: z.email(),
+                },
+            ],
+        });
+        const content = {
+            title: 'Hello',
+            slug: 'hello',
+            code: 'ABC',
+            author: 'emp_1',
+            contacts: ['emp_2'],
+            website: 'https://example.com',
+            email: 'ada@example.com',
+        };
+        const encoded = encodeSourcePaths(articlePage, content, 'item:articles:a1', ['slug']);
+        const title = String(encoded['title']);
+        expect(decodePath(title)).toBe('title');
+        expect({
+            ...encoded,
+            title: stripPaths(title),
+        }).toEqual(content);
     });
 });

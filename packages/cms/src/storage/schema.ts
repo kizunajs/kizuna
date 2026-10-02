@@ -1,7 +1,7 @@
 import { integer, jsonb, pgTable, primaryKey, text, timestamp, unique, index } from 'drizzle-orm/pg-core';
 
 /**
- * One document: a page or a media item. `site` and `locale` are fixed to
+ * One document: a page, a global, an item of a collection, or a media item. `site` and `locale` are fixed to
  * `default` in v1 and exist so later features need no data migration.
  */
 export const cmsDocuments = pgTable(
@@ -15,6 +15,10 @@ export const cmsDocuments = pgTable(
         published: jsonb('published'),
         draft: jsonb('draft'),
         publishedVersion: integer('published_version'),
+        publishedAt: timestamp('published_at', {
+            withTimezone: true,
+            mode: 'date',
+        }),
         migrationVersion: integer('migration_version').notNull().default(0),
         updatedAt: timestamp('updated_at', {
             withTimezone: true,

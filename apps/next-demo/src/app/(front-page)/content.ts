@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { page } from '@kizunajs/cms';
-import { HeroBlockSchema } from '../../../cms/blocks';
-import { ProductId, SeoSchema } from '../../../cms/schemas';
+import { definePage } from '@kizunajs/cms';
+import { HeroBlockSchema } from '../../cms/blocks';
+import { ArticleId, ProductId } from '../../models';
+import { SeoSchema } from '../../cms/schemas';
 
-export default page({
-    name: 'springPage',
+export default definePage({
+    name: 'frontPage',
     fields: [
         {
             name: 'hero',
@@ -14,6 +15,11 @@ export default page({
             name: 'featured',
             schema: z.array(ProductId).max(6),
             description: 'Products shown in the grid, in this order. Up to six.',
+        },
+        {
+            name: 'articles',
+            schema: z.array(ArticleId).max(3).default([]),
+            description: 'Articles shown under the products, in this order. Up to three; none shows the latest.',
         },
         {
             name: 'seo',
@@ -26,6 +32,7 @@ export default page({
     labels: {
         hero: 'Hero',
         featured: 'Featured products',
+        articles: 'Featured articles',
         seo: 'Search engines',
     },
 });

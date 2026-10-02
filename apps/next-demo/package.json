@@ -3,15 +3,21 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "dev": "pglite-server --db=.pglite --port=5499 --max-connections=20 --run \"tsx scripts/setup-demo.ts && next dev -p 3030\"",
-    "build": "pglite-server --db=.pglite --port=5499 --max-connections=20 --run \"tsx scripts/setup-demo.ts && next build\"",
-    "start": "pglite-server --db=.pglite --port=5499 --max-connections=20 --run \"next start -p 3030\"",
+    "dev": "pglite-server --db=.pglite --port=5499 --max-connections=20 --run \"pnpm run dev:app\"",
+    "build": "pglite-server --db=.pglite --port=5499 --max-connections=20 --run \"pnpm run build:app\"",
+    "start": "pglite-server --db=.pglite --port=5499 --max-connections=20 --run \"pnpm run start:app\"",
     "typecheck": "tsc --noEmit",
     "openapi": "tsx scripts/generate-openapi.ts",
-    "kizuna:generate": "kizuna generate",
-    "kizuna:check": "kizuna generate --check",
+    "kizuna:generate": "kizuna generate --config kizuna.cms.config.ts && kizuna generate",
+    "kizuna:check": "kizuna generate --check --config kizuna.cms.config.ts && kizuna generate --check",
     "demo:setup": "tsx scripts/setup-demo.ts",
-    "db": "pglite-server --db=.pglite --port=5499 --max-connections=20"
+    "db": "pglite-server --db=.pglite --port=5499 --max-connections=20",
+    "dev:app": "tsx scripts/setup-demo.ts && next dev -p 3030",
+    "build:app": "tsx scripts/setup-demo.ts && next build",
+    "start:app": "next start -p 3030",
+    "e2e": "playwright test",
+    "e2e:server": "rm -rf .pglite-e2e && pglite-server --db=.pglite-e2e --port=5498 --max-connections=20 --run \"pnpm run e2e:app\"",
+    "e2e:app": "tsx scripts/setup-demo.ts && next dev -p 3031"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
@@ -34,6 +40,7 @@
   },
   "devDependencies": {
     "@kizunajs/cli": "workspace:*",
+    "@playwright/test": "^1.63.0",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

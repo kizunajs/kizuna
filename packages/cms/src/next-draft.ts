@@ -10,7 +10,7 @@ const safeRedirect = (value: string | null): string => (value !== null && value.
 
 /**
  * The route handler that opens and closes draft mode:
- * `GET /api/draft?token=…&redirect=/lp/spring` enables it for a token the API
+ * `GET /api/draft?token=…&redirect=/blog/spring-sale` enables it for a token the API
  * minted, `GET /api/draft?disable=1&redirect=/` turns it off.
  */
 export const createDraftRoute = (options?: { secret?: string }) =>

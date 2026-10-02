@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import type { RouteDefinition } from 'kizunajs';
-import { RoutePathSchema } from 'kizunajs/plugin';
+import type { RouteAuth, RouteDefinition } from 'kizunajs';
+import { RouteAuthSchema, RoutePathSchema } from 'kizunajs/plugin';
 import { isPage, type Page } from './page.js';
+import { isCollection, isGlobal, type Collection, type Global } from './definitions.js';
 import type { CmsDatabase } from './storage/store.js';
 import type { MediaStorage } from './media/storage.js';
 
@@ -20,14 +21,31 @@ export interface PageEntry<P extends Page = Page> {
 export type PageMap = Record<string, PageEntry>;
 
 /**
+ * The pages module's export, kept as written so each path stays a literal
+ * type and a dynamic page's reader knows its params.
+ */
+export const definePages = <const Pages extends PageMap>(pages: Pages): Pages => pages;
+
+/**
  * What the CMS knows about one brand, all optional.
  */
 export interface BrandOptions<Item = any> {
     /**
-     * A route marked `tool: true` that finds items. It powers the picker and
-     * tells the agent where to look for ids.
+     * What finds items for the picker and the agent: a function, which can
+     * call another API through its generated client, or a route this API
+     * serves with `tool: true`.
+     *
+     * @example
+     * search: async (query) => {
+     *     const result = await apiClient.products.listProducts({
+     *         query: {
+     *             q: query,
+     *         },
+     *     });
+     *     return result.status === 200 ? result.body.products : [];
+     * },
      */
-    search?: RouteDefinition;
+    search?: RouteDefinition | ((query: string | undefined) => Promise<readonly Item[]> | readonly Item[]);
     /**
      * What a picker row and a history diff show for an item.
      */
@@ -122,12 +140,49 @@ export interface CmsAuthOptions {
      * it, the context's `userId`, `id`, `email` or `name`.
      */
     author?: (context: Record<string, unknown>) => string;
+    /**
+     * Who may call the `invalidate` route, in a route's own words: usually
+     * the app API's key, so the app refreshes the pages that show a product
+     * it changed. Editors when left out.
+     */
+    invalidate?: RouteAuth;
 }
 
 /**
  * What `cmsPlugin` takes.
  */
-export interface CmsPluginOptions<Pages extends PageMap = PageMap> {
+/**
+ * One Next.js app of several sharing the CMS: its pages, as the module
+ * generated into it exports them, and where its `app` directory is.
+ */
+export interface SiteOptions<Pages extends PageMap = PageMap> {
+    /**
+     * The pages, as the `cms.pages.ts` written into this app exports them.
+     */
+    pages: Pages;
+    /**
+     * The app's `app` directory, relative to the working directory, which
+     * `kizuna generate` scans for `content.ts` files.
+     */
+    app: string;
+    /**
+     * Where this app's pages module is written.
+     *
+     * @default beside `app`, as `cms.pages.ts`
+     */
+    output?: string;
+}
+
+/**
+ * The site a single-app project's pages belong to, and the one a document
+ * with no site of its own is stored under.
+ */
+export const DEFAULT_SITE = 'default';
+
+export interface CmsPluginOptions<
+    Pages extends PageMap = PageMap,
+    Sites extends Record<string, SiteOptions> = Record<string, SiteOptions>,
+> {
     /**
      * The Drizzle database the three `cms_` tables live in. A dedicated
      * instance on a role limited to those tables keeps a CMS bug away from
@@ -137,7 +192,33 @@ export interface CmsPluginOptions<Pages extends PageMap = PageMap> {
     /**
      * The pages, as the generated `cms.pages.ts` exports them.
      */
-    pages: Pages;
+    pages?: Pages;
+    /**
+     * Several Next.js apps sharing one CMS, keyed by a site name, in place of
+     * `pages`. Each app's pages are stored and read under its site; globals
+     * and collections are shared.
+     *
+     * @example
+     * sites: {
+     *     web: {
+     *         pages: webPages,
+     *         app: '../../apps/web/src/app',
+     *     },
+     *     campaign: {
+     *         pages: campaignPages,
+     *         app: '../../apps/campaign/src/app',
+     *     },
+     * },
+     */
+    sites?: Sites;
+    /**
+     * Content with one instance and no route, made with `defineGlobal()`.
+     */
+    globals?: readonly Global[];
+    /**
+     * Content with many instances and no route, made with `defineCollection()`.
+     */
+    collections?: readonly Collection[];
     auth: CmsAuthOptions;
     brands?: Record<string, BrandOptions>;
     media?: MediaOptions;
@@ -153,11 +234,19 @@ export interface CmsPluginOptions<Pages extends PageMap = PageMap> {
     revalidate?: (tags: readonly string[]) => void | Promise<void>;
     environments?: Record<string, EnvironmentOptions>;
     /**
-     * Where the routes are served.
+     * Where `cmsRoutes` serves the routes within the API. `/` serves them at
+     * the API's root, for a config that holds the CMS alone.
      *
      * @default '/cms'
      */
-    basePath?: `/${string}`;
+    path?: `/${string}`;
+    /**
+     * Where the API is mounted, which the image URLs the reader hands out
+     * start with: `/cms-api` for a CMS API mounted there.
+     *
+     * @default '/api'
+     */
+    apiPath?: string;
     /**
      * Where `content.ts` files are looked for, relative to the working
      * directory. Found on its own when the app has `src/app` or `app`.
@@ -173,70 +262,144 @@ export interface CmsPluginOptions<Pages extends PageMap = PageMap> {
 
 const isFunction = (value: unknown): value is (...args: never[]) => unknown => typeof value === 'function';
 
-export const CmsPluginOptionsSchema = z.object({
-    db: z.custom<CmsDatabase>((value) => typeof value === 'object' && value !== null && 'select' in value, {
-        error: 'must be a Drizzle database',
-    }),
-    pages: z.custom<PageMap>(
-        (value) =>
-            typeof value === 'object' &&
-            value !== null &&
-            Object.entries(value).every(
-                ([name, entry]) =>
-                    typeof entry === 'object' &&
-                    entry !== null &&
-                    typeof (entry as PageEntry).path === 'string' &&
-                    isPage((entry as PageEntry).page) &&
-                    (entry as PageEntry).page.name === name
-            ),
-        {
-            error: 'must be the pages module kizuna generate writes, with each page keyed by its own name',
-        }
-    ),
-    auth: z.object({
-        identity: z.string().min(1),
-        roles: z.union([z.string(), z.array(z.string())]).optional(),
-        author: z.custom<CmsAuthOptions['author']>(isFunction).optional(),
-    }),
-    brands: z
-        .record(
-            z.string(),
-            z.object({
-                search: z.custom<RouteDefinition>((value) => typeof value === 'object' && value !== null).optional(),
-                label: z.custom<(item: any) => string>(isFunction).optional(),
-                image: z.custom<(item: any) => string | undefined>(isFunction).optional(),
-                exists: z.custom<BrandOptions['exists']>(isFunction).optional(),
+const PageMapSchema = z.custom<PageMap>(
+    (value) =>
+        typeof value === 'object' &&
+        value !== null &&
+        Object.entries(value).every(
+            ([name, entry]) =>
+                typeof entry === 'object' &&
+                entry !== null &&
+                typeof (entry as PageEntry).path === 'string' &&
+                isPage((entry as PageEntry).page) &&
+                (entry as PageEntry).page.name === name
+        ),
+    {
+        error: 'must be the pages module kizuna generate writes, with each page keyed by its own name',
+    }
+);
+
+export const CmsPluginOptionsSchema = z
+    .object({
+        db: z.custom<CmsDatabase>((value) => typeof value === 'object' && value !== null && 'select' in value, {
+            error: 'must be a Drizzle database',
+        }),
+        globals: z
+            .array(
+                z.custom<Global>(isGlobal, {
+                    error: 'must be made with defineGlobal()',
+                })
+            )
+            .optional(),
+        collections: z
+            .array(
+                z.custom<Collection>(isCollection, {
+                    error: 'must be made with defineCollection()',
+                })
+            )
+            .optional(),
+        pages: PageMapSchema.optional(),
+        sites: z
+            .record(
+                z.string().regex(/^[a-z][a-z0-9-]*$/, {
+                    error: 'is a site name, lowercase like web or campaign',
+                }),
+                z.object({
+                    pages: PageMapSchema,
+                    app: z.string(),
+                    output: z.string().optional(),
+                })
+            )
+            .optional(),
+        auth: z.object({
+            identity: z.string().min(1),
+            roles: z.union([z.string(), z.array(z.string())]).optional(),
+            author: z.custom<CmsAuthOptions['author']>(isFunction).optional(),
+            invalidate: RouteAuthSchema.optional(),
+        }),
+        brands: z
+            .record(
+                z.string(),
+                z.object({
+                    search: z
+                        .custom<
+                            NonNullable<BrandOptions['search']>
+                        >((value) => isFunction(value) || (typeof value === 'object' && value !== null))
+                        .optional(),
+                    label: z.custom<(item: any) => string>(isFunction).optional(),
+                    image: z.custom<(item: any) => string | undefined>(isFunction).optional(),
+                    exists: z.custom<BrandOptions['exists']>(isFunction).optional(),
+                })
+            )
+            .optional(),
+        media: z
+            .object({
+                bucket: z.string().optional(),
+                region: z.string().optional(),
+                endpoint: z.string().optional(),
+                accessKeyId: z.string().optional(),
+                secretAccessKey: z.string().optional(),
+                forcePathStyle: z.boolean().optional(),
+                publicPath: z.string().optional(),
+                maxBytes: z.int().min(1).optional(),
+                storage: z.custom<MediaStorage>((value) => typeof value === 'object' && value !== null).optional(),
             })
-        )
-        .optional(),
-    media: z
-        .object({
-            bucket: z.string().optional(),
-            region: z.string().optional(),
-            endpoint: z.string().optional(),
-            accessKeyId: z.string().optional(),
-            secretAccessKey: z.string().optional(),
-            forcePathStyle: z.boolean().optional(),
-            publicPath: z.string().optional(),
-            maxBytes: z.int().min(1).optional(),
-            storage: z.custom<MediaStorage>((value) => typeof value === 'object' && value !== null).optional(),
-        })
-        .optional(),
-    previewSecret: z.string().optional(),
-    revalidate: z.custom<CmsPluginOptions['revalidate']>(isFunction).optional(),
-    environments: z
-        .record(
-            z.string(),
-            z.object({
-                url: z.url(),
-                headers: z.record(z.string(), z.string()).optional(),
-                production: z.boolean().optional(),
-            })
-        )
-        .optional(),
-    basePath: RoutePathSchema.optional(),
-    appDir: z.string().optional(),
-    pagesOutput: z.string().optional(),
-});
+            .optional(),
+        previewSecret: z.string().optional(),
+        revalidate: z.custom<CmsPluginOptions['revalidate']>(isFunction).optional(),
+        environments: z
+            .record(
+                z.string(),
+                z.object({
+                    url: z.url(),
+                    headers: z.record(z.string(), z.string()).optional(),
+                    production: z.boolean().optional(),
+                })
+            )
+            .optional(),
+        path: RoutePathSchema.optional(),
+        apiPath: z.string().optional(),
+        appDir: z.string().optional(),
+        pagesOutput: z.string().optional(),
+    })
+    .refine((options) => options.pages === undefined || options.sites === undefined, {
+        error: 'takes `pages` for one app, or `sites` for several, not both',
+        path: ['sites'],
+    });
 
 export type ResolvedCmsOptions = z.output<typeof CmsPluginOptionsSchema>;
+
+/**
+ * The plugin's `path` as a prefix for its routes: `/cms` by default, and
+ * nothing when the CMS is served at its API's root.
+ */
+export const routePrefix = (path: string | undefined): '' | `/${string}` => {
+    const trimmed = (path ?? '/cms').replace(/\/+$/, '');
+    return trimmed === '' ? '' : (trimmed as `/${string}`);
+};
+
+/**
+ * Every site's pages: the `sites` option, or the `pages` of a single-app
+ * project under the default site.
+ */
+export const sitesOf = (options: {
+    pages?: PageMap;
+    sites?: Record<string, { pages: PageMap; app?: string; output?: string }>;
+    appDir?: string;
+    pagesOutput?: string;
+}): Record<string, { pages: PageMap; app?: string; output?: string }> =>
+    options.sites ?? {
+        [DEFAULT_SITE]: {
+            pages: options.pages ?? {},
+            ...(options.appDir === undefined
+                ? {}
+                : {
+                      app: options.appDir,
+                  }),
+            ...(options.pagesOutput === undefined
+                ? {}
+                : {
+                      output: options.pagesOutput,
+                  }),
+        },
+    };

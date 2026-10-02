@@ -3,16 +3,32 @@
  * DO NOT MODIFY IT BY HAND. Instead, add or move a `content.ts` under `app/`,
  * and re-run `kizuna generate` to regenerate this file.
  */
+import { definePages } from '@kizunajs/cms';
+import frontPage from './app/(front-page)/content';
+import blogIndexPage from './app/blog/content';
+import articlePage from './app/blog/[slug]/content';
 import contactPage from './app/contact/content';
-import springPage from './app/lp/spring/content';
+import teamPage from './app/team/content';
 
-export const pages = {
+export const pages = definePages({
+    frontPage: {
+        path: '/',
+        page: frontPage,
+    },
+    blogIndexPage: {
+        path: '/blog',
+        page: blogIndexPage,
+    },
+    articlePage: {
+        path: '/blog/[slug]',
+        page: articlePage,
+    },
     contactPage: {
         path: '/contact',
         page: contactPage,
     },
-    springPage: {
-        path: '/lp/spring',
-        page: springPage,
+    teamPage: {
+        path: '/team',
+        page: teamPage,
     },
-};
+});

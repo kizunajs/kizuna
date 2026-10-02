@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { page } from '@kizunajs/cms';
+import { definePage } from '@kizunajs/cms';
+import { EmployeeId } from '../../models';
 import { HeadingSchema } from '../../cms/schemas';
 
-export default page({
+export default definePage({
     name: 'contactPage',
     fields: [
         {
@@ -16,6 +17,11 @@ export default page({
         {
             name: 'buttonLabel',
             schema: z.string().min(1).max(24).default('Send'),
+        },
+        {
+            name: 'contacts',
+            schema: z.array(EmployeeId).max(3).default([]),
+            description: 'The people shown beside the form. Up to three.',
         },
         {
             name: 'thanks',

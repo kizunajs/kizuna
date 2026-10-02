@@ -11,14 +11,14 @@ pnpm add @kizunajs/cms drizzle-orm
 ## Usage
 
 ```ts
-// src/app/lp/spring/content.ts
+// src/app/(front-page)/content.ts
 import { z } from 'zod';
-import { page } from '@kizunajs/cms';
-import { HeroBlockSchema } from '../../../cms/blocks';
-import { ProductId, SeoSchema } from '../../../cms/schemas';
+import { definePage } from '@kizunajs/cms';
+import { HeroBlockSchema } from '../../cms/blocks';
+import { ProductId, SeoSchema } from '../../cms/schemas';
 
-export default page({
-    name: 'springPage',
+export default definePage({
+    name: 'frontPage',
     fields: [
         {
             name: 'hero',
@@ -41,11 +41,11 @@ export default page({
 ```
 
 ```tsx
-// src/app/lp/spring/page.tsx
-import { cms } from '../../../cms';
+// src/app/(front-page)/page.tsx
+import { cms } from '../../cms';
 
-export default async function SpringPage() {
-    const content = await cms.pages.springPage.get();
+export default async function FrontPage() {
+    const content = await cms.pages.frontPage.get();
 
     return <Hero {...content.hero} />;
 }

@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { block } from '@kizunajs/cms';
+import { defineBlock } from '@kizunajs/cms';
 import { ImageSchema } from '@kizunajs/cms/schemas';
 import { CtaSchema, HeadingSchema } from './schemas';
 
-export const HeroBlockSchema = block({
+export const HeroBlockSchema = defineBlock({
     slug: 'hero',
     fields: [
         {

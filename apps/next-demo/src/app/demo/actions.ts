@@ -1,8 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiClient } from '../lib/api-client';
-import { toUserId } from '../lib/api-client.generated';
+import { apiClient } from '../../lib/api-client';
+import { toUserId } from '../../lib/api-client.generated';
 
 export const createUserAction = async (formData: FormData) => {
     const name = String(formData.get('name') ?? '');
@@ -13,7 +13,7 @@ export const createUserAction = async (formData: FormData) => {
             email,
         },
     });
-    revalidatePath('/');
+    revalidatePath('/demo');
 };
 
 export const deleteUserAction = async (formData: FormData) => {
@@ -24,5 +24,5 @@ export const deleteUserAction = async (formData: FormData) => {
             id: toUserId(id),
         },
     });
-    revalidatePath('/');
+    revalidatePath('/demo');
 };

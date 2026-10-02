@@ -1,0 +1,169 @@
+---
+title: Its own API
+description: The CMS runs as an API of its own, with its own editors, MCP endpoint and client, beside the app API.
+---
+
+A site holds two kinds of data: the app's, like products, orders and users, and the copy and media editors change. The CMS keeps the second in an API of its own, `kizuna.cms.config.ts` beside the app's `kizuna.config.ts`. Each config is one API, with its own routes, identities, generated client and `k`, so an editor can never reach an app route and an app user never reaches content tools.
+
+## The config
+
+```ts title="kizuna.cms.config.ts"
+import { defineConfig } from 'kizunajs';
+import { fetchClient } from '@kizunajs/fetch';
+import { nextAdapter } from '@kizunajs/next';
+import { mcpPlugin } from '@kizunajs/mcp';
+import { cmsPlugin, cmsRoutes } from '@kizunajs/cms';
+import { nextRevalidate } from '@kizunajs/cms/next';
+import { app, editor } from './src/cms/identities';
+import { articles, employees, site } from './src/cms/content';
+import { pages } from './src/cms.pages';
+import { db } from './src/db';
+
+const cms = cmsPlugin({
+    db,
+    pages,
+    globals: [site],
+    collections: [employees, articles],
+    auth: {
+        identity: 'editor',
+        roles: ['editor', 'admin'],
+        invalidate: 'app',
+    },
+    revalidate: nextRevalidate,
+    path: '/',
+    apiPath: '/cms-api',
+});
+
+export default defineConfig({
+    adapter: nextAdapter(),
+    typescript: {
+        outputFile: './src/cms/kizuna.types.ts',
+    },
+    auth: {
+        identities: {
+            editor,
+            app,
+        },
+    },
+    routes: {
+        cms: cmsRoutes(cms),
+    },
+    clients: [
+        fetchClient({
+            output: './src/lib/cms-client.generated.ts',
+        }),
+    ],
+    plugins: [mcpPlugin(), cms],
+});
+```
+
+`path: '/'` serves the CMS routes at the root of this API rather than under `/cms`, and `apiPath` says where the API is mounted, so the image URLs the reader hands out point there.
+
+## Mount both
+
+Each API gets a catch-all route of its own:
+
+```ts title="src/app/cms-api/[...kizuna-cms]/route.ts"
+import kizuna from '../../../../kizuna.cms.config';
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
+    basePath: '/cms-api',
+});
+```
+
+The reader, the preview and the content overview take the CMS API:
+
+```ts title="src/cms.ts"
+import { createCms } from '@kizunajs/cms/next';
+import kizuna from '../kizuna.cms.config';
+
+export const cms = createCms(kizuna.api);
+```
+
+```tsx title="src/app/layout.tsx"
+<KizunaPreview apiPath="/cms-api" basePath="/" />
+```
+
+## What stays apart
+
+- **Identities.** Editors exist on the CMS API alone. Its `k` is typed by its own generated `Config`, so an app route that names `editor` fails to compile.
+- **MCP.** An editor's agent connects to `/cms-api/mcp` and sees content tools, never app tools.
+- **Clients and OpenAPI.** Each API generates its own. A mobile app gets the app client, and the site uses both.
+- **Plugin exports.** App handlers cannot reach `plugins.cms`, so they call the CMS through its client.
+- **Shared ids.** Brands both sides use, like `ProductId`, live in a module both configs import.
+
+## Crossing the boundary
+
+Pages read app data through the app API's client, the way any server component does.
+
+The brand registry takes functions, so it calls the app API through its client instead of importing app routes:
+
+```ts title="kizuna.cms.config.ts"
+const listProducts = async (query?: string) => {
+    const result = await apiClient.products.listProducts({
+        query: {
+            q: query,
+        },
+    });
+    return result.status === 200 ? result.body.products : [];
+};
+
+brands: {
+    ProductId: {
+        search: listProducts,
+        label: (product) => product.name,
+        image: (product) => product.imageUrl,
+    },
+},
+```
+
+The picker and the agent find products through the CMS's own search tool, `cms_search_items`.
+
+When the app changes a product, it tells the CMS through the CMS client. The `invalidate` route answers the identity `auth.invalidate` names, here an API key only the app's server holds:
+
+```ts title="src/lib/cms-client.ts"
+import { createClient } from './cms-client.generated';
+
+export const cmsClient = createClient({
+    baseUrl: process.env.CMS_API_BASE_URL ?? 'http://localhost:3000/cms-api',
+    baseHeaders: {
+        'x-cms-key': process.env.CMS_APP_KEY!,
+    },
+});
+```
+
+```ts title="src/routes/products.ts"
+.handler(async ({ params, body }) => {
+    const product = await renameProduct(params.id, body.name);
+    await cmsClient.cms.invalidate({
+        body: {
+            brand: 'ProductId',
+            id: params.id,
+        },
+    });
+
+    return {
+        status: 200,
+        body: product,
+    };
+}),
+```
+
+Every page featuring the product refreshes, and none other. The call is the same whether the two APIs share a process or not.
+
+## Generating
+
+Each config generates on its own. The app imports the CMS client, so the CMS goes first:
+
+```sh
+kizuna generate --config kizuna.cms.config.ts
+kizuna generate
+```
+
+The `kizuna cms` commands find `kizuna.cms.config.ts` without `--config`.
+
+## Deployment
+
+Most projects run both APIs in one Next.js app, as above. A sensitive or compliance-heavy project can run the CMS API as an app of its own instead, and that is a deployment change: the CMS client's `baseUrl` moves, and `revalidate` calls a route on the site that runs `revalidateTag`, since the site's cache lives in the site's process.
+
+Either way the content stays in the app's database. To keep a CMS bug away from app data, connect the plugin as a database role that reaches only the `cms_` tables. See [Security](/docs/cms/security#least-privilege).
