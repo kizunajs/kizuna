@@ -1,4 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
+import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
 import { createClient, toCenterId, type API } from './generated/api.js';
 
 const client = createClient({
@@ -57,4 +59,11 @@ test('a branded value from a response passes where a branded param is expected',
             parentId: result.body.id,
         },
     });
+});
+
+test('an id the server parsed is the type the client takes, and the other way round', () => {
+    const CenterId = Kizuna.brand('CenterId', z.string());
+    expectTypeOf<z.output<typeof CenterId>>().toEqualTypeOf<API.CenterId>();
+    const OtherId = Kizuna.brand('OtherId', z.string());
+    expectTypeOf<z.output<typeof OtherId>>().not.toExtend<API.CenterId>();
 });

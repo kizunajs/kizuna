@@ -1,9 +1,19 @@
-import { cms } from '../../cms';
+import kizuna from '@kizuna-config';
 import { sendContactMessage } from './actions';
+import { EmployeeCard } from '../../components/EmployeeCard';
+
+export const metadata = {
+    title: 'Contact us',
+};
 
 export default async function ContactPage({ searchParams }: { searchParams: Promise<{ sent?: string }> }) {
     const { sent } = await searchParams;
-    const content = await cms.pages.contactPage.get();
+
+    const content = await kizuna.content.pages.contactPage.get();
+
+    const contacts = await kizuna.content.collections.employees.getMany({
+        ids: content.contacts,
+    });
 
     return (
         <main
@@ -29,6 +39,20 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
                     <button type="submit">{content.buttonLabel}</button>
                 </form>
             )}
+            {contacts.length > 0 ? (
+                <section>
+                    <h2>Talk to us directly</h2>
+                    <div
+                        style={{
+                            display: 'grid',
+                            gap: '1rem',
+                        }}>
+                        {contacts.map((employee) => (
+                            <EmployeeCard key={employee.id} employee={employee} />
+                        ))}
+                    </div>
+                </section>
+            ) : null}
         </main>
     );
 }

@@ -4,13 +4,12 @@
  *
  * Regenerate: kizuna generate
  */
-declare const kizunaBrand: unique symbol;
-
 /**
- * Tells one branded type from another with the same base.
+ * Tells one branded type from another with the same base. The server declares
+ * the same shape, so an id it hands out is the type this client takes.
  */
 type KizunaBrand<Name extends string> = {
-    readonly [kizunaBrand]: {
+    readonly '~kizunaBrand': {
         readonly [Key in Name]: true;
     };
 };

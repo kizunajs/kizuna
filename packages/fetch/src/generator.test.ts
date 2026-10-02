@@ -354,7 +354,7 @@ describe('a branded schema', () => {
     });
 
     it('declares the brand helper only when a brand is used', () => {
-        expect(branded).toContain('declare const kizunaBrand: unique symbol;');
+        expect(branded).toContain("readonly '~kizunaBrand': {");
         expect(source).not.toContain('KizunaBrand');
     });
 });

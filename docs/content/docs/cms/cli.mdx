@@ -3,28 +3,58 @@ title: CLI
 description: Create the tables, list the pages, and move content between environments through the routes, never a database.
 ---
 
-Content is not in code, so moving it between a laptop, staging and production is a job for the CLI. `kizuna cms` extends the [kizuna CLI](/docs/cli) and exists wherever `@kizunajs/cms` is installed. Every command takes `--json` and then prints only machine-readable output, for a coding agent to drive.
+Content is not in code, so moving it between a laptop, staging and production is a job for the CLI. `kizuna cms` extends the [kizuna CLI](/docs/cli) and exists wherever `@kizunajs/cms` is installed. It reads `kizuna.cms.config.ts` when the project has one, and `kizuna.config.ts` otherwise. Every command takes `--json` and then prints only machine-readable output, for a coding agent to drive.
 
 ## `kizuna cms migrate`
 
-Writes `<timestamp>_kizuna_cms.sql` with the three tables into `./drizzle`, or the folder `--out` names. Run it with your other migrations.
+Writes `<timestamp>_kizuna_cms.sql` with the three tables and an index for every collection index into `./drizzle`, or the folder `--out` names. Run it with your other migrations, and again after adding a collection or an index.
 
 ```sh
 kizuna cms migrate --out drizzle
 ```
+
+## `kizuna cms check`
+
+Lists published content that fails its schema, what a schema change without a default or a `migrate` step leaves behind, and which earlier version visitors see instead. It exits `1` when there is some. Run it in your deploy against the database the new code will read, so a release stops before visitors see the gap.
+
+```text
+Published content that fails its schema:
+  page:frontPage, visitors see version 3
+    subheading: Invalid input: expected string, received undefined
+```
+
+## `kizuna cms migrate-content`
+
+Stores every document at its latest `migrate` step. Reads already run newer steps in memory and the next save stores them, so this is optional: run it after a deploy to stop reads migrating documents nobody edits. It adds no version and publishes nothing.
 
 ## `kizuna cms pages`
 
 Lists every page's path and name from the `content.ts` files under `src/app` or `app`, without loading the config.
 
 ```text
+/                                frontPage
+/blog                            blogIndexPage
+/blog/[slug]                     articlePage
 /contact                         contactPage
-/lp/spring                       springPage
+```
+
+`--write` also writes the pages module the config imports. `kizuna generate` does that on its own for the module beside the app directory; pass `--app` and `--out` for one kept elsewhere.
+
+## `kizuna cms orphans`
+
+Lists stored page content that no page claims anymore, what a page renamed or deleted in code leaves behind. It exits `1` when there is some, so CI with a database can fail on it.
+
+## `kizuna cms rename-page`
+
+Moves a renamed page's stored content, with its versions and history, to the new name. Rename the page in its `content.ts` first. The command refuses a name that is still a page, and a target that has content of its own.
+
+```sh
+kizuna cms rename-page pricingPage plansPage
 ```
 
 ## Environments
 
-`push` and `pull` call each environment's `cms` routes as a signed-in editor, so every copied draft carries a real author. Name them on the plugin:
+`push` and `pull` call each environment's `editing` routes as a signed-in editor, so every copied draft carries a real author. Name them on `cms()`:
 
 ```ts title="kizuna.config.ts"
 environments: {
@@ -49,20 +79,20 @@ environments: {
 Copies one page's draft from `local`, or `--from`, into the target as a new draft, with the media it lacks. Published content on the target is never touched.
 
 ```sh
-kizuna cms push springPage --to staging
+kizuna cms push frontPage --to staging
 ```
 
-Every branded id is checked with the brand's `exists`, and missing ids are listed rather than kept silently. The command exits `2` when any are missing.
+Every id a page holds through a [relationship](/docs/cms/content#relationships) is checked against the target's own picker list, and missing ids are listed rather than kept silently. The command exits `2` when any are missing.
 
 ```json
 {
-    "page": "springPage",
+    "page": "frontPage",
     "to": "staging",
     "version": 4,
     "mediaCopied": ["med_3f2a9c1e8b7d4a5f6c0e1d2b"],
     "missingIds": [
         {
-            "brand": "ProductId",
+            "relationship": "products",
             "id": "prod_tulips",
             "fieldPath": "featured.0"
         }
@@ -72,7 +102,7 @@ Every branded id is checked with the brand's `exists`, and missing ids are liste
 
 ## `kizuna cms pull`
 
-Copies every page's published content and media from the source into `local`, or `--to`, and publishes it there. It reads only from the source and refuses a destination marked `production`.
+Copies every published page, global and collection item, with its media, from the source into `local`, or `--to`, and publishes it there. Items keep their ids, so references to them still resolve, and content arrives as it is stored, so images keep their crops and focal points. It reads only from the source and refuses a destination marked `production`.
 
 ```sh
 kizuna cms pull --from production

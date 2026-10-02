@@ -1,143 +1,107 @@
-import { draftMode } from 'next/headers';
-import { notFound } from 'next/navigation';
-import { revalidateTag, unstable_cache } from 'next/cache';
-import { pluginExportsOf } from 'kizunajs/adapter';
-import type { PluginDeclaration } from 'kizunajs/plugin';
-import { PreviewOverlay } from '@kizunajs/cms/next/preview';
-import type { CmsExports, CmsSetup } from './plugin.js';
-import type { PageMap } from './options.js';
-import type { Output } from './output.js';
-import { pageCacheTag, type CmsService } from './cms.js';
-import { encodeSourcePaths } from './source-path.js';
+import type { CSSProperties } from 'react';
+import { ContentEditor, PreviewOverlay } from '@kizunajs/cms/next/preview';
+import { DEFAULT_SITE } from './options.js';
+import type { Resolved } from './output.js';
+import { PortableText, type PortableTextComponents } from '@portabletext/react';
+import type { RichTextValue } from './rich-text.js';
+import type { ResolvedImage } from './image.js';
+import { parseRef } from './refs.js';
+import { sourceOf, type ReaderSource } from './reader.js';
 
 export { inStoredOrder } from './in-order.js';
 
-type PluginsOf<Api> = Api extends { plugins?: infer Plugins } ? Exclude<Plugins, undefined> : never;
-
 /**
- * The pages the CMS plugin on an api declares, read off the api's type.
+ * Rich text as a component receives it: Portable Text with its images
+ * resolved.
  */
-export type PagesOf<Api, Slug extends string = 'cms'> = Slug extends keyof PluginsOf<Api>
-    ? PluginsOf<Api>[Slug] extends PluginDeclaration<string, CmsSetup<infer Pages>>
-        ? Pages
-        : never
-    : never;
+export type RichTextContent = Resolved<RichTextValue>;
 
-/**
- * One page as a server component reads it.
- */
-export interface CmsPageReader<P> {
+export interface RichTextProps {
+    value: RichTextContent;
     /**
-     * The page's content, typed from its fields with media resolved. Outside
-     * draft mode it is the published content, cached and tagged, and an
-     * unpublished page calls `notFound()`. In draft mode it is the draft, and
-     * an incomplete draft calls `notFound()` while the preview overlay shows
-     * the setup screen.
+     * Overrides for any element, keyed the way `@portabletext/react` keys
+     * them: `block.h2`, `list.bullet`, `marks.link`, `types.image`, and so on.
      */
-    get(): Promise<Output<P>>;
+    components?: PortableTextComponents;
 }
 
-export type CmsPages<Pages extends PageMap> = {
-    [Name in keyof Pages]: CmsPageReader<Pages[Name]['page']>;
-};
-
-export interface Cms<Pages extends PageMap> {
-    pages: CmsPages<Pages>;
-}
-
-const serviceOf = (api: unknown, slug: string): CmsService => {
-    const exported = pluginExportsOf(api)[slug] as CmsExports | undefined;
-    if (exported?.service === undefined) {
-        throw new Error(`createCms() found no CMS plugin at plugins.${slug}. Install cmsPlugin on this config.`);
-    }
-    return exported.service;
+const RICH_TEXT_COMPONENTS: PortableTextComponents = {
+    types: {
+        image: ({ value }: { value: { image: ResolvedImage } }) => (
+            <figure>
+                <img
+                    src={value.image.url}
+                    alt={value.image.alt}
+                    width={value.image.width}
+                    height={value.image.height}
+                    style={{
+                        maxWidth: '100%',
+                        height: 'auto',
+                    }}
+                />
+            </figure>
+        ),
+    },
 };
 
 /**
- * The typed reader for server components, from the configured api:
+ * Renders rich text with plain HTML elements, each of which `components`
+ * may replace:
  *
- * ```ts
- * import kizuna from '../kizuna.config';
- *
- * export const cms = createCms(kizuna.api);
+ * ```tsx
+ * <RichText
+ *     value={article.body}
+ *     components={{
+ *         block: {
+ *             h2: ({ children }) => <h2 className="title">{children}</h2>,
+ *         },
+ *     }}
+ * />
  * ```
- *
- * Reads happen in process, so a static build needs no server to call. Outside
- * draft mode the reader uses nobody's credentials: published content is public.
  */
-export const createCms = <Api, const Slug extends string = 'cms'>(
-    api: Api,
-    options?: {
-        slug?: Slug;
-    }
-): Cms<PagesOf<Api, Slug>> => {
-    const slug = options?.slug ?? 'cms';
-    const service = serviceOf(api, slug);
-    const pages: Record<string, { get: () => Promise<Record<string, unknown>> }> = {};
-    for (const name of Object.keys(service.pages)) {
-        const readPublished = unstable_cache(
-            async () => (await service.published(name))?.content ?? null,
-            ['kizuna-cms', 'published', name],
-            {
-                tags: [pageCacheTag(name)],
-            }
-        );
-        pages[name] = {
-            get: async () => {
-                const draft = await draftMode();
-                if (draft.isEnabled) {
-                    const result = await service.draft(name);
-                    if (result === undefined) notFound();
-                    return encodeSourcePaths(result.state.entry.page, result.content);
-                }
-                const published = await readPublished();
-                if (published === null) notFound();
-                return published;
-            },
-        };
-    }
-    return {
-        pages,
-    } as unknown as Cms<PagesOf<Api, Slug>>;
-};
-
-/**
- * Expires Next's cached renders for the tags given, so the next visit renders
- * fresh. Pass it to `cmsPlugin` as `revalidate`.
- */
-export const nextRevalidate = (tags: readonly string[]): void => {
-    for (const tag of tags) {
-        revalidateTag(tag, {
-            expire: 0,
-        });
-    }
-};
+export function RichText(props: RichTextProps) {
+    return (
+        <PortableText
+            value={props.value}
+            components={{
+                ...props.components,
+                types: {
+                    ...RICH_TEXT_COMPONENTS.types,
+                    ...props.components?.types,
+                },
+            }}
+        />
+    );
+}
 
 export interface KizunaPreviewProps {
     /**
-     * Where the api is mounted.
-     *
-     * @default '/api'
+     * `kizuna.content`, or one of its `sites` when several apps share the CMS.
      */
-    apiPath?: string;
+    content: unknown;
     /**
-     * The plugin's `basePath`.
-     *
-     * @default '/cms'
+     * Where editors sign in, for a signed-out editor in draft mode. Defaults
+     * to the `signInPath` on `cms()`.
      */
-    basePath?: string;
-    /**
-     * Where the draft route is served.
-     *
-     * @default '/api/draft'
-     */
-    draftPath?: string;
+    signInPath?: string;
     /**
      * Headers the overlay sends with every call, such as the editor's bearer
      * token. Cookies travel on their own.
      */
     headers?: Record<string, string>;
 }
+
+/**
+ * Where the overlay and the content editor reach the CMS from the browser.
+ */
+const browserPaths = (source: ReaderSource) => {
+    const apiPath = source.service.options.apiPath ?? '/api';
+    return {
+        apiPath,
+        basePath: `${source.service.basePath}/editing`,
+        draftPath: `${apiPath}${source.service.basePath}/draft`,
+    };
+};
 
 /**
  * The preview overlay: draft status, click-to-edit, the setup screen and the
@@ -147,24 +111,30 @@ export interface KizunaPreviewProps {
  * ```tsx
  * <body>
  *     {children}
- *     <KizunaPreview />
+ *     <KizunaPreview content={kizuna.content} />
  * </body>
  * ```
  */
 export async function KizunaPreview(props: KizunaPreviewProps) {
-    const draft = await draftMode();
-    if (!draft.isEnabled) return null;
+    const source = sourceOf(props.content);
+    const runtime = source.service.runtime;
+    if (runtime === undefined || !(await runtime.draftMode()).enabled) return null;
+    const signInPath = props.signInPath ?? source.service.options.signInPath;
     return (
         <PreviewOverlay
-            apiPath={props.apiPath ?? '/api'}
-            basePath={props.basePath ?? '/cms'}
-            draftPath={props.draftPath ?? '/api/draft'}
+            {...browserPaths(source)}
+            {...(signInPath === undefined
+                ? {}
+                : {
+                      signInPath,
+                  })}
             headers={props.headers}
+            site={source.site === DEFAULT_SITE ? undefined : source.site}
         />
     );
 }
 
-const styles = {
+const styles: Record<string, CSSProperties> = {
     page: {
         fontFamily: 'system-ui, sans-serif',
         color: '#111',
@@ -174,14 +144,14 @@ const styles = {
     },
     table: {
         width: '100%',
-        borderCollapse: 'collapse' as const,
+        borderCollapse: 'collapse',
         fontSize: '0.9rem',
     },
     cell: {
-        textAlign: 'left' as const,
+        textAlign: 'left',
         padding: '0.5rem 0.75rem',
         borderBottom: '1px solid #e5e5e5',
-        verticalAlign: 'top' as const,
+        verticalAlign: 'top',
     },
     muted: {
         color: '#666',
@@ -201,30 +171,38 @@ const styles = {
 
 export interface CmsOverviewProps {
     /**
-     * The configured api, the one `createCms` took.
+     * `kizuna.content`, or one of its `sites`, whose pages are listed, since
+     * their previews open on this app.
      */
-    api: unknown;
-    slug?: string;
-    /**
-     * Where the draft route is served, for the preview links.
-     *
-     * @default '/api/draft'
-     */
-    draftPath?: string;
+    content: unknown;
 }
+
+const humanizeName = (name: string): string =>
+    name
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_-]/g, ' ')
+        .toLowerCase()
+        .replace(/^./, (first) => first.toUpperCase());
 
 /**
  * The content overview, for a route of the app's own, such as `app/cms/page.tsx`.
- * Lists every page with its status, the recent versions, and the media. The
- * app decides who may open it; the preview links it mints open draft mode.
+ * Lists every page with its status and recent versions, edits collections and
+ * globals in place, and shows the media. The app decides who may open it; the
+ * preview links it mints open draft mode.
  */
 export async function CmsOverview(props: CmsOverviewProps) {
-    const service = serviceOf(props.api, props.slug ?? 'cms');
-    const draftPath = props.draftPath ?? '/api/draft';
-    const summaries = await service.summaries();
-    const histories = await Promise.all(summaries.map((summary) => service.history(summary.name)));
+    const source = sourceOf(props.content);
+    const { service, site } = source;
+    const { apiPath, basePath, draftPath } = browserPaths(source);
+    const summaries = (await service.summaries()).filter((summary) => summary.site === site);
+    const orphans = (await service.orphanedPages()).filter((orphan) => orphan.site === site);
+    const problems = (await service.contentProblems()).filter((problem) => {
+        const ref = parseRef(problem.ref);
+        return ref?.type !== 'page' || (ref.site ?? DEFAULT_SITE) === site;
+    });
+    const histories = await Promise.all(summaries.map((summary) => service.history(parseRef(summary.ref)!)));
+
     const media = await service.media.list();
-    const token = service.previewToken();
 
     return (
         <main style={styles.page}>
@@ -242,7 +220,7 @@ export async function CmsOverview(props: CmsOverviewProps) {
                 </thead>
                 <tbody>
                     {summaries.map((summary, index) => (
-                        <tr key={summary.name}>
+                        <tr key={summary.ref}>
                             <td style={styles.cell}>
                                 <strong>{summary.name}</strong>
                                 <div style={styles.muted}>{summary.path}</div>
@@ -269,9 +247,7 @@ export async function CmsOverview(props: CmsOverviewProps) {
                                 ))}
                             </td>
                             <td style={styles.cell}>
-                                <a
-                                    style={styles.link}
-                                    href={`${draftPath}?token=${encodeURIComponent(token)}&redirect=${encodeURIComponent(summary.path)}`}>
+                                <a style={styles.link} href={`${draftPath}?redirect=${encodeURIComponent(summary.path)}`}>
                                     Open preview
                                 </a>
                             </td>
@@ -279,6 +255,97 @@ export async function CmsOverview(props: CmsOverviewProps) {
                     ))}
                 </tbody>
             </table>
+            {orphans.length > 0 ? (
+                <section
+                    style={{
+                        marginTop: '1.5rem',
+                    }}>
+                    <h2
+                        style={{
+                            fontSize: '1.1rem',
+                            margin: '0 0 0.5rem',
+                        }}>
+                        Content with no page
+                    </h2>
+                    <p style={styles.muted}>
+                        These pages were renamed or removed in code, and their content is still stored. Move it to the new name, or leave
+                        it.
+                    </p>
+                    <pre
+                        style={{
+                            background: '#f4f4f4',
+                            padding: '0.75rem',
+                            overflow: 'auto',
+                            fontSize: '0.8rem',
+                        }}>
+                        {orphans
+                            .map(
+                                (orphan) =>
+                                    `kizuna cms rename-page ${orphan.name} <new name>${orphan.site === DEFAULT_SITE ? '' : ` --site ${orphan.site}`}`
+                            )
+                            .join('\n')}
+                    </pre>
+                </section>
+            ) : null}
+            {problems.length > 0 ? (
+                <section
+                    style={{
+                        marginTop: '1.5rem',
+                    }}>
+                    <h2
+                        style={{
+                            fontSize: '1.1rem',
+                            margin: '0 0 0.5rem',
+                        }}>
+                        Published content that fails its schema
+                    </h2>
+                    <p style={styles.muted}>
+                        The code changed and this content no longer fits it. Visitors see the earlier version named here, or nothing when no
+                        earlier version fits. Fix the content and publish it again, or add a migrate step.
+                    </p>
+                    <table style={styles.table}>
+                        <tbody>
+                            {problems.map((problem) => (
+                                <tr key={problem.ref}>
+                                    <td style={styles.cell}>
+                                        <strong>{problem.ref}</strong>
+                                        <div style={styles.muted}>
+                                            {problem.serving === undefined
+                                                ? 'Reads as unpublished'
+                                                : `Visitors see version ${problem.serving}`}
+                                        </div>
+                                    </td>
+                                    <td style={styles.cell}>
+                                        {problem.issues.map((issue) => (
+                                            <div key={issue}>{issue}</div>
+                                        ))}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </section>
+            ) : null}
+            {Object.keys(service.collections).length > 0 || Object.keys(service.globals).length > 0 ? (
+                <>
+                    <h2 style={{ fontSize: '1.1rem', margin: '2rem 0 0.75rem' }}>Edit content</h2>
+                    <ContentEditor
+                        apiPath={apiPath}
+                        basePath={basePath}
+                        draftPath={draftPath}
+                        collections={Object.values(service.collections).map((definition) => ({
+                            name: definition.name,
+                            label: humanizeName(definition.name),
+                            group: definition.group ?? null,
+                        }))}
+                        globals={Object.values(service.globals).map((definition) => ({
+                            name: definition.name,
+                            label: humanizeName(definition.name),
+                            group: definition.group ?? null,
+                        }))}
+                    />
+                </>
+            ) : null}
             <h2 style={{ fontSize: '1.1rem', margin: '2rem 0 0.75rem' }}>Media</h2>
             {media.length === 0 ? (
                 <p style={styles.muted}>No uploads yet.</p>

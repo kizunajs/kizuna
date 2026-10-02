@@ -6,9 +6,8 @@
 import type { nextAdapter } from '@kizunajs/next';
 import type { mcpPlugin } from '@kizunajs/mcp';
 import type { openApiPlugin } from '@kizunajs/openapi';
-import type { cmsPlugin } from '@kizunajs/cms';
 import type { GuardSchema, analytics, jobs, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
-import type { editor, site } from './src/cms/identities';
+import type { site, staff } from './src/identities';
 
 export interface Config {
     adapter: ReturnType<typeof nextAdapter>;
@@ -19,8 +18,8 @@ export interface Config {
             member: typeof member;
             inviteToken: typeof inviteToken;
             scheduler: typeof scheduler;
-            editor: typeof editor;
             site: typeof site;
+            staff: typeof staff;
         };
         guardSchema: typeof GuardSchema;
     };
@@ -31,5 +30,5 @@ export interface Config {
         issueCodes: 'invalid_phone_number';
     };
     jobs: typeof jobs;
-    plugins: [ReturnType<typeof mcpPlugin>, ReturnType<typeof openApiPlugin>, ReturnType<typeof cmsPlugin>];
+    plugins: [ReturnType<typeof mcpPlugin>, ReturnType<typeof openApiPlugin>];
 }

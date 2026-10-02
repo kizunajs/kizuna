@@ -51,6 +51,7 @@ See [`defineConfig`](/docs/reference/define-config) for every field it takes.
 | `requestContext` | Values every handler receives, resolved once per request. Resolvers run on every route, before the guards, and never deny. See [Request Context](/docs/request-context).                                                    |
 | `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints) unless `jobRunner.mode` is `'in-process'`, and every handler receives a typed `jobs` runner so a route can run one in process. |
 | `plugins`        | Routes, jobs and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                                    |
+| `content`        | The content editors change: its routes, its documents and a reader at `kizuna.content`. See [Content](#content).                                                                                                            |
 | `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                                           |
 | `tags`           | The OpenAPI tags route groups sit under. See [`k.tags`](/docs/reference/k-tags).                                                                                                                                            |
 
@@ -103,6 +104,38 @@ plugins: [
     }),
 ],
 ```
+
+## Content
+
+Copy, images and articles that editors change are content, and they have a place of their own on the config. `content` takes a provider, and [`@kizunajs/cms`](/docs/cms) is the one Kizuna ships:
+
+```ts title="kizuna.config.ts"
+import { cms } from '@kizunajs/cms';
+
+export default defineConfig({
+    adapter: nextAdapter(),
+    auth: {
+        identities: {
+            editor,
+        },
+    },
+    content: cms({
+        db,
+        pages,
+        auth: {
+            identity: 'editor',
+        },
+    }),
+});
+```
+
+What the provider brings:
+
+- **Routes.** They join this API's at the top level, as `content`, `editing` and `invalidate`, and reach the clients, the OpenAPI document and MCP like any route of yours.
+- **A reader.** `kizuna.content` sits beside `kizuna.api`, typed from every page, global and collection: `kizuna.content.pages.frontPage.get()`.
+- **Documents.** Every page, global and collection has a name and a schema. `kizuna generate` records them in the snapshot, and [`kizuna diff`](/docs/breaking-changes#content) fails on a change the stored content cannot survive.
+
+The adapter supplies what reading needs from the framework. `nextAdapter()` gives the reader Next's cache, draft mode and `notFound()`, and lets publishing revalidate in process.
 
 ## Middleware
 

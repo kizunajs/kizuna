@@ -620,6 +620,114 @@ describe('buildMcpTools: output schema', () => {
     });
 });
 
+/**
+ * Every `id` keyword with a string value, wherever it sits in a JSON Schema.
+ */
+const idKeywords = (value: unknown): string[] => {
+    if (Array.isArray(value)) return value.flatMap(idKeywords);
+    if (typeof value !== 'object' || value === null) return [];
+    return Object.entries(value).flatMap(([key, child]) => [
+        ...(key === 'id' && typeof child === 'string' ? [child] : []),
+        ...(key === 'properties' && typeof child === 'object' && child !== null
+            ? Object.values(child).flatMap(idKeywords)
+            : idKeywords(child)),
+    ]);
+};
+
+describe('buildMcpTools: models', () => {
+    const UserSchema = Kizuna.model({
+        title: 'User',
+        schema: z.object({
+            id: z.string(),
+            name: z.string(),
+        }),
+    });
+    const modelRoutes = k.routes('api', {
+        saveUser: k.route({
+            method: 'PUT',
+            path: '/users/:id',
+            tool: true,
+            summary: 'Save a user',
+            body: UserSchema,
+            responses: {
+                200: z.object({
+                    user: UserSchema,
+                    friends: z.array(UserSchema),
+                }),
+            },
+        }),
+    });
+    const modelApi = assembleApi(
+        defineConfig({
+            ...config,
+            routes: modelRoutes,
+        }).api,
+        {
+            router: {
+                saveUser: ({ body }: { body: { id: string; name: string } }) => ({
+                    status: 200,
+                    body: {
+                        user: body,
+                        friends: [],
+                    },
+                }),
+            },
+        }
+    );
+
+    it('sends no bare id keyword, which validators read as the draft-04 $id and refuse', async () => {
+        const { client, close } = await connectMcpClient(modelApi);
+
+        const { tools } = await client.listTools();
+        const saveUser = tools.find((tool) => tool.name === 'save_user')!;
+
+        expect(idKeywords(saveUser.inputSchema)).toEqual([]);
+        expect(idKeywords(saveUser.outputSchema)).toEqual([]);
+        expect(JSON.stringify(saveUser.outputSchema)).toContain('#/$defs/User');
+
+        await close();
+    });
+
+    it('still validates a call against the model', async () => {
+        const { client, close } = await connectMcpClient(modelApi);
+
+        const saved = await client.callTool({
+            name: 'save_user',
+            arguments: {
+                params: {
+                    id: '1',
+                },
+                body: {
+                    id: '1',
+                    name: 'Ada',
+                },
+            },
+        });
+        expect(saved.structuredContent).toMatchObject({
+            status: 200,
+            body: {
+                user: {
+                    name: 'Ada',
+                },
+            },
+        });
+        const refused = await client.callTool({
+            name: 'save_user',
+            arguments: {
+                params: {
+                    id: '1',
+                },
+                body: {
+                    id: '1',
+                },
+            },
+        });
+        expect(refused.isError).toBe(true);
+
+        await close();
+    });
+});
+
 describe('instructions', () => {
     it('lists the contract tag groups', () => {
         const instructions = buildInstructions(contract, buildMcpTools(contract.routes), undefined);

@@ -342,13 +342,12 @@ ${docComment([
 /**
  * Declared in the file, so a brand needs nothing installed.
  */
-const BRAND_DECLARATION = `declare const kizunaBrand: unique symbol;
-
-/**
- * Tells one branded type from another with the same base.
+const BRAND_DECLARATION = `/**
+ * Tells one branded type from another with the same base. The server declares
+ * the same shape, so an id it hands out is the type this client takes.
  */
 type KizunaBrand<Name extends string> = {
-    readonly [kizunaBrand]: {
+    readonly '~kizunaBrand': {
         readonly [Key in Name]: true;
     };
 };

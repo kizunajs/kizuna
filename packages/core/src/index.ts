@@ -1,3 +1,4 @@
+export type { KizunaBrand, BrandedSchema, BrandableSchema } from './brand.js';
 import './zod-meta.js';
 
 export {

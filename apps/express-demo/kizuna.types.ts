@@ -7,7 +7,6 @@ import type { expressAdapter } from '@kizunajs/express';
 import type { mcpPlugin } from '@kizunajs/mcp';
 import type { openApiPlugin } from '@kizunajs/openapi';
 import type { resendPlugin } from '@kizunajs/resend';
-import type { cmsPlugin } from '@kizunajs/cms';
 import type { GuardSchema, analytics, jobs, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
 import type { emailPlugin } from './src/plugins/email';
 
@@ -35,6 +34,5 @@ export interface Config {
         ReturnType<typeof openApiPlugin>,
         ReturnType<typeof emailPlugin>,
         ReturnType<typeof resendPlugin>,
-        ReturnType<typeof cmsPlugin>,
     ];
 }

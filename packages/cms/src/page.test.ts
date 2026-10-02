@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
-import { block } from './block.js';
+import { defineBlock } from './block.js';
 import { fieldDescription, undeclaredFieldRoles } from './field.js';
-import { isPage, page } from './page.js';
+import { isPage, definePage } from './page.js';
 
 const ProductId = Kizuna.brand('ProductId', z.string());
 
-const HeroBlockSchema = block({
-    slug: 'hero',
+const HeroBlockSchema = defineBlock({
+    name: 'hero',
     fields: [
         {
             name: 'heading',
@@ -17,11 +17,12 @@ const HeroBlockSchema = block({
     ],
 });
 
-const springPage = page({
-    name: 'springPage',
+const FrontPage = definePage({
+    name: 'frontPage',
     fields: [
         {
             name: 'hero',
+            label: 'Hero',
             schema: HeroBlockSchema,
         },
         {
@@ -39,9 +40,6 @@ const springPage = page({
             },
         },
     ],
-    labels: {
-        hero: 'Hero',
-    },
     migrate: {
         1: (document) => ({
             ...document,
@@ -52,14 +50,14 @@ const springPage = page({
 
 describe('page', () => {
     it('keeps the definition and marks it as a page', () => {
-        expect(springPage.name).toBe('springPage');
-        expect(springPage.fields.map((field) => field.name)).toEqual(['hero', 'featured', 'seo']);
-        expect(isPage(springPage)).toBe(true);
+        expect(FrontPage.name).toBe('frontPage');
+        expect(FrontPage.fields.map((field) => field.name)).toEqual(['hero', 'featured', 'seo']);
+        expect(isPage(FrontPage)).toBe(true);
         expect(isPage(HeroBlockSchema)).toBe(false);
     });
 
     it('builds a schema the whole page is checked against', () => {
-        const result = springPage.schema.safeParse({
+        const result = FrontPage.schema.safeParse({
             hero: {
                 heading: 'Spring',
             },
@@ -74,8 +72,8 @@ describe('page', () => {
 
     it('throws on a name that is not an identifier', () => {
         expect(() =>
-            page({
-                name: 'spring-page',
+            definePage({
+                name: 'front-page',
                 fields: [
                     {
                         name: 'heading',
@@ -83,30 +81,43 @@ describe('page', () => {
                     },
                 ],
             })
-        ).toThrow("page() has the name 'spring-page'");
+        ).toThrow("definePage() has the name 'front-page'");
     });
 
-    it('throws on a label for a field it does not have', () => {
+    it('throws on options for a field that is not an enum, or a value the enum lacks', () => {
         expect(() =>
-            page({
-                name: 'aboutPage',
+            definePage({
+                name: 'teamPage',
                 fields: [
                     {
                         name: 'heading',
                         schema: z.string(),
+                        options: {
+                            design: 'Design',
+                        },
                     },
                 ],
-                labels: {
-                    // @ts-expect-error not a field
-                    title: 'Title',
-                },
             })
-        ).toThrow("page('aboutPage') labels 'title', which is not one of its fields.");
+        ).toThrow("definePage('teamPage') gives the field 'heading' options, which only an enum takes.");
+        expect(() =>
+            definePage({
+                name: 'teamPage',
+                fields: [
+                    {
+                        name: 'department',
+                        schema: z.enum(['design', 'engineering']),
+                        options: {
+                            sales: 'Sales',
+                        },
+                    },
+                ],
+            })
+        ).toThrow("definePage('teamPage') labels the option 'sales' of 'department', which its enum does not have.");
     });
 
     it('throws on a migrate step that is not a version number', () => {
         expect(() =>
-            page({
+            definePage({
                 name: 'aboutPage',
                 fields: [
                     {
@@ -118,13 +129,13 @@ describe('page', () => {
                     0: (document) => document,
                 },
             })
-        ).toThrow("page('aboutPage') has a migrate step '0'");
+        ).toThrow("definePage('aboutPage') has a migrate step '0'");
     });
 });
 
 describe('fieldDescription', () => {
     it('prefers the field description over the schema text', () => {
-        expect(fieldDescription(springPage.fields[1])).toBe('Products shown in the grid, in this order.');
+        expect(fieldDescription(FrontPage.fields[1])).toBe('Products shown in the grid, in this order.');
     });
 
     it('falls back to .describe(), through .optional()', () => {
@@ -137,18 +148,18 @@ describe('fieldDescription', () => {
     });
 
     it('is undefined when neither says anything', () => {
-        expect(fieldDescription(springPage.fields[0])).toBeUndefined();
+        expect(fieldDescription(FrontPage.fields[0])).toBeUndefined();
     });
 });
 
 describe('undeclaredFieldRoles', () => {
     it('names every role the identity does not declare', () => {
-        expect(undeclaredFieldRoles(springPage.fields, ['editor'])).toEqual([
+        expect(undeclaredFieldRoles(FrontPage.fields, ['editor'])).toEqual([
             {
                 field: 'seo',
                 role: 'admin',
             },
         ]);
-        expect(undeclaredFieldRoles(springPage.fields, ['editor', 'admin'])).toEqual([]);
+        expect(undeclaredFieldRoles(FrontPage.fields, ['editor', 'admin'])).toEqual([]);
     });
 });

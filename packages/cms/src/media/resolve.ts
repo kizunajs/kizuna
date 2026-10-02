@@ -1,7 +1,8 @@
 import type { z } from 'zod';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
+import { optionOf } from '../union.js';
 import { isImageSchema, type ImageRef, type ResolvedImage } from '../image.js';
-import type { Page } from '../page.js';
+import type { ContentDefinition } from '../definitions.js';
 import type { MediaRecord } from './media.js';
 
 /**
@@ -42,7 +43,7 @@ export const resolveImage = (
 /**
  * Every media id a document refers to.
  */
-export const mediaIdsOf = (page: Page, content: Record<string, unknown>): string[] => {
+export const mediaIdsOf = (page: ContentDefinition, content: Record<string, unknown>): string[] => {
     const ids = new Set<string>();
     const walk = (schema: z.core.$ZodType, value: unknown): void => {
         if (value === undefined || value === null) return;
@@ -68,7 +69,7 @@ export const mediaIdsOf = (page: Page, content: Record<string, unknown>): string
  * The content with every image reference replaced by its resolved image.
  */
 export const resolveContent = (
-    page: Page,
+    page: ContentDefinition,
     content: Record<string, unknown>,
     media: ReadonlyMap<string, MediaRecord>,
     urlOf: (id: string, query: string) => string
@@ -82,6 +83,10 @@ export const resolveContent = (
         const def = readDef(unwrapOptionalWrappers(schema).inner);
         if (def.type === 'array' && def.element !== undefined && Array.isArray(value)) {
             return value.map((item) => walk(def.element!, item));
+        }
+        if (def.options !== undefined) {
+            const option = optionOf(def.options, value);
+            return option === undefined ? value : walk(option, value);
         }
         if (def.type === 'object' && def.shape !== undefined && typeof value === 'object') {
             const resolved: Record<string, unknown> = {};

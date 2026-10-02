@@ -5,12 +5,12 @@ description: Define a reusable content block for @kizunajs/cms with block(), and
 
 # Define a block and shared schemas
 
-A block is a group of fields several pages use as one field. `block()` returns a plain Zod object schema, so a page takes it wherever it takes a schema, and the block's own field rules and descriptions apply inside it.
+A block is a group of fields several pages use as one field. `defineBlock()` returns a plain Zod object schema, so a page takes it wherever it takes a schema, and the block's own field rules and descriptions apply inside it.
 
 ## Where things live
 
 - `cms/schemas.ts`: shared Zod schemas with their limits and `.describe()` text. `HeadingSchema`, `CtaSchema`, `SeoSchema`, branded ids like `ProductId`.
-- `cms/blocks.ts`: blocks built from them with `block()`.
+- `cms/blocks.ts`: blocks built from them with `defineBlock()`.
 - `components/`: one component per block, typed with `Output<typeof HeroBlockSchema>`.
 
 ## Steps
@@ -25,12 +25,12 @@ A block is a group of fields several pages use as one field. `block()` returns a
 
 ```ts
 import { z } from 'zod';
-import { block } from '@kizunajs/cms';
+import { defineBlock } from '@kizunajs/cms';
 import { ImageSchema } from '@kizunajs/cms/schemas';
 import { CtaSchema, HeadingSchema } from './schemas';
 
-export const HeroBlockSchema = block({
-    slug: 'hero',
+export const HeroBlockSchema = defineBlock({
+    name: 'hero',
     fields: [
         {
             name: 'heading',

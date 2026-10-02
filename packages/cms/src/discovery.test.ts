@@ -10,7 +10,12 @@ const fixtures = join(fileURLToPath(new URL('.', import.meta.url)), '__fixtures_
 const temporary: string[] = [];
 
 afterEach(() => {
-    for (const folder of temporary) rmSync(folder, { recursive: true, force: true });
+    for (const folder of temporary) {
+        rmSync(folder, {
+            recursive: true,
+            force: true,
+        });
+    }
     temporary.length = 0;
 });
 
@@ -18,12 +23,12 @@ describe('discoverPages', () => {
     it('finds every content.ts and derives the path from its folder', () => {
         expect(discoverPages(fixtures).map(({ name, path }) => ({ name, path }))).toEqual([
             {
-                name: 'aboutPage',
-                path: '/about',
+                name: 'frontPage',
+                path: '/',
             },
             {
-                name: 'springPage',
-                path: '/lp/spring',
+                name: 'aboutPage',
+                path: '/about',
             },
             {
                 name: 'photoPage',
@@ -37,7 +42,7 @@ describe('discoverPages', () => {
         temporary.push(root);
         for (const folder of ['one', 'two']) {
             mkdirSync(join(root, folder));
-            writeFileSync(join(root, folder, 'content.ts'), "export default page({\n    name: 'samePage',\n    fields: [],\n});\n");
+            writeFileSync(join(root, folder, 'content.ts'), "export default definePage({\n    name: 'samePage',\n    fields: [],\n});\n");
         }
         expect(() => discoverPages(root)).toThrow(/Two pages are named 'samePage':\n {2}.*one.*\n {2}.*two/);
     });
@@ -63,8 +68,8 @@ describe('routePathOf', () => {
 });
 
 describe('pageNameIn', () => {
-    it('reads the name from page({ name })', () => {
-        expect(pageNameIn("export default page({\n    name: 'springPage',\n    fields: [],\n});")).toBe('springPage');
+    it('reads the name from definePage({ name })', () => {
+        expect(pageNameIn("export default definePage({\n    name: 'frontPage',\n    fields: [],\n});")).toBe('frontPage');
         expect(pageNameIn('const x = 1;')).toBeUndefined();
     });
 });
@@ -74,16 +79,16 @@ describe('renderPagesModule', () => {
         const rendered = renderPagesModule(
             [
                 {
-                    name: 'springPage',
-                    path: '/lp/spring',
-                    file: '/project/src/app/lp/spring/content.ts',
+                    name: 'frontPage',
+                    path: '/',
+                    file: '/project/src/app/content.ts',
                 },
             ],
             '/project/src/cms.pages.ts'
         );
-        expect(rendered).toContain("import springPage from './app/lp/spring/content';");
-        expect(rendered).toContain("        path: '/lp/spring',");
-        expect(rendered).toContain('        page: springPage,');
+        expect(rendered).toContain("import frontPage from './app/content';");
+        expect(rendered).toContain("        path: '/',");
+        expect(rendered).toContain('        page: frontPage,');
         expect(defaultPagesOutput('/project/src/app')).toBe('/project/src/cms.pages.ts');
     });
 });

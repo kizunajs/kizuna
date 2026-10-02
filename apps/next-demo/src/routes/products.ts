@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { k } from '../k';
-import { ProductId } from '../cms/schemas';
+import { ProductId } from '../models';
+import { cmsClient } from '../lib/cms-client';
 
 const ProductSchema = Kizuna.model({
     title: 'Product',
@@ -32,11 +33,6 @@ const catalogue = new Map<string, Product>(
     ])
 );
 
-/**
- * Which of the ids exist, for the CMS brand registry and `kizuna cms push`.
- */
-export const findExistingProductIds = (ids: readonly string[]): string[] => ids.filter((id) => catalogue.has(id));
-
 export const products = k.routes({
     listProducts: k
         .route({
@@ -62,12 +58,50 @@ export const products = k.routes({
                 ),
             },
         })),
+    listProductOptions: k
+        .route({
+            method: 'GET',
+            path: '/product-options',
+            auth: false,
+            summary: "List products by name and thumbnail, for the CMS editor's picker",
+            query: z.object({
+                q: z.string().optional(),
+                ids: z.array(ProductId).optional(),
+            }),
+            responses: {
+                200: z.object({
+                    options: z.array(
+                        z.object({
+                            id: ProductId,
+                            label: z.string(),
+                            image: z.string().optional(),
+                        })
+                    ),
+                }),
+            },
+        })
+        .handler(({ query }) => ({
+            status: 200,
+            body: {
+                options: [...catalogue.values()]
+                    .filter((product) =>
+                        query.ids === undefined
+                            ? query.q === undefined || product.name.toLowerCase().includes(query.q.toLowerCase())
+                            : query.ids.includes(product.id)
+                    )
+                    .map((product) => ({
+                        id: product.id,
+                        label: product.name,
+                        image: product.imageUrl,
+                    })),
+            },
+        })),
     getProduct: k
         .route({
             method: 'GET',
             path: '/products/:id',
-            auth: ['site', 'editor'],
-            summary: 'Read one product, as the site or an editor',
+            auth: ['site', 'staff'],
+            summary: 'Read one product, as the site or the staff',
             pathParams: z.object({
                 id: ProductId,
             }),
@@ -95,7 +129,7 @@ export const products = k.routes({
             method: 'PATCH',
             path: '/products/:id',
             auth: {
-                identity: 'editor',
+                identity: 'staff',
                 roles: 'admin',
             },
             summary: 'Rename a product and refresh every page featuring it',
@@ -109,7 +143,7 @@ export const products = k.routes({
                 200: ProductSchema,
             },
         })
-        .handler(async ({ params, body, plugins, throwError }) => {
+        .handler(async ({ params, body, throwError }) => {
             const product = catalogue.get(params.id);
             if (product === undefined) {
                 return throwError({
@@ -124,7 +158,12 @@ export const products = k.routes({
                 name: body.name,
             };
             catalogue.set(params.id, updated);
-            await plugins.cms.invalidate(ProductId, params.id);
+            await cmsClient.invalidate({
+                body: {
+                    relationship: 'products',
+                    id: params.id,
+                },
+            });
             return {
                 status: 200,
                 body: updated,

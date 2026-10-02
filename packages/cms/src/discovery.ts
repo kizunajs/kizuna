@@ -26,7 +26,7 @@ export const routePathOf = (appDir: string, folder: string): string => {
     return `/${segments.join('/')}`;
 };
 
-const NAME_PATTERN = /\bpage\s*\(\s*\{[\s\S]*?\bname\s*:\s*(['"`])([A-Za-z_$][\w$]*)\1/;
+const NAME_PATTERN = /\bdefinePage\s*\(\s*\{[\s\S]*?\bname\s*:\s*(['"`])([A-Za-z_$][\w$]*)\1/;
 
 /**
  * The page name a `content.ts` declares, read from its source so discovery
@@ -58,7 +58,9 @@ export const discoverPages = (appDir: string): DiscoveredPage[] => {
             if (!CONTENT_FILES.includes(entry)) continue;
             const name = pageNameIn(readFileSync(full, 'utf8'));
             if (name === undefined) {
-                throw new Error(`${full} has no \`page({ name: '...' })\` with a literal name. Discovery reads the name from the source.`);
+                throw new Error(
+                    `${full} has no \`definePage({ name: '...' })\` with a literal name. Discovery reads the name from the source.`
+                );
             }
             found.push({
                 name,
@@ -99,16 +101,17 @@ export const renderPagesModule = (pages: readonly DiscoveredPage[], outputFile: 
         ' * and re-run `kizuna generate` to regenerate this file.',
         ' */',
     ];
+    lines.push("import { definePages } from '@kizunajs/cms';");
     for (const page of pages) lines.push(`import ${page.name} from '${importSpecifier(outputFile, page.file)}';`);
     lines.push('');
-    lines.push('export const pages = {');
+    lines.push('export const pages = definePages({');
     for (const page of pages) {
         lines.push(`    ${page.name}: {`);
         lines.push(`        path: '${page.path}',`);
         lines.push(`        page: ${page.name},`);
         lines.push('    },');
     }
-    lines.push('};');
+    lines.push('});');
     lines.push('');
     return lines.join('\n');
 };

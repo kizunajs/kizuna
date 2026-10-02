@@ -1,0 +1,5676 @@
+routes:
+  content.pages.frontPage:
+    method: GET
+    path: /content/pages/frontPage
+    statuses:
+      - 200
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          version:
+            optional: false
+            schema:
+              kind: number
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          content:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                hero:
+                  optional: false
+                  schema:
+                    kind: object
+                    fields:
+                      heading:
+                        optional: false
+                        schema:
+                          kind: string
+                      subheading:
+                        optional: false
+                        schema:
+                          kind: string
+                      image:
+                        optional: true
+                        schema:
+                          kind: object
+                          fields:
+                            id:
+                              optional: false
+                              schema:
+                                kind: string
+                            url:
+                              optional: false
+                              schema:
+                                kind: string
+                            alt:
+                              optional: false
+                              schema:
+                                kind: string
+                            width:
+                              optional: false
+                              schema:
+                                kind: number
+                            height:
+                              optional: false
+                              schema:
+                                kind: number
+                      cta:
+                        optional: false
+                        schema:
+                          kind: object
+                          fields:
+                            label:
+                              optional: false
+                              schema:
+                                kind: string
+                            href:
+                              optional: false
+                              schema:
+                                kind: string
+                featured:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: string
+                articles:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: string
+                seo:
+                  optional: false
+                  schema:
+                    kind: object
+                    fields:
+                      title:
+                        optional: false
+                        schema:
+                          kind: string
+                      description:
+                        optional: false
+                        schema:
+                          kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.pages.blogIndexPage:
+    method: GET
+    path: /content/pages/blogIndexPage
+    statuses:
+      - 200
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          version:
+            optional: false
+            schema:
+              kind: number
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          content:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                heading:
+                  optional: false
+                  schema:
+                    kind: string
+                intro:
+                  optional: false
+                  schema:
+                    kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.pages.contactPage:
+    method: GET
+    path: /content/pages/contactPage
+    statuses:
+      - 200
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          version:
+            optional: false
+            schema:
+              kind: number
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          content:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                heading:
+                  optional: false
+                  schema:
+                    kind: string
+                intro:
+                  optional: false
+                  schema:
+                    kind: string
+                buttonLabel:
+                  optional: false
+                  schema:
+                    kind: string
+                contacts:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: string
+                thanks:
+                  optional: false
+                  schema:
+                    kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.pages.teamPage:
+    method: GET
+    path: /content/pages/teamPage
+    statuses:
+      - 200
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          version:
+            optional: false
+            schema:
+              kind: number
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          content:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                heading:
+                  optional: false
+                  schema:
+                    kind: string
+                intro:
+                  optional: false
+                  schema:
+                    kind: string
+                photo:
+                  optional: true
+                  schema:
+                    kind: object
+                    fields:
+                      id:
+                        optional: false
+                        schema:
+                          kind: string
+                      url:
+                        optional: false
+                        schema:
+                          kind: string
+                      alt:
+                        optional: false
+                        schema:
+                          kind: string
+                      width:
+                        optional: false
+                        schema:
+                          kind: number
+                      height:
+                        optional: false
+                        schema:
+                          kind: number
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.globals.site:
+    method: GET
+    path: /content/globals/site
+    statuses:
+      - 200
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          version:
+            optional: false
+            schema:
+              kind: number
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          content:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                footerText:
+                  optional: false
+                  schema:
+                    kind: string
+                contactEmail:
+                  optional: false
+                  schema:
+                    kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.collections.employees.list:
+    method: GET
+    path: /content/collections/employees
+    statuses:
+      - 200
+      - 400
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        department:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - design
+              - engineering
+              - sales
+              - support
+        order:
+          optional: true
+          schema:
+            kind: number
+        name:
+          optional: true
+          schema:
+            kind: string
+        orderBy:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - department
+              - name
+              - order
+              - publishedAt
+              - updatedAt
+        direction:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        cursor:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  role:
+                    optional: false
+                    schema:
+                      kind: string
+                  department:
+                    optional: false
+                    schema:
+                      kind: enum
+                      values:
+                        - design
+                        - engineering
+                        - sales
+                        - support
+                  email:
+                    optional: true
+                    schema:
+                      kind: string
+                  photo:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
+                  bio:
+                    optional: true
+                    schema:
+                      kind: string
+                  order:
+                    optional: false
+                    schema:
+                      kind: number
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+          next:
+            optional: false
+            schema:
+              kind: string
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.collections.employees.get:
+    method: GET
+    path: /content/collections/employees/:id
+    statuses:
+      - 200
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          role:
+            optional: false
+            schema:
+              kind: string
+          department:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - design
+                - engineering
+                - sales
+                - support
+          email:
+            optional: true
+            schema:
+              kind: string
+          photo:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
+          bio:
+            optional: true
+            schema:
+              kind: string
+          order:
+            optional: false
+            schema:
+              kind: number
+          id:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.collections.articles.list:
+    method: GET
+    path: /content/collections/articles
+    statuses:
+      - 200
+      - 400
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        slug:
+          optional: true
+          schema:
+            kind: string
+        topic:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - guides
+              - news
+              - stories
+        orderBy:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - publishedAt
+              - slug
+              - topic
+              - updatedAt
+        direction:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        cursor:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  title:
+                    optional: false
+                    schema:
+                      kind: string
+                  slug:
+                    optional: false
+                    schema:
+                      kind: string
+                  topic:
+                    optional: false
+                    schema:
+                      kind: enum
+                      values:
+                        - guides
+                        - news
+                        - stories
+                  excerpt:
+                    optional: false
+                    schema:
+                      kind: string
+                  cover:
+                    optional: false
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                        alt:
+                          optional: false
+                          schema:
+                            kind: string
+                        width:
+                          optional: false
+                          schema:
+                            kind: number
+                        height:
+                          optional: false
+                          schema:
+                            kind: number
+                  body:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: union
+                  author:
+                    optional: true
+                    schema:
+                      kind: string
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+          next:
+            optional: false
+            schema:
+              kind: string
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.collections.articles.get:
+    method: GET
+    path: /content/collections/articles/:id
+    statuses:
+      - 200
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          title:
+            optional: false
+            schema:
+              kind: string
+          slug:
+            optional: false
+            schema:
+              kind: string
+          topic:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - guides
+                - news
+                - stories
+          excerpt:
+            optional: false
+            schema:
+              kind: string
+          cover:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+                alt:
+                  optional: false
+                  schema:
+                    kind: string
+                width:
+                  optional: false
+                  schema:
+                    kind: number
+                height:
+                  optional: false
+                  schema:
+                    kind: number
+          body:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: union
+          author:
+            optional: true
+            schema:
+              kind: string
+          id:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  content.media.image:
+    method: GET
+    path: /content/media/:id/image
+    statuses:
+      - 200
+      - 404
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        crop:
+          optional: true
+          schema:
+            kind: pipe
+        focal:
+          optional: true
+          schema:
+            kind: pipe
+        w:
+          optional: true
+          schema:
+            kind: number
+        h:
+          optional: true
+          schema:
+            kind: number
+    responses:
+      "200":
+        kind: custom
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.describe:
+    method: GET
+    path: /editing/describe
+    statuses:
+      - 200
+      - 400
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        url:
+          optional: true
+          schema:
+            kind: string
+        site:
+          optional: true
+          schema:
+            kind: string
+        ref:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          kind:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - global
+                - item
+                - page
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          usedOn:
+            optional: false
+            schema:
+              kind: object
+              fields:
+                everywhere:
+                  optional: false
+                  schema:
+                    kind: boolean
+                pages:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: object
+                      fields:
+                        name:
+                          optional: false
+                          schema:
+                            kind: string
+                        path:
+                          optional: false
+                          schema:
+                            kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          fields:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  path:
+                    optional: false
+                    schema:
+                      kind: string
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  label:
+                    optional: true
+                    schema:
+                      kind: string
+                  options:
+                    optional: true
+                    schema:
+                      kind: record
+                  description:
+                    optional: true
+                    schema:
+                      kind: string
+                  block:
+                    optional: true
+                    schema:
+                      kind: string
+                  parent:
+                    optional: true
+                    schema:
+                      kind: string
+                  readOnly:
+                    optional: false
+                    schema:
+                      kind: boolean
+                  writable:
+                    optional: false
+                    schema:
+                      kind: boolean
+                  roles:
+                    optional: true
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  brand:
+                    optional: true
+                    schema:
+                      kind: string
+                  searchTool:
+                    optional: true
+                    schema:
+                      kind: string
+                  schema:
+                    optional: false
+                    schema:
+                      kind: record
+                  value:
+                    optional: true
+                    schema:
+                      kind: unknown
+          draft:
+            optional: false
+            schema:
+              kind: record
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.pages.list:
+    method: GET
+    path: /editing/pages
+    statuses:
+      - 200
+      - 401
+      - 403
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          pages:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  site:
+                    optional: false
+                    schema:
+                      kind: string
+                  ref:
+                    optional: false
+                    schema:
+                      kind: string
+                  path:
+                    optional: false
+                    schema:
+                      kind: string
+                  status:
+                    optional: false
+                    schema:
+                      kind: enum
+                      values:
+                        - changed
+                        - draft
+                        - empty
+                        - published
+                  group:
+                    optional: false
+                    schema:
+                      kind: string
+                  version:
+                    optional: false
+                    schema:
+                      kind: number
+                  publishedVersion:
+                    optional: false
+                    schema:
+                      kind: number
+                  updatedAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  updatedBy:
+                    optional: false
+                    schema:
+                      kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.pages.getDraft:
+    method: GET
+    path: /editing/pages/:name/draft
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.pages.updateDraft:
+    method: PATCH
+    path: /editing/pages/:name/draft
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 409
+      - 422
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        changes:
+          optional: false
+          schema:
+            kind: record
+        summary:
+          optional: true
+          schema:
+            kind: string
+        autosave:
+          optional: true
+          schema:
+            kind: boolean
+    headers:
+      kind: object
+      fields:
+        if-match:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "422":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          errors:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  code:
+                    optional: false
+                    schema:
+                      kind: union
+                  path:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  message:
+                    optional: false
+                    schema:
+                      kind: string
+  editing.pages.missingFields:
+    method: GET
+    path: /editing/pages/:name/missing
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          prompt:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.pages.getPublished:
+    method: GET
+    path: /editing/pages/:name/published
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          version:
+            optional: false
+            schema:
+              kind: number
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          content:
+            optional: false
+            schema:
+              kind: record
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.pages.history:
+    method: GET
+    path: /editing/pages/:name/versions
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          versions:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  version:
+                    optional: false
+                    schema:
+                      kind: number
+                  summary:
+                    optional: false
+                    schema:
+                      kind: string
+                  createdAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  createdBy:
+                    optional: false
+                    schema:
+                      kind: string
+                  published:
+                    optional: false
+                    schema:
+                      kind: boolean
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.pages.publish:
+    method: POST
+    path: /editing/pages/:name/publish
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 409
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        summary:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.pages.rollback:
+    method: POST
+    path: /editing/pages/:name/rollback
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        version:
+          optional: false
+          schema:
+            kind: number
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.globals.getDraft:
+    method: GET
+    path: /editing/globals/:name/draft
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.globals.updateDraft:
+    method: PATCH
+    path: /editing/globals/:name/draft
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 409
+      - 422
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        changes:
+          optional: false
+          schema:
+            kind: record
+        summary:
+          optional: true
+          schema:
+            kind: string
+        autosave:
+          optional: true
+          schema:
+            kind: boolean
+    headers:
+      kind: object
+      fields:
+        if-match:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "422":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          errors:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  code:
+                    optional: false
+                    schema:
+                      kind: union
+                  path:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  message:
+                    optional: false
+                    schema:
+                      kind: string
+  editing.globals.missingFields:
+    method: GET
+    path: /editing/globals/:name/missing
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          prompt:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.globals.getPublished:
+    method: GET
+    path: /editing/globals/:name/published
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          version:
+            optional: false
+            schema:
+              kind: number
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          content:
+            optional: false
+            schema:
+              kind: record
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.globals.history:
+    method: GET
+    path: /editing/globals/:name/versions
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          versions:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  version:
+                    optional: false
+                    schema:
+                      kind: number
+                  summary:
+                    optional: false
+                    schema:
+                      kind: string
+                  createdAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  createdBy:
+                    optional: false
+                    schema:
+                      kind: string
+                  published:
+                    optional: false
+                    schema:
+                      kind: boolean
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.globals.publish:
+    method: POST
+    path: /editing/globals/:name/publish
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 409
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        summary:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.globals.rollback:
+    method: POST
+    path: /editing/globals/:name/rollback
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        version:
+          optional: false
+          schema:
+            kind: number
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.collections.listItems:
+    method: GET
+    path: /editing/collections/:name/items
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  ref:
+                    optional: false
+                    schema:
+                      kind: string
+                  label:
+                    optional: false
+                    schema:
+                      kind: string
+                  path:
+                    optional: false
+                    schema:
+                      kind: string
+                  status:
+                    optional: false
+                    schema:
+                      kind: enum
+                      values:
+                        - changed
+                        - draft
+                        - empty
+                        - published
+                  complete:
+                    optional: false
+                    schema:
+                      kind: boolean
+                  updatedAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  updatedBy:
+                    optional: false
+                    schema:
+                      kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.collections.createItem:
+    method: POST
+    path: /editing/collections/:name/items
+    statuses:
+      - 201
+      - 401
+      - 403
+      - 404
+      - 409
+      - 422
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        values:
+          optional: true
+          schema:
+            kind: record
+    responses:
+      "201":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "422":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          errors:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  code:
+                    optional: false
+                    schema:
+                      kind: union
+                  path:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  message:
+                    optional: false
+                    schema:
+                      kind: string
+  editing.collections.deleteItem:
+    method: DELETE
+    path: /editing/collections/:name/items/:id
+    statuses:
+      - 204
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "204":
+        kind: void
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.collections.getDraft:
+    method: GET
+    path: /editing/collections/:name/items/:id/draft
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.collections.updateDraft:
+    method: PATCH
+    path: /editing/collections/:name/items/:id/draft
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 409
+      - 422
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        changes:
+          optional: false
+          schema:
+            kind: record
+        summary:
+          optional: true
+          schema:
+            kind: string
+        autosave:
+          optional: true
+          schema:
+            kind: boolean
+    headers:
+      kind: object
+      fields:
+        if-match:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "422":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          errors:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  code:
+                    optional: false
+                    schema:
+                      kind: union
+                  path:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  message:
+                    optional: false
+                    schema:
+                      kind: string
+  editing.collections.missingFields:
+    method: GET
+    path: /editing/collections/:name/items/:id/missing
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          prompt:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.collections.getPublished:
+    method: GET
+    path: /editing/collections/:name/items/:id/published
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          version:
+            optional: false
+            schema:
+              kind: number
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          content:
+            optional: false
+            schema:
+              kind: record
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.collections.history:
+    method: GET
+    path: /editing/collections/:name/items/:id/versions
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          name:
+            optional: false
+            schema:
+              kind: string
+          versions:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  version:
+                    optional: false
+                    schema:
+                      kind: number
+                  summary:
+                    optional: false
+                    schema:
+                      kind: string
+                  createdAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  createdBy:
+                    optional: false
+                    schema:
+                      kind: string
+                  published:
+                    optional: false
+                    schema:
+                      kind: boolean
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.collections.publish:
+    method: POST
+    path: /editing/collections/:name/items/:id/publish
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 409
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        summary:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.collections.rollback:
+    method: POST
+    path: /editing/collections/:name/items/:id/rollback
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        version:
+          optional: false
+          schema:
+            kind: number
+    responses:
+      "200":
+        kind: object
+        fields:
+          ref:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          path:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: enum
+              values:
+                - changed
+                - draft
+                - empty
+                - published
+          version:
+            optional: false
+            schema:
+              kind: number
+          publishedVersion:
+            optional: false
+            schema:
+              kind: number
+          content:
+            optional: false
+            schema:
+              kind: record
+          complete:
+            optional: false
+            schema:
+              kind: boolean
+          missing:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          updatedAt:
+            optional: false
+            schema:
+              kind: string
+          updatedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.media.list:
+    method: GET
+    path: /editing/media
+    statuses:
+      - 200
+      - 401
+      - 403
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          media:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  url:
+                    optional: false
+                    schema:
+                      kind: string
+                  contentType:
+                    optional: false
+                    schema:
+                      kind: string
+                  size:
+                    optional: false
+                    schema:
+                      kind: number
+                  width:
+                    optional: false
+                    schema:
+                      kind: number
+                  height:
+                    optional: false
+                    schema:
+                      kind: number
+                  filename:
+                    optional: false
+                    schema:
+                      kind: string
+                  alt:
+                    optional: false
+                    schema:
+                      kind: string
+                  focalPoint:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        x:
+                          optional: false
+                          schema:
+                            kind: number
+                        y:
+                          optional: false
+                          schema:
+                            kind: number
+                  uploadedAt:
+                    optional: false
+                    schema:
+                      kind: string
+                  uploadedBy:
+                    optional: false
+                    schema:
+                      kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.media.get:
+    method: GET
+    path: /editing/media/:id
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          id:
+            optional: false
+            schema:
+              kind: string
+          url:
+            optional: false
+            schema:
+              kind: string
+          contentType:
+            optional: false
+            schema:
+              kind: string
+          size:
+            optional: false
+            schema:
+              kind: number
+          width:
+            optional: false
+            schema:
+              kind: number
+          height:
+            optional: false
+            schema:
+              kind: number
+          filename:
+            optional: false
+            schema:
+              kind: string
+          alt:
+            optional: false
+            schema:
+              kind: string
+          focalPoint:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                x:
+                  optional: false
+                  schema:
+                    kind: number
+                y:
+                  optional: false
+                  schema:
+                    kind: number
+          uploadedAt:
+            optional: false
+            schema:
+              kind: string
+          uploadedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.media.getFile:
+    method: GET
+    path: /editing/media/:id/file
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: custom
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.media.update:
+    method: PATCH
+    path: /editing/media/:id
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        alt:
+          optional: true
+          schema:
+            kind: string
+        focalPoint:
+          optional: true
+          schema:
+            kind: object
+            fields:
+              x:
+                optional: false
+                schema:
+                  kind: number
+              y:
+                optional: false
+                schema:
+                  kind: number
+    responses:
+      "200":
+        kind: object
+        fields:
+          id:
+            optional: false
+            schema:
+              kind: string
+          url:
+            optional: false
+            schema:
+              kind: string
+          contentType:
+            optional: false
+            schema:
+              kind: string
+          size:
+            optional: false
+            schema:
+              kind: number
+          width:
+            optional: false
+            schema:
+              kind: number
+          height:
+            optional: false
+            schema:
+              kind: number
+          filename:
+            optional: false
+            schema:
+              kind: string
+          alt:
+            optional: false
+            schema:
+              kind: string
+          focalPoint:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                x:
+                  optional: false
+                  schema:
+                    kind: number
+                y:
+                  optional: false
+                  schema:
+                    kind: number
+          uploadedAt:
+            optional: false
+            schema:
+              kind: string
+          uploadedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.media.createUpload:
+    method: POST
+    path: /editing/media/uploads
+    statuses:
+      - 201
+      - 401
+      - 403
+      - 422
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        filename:
+          optional: false
+          schema:
+            kind: string
+        contentType:
+          optional: false
+          schema:
+            kind: string
+        size:
+          optional: false
+          schema:
+            kind: number
+    responses:
+      "201":
+        kind: object
+        fields:
+          uploadId:
+            optional: false
+            schema:
+              kind: string
+          url:
+            optional: false
+            schema:
+              kind: string
+          headers:
+            optional: false
+            schema:
+              kind: record
+          maxBytes:
+            optional: false
+            schema:
+              kind: number
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "422":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          errors:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  code:
+                    optional: false
+                    schema:
+                      kind: union
+                  path:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  message:
+                    optional: false
+                    schema:
+                      kind: string
+  editing.media.completeUpload:
+    method: POST
+    path: /editing/media/uploads/:uploadId
+    statuses:
+      - 201
+      - 401
+      - 403
+      - 422
+    deprecated: false
+    responses:
+      "201":
+        kind: object
+        fields:
+          id:
+            optional: false
+            schema:
+              kind: string
+          url:
+            optional: false
+            schema:
+              kind: string
+          contentType:
+            optional: false
+            schema:
+              kind: string
+          size:
+            optional: false
+            schema:
+              kind: number
+          width:
+            optional: false
+            schema:
+              kind: number
+          height:
+            optional: false
+            schema:
+              kind: number
+          filename:
+            optional: false
+            schema:
+              kind: string
+          alt:
+            optional: false
+            schema:
+              kind: string
+          focalPoint:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                x:
+                  optional: false
+                  schema:
+                    kind: number
+                y:
+                  optional: false
+                  schema:
+                    kind: number
+          uploadedAt:
+            optional: false
+            schema:
+              kind: string
+          uploadedBy:
+            optional: false
+            schema:
+              kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "422":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          errors:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  code:
+                    optional: false
+                    schema:
+                      kind: union
+                  path:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+                  message:
+                    optional: false
+                    schema:
+                      kind: string
+  editing.whereUsed:
+    method: GET
+    path: /editing/refs/:brand/:id
+    statuses:
+      - 200
+      - 401
+      - 403
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          brand:
+            optional: false
+            schema:
+              kind: string
+          id:
+            optional: false
+            schema:
+              kind: string
+          pages:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  site:
+                    optional: false
+                    schema:
+                      kind: string
+                  path:
+                    optional: false
+                    schema:
+                      kind: string
+                  fieldPaths:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  editing.searchItems:
+    method: GET
+    path: /editing/items/:brand
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+      - 502
+    deprecated: false
+    query:
+      kind: object
+      fields:
+        q:
+          optional: true
+          schema:
+            kind: string
+        ids:
+          optional: true
+          schema:
+            kind: array
+            element:
+              kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          items:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  label:
+                    optional: false
+                    schema:
+                      kind: string
+                  image:
+                    optional: true
+                    schema:
+                      kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "502":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  invalidate:
+    method: POST
+    path: /invalidate
+    statuses:
+      - 200
+      - 401
+      - 403
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        relationship:
+          optional: false
+          schema:
+            kind: string
+        id:
+          optional: false
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          pages:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  mcp.endpoint:
+    method: POST
+    path: /mcp
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    body:
+      kind: unknown
+    responses:
+      "200":
+        kind: unknown
+  openApi.page:
+    method: GET
+    path: /docs
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    responses:
+      "200":
+        kind: string
+  openApi.json:
+    method: GET
+    path: /openapi.json
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    responses:
+      "200":
+        kind: unknown
+  cms.draft:
+    method: GET
+    path: /draft
+    statuses:
+      - 200
+    deprecated: false
+    hidden: true
+    query:
+      kind: object
+      fields:
+        redirect:
+          optional: true
+          schema:
+            kind: string
+        renew:
+          optional: true
+          schema:
+            kind: string
+        disable:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          expired:
+            optional: false
+            schema:
+              kind: boolean
+jobs: []
+tools:
+  editing.describe: editing_describe
+  editing.pages.list: editing_pages_list
+  editing.pages.getDraft: editing_pages_get_draft
+  editing.pages.updateDraft: editing_pages_update_draft
+  editing.pages.missingFields: editing_pages_missing_fields
+  editing.pages.history: editing_pages_history
+  editing.pages.publish: editing_pages_publish
+  editing.pages.rollback: editing_pages_rollback
+  editing.globals.getDraft: editing_globals_get_draft
+  editing.globals.updateDraft: editing_globals_update_draft
+  editing.globals.missingFields: editing_globals_missing_fields
+  editing.globals.history: editing_globals_history
+  editing.globals.publish: editing_globals_publish
+  editing.globals.rollback: editing_globals_rollback
+  editing.collections.listItems: editing_collections_list_items
+  editing.collections.createItem: editing_collections_create_item
+  editing.collections.deleteItem: editing_collections_delete_item
+  editing.collections.getDraft: editing_collections_get_draft
+  editing.collections.updateDraft: editing_collections_update_draft
+  editing.collections.missingFields: editing_collections_missing_fields
+  editing.collections.history: editing_collections_history
+  editing.collections.publish: editing_collections_publish
+  editing.collections.rollback: editing_collections_rollback
+  editing.media.list: editing_media_list
+  editing.media.get: editing_media_get
+  editing.media.update: editing_media_update
+  editing.whereUsed: editing_where_used
+  editing.searchItems: editing_search_items
+content:
+  collection:articles:
+    kind: collection
+    migration: 1
+    schema:
+      kind: object
+      fields:
+        title:
+          optional: false
+          schema:
+            kind: string
+        slug:
+          optional: false
+          schema:
+            kind: string
+        topic:
+          optional: false
+          schema:
+            kind: enum
+            values:
+              - guides
+              - news
+              - stories
+        excerpt:
+          optional: false
+          schema:
+            kind: string
+        cover:
+          optional: false
+          schema:
+            kind: object
+            fields:
+              id:
+                optional: false
+                schema:
+                  kind: string
+              alt:
+                optional: false
+                schema:
+                  kind: string
+              crop:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+                    width:
+                      optional: false
+                      schema:
+                        kind: number
+                    height:
+                      optional: false
+                      schema:
+                        kind: number
+              focalPoint:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+        body:
+          optional: false
+          schema:
+            kind: array
+            element:
+              kind: union
+        author:
+          optional: true
+          schema:
+            kind: string
+  collection:employees:
+    kind: collection
+    migration: 1
+    schema:
+      kind: object
+      fields:
+        name:
+          optional: false
+          schema:
+            kind: string
+        role:
+          optional: false
+          schema:
+            kind: string
+        department:
+          optional: false
+          schema:
+            kind: enum
+            values:
+              - design
+              - engineering
+              - sales
+              - support
+        email:
+          optional: true
+          schema:
+            kind: string
+        photo:
+          optional: true
+          schema:
+            kind: object
+            fields:
+              id:
+                optional: false
+                schema:
+                  kind: string
+              alt:
+                optional: false
+                schema:
+                  kind: string
+              crop:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+                    width:
+                      optional: false
+                      schema:
+                        kind: number
+                    height:
+                      optional: false
+                      schema:
+                        kind: number
+              focalPoint:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+        bio:
+          optional: true
+          schema:
+            kind: string
+        order:
+          optional: true
+          schema:
+            kind: number
+  global:site:
+    kind: global
+    migration: 0
+    schema:
+      kind: object
+      fields:
+        footerText:
+          optional: false
+          schema:
+            kind: string
+        contactEmail:
+          optional: false
+          schema:
+            kind: string
+  page:blogIndexPage:
+    kind: page
+    migration: 0
+    schema:
+      kind: object
+      fields:
+        heading:
+          optional: false
+          schema:
+            kind: string
+        intro:
+          optional: false
+          schema:
+            kind: string
+  page:contactPage:
+    kind: page
+    migration: 0
+    schema:
+      kind: object
+      fields:
+        heading:
+          optional: false
+          schema:
+            kind: string
+        intro:
+          optional: false
+          schema:
+            kind: string
+        buttonLabel:
+          optional: true
+          schema:
+            kind: string
+        contacts:
+          optional: true
+          schema:
+            kind: array
+            element:
+              kind: string
+        thanks:
+          optional: false
+          schema:
+            kind: string
+  page:frontPage:
+    kind: page
+    migration: 0
+    schema:
+      kind: object
+      fields:
+        hero:
+          optional: false
+          schema:
+            kind: object
+            fields:
+              heading:
+                optional: false
+                schema:
+                  kind: string
+              subheading:
+                optional: false
+                schema:
+                  kind: string
+              image:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    id:
+                      optional: false
+                      schema:
+                        kind: string
+                    alt:
+                      optional: false
+                      schema:
+                        kind: string
+                    crop:
+                      optional: true
+                      schema:
+                        kind: object
+                        fields:
+                          x:
+                            optional: false
+                            schema:
+                              kind: number
+                          y:
+                            optional: false
+                            schema:
+                              kind: number
+                          width:
+                            optional: false
+                            schema:
+                              kind: number
+                          height:
+                            optional: false
+                            schema:
+                              kind: number
+                    focalPoint:
+                      optional: true
+                      schema:
+                        kind: object
+                        fields:
+                          x:
+                            optional: false
+                            schema:
+                              kind: number
+                          y:
+                            optional: false
+                            schema:
+                              kind: number
+              cta:
+                optional: false
+                schema:
+                  kind: object
+                  fields:
+                    label:
+                      optional: false
+                      schema:
+                        kind: string
+                    href:
+                      optional: false
+                      schema:
+                        kind: string
+        featured:
+          optional: false
+          schema:
+            kind: array
+            element:
+              kind: string
+        articles:
+          optional: true
+          schema:
+            kind: array
+            element:
+              kind: string
+        seo:
+          optional: false
+          schema:
+            kind: object
+            fields:
+              title:
+                optional: false
+                schema:
+                  kind: string
+              description:
+                optional: false
+                schema:
+                  kind: string
+  page:teamPage:
+    kind: page
+    migration: 0
+    schema:
+      kind: object
+      fields:
+        heading:
+          optional: false
+          schema:
+            kind: string
+        intro:
+          optional: false
+          schema:
+            kind: string
+        photo:
+          optional: true
+          schema:
+            kind: object
+            fields:
+              id:
+                optional: false
+                schema:
+                  kind: string
+              alt:
+                optional: false
+                schema:
+                  kind: string
+              crop:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number
+                    width:
+                      optional: false
+                      schema:
+                        kind: number
+                    height:
+                      optional: false
+                      schema:
+                        kind: number
+              focalPoint:
+                optional: true
+                schema:
+                  kind: object
+                  fields:
+                    x:
+                      optional: false
+                      schema:
+                        kind: number
+                    y:
+                      optional: false
+                      schema:
+                        kind: number

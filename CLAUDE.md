@@ -50,6 +50,18 @@ Jobs (`k.jobs`) are the one non-HTTP-shaped concept. Settled; don't relitigate.
 
 Deliberate omissions: no first-party transports, no stored state, and no per-job cron generation. Retries, deduplication, and run history belong to the transport. An occurrence's dedupe key is `job@occurrenceISO`.
 
+# Content
+
+`content` on `defineConfig` takes a content provider, and `cms()` from `@kizunajs/cms` is the one Kizuna ships. Settled; don't relitigate.
+
+- The CMS is not a plugin. Its routes join the API's own in three groups: `content` for anyone reading published content, `editing` for editors and their agents, and `invalidate` for the app. They reach the clients, OpenAPI and MCP like any route, and an app route group with one of those names makes `defineConfig` throw.
+- Core owns a small contract in `content.ts`: the provider's documents (ref, kind, name, schema, latest migrate step), which the snapshot records and `kizuna diff` compares, and the reader `defineConfig` hands back as `kizuna.content`. A `published` event waits for its first listener.
+- The adapter supplies the runtime the reader needs: a tagged cache, revalidation, draft mode, cookies and not-found. `nextAdapter()` does, importing Next only when called so the CLI can load the config. Without a runtime, reads go uncached.
+- The CMS API serves draft mode itself at `/draft`, behind the editor identity, and sends a signed-out editor to `signInPath`. Drafts show only while a signed preview cookie verifies, and the preview renews it.
+- Things that live outside the CMS are relationships, made with `defineRelationship`. A page holds their ids and fetches what it shows of them; `options` feeds only the editor's picker, as the editor. The CMS does not edit them.
+- Globals, collections and relationships are exported in PascalCase, `Articles`, with a camelCase `name`, `articles`. Blocks take `name` like the rest.
+- Model names keep the `Cms` prefix, since Zod's global registry is shared by every config in one process.
+
 # Tools
 
 A tool is a route a model may call. Settled; don't relitigate.
@@ -202,6 +214,7 @@ When changing any exported function, type, or option in `packages/*/src/`, check
 - `pnpm typecheck:tests` typechecks every package's `src`, test files included. Each package's own tsconfig excludes them, so this is the only check that sees a type error in a test.
 - `pnpm build` rebuilds all packages. Required before typechecking after changing cross-package exports.
 - `pnpm --filter @kizunajs-demo/kotlin test` runs Kotlin end-to-end (starts express-demo, compiles the generated client, runs `./gradlew test`). Not part of `pnpm test`.
+- `pnpm --filter @kizunajs-demo/next e2e` runs the CMS preview in Playwright. It starts its own `next dev` on port 3031 with a fresh PGlite database on 5498 and its own `.next-e2e` folder, so it runs beside `pnpm dev` without touching its content. Not part of `pnpm test`.
 
 ## Compiling the Kotlin demo
 

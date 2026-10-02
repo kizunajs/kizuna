@@ -3,13 +3,14 @@ import { unwrapOptionalWrappers } from 'kizunajs/generator';
 import { assertFields, shapeOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
 
 /**
- * What {@link block} takes.
+ * What {@link defineBlock} takes.
  */
-export interface BlockDefinition<Slug extends string, Fields extends FieldList> {
+export interface BlockDefinition<Name extends string, Fields extends FieldList> {
     /**
-     * The block's name in the CMS, kebab-case: `hero`, `product-grid`.
+     * The block's name in the CMS, camelCase like every other name:
+     * `hero`, `productGrid`.
      */
-    slug: Slug;
+    name: Name;
     /**
      * The fields editors may change, in the order they are shown.
      */
@@ -17,7 +18,7 @@ export interface BlockDefinition<Slug extends string, Fields extends FieldList> 
 }
 
 /**
- * What {@link block} returns: a Zod object schema with one property per field.
+ * What {@link defineBlock} returns: a Zod object schema with one property per field.
  */
 export type BlockSchema<Fields extends FieldList> = z.ZodObject<ShapeOf<Fields>, z.core.$strip>;
 
@@ -25,13 +26,13 @@ export type BlockSchema<Fields extends FieldList> = z.ZodObject<ShapeOf<Fields>,
  * A block as the CMS reads it back off its schema.
  */
 export interface Block {
-    slug: string;
+    name: string;
     fields: FieldList;
 }
 
 const blocks = new WeakMap<z.core.$ZodType, Block>();
 
-const SLUG = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+const NAME = /^[a-z][A-Za-z0-9]*$/;
 
 /**
  * Define a reusable block: a group of fields a page uses as one of its own. The
@@ -39,8 +40,8 @@ const SLUG = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
  * schema, and the block's field rules and descriptions apply inside it.
  *
  * @example
- * export const HeroBlockSchema = block({
- *     slug: 'hero',
+ * export const HeroBlockSchema = defineBlock({
+ *     name: 'hero',
  *     fields: [
  *         {
  *             name: 'heading',
@@ -53,17 +54,17 @@ const SLUG = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
  *     ],
  * });
  */
-export const block = <const Slug extends string, const Fields extends FieldList>(
-    definition: BlockDefinition<Slug, Fields> & FieldsCheck<Fields>
+export const defineBlock = <const Name extends string, const Fields extends FieldList>(
+    definition: BlockDefinition<Name, Fields> & FieldsCheck<Fields>
 ): BlockSchema<Fields> => {
-    if (typeof definition.slug !== 'string' || !SLUG.test(definition.slug)) {
-        throw new Error(`block() has the slug '${String(definition.slug)}'. A slug is kebab-case, like 'hero' or 'product-grid'.`);
+    if (typeof definition.name !== 'string' || !NAME.test(definition.name)) {
+        throw new Error(`defineBlock() has the name '${String(definition.name)}'. A name is camelCase, like 'hero' or 'productGrid'.`);
     }
-    const owner = `block('${definition.slug}')`;
+    const owner = `defineBlock('${definition.name}')`;
     assertFields(definition.fields, owner);
     const schema = z.object(shapeOf(definition.fields));
     blocks.set(schema, {
-        slug: definition.slug,
+        name: definition.name,
         fields: definition.fields,
     });
     return schema as BlockSchema<Fields>;

@@ -10,7 +10,7 @@ import {
     toToolName,
     unwrapOptionalWrappers,
 } from 'kizunajs/generator';
-import { flattenRoutes } from 'kizunajs/adapter';
+import { contentOf, flattenRoutes } from 'kizunajs/adapter';
 import type { z } from 'zod';
 
 /**
@@ -73,6 +73,24 @@ export interface ApiSnapshot {
      * MCP tool name, keyed by the route key that publishes it.
      */
     tools: Record<string, string>;
+    /**
+     * Every page, global and collection `content` provides, keyed by its
+     * ref, for a config that has one.
+     */
+    content?: Record<string, ContentSnapshot>;
+}
+
+/**
+ * One kind of document editors change, as stored content is read against
+ * it.
+ */
+export interface ContentSnapshot {
+    kind: string;
+    /**
+     * The highest `migrate` step it declares.
+     */
+    migration: number;
+    schema: SchemaNode;
 }
 
 export interface SnapshotOptions {
@@ -198,10 +216,28 @@ export const toSnapshot = (api: ApiDefinition): ApiSnapshot => {
             .map(({ routeKey }) => [routeKey, toToolName(routeKey)])
     );
 
+    const documents = contentOf(api)?.provider.documents();
+
     return {
         routes: routeSnapshots(api),
         jobs,
         tools,
+        ...(documents === undefined
+            ? {}
+            : {
+                  content: Object.fromEntries(
+                      [...documents]
+                          .sort((left, right) => left.ref.localeCompare(right.ref))
+                          .map((document) => [
+                              document.ref,
+                              {
+                                  kind: document.kind,
+                                  migration: document.migration,
+                                  schema: toSchemaNode(document.schema),
+                              },
+                          ])
+                  ),
+              }),
     };
 };
 

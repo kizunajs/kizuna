@@ -3,6 +3,19 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 const DEV_SECRET = 'kizuna-cms-development-preview-secret';
 
 /**
+ * How long a preview token lasts.
+ */
+export const PREVIEW_TTL_SECONDS = 600;
+
+/**
+ * The cookie that holds a preview token while draft mode is on. Drafts show
+ * only while it verifies, and the preview overlay renews it through a route
+ * only a signed-in editor reaches, so drafts stop showing within minutes of
+ * the editor signing out.
+ */
+export const PREVIEW_COOKIE = 'kizuna-cms-preview';
+
+/**
  * The secret preview tokens are signed with: the plugin's `previewSecret`, or
  * `KIZUNA_CMS_PREVIEW_SECRET`. Production refuses to run without one.
  */
@@ -10,7 +23,7 @@ export const previewSecret = (configured: string | undefined): string => {
     const secret = configured ?? process.env['KIZUNA_CMS_PREVIEW_SECRET'];
     if (secret !== undefined && secret !== '') return secret;
     if (process.env['NODE_ENV'] === 'production') {
-        throw new Error('Set KIZUNA_CMS_PREVIEW_SECRET, or `previewSecret` on cmsPlugin. Draft mode tokens are signed with it.');
+        throw new Error('Set KIZUNA_CMS_PREVIEW_SECRET, or `previewSecret` on cms(). Draft mode is signed with it.');
     }
     return DEV_SECRET;
 };
@@ -22,7 +35,7 @@ const signature = (secret: string, payload: string): string => createHmac('sha25
 /**
  * A short-lived token that lets a signed-in editor enter draft mode.
  */
-export const signPreviewToken = (secret: string, ttlSeconds = 600, now = Date.now()): string => {
+export const signPreviewToken = (secret: string, ttlSeconds = PREVIEW_TTL_SECONDS, now = Date.now()): string => {
     const payload = encode(String(now + ttlSeconds * 1000));
     return `${payload}.${signature(secret, payload)}`;
 };

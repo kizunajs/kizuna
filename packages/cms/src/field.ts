@@ -33,6 +33,10 @@ export interface Field<Name extends string = string, Schema extends z.ZodType = 
      */
     name: Name;
     /**
+     * What editors see the field called. Without it, its name.
+     */
+    label?: string;
+    /**
      * What the value has to pass. The limits a designer sets here, `.max()`,
      * `.min()`, an enum, hold in the API, the tools and the inline editor alike.
      */
@@ -50,6 +54,17 @@ export interface Field<Name extends string = string, Schema extends z.ZodType = 
      * Editors and the agent see the field, and nothing writes it.
      */
     readOnly?: boolean;
+    /**
+     * For an enum, the label editors see for each value, so the stored value
+     * stays what code compares against.
+     *
+     * @example
+     * options: {
+     *     design: 'Design',
+     *     engineering: 'Engineering',
+     * },
+     */
+    options?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -118,7 +133,27 @@ export const assertFields = (fields: FieldList, owner: string): void => {
         if (!isZodSchema(field.schema)) {
             throw new Error(`${owner} gives the field '${field.name}' something other than a Zod schema.`);
         }
+        if (field.options !== undefined) {
+            const values = enumValuesOf(field.schema);
+            if (values === undefined) {
+                throw new Error(`${owner} gives the field '${field.name}' options, which only an enum takes.`);
+            }
+            for (const value of Object.keys(field.options)) {
+                if (!values.includes(value)) {
+                    throw new Error(`${owner} labels the option '${value}' of '${field.name}', which its enum does not have.`);
+                }
+            }
+        }
     }
+};
+
+/**
+ * The values of an enum, under any `.optional()` or `.default()`, or
+ * `undefined` for any other schema.
+ */
+const enumValuesOf = (schema: z.ZodType): string[] | undefined => {
+    const inner = unwrapOptionalWrappers(schema).inner as unknown as { options?: unknown; _zod?: { def?: { type?: string } } };
+    return inner._zod?.def?.type === 'enum' && Array.isArray(inner.options) ? inner.options.map(String) : undefined;
 };
 
 /**

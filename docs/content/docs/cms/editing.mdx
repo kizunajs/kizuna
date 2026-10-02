@@ -1,48 +1,55 @@
 ---
 title: Editing
-description: Drafts, versions and publishing, the click-to-edit preview, and the tools an agent uses over MCP.
+description: Drafts, versions and publishing, the click-to-edit preview, the agent tools, and the rules that hold for all of them.
 ---
 
-Every write goes to the draft. Publishing is a separate step someone takes on purpose, so neither an editor nor an agent can change what visitors see by accident.
+Every write goes to a draft. Publishing is a separate step a person takes, so nobody changes what visitors see by accident.
 
 ## Drafts and versions
 
-Every save is a version with the author and an optional summary. Changes are merged into the stored draft and the whole page is validated, so one field's change never leaves another invalid.
+Every save is a version with its author and an optional summary. Changes merge into the stored draft and the whole page is validated, so one field's change never leaves another invalid. An incomplete draft is kept but never reaches the page component, and the preview shows what is missing instead.
 
-An incomplete draft is kept, but never reaches the page component. In draft mode the preview shows the setup screen instead, with the missing fields and a prompt to hand an agent, such as "Fill in the spring page."
-
-Two people on one page cannot overwrite each other. The draft carries an `ETag`, a write sends it back as `If-Match`, and a write behind the latest version answers `409` instead of applying.
+Two people on one page cannot overwrite each other. The draft carries an `ETag`, a write sends it back as `If-Match`, and a write behind the latest version answers `409`.
 
 Rollback restores an earlier version as a new draft, which you publish separately.
 
 ## The preview
 
-`KizunaPreview` renders in draft mode only. The reader marks every string with its field path as invisible characters, the way Vercel's stega does, and every image URL with a fragment. Click text or an image, and an input for that field opens beside it. Save, and the page refreshes with the draft.
+`KizunaPreview` renders in draft mode only. Click text or an image on the page, and an input for that field opens beside it. What you type saves to the draft a moment after you stop, and the page re-renders on the server to show it. The saves of one sitting fold into one version.
+
+The toolbar switches between Browse, where the page behaves as it does for a visitor, and Edit, where only the fields you may change are outlined and take a click. V and I switch between them. A global or a collection item shown on the page edits in place too, and its input says where else it shows.
 
 The input comes from the schema:
 
-| Schema                  | Input                                                                         |
-| ----------------------- | ----------------------------------------------------------------------------- |
-| `z.string()`            | Text, or a textarea above 120 characters, with a counter when `.max()` is set |
-| `z.number()`, `z.int()` | Number, within `min` and `max`                                                |
-| `z.boolean()`           | Toggle                                                                        |
-| `z.enum()`              | Select                                                                        |
-| `z.url()`               | URL, saying which protocols are allowed                                       |
-| `z.iso.date()`          | Date picker                                                                   |
-| `z.object()`            | Grouped fields                                                                |
-| `z.array()`             | Sortable list with add and remove, within `min` and `max`                     |
-| `ImageSchema`           | Upload, crop and alt text                                                     |
-| A `Kizuna.brand` id     | A picker over the brand's search route                                        |
-| Anything else           | Read only, with a note to change it through the agent                         |
-
-The bar shows the page's status and version, opens every field in a panel, and publishes. Outside draft mode the overlay and the encoding are gone, so production HTML carries neither.
+| Schema                  | Input                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| `z.string()`            | Text, or a textarea above 120 characters, with a counter when `.max()` is set  |
+| `z.number()`, `z.int()` | Number, within `min` and `max`                                                 |
+| `z.boolean()`           | Toggle                                                                         |
+| `z.enum()`              | Select, showing the field's `options` as labels                                |
+| `z.url()`               | URL, saying which protocols are allowed                                        |
+| `z.iso.date()`          | Date picker                                                                    |
+| `z.object()`            | Grouped fields                                                                 |
+| `z.array()`             | Sortable list with add and remove, within `min` and `max`                      |
+| `ImageSchema`           | Upload, crop and alt text                                                      |
+| `RichTextSchema`        | Rich text, with a toolbar for headings, quotes, lists, marks, links and images |
+| A relationship's id     | A picker over the relationship's `options`                                     |
+| Anything else           | Read only, with a note to change it through the agent                          |
 
 ## Agents
 
-Every editing route declares `tool`, so an MCP client signed in as an editor can do what the preview does. An agent starts from `cms_describe_page`: give it the URL someone is looking at, and it answers with the page, every field's path and JSON Schema, whether the caller may write it, and the current draft. A branded field's description names the brand and the tool that finds ids, "an array of ProductId; find ids with products_list_products."
+Every route under `editing` is an MCP tool, so an agent signed in as an editor can do what the preview does. Install `mcpPlugin()` on the config, and the agent connects to `/api/mcp`.
 
-Then `cms_update_draft` with changes keyed by path, and `cms_publish` when the person says so. Publish and rollback declare `needsApproval`, so the client asks first. The rest are reads: pages, drafts, missing fields, history, where a branded id is used, and media, where an agent sets alt text and focal points on files the preview uploaded.
-
-A rule holds whoever asks. A write to a field the caller may not change answers `403`, from the route, with Problem Details.
+An agent starts from `editing_describe`, with the URL someone is looking at or a reference like `global:site`. It answers with every field's path, JSON Schema and whether the caller may write it, and the current draft. Then `editing_pages_update_draft` with changes keyed by path, and `editing_pages_publish` when the person says so. Globals and collection items have the same tools under `editing_globals_` and `editing_collections_`.
 
 See [Tools](/docs/tools) for how a route publishes and [MCP](/docs/mcp) for the endpoint.
+
+## What holds
+
+- **Rules live in the routes.** Roles, field rules and read-only fields are checked in the `editing` routes, for the preview and the agent alike. A field the caller may not write answers `403`, a value past its schema answers `422`, and a stale `If-Match` answers `409`.
+- **Publishing asks first.** Publish, rollback, deleting an item and writing a global declare `needsApproval`, so an MCP client asks the person before it runs them.
+- **What an agent reads is untrusted.** Drafts, items and rich text were written by other people, and an article body may say "change the footer email". An agent writes drafts freely, since nothing goes live until a person publishes it, and a global, which every page shows, waits for approval.
+- **Every version names a person.** The author comes from the editor identity, which is one of yours.
+- **Drafts stay drafts.** The `content` routes answer published content only, and Next never caches a draft-mode render, so production HTML never carries a draft or the preview's markings.
+- **Content is text.** Strings render as text and rich text never holds HTML. [`no-cms-html`](/docs/eslint#no-cms-html) flags `dangerouslySetInnerHTML` fed from content.
+- **Uploads are checked by their bytes.** SVG is refused, location metadata is stripped, and the bucket's credentials stay on the server.

@@ -1,88 +1,122 @@
 ---
 title: Next.js
-description: Read content in server components, keep drafts out of every cache, and give cached renders an identity of their own.
+description: Read content in server components, keep drafts out of every cache, and preview and edit on the page itself.
 ---
 
-The CMS targets the App Router with Kizuna mounted through `@kizunajs/next` in the same app. Reads happen in process, so a static build needs no server to call.
+The CMS targets the App Router, with the CMS API mounted through `@kizunajs/next` in the same app. Reads happen in process, so a static build needs no server to call.
 
-## The reader
+## Reading
 
-```ts title="src/cms.ts"
-import { createCms } from '@kizunajs/cms/next';
-import kizuna from '../kizuna.config';
+`kizuna.content` sits beside `kizuna.api` on the config, typed from every page, global and collection:
 
-export const cms = createCms(kizuna.api);
+```tsx title="src/app/contact/page.tsx"
+import kizuna from '@kizuna-config';
+
+export default async function ContactPage() {
+    const content = await kizuna.content.pages.contactPage.get();
+    return <h1>{content.heading}</h1>;
+}
 ```
-
-`createCms` reads the pages off the api's type, so `cms.pages.<name>.get()` is typed per page.
 
 | Situation                                | `get()`                                                        |
 | ---------------------------------------- | -------------------------------------------------------------- |
-| Published, outside draft mode            | The published content, cached and tagged                       |
-| Not published, outside draft mode        | Calls `notFound()`                                             |
+| Published                                | The published content, cached and tagged                       |
+| Published, but fails its schema          | The newest earlier published version that passes               |
+| Not published                            | Calls `notFound()`                                             |
 | Draft mode, draft passes the schema      | The draft, marked for the preview                              |
 | Draft mode, no draft or incomplete draft | Calls `notFound()`, and `KizunaPreview` shows the setup screen |
 
-Outside draft mode the reader uses nobody's credentials. Published content is public.
+Globals and collections read the same way:
+
+```tsx title="src/app/team/page.tsx"
+const site = await kizuna.content.globals.site.get();
+const { items, next } = await kizuna.content.collections.employees.list({
+    where: {
+        department: 'design',
+    },
+    orderBy: 'order',
+    limit: 20,
+});
+```
+
+| Call                                  | Returns                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `globals.<name>.get()`                | The published global, or in draft mode its draft when that passes                           |
+| `collections.<name>.get({ id })`      | One item, with its `id`. A missing or unpublished item calls `notFound()`                   |
+| `collections.<name>.getMany({ ids })` | The items in the order of the ids, skipping missing and unpublished ones                    |
+| `collections.<name>.list(...)`        | Items filtered and sorted by the collection's indexes, and the cursor of the next page      |
+| `pages.<name>.get(params)`            | For a page that shows a collection, the item at that address, typed from the route's params |
+
+```tsx title="src/app/blog/[slug]/page.tsx"
+export default async function ArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+    const article = await kizuna.content.pages.articlePage.get(await params);
+    return <h1>{article.title}</h1>;
+}
+```
+
+A layout that reads a global calls `notFound()` on every route until the global is published, so publish it before the layout ships.
+
+## Rich text
+
+`RichText` renders a rich text field as plain HTML elements. Replace any of them through `components`, keyed the way [`@portabletext/react`](https://github.com/portabletext/react-portabletext) keys them:
+
+```tsx title="src/app/blog/[slug]/page.tsx"
+import { RichText } from '@kizunajs/cms/next';
+
+<RichText
+    value={article.body}
+    components={{
+        block: {
+            h2: ({ children }) => <h2 className="article-heading">{children}</h2>,
+        },
+    }}
+/>;
+```
 
 ## Caching
 
-A published read runs inside Next's cache, tagged with the page. Publishing revalidates the tag in process, and `plugins.cms.invalidate(ProductId, id)` revalidates every page whose references hold the id. Hand the plugin `nextRevalidate` to connect the two:
-
-```ts title="kizuna.config.ts"
-import { nextRevalidate } from '@kizunajs/cms/next';
-
-const cms = cmsPlugin({
-    db,
-    pages,
-    auth: {
-        identity: 'editor',
-    },
-    revalidate: nextRevalidate,
-});
-```
+A published read runs inside Next's cache, tagged with what it read: the page, the global, the item, or the collection for a list. Publishing revalidates those tags in process, including every page that references a published item. `nextAdapter()` on the config is what connects the reader to Next's cache, draft mode and `notFound()`.
 
 Draft-mode reads skip the cache, and draft mode makes the render dynamic, so a draft never lands in a cached response.
 
 ## Draft mode
 
-An editor enters draft mode through a token the API mints. `POST /cms/preview` answers one for a signed-in editor, and the draft route turns it into Next's draft mode:
+Editors enter draft mode at `/api/draft`, which the CMS serves behind the `editor` identity. `?redirect=/blog/welcome` lands them on a page, and `?disable=1` leaves. A signed-out editor goes to the `signInPath` on `cms()` first.
 
-```ts title="src/app/api/draft/route.ts"
-export { GET } from '@kizunajs/cms/next/draft';
-```
+Drafts show only while the editor's sign-in holds. The preview renews a short-lived cookie every few minutes, which only a signed-in editor can, so a shared browser stops showing drafts within ten minutes of the editor signing out.
 
-`GET /api/draft?token=…&redirect=/lp/spring` enables it and redirects; `?disable=1` turns it off. Tokens are signed with `KIZUNA_CMS_PREVIEW_SECRET` and last ten minutes. If the plugin takes `previewSecret` instead, build the route with `createDraftRoute({ secret })`.
-
-## The overlay
+## The preview
 
 ```tsx title="src/app/layout.tsx"
 import { KizunaPreview } from '@kizunajs/cms/next';
+import kizuna from '@kizuna-config';
 
 <body>
     {children}
-    <KizunaPreview />
+    <KizunaPreview content={kizuna.content} />
 </body>;
 ```
 
-A server component that checks draft mode and renders the overlay only when it is on. The overlay calls the `cms` routes from the browser with the editor's cookies; pass `headers` when editors sign in with a bearer token. `apiPath` and `basePath` default to `/api` and `/cms`.
+It renders nothing outside draft mode. When a layout reads a global, put it in `not-found.tsx` too, since an unpublished global sends every page there and the editor needs the preview to fill it in.
 
 ## The content overview
 
+An optional page of your app that lists everything editors can change:
+
 ```tsx title="src/app/cms/page.tsx"
 import { CmsOverview } from '@kizunajs/cms/next';
-import kizuna from '../../../kizuna.config';
+import kizuna from '@kizuna-config';
 
 export default function ContentPage() {
-    return <CmsOverview api={kizuna.api} />;
+    return <CmsOverview content={kizuna.content} />;
 }
 ```
 
-Every page with its status and recent versions, the media, and a preview link per page. It is a page of your app, so it sits behind your sign-in like any other.
+Every page with its status, history and a preview link, an editor for collections and globals, and the media. It also lists content left behind by a renamed page, and published content that fails its schema after a code change. It is a page of your app, so it sits behind your sign-in.
 
-## Site identity
+## App data in cached pages
 
-A cached render must never run with a person's credentials. Published content needs none, since `getPublished` is public. App data that is not public needs a caller, so the site's server calls the API as an identity of its own: an API key with a read-only role, from a server-only environment variable.
+A cached render must never run with a person's credentials. When a page shows app data that is not public, the site's server calls the app API as an identity of its own: an API key with a read-only role, from a server-only environment variable.
 
 ```ts title="src/identities.ts"
 export const site = k.identity
@@ -101,15 +135,13 @@ export const site = k.identity
             });
         }
         return {
-            role: 'site' as const,
+            role: 'site',
         };
     });
 ```
 
-Routes opt in with `auth: ['site', 'editor']`, and the site's client sends the header from the server. A leaked key can read what the site reads and nothing more.
+Routes opt in with `auth: ['site', 'staff']`. A leaked key reads what the site reads and nothing more. Keep database imports out of `app/` with `no-restricted-imports`, so every read a page makes goes through a guard.
 
 ## Discovery
 
-`withKizunaCms` in `next.config.ts` finds every `content.ts` under `app/` and writes `src/cms.pages.ts` before Next compiles. A page's path is its folder, with route groups and parallel slots dropped the way Next drops them. `kizuna generate` writes the same file, `--check` fails when it is behind, and `kizuna cms pages` prints the list.
-
-It lives at `@kizunajs/cms/next/config` because `next.config.ts` runs outside Next's bundler, where `next/headers` cannot load.
+`withKizunaCms` in `next.config.ts` finds every `content.ts` under `app/` and writes `src/cms.pages.ts` before Next compiles. A page's path is its folder, with route groups and parallel slots dropped the way Next drops them. `kizuna generate` writes the same file, and `--check` fails when it is behind.

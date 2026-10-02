@@ -24,7 +24,7 @@ describe('DocumentStore', () => {
     it('creates a document on the first draft and records a version', async () => {
         const saved = await store.saveDraft({
             kind: 'page',
-            key: '/lp/spring',
+            key: '/',
             draft: {
                 heading: 'Spring',
             },
@@ -46,7 +46,7 @@ describe('DocumentStore', () => {
     it('refuses a write behind the latest version and keeps the newer one', async () => {
         const first = await store.saveDraft({
             kind: 'page',
-            key: '/lp/spring',
+            key: '/',
             draft: {
                 heading: 'One',
             },
@@ -54,53 +54,138 @@ describe('DocumentStore', () => {
         });
         await store.saveDraft({
             kind: 'page',
-            key: '/lp/spring',
+            key: '/',
             draft: {
                 heading: 'Two',
             },
             author: 'grace',
-            ifMatch: first.version,
+            ifMatch: {
+                version: first.version,
+            },
         });
         await expect(
             store.saveDraft({
                 kind: 'page',
-                key: '/lp/spring',
+                key: '/',
                 draft: {
                     heading: 'Stale',
                 },
                 author: 'ada',
-                ifMatch: first.version,
+                ifMatch: {
+                    version: first.version,
+                },
             })
         ).rejects.toBeInstanceOf(VersionConflictError);
-        expect((await store.get('page', '/lp/spring'))?.draft).toEqual({
+        expect((await store.get('page', '/'))?.draft).toEqual({
             heading: 'Two',
         });
         expect(await store.latestVersion(first.document.id)).toBe(2);
     });
 
-    it('publishes the draft at its version and leaves later drafts unpublished', async () => {
-        await store.saveDraft({
+    it('folds a save into the recent unpublished version of the same author', async () => {
+        const first = await store.saveDraft({
             kind: 'page',
-            key: '/lp/spring',
+            key: '/',
             draft: {
                 heading: 'One',
             },
             author: 'ada',
         });
-        const published = await store.publish('page', '/lp/spring', 'ada');
+        const folded = await store.saveDraft({
+            kind: 'page',
+            key: '/',
+            draft: {
+                heading: 'One, edited',
+            },
+            author: 'ada',
+            fold: 60_000,
+        });
+        expect(folded.version).toBe(first.version);
+        expect((await store.version(first.document.id, 1))?.data).toEqual({
+            heading: 'One, edited',
+        });
+        const other = await store.saveDraft({
+            kind: 'page',
+            key: '/',
+            draft: {
+                heading: 'Grace',
+            },
+            author: 'grace',
+            fold: 60_000,
+        });
+        expect(other.version).toBe(2);
+        await store.publish('page', '/', 'grace');
+        const afterPublish = await store.saveDraft({
+            kind: 'page',
+            key: '/',
+            draft: {
+                heading: 'After',
+            },
+            author: 'grace',
+            fold: 60_000,
+        });
+        expect(afterPublish.version).toBe(3);
+    });
+
+    it('refuses a write whose save time is behind, even at the same version', async () => {
+        const first = await store.saveDraft({
+            kind: 'page',
+            key: '/',
+            draft: {
+                heading: 'One',
+            },
+            author: 'ada',
+        });
+        const savedAt = first.document.updatedAt.getTime();
+        await store.saveDraft({
+            kind: 'page',
+            key: '/',
+            draft: {
+                heading: 'Other tab',
+            },
+            author: 'ada',
+            fold: 60_000,
+        });
+        await expect(
+            store.saveDraft({
+                kind: 'page',
+                key: '/',
+                draft: {
+                    heading: 'Stale tab',
+                },
+                author: 'ada',
+                fold: 60_000,
+                ifMatch: {
+                    version: 1,
+                    savedAt,
+                },
+            })
+        ).rejects.toBeInstanceOf(VersionConflictError);
+    });
+
+    it('publishes the draft at its version and leaves later drafts unpublished', async () => {
+        await store.saveDraft({
+            kind: 'page',
+            key: '/',
+            draft: {
+                heading: 'One',
+            },
+            author: 'ada',
+        });
+        const published = await store.publish('page', '/', 'ada');
         expect(published?.published).toEqual({
             heading: 'One',
         });
         expect(published?.publishedVersion).toBe(1);
         await store.saveDraft({
             kind: 'page',
-            key: '/lp/spring',
+            key: '/',
             draft: {
                 heading: 'Two',
             },
             author: 'ada',
         });
-        const row = await store.get('page', '/lp/spring');
+        const row = await store.get('page', '/');
         expect(row?.published).toEqual({
             heading: 'One',
         });
@@ -116,7 +201,7 @@ describe('DocumentStore', () => {
     it('rebuilds the refs index on every save and answers where-used', async () => {
         const saved = await store.saveDraft({
             kind: 'page',
-            key: '/lp/spring',
+            key: '/',
             draft: {
                 featured: ['prod_1', 'prod_2'],
             },
@@ -142,7 +227,7 @@ describe('DocumentStore', () => {
         ]);
         await store.saveDraft({
             kind: 'page',
-            key: '/lp/spring',
+            key: '/',
             draft: {
                 featured: ['prod_1'],
             },
@@ -161,7 +246,7 @@ describe('DocumentStore', () => {
     it('reads one version back with its data', async () => {
         const saved = await store.saveDraft({
             kind: 'page',
-            key: '/lp/spring',
+            key: '/',
             draft: {
                 heading: 'One',
             },

@@ -1,0 +1,153 @@
+---
+title: The CMS API
+description: The CMS runs as an API of its own beside the app API, with its own editors, client and MCP endpoint, and serves one Next.js app or several.
+---
+
+A site with only content needs one config. When the site has an app API too, like a shop's products and orders, give the CMS a config of its own, so editors and content tools never mix with the app's routes, clients and MCP tools:
+
+```ts title="kizuna.cms.config.ts"
+export default defineConfig({
+    adapter: nextAdapter(),
+    auth: {
+        identities: {
+            editor,
+            app,
+        },
+    },
+    content: cms({
+        db,
+        pages,
+        auth: {
+            identity: 'editor',
+            invalidate: 'app',
+        },
+        apiPath: '/cms-api',
+        signInPath: '/login',
+    }),
+});
+```
+
+Mount it at `apiPath`, in `src/app/cms-api/[...kizuna-cms]/route.ts`, and point `@kizuna-config` at `kizuna.cms.config.ts`, since that is the config pages read content from. Editors enter draft mode at `/cms-api/draft`.
+
+## The client
+
+The CMS routes come in three groups, one for each kind of caller:
+
+| Group        | Called by                | What it holds                                                                 |
+| ------------ | ------------------------ | ----------------------------------------------------------------------------- |
+| `content`    | Anyone                   | Published pages, globals, collection items and images                         |
+| `editing`    | Editors and their agents | Drafts, publishing, versions, media, describe, where-used, search and preview |
+| `invalidate` | The app                  | Refreshing the pages that show an id the app changed                          |
+
+Generate a client from the CMS config, and a frontend that reads the front page finds it under `content`:
+
+```ts title="kizuna.cms.config.ts"
+clients: [
+    fetchClient({
+        output: './src/lib/cms-client.generated.ts',
+    }),
+],
+```
+
+```ts title="src/lib/front-page.ts"
+const result = await cmsClient.content.pages.frontPage();
+```
+
+`kizuna.content.pages.frontPage.get()` in process and `cmsClient.content.pages.frontPage()` over HTTP read the same content by the same path.
+
+## What stays apart
+
+- **Identities.** `editor` lives on the CMS config, so an app route that names it fails to compile. When a [relationship's](/docs/cms/content#relationships) `options` calls a route that is not public, the editor also needs an identity on the app API, since `options` runs as them.
+- **MCP.** An editor's agent connects to `/cms-api/mcp` and sees content tools alone.
+- **Clients and OpenAPI.** Each API generates its own. A mobile app gets the app client, and the site uses both.
+- **Shared ids.** Ids both sides use, like `ProductId`, live in a module both configs import.
+
+## Talking to the app
+
+When the app changes a product, it calls `invalidate` through the CMS client, and every page that shows the product refreshes. The route answers the identity `auth.invalidate` names, here `app`, an API key only the app's server holds:
+
+```ts title="src/routes/products.ts"
+.handler(async ({ params, body }) => {
+    const product = await renameProduct(params.id, body.name);
+    await cmsClient.invalidate({
+        body: {
+            relationship: 'products',
+            id: params.id,
+        },
+    });
+
+    return {
+        status: 200,
+        body: product,
+    };
+}),
+```
+
+## Images
+
+Files live in an S3 bucket, so any S3-compatible store works. Point the CMS at yours with environment variables:
+
+| Variable                   | What it is                                                                          |
+| -------------------------- | ----------------------------------------------------------------------------------- |
+| `CMS_S3_BUCKET`            | The bucket                                                                          |
+| `CMS_S3_ENDPOINT`          | The store's S3 endpoint for Supabase Storage, Cloudflare R2 or MinIO. Unset for AWS |
+| `CMS_S3_REGION`            | `auto` for R2, your project's region for Supabase, the bucket's for AWS             |
+| `CMS_S3_ACCESS_KEY_ID`     | Falls back to the SDK's own lookup                                                  |
+| `CMS_S3_SECRET_ACCESS_KEY` | Falls back to the SDK's own lookup                                                  |
+
+The same names go under `media` on `cms()`. The bucket can stay private: browsers upload through a presigned URL and read through `GET /content/media/:id/image`, which renders the crop and caches for a year. Without a bucket, development keeps files in memory and production refuses to start.
+
+Uploads are checked by their bytes, never their name. SVG is refused, location metadata is stripped, and files over ten megabytes are refused unless `media.maxBytes` says otherwise.
+
+## Several sites
+
+When several Next.js apps share one CMS, like a main site and a campaign site, list each under `sites`, with its generated pages module and its `app` directory:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+content: cms({
+    db,
+    sites: {
+        web: {
+            pages: webPages,
+            app: '../../apps/web/src/app',
+        },
+        campaign: {
+            pages: campaignPages,
+            app: '../../apps/campaign/src/app',
+        },
+    },
+    globals: [Footer],
+    collections: [Articles],
+    auth: {
+        identity: 'editor',
+    },
+}),
+```
+
+Each site's pages are stored apart, so both apps can have a `frontPage`. Globals and collections are shared. An app reads its own site:
+
+```ts title="apps/web/src/content.ts"
+import kizuna from '@acme/content/kizuna.cms.config';
+
+export const content = kizuna.content.sites.web;
+```
+
+Pages call `content.pages.frontPage.get()`, and `<KizunaPreview content={content} />` knows which site it is on.
+
+## Deployment
+
+Most projects mount both APIs in one Next.js app. A sensitive project can run the CMS API as an app of its own instead: the CMS client's `baseUrl` moves, and `revalidate` on `cms()` calls a route on the site that runs `revalidateTag`.
+
+Either way the content stays in the app's database. Connect the CMS as a role that reaches only its tables, so a CMS bug cannot reach app data:
+
+```sql
+create role cms_editor login password '…';
+grant select, insert, update, delete on cms_documents, cms_versions, cms_refs to cms_editor;
+```
+
+Each config generates on its own. The app imports the CMS client, so the CMS goes first:
+
+```sh
+kizuna generate --config kizuna.cms.config.ts
+kizuna generate
+```

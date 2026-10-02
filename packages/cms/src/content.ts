@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { readMetaBrand, readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { readBlock } from './block.js';
 import { fieldDescription, type Field, type FieldAuth, type FieldList } from './field.js';
-import type { Page } from './page.js';
+import type { ContentDefinition } from './definitions.js';
 import type { Ref } from './storage/store.js';
 
 /**
@@ -13,6 +13,10 @@ export interface DescribedField {
     path: string;
     name: string;
     label: string | undefined;
+    /**
+     * For an enum, the label of each value.
+     */
+    options: Readonly<Record<string, string>> | undefined;
     description: string | undefined;
     auth: FieldAuth | undefined;
     readOnly: boolean;
@@ -24,27 +28,27 @@ export interface DescribedField {
     fields: DescribedField[] | undefined;
 }
 
-const describe = (field: Field, parentPath: string, labels: Readonly<Record<string, string | undefined>> | undefined): DescribedField => {
+const describe = (field: Field, parentPath: string): DescribedField => {
     const path = parentPath === '' ? field.name : `${parentPath}.${field.name}`;
     const block = readBlock(field.schema);
     return {
         path,
         name: field.name,
-        label: labels?.[field.name],
+        label: field.label,
+        options: field.options,
         description: fieldDescription(field),
         auth: field.auth,
         readOnly: field.readOnly === true,
         schema: field.schema,
-        block: block?.slug,
-        fields: block === undefined ? undefined : block.fields.map((inner) => describe(inner, path, undefined)),
+        block: block?.name,
+        fields: block === undefined ? undefined : block.fields.map((inner) => describe(inner, path)),
     };
 };
 
 /**
  * Every field of a page, with the fields of each block inside it.
  */
-export const describeFields = (page: Page): DescribedField[] =>
-    page.fields.map((field) => describe(field, '', page.labels as Readonly<Record<string, string | undefined>> | undefined));
+export const describeFields = (page: ContentDefinition): DescribedField[] => page.fields.map((field) => describe(field, ''));
 
 /**
  * The chain of fields a dotted path crosses, from the page's own field down
@@ -143,7 +147,7 @@ const collectRefs = (schema: z.core.$ZodType, value: unknown, path: string, into
  * Every branded id a document holds, with the field path it sits at. Rebuilt
  * on every save, so `cms_refs` always mirrors the content.
  */
-export const refsOf = (page: Page, content: Record<string, unknown>): Ref[] => {
+export const refsOf = (page: ContentDefinition, content: Record<string, unknown>): Ref[] => {
     const refs: Ref[] = [];
     for (const field of page.fields) collectRefs(field.schema, content[field.name], field.name, refs);
     return refs;
@@ -152,21 +156,28 @@ export const refsOf = (page: Page, content: Record<string, unknown>): Ref[] => {
 /**
  * The migration steps a stored document still has to run, in order.
  */
-export const pendingMigrations = (page: Page, migrationVersion: number): Array<[number, NonNullable<Page['migrate']>[number]]> =>
+export const pendingMigrations = (
+    page: ContentDefinition,
+    migrationVersion: number
+): Array<[number, NonNullable<ContentDefinition['migrate']>[number]]> =>
     Object.entries(page.migrate ?? {})
-        .map(([version, step]) => [Number(version), step] as [number, NonNullable<Page['migrate']>[number]])
+        .map(([version, step]) => [Number(version), step] as [number, NonNullable<ContentDefinition['migrate']>[number]])
         .filter(([version]) => version > migrationVersion)
         .sort(([left], [right]) => left - right);
 
 /**
  * The highest migration step a page declares, or 0.
  */
-export const latestMigration = (page: Page): number => Math.max(0, ...Object.keys(page.migrate ?? {}).map(Number));
+export const latestMigration = (page: ContentDefinition): number => Math.max(0, ...Object.keys(page.migrate ?? {}).map(Number));
 
 /**
  * Runs every pending step over a copy of the content.
  */
-export const migrateContent = (page: Page, content: Record<string, unknown>, migrationVersion: number): Record<string, unknown> => {
+export const migrateContent = (
+    page: ContentDefinition,
+    content: Record<string, unknown>,
+    migrationVersion: number
+): Record<string, unknown> => {
     let current = content;
     for (const [, step] of pendingMigrations(page, migrationVersion)) current = step(current);
     return current;
@@ -176,7 +187,7 @@ export const migrateContent = (page: Page, content: Record<string, unknown>, mig
  * The top-level fields a draft is missing or fails, as the setup screen lists
  * them.
  */
-export const missingFields = (page: Page, draft: Record<string, unknown> | null): string[] => {
+export const missingFields = (page: ContentDefinition, draft: Record<string, unknown> | null): string[] => {
     const result = page.schema.safeParse(draft ?? {});
     if (result.success) return [];
     const missing = new Set<string>();

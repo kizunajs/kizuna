@@ -1,9 +1,11 @@
 import sharp, { type Metadata } from 'sharp';
 
+export type ImageFormat = 'jpeg' | 'png' | 'webp' | 'gif' | 'avif';
+
 /**
  * The image types the CMS accepts, by what sharp reads from the bytes.
  */
-const ACCEPTED = {
+const ACCEPTED: Record<ImageFormat, { contentType: string; extension: string }> = {
     jpeg: {
         contentType: 'image/jpeg',
         extension: 'jpg',
@@ -24,14 +26,12 @@ const ACCEPTED = {
         contentType: 'image/avif',
         extension: 'avif',
     },
-} as const;
-
-export type ImageFormat = keyof typeof ACCEPTED;
+};
 
 export interface InspectedImage {
     format: ImageFormat;
-    contentType: (typeof ACCEPTED)[ImageFormat]['contentType'];
-    extension: (typeof ACCEPTED)[ImageFormat]['extension'];
+    contentType: string;
+    extension: string;
     width: number;
     height: number;
     /**

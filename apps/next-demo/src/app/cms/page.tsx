@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { CmsOverview } from '@kizunajs/cms/next';
-import kizuna from '../../../kizuna.config';
+import kizuna from '@kizuna-config';
 import { auth } from '../../auth';
 import { signOut } from '../login/actions';
 
@@ -34,7 +34,7 @@ export default async function ContentPage() {
                     <button type="submit">Sign out</button>
                 </form>
             </header>
-            <CmsOverview api={kizuna.api} />
+            <CmsOverview content={kizuna.content} />
             <section
                 style={{
                     maxWidth: '64rem',
@@ -56,7 +56,7 @@ export default async function ContentPage() {
                         overflow: 'auto',
                         fontSize: '0.8rem',
                     }}>
-                    {`claude mcp add --transport http kizuna-demo ${origin}/api/mcp --header "Authorization: Bearer ${found.session.token}"`}
+                    {`claude mcp add --transport http kizuna-demo ${origin}/cms-api/mcp --header "Authorization: Bearer ${found.session.token}"`}
                 </pre>
             </section>
         </>

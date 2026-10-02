@@ -1,11 +1,4 @@
 import { z } from 'zod';
-import { Kizuna } from 'kizunajs';
-
-/**
- * A product in the shop. Branded, so a page that lists products stores ids
- * the CMS can index and check.
- */
-export const ProductId = Kizuna.brand('ProductId', z.string());
 
 /**
  * The limits here are design rules: a heading that fits the hero on one line,

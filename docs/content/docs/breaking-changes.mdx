@@ -117,6 +117,24 @@ A breaking change blocks the pull request until someone adds the `breaking chang
 
 A rename is spotted by matching a departed key against an arrived one on the same method and path, so it reads as one breaking change rather than a removal and an addition. Renaming `users.patchUser` to `users.updateUser` leaves the method, the path and every schema alone, and still changes the client method, the MCP tool name, and the method names in the generated Swift and Kotlin clients.
 
+## Content
+
+With [`content`](/docs/config#content) on the config, the snapshot records every page, global and collection with its schema and its latest `migrate` step. Stored content outlives the code that declared it, so a change the stored copies cannot read is breaking even though no caller sees it:
+
+| Change                                                        | Level    |
+| ------------------------------------------------------------- | -------- |
+| A required field added, with no default and no `migrate` step | breaking |
+| A field's type changed, with no `migrate` step                | breaking |
+| A page, global or collection removed                          | breaking |
+| A `migrate` step added                                        | changed  |
+| A field removed                                               | changed  |
+
+```
+BREAKING page:frontPage subheading is now required, with no default and no migrate step
+```
+
+A `migrate` step in the same change settles the first two, since it says what the stored copies become. Content is always compared, like routes. A removed page usually means a renamed one, and [`kizuna cms rename-page`](/docs/cms/cli#kizuna-cms-rename-page) moves its content.
+
 ## Schemas, where direction decides everything
 
 A caller sends requests and reads responses, so tightening an input and dropping an output are the two that hurt.
@@ -124,7 +142,6 @@ A caller sends requests and reads responses, so tightening an input and dropping
 | Change                     | Request      | Response     |
 | -------------------------- | ------------ | ------------ |
 | A required field added     | **breaking** | changed      |
-| An optional field added    | quiet        | changed      |
 | A field removed            | changed      | **breaking** |
 | An optional field required | **breaking** | changed      |
 | A type changed             | **breaking** | **breaking** |

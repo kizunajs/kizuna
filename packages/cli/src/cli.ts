@@ -5,7 +5,7 @@ import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ConfigSyntaxError, generateConfigTypes } from './generate-types.js';
 import { checkFiles, formatStale, writeFiles } from './generate-clients.js';
-import { loadConfig, resolvePluginCli } from './load-config.js';
+import { loadConfig, preparePlugins, resolvePluginCli } from './load-config.js';
 import { formatRoutes, routeMap } from './route-map.js';
 import { diffAgainst, readSnapshot } from './diff-against.js';
 import { diffSnapshots, formatChange, hasBreakingChange } from './diff-apis.js';
@@ -82,6 +82,13 @@ const besideConfig = (configPath: string, files: readonly GeneratedFile[]): Gene
 
 const runGenerate = async (values: { check?: boolean; config?: string; types?: string }): Promise<void> => {
     const configPath = configPathFrom(values.config);
+    // Files the config imports come first: loading it with one gone stale would fail.
+    const prepared = await preparePlugins(configPath, values.check === true);
+    const preparedBehind = prepared.filter((file) => file.changed);
+    if (values.check && preparedBehind.length > 0) {
+        for (const file of preparedBehind) process.stdout.write(`  ${displayPath(file.output)} is behind the files it is generated from\n`);
+        process.exit(1);
+    }
     const config = await loadOrDie(configPath);
     // `--types` beats the config, which beats the file beside the config.
     const typesOutput = values.types ?? config.typesOutput;
@@ -128,6 +135,7 @@ const runGenerate = async (values: { check?: boolean; config?: string; types?: s
     ]);
 
     const changed = [
+        ...preparedBehind.map((file) => displayPath(file.output)),
         ...(typesBehind ? [displayPath(typesPath)] : []),
         ...written.filter((file) => file.changed).map((file) => displayPath(file.output)),
     ];
@@ -168,7 +176,8 @@ const runDiff = async (values: { config?: string; json?: boolean; against?: stri
 /**
  * A command kizuna does not know is offered to the plugin of that name: the
  * `run` export of `@kizunajs/<command>/cli`, resolved from the project rather
- * than from this package, so a plugin's commands ship with the plugin.
+ * than from this package, so a plugin's commands ship with the plugin. It
+ * runs against `kizuna.<command>.config.ts` when the project has one.
  */
 const runPluginCommand = async (command: string, argv: string[]): Promise<void> => {
     const resolved = await resolvePluginCli(`@kizunajs/${command}/cli`);
@@ -182,7 +191,14 @@ const runPluginCommand = async (command: string, argv: string[]): Promise<void> 
         },
         strict: false,
     });
-    const configPath = resolve(process.cwd(), typeof values.config === 'string' ? values.config : 'kizuna.config.ts');
+    // A plugin with a config of its own, like the CMS's `kizuna.cms.config.ts`, finds it without `--config`.
+    const ownConfig = resolve(process.cwd(), `kizuna.${command}.config.ts`);
+    const configPath =
+        typeof values.config === 'string'
+            ? resolve(process.cwd(), values.config)
+            : existsSync(ownConfig)
+              ? ownConfig
+              : resolve(process.cwd(), 'kizuna.config.ts');
     const code = await resolved.run(
         argv.filter((argument, index) => argument !== '--config' && argv[index - 1] !== '--config'),
         {

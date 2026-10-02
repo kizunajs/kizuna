@@ -46,6 +46,55 @@ export interface DiffOptions {
     dottedKeys?: boolean;
 }
 
+/**
+ * What changed in the documents editors change. Stored content outlives the
+ * code that declared it, so it is read like a request sent before the
+ * change: a field it lacks, or a type it no longer has, breaks it unless a
+ * `migrate` step says what it becomes.
+ */
+const diffContent = (before: NonNullable<ApiSnapshot['content']>, after: NonNullable<ApiSnapshot['content']>): Change[] => {
+    const changes: Change[] = [];
+    for (const [ref, gone] of Object.entries(before)) {
+        const arrived = after[ref];
+        if (arrived === undefined) {
+            changes.push({
+                level: 'breaking',
+                key: ref,
+                summary: `${ref} is gone`,
+                detail: "its stored content no longer shows anywhere; `kizuna cms rename-page` moves a renamed page's content",
+            });
+            continue;
+        }
+        if (arrived.migration > gone.migration) {
+            changes.push({
+                level: 'changed',
+                key: ref,
+                summary: `${ref} has a new migrate step`,
+            });
+            continue;
+        }
+        for (const change of diffSchemas(gone.schema, arrived.schema, 'request')) {
+            const unsettled = change.summary.endsWith('is now required')
+                ? ', with no default and no migrate step'
+                : ', with no migrate step';
+            changes.push({
+                level: change.breaking ? 'breaking' : 'changed',
+                key: ref,
+                summary: `${ref} ${change.summary}${change.breaking ? unsettled : ''}`,
+            });
+        }
+    }
+    for (const ref of Object.keys(after)) {
+        if (ref in before) continue;
+        changes.push({
+            level: 'added',
+            key: ref,
+            summary: `${ref} added`,
+        });
+    }
+    return changes;
+};
+
 export const diffSnapshots = (before: ApiSnapshot, after: ApiSnapshot, options: DiffOptions = {}): Change[] => {
     const changes: Change[] = [];
 
@@ -223,6 +272,8 @@ export const diffSnapshots = (before: ApiSnapshot, after: ApiSnapshot, options: 
             });
         }
     }
+
+    changes.push(...diffContent(before.content ?? {}, after.content ?? {}));
 
     const order: Record<ChangeLevel, number> = { breaking: 0, changed: 1, added: 2 };
     return changes.sort((left, right) => order[left.level] - order[right.level] || left.key.localeCompare(right.key));

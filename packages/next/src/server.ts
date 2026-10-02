@@ -24,6 +24,7 @@ import {
     jobRouter,
     jobRunnerFrom,
     type Adapter,
+    type ContentRuntime,
     pluginRoutesOf,
     pluginExportsOf,
     pluginRouterOf,
@@ -372,7 +373,58 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
  *     basePath: '/api',
  * });
  */
+/**
+ * Next's cache, draft mode, cookies and not-found, for content reading. Each
+ * imports Next when called, so a config that names this adapter still loads
+ * outside Next, as `kizuna generate` does.
+ */
+export const nextContentRuntime: ContentRuntime = {
+    cache:
+        (read, keys, tags) =>
+        async (...args) => {
+            const { unstable_cache } = await import('next/cache');
+            return unstable_cache(read, [...keys], {
+                tags: [...tags],
+            })(...args);
+        },
+    revalidate: async (tags) => {
+        const { revalidateTag } = await import('next/cache');
+        for (const tag of tags) {
+            revalidateTag(tag, {
+                expire: 0,
+            });
+        }
+    },
+    draftMode: async () => {
+        const { draftMode } = await import('next/headers');
+        const draft = await draftMode();
+        return {
+            enabled: draft.isEnabled,
+            enable: () => draft.enable(),
+            disable: () => draft.disable(),
+        };
+    },
+    cookies: async () => {
+        const { cookies } = await import('next/headers');
+        const jar = await cookies();
+        return {
+            get: (name) => jar.get(name)?.value,
+            set: (name, value, options) => {
+                jar.set(name, value, options);
+            },
+            delete: (name) => {
+                jar.delete(name);
+            },
+        };
+    },
+    notFound: async () => {
+        const { notFound } = await import('next/navigation');
+        return notFound();
+    },
+};
+
 export const nextAdapter = (defaults?: NextHandlerOptions): Adapter<NextHandlerContext, [options?: NextHandlerOptions], HttpHandlers> => ({
     name: 'next',
     mount: (api, options) => mountNext(api as NextApiWithRouter, { ...defaults, ...options }),
+    content: nextContentRuntime,
 });

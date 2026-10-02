@@ -1,10 +1,11 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
+import type { KizunaBrand } from './brand.js';
 
-test('Kizuna.brand types the output the way .brand() does', () => {
+test('Kizuna.brand types the output with the brand a generated client declares', () => {
     const UserId = Kizuna.brand('UserId', z.string());
-    expectTypeOf<z.output<typeof UserId>>().toEqualTypeOf<z.output<ReturnType<typeof z.string>> & z.core.$brand<'UserId'>>();
+    expectTypeOf<z.output<typeof UserId>>().toEqualTypeOf<string & KizunaBrand<'UserId'>>();
 });
 
 test('Kizuna.brand leaves the input unbranded', () => {

@@ -239,11 +239,13 @@ const pluginPackages = (): string[] => {
         if (manifest.name === 'kizunajs') continue;
         const sourceDir = path.join(packageDir, 'src');
         if (!fs.existsSync(sourceDir)) continue;
-        const declaresPlugin = fs
+        const sources = fs
             .readdirSync(sourceDir, { recursive: true })
             .filter((entry): entry is string => typeof entry === 'string' && entry.endsWith('.ts') && !entry.includes('.test.'))
-            .some((entry) => fs.readFileSync(path.join(sourceDir, entry), 'utf8').includes('definePlugin('));
-        if (declaresPlugin) declaring.push(manifest.name);
+            .map((entry) => fs.readFileSync(path.join(sourceDir, entry), 'utf8'));
+        // A content provider builds its server half with `definePlugin`, and is installed under `content`.
+        const providesContent = sources.some((source) => source.includes('defineContentProvider('));
+        if (!providesContent && sources.some((source) => source.includes('definePlugin('))) declaring.push(manifest.name);
     }
     return declaring;
 };

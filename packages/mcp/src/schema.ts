@@ -8,6 +8,32 @@ import {
     resolveResponseContentType,
 } from 'kizunajs/generator';
 import type { RouteDefinition } from 'kizunajs';
+import type { StandardSchemaWithJSON } from '@modelcontextprotocol/server';
+
+/**
+ * A tool schema as the SDK takes it. Zod still validates, and the JSON Schema
+ * the client receives drops the `id` a `Kizuna.model` carries: validators
+ * read a bare `id` as the draft-04 spelling of `$id` and refuse the tool.
+ */
+export const toolSchema = <Schema extends z.ZodType>(schema: Schema): StandardSchemaWithJSON<z.input<Schema>, z.output<Schema>> => {
+    const convert = (io: 'input' | 'output'): Record<string, unknown> =>
+        z.toJSONSchema(schema, {
+            target: 'draft-2020-12',
+            io,
+            override: ({ jsonSchema }) => {
+                delete jsonSchema.id;
+            },
+        }) as Record<string, unknown>;
+    return {
+        '~standard': {
+            ...schema['~standard'],
+            jsonSchema: {
+                input: () => convert('input'),
+                output: () => convert('output'),
+            },
+        },
+    };
+};
 
 /**
  * The `{ status, body }` envelope a tool returns, with `body` carrying the

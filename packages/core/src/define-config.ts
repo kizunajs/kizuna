@@ -20,6 +20,7 @@ import { GUARD } from './identity-builder.js';
 import { RESOLVER } from './request-context-builder.js';
 import { buildApi, type Api } from './api.js';
 import type { DiffSettings, GeneratedFile } from './config.js';
+import { CONTENT_META_KEY, isContentProvider, type ContentMeta, type ContentProvider, type ContentReaderOf } from './content.js';
 
 /**
  * Kizuna sends the guard body itself when a route's `requires` turns a caller
@@ -159,6 +160,7 @@ export type KizunaConfigInput<
     RequestContext extends Record<string, RequestContextSchema>,
     GuardSchema extends z.ZodType | undefined,
     AdapterValue extends AnyAdapter | undefined,
+    ContentValue extends ContentProvider | undefined = undefined,
 > = {
     /**
      * The framework this API is served on, as a value. Its handler context
@@ -183,6 +185,21 @@ export type KizunaConfigInput<
      * plugins: [mcpPlugin({ name: 'workspace' }), openApiPlugin({ info })],
      */
     plugins?: P;
+    /**
+     * The content editors change, from a provider such as `cms()` from
+     * `@kizunajs/cms`. Its routes join this API's own, and `kizuna.content`
+     * reads it.
+     *
+     * @example
+     * content: cms({
+     *     db,
+     *     pages,
+     *     auth: {
+     *         identity: 'editor',
+     *     },
+     * }),
+     */
+    content?: ContentValue;
     tags?: TagSet<Tags>;
     /**
      * Who may call this API: the identities a route's `auth` names, and the
@@ -335,10 +352,15 @@ export const defineConfig = <
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
     GuardSchema extends z.ZodType | undefined = undefined,
     const AdapterValue extends AnyAdapter | undefined = undefined,
+    const ContentValue extends ContentProvider | undefined = undefined,
 >(
-    options: KizunaConfigInput<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>
+    options: KizunaConfigInput<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue, ContentValue>
 ): {
     api: ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
+    /**
+     * Reads the content `content` provides, typed from its documents.
+     */
+    content: ContentReaderOf<ContentValue>;
     clients: readonly GeneratedFile[];
     generators: readonly GeneratedFile[];
     typescript: { outputFile?: string } | undefined;
@@ -347,11 +369,25 @@ export const defineConfig = <
     const guardSchema = options.auth?.guardSchema;
     if (guardSchema) assertFillableGuardSchema(guardSchema);
 
-    const routes = (options.routes ?? {}) as Routes;
+    const content = options.content;
+    if (content !== undefined && !isContentProvider(content)) {
+        throw new Error('`content` takes a content provider, such as `cms({ ... })` from `@kizunajs/cms`.');
+    }
+    const routes = {
+        ...((options.routes ?? {}) as Routes),
+    } as Routes;
+    for (const [group, provided] of Object.entries(content?.routes ?? {})) {
+        if (group in routes) {
+            throw new Error(
+                `\`content\` serves its routes under '${group}', and \`routes\` has a group of the same name. Rename yours, since both would reach the clients and MCP under it.`
+            );
+        }
+        (routes as Record<string, unknown>)[group] = provided;
+    }
     const jobs = options.jobs as Jobs | undefined;
     const identities = options.auth?.identities as Record<string, SecurityScheme> | undefined;
     const apiReference = createApiReference();
-    const plugins = resolvePlugins(options.plugins, apiReference.api);
+    const plugins = resolvePlugins([...(options.plugins ?? []), ...(content === undefined ? [] : [content.plugin])], apiReference.api);
     const pluginRoutes = pluginRouteTree(plugins);
 
     assertNoPathCollisions([...routeClaims(routes), ...routeClaims(pluginRoutes, 'Plugin route'), ...jobClaims(jobs, options.jobRunner)]);
@@ -440,8 +476,25 @@ export const defineConfig = <
     apiReference.bind(api);
     for (const plugin of Object.values(plugins)) plugin.validate?.();
 
+    const runtime = options.adapter?.content;
+    const reader = content?.reader({
+        api: apiReference.api,
+        runtime,
+    });
+    if (content !== undefined) {
+        Object.defineProperty(api, CONTENT_META_KEY, {
+            value: {
+                provider: content,
+                reader,
+                runtime,
+            } satisfies ContentMeta,
+            enumerable: false,
+        });
+    }
+
     return {
         api,
+        content: reader as ContentReaderOf<ContentValue>,
         clients: options.clients ?? [],
         generators: Object.values(plugins).flatMap((plugin) => plugin.generators),
         diff: options.diff,

@@ -25,7 +25,7 @@ import { contractOf, jobRunnerFrom, pluginExportsOf, JOBS_META, type JobsMeta } 
 import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from 'kizunajs';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from 'kizunajs/generator';
-import { buildToolOutputSchema } from './schema.js';
+import { buildToolOutputSchema, toolSchema } from './schema.js';
 import { buildToolInputSchema, describeTool, selectToolRoutes, toolOptionsOf, type ToolInputSchema } from 'kizunajs/adapter';
 
 export interface McpServerOptions {
@@ -587,8 +587,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                           title: definition.title,
                       }),
                 description: definition.description,
-                inputSchema: definition.inputSchema.shape === undefined ? undefined : z.object(definition.inputSchema.shape),
-                outputSchema: definition.outputSchema,
+                inputSchema: definition.inputSchema.shape === undefined ? undefined : toolSchema(z.object(definition.inputSchema.shape)),
+                outputSchema: toolSchema(definition.outputSchema),
                 annotations: buildToolAnnotations(definition.route),
             },
             async (args: Record<string, unknown>, context: McpToolContext) => {

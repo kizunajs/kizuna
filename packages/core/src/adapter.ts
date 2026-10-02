@@ -27,6 +27,8 @@ import { problemDetails, problemFromBody, type ProblemDetails } from './problem-
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
+import type { ContentRuntime } from './content.js';
+export { contentOf, CONTENT_META_KEY, type ContentRuntime, type ContentCookies, type ContentMeta } from './content.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ResolvedPlugin } from './plugin.js';
 import {
     resolveResponseBody,
@@ -404,6 +406,11 @@ export interface Adapter<HandlerContext = unknown, MountArgs extends readonly un
      * api, and what it hands back, is the framework's own.
      */
     readonly mount: (api: ApiWithRouter, ...args: MountArgs) => Mounted;
+    /**
+     * What the framework gives content reading: its cache, draft mode, cookies
+     * and not-found answer. Without it, content reads go uncached.
+     */
+    readonly content?: ContentRuntime;
     readonly [ADAPTER_CONTEXT]?: HandlerContext;
 }
 
@@ -890,6 +897,42 @@ export const extractCredential = (scheme: SecurityScheme, request: AdapterReques
     if (openapi.type === 'oauth2') return { oauth2: token };
     if (openapi.type === 'openIdConnect') return { openIdConnect: token };
     return { bearer: token };
+};
+
+/**
+ * Runs one identity's guard on a request outside a route's `auth`, for a
+ * handler that serves the signed-in and the signed-out alike, such as one that
+ * sends a signed-out caller to sign in. Answers the context the guard
+ * returned, or `undefined` when it denied.
+ */
+export const authenticate = async (
+    api: unknown,
+    identity: string,
+    request: {
+        headers: Record<string, string | string[] | undefined>;
+        query?: unknown;
+    },
+    handlerContext: Record<string, unknown> = {}
+): Promise<Record<string, unknown> | undefined> => {
+    const guards = (api as Record<symbol, unknown>)[GUARDS_META] as Record<string, (args: unknown) => unknown> | undefined;
+    const schemes = (api as Record<symbol, unknown>)[SCHEMES_META] as Record<string, SecurityScheme> | undefined;
+    const guard = guards?.[identity];
+    if (guard === undefined) throw new Error(`The api has no guard for the identity '${identity}'.`);
+    const scheme = schemes?.[identity];
+    const credential = scheme
+        ? extractCredential(scheme, {
+              headers: request.headers,
+              query: request.query,
+          } as AdapterRequest<unknown>)
+        : {};
+    const result = await guard({
+        ...handlerContext,
+        ...credential,
+        params: {},
+        deny: guardDenyFor(scheme),
+    });
+    if (isGuardDenial(result)) return undefined;
+    return (result !== null && typeof result === 'object' ? withPermissions(identity, scheme, result) : {}) as Record<string, unknown>;
 };
 
 /**

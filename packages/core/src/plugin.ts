@@ -9,6 +9,14 @@ import type { RoutePath } from './types.js';
 
 export type { RoutePath };
 export type { ApiContext } from './configured.js';
+export {
+    defineContentProvider,
+    isContentProvider,
+    type ContentProvider,
+    type ContentDocument,
+    type ContentRuntime,
+    type ContentCookies,
+} from './content.js';
 
 // Registry-global: adapters read these off the api, and a dual ESM/CJS install
 // would otherwise hold two different symbols.

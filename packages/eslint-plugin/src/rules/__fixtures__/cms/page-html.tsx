@@ -1,8 +1,8 @@
 import { cms } from './cms';
 
-export default async function SpringPage() {
-    const page = await cms.pages.springPage.get();
-    const { hero } = await cms.pages.springPage.get();
+export default async function FrontPage() {
+    const page = await cms.pages.frontPage.get();
+    const { hero } = await cms.pages.frontPage.get();
     return (
         <main>
             <div dangerouslySetInnerHTML={{ __html: page.hero.heading }} />

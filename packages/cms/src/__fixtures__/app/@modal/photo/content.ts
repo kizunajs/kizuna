@@ -1,7 +1,7 @@
-import { page } from '../../../../page.js';
+import { definePage } from '../../../../page.js';
 import { z } from 'zod';
 
-export default page({
+export default definePage({
     name: 'photoPage',
     fields: [
         {

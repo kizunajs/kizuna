@@ -45,6 +45,7 @@ kizuna.api.mount(app);
 | `jobs`           | Scheduled work, declared with [`k.jobs`](/docs/reference/k-jobs).                                                                                                             |
 | `jobRunner`      | How this deployment runs them: `mode`, `path`, `method`, `transport`, `onError`. See [Jobs](/docs/jobs).                                                                      |
 | `plugins`        | What this API installs beside its own routes, as a list. See [Create a Plugin](/docs/extend/create-plugin).                                                                   |
+| `content`        | The content editors change, from a provider such as `cms()` from `@kizunajs/cms`. Its routes join this API's. See [Config](/docs/config#content).                             |
 | `tags`           | The OpenAPI tags routes are grouped under, from [`k.tags`](/docs/reference/k-tags).                                                                                           |
 | `typescript`     | Where `kizuna generate` writes the `Config`, as `{ outputFile }`.                                                                                                             |
 | `clients`        | The clients `kizuna generate` writes from this API, each built with [`defineClient`](/docs/extend/create-client).                                                             |
@@ -63,6 +64,14 @@ const document = generateOpenApi(kizuna.api);
 ```
 
 And `clients`, which the CLI reads when it generates.
+
+With `content` on the config, it also hands back `content`, the reader for it:
+
+```tsx title="src/app/(front-page)/page.tsx"
+import kizuna from '@kizuna-config';
+
+const content = await kizuna.content.pages.frontPage.get();
+```
 
 ## Access control
 

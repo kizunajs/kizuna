@@ -31,3 +31,9 @@ tests/.generated-client-*.ts
 # CMS demo database and uploads
 .pglite/
 .media/
+
+# Playwright runs of the Next demo
+.pglite-e2e/
+.next-e2e/
+test-results/
+playwright-report/
