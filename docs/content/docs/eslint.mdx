@@ -125,6 +125,24 @@ responses: {
 
 A transform on the way in is fine, since the caller sends the input and the server parses it.
 
+### A nullable query, path, header or form field
+
+A query string, a path, a header and a form field have no `null`, so every client leaves a `null` out, and the server rejects the missing key of a `.nullable()` field. Declare it `.optional()`:
+
+```ts
+// flagged
+query: z.object({
+    cursor: z.string().nullable(),
+});
+
+// good, a caller leaves it out
+query: z.object({
+    cursor: z.string().optional(),
+});
+```
+
+JSON bodies and responses can carry `null`, so `.nullable()` there is untouched. See [Optional and null fields](/docs/zod#optional-and-null-fields).
+
 ### Across files
 
 A schema defined elsewhere, such as a shared `PaginationQuery` in its own `zod`-only module, is still caught, and the error lands on the reference:

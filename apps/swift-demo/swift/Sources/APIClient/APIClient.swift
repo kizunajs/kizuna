@@ -46,7 +46,7 @@ public enum API {
         /// Family name on the wire as `last_name`, exercises snake_case fidelity through the generators.
         public let last_name: String?
         /// Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.
-        public let avatar: Avatar?
+        public let avatar: Nullish<Avatar>
         public let avatars: [AvatarsItem]?
         /// Free-form string map, exercises a record through the generators.
         public let metadata: [String: String]?
@@ -71,7 +71,7 @@ public enum API {
             email: String,
             email_address: String? = nil,
             last_name: String? = nil,
-            avatar: Avatar? = nil,
+            avatar: Nullish<Avatar> = .absent,
             avatars: [AvatarsItem]? = nil,
             metadata: [String: String]? = nil,
             tags: [String?]? = nil
@@ -219,6 +219,64 @@ public enum API {
             self.email = email
             self.last_name = last_name
             self.phone = phone
+        }
+    }
+
+    public struct UserPreferences: Codable, Sendable, Equatable {
+        public let timezone: String?
+        public let locale: String?
+        public let signature: Nullish<String>
+        public let mutedChannels: [MutedChannel]
+
+        private enum CodingKeys: String, CodingKey {
+            case timezone
+            case locale
+            case signature
+            case mutedChannels
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(timezone, forKey: .timezone)
+            try container.encodeIfPresent(locale, forKey: .locale)
+            try container.encode(signature, forKey: .signature)
+            try container.encode(mutedChannels, forKey: .mutedChannels)
+        }
+
+        public init(
+            timezone: String?,
+            locale: String? = nil,
+            signature: Nullish<String> = .absent,
+            mutedChannels: [MutedChannel]
+        ) {
+            self.timezone = timezone
+            self.locale = locale
+            self.signature = signature
+            self.mutedChannels = mutedChannels
+        }
+    }
+
+    public struct MutedChannel: Codable, Sendable, Equatable {
+        public let channel: String
+        public let until: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case channel
+            case until
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(channel, forKey: .channel)
+            try container.encode(until, forKey: .until)
+        }
+
+        public init(
+            channel: String,
+            until: String?
+        ) {
+            self.channel = channel
+            self.until = until
         }
     }
 
@@ -714,9 +772,20 @@ public final class APIClient: Sendable {
             public let users: [API.User]
             public let nextCursor: Double?
 
+            private enum CodingKeys: String, CodingKey {
+                case users
+                case nextCursor
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(users, forKey: .users)
+                try container.encode(nextCursor, forKey: .nextCursor)
+            }
+
             public init(
                 users: [API.User],
-                nextCursor: Double? = nil
+                nextCursor: Double?
             ) {
                 self.users = users
                 self.nextCursor = nextCursor
@@ -963,6 +1032,61 @@ public final class APIClient: Sendable {
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(API.ProblemDetails)
             case validationError(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum UsersUpdatePreferences {
+
+        public struct Params: Sendable {
+            public let id: API.UserId
+
+            public init(id: API.UserId) {
+                self.id = id
+            }
+
+            public static func params(id: API.UserId) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: API.UserPreferences
+
+            public init(payload: API.UserPreferences) {
+                self.payload = payload
+            }
+
+            public static func body(
+                timezone: String?,
+                locale: String? = nil,
+                signature: Nullish<String> = .absent,
+                mutedChannels: [API.MutedChannel]
+            ) -> Self {
+                .init(payload: API.UserPreferences(timezone: timezone, locale: locale, signature: signature, mutedChannels: mutedChannels))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: API.UserPreferences
+
+            public init(body: API.UserPreferences) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1481,13 +1605,32 @@ public final class APIClient: Sendable {
             public let tagIds: [String]?
             public let sessionId: String?
 
+            private enum CodingKeys: String, CodingKey {
+                case since
+                case kind
+                case ids
+                case label
+                case tagIds
+                case sessionId
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(since, forKey: .since)
+                try container.encode(kind, forKey: .kind)
+                try container.encode(ids, forKey: .ids)
+                try container.encode(label, forKey: .label)
+                try container.encode(tagIds, forKey: .tagIds)
+                try container.encode(sessionId, forKey: .sessionId)
+            }
+
             public init(
-                since: Date? = nil,
-                kind: API.EventKind? = nil,
-                ids: [String]? = nil,
-                label: String? = nil,
-                tagIds: [String]? = nil,
-                sessionId: String? = nil
+                since: Date?,
+                kind: API.EventKind?,
+                ids: [String]?,
+                label: String?,
+                tagIds: [String]?,
+                sessionId: String?
             ) {
                 self.since = since
                 self.kind = kind
@@ -3289,10 +3432,17 @@ public final class APIClient: Sendable {
                 case userAgent
             }
 
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(ip, forKey: .ip)
+                try container.encode(`protocol`, forKey: .`protocol`)
+                try container.encode(userAgent, forKey: .userAgent)
+            }
+
             public init(
                 ip: String,
                 `protocol`: String,
-                userAgent: String? = nil
+                userAgent: String?
             ) {
                 self.ip = ip
                 self.`protocol` = `protocol`
@@ -3608,6 +3758,29 @@ public struct APIUsersClient: Sendable {
             ])
         default:
             throw APIClient.UsersCreateUser.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Replace a user's preferences, exercises required nullable fields round-tripping through the clients
+    public func updatePreferences(_ params: APIClient.UsersUpdatePreferences.Params, _ body: APIClient.UsersUpdatePreferences.Body) async throws(APIClient.UsersUpdatePreferences.Failure) -> APIClient.UsersUpdatePreferences.Result {
+        var path = "/users/:id/preferences"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersUpdatePreferences.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "PUT"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: APIClient.UsersUpdatePreferences.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersUpdatePreferences.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(API.UserPreferences.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUpdatePreferences.Failure.self)
+            return APIClient.UsersUpdatePreferences.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersUpdatePreferences.Failure.self)
+            throw APIClient.UsersUpdatePreferences.Failure.badRequest(payload)
+        default:
+            throw APIClient.UsersUpdatePreferences.Failure.unexpectedStatus(statusCode, data)
         }
     }
 
@@ -4456,6 +4629,56 @@ public struct APINewsletterClient: Sendable {
         default:
             throw APIClient.NewsletterSubscribe.Failure.unexpectedStatus(statusCode, data)
         }
+    }
+}
+
+/// A `.nullish()` field: left out, sent as `null`, or sent with a value.
+public enum Nullish<Wrapped> {
+    case absent
+    case null
+    case some(Wrapped)
+
+    public var value: Wrapped? {
+        if case .some(let value) = self { return value }
+        return nil
+    }
+}
+
+extension Nullish: Sendable where Wrapped: Sendable {}
+extension Nullish: Equatable where Wrapped: Equatable {}
+extension Nullish: Hashable where Wrapped: Hashable {}
+
+extension Nullish: Encodable where Wrapped: Encodable {
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .absent, .null: try container.encodeNil()
+        case .some(let value): try container.encode(value)
+        }
+    }
+}
+
+extension Nullish: Decodable where Wrapped: Decodable {
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self = container.decodeNil() ? .null : .some(try container.decode(Wrapped.self))
+    }
+}
+
+extension KeyedEncodingContainer {
+    public mutating func encode<Wrapped: Encodable>(_ value: Nullish<Wrapped>, forKey key: Key) throws {
+        switch value {
+        case .absent: return
+        case .null: try encodeNil(forKey: key)
+        case .some(let wrapped): try encode(wrapped, forKey: key)
+        }
+    }
+}
+
+extension KeyedDecodingContainer {
+    public func decode<Wrapped: Decodable>(_ type: Nullish<Wrapped>.Type, forKey key: Key) throws -> Nullish<Wrapped> {
+        guard contains(key) else { return .absent }
+        return try decodeNil(forKey: key) ? .null : .some(try decode(Wrapped.self, forKey: key))
     }
 }
 

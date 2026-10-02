@@ -194,6 +194,24 @@ val user = client.users.getUser {
 Text(user.body.id.value)
 ```
 
+## Optional and null fields
+
+An `.optional()` field is a `String?` that defaults to `null` and is left out of the request. A `.nullable()` field is a `String?` with no default, sent as `null` when you pass `null`. A `.nullish()` field is a `Nullish<String>`, so you can leave it out with `Nullish.Absent` or send `Nullish.Null` to clear it:
+
+```kotlin
+client.users.updatePreferences {
+    params(
+        id = userId,
+    ).body(
+        timezone = null,
+        signature = Nullish.Null,
+        mutedChannels = emptyList(),
+    )
+}
+```
+
+See [Optional and null fields](/docs/zod#optional-and-null-fields) for which to declare.
+
 ## Property naming
 
 By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. A `@file:Suppress(...)` header keeps the IDE green over the generated file.

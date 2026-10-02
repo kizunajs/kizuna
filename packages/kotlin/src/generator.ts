@@ -28,6 +28,7 @@ import {
     TypeRegistry,
     mapType,
     collectObjectFields,
+    hasDefault,
     objectFieldCount,
     objectShapeKeys,
     type KotlinBrand,
@@ -212,7 +213,7 @@ const buildRouteMethod = (
                         multipartFields: [],
                     };
                 } else {
-                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint);
+                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, true);
                     bodyDescriptor = {
                         kind: 'json-flat',
                         structName,
@@ -415,6 +416,50 @@ const escapeKeyword = (name: string): string => {
     return KOTLIN_KEYWORDS.has(name) ? `\`${name}\`` : name;
 };
 
+const NULLISH_TYPE = /^Nullish<(.+)>$/;
+
+const emitNullish = (writer: KotlinWriter): void => {
+    writer.line('/** A `.nullish()` field: left out, sent as `null`, or sent with a value. */');
+    writer.line('@Serializable(with = NullishSerializer::class)');
+    writer.block('sealed interface Nullish<out T>', () => {
+        writer.line('val value: T?');
+        writer.blank();
+        writer.block('data object Absent : Nullish<Nothing>', () => {
+            writer.line('override val value: Nothing? get() = null');
+        });
+        writer.blank();
+        writer.block('data object Null : Nullish<Nothing>', () => {
+            writer.line('override val value: Nothing? get() = null');
+        });
+        writer.blank();
+        writer.line('data class Some<out T>(override val value: T) : Nullish<T>');
+    });
+    writer.blank();
+    writer.block('class NullishSerializer<T>(private val valueSerializer: KSerializer<T>) : KSerializer<Nullish<T>>', () => {
+        writer.line('override val descriptor: SerialDescriptor = valueSerializer.descriptor.nullable');
+        writer.blank();
+        writer.line('@OptIn(ExperimentalSerializationApi::class)');
+        writer.block('override fun serialize(encoder: Encoder, value: Nullish<T>)', () => {
+            writer.line(
+                'if (value is Nullish.Some) encoder.encodeSerializableValue(valueSerializer, value.value) else encoder.encodeNull()'
+            );
+        });
+        writer.blank();
+        writer.line('@OptIn(ExperimentalSerializationApi::class)');
+        writer.block('override fun deserialize(decoder: Decoder): Nullish<T>', () => {
+            writer.line('if (decoder.decodeNotNullMark()) return Nullish.Some(decoder.decodeSerializableValue(valueSerializer))');
+            writer.line('decoder.decodeNull()');
+            writer.line('return Nullish.Null');
+        });
+    });
+    writer.blank();
+};
+
+const defaultArgument = (field: KotlinField): string => {
+    if (!hasDefault(field)) return '';
+    return field.nullish ? ' = Nullish.Absent' : ' = null';
+};
+
 const optionalize = (type: string, optional: boolean): string => {
     if (!optional) return type;
     return type.endsWith('?') ? type : `${type}?`;
@@ -435,6 +480,8 @@ const resolveType = (
     scope: 'operation-object' | 'client' = 'client'
 ): string => {
     const { operationTypeMap, namespaceName, clientName, fileLevelTypeNames } = context;
+    const nullish = NULLISH_TYPE.exec(typeName);
+    if (nullish) return `Nullish<${resolveType(nullish[1]!, currentOperation, context, scope)}>`;
     const optional = typeName.endsWith('?');
     const base = optional ? typeName.slice(0, -1) : typeName;
 
@@ -604,6 +651,8 @@ const emitDataClass = (
     const hasFile = baseFields.some((field) => field.isFile);
 
     const resolveOwnedType = (raw: string): string => {
+        const nullish = NULLISH_TYPE.exec(raw);
+        if (nullish) return `Nullish<${resolveOwnedType(nullish[1]!)}>`;
         const optional = raw.endsWith('?');
         const stripped = optional ? raw.slice(0, -1) : raw;
         const isList = stripped.startsWith('List<') && stripped.endsWith('>');
@@ -630,7 +679,7 @@ const emitDataClass = (
 
     const params = adjustedFields.map((field) => {
         const typeExpression = optionalize(field.type, field.optional);
-        const defaultPart = field.optional ? ' = null' : '';
+        const defaultPart = defaultArgument(field);
         const serialNameAnnotation =
             needsSerialName && (field.name !== field.wireName || KOTLIN_KEYWORDS.has(field.name))
                 ? `@SerialName(${stringLiteral(field.wireName)}) `
@@ -699,6 +748,8 @@ const relativeOwnedPath = (
 };
 
 const ownedTypePath = (typeName: string, ownedTypeMap: Map<string, string>, registry?: TypeRegistry): string => {
+    const nullish = NULLISH_TYPE.exec(typeName);
+    if (nullish) return `Nullish<${ownedTypePath(nullish[1]!, ownedTypeMap, registry)}>`;
     const sealedPath = registry?.sealedVariantPath(typeName);
     if (sealedPath !== undefined) return sealedPath;
     const owningClass = ownedTypeMap.get(typeName);
@@ -776,7 +827,7 @@ const emitSealedClass = (
                         const variantPath = registry.sealedVariantPath(variant.payloadType) ?? variant.payloadType;
                         const relative = relativeOwnedPath(field.type, ownedTypeMap, variantPath, registry);
                         const typeExpression = optionalize(relative ?? ownedTypePath(field.type, ownedTypeMap, registry), field.optional);
-                        const defaultPart = field.optional ? ' = null' : '';
+                        const defaultPart = defaultArgument(field);
                         return `val ${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
                     });
                     if (params.length === 1) {
@@ -1046,7 +1097,7 @@ const groupMemberAccessor = (groupLabel: string, field: { name: string; optional
 // Required fields are non-null constructor properties, so omitting them is a compile error.
 const groupClassField = (field: KotlinField): string => {
     const typeExpression = optionalize(field.type, field.optional);
-    const defaultPart = field.optional ? ' = null' : '';
+    const defaultPart = defaultArgument(field);
     return `val ${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
 };
 
@@ -1139,7 +1190,7 @@ const methodChannels = (method: RouteMethod): MethodChannel[] => {
         channels.push({
             varName: 'query',
             className: 'Query',
-            required: method.query.some((field) => !field.optional),
+            required: method.query.some((field) => !hasDefault(field)),
             fields: method.query,
         });
     }
@@ -1147,7 +1198,7 @@ const methodChannels = (method: RouteMethod): MethodChannel[] => {
         channels.push({
             varName: 'headers',
             className: 'Headers',
-            required: method.headers.some((field) => !field.optional),
+            required: method.headers.some((field) => !hasDefault(field)),
             fields: method.headers,
         });
     }
@@ -1217,7 +1268,7 @@ const emitArgsScaffolding = (writer: KotlinWriter, method: RouteMethod, context:
         channel.fields
             .map((field) => {
                 const typeExpression = optionalize(field.type, field.optional);
-                const defaultPart = field.optional ? ' = null' : '';
+                const defaultPart = defaultArgument(field);
                 return `${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
             })
             .join(', ');
@@ -1299,14 +1350,23 @@ const emitBodyEncoding = (writer: KotlinWriter, method: RouteMethod, context: Em
     if (body.kind === 'multipart') {
         writer.line('val multipartBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)');
         for (const field of body.multipartFields) {
-            const accessor = groupMemberAccessor('body', field);
-            const isFlattenedFile = body.flattened.find((flatField) => flatField.name === field.name)?.isFile === true;
-            if (field.isFile || isFlattenedFile) {
-                writer.line(
-                    `multipartBuilder.addFormDataPart(${stringLiteral(field.wireName)}, ${accessor}.filename, ${accessor}.data.toRequestBody(${accessor}.mimeType.toMediaType()))`
-                );
+            const flattenedField = body.flattened.find((flatField) => flatField.name === field.name);
+            const isFile = field.isFile || flattenedField?.isFile === true;
+            const append = (accessor: string): void => {
+                if (isFile) {
+                    writer.line(
+                        `multipartBuilder.addFormDataPart(${stringLiteral(field.wireName)}, ${accessor}.filename, ${accessor}.data.toRequestBody(${accessor}.mimeType.toMediaType()))`
+                    );
+                } else {
+                    writer.line(`multipartBuilder.addFormDataPart(${stringLiteral(field.wireName)}, ${accessor}.toString())`);
+                }
+            };
+            if (flattenedField?.optional === true) {
+                writer.block(`if (${groupMemberAccessor('body', field)} != null)`, () => {
+                    append(groupMemberAccessor('body', field));
+                });
             } else {
-                writer.line(`multipartBuilder.addFormDataPart(${stringLiteral(field.wireName)}, ${accessor}.toString())`);
+                append(groupMemberAccessor('body', field));
             }
         }
         writer.line('requestBody = multipartBuilder.build()');
@@ -1766,7 +1826,7 @@ const emitClient = (
     const usesMultipart = allMethods.some((method) => method.body?.kind === 'multipart');
 
     const contextFields = context.requestContextFields;
-    const contextRequired = contextFields.some((field) => !field.optional);
+    const contextRequired = contextFields.some((field) => !hasDefault(field));
     const contextParam = contextFields.length > 0 ? `requestContext: RequestContext${contextRequired ? '' : ' = RequestContext()'}, ` : '';
 
     writer.blank();
@@ -1779,7 +1839,7 @@ const emitClient = (
                 emitConstructorClass(
                     writer,
                     'data class RequestContext',
-                    contextFields.map((field) => `val ${escapeKeyword(field.name)}: ${field.type}${field.optional ? ' = null' : ''}`)
+                    contextFields.map((field) => `val ${escapeKeyword(field.name)}: ${field.type}${defaultArgument(field)}`)
                 );
                 writer.blank();
                 writer.block('private val requestContextHeaders: Map<String, String> = buildMap', () => {
@@ -1888,7 +1948,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     writer.line('import kotlinx.serialization.*');
     writer.line('import kotlinx.serialization.json.*');
     const hasTolerantEnums = registry.all().some((type) => type.kind === 'enum-class' && type.unknownCase);
-    if (hasTolerantEnums) {
+    if (hasTolerantEnums || registry.usesNullish) {
         writer.line('import kotlinx.serialization.descriptors.*');
         writer.line('import kotlinx.serialization.encoding.*');
     }
@@ -1910,6 +1970,8 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
         });
         writer.blank();
     }
+
+    if (registry.usesNullish) emitNullish(writer);
 
     const sharedTypes: KotlinType[] = [];
     const typesByOperation = new Map<string, KotlinType[]>();

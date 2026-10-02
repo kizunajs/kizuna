@@ -571,6 +571,52 @@ final class APIClientTests: XCTestCase {
             XCTAssertEqual((thrown as? any KizunaFailure)?.isCancelled, false)
         }
     }
+
+    func testRequiredNullableFieldsAreSentAsNull() async throws {
+        let preferences = API.UserPreferences(
+            timezone: nil,
+            mutedChannels: [
+                API.MutedChannel(channel: "email", until: nil),
+            ]
+        )
+        let updated = try await client.users.updatePreferences(
+            .params(id: API.UserId("1")),
+            .init(payload: preferences)
+        )
+        XCTAssertEqual(updated.body, preferences)
+
+        let again = try await client.users.updatePreferences(
+            .params(id: API.UserId("1")),
+            .init(payload: updated.body)
+        )
+        XCTAssertEqual(again.body, preferences)
+
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(preferences)) as? [String: Any]
+        XCTAssertTrue(encoded?["timezone"] is NSNull, "a nullable field is sent as null")
+        XCTAssertNil(encoded?["locale"], "an optional field is left out")
+    }
+
+    func testNullishFieldKeepsAllThreeStates() async throws {
+        let states: [Nullish<String>] = [.absent, .null, .some("Ada")]
+        for state in states {
+            let preferences = API.UserPreferences(timezone: "Europe/Oslo", signature: state, mutedChannels: [])
+            let updated = try await client.users.updatePreferences(
+                .params(id: API.UserId("1")),
+                .init(payload: preferences)
+            )
+            XCTAssertEqual(updated.body.signature, state)
+        }
+
+        let absent = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(API.UserPreferences(timezone: nil, signature: .absent, mutedChannels: []))
+        ) as? [String: Any]
+        XCTAssertNil(absent?["signature"], "an absent nullish field is left out")
+
+        let null = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(API.UserPreferences(timezone: nil, signature: .null, mutedChannels: []))
+        ) as? [String: Any]
+        XCTAssertTrue(null?["signature"] is NSNull, "a null nullish field is sent as null")
+    }
 }
 
 /// Accepts a request and never answers it, so a test can cancel a request that is really in flight.

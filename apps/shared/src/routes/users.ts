@@ -108,6 +108,24 @@ export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 /**
  * The `:id` of every route under `/users/:id`.
  */
+export const MutedChannelSchema = Kizuna.model({
+    title: 'MutedChannel',
+    schema: z.object({
+        channel: z.string(),
+        until: z.string().nullable(),
+    }),
+});
+
+export const UserPreferencesSchema = Kizuna.model({
+    title: 'UserPreferences',
+    schema: z.object({
+        timezone: z.string().nullable(),
+        locale: z.string().optional(),
+        signature: z.string().nullish(),
+        mutedChannels: z.array(MutedChannelSchema),
+    }),
+});
+
 const UserPathParams = z.object({
     id: UserId,
 });
@@ -411,6 +429,22 @@ export const usersRoutes = k.routes('users', {
                 body: user,
             };
         }),
+    updatePreferences: k
+        .route({
+            method: 'PUT',
+            path: '/users/:id/preferences',
+            auth: false,
+            pathParams: UserPathParams,
+            body: UserPreferencesSchema,
+            responses: {
+                200: UserPreferencesSchema,
+            },
+            summary: "Replace a user's preferences, exercises required nullable fields round-tripping through the clients",
+        })
+        .handler(({ body }) => ({
+            status: 200,
+            body,
+        })),
     deleteUser: k
         .route({
             method: 'DELETE',

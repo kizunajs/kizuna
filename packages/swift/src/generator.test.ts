@@ -1095,10 +1095,102 @@ describe('Swift generator: nullable', () => {
         }),
     }).api;
 
-    it('maps a nullable field to an optional, since Swift has only the one', () => {
+    it('maps a nullable field to an optional with no default, since its key is required', () => {
         const output = generateSwiftClient(contract, baseConfig);
-        expect(output).toContain('let appVersion: String?');
-        expect(output).toContain('let releaseNotes: String?');
+        expect(output).toContain('public let appVersion: String?');
+        expect(output).toContain('appVersion: String?,');
+        expect(output).not.toContain('appVersion: String? = nil');
+    });
+
+    it('maps a nullish field to Nullish, defaulting to absent', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public let releaseNotes: Nullish<String>');
+        expect(output).toContain('releaseNotes: Nullish<String> = .absent');
+        expect(output).toContain('public enum Nullish<Wrapped>');
+        expect(output).toContain('case .absent: return');
+        expect(output).toContain('guard contains(key) else { return .absent }');
+    });
+
+    it('sends a nullable field that holds nil as null', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public func encode(to encoder: Encoder) throws');
+        expect(output).toContain('try container.encode(id, forKey: .id)');
+        expect(output).toContain('try container.encode(appVersion, forKey: .appVersion)');
+        expect(output).toContain('try container.encode(releaseNotes, forKey: .releaseNotes)');
+    });
+
+    it('maps a nullish query field to an optional, since a query string has no null', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: k.routes('api', {
+                    listUsers: k.route({
+                        method: 'GET',
+                        path: '/users',
+                        query: z.object({
+                            cursor: z.string().nullish(),
+                        }),
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    }),
+                }),
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public let cursor: String?');
+        expect(output).not.toContain('Nullish');
+    });
+
+    it('keeps synthesized encoding when no field is required and nullable', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: k.routes('api', {
+                    getUser: k.route({
+                        method: 'GET',
+                        path: '/users/:id',
+                        responses: {
+                            200: z.object({
+                                id: z.string(),
+                                email: z.string().optional(),
+                            }),
+                        },
+                    }),
+                }),
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public let email: String?');
+        expect(output).not.toContain('encoder.container(keyedBy: CodingKeys.self)');
+    });
+
+    it('leaves a nil form field out', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: k.routes('api', {
+                    uploadAvatar: k.route({
+                        method: 'POST',
+                        path: '/avatar',
+                        contentType: 'multipart/form-data',
+                        body: z.object({
+                            file: z.instanceof(File),
+                            caption: z.string().optional(),
+                        }),
+                        responses: {
+                            204: z.void(),
+                        },
+                    }),
+                }),
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('multipart.appendFile(name: "file", file: body.file)');
+        expect(output).toContain('if let value = body.caption {');
+        expect(output).toContain('multipart.appendField(name: "caption", value: String(describing: value))');
     });
 });
 

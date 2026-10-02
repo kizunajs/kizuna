@@ -136,6 +136,39 @@ In the handler, `params.id` is a `UserId` and still a string, so it goes into a 
 
 Brand the IDs that sit beside other IDs of the same shape, and leave other values plain. A swapped ID is a common mistake for people and coding agents alike, and a brand turns it into a compile error that names both types.
 
+## Optional and null fields
+
+A field can be left out, can be `null`, or both, and Zod says which. On the wire these differ: a request without the key of a `.nullable()` field gets a `400`, and so does a `null` sent for an `.optional()` one. Every client follows the schema, so whatever you declare, the generated types only build requests the server accepts.
+
+| Declare       | Key may be left out | Value may be `null` | TypeScript                  | Swift                       | Kotlin                             |
+| ------------- | ------------------- | ------------------- | --------------------------- | --------------------------- | ---------------------------------- |
+| `.optional()` | yes                 | no                  | `timezone?: string`         | `String? = nil`             | `String? = null`                   |
+| `.nullable()` | no                  | yes                 | `timezone: string \| null`  | `String?`, no default       | `String?`, no default              |
+| `.nullish()`  | yes                 | yes                 | `timezone?: string \| null` | `Nullish<String> = .absent` | `Nullish<String> = Nullish.Absent` |
+
+Declare `.optional()` when a caller may skip the field, and `.nullable()` when the field is always part of the object and `null` means it has no value, like a timezone the user has not set.
+
+Swift and Kotlin have one `nil`, so the default says which one you get. An `.optional()` field defaults to `nil` and is left out of the request. A `.nullable()` field has no default, so the caller passes `nil` on purpose and the client sends `null`.
+
+A `.nullish()` field has three states, which a PATCH route needs to tell "clear this field" from "leave it alone". Swift and Kotlin type it as `Nullish`: `.absent` leaves the key out, `.null` sends `null`, and `.some(value)` sends the value.
+
+```swift
+try await client.users.updatePreferences(
+    .params(id: userID),
+    .body(
+        timezone: "Europe/Oslo",
+        signature: .null,
+        mutedChannels: []
+    )
+)
+```
+
+`signature.value` reads a received one back as an optional.
+
+### Query, path, header and form fields
+
+A URL, a header and a form field have no `null`, so every client leaves a `nil` out, and a `.nullable()` field there fails as missing. Declare `.optional()` instead. The [ESLint plugin](/docs/eslint#a-nullable-query-path-header-or-form-field) flags it. A `.nullish()` field there means the same as `.optional()`, and the clients type it as one.
+
 ## Coercion
 
 Path parameters, query parameters, and headers arrive as strings, and Kizuna coerces them to the declared schema, so `z.number()` in a query means the handler receives a number. Declare plain schemas; `k.routes` throws on `z.coerce`, since coercion is already built in. See [coercion](/docs/routes#query-path-and-header-coercion).

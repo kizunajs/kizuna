@@ -56,10 +56,66 @@ describe('Kotlin generator: nullable', () => {
         },
     }).api;
 
-    it('maps a nullable field to a nullable type, since Kotlin has only the one', () => {
+    it('maps a nullable field to a nullable type with no default, since its key is required', () => {
         const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('val appVersion: String?');
-        expect(output).toContain('val releaseNotes: String?');
+        expect(output).toContain('val appVersion: String?,');
+        expect(output).not.toContain('val appVersion: String? = null');
+    });
+
+    it('maps a nullish field to Nullish, defaulting to absent', () => {
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val releaseNotes: Nullish<String> = Nullish.Absent');
+        expect(output).toContain('@Serializable(with = NullishSerializer::class)');
+        expect(output).toContain('sealed interface Nullish<out T>');
+        expect(output).toContain('import kotlinx.serialization.encoding.*');
+    });
+
+    it('maps a nullish query field to an optional, since a query string has no null', () => {
+        const output = generateKotlinClient(
+            defineConfig({
+                routes: {
+                    listUsers: {
+                        method: 'GET',
+                        path: '/users',
+                        query: z.object({
+                            cursor: z.string().nullish(),
+                        }),
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    },
+                },
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('val cursor: String? = null');
+        expect(output).not.toContain('Nullish');
+    });
+
+    it('leaves a null form field out', () => {
+        const output = generateKotlinClient(
+            defineConfig({
+                routes: {
+                    uploadAvatar: {
+                        method: 'POST',
+                        path: '/avatar',
+                        contentType: 'multipart/form-data',
+                        body: z.object({
+                            file: z.instanceof(File),
+                            caption: z.string().optional(),
+                        }),
+                        responses: {
+                            204: z.void(),
+                        },
+                    },
+                },
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('if (body.caption != null) {');
+        expect(output).toContain('multipartBuilder.addFormDataPart("caption", body.caption.toString())');
     });
 });
 

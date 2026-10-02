@@ -19,6 +19,38 @@ interface KizunaQueryValue {
     val wireValue: String
 }
 
+/** A `.nullish()` field: left out, sent as `null`, or sent with a value. */
+@Serializable(with = NullishSerializer::class)
+sealed interface Nullish<out T> {
+    val value: T?
+
+    data object Absent : Nullish<Nothing> {
+        override val value: Nothing? get() = null
+    }
+
+    data object Null : Nullish<Nothing> {
+        override val value: Nothing? get() = null
+    }
+
+    data class Some<out T>(override val value: T) : Nullish<T>
+}
+
+class NullishSerializer<T>(private val valueSerializer: KSerializer<T>) : KSerializer<Nullish<T>> {
+    override val descriptor: SerialDescriptor = valueSerializer.descriptor.nullable
+
+    @OptIn(ExperimentalSerializationApi::class)
+    override fun serialize(encoder: Encoder, value: Nullish<T>) {
+        if (value is Nullish.Some) encoder.encodeSerializableValue(valueSerializer, value.value) else encoder.encodeNull()
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    override fun deserialize(decoder: Decoder): Nullish<T> {
+        if (decoder.decodeNotNullMark()) return Nullish.Some(decoder.decodeSerializableValue(valueSerializer))
+        decoder.decodeNull()
+        return Nullish.Null
+    }
+}
+
 object OpenEnumAPI {
 
     /** A user in the system */
@@ -29,7 +61,7 @@ object OpenEnumAPI {
         @Deprecated("use `email_address` instead.") val email: String,
         val email_address: String? = null,
         val last_name: String? = null,
-        val avatar: Avatar? = null,
+        val avatar: Nullish<Avatar> = Nullish.Absent,
         val avatars: List<AvatarsItem>? = null,
         val metadata: Map<String, String>? = null,
         val tags: List<String?>? = null
@@ -110,6 +142,20 @@ object OpenEnumAPI {
         val email: String,
         val last_name: String? = null,
         val phone: String? = null
+    )
+
+    @Serializable
+    data class UserPreferences(
+        val timezone: String?,
+        val locale: String? = null,
+        val signature: Nullish<String> = Nullish.Absent,
+        val mutedChannels: List<MutedChannel>
+    )
+
+    @Serializable
+    data class MutedChannel(
+        val channel: String,
+        val until: String?
     )
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -353,7 +399,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class Response(
             val users: List<OpenEnumAPI.User>,
-            val nextCursor: Double? = null
+            val nextCursor: Double?
         )
 
         data class Query(
@@ -497,6 +543,41 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: OpenEnumAPI.ProblemDetails) : Failure()
             data class ValidationError(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object UsersUpdatePreferences {
+
+        data class Params(val id: OpenEnumAPI.UserId)
+
+        data class Body(
+            val timezone: String?,
+            val locale: String? = null,
+            val signature: Nullish<String> = Nullish.Absent,
+            val mutedChannels: List<OpenEnumAPI.MutedChannel>
+        )
+
+        sealed interface Args {
+            val params: Params
+            val body: Body
+        }
+
+        object Scope {
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
+        }
+
+        class AfterParams internal constructor(internal val params: Params) {
+            fun body(timezone: String?, locale: String? = null, signature: Nullish<String> = Nullish.Absent, mutedChannels: List<OpenEnumAPI.MutedChannel>): AfterBody = AfterBody(params = params, body = Body(timezone = timezone, locale = locale, signature = signature, mutedChannels = mutedChannels))
+        }
+
+        class AfterBody internal constructor(override val params: Params, override val body: Body) : Args
+
+        data class Result(val body: OpenEnumAPI.UserPreferences)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -796,12 +877,12 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         @Serializable
         data class ResponseEcho(
-            val since: Instant? = null,
-            val kind: OpenEnumAPI.EventKind? = null,
-            val ids: List<String>? = null,
-            val label: String? = null,
-            val tagIds: List<String>? = null,
-            val sessionId: String? = null
+            val since: Instant?,
+            val kind: OpenEnumAPI.EventKind?,
+            val ids: List<String>?,
+            val label: String?,
+            val tagIds: List<String>?,
+            val sessionId: String?
         )
 
         data class Query(
@@ -1850,7 +1931,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Response(
             val ip: String,
             val protocol: String,
-            val userAgent: String? = null
+            val userAgent: String?
         )
 
         data class Result(val body: Response)
@@ -2281,6 +2362,46 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     throw OpenEnumAPIClient.UsersCreateUser.Failure.Unexpected(statusCode = statusCode, data = data)
                 }
                 else -> throw OpenEnumAPIClient.UsersCreateUser.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Replace a user's preferences, exercises required nullable fields round-tripping through the clients */
+    @Throws(OpenEnumAPIClient.UsersUpdatePreferences.Failure::class)
+    suspend fun updatePreferences(build: OpenEnumAPIClient.UsersUpdatePreferences.Scope.() -> OpenEnumAPIClient.UsersUpdatePreferences.Args): OpenEnumAPIClient.UsersUpdatePreferences.Result {
+        val args = OpenEnumAPIClient.UsersUpdatePreferences.Scope.build()
+        val params = args.params
+        val body = args.body
+        var path = "/users/:id/preferences"
+        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = OpenEnumAPI.UserPreferences(timezone = body.timezone, locale = body.locale, signature = body.signature, mutedChannels = body.mutedChannels)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("PUT", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPI.UserPreferences>(data.decodeToString())
+                        return@use OpenEnumAPIClient.UsersUpdatePreferences.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.BadRequest(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

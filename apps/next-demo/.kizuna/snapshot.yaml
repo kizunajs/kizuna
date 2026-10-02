@@ -582,6 +582,73 @@ routes:
             optional: false
             schema:
               kind: string
+  users.updatePreferences:
+    method: PUT
+    path: /users/:id/preferences
+    statuses:
+      - 200
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        timezone:
+          optional: false
+          schema:
+            kind: string
+        locale:
+          optional: true
+          schema:
+            kind: string
+        signature:
+          optional: true
+          schema:
+            kind: string
+        mutedChannels:
+          optional: false
+          schema:
+            kind: array
+            element:
+              kind: object
+              fields:
+                channel:
+                  optional: false
+                  schema:
+                    kind: string
+                until:
+                  optional: false
+                  schema:
+                    kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          timezone:
+            optional: false
+            schema:
+              kind: string
+          locale:
+            optional: true
+            schema:
+              kind: string
+          signature:
+            optional: true
+            schema:
+              kind: string
+          mutedChannels:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  channel:
+                    optional: false
+                    schema:
+                      kind: string
+                  until:
+                    optional: false
+                    schema:
+                      kind: string
   users.deleteUser:
     method: DELETE
     path: /users/:id
