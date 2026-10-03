@@ -99,7 +99,7 @@ export default definePage({
 
 `name` is how the page is read, `kizuna.content.pages.frontPage`, and how tools address it. Write it in camelCase with a `Page` suffix, unique across the site, and as a literal so discovery can read it.
 
-Content is stored under the page's name, so moving the route's folder keeps it. A new name starts the page afresh, and the old content waits, listed in the content overview, until you move it:
+Content is stored under the page's name, so moving the route's folder keeps it. A new name starts the page afresh, and the old content waits, listed by [`kizuna cms orphans`](/docs/cms/cli#kizuna-cms-orphans), until you move it:
 
 ```sh
 kizuna cms rename-page pricingPage plansPage
@@ -459,7 +459,7 @@ migrate: {
 },
 ```
 
-Reads run the step in memory, and the document's next save stores the result, so migrating never publishes anything. [`kizuna diff`](/docs/breaking-changes#content) fails a pull request that adds a required field with neither. If one ships anyway, visitors see the newest earlier version that still passes, or nothing when none does, and the content overview lists the page.
+Reads run the step in memory, and the document's next save stores the result, so migrating never publishes anything. [`kizuna diff`](/docs/breaking-changes#content) fails a pull request that adds a required field with neither. If one ships anyway, visitors see the newest earlier version that still passes, or nothing when none does, and [`kizuna cms check`](/docs/cms/cli#kizuna-cms-check) lists the page.
 
 A rename is a removal and an addition, so write a step that moves the value. `richTextFromPlain` turns a text field into rich text:
 

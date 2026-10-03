@@ -206,6 +206,19 @@ export interface CmsPluginOptions<
      * naming where they were going.
      */
     signInPath?: string;
+    /**
+     * Where the site is, so the editor can show its draft beside the form.
+     *
+     * @example
+     * ```ts
+     * preview: {
+     *     url: 'https://example.com',
+     * },
+     * ```
+     */
+    preview?: {
+        url: string;
+    };
     environments?: Record<string, EnvironmentOptions>;
     /**
      * Where the CMS routes are served within the API.
@@ -313,6 +326,11 @@ export const CmsPluginOptionsSchema = z
         previewSecret: z.string().optional(),
         revalidate: z.custom<CmsPluginOptions['revalidate']>(isFunction).optional(),
         signInPath: z.string().optional(),
+        preview: z
+            .object({
+                url: z.url(),
+            })
+            .optional(),
         environments: z
             .record(
                 z.string(),

@@ -84,6 +84,7 @@ It collects every `content.ts` into `src/cms.pages.ts` whenever Next starts or b
 import { defineConfig } from 'kizunajs';
 import { nextAdapter } from '@kizunajs/next';
 import { cms } from '@kizunajs/cms';
+import { mcpPlugin } from '@kizunajs/mcp';
 import { editor } from './src/identities';
 import { pages } from './src/cms.pages';
 import { db } from './src/db';
@@ -102,11 +103,15 @@ export default defineConfig({
             identity: 'editor',
         },
         signInPath: '/login',
+        preview: {
+            url: 'https://example.com',
+        },
     }),
+    plugins: [mcpPlugin()],
 });
 ```
 
-`editor` is the [identity](/docs/authentication) your editors sign in as, checked by your own sign-in. Mount the config once, and it serves everything the CMS needs, from the content to the images to draft mode:
+`editor` is the [identity](/docs/authentication) your editors sign in as, checked by your own sign-in. `mcpPlugin()` serves the [MCP](/docs/mcp) endpoint editors connect their chat to, and `preview.url` is where the site is, so the editor can show its draft. Mount the config once, and it serves everything the CMS needs, from the content to the images to draft mode:
 
 ```ts title="src/app/api/[...kizuna]/route.ts"
 import kizuna from '@kizuna-config';
@@ -167,7 +172,7 @@ import kizuna from '@kizuna-config';
 </body>;
 ```
 
-Editors open `/api/draft`. Signed out, they go to `signInPath` first, and signed in, they land on the site in draft mode, where clicking any text edits it and the bar publishes.
+The preview shows drafts in the editor, which runs in your chat. Add the MCP endpoint to Claude or another host that supports MCP Apps, signed in as an editor, and ask it to change the front page. See [Editing](/docs/cms/editing#the-editor).
 
 </Step>
 
@@ -176,7 +181,7 @@ Editors open `/api/draft`. Signed out, they go to `signInPath` first, and signed
 ## Where to go next
 
 - [Content](/docs/cms/content): fields, blocks, globals, collections, images, and relationships
-- [Editing](/docs/cms/editing): drafts, the preview, agents, and what holds for all of them
+- [Editing](/docs/cms/editing): drafts, the editor in your chat, its tools, and what holds for all of them
 - [Next.js](/docs/cms/next): reading, caching and draft mode
 - [The CMS API](/docs/cms/api): when the site has an app API too, and when several sites share one CMS
 - [CLI](/docs/cms/cli): checks, renames, and moving content between environments

@@ -22,7 +22,7 @@ import {
     isGuardDenial,
 } from 'kizunajs/adapter';
 import { contractOf, jobRunnerFrom, pluginExportsOf, JOBS_META, type JobsMeta } from 'kizunajs/adapter';
-import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from 'kizunajs';
+import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme, ToolView } from 'kizunajs';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from 'kizunajs/generator';
 import { buildToolOutputSchema, toolSchema } from './schema.js';
@@ -170,6 +170,68 @@ const buildToolAnnotations = (route: RouteDefinition): Annotations => {
         ...(declared.openWorldHint === undefined ? {} : { openWorldHint: declared.openWorldHint }),
     };
 };
+
+/**
+ * The media type MCP Apps reads a view's HTML as.
+ */
+const VIEW_MIME_TYPE = 'text/html;profile=mcp-app';
+
+/**
+ * The extension a server advertises when it serves views.
+ */
+const VIEW_EXTENSION = 'io.modelcontextprotocol/ui';
+
+/**
+ * The `_meta.ui` a tool carries, linking it to its view and saying who may
+ * call it.
+ */
+const toolUiMeta = (route: RouteDefinition): Record<string, unknown> | undefined => {
+    const declared = toolOptionsOf(route);
+    const ui = {
+        ...(declared?.ui === undefined
+            ? {}
+            : {
+                  resourceUri: declared.ui.uri,
+              }),
+        ...(declared?.visibility === undefined
+            ? {}
+            : {
+                  visibility: [...declared.visibility],
+              }),
+    };
+    return Object.keys(ui).length === 0 ? undefined : ui;
+};
+
+/**
+ * Every distinct view the tools name, once each.
+ */
+const collectViews = (definitions: readonly McpTool[]): ToolView[] => {
+    const views = new Map<string, ToolView>();
+    for (const definition of definitions) {
+        const view = toolOptionsOf(definition.route)?.ui;
+        if (view !== undefined) views.set(view.uri, view);
+    }
+    return [...views.values()];
+};
+
+/**
+ * The `_meta.ui` a view's resource carries: what it may reach, and how the
+ * host frames it.
+ */
+const viewMeta = (view: ToolView): Record<string, unknown> => ({
+    ui: {
+        ...(view.csp === undefined
+            ? {}
+            : {
+                  csp: view.csp,
+              }),
+        ...(view.prefersBorder === undefined
+            ? {}
+            : {
+                  prefersBorder: view.prefersBorder,
+              }),
+    },
+});
 
 export interface McpTool {
     name: string;
@@ -566,6 +628,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     };
 
     const definitions = buildMcpTools(api.routes);
+    const views = collectViews(definitions);
 
     const server = new McpServer(
         {
@@ -574,10 +637,48 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
         },
         {
             instructions: buildInstructions(contract, definitions, options?.instructions),
+            ...(views.length === 0
+                ? {}
+                : {
+                      capabilities: {
+                          extensions: {
+                              [VIEW_EXTENSION]: {
+                                  mimeTypes: [VIEW_MIME_TYPE],
+                              },
+                          },
+                      },
+                  }),
         }
     );
 
+    for (const view of views) {
+        server.registerResource(
+            view.name,
+            view.uri,
+            {
+                mimeType: VIEW_MIME_TYPE,
+                ...(view.description === undefined
+                    ? {}
+                    : {
+                          description: view.description,
+                      }),
+                _meta: viewMeta(view),
+            },
+            async () => ({
+                contents: [
+                    {
+                        uri: view.uri,
+                        mimeType: VIEW_MIME_TYPE,
+                        text: await view.html(),
+                        _meta: viewMeta(view),
+                    },
+                ],
+            })
+        );
+    }
+
     for (const definition of definitions) {
+        const uiMeta = toolUiMeta(definition.route);
         server.registerTool(
             definition.name,
             {
@@ -590,6 +691,13 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                 inputSchema: definition.inputSchema.shape === undefined ? undefined : toolSchema(z.object(definition.inputSchema.shape)),
                 outputSchema: toolSchema(definition.outputSchema),
                 annotations: buildToolAnnotations(definition.route),
+                ...(uiMeta === undefined
+                    ? {}
+                    : {
+                          _meta: {
+                              ui: uiMeta,
+                          },
+                      }),
             },
             async (args: Record<string, unknown>, context: McpToolContext) => {
                 const refusal = approval(definition.route, context);

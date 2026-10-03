@@ -32,6 +32,12 @@ export const toolRefusal = (route: RouteDefinition): string | undefined => {
  * The routes a model may call: the ones that declared `tool`, less the ones
  * whose shape a tool call cannot carry.
  */
+/**
+ * Whether a model may call the route, rather than only a view on the same
+ * server.
+ */
+export const modelMayCall = (route: RouteDefinition): boolean => toolOptionsOf(route)?.visibility?.includes('model') ?? true;
+
 export const selectToolRoutes = (routes: FlattenedRoute[]): FlattenedRoute[] =>
     routes.filter(({ route }) => toolOptionsOf(route) !== undefined && toolRefusal(route) === undefined);
 

@@ -86,6 +86,8 @@ deleteWorkspace: k
 | `destructiveHint` | The route may remove or overwrite. Defaults to true for `DELETE`                  |
 | `openWorldHint`   | The route reaches something outside this API                                      |
 | `needsApproval`   | The person approves each call before it runs. Kizuna's own                        |
+| `ui`              | The [view](/docs/mcp#showing-a-view) a host renders the result in. MCP Apps' own  |
+| `visibility`      | Who may call it, `model`, `app` or both. MCP Apps' own                            |
 
 The hints come from the method's RFC 9110 semantics, so a `GET` is already marked read only and a `DELETE` already destructive. Set one to say what the method cannot.
 
@@ -652,6 +654,8 @@ export default defineConfig({
 ```
 
 A route names itself `users_get_user` over MCP, from its dotted key. If it needs an identity, the same guard runs on a tool call as on an HTTP request, and a refusal reaches the model as an execution error.
+
+A host that supports MCP Apps can render a route's result in a page of yours instead of as text. See [Showing a view](/docs/mcp#showing-a-view).
 
 See [MCP](/docs/mcp) for the rest of the endpoint, including OAuth.
 

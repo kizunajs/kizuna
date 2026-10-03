@@ -22,6 +22,7 @@ Kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RFCs 
 - **RFC 8707** (Resource Indicators for OAuth 2.0, February 2020): the canonical `resource` URI and the audience a guard checks
 - **RFC 6750** (OAuth 2.0 Bearer Token Usage, October 2012): the `WWW-Authenticate` challenge, including `insufficient_scope`
 - **Model Context Protocol**: the MCP endpoint, its tools, their names, and its authorization. A route's `tool` follows the `Tool` object field for field
+- **MCP Apps** (`io.modelcontextprotocol/ui`, spec 2026-01-26): a tool's `ui` view, served as a `ui://` resource of type `text/html;profile=mcp-app`, and its `visibility`
 
 ### MCP tool names
 
@@ -69,6 +70,7 @@ A tool is a route a model may call. Settled; don't relitigate.
 - A tool is not a second kind of declaration. A route says `tool` and it publishes, so there is one place a route runs whoever asked.
 - `tool: true` takes the route's `summary` as what a model reads, so a route that publishes carries one. The object form's fields are MCP's own, field for field: `description`, `title`, `readOnlyHint`, `idempotentHint`, `destructiveHint`, `openWorldHint`.
 - `needsApproval` is kizuna's own, the one field MCP cannot declare: the person approves each call before it runs. It is a boolean. A rule that depends on the input belongs in the handler.
+- `ui` names a view built with `defineView`, and `visibility` says who may call the tool, both MCP Apps' own. A view is self-contained HTML the MCP endpoint serves as a resource. A tool only a view calls says `visibility: ['app']`, and a stream cannot name it.
 - The hints default from the method's RFC 9110 semantics. Declare one only to say what the method cannot.
 - A tool is addressed by its dotted key, `weather.getForecast`, and publishes as `weather_get_forecast`.
 - A route that streams, or that takes a form body, never publishes: a tool result is one value and tool input is JSON.

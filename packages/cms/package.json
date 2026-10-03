@@ -2,7 +2,7 @@
   "name": "@kizunajs/cms",
   "private": true,
   "version": "2.0.0-beta.16",
-  "description": "Content layer for Next.js sites on Kizuna.js: pages and blocks declared with Zod, drafts and publishing, edited by agents or on the page",
+  "description": "Content layer for Next.js sites on Kizuna.js: pages and blocks declared with Zod, drafts and publishing, edited in your chat over MCP",
   "keywords": [
     "kizunajs",
     "typescript",
@@ -114,13 +114,14 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown src/index.ts src/schemas.ts src/next.tsx src/next-preview.tsx src/next-config.ts src/cli.ts --format esm,cjs --dts --clean --external kizunajs --external zod --external drizzle-orm --external next --external react --external react-dom --external @kizunajs/cms/next/preview --external next/headers --external next/navigation --external next/cache --external next/server --external sharp --external @aws-sdk/client-s3 --external @aws-sdk/s3-request-presigner --external @vercel/stega --external @base-ui/react --external lucide-react --external @portabletext/react --external @portabletext/editor --external @portabletext/editor/plugins --external @portabletext/editor/selectors --external @portabletext/types",
+    "build": "tsdown src/index.ts src/schemas.ts src/next.tsx src/next-preview.tsx src/next-config.ts src/cli.ts --format esm,cjs --dts --clean --shims --external kizunajs --external zod --external drizzle-orm --external next --external react --external react-dom --external @kizunajs/cms/next/preview --external next/headers --external next/navigation --external next/cache --external next/server --external sharp --external @aws-sdk/client-s3 --external @aws-sdk/s3-request-presigner --external @vercel/stega --external @base-ui/react --external lucide-react --external @portabletext/react --external @portabletext/editor --external @portabletext/editor/plugins --external @portabletext/editor/selectors --external @portabletext/types && node scripts/build-view.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
     "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "@base-ui/react": "^1.8.0",
+    "@modelcontextprotocol/ext-apps": "^2.0.3",
     "@portabletext/editor": "^8.2.3",
     "@portabletext/react": "^8.0.1",
     "@portabletext/types": "^4.0.2",
@@ -146,6 +147,8 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@kizunajs/express": "workspace:*",
+    "@kizunajs/mcp": "workspace:*",
+    "@modelcontextprotocol/client": "^2.0.0",
     "@types/express": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",

@@ -635,6 +635,7 @@ export {
     buildToolDefinitions,
     buildToolInputSchema,
     describeTool,
+    modelMayCall,
     selectToolRoutes,
     toolOptionsOf,
     toolRefusal,

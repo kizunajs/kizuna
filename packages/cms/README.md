@@ -1,6 +1,6 @@
 # @kizunajs/cms
 
-`@kizunajs/cms` is content for Next.js sites on Kizuna.js: pages, globals and collections declared with Zod, drafts and publishing in your own database, and editing by clicking on the page or by asking an agent.
+`@kizunajs/cms` is content for Next.js sites on Kizuna.js: pages, globals and collections declared with Zod, drafts and publishing in your own database, and editing in your chat, where Claude or another MCP host shows the editor beside the answer.
 
 ## Installation
 

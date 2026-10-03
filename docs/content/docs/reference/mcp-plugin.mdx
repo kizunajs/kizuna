@@ -58,6 +58,10 @@ getForecast: k
 
 A route with no `tool` is an HTTP endpoint and nothing more. Two shapes never publish even with it: a route whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded`, because tool input is JSON, and a route whose response [streams](/docs/streaming), because a tool result is one value. A [hidden](/docs/routes#hidden-routes) route can't say `tool`: the two together are a type error.
 
+## Views
+
+A route whose `tool` names a view under `ui` makes the endpoint serve that view as an [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview) resource and advertise the `io.modelcontextprotocol/ui` extension. See [Showing a view](/docs/mcp#showing-a-view).
+
 ## Example
 
 ```ts title="kizuna.config.ts"

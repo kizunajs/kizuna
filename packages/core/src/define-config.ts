@@ -5,6 +5,7 @@ import { createApiReference, resolvePlugins } from './plugin-server.js';
 import { assertNoPathCollisions, routeClaims } from './path-claims.js';
 import { assertValidDeprecationDates } from './deprecation.js';
 import { assertValidCache } from './cache.js';
+import { assertValidViews } from './tool-view.js';
 import { injectGuardResponses } from './guard-responses.js';
 import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { assertJobRunner, jobClaims, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
@@ -442,6 +443,7 @@ export const defineConfig = <
     injectGuardResponses(pluginRoutes, identities, guardSchema);
     assertValidCache(routes);
     assertValidCache(pluginRoutes);
+    assertValidViews(routes);
 
     const contract = buildApiDefinition({
         routes,

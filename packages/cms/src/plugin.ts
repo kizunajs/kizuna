@@ -275,9 +275,10 @@ const safeRedirect = (value: unknown): string =>
     typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') ? value : '/';
 
 /**
- * `GET /draft`: opens draft mode for a signed-in editor and lands them on
- * `redirect`, sends a signed-out one to `signInPath` first, and with
- * `renew` swaps in a fresh preview cookie for the overlay. `disable` leaves.
+ * `GET /draft`: opens draft mode for a signed-in editor, or for anyone holding
+ * a link the editor minted, and lands them on `redirect`. A signed-out editor
+ * with no link goes to `signInPath` first. `renew` swaps in a fresh preview
+ * cookie for the preview, and `disable` leaves.
  */
 const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: PluginApi, base: '' | `/${string}`) =>
     route({
@@ -289,6 +290,7 @@ const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
             redirect: z.string().optional(),
             renew: z.string().optional(),
             disable: z.string().optional(),
+            token: z.string().optional(),
         }),
         responses: {
             200: z.object({
@@ -308,6 +310,7 @@ const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
             redirect?: string;
             renew?: string;
             disable?: string;
+            token?: string;
         };
         const draft = await runtime.draftMode();
         const jar = await runtime.cookies();
@@ -317,20 +320,26 @@ const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
             jar.delete(PREVIEW_COOKIE);
             return rawResponse(redirect(target));
         }
+        // A link from the editor, which runs the site's draft inside a frame of the editor's own.
+        const viaLink = query.token !== undefined && service.verifiesPreview(query.token);
         const context = adapterContextOf(args as unknown as Record<string, unknown>);
-        const signedIn = await authenticate(
-            api,
-            options.auth.identity,
-            {
-                headers: args.headers as Record<string, string | string[] | undefined>,
-                query: args.query,
-            },
-            context
-        );
+        const signedIn = viaLink
+            ? undefined
+            : await authenticate(
+                  api,
+                  options.auth.identity,
+                  {
+                      headers: args.headers as Record<string, string | string[] | undefined>,
+                      query: args.query,
+                  },
+                  context
+              );
         const role = signedIn?.['role'];
         const allowed =
-            signedIn !== undefined &&
-            (service.roles === undefined || (Array.isArray(role) ? role : [role]).some((held) => service.roles!.includes(held as string)));
+            viaLink ||
+            (signedIn !== undefined &&
+                (service.roles === undefined ||
+                    (Array.isArray(role) ? role : [role]).some((held) => service.roles!.includes(held as string))));
         if (!allowed) {
             if (query.renew !== undefined) {
                 return rawResponse(
@@ -356,13 +365,26 @@ const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
         }
         const held = jar.get(PREVIEW_COOKIE);
         draft.enable();
-        jar.set(PREVIEW_COOKIE, service.previewToken(), {
-            httpOnly: true,
-            sameSite: 'lax',
-            secure: process.env['NODE_ENV'] === 'production',
-            path: '/',
-            maxAge: PREVIEW_TTL_SECONDS,
-        });
+        jar.set(
+            PREVIEW_COOKIE,
+            service.previewToken(),
+            viaLink
+                ? {
+                      httpOnly: true,
+                      sameSite: 'none',
+                      secure: true,
+                      partitioned: true,
+                      path: '/',
+                      maxAge: PREVIEW_TTL_SECONDS,
+                  }
+                : {
+                      httpOnly: true,
+                      sameSite: 'lax',
+                      secure: process.env['NODE_ENV'] === 'production',
+                      path: '/',
+                      maxAge: PREVIEW_TTL_SECONDS,
+                  }
+        );
         if (query.renew !== undefined) {
             // The page rendered without drafts when the held cookie had run out.
             return rawResponse(

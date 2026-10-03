@@ -37,6 +37,12 @@ export interface ContentCookies {
             httpOnly?: boolean;
             sameSite?: 'lax' | 'strict' | 'none';
             secure?: boolean;
+            /**
+             * Keep the cookie to the top-level site it was set under (CHIPS),
+             * so a browser that blocks cross-site cookies still keeps one set
+             * inside a frame.
+             */
+            partitioned?: boolean;
             path?: string;
             maxAge?: number;
         }

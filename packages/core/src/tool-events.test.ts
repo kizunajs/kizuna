@@ -355,6 +355,42 @@ describe('expandStreamTools', () => {
         ).toThrow(/naming "countLines", which does not declare `tool`/);
     });
 
+    it('throws on a named route only a view may call', () => {
+        const appOnly = k.routes({
+            countLines: k.route({
+                method: 'POST',
+                path: '/line-count',
+                summary: 'Count lines',
+                tool: {
+                    visibility: ['app'],
+                },
+                responses: {
+                    200: z.object({
+                        lines: z.int(),
+                    }),
+                },
+            }),
+        });
+        expect(() =>
+            k.routes({
+                reply: k.route({
+                    method: 'POST',
+                    path: '/reply',
+                    responses: {
+                        200: {
+                            stream: {
+                                delta: z.object({
+                                    text: z.string(),
+                                }),
+                            },
+                            tools: appOnly,
+                        },
+                    },
+                }),
+            })
+        ).toThrow(/naming "countLines", whose `visibility` keeps it from the model/);
+    });
+
     it('throws on a named route that streams', () => {
         const streaming = k.routes({
             tail: k.route({

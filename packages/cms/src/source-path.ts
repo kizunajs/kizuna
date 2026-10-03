@@ -128,7 +128,10 @@ export const encodeSourcePaths = (
         }
         return value;
     };
-    const encoded: Record<string, unknown> = {};
+    // Keys that are no field, like an item's `id`, pass through as they are.
+    const encoded: Record<string, unknown> = {
+        ...content,
+    };
     for (const field of page.fields) {
         encoded[field.name] = plain.includes(field.name) ? content[field.name] : walk(field.schema, content[field.name], field.name);
     }

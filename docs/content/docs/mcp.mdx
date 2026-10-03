@@ -216,6 +216,56 @@ tool: {
 
 The first call answers with the elicitation rather than a result, asking `Allow "Delete the workspace, owner only"?` from the route's `summary`, or its `title` when it has one. Approving runs the handler. Declining leaves it uncalled and answers `isError: true`.
 
+## Showing a view
+
+A host that supports [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview), such as Claude, can show a tool's result as a page rather than as text. Declare the page once with `defineView`, and name it under `ui` on the routes whose results it shows:
+
+```ts title="src/views.ts"
+import { readFile } from 'node:fs/promises';
+import { defineView } from 'kizunajs';
+
+export const userView = defineView({
+    uri: 'ui://users/user',
+    name: 'User',
+    html: () => readFile(new URL('./user-view.html', import.meta.url), 'utf8'),
+});
+```
+
+```ts title="src/routes/users.ts"
+tool: {
+    ui: userView,
+},
+```
+
+`html` returns one self-contained HTML document, with its scripts and styles inlined. The endpoint serves it as a `ui://` resource with the media type `text/html;profile=mcp-app`, and every tool naming it carries `_meta.ui.resourceUri`. The page runs in a sandboxed frame. It uses [`@modelcontextprotocol/ext-apps`](https://www.npmjs.com/package/@modelcontextprotocol/ext-apps) to receive the tool's result and to call this API's tools as the person in the chat. Hosts without MCP Apps read the `{ status, body }` result as before.
+
+The host blocks every origin a view does not list. `csp` names the ones it may reach:
+
+```ts title="src/views.ts"
+export const userView = defineView({
+    uri: 'ui://users/user',
+    name: 'User',
+    html: () => readFile(new URL('./user-view.html', import.meta.url), 'utf8'),
+    csp: {
+        frameDomains: ['https://example.com'],
+    },
+});
+```
+
+`connectDomains` covers `fetch`, `resourceDomains` covers scripts, styles, images and fonts, `frameDomains` covers nested frames, and `baseUriDomains` covers the document's base URI. `prefersBorder: true` asks the host to draw its own border and background around the view.
+
+### Tools only a view calls
+
+A view often calls tools the model has no reason to see, such as one that mints a short-lived token. `visibility` keeps a tool from the model while its view can still call it:
+
+```ts title="src/routes/users.ts"
+tool: {
+    visibility: ['app'],
+},
+```
+
+`defineConfig` throws when no route names a view, since nothing could call the tool then. A streamed response cannot name it under `tools` either.
+
 ## OAuth
 
 Point `oauth` at your [oauth2 identity](/docs/oauth) and the endpoint serves the discovery and challenges the MCP authorization specification asks of an OAuth 2.1 resource server. MCP clients log in through your authorization server (better-auth, Auth0, Keycloak) on their own.

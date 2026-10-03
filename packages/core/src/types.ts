@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import type { KnownStatus } from './status-titles.js';
 import type { ProblemDetails } from './problem-details.js';
+import type { ToolView, ToolVisibility } from './tool-view.js';
 
 export const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const;
 
@@ -327,6 +328,25 @@ export interface RouteToolOptions {
      * ```
      */
     needsApproval?: boolean;
+    /**
+     * The view a host renders this tool's result in, for a host that shows
+     * MCP Apps. Other hosts read the result as they always do.
+     *
+     * @example
+     * ```ts
+     * tool: {
+     *     ui: userView,
+     * },
+     * ```
+     */
+    ui?: ToolView;
+    /**
+     * Who may call it. `['app']` keeps it from the model, for a tool only a
+     * view calls.
+     *
+     * @default ['model', 'app']
+     */
+    visibility?: readonly ToolVisibility[];
 }
 
 export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {

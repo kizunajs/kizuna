@@ -14,6 +14,7 @@ const draft = {
     enabled: false,
 };
 const jar = new Map<string, string>();
+const cookieOptions = new Map<string, unknown>();
 
 const runtime: ContentRuntime = {
     cache: (read) => read,
@@ -29,8 +30,9 @@ const runtime: ContentRuntime = {
     }),
     cookies: async () => ({
         get: (name) => jar.get(name),
-        set: (name, value) => {
+        set: (name, value, options) => {
             jar.set(name, value);
+            cookieOptions.set(name, options);
         },
         delete: (name) => {
             jar.delete(name);
@@ -90,6 +92,9 @@ const config = defineConfig({
             roles: ['editor', 'admin'],
         },
         signInPath: '/login',
+        preview: {
+            url: 'https://site.example',
+        },
     }),
 });
 const app = express();
@@ -100,6 +105,7 @@ const asEditor = (call: request.Test) => call.set('authorization', 'Bearer edito
 beforeEach(() => {
     draft.enabled = false;
     jar.clear();
+    cookieOptions.clear();
 });
 
 afterAll(async () => {
@@ -153,5 +159,56 @@ describe('the draft route', () => {
         expect(response.status).toBe(307);
         expect(draft.enabled).toBe(false);
         expect(jar.has(PREVIEW_COOKIE)).toBe(false);
+    });
+
+    it('opens draft mode from a link the editor minted, with a cookie a frame keeps', async () => {
+        const response = await request(app)
+            .get('/draft')
+            .query({
+                token: signPreviewToken(previewSecret(undefined)),
+                redirect: '/blog/welcome',
+            });
+        expect(response.status).toBe(307);
+        expect(response.headers['location']).toBe('/blog/welcome');
+        expect(draft.enabled).toBe(true);
+        expect(cookieOptions.get(PREVIEW_COOKIE)).toMatchObject({
+            sameSite: 'none',
+            secure: true,
+            partitioned: true,
+        });
+    });
+
+    it('sends a link that does not verify to sign in', async () => {
+        const response = await request(app)
+            .get('/draft')
+            .query({
+                token: signPreviewToken(previewSecret(undefined), 600, Date.now() - 601_000),
+            });
+        expect(response.status).toBe(307);
+        expect(response.headers['location']).toMatch(/^\/login\?next=/);
+        expect(draft.enabled).toBe(false);
+    });
+});
+
+describe('the preview link route', () => {
+    it('mints a link into draft mode on the site, for an editor', async () => {
+        const response = await asEditor(
+            request(app).post('/editing/preview').send({
+                path: '/blog/welcome',
+            })
+        );
+        expect(response.status).toBe(200);
+        const link = new URL(response.body.url);
+        expect(link.origin).toBe('https://site.example');
+        expect(link.pathname).toBe('/api/draft');
+        expect(link.searchParams.get('redirect')).toBe('/blog/welcome');
+
+        const opened = await request(app).get('/draft').query(Object.fromEntries(link.searchParams));
+        expect(opened.status).toBe(307);
+        expect(draft.enabled).toBe(true);
+    });
+
+    it('refuses anyone but an editor', async () => {
+        expect((await request(app).post('/editing/preview').send({})).status).toBe(401);
     });
 });

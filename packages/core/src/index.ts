@@ -144,6 +144,7 @@ export {
 export { readToolCalls, type ToolCallRecord, type ToolCallState, type ToolCallMessage } from './tool-records.js';
 export type { ModelToolCall, StreamTools, ToolAnswer, ToolEventYield, ToolRunCall, ToolRunOptions, ToolRunResult } from './tool-runner.js';
 export type { ToolDefinition } from './tool-definitions.js';
+export { defineView, type ToolView, type ToolViewCsp, type ToolVisibility } from './tool-view.js';
 export {
     defineJobTransport,
     JobDispatchError,

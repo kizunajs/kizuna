@@ -254,7 +254,7 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             name: 'site',
         },
         {
-            footerText: 'Kizuna demo shop. Content edited at /cms, or by an agent over MCP.',
+            footerText: 'Kizuna demo shop. Content edited in your chat, over MCP.',
             contactEmail: 'hello@example.com',
         }
     );

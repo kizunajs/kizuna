@@ -1,7 +1,5 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { CmsOverview } from '@kizunajs/cms/next';
-import kizuna from '@kizuna-config';
 import { auth } from '../../auth';
 import { signOut } from '../login/actions';
 
@@ -34,7 +32,6 @@ export default async function ContentPage() {
                     <button type="submit">Sign out</button>
                 </form>
             </header>
-            <CmsOverview content={kizuna.content} />
             <section
                 style={{
                     maxWidth: '64rem',
@@ -46,9 +43,12 @@ export default async function ContentPage() {
                     style={{
                         fontSize: '1.1rem',
                     }}>
-                    Connect an agent
+                    Edit in your chat
                 </h2>
-                <p>Point an MCP client at the endpoint below with your session as the bearer. It edits as you, with your role.</p>
+                <p>
+                    Add the endpoint below to Claude, or another host that shows MCP Apps, with your session as the bearer. Ask it to change
+                    a page, and the editor opens beside the answer. It edits as you, with your role.
+                </p>
                 <pre
                     style={{
                         background: '#f4f4f4',

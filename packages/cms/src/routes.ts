@@ -10,6 +10,8 @@ import { servesCollection } from './page.js';
 import { addressFieldsOf } from './dynamic.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
 import { resolvedSchema } from './content-schema.js';
+import { documentViewFor } from './document-view.js';
+import { PREVIEW_TTL_SECONDS } from './preview-token.js';
 import {
     CreateItemBodySchema,
     CreateUploadBodySchema,
@@ -216,6 +218,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
 
     const authorOf = (cms: CmsService, args: Args): string => cms.author(args.auth?.[cms.identity]);
 
+    // One view for every route that opens the editor, so MCP serves it once.
+    const documentView = documentViewFor(options);
+
     const withUrl = (cms: CmsService, record: Awaited<ReturnType<CmsService['media']['get']>> & object) => ({
         ...record,
         url: cms.imageUrl(record.id),
@@ -227,7 +232,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             path: `${editingBase}${scope.prefix}/draft`,
             auth: editor,
             summary: `Read the draft of ${scope.noun}`,
-            tool: true,
+            tool: {
+                ui: documentView,
+            },
             pathParams: scope.params,
             responses: {
                 200: {
@@ -791,7 +798,9 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         summary: 'Describe what is shown at a URL, or any document by its ref: its fields, what the caller may write, and the draft',
         description:
             'Start here when working from the page someone is looking at, or from a ref a source path or another tool gave you. Each field carries its path, the JSON Schema a value has to pass, and whether you may write it. `usedOn` says where else shared content appears; say so before changing it.',
-        tool: true,
+        tool: {
+            ui: documentView,
+        },
         query: z.object({
             url: z.string().optional().describe('The page URL or path, like https://example.com/blog/spring-sale or /blog/spring-sale.'),
             site: z.string().optional().describe('The site the URL belongs to, when several apps share the CMS.'),
@@ -1105,6 +1114,48 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         })) as never
     );
 
+    const createPreview = route({
+        method: 'POST',
+        path: `${editingBase}/preview`,
+        auth: editor,
+        summary: "Open the site's draft",
+        description: 'A link into draft mode that holds for ten minutes, for the editor to frame the site or open it in a tab.',
+        tool: {
+            visibility: ['app'],
+        },
+        body: z
+            .object({
+                path: z.string().optional().describe('The page to land on, like /blog/spring-sale.'),
+            })
+            .optional(),
+        responses: {
+            200: z.object({
+                url: z.string(),
+                expiresAt: z.string(),
+            }),
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            if (options.preview === undefined) {
+                throw new CmsHttpError(404, {
+                    detail: 'The CMS does not know where the site is. Set `preview.url` on cms().',
+                });
+            }
+            const body = args.body as { path?: string } | undefined;
+            const draft = new URL(`${options.apiPath ?? '/api'}${base}/draft`, options.preview.url);
+            draft.searchParams.set('token', cms.previewToken());
+            draft.searchParams.set('redirect', body?.path ?? '/');
+            return {
+                status: 200,
+                body: {
+                    url: draft.toString(),
+                    expiresAt: new Date(Date.now() + PREVIEW_TTL_SECONDS * 1000).toISOString(),
+                },
+            };
+        }) as never
+    );
+
     const invalidate = route({
         method: 'POST',
         path: `${base}/invalidate`,
@@ -1172,6 +1223,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             },
             whereUsed,
             searchItems,
+            createPreview,
         },
         invalidate,
     };

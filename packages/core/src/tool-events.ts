@@ -11,7 +11,7 @@ import {
 import { flattenRoutes } from './handler-pipeline.js';
 import { parsePath } from './path-params.js';
 import { isVoidSchema, readObjectShape } from './zod-internals.js';
-import { toolOptionsOf, toolRefusal } from './tool-definitions.js';
+import { modelMayCall, toolOptionsOf, toolRefusal } from './tool-definitions.js';
 import { deriveToolNames } from './tool-name.js';
 
 /**
@@ -294,6 +294,9 @@ export const expandStreamTools = (route: RouteDefinition, routeKey: string): voi
             }
             const refusal = toolRefusal(toolRoute);
             if (refusal !== undefined) throw new Error(`${where}, naming "${toolKey}", which cannot run as a tool: ${refusal}.`);
+            if (!modelMayCall(toolRoute)) {
+                throw new Error(`${where}, naming "${toolKey}", whose \`visibility\` keeps it from the model. Only a view calls it.`);
+            }
         }
 
         const events = toolEvents(tools);

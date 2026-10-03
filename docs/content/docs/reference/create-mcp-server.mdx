@@ -63,6 +63,8 @@ const server = createMcpServer(kizuna.api, {
 
 An `McpServer` instance from `@modelcontextprotocol/sdk`. Connect it to any transport.
 
+Each route with `tool` is registered as a tool, and each [view](/docs/mcp#showing-a-view) those routes name is registered once as a resource.
+
 ## Example
 
 ```ts title="src/mcp.ts"

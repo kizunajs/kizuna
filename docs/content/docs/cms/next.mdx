@@ -18,13 +18,13 @@ export default async function ContactPage() {
 }
 ```
 
-| Situation                                | `get()`                                                        |
-| ---------------------------------------- | -------------------------------------------------------------- |
-| Published                                | The published content, cached and tagged                       |
-| Published, but fails its schema          | The newest earlier published version that passes               |
-| Not published                            | Calls `notFound()`                                             |
-| Draft mode, draft passes the schema      | The draft, marked for the preview                              |
-| Draft mode, no draft or incomplete draft | Calls `notFound()`, and `KizunaPreview` shows the setup screen |
+| Situation                                | `get()`                                                  |
+| ---------------------------------------- | -------------------------------------------------------- |
+| Published                                | The published content, cached and tagged                 |
+| Published, but fails its schema          | The newest earlier published version that passes         |
+| Not published                            | Calls `notFound()`                                       |
+| Draft mode, draft passes the schema      | The draft, marked for the preview                        |
+| Draft mode, no draft or incomplete draft | Calls `notFound()`, and the editor lists what is missing |
 
 Globals and collections read the same way:
 
@@ -81,9 +81,11 @@ Draft-mode reads skip the cache, and draft mode makes the render dynamic, so a d
 
 ## Draft mode
 
-Editors enter draft mode at `/api/draft`, which the CMS serves behind the `editor` identity. `?redirect=/blog/welcome` lands them on a page, and `?disable=1` leaves. A signed-out editor goes to the `signInPath` on `cms()` first.
+The editor opens the site in draft mode, at `/api/draft`, which the CMS serves. It first asks the CMS for a signed link that holds for ten minutes, minted behind the `editor` identity, so the site needs no sign-in of its own. `?redirect=/blog/welcome` lands on a page, and `?disable=1` leaves.
 
-Drafts show only while the editor's sign-in holds. The preview renews a short-lived cookie every few minutes, which only a signed-in editor can, so a shared browser stops showing drafts within ten minutes of the editor signing out.
+Drafts show only while that link's cookie verifies. The open editor renews it every few minutes, so closing the editor stops the drafts showing soon after. The cookies are set for a cross-site frame, since the site's draft runs inside the editor in your chat.
+
+`/api/draft` opened directly, with no link, still works for a signed-in editor. A signed-out editor goes to the `signInPath` on `cms()` first.
 
 ## The preview
 
@@ -97,22 +99,20 @@ import kizuna from '@kizuna-config';
 </body>;
 ```
 
-It renders nothing outside draft mode. When a layout reads a global, put it in `not-found.tsx` too, since an unpublished global sends every page there and the editor needs the preview to fill it in.
+It renders nothing outside draft mode. Inside the editor, it outlines the fields you can change and tells the editor which one you click, and which page a link took you to. Opened in a tab of its own, it shows the draft with a bar to leave draft mode.
 
-## The content overview
+When a layout reads a global, put the preview in `not-found.tsx` too, since an unpublished global sends every page there and the editor needs the preview to point at it.
 
-An optional page of your app that lists everything editors can change:
+The editor needs the site's address to show it, so give `cms()` a `preview`:
 
-```tsx title="src/app/cms/page.tsx"
-import { CmsOverview } from '@kizunajs/cms/next';
-import kizuna from '@kizuna-config';
-
-export default function ContentPage() {
-    return <CmsOverview content={kizuna.content} />;
-}
+```ts title="kizuna.config.ts"
+content: cms({
+    // ...
+    preview: {
+        url: 'https://example.com',
+    },
+}),
 ```
-
-Every page with its status, history and a preview link, an editor for collections and globals, and the media. It also lists content left behind by a renamed page, and published content that fails its schema after a code change. It is a page of your app, so it sits behind your sign-in.
 
 ## App data in cached pages
 

@@ -41,6 +41,9 @@ export default defineConfig({
         media: process.env.CMS_S3_BUCKET === undefined ? { storage: localMediaStorage } : undefined,
         apiPath: '/cms-api',
         signInPath: '/login',
+        preview: {
+            url: process.env.BETTER_AUTH_URL ?? 'http://localhost:3030',
+        },
         environments: {
             local: {
                 url: 'http://localhost:3030/cms-api',

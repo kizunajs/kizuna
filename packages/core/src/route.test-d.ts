@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { ProblemDetailsSchema } from './error-response.js';
 import { HANDLER } from './types.js';
+import { defineView } from './tool-view.js';
 
 interface Config {
     tags: typeof kTags;
@@ -211,6 +212,50 @@ test('tool rejects an option it does not know', () => {
             // @ts-expect-error `needsAproval` is misspelled
             needsAproval: true,
         },
+    });
+});
+
+test('tool names a view and who may call it', () => {
+    const userView = defineView({
+        uri: 'ui://users/user',
+        name: 'User',
+        html: () => '<!doctype html>',
+    });
+    k.route({
+        method: 'GET',
+        path: '/users/:id',
+        responses: {
+            200: UserSchema,
+        },
+        summary: 'Get a user',
+        tool: {
+            ui: userView,
+            visibility: ['model', 'app'],
+        },
+    });
+});
+
+test('visibility takes only model and app', () => {
+    k.route({
+        method: 'GET',
+        path: '/users',
+        responses: {
+            200: UserSchema,
+        },
+        summary: 'List users',
+        tool: {
+            // @ts-expect-error a tool is called by the model or a view, nothing else
+            visibility: ['user'],
+        },
+    });
+});
+
+test('a view uri starts with ui://', () => {
+    defineView({
+        // @ts-expect-error MCP Apps serves views under ui://
+        uri: 'https://example.com/user',
+        name: 'User',
+        html: () => '',
     });
 });
 

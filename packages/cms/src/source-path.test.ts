@@ -84,6 +84,19 @@ describe('source paths', () => {
         expect(stripPaths(encoded).hero.heading).toBe('Spring');
     });
 
+    it('keep what is no field, such as the id a collection item is read with', () => {
+        const encoded = encodeSourcePaths(
+            FrontPage,
+            {
+                id: 'item_1',
+                count: 3,
+            },
+            'item:articles:item_1'
+        );
+        expect(encoded['id']).toBe('item_1');
+        expect(encoded['count']).toBe(3);
+    });
+
     it('leave ids, URLs, emails, patterned values and plain fields unmarked, since code compares and links with them', () => {
         const EmployeeId = Kizuna.brand('EmployeeId', z.string());
         const ArticlePage = definePage({
