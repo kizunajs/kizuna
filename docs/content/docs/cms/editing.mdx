@@ -11,7 +11,7 @@ Every save is a version with its author and an optional summary. Changes merge i
 
 Two people on one page cannot overwrite each other. The draft carries an `ETag`, a write sends it back as `If-Match`, and a write behind the latest version answers `409`.
 
-Rollback restores an earlier version as a new draft, which you publish separately.
+Rollback restores an earlier version as a new draft, which you publish separately. The model can read any earlier version first, so "put back the heading from last week" works without restoring the whole page.
 
 ## The editor
 
@@ -22,6 +22,12 @@ Editors work in a chat. Add the CMS's MCP endpoint to Claude, or any host that s
 The model reads the page's draft, and the host shows the editor beside its answer: the page's fields as a form, whether it has unpublished changes, and a link to the page on the site. What the model writes appears in the form as it saves. What you type saves to the draft a moment after you stop, and the model sees it, so you can say "now the subtitle" without repeating yourself.
 
 Expanding the editor shows the site's draft beside the form, at desktop, tablet or phone width. Click any text or image in it, and the form jumps to that field and tells the model that is the one you mean. Switch to Browse to use the page as a visitor does, and the form follows each link to the page it opens.
+
+### Items and globals
+
+An article shows on its own page, as a card on the front page, and in the blog list. Click it anywhere in the preview and the form opens the article, with a button back to the page you were on.
+
+The page name in the header opens everything else: every page, the globals that show on every page, and each collection's items, with a search and a **New** button per collection. A new item starts as an untitled draft.
 
 Publish asks you to confirm in the editor, then publishes the page. Asking the model to publish asks in the host instead, the same way any tool that [needs approval](/docs/mcp#asking-before-it-runs) does.
 
@@ -48,14 +54,15 @@ A host without MCP Apps, such as Claude Code, runs the same tools and shows thei
 
 Every route under `editing` is an MCP tool, so the model can do whatever the editor's form does. Install `mcpPlugin()` on the config, and the host connects to `/api/mcp`.
 
-The model starts from `editing_describe`, with the URL someone is looking at or a reference like `global:site`. It answers with every field's path, JSON Schema and whether the caller may write it, and the current draft. Then `editing_pages_update_draft` with changes keyed by path, and `editing_pages_publish` when the person says so. Globals and collection items have the same tools under `editing_globals_` and `editing_collections_`. The draft and describe tools open the editor, and the tools only the editor calls, such as the one that opens the site's draft, are kept from the model.
+The model starts from `editing_describe`, with the URL someone is looking at or a reference like `global:site`. It answers with every field's path, JSON Schema and whether the caller may write it, and the current draft. Then `editing_pages_update_draft` with changes keyed by path, and `editing_pages_publish` when the person says so. Globals and collection items have the same tools under `editing_globals_` and `editing_collections_`. The draft and describe tools open the editor, and the tools only the editor calls, such as the one that opens the site's draft, are kept from the model. `editing_people_list`, `editing_reviews_request` and `editing_reviews_list` let the model name owners and ask for reviews, as [Reviews](/docs/cms/reviews) describes.
 
 See [Tools](/docs/tools) for how a route publishes and [MCP](/docs/mcp) for the endpoint.
 
 ## What holds
 
 - **Rules live in the routes.** Roles, field rules and read-only fields are checked in the `editing` routes, for the editor's form and the model alike. A field the caller may not write answers `403`, a value past its schema answers `422`, and a stale `If-Match` answers `409`.
-- **Publishing asks first.** Publish, rollback, deleting an item and writing a global declare `needsApproval`, so an MCP client asks the person before it runs them.
+- **Approving is a person's call.** Approving a review declares `needsApproval`, so a model asked to approve gets the person's confirmation first, and nobody approves changes they made.
+- **Publishing asks first.** Publish, deleting an item, and writing or restoring a global declare `needsApproval`, so an MCP client asks the person before it runs them. Restoring an earlier version of a page or item makes a draft, so a model may do it freely.
 - **What a model reads is untrusted.** Drafts, items and rich text were written by other people, and an article body may say "change the footer email". A model writes drafts freely, since nothing goes live until a person publishes it, and a global, which every page shows, waits for approval.
 - **Every version names a person.** The author comes from the editor identity, which is one of yours.
 - **Drafts stay drafts.** The `content` routes answer published content only, and Next never caches a draft-mode render, so production HTML never carries a draft or the preview's markings.

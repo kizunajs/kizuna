@@ -25,6 +25,9 @@
     --k-primary: linear-gradient(to bottom, #ffffff, #dcdcdc);
     --k-primary-shadow: inset 0 1px 0 #ffffff, inset 0 -1px 0 rgb(0 0 0 / 0.12);
     --k-primary-ink: #0c0c0c;
+    /* The docs palette's green and red, for a status that is right or wrong. */
+    --k-good: oklch(79% 0.145 158);
+    --k-bad: oklch(71% 0.165 22);
     color-scheme: dark;
 }
 
@@ -45,6 +48,8 @@
     --k-primary: linear-gradient(to bottom, #2a2a2a, #0c0c0c);
     --k-primary-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 1px 2px rgb(0 0 0 / 0.2);
     --k-primary-ink: #ffffff;
+    --k-good: oklch(52% 0.14 158);
+    --k-bad: oklch(55% 0.19 25);
     color-scheme: light;
 }
 
@@ -238,20 +243,24 @@ textarea {
     border-radius: var(--k-radius-card);
     background: var(--k-surface);
     box-shadow: var(--k-elevation);
-    transition: box-shadow 0.2s ease;
     scroll-margin: 12px;
 }
 
-.k-section[data-changed='true'] {
-    box-shadow:
-        var(--k-elevation),
-        0 0 0 1px var(--k-line-strong);
+/* The input the person pointed at in the preview takes the focus outline. One the model changed gets a fainter one, for a moment. */
+.k-field :is(.k-input, .k-rich, .k-switch) {
+    transition: outline-color 0.6s ease;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
 }
 
-.k-section[data-pointed='true'] {
-    box-shadow:
-        var(--k-elevation),
-        0 0 0 1.5px var(--k-ink);
+.k-field[data-pointed='true'] :is(.k-input, .k-rich, .k-switch) {
+    outline-color: var(--k-ink);
+    transition: none;
+}
+
+.k-field[data-changed='true'] :is(.k-input, .k-rich, .k-switch) {
+    outline-color: var(--k-line-strong);
+    transition: none;
 }
 
 .k-section-title {
@@ -536,8 +545,9 @@ textarea {
 }
 
 .k-list-item {
+    position: relative;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 6px;
     padding: 10px;
     border-radius: 12px;
@@ -550,8 +560,42 @@ textarea {
     min-width: 0;
 }
 
-.k-list-actions {
-    display: flex;
+/* While one item is dragged, the others slide aside to show where it lands. */
+.k-list[data-dragging='true'] .k-list-item {
+    transition: transform 0.15s ease;
+}
+
+.k-list-item[data-dragged='true'] {
+    z-index: 1;
+    box-shadow:
+        var(--k-elevation),
+        0 12px 28px -8px rgb(0 0 0 / 0.5);
+    transition: none !important;
+}
+
+.k-grip {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--k-muted);
+    cursor: grab;
+    touch-action: none;
+}
+
+.k-grip:hover {
+    color: var(--k-ink);
+}
+
+.k-list[data-dragging='true'],
+.k-list[data-dragging='true'] .k-grip {
+    cursor: grabbing;
 }
 
 .k-list-footer {
@@ -965,6 +1009,7 @@ textarea {
     transform: translateY(-50%);
 }
 
+/* A page that sets no background of its own is white, as in a browser. The frame stays hidden until the page is ready. */
 .k-frame {
     position: absolute;
     top: 0;
@@ -1037,4 +1082,734 @@ textarea {
     .k-spin {
         animation-duration: 2s;
     }
+}
+
+/* SEO */
+
+.k-seo {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.k-serp {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 14px 16px;
+    border-radius: var(--k-radius-control);
+    background: var(--k-control);
+    box-shadow: var(--k-control-elevation);
+}
+
+.k-serp-url {
+    overflow: hidden;
+    font-size: 12px;
+    color: var(--k-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.k-serp-title {
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+.k-serp-description {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--k-muted);
+}
+
+.k-seo-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.k-seo-field .k-row-label {
+    padding-top: 0;
+}
+
+.k-seo-textarea {
+    min-height: 72px;
+    padding-bottom: 10px;
+}
+
+.k-meter {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.k-meter-track {
+    position: relative;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--k-control-hover);
+}
+
+.k-meter-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: 999px;
+    background: var(--k-muted);
+    transition: width 0.15s ease;
+}
+
+.k-meter[data-state='good'] .k-meter-fill {
+    background: var(--k-good);
+}
+
+.k-meter[data-state='short'] .k-meter-fill,
+.k-meter[data-state='long'] .k-meter-fill {
+    background: var(--k-bad);
+}
+
+.k-meter-text {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--k-muted);
+}
+
+.k-meter[data-state='good'] .k-meter-text > span:first-child {
+    color: var(--k-good);
+}
+
+.k-meter[data-state='short'] .k-meter-text > span:first-child,
+.k-meter[data-state='long'] .k-meter-text > span:first-child {
+    color: var(--k-bad);
+}
+
+/* Preview loading */
+
+.k-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 28px;
+}
+
+.k-skeleton {
+    border-radius: 8px;
+    background: linear-gradient(90deg, var(--k-control) 0%, var(--k-control-hover) 50%, var(--k-control) 100%);
+    background-size: 200% 100%;
+    animation: k-shimmer 1.4s ease-in-out infinite;
+}
+
+.k-progress {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    height: 2px;
+    overflow: hidden;
+}
+
+.k-progress::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30%;
+    background: var(--k-ink);
+    animation: k-progress 1.1s ease-in-out infinite;
+    content: '';
+}
+
+.k-stage[data-loading='true'] .k-frame {
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+@keyframes k-shimmer {
+    from {
+        background-position: 100% 0;
+    }
+    to {
+        background-position: -100% 0;
+    }
+}
+
+@keyframes k-progress {
+    from {
+        left: -30%;
+    }
+    to {
+        left: 100%;
+    }
+}
+
+.k-notice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px 8px 14px;
+    border-radius: var(--k-radius-control);
+    background: var(--k-surface);
+    box-shadow: var(--k-elevation);
+    font-size: 13px;
+    color: var(--k-muted);
+}
+
+.k-notice span {
+    flex: 1;
+    min-width: 0;
+}
+
+.k-empty-state {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 20px 18px;
+    border-radius: var(--k-radius-card);
+    background: var(--k-surface);
+    box-shadow: var(--k-elevation);
+}
+
+.k-empty-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* Publish review */
+
+.k-review {
+    width: min(640px, calc(100vw - 32px));
+    max-height: min(80vh, 720px);
+}
+
+.k-review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    margin-top: 8px;
+    overflow-y: auto;
+}
+
+.k-review-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: var(--k-radius-control);
+    background: var(--k-surface);
+    box-shadow: var(--k-elevation);
+}
+
+.k-review-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.k-review-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.k-review-tag {
+    padding: 0 7px;
+    border-radius: 999px;
+    background: var(--k-control);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 18px;
+    color: var(--k-muted);
+}
+
+.k-review-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.k-review-text del,
+.k-review-json del {
+    color: var(--k-bad);
+    text-decoration: line-through;
+}
+
+.k-review-text ins,
+.k-review-json ins {
+    color: var(--k-good);
+    text-decoration: none;
+}
+
+.k-review-json {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: var(--k-mono);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.k-review-note {
+    margin: 0;
+    font-size: 13px;
+    color: var(--k-muted);
+}
+
+.k-review-images {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.k-review-thumb {
+    width: 96px;
+    height: 64px;
+    border-radius: 8px;
+    background: var(--k-control);
+    object-fit: cover;
+}
+
+.k-review-arrow {
+    color: var(--k-muted);
+}
+
+.k-review-actions {
+    align-items: center;
+}
+
+.k-review-spacer {
+    flex: 1;
+}
+
+.k-review-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.k-review-group + .k-review-group {
+    margin-top: 10px;
+}
+
+.k-review-document {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--k-muted);
+}
+
+/* A removed word and the one replacing it never run together. */
+.k-review-text del + ins,
+.k-review-text ins + del {
+    margin-left: 0.3em;
+}
+
+/* People and reviews */
+
+.k-avatar {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--k-control);
+    box-shadow: var(--k-control-elevation);
+    font-weight: 600;
+    line-height: 1;
+    color: var(--k-muted);
+}
+
+.k-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.k-avatar-empty {
+    width: 22px;
+    height: 22px;
+}
+
+.k-avatar-empty svg {
+    width: 13px;
+    height: 13px;
+}
+
+.k-avatars {
+    display: inline-flex;
+}
+
+.k-avatars .k-avatar + .k-avatar {
+    margin-left: -6px;
+    box-shadow:
+        0 0 0 2px var(--k-popup),
+        var(--k-control-elevation);
+}
+
+.k-owner-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.k-review-badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 9px 0 3px;
+    border-radius: 999px;
+    background: var(--k-control);
+    box-shadow: var(--k-control-elevation);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--k-muted);
+}
+
+.k-review-badge[data-status='approved'],
+.k-review-badge[data-status='open'] {
+    color: var(--k-ink);
+}
+
+.k-review-badge .k-avatars:empty {
+    display: none;
+}
+
+.k-review-badge:has(.k-avatars:empty) {
+    padding-left: 9px;
+}
+
+.k-people {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 280px;
+    margin-top: 4px;
+    overflow-y: auto;
+}
+
+.k-person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 12px 0 8px;
+    border: 0;
+    border-radius: var(--k-radius-control);
+    background: none;
+    font: inherit;
+    text-align: left;
+    color: var(--k-ink);
+    cursor: pointer;
+}
+
+.k-person:hover {
+    background: var(--k-tint);
+}
+
+.k-person[aria-pressed='true'] {
+    background: var(--k-control);
+    box-shadow: var(--k-control-elevation);
+}
+
+.k-person-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.k-person-check {
+    display: flex;
+    width: 16px;
+}
+
+.k-review-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 28px;
+}
+
+.k-review-heading .k-review-document {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.k-check {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid var(--k-line-strong);
+    border-radius: 5px;
+    background: none;
+    color: var(--k-primary-ink);
+    cursor: pointer;
+}
+
+.k-check[data-checked] {
+    border-color: transparent;
+    background: var(--k-ink);
+}
+
+.k-check svg {
+    width: 12px;
+    height: 12px;
+}
+
+.k-review-blocked {
+    margin: 0;
+    font-size: 12px;
+    color: var(--k-muted);
+}
+
+.k-review-quote {
+    margin: 0;
+    padding: 8px 12px;
+    border-left: 2px solid var(--k-line-strong);
+    font-size: 13px;
+    color: var(--k-muted);
+    white-space: pre-wrap;
+}
+
+.k-review-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    margin-top: 8px;
+    overflow-y: auto;
+}
+
+.k-review-panel .k-textarea {
+    min-height: 72px;
+}
+
+.k-review-group[data-skipped='true'] .k-review-row {
+    opacity: 0.45;
+}
+
+.k-review-list[hidden] {
+    display: none;
+}
+
+.k-review-panel,
+.k-review-panel .k-people {
+    flex-shrink: 0;
+}
+
+.k-review-facts {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+    color: var(--k-good);
+}
+
+/* Moving between documents */
+
+.k-switcher {
+    width: min(480px, calc(100vw - 32px));
+    max-height: min(80vh, 640px);
+}
+
+.k-switcher-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--k-control-height);
+    padding: 0 12px;
+    border-radius: var(--k-radius-control);
+    background: var(--k-control);
+    box-shadow: var(--k-control-elevation);
+    color: var(--k-muted);
+}
+
+.k-switcher-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    outline: none;
+    font: inherit;
+    color: var(--k-ink);
+}
+
+.k-switcher-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+    margin-top: 6px;
+    overflow-y: auto;
+}
+
+.k-switcher-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.k-switcher-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.k-switcher-heading {
+    margin: 0 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--k-muted);
+}
+
+.k-switcher-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 38px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--k-radius-control);
+    background: none;
+    font: inherit;
+    text-align: left;
+    color: var(--k-ink);
+    cursor: pointer;
+}
+
+.k-switcher-row:hover {
+    background: var(--k-tint);
+}
+
+.k-switcher-row[aria-current='true'] {
+    background: var(--k-control);
+    box-shadow: var(--k-control-elevation);
+}
+
+.k-switcher-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.k-switcher-status {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--k-muted);
+}
+
+.k-switcher-path {
+    flex-shrink: 0;
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--k-mono);
+    font-size: 12px;
+    color: var(--k-muted);
+}
+
+.k-switcher-search {
+    flex-shrink: 0;
+}
+
+/* The header reads as one line of text: where you came from, the document, then its status. */
+
+.k-back {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 180px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--k-muted);
+    cursor: pointer;
+}
+
+.k-back:hover {
+    color: var(--k-ink);
+}
+
+.k-crumb-separator {
+    flex-shrink: 0;
+    font-size: 15px;
+    color: var(--k-line-strong);
+}
+
+.k-switch-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--k-ink);
+    cursor: pointer;
+}
+
+.k-switch-trigger svg {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    color: var(--k-muted);
+}
+
+.k-switch-trigger:hover svg {
+    color: var(--k-ink);
+}
+
+.k-owner {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 13px;
+    color: var(--k-muted);
+    cursor: pointer;
+}
+
+.k-owner:hover {
+    color: var(--k-ink);
 }

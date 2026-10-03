@@ -5,16 +5,28 @@ import GithubIcon from '@/icons/Github.svg';
 import LogoMark from '@/icons/LogoMark.svg';
 import styles from './closing-cta.module.css';
 
-export function ClosingCta({ className }: { className?: string }) {
+interface ClosingCtaProps {
+    title?: string;
+    text?: string;
+    href?: string;
+    className?: string;
+}
+
+export function ClosingCta({
+    title = 'Ready to build?',
+    text = '8 minutes from an empty file to a typed client calling a real endpoint.',
+    href = '/docs/quickstart',
+    className,
+}: ClosingCtaProps) {
     return (
         <section className={clsx(styles.closingCta, className)}>
             <span className={styles.mark}>
                 <LogoMark />
             </span>
-            <h2 className={styles.ctaTitle}>Ready to build?</h2>
-            <p className={styles.ctaText}>8 minutes from an empty file to a typed client calling a real endpoint.</p>
+            <h2 className={styles.ctaTitle}>{title}</h2>
+            <p className={styles.ctaText}>{text}</p>
             <div className={styles.ctaActions}>
-                <ButtonLink href="/docs/quickstart">
+                <ButtonLink href={href}>
                     Get started
                     <ArrowRight aria-hidden />
                 </ButtonLink>

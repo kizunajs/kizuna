@@ -144,7 +144,7 @@ export function FieldForm({ fields, draft, onSave, onState, changed, pointed }: 
                     {errorFor(field.path)}
                 </p>
             ) : null}
-            {field.description !== undefined ? <p className="k-help">{field.description}</p> : null}
+            {field.help !== undefined ? <p className="k-help">{field.help}</p> : null}
             {writable ? null : <p className="k-help">{refusalFor(field)}</p>}
         </>
     );
@@ -163,21 +163,26 @@ export function FieldForm({ fields, draft, onSave, onState, changed, pointed }: 
                 .map((field) => {
                     const children = fields.filter((candidate) => candidate.parent === field.path);
                     return (
-                        <section
-                            key={field.path}
-                            id={domId(field.path)}
-                            className="k-section"
-                            data-changed={isMarked(field.path, changed)}
-                            data-pointed={isMarked(field.path, pointed)}>
+                        <section key={field.path} id={domId(field.path)} className="k-section">
                             <label className="k-section-title" htmlFor={children.length === 0 ? domId(field.path) + '-input' : undefined}>
                                 {labelOf(field)}
                             </label>
                             {children.length === 0 ? (
-                                control(field, field.writable)
+                                <div
+                                    className="k-field"
+                                    data-changed={isMarked(field.path, changed)}
+                                    data-pointed={isMarked(field.path, pointed)}>
+                                    {control(field, field.writable)}
+                                </div>
                             ) : (
                                 <div className="k-group">
                                     {children.map((child) => (
-                                        <div key={child.path} id={domId(child.path)} data-pointed={isMarked(child.path, pointed)}>
+                                        <div
+                                            key={child.path}
+                                            id={domId(child.path)}
+                                            className="k-field"
+                                            data-changed={isMarked(child.path, changed)}
+                                            data-pointed={isMarked(child.path, pointed)}>
                                             <Row label={labelOf(child)} htmlFor={domId(child.path) + '-input'}>
                                                 {control(child, child.writable && field.writable)}
                                             </Row>

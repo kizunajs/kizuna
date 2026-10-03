@@ -12,8 +12,3 @@ export const CtaSchema = z.object({
         protocol: /^https$/,
     }),
 });
-
-export const SeoSchema = z.object({
-    title: z.string().min(1).max(60).describe('What search results show as the title.'),
-    description: z.string().max(155).describe('One or two sentences for search results.'),
-});

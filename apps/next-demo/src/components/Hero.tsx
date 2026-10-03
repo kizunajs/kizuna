@@ -1,6 +1,20 @@
 import type { Output } from '@kizunajs/cms';
 import type { HeroBlockSchema } from '../cms/blocks';
 
+/**
+ * The hero image cropped short and wide around its focal point, so moving the
+ * focus in the editor moves what the crop keeps.
+ */
+const HERO_WIDTH = 1600;
+const HERO_HEIGHT = 560;
+
+const heroSource = (url: string): string => {
+    const parsed = new URL(url, 'http://image.local');
+    parsed.searchParams.set('w', String(HERO_WIDTH));
+    parsed.searchParams.set('h', String(HERO_HEIGHT));
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+};
+
 export function Hero(props: Output<typeof HeroBlockSchema>) {
     return (
         <section
@@ -11,10 +25,10 @@ export function Hero(props: Output<typeof HeroBlockSchema>) {
             }}>
             {props.image !== undefined ? (
                 <img
-                    src={props.image.url}
+                    src={heroSource(props.image.url)}
                     alt={props.image.alt}
-                    width={props.image.width}
-                    height={props.image.height}
+                    width={HERO_WIDTH}
+                    height={HERO_HEIGHT}
                     style={{
                         width: '100%',
                         height: 'auto',

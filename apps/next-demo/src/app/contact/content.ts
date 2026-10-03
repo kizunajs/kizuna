@@ -5,6 +5,8 @@ import { HeadingSchema } from '../../cms/schemas';
 
 export default definePage({
     name: 'contactPage',
+    label: 'Contact',
+    requireReview: true,
     fields: [
         {
             name: 'heading',

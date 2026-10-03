@@ -1,0 +1,229 @@
+.soon {
+    display: block;
+    width: fit-content;
+    margin-bottom: 14px;
+    border-radius: var(--kizuna-radius-pill);
+    background-color: rgb(255 255 255 / 0.08);
+    box-shadow: var(--kizuna-elevation-hover);
+    padding: 2px 10px;
+    font-size: 0.6875rem;
+    font-weight: var(--font-weight-600);
+    letter-spacing: 0.06em;
+    line-height: 1.6;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--kizuna-gap-actions);
+}
+
+/* The email at phone width, as the preview's Phone tab shows it. */
+.stage {
+    display: flex;
+    justify-content: center;
+    padding: 18px 16px 0;
+}
+
+.phone {
+    display: flex;
+    width: 100%;
+    max-width: 300px;
+    height: 560px;
+    flex-direction: column;
+    overflow: hidden;
+    border: 6px solid #2e2e2e;
+    border-bottom: 0;
+    border-radius: 34px 34px 0 0;
+    background-color: #1a1a1a;
+    mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
+}
+
+.email {
+    display: flex;
+    flex-direction: column;
+    background-color: #262626;
+    color: #ffffff;
+}
+
+.hero {
+    width: calc(100% - 24px);
+    height: 132px;
+    margin: 12px 12px 0;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px 18px 24px;
+}
+
+.eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8a8a8a;
+}
+
+.emailHeading {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+}
+
+.rich {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #b3b3b3;
+}
+
+.rich > * {
+    margin: 0;
+}
+
+.rich strong {
+    color: #ffffff;
+}
+
+.rich h3 {
+    margin-top: 4px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.rich ol {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 18px;
+    list-style: decimal;
+}
+
+.rich li::marker {
+    color: #8a8a8a;
+}
+
+.rich code {
+    border-radius: 4px;
+    background-color: rgb(255 255 255 / 0.08);
+    padding: 1px 5px;
+    font-family: var(--kizuna-mono);
+    font-size: 11.5px;
+    color: #ffffff;
+}
+
+.richLink {
+    color: #ffffff;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* A block the editor embedded in the text: the CMS launch. */
+.launch {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    border-radius: 12px;
+    background: linear-gradient(160deg, #3a3a3a, #2c2c2c 60%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+    padding: 16px;
+}
+
+.launchLogo {
+    width: auto;
+    height: 16px;
+    margin-bottom: 6px;
+    color: #ffffff;
+}
+
+.launchTitle {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.launchText {
+    font-size: 12.5px;
+}
+
+.launchButton,
+.eventButton {
+    margin-top: 8px;
+    border-radius: 8px;
+    background: linear-gradient(to bottom, #ffffff, #dcdcdc);
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0c0c0c;
+}
+
+.callout {
+    border-radius: 10px;
+    background-color: rgb(255 255 255 / 0.05);
+    box-shadow: inset 2px 0 0 #ffffff;
+    padding: 10px 12px;
+}
+
+/* An event from the app's own API, held by id like any relationship. */
+.event {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 12px;
+    background-color: rgb(255 255 255 / 0.05);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+    padding: 10px;
+}
+
+.eventDate {
+    display: flex;
+    width: 44px;
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 8px;
+    background-color: #ffffff;
+    padding: 4px 0;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: #0c0c0c;
+}
+
+.eventDate strong {
+    font-size: 18px;
+    color: #0c0c0c;
+}
+
+.eventBody {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    font-size: 12px;
+}
+
+.eventButton {
+    margin-top: 0;
+}
+
+.unsubscribe {
+    margin: 8px 0 0;
+    font-size: 11px;
+    color: #8a8a8a;
+    text-decoration: underline;
+}

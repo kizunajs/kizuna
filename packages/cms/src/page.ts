@@ -18,6 +18,11 @@ export interface PageDefinition<Name extends string, Fields extends FieldList> {
      */
     name: Name;
     /**
+     * What editors see it called, such as `'Front Page'`. Defaults to its
+     * name, written out.
+     */
+    label?: string;
+    /**
      * The fields editors may change, in the order they are shown.
      */
     fields: Fields;
@@ -42,6 +47,11 @@ export interface PageDefinition<Name extends string, Fields extends FieldList> {
      * `'Landing pages'`.
      */
     group?: string;
+    /**
+     * Publishing waits for someone other than the person who changed it to
+     * approve the draft.
+     */
+    requireReview?: boolean;
 }
 
 /**
@@ -53,6 +63,11 @@ export interface CollectionPageDefinition<Name extends string, Served extends Co
      * How the page is read, `cms.pages.<name>`: `articlePage`.
      */
     name: Name;
+    /**
+     * What editors see it called, such as `'Front Page'`. Defaults to its
+     * name, written out.
+     */
+    label?: string;
     /**
      * The collection the page shows one item of per address. Each route param
      * names the item field it reads, so `[slug]` reads `slug`.
@@ -113,6 +128,7 @@ export function definePage<const Name extends string, const Served extends Colle
  * @example
  * export default definePage({
  *     name: 'frontPage',
+ *     label: 'Front Page',
  *     fields: [
  *         {
  *             name: 'hero',
@@ -134,6 +150,7 @@ export function definePage<const Name extends string, const Fields extends Field
 export function definePage(
     definition: Partial<PageDefinition<string, FieldList>> & {
         name: string;
+        label?: string;
         collection?: Collection;
     }
 ): Page {

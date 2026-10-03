@@ -79,7 +79,7 @@ describe('the editor over MCP', () => {
         expect(meta['editing_pages_update_draft']).toBeUndefined();
     });
 
-    it('serves the built editor, told where the site is and allowed to frame it', async () => {
+    it('serves the built editor, told where the site is and allowed to reach it', async () => {
         const client = await connect();
         const { resources } = await client.listResources();
         expect(resources.map((resource) => resource.uri)).toEqual([DOCUMENT_VIEW_URI]);
@@ -87,6 +87,8 @@ describe('the editor over MCP', () => {
             ui: {
                 csp: {
                     frameDomains: ['https://site.example'],
+                    connectDomains: ['https://site.example'],
+                    baseUriDomains: ['https://site.example'],
                     resourceDomains: ['https://site.example'],
                 },
                 prefersBorder: true,

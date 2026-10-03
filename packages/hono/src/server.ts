@@ -1,6 +1,7 @@
 import type { Context, Env, Hono, MiddlewareHandler } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
+    queryFromSearchParams,
     type AdapterRequest,
     type RouteDefinition,
     type Routes,
@@ -130,7 +131,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                     route,
                     params: c.req.param() as Record<string, string>,
                 },
-                query: Object.fromEntries(url.searchParams),
+                query: queryFromSearchParams(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),
                 readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
                 readRawBody: () => c.req.raw.text(),

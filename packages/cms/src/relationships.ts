@@ -48,6 +48,16 @@ export interface RelationshipDefinition<Name extends string = string, Id extends
      * What the editor's picker lists. A visitor's page never calls it.
      */
     options: (input: RelationshipOptionsInput<z.output<Id>>) => Promise<readonly RelationshipOption[]>;
+    /**
+     * Where the options' thumbnails load from, when that is not the site. The
+     * editor runs in a sandbox that loads images only from origins it names.
+     *
+     * @example
+     * ```ts
+     * imageOrigins: ['https://cdn.example.com'],
+     * ```
+     */
+    imageOrigins?: readonly string[];
 }
 
 export type CmsRelationship<Name extends string = string, Id extends z.ZodType = z.ZodType> = RelationshipDefinition<Name, Id> & {
@@ -80,6 +90,13 @@ export const defineRelationship = <const Name extends string, Id extends z.ZodTy
 ): CmsRelationship<Name, Id> => {
     if (!/^[a-z][A-Za-z0-9]*$/.test(definition.name)) {
         throw new Error(`The relationship '${definition.name}' needs a camelCase name, like 'products'.`);
+    }
+    for (const origin of definition.imageOrigins ?? []) {
+        if (!URL.canParse(origin) || new URL(origin).origin !== origin) {
+            throw new Error(
+                `The ${definition.name} relationship names '${origin}' under imageOrigins. Give an origin, like 'https://cdn.example.com'.`
+            );
+        }
     }
     return {
         ...definition,

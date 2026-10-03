@@ -9,9 +9,11 @@ import type { PageMigration } from './page.js';
  */
 export interface ContentDefinition {
     readonly name: string;
+    readonly label?: string;
     readonly fields: FieldList;
     readonly migrate?: Readonly<Record<number, PageMigration>>;
     readonly group?: string;
+    readonly requireReview?: boolean;
     readonly schema: z.ZodType;
 }
 
@@ -20,6 +22,11 @@ interface SharedOptions<Name extends string, Fields extends FieldList> {
      * How the content is read and addressed by the tools, camelCase.
      */
     name: Name;
+    /**
+     * What editors see it called, such as `'Front Page'`. Defaults to its
+     * name, written out.
+     */
+    label?: string;
     /**
      * The fields editors may change, in the order they are shown.
      */
@@ -34,6 +41,11 @@ interface SharedOptions<Name extends string, Fields extends FieldList> {
      * `'Company'`.
      */
     group?: string;
+    /**
+     * Publishing waits for someone other than the person who changed it to
+     * approve the draft. For a collection, each item's.
+     */
+    requireReview?: boolean;
 }
 
 // Registry-global: discovery and the reader check them on modules another copy of this package may have made.

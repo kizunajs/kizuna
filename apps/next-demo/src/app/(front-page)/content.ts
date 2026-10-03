@@ -3,10 +3,11 @@ import { definePage } from '@kizunajs/cms';
 import { HeroBlockSchema } from '../../cms/blocks';
 import { ArticleId } from '../../models';
 import { Products } from '../../cms/relationships';
-import { SeoSchema } from '../../cms/schemas';
+import { SeoSchema } from '@kizunajs/cms/schemas';
 
 export default definePage({
     name: 'frontPage',
+    label: 'Front Page',
     fields: [
         {
             name: 'hero',
@@ -27,11 +28,8 @@ export default definePage({
         },
         {
             name: 'seo',
-            label: 'Search engines',
+            label: 'SEO',
             schema: SeoSchema,
-            auth: {
-                roles: 'admin',
-            },
         },
     ],
 });

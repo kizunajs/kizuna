@@ -25,6 +25,10 @@ export const cmsDocuments = pgTable(
             mode: 'date',
         }).notNull(),
         updatedBy: text('updated_by').notNull(),
+        /**
+         * The person who looks after the document, by the id `people` gives them.
+         */
+        owner: text('owner'),
     },
     (table) => [unique('cms_documents_identity').on(table.kind, table.site, table.locale, table.key)]
 );
@@ -75,4 +79,36 @@ export const cmsRefs = pgTable(
         fieldPath: text('field_path').notNull(),
     },
     (table) => [index('cms_refs_lookup').on(table.brand, table.refId)]
+);
+
+/**
+ * A request for someone to look at a document's draft before it goes live,
+ * and their answer. Documents asked about together share a `requestId`.
+ */
+export const cmsReviews = pgTable(
+    'cms_reviews',
+    {
+        id: text('id').primaryKey(),
+        requestId: text('request_id').notNull(),
+        ref: text('ref').notNull(),
+        documentId: text('document_id')
+            .notNull()
+            .references(() => cmsDocuments.id),
+        version: integer('version').notNull(),
+        reviewers: jsonb('reviewers').notNull(),
+        requestedBy: text('requested_by').notNull(),
+        note: text('note'),
+        createdAt: timestamp('created_at', {
+            withTimezone: true,
+            mode: 'date',
+        }).notNull(),
+        status: text('status').notNull(),
+        decidedBy: text('decided_by'),
+        decisionNote: text('decision_note'),
+        decidedAt: timestamp('decided_at', {
+            withTimezone: true,
+            mode: 'date',
+        }),
+    },
+    (table) => [index('cms_reviews_document').on(table.documentId, table.createdAt)]
 );

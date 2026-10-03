@@ -14,11 +14,25 @@ const people = [
         email: 'editor@example.com',
         name: 'Edda Editor',
         role: 'editor',
+        image: 'https://picsum.photos/id/64/96/96',
     },
     {
         email: 'admin@example.com',
         name: 'Ada Admin',
         role: 'admin',
+        image: 'https://picsum.photos/id/1027/96/96',
+    },
+    {
+        email: 'kari@example.com',
+        name: 'Kari Nordmann',
+        role: 'editor',
+        image: 'https://picsum.photos/id/338/96/96',
+    },
+    {
+        email: 'jonas@example.com',
+        name: 'Jonas Berg',
+        role: 'editor',
+        image: 'https://picsum.photos/id/91/96/96',
     },
 ];
 
@@ -37,6 +51,8 @@ const main = async (): Promise<void> => {
         await service.store.createTables();
         console.log('[demo] created the cms_ tables');
     } else {
+        // Every statement may run again, so this adds what later versions of the CMS store.
+        await service.store.createTables();
         // Demo databases made before these columns existed.
         await db.execute(sql`alter table cms_documents add column if not exists published_at timestamptz`);
         await db.execute(sql`alter table cms_versions add column if not exists migration_version int not null default 0`);
@@ -64,6 +80,7 @@ const main = async (): Promise<void> => {
             .update(user)
             .set({
                 role: person.role,
+                image: person.image,
             })
             .where(eq(user.email, person.email));
     }

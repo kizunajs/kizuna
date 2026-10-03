@@ -1,0 +1,173 @@
+/*
+ * The image takes the tall tile on the left, and the five smaller fields fill
+ * the grid beside and below it.
+ */
+.bento {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-areas:
+        'image image heading heading'
+        'image image look admin'
+        'articles articles link link';
+    gap: 12px;
+}
+
+.image {
+    grid-area: image;
+}
+
+.heading {
+    grid-area: heading;
+}
+
+.look {
+    grid-area: look;
+}
+
+.admin {
+    grid-area: admin;
+}
+
+.articles {
+    grid-area: articles;
+}
+
+.link {
+    grid-area: link;
+}
+
+.tile {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+    border-radius: var(--kizuna-radius-card);
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    padding: 10px;
+}
+
+.head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 10px 4px;
+}
+
+.want {
+    margin: 0;
+    font-size: var(--kizuna-text-ui);
+    font-weight: var(--font-weight-600);
+    letter-spacing: -0.01em;
+    color: var(--kizuna-ink);
+}
+
+.schema {
+    max-width: 100%;
+    overflow-x: auto;
+    border-radius: 8px;
+    background-color: var(--kizuna-tint);
+    box-shadow: var(--kizuna-elevation-hover);
+    padding: 4px 10px;
+    font-family: var(--kizuna-mono);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    color: var(--kizuna-ink);
+    scrollbar-width: none;
+}
+
+.well {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    min-height: 96px;
+    border-radius: 10px;
+    background-color: var(--kizuna-raised);
+    box-shadow: var(--kizuna-elevation-hover);
+    padding: 16px;
+}
+
+.image .well {
+    justify-content: stretch;
+}
+
+.image .image {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.photo {
+    position: relative;
+    flex: 1;
+    min-height: 200px;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+.photo img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 42% 58%;
+}
+
+.focal {
+    position: absolute;
+    top: 58%;
+    left: 42%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: #0c0c0c;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
+}
+
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.locked {
+    position: relative;
+}
+
+.locked svg {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+
+@media (max-width: 1023px) {
+    .bento {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-areas:
+            'image heading'
+            'image look'
+            'articles admin'
+            'link link';
+    }
+}
+
+@media (max-width: 639px) {
+    .bento {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            'image'
+            'heading'
+            'look'
+            'admin'
+            'articles'
+            'link';
+    }
+}

@@ -1,0 +1,154 @@
+.panels {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.visual {
+    display: flex;
+    flex: 1;
+    min-height: 400px;
+}
+
+.window {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-direction: column;
+    gap: 10px;
+    border-radius: 10px;
+    background-color: var(--kizuna-window);
+    box-shadow: var(--kizuna-window-elevation);
+    padding: 14px;
+}
+
+.dialogStage {
+    justify-content: center;
+    background-image: radial-gradient(ellipse at 50% 40%, rgb(255 255 255 / 0.04), transparent 70%);
+}
+
+.stage {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+}
+
+.site {
+    flex: 1;
+    overflow: hidden;
+    border-radius: 8px;
+    background-color: #262626;
+    padding: 14px 18px 76px;
+    color: #ffffff;
+}
+
+.siteNav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 26px;
+    font-size: 11px;
+}
+
+.siteBrand {
+    font-weight: 700;
+}
+
+.siteLinks {
+    display: flex;
+    gap: 12px;
+    color: #b3b3b3;
+}
+
+.siteHero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 18px;
+}
+
+.siteCopy {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.siteHeading {
+    position: relative;
+    align-self: flex-start;
+    border-radius: 3px;
+    font-size: clamp(1.125rem, 2.2vw, 1.5rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    outline: 2px solid #ffffff;
+    outline-offset: 4px;
+}
+
+.cursor {
+    position: absolute;
+    right: 12%;
+    bottom: -16px;
+    width: 18px;
+    height: 18px;
+    fill: #262626;
+    stroke: #ffffff;
+    stroke-width: 1.75;
+}
+
+.siteIntro {
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: #b3b3b3;
+}
+
+.sitePhoto {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border-radius: 6px;
+    object-fit: cover;
+}
+
+.pointed {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    left: 20px;
+    border-radius: 14px;
+    background-color: #232323;
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.05),
+        0 24px 48px -12px rgb(0 0 0 / 0.6);
+    padding: 12px 14px;
+    container-type: inline-size;
+}
+
+@media (max-width: 1023px) {
+    .panels {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 1279px) {
+    .tabLabel {
+        display: none;
+    }
+}
+
+@media (max-width: 479px) {
+    .visual {
+        min-height: 0;
+    }
+
+    .siteHero {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .sitePhoto {
+        display: none;
+    }
+
+    .revertAll {
+        display: none;
+    }
+}

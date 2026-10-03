@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { decodeImageSource, decodeSource, IMAGE_MARKER, type Source } from './source-path.js';
+import { fieldElementFor, markedElements, type Source } from './source-marks.js';
 import { envelope, openEnvelope, type EditorMessage, type PreviewMessage } from './preview-messages.js';
 
 export interface PreviewOverlayProps {
@@ -22,64 +22,6 @@ const PREVIEW_RENEW_MS = 4 * 60 * 1000;
 const LAYER = 2147483000;
 
 const FONT = "'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif";
-
-const imageSource = (image: Element): Source | undefined => {
-    const src = image.getAttribute('src') ?? '';
-    const direct = src.indexOf(IMAGE_MARKER);
-    if (direct >= 0) return decodeImageSource(src.slice(direct + IMAGE_MARKER.length));
-    try {
-        // next/image passes the source through its loader as `?url=`.
-        const inner = new URL(src, window.location.origin).searchParams.get('url') ?? '';
-        const nested = inner.indexOf(IMAGE_MARKER);
-        if (nested >= 0) return decodeImageSource(inner.slice(nested + IMAGE_MARKER.length));
-    } catch {
-        return undefined;
-    }
-    return decodeSource(image.getAttribute('alt') ?? '');
-};
-
-const MARKED_ATTRIBUTES = ['placeholder', 'aria-label', 'title', 'value'];
-
-/**
- * Every element that holds a value itself, with the document and field it came
- * from: the parent of a text node carrying a source, an element with one in an
- * attribute, or an image.
- */
-const markedElements = (root: Element): Map<Element, Source> => {
-    const marked = new Map<Element, Source>();
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-        const parent = node.parentElement;
-        if (parent === null || marked.has(parent)) continue;
-        const source = decodeSource(node.nodeValue ?? '');
-        if (source !== undefined) marked.set(parent, source);
-    }
-    for (const element of root.querySelectorAll('img, [placeholder], [aria-label], [title], [value]')) {
-        if (marked.has(element)) continue;
-        const source =
-            element.tagName === 'IMG'
-                ? imageSource(element)
-                : MARKED_ATTRIBUTES.map((name) => decodeSource(element.getAttribute(name) ?? '')).find((found) => found !== undefined);
-        if (source !== undefined) marked.set(element, source);
-    }
-    return marked;
-};
-
-/**
- * The nearest element from the target up that holds a value, with its source.
- */
-const fieldElementFor = (target: Element, marked: Map<Element, Source>): { element: Element; source: Source } | undefined => {
-    for (let element: Element | null = target; element !== null && element !== document.body; element = element.parentElement) {
-        const source = marked.get(element);
-        if (source !== undefined) {
-            return {
-                element,
-                source,
-            };
-        }
-    }
-    return undefined;
-};
 
 interface Box {
     top: number;

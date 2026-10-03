@@ -1,4 +1,4 @@
 {
     "title": "CMS",
-    "pages": ["index", "content", "editing", "next", "api", "cli"]
+    "pages": ["index", "content", "editing", "reviews", "next", "api", "cli"]
 }

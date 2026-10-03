@@ -9,3 +9,4 @@ export {
     richTextFromPlain,
     type RichTextValue,
 } from './rich-text.js';
+export { SeoSchema, SEO_GOALS, type SeoValue } from './seo.js';

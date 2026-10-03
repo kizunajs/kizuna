@@ -346,6 +346,26 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'query.lists': async () => {
+            const one = await api.request({
+                method: 'GET',
+                path: '/query-lists?ids=a',
+            });
+            expect(one.status).toBe(200);
+            expect(one.body).toEqual({
+                ids: ['a'],
+            });
+            const several = await api.request({
+                method: 'GET',
+                path: '/query-lists?ids=a&ids=b&pages=1&pages=2',
+            });
+            expect(several.status).toBe(200);
+            expect(several.body).toEqual({
+                ids: ['a', 'b'],
+                pages: [1, 2],
+            });
+        },
+
         'query.coercion': async () => {
             await createAda();
             await api.request({

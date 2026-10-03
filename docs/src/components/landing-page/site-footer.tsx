@@ -23,6 +23,10 @@ const columns = [
                 label: 'Jobs',
                 href: '/docs/jobs',
             },
+            {
+                label: 'CMS',
+                href: '/cms',
+            },
         ],
     },
     {

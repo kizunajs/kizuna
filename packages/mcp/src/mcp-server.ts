@@ -104,12 +104,26 @@ interface Annotations {
 const APPROVAL_KEY = 'approved';
 
 /**
+ * The `_meta` key a view sets on a call the person already confirmed in it.
+ */
+export const APPROVED_META = 'io.kizunajs/approved';
+
+const approvalTitle = (route: RouteDefinition): string => toolOptionsOf(route)?.title ?? route.summary ?? `${route.method} ${route.path}`;
+
+/**
  * What a tool handler is handed beyond its arguments. Only the answers to an
  * earlier elicitation are read here.
  */
 interface McpToolContext {
     mcpReq?: {
         inputResponses?: unknown;
+        _meta?: Record<string, unknown>;
+        /**
+         * Set on a request of the 2026-07-28 protocol, which asks the person
+         * by answering `input_required`. Absent on the 2025 protocol, which
+         * asks by sending the client a request of its own.
+         */
+        envelope?: unknown;
     };
 }
 
@@ -118,15 +132,33 @@ interface McpToolContext {
  * elicitation on the first call, a refusal when they declined, and nothing once
  * they approved.
  */
-const approval = (route: RouteDefinition, context: McpToolContext): CallToolResult | InputRequiredResult | undefined => {
+const approval = (
+    route: RouteDefinition,
+    context: McpToolContext,
+    canAsk: () => boolean
+): CallToolResult | InputRequiredResult | undefined => {
     if (toolOptionsOf(route)?.needsApproval !== true) return undefined;
 
+    // A view the person confirmed in already asked them. A model sets arguments, never a request's _meta.
+    if (context.mcpReq?._meta?.[APPROVED_META] === true) return undefined;
+
     const answer = inputResponse(context.mcpReq?.inputResponses as never, APPROVAL_KEY);
+    if (answer.kind === 'missing' && context.mcpReq?.envelope === undefined && !canAsk()) {
+        return {
+            content: [
+                {
+                    type: 'text' as const,
+                    text: `"${approvalTitle(route)}" needs the person's approval, and this client cannot ask for it, so nothing ran. Ask the person to do it themselves, where they confirm first.`,
+                },
+            ],
+            isError: true,
+        };
+    }
     if (answer.kind === 'missing') {
         return inputRequired({
             inputRequests: {
                 [APPROVAL_KEY]: inputRequired.elicit({
-                    message: `Allow "${toolOptionsOf(route)?.title ?? route.summary ?? `${route.method} ${route.path}`}"?`,
+                    message: `Allow "${approvalTitle(route)}"?`,
                     requestedSchema: {
                         type: 'object',
                         properties: {
@@ -700,7 +732,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                       }),
             },
             async (args: Record<string, unknown>, context: McpToolContext) => {
-                const refusal = approval(definition.route, context);
+                const refusal = approval(definition.route, context, () => server.server.getClientCapabilities()?.elicitation !== undefined);
                 if (refusal !== undefined) return refusal;
                 return executeToolCall(
                     definition.route,

@@ -32,6 +32,7 @@ export interface DescribedField {
     label?: string;
     options?: Record<string, string>;
     description?: string;
+    help?: string;
     block?: string;
     parent?: string;
     readOnly: boolean;
@@ -52,6 +53,7 @@ export interface Description {
     ref: string;
     kind: 'page' | 'global' | 'item';
     name: string;
+    label?: string;
     path: string | null;
     usedOn: {
         everywhere: boolean;
@@ -66,6 +68,34 @@ export interface Description {
     missing: string[];
     fields: DescribedField[];
     draft: Record<string, unknown> | null;
+    owner: PersonView | null;
+    review: ReviewState | null;
+    requireReview: boolean;
+}
+
+/**
+ * Someone as the editor shows them.
+ */
+export interface PersonView {
+    id: string;
+    name: string;
+    image?: string;
+}
+
+/**
+ * Where a document's latest review stands.
+ */
+export interface ReviewState {
+    id: string;
+    status: 'open' | 'approved' | 'changes' | 'outdated';
+    version: number;
+    reviewers: PersonView[];
+    requestedBy: PersonView;
+    note: string | null;
+    createdAt: string;
+    decidedBy: PersonView | null;
+    decisionNote: string | null;
+    decidedAt: string | null;
 }
 
 /**
@@ -167,6 +197,7 @@ export const labelOf = (field: DescribedField): string => field.label ?? humaniz
  * What the editor's header calls a document.
  */
 export const documentTitle = (document: Description): string => {
+    if (document.kind !== 'item' && document.label !== undefined) return document.label;
     if (document.kind === 'global') return humanize(document.name);
     if (document.kind === 'item') {
         const text = document.fields.map((field) => field.value).find((value) => typeof value === 'string' && value !== '');

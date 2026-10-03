@@ -10,6 +10,7 @@ import { Products } from './src/cms/relationships';
 import { localMediaStorage } from './src/cms/media-storage';
 import { pages } from './src/cms.pages';
 import { db } from './src/db';
+import { editors } from './src/cms/people';
 
 /**
  * The CMS API: editors, the content they change, and an MCP endpoint of its
@@ -37,6 +38,18 @@ export default defineConfig({
             identity: 'editor',
             roles: ['editor', 'admin'],
             invalidate: 'app',
+            people: {
+                list: editors,
+                imageOrigins: ['https://picsum.photos', 'https://fastly.picsum.photos'],
+            },
+        },
+        reviews: {
+            roles: 'admin',
+            onReviewRequested: ({ documents, reviewers, requestedBy }) => {
+                console.log(
+                    `[demo] ${requestedBy.name} asked ${reviewers.map((reviewer) => reviewer.name).join(', ')} to review ${documents.map((document) => document.label).join(', ')}`
+                );
+            },
         },
         media: process.env.CMS_S3_BUCKET === undefined ? { storage: localMediaStorage } : undefined,
         apiPath: '/cms-api',

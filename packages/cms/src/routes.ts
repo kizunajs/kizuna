@@ -10,12 +10,16 @@ import { servesCollection } from './page.js';
 import { addressFieldsOf } from './dynamic.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
 import { resolvedSchema } from './content-schema.js';
+import { getAtPath } from './content.js';
 import { documentViewFor } from './document-view.js';
 import { PREVIEW_TTL_SECONDS } from './preview-token.js';
+import { previewProxyUrl } from './preview-proxy.js';
 import {
     CreateItemBodySchema,
     CreateUploadBodySchema,
     DescribedPageSchema,
+    DraftChangesSchema,
+    RevertBodySchema,
     DraftHeadersSchema,
     DraftPageSchema,
     EditorItemSchema,
@@ -31,10 +35,21 @@ import {
     UpdateMediaBodySchema,
     UploadSchema,
     VersionListSchema,
+    VersionContentSchema,
+    PageStatusSchema,
+    PeopleSchema,
+    OwnerBodySchema,
+    RequestReviewBodySchema,
+    DecideReviewBodySchema,
+    WaitingReviewsSchema,
+    ReviewListSchema,
     WhereUsedSchema,
 } from './wire.js';
 import { UploadRejectedError } from './media/media.js';
 import { ImageQuerySchema, InvalidateBodySchema } from './wire.js';
+import { sameContent } from './same-content.js';
+import { assertReviewed, decideReviews, documentLabel, peopleOf, requestReviews, reviewOf, setOwner, waitingReviews } from './reviews.js';
+import type { Person } from './options.js';
 
 interface Args {
     params: Record<string, string>;
@@ -75,6 +90,86 @@ const draftBody = (state: DraftState) => ({
     updatedAt: state.row?.updatedAt.toISOString() ?? null,
     updatedBy: state.row?.updatedBy ?? null,
 });
+
+/**
+ * What editors call a field: its label, or its name written out.
+ */
+const labelOf = (field: { label?: string; name: string }): string =>
+    field.label ??
+    field.name
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/[_-]/g, ' ')
+        .toLowerCase()
+        .replace(/^./, (first) => first.toUpperCase());
+
+/**
+ * Who looks after a document, and where its review stands, as `describe` and
+ * the changes list answer them.
+ */
+const reviewFields = async (cms: CmsService, state: DraftState, people?: readonly Person[]) => {
+    const everyone = people ?? (await peopleOf(cms));
+    const owner = state.row?.owner === null || state.row?.owner === undefined ? undefined : state.row.owner;
+    const person = owner === undefined ? undefined : everyone.find((candidate) => candidate.id === owner);
+    return {
+        owner:
+            owner === undefined
+                ? null
+                : {
+                      id: owner,
+                      name: person?.name ?? owner,
+                      ...(person?.image === undefined
+                          ? {}
+                          : {
+                                image: person.image,
+                            }),
+                  },
+        review: await reviewOf(cms, state, everyone),
+        requireReview: state.target.definition.requireReview === true,
+    };
+};
+
+/**
+ * What a draft changes from what is published: one entry per field shown in
+ * the editor, the fields of a block counted one by one.
+ */
+const draftChanges = async (cms: CmsService, ref: DocumentRef, caller: ReturnType<CmsService['caller']>) => {
+    const state = await cms.draftState(ref);
+    const draft = state.row?.draft ?? state.row?.published ?? null;
+    const published = (await cms.publishedAsStored(ref))?.content;
+    const fields = cms.describe(ref, draft, caller);
+    const differs = (path: string): boolean => !sameContent(getAtPath(published, path), getAtPath(draft, path));
+    const changes = [];
+    for (const field of fields.filter((candidate) => candidate.parent === undefined)) {
+        const children = fields.filter((candidate) => candidate.parent === field.path);
+        for (const changed of (children.length === 0 ? [field] : children).filter((candidate) => differs(candidate.path))) {
+            const before = getAtPath(published, changed.path);
+            const after = getAtPath(draft, changed.path);
+            changes.push({
+                path: changed.path,
+                label: children.length === 0 ? labelOf(changed) : `${labelOf(field)} › ${labelOf(changed)}`,
+                ...(before === undefined
+                    ? {}
+                    : {
+                          before,
+                      }),
+                ...(after === undefined
+                    ? {}
+                    : {
+                          after,
+                      }),
+                writable: changed.writable,
+            });
+        }
+    }
+    return {
+        ref: formatRef(ref),
+        label: documentLabel(state),
+        path: cms.addressOf(state.target, draft) ?? null,
+        published: published !== undefined,
+        changes,
+        ...(await reviewFields(cms, state)),
+    };
+};
 
 /**
  * Where an editing route finds its document, and what its paths and tool
@@ -386,12 +481,111 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             }) as never
         ),
 
+        getVersion: route({
+            method: 'GET',
+            path: `${editingBase}${scope.prefix}/versions/:version`,
+            auth: editor,
+            summary: `Read one earlier version of ${scope.noun}`,
+            description: 'The content as it was saved in that version, to compare with the draft or decide what to restore.',
+            tool: true,
+            pathParams: scope.params.extend({
+                version: z.coerce.number().int().min(1),
+            }),
+            responses: {
+                200: VersionContentSchema,
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const ref = scope.refOf(args.params);
+                const version = Number(args.params['version']);
+                const found = await cms.versionContent(ref, version);
+                return {
+                    status: 200,
+                    body: {
+                        ref: formatRef(ref),
+                        version,
+                        summary: found.summary,
+                        createdAt: found.createdAt.toISOString(),
+                        createdBy: found.createdBy,
+                        content: found.content,
+                    },
+                };
+            }) as never
+        ),
+
+        changes: route({
+            method: 'GET',
+            path: `${editingBase}${scope.prefix}/changes`,
+            auth: editor,
+            summary: `List what the draft of ${scope.noun} changes from what is published`,
+            description:
+                'Each changed field with what visitors see now and what publishing makes them see. Read it before publishing, so the person knows what goes live.',
+            tool: true,
+            pathParams: scope.params,
+            responses: {
+                200: {
+                    body: DraftChangesSchema,
+                    cache: 'no-store',
+                },
+                404: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const ref = scope.refOf(args.params);
+                return {
+                    status: 200,
+                    body: await draftChanges(cms, ref, cms.caller(args.auth)),
+                };
+            }) as never
+        ),
+
+        revert: route({
+            method: 'POST',
+            path: `${editingBase}${scope.prefix}/revert`,
+            auth: editor,
+            summary: `Set fields of the draft of ${scope.noun} back to what is published`,
+            description: 'Undoes the draft changes to the fields named, from the changes list. Nothing is published by this.',
+            tool:
+                scope.approveWrites === true
+                    ? {
+                          needsApproval: true,
+                      }
+                    : true,
+            pathParams: scope.params,
+            body: RevertBodySchema,
+            responses: {
+                200: DraftPageSchema,
+                404: ProblemDetailsSchema,
+                422: ValidationErrorSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                const ref = scope.refOf(args.params);
+                const paths = (args.body as z.output<typeof RevertBodySchema>).paths;
+                const published = (await cms.publishedAsStored(ref))?.content;
+                const changes = Object.fromEntries(paths.map((path) => [path, getAtPath(published, path)]));
+                const state = await cms.update({
+                    ref,
+                    changes,
+                    caller: cms.caller(args.auth),
+                    author: authorOf(cms, args),
+                    summary: paths.length === 1 ? `Reverted ${paths[0]}` : `Reverted ${paths.length} changes`,
+                });
+                return {
+                    status: 200,
+                    body: draftBody(state),
+                };
+            }) as never
+        ),
+
         publish: route({
             method: 'POST',
             path: `${editingBase}${scope.prefix}/publish`,
             auth: editor,
             summary: `Publish the draft of ${scope.noun}`,
-            description: 'Makes the current draft what every visitor sees. The person confirms before this runs.',
+            description:
+                'Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead.',
             tool: {
                 needsApproval: true,
                 destructiveHint: false,
@@ -405,10 +599,38 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 409: ProblemDetailsSchema,
             },
         }).handler(
-            guarded(async (cms, args) => ({
-                status: 200,
-                body: draftBody(await cms.publish(scope.refOf(args.params), authorOf(cms, args))),
-            })) as never
+            guarded(async (cms, args) => {
+                const ref = scope.refOf(args.params);
+                await assertReviewed(cms, await cms.draftState(ref));
+                return {
+                    status: 200,
+                    body: draftBody(await cms.publish(ref, authorOf(cms, args))),
+                };
+            }) as never
+        ),
+
+        setOwner: route({
+            method: 'PUT',
+            path: `${editingBase}${scope.prefix}/owner`,
+            auth: editor,
+            summary: `Name the person who looks after ${scope.noun}`,
+            description: 'The owner is suggested first when someone asks for a review. Pass null for nobody.',
+            tool: true,
+            pathParams: scope.params,
+            body: OwnerBodySchema,
+            responses: {
+                204: z.void(),
+                404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
+                422: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => {
+                await setOwner(cms, scope.refOf(args.params), (args.body as z.output<typeof OwnerBodySchema>).owner);
+                return {
+                    status: 204,
+                };
+            }) as never
         ),
 
         rollback: route({
@@ -417,10 +639,15 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             auth: editor,
             summary: `Restore an earlier version of ${scope.noun} as a new draft`,
             description: 'Nothing is published by this. The restored content becomes the draft, which is published separately.',
-            tool: {
-                needsApproval: true,
-                destructiveHint: false,
-            },
+            tool:
+                scope.approveWrites === true
+                    ? {
+                          needsApproval: true,
+                          destructiveHint: false,
+                      }
+                    : {
+                          destructiveHint: false,
+                      },
             pathParams: scope.params,
             body: RollbackBodySchema,
             responses: {
@@ -695,6 +922,35 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
      * Listing, adding and deleting the items of a collection.
      */
     const itemRoutes = () => ({
+        list: route({
+            method: 'GET',
+            path: `${editingBase}/collections`,
+            auth: editor,
+            summary: 'List every collection, with how many items it holds',
+            tool: true,
+            responses: {
+                200: {
+                    body: z.object({
+                        collections: z.array(
+                            z.object({
+                                name: z.string(),
+                                label: z.string(),
+                                count: z.int(),
+                            })
+                        ),
+                    }),
+                    cache: 'no-store',
+                },
+            },
+        }).handler(
+            guarded(async (cms) => ({
+                status: 200,
+                body: {
+                    collections: await cms.collectionSummaries(),
+                },
+            })) as never
+        ),
+
         listItems: route({
             method: 'GET',
             path: `${editingBase}/collections/:name/items`,
@@ -791,6 +1047,134 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         noun: 'an item of a collection',
     };
 
+    const listPeople = route({
+        method: 'GET',
+        path: `${editingBase}/people`,
+        auth: editor,
+        summary: 'List the people who edit, to name an owner or ask someone for a review',
+        tool: true,
+        responses: {
+            200: {
+                body: PeopleSchema,
+                cache: 'no-store',
+            },
+        },
+    }).handler(
+        guarded(async (cms, args) => ({
+            status: 200,
+            body: {
+                me: authorOf(cms, args),
+                people: (await peopleOf(cms)).map((person) => ({
+                    id: person.id,
+                    name: person.name,
+                    ...(person.image === undefined
+                        ? {}
+                        : {
+                              image: person.image,
+                          }),
+                })),
+            },
+        })) as never
+    );
+
+    const listReviews = route({
+        method: 'GET',
+        path: `${editingBase}/reviews`,
+        auth: editor,
+        summary: 'List the reviews waiting for an answer, for you or for anyone',
+        tool: {
+            readOnlyHint: true,
+        },
+        query: z.object({
+            for: z.enum(['me', 'anyone']).default('me').describe('`me` lists the reviews you were asked for.'),
+        }),
+        responses: {
+            200: {
+                body: WaitingReviewsSchema,
+                cache: 'no-store',
+            },
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const query = (args.query ?? {}) as { for?: 'me' | 'anyone' };
+            return {
+                status: 200,
+                body: {
+                    reviews: await waitingReviews(cms, query.for === 'anyone' ? undefined : authorOf(cms, args)),
+                },
+            };
+        }) as never
+    );
+
+    const requestReview = route({
+        method: 'POST',
+        path: `${editingBase}/reviews`,
+        auth: editor,
+        summary: 'Ask people to review the drafts of one or more documents before they go live',
+        description:
+            'Each reviewer sees the request in the editor and when they ask what is waiting for them. Name reviewers by their id from the people list, and suggest the owner first.',
+        tool: true,
+        body: RequestReviewBodySchema,
+        responses: {
+            201: ReviewListSchema,
+            400: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+            422: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof RequestReviewBodySchema>;
+            return {
+                status: 201,
+                body: {
+                    reviews: await requestReviews(cms, {
+                        refs: body.refs,
+                        reviewers: body.reviewers,
+                        note: body.note ?? null,
+                        by: authorOf(cms, args),
+                    }),
+                },
+            };
+        }) as never
+    );
+
+    const decideReview = route({
+        method: 'POST',
+        path: `${editingBase}/reviews/decide`,
+        auth: editor,
+        summary: 'Approve reviews, or send them back with changes to make',
+        description:
+            "An approval is the person's own judgement of what goes live, so they confirm first: in a host that cannot ask, such as Claude, they answer in the editor instead.",
+        tool: {
+            needsApproval: true,
+            destructiveHint: false,
+        },
+        body: DecideReviewBodySchema,
+        responses: {
+            200: ReviewListSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof DecideReviewBodySchema>;
+            return {
+                status: 200,
+                body: {
+                    reviews: await decideReviews(cms, {
+                        ids: body.ids,
+                        decision: body.decision,
+                        note: body.note ?? null,
+                        by: authorOf(cms, args),
+                        role: cms.caller(args.auth).role,
+                    }),
+                },
+            };
+        }) as never
+    );
+
     const describe = route({
         method: 'GET',
         path: `${editingBase}/describe`,
@@ -838,6 +1222,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     ref: formatRef(ref),
                     kind: state.target.kind,
                     name: nameOf(ref),
+                    ...(state.target.definition.label === undefined
+                        ? {}
+                        : {
+                              label: state.target.definition.label,
+                          }),
                     path: addressOf(state.target, draft) ?? null,
                     usedOn: await cms.usedOn(ref),
                     status: state.status,
@@ -846,6 +1235,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     missing: state.missing,
                     fields: cms.describe(ref, draft, cms.caller(args.auth)),
                     draft,
+                    ...(await reviewFields(cms, state)),
                 },
                 headers: {
                     etag: state.etag,
@@ -870,6 +1260,38 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             status: 200,
             body: {
                 pages: await cms.summaries(),
+            },
+        })) as never
+    );
+
+    const listGlobals = route({
+        method: 'GET',
+        path: `${editingBase}/globals`,
+        auth: editor,
+        summary: 'List every global, like the footer or site settings, with its status',
+        tool: true,
+        responses: {
+            200: {
+                body: z.object({
+                    globals: z.array(
+                        z.object({
+                            name: z.string(),
+                            label: z.string().nullable(),
+                            group: z.string().nullable(),
+                            status: PageStatusSchema,
+                            version: z.int(),
+                            updatedAt: z.string().nullable(),
+                        })
+                    ),
+                }),
+                cache: 'no-store',
+            },
+        },
+    }).handler(
+        guarded(async (cms) => ({
+            status: 200,
+            body: {
+                globals: await cms.globalSummaries(),
             },
         })) as never
     );
@@ -1130,7 +1552,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             .optional(),
         responses: {
             200: z.object({
-                url: z.string(),
+                url: z.string().describe('A link into draft mode, for a browser tab or a frame on the site.'),
+                proxy: z
+                    .string()
+                    .describe('Where the editor fetches the draft through, with `token`, in a host that will not frame the site.'),
+                token: z.string(),
                 expiresAt: z.string(),
             }),
             404: ProblemDetailsSchema,
@@ -1143,13 +1569,16 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 });
             }
             const body = args.body as { path?: string } | undefined;
+            const token = cms.previewToken();
             const draft = new URL(`${options.apiPath ?? '/api'}${base}/draft`, options.preview.url);
-            draft.searchParams.set('token', cms.previewToken());
+            draft.searchParams.set('token', token);
             draft.searchParams.set('redirect', body?.path ?? '/');
             return {
                 status: 200,
                 body: {
                     url: draft.toString(),
+                    proxy: previewProxyUrl(options.preview.url, options.apiPath ?? '/api', base),
+                    token,
                     expiresAt: new Date(Date.now() + PREVIEW_TTL_SECONDS * 1000).toISOString(),
                 },
             };
@@ -1208,7 +1637,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                           pages: editingRoutes(sitePageScope),
                       },
                   }),
-            globals: editingRoutes(globalScope),
+            globals: {
+                list: listGlobals,
+                ...editingRoutes(globalScope),
+            },
             collections: {
                 ...itemRoutes(),
                 ...editingRoutes(itemScope),
@@ -1224,6 +1656,14 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             whereUsed,
             searchItems,
             createPreview,
+            people: {
+                list: listPeople,
+            },
+            reviews: {
+                list: listReviews,
+                request: requestReview,
+                decide: decideReview,
+            },
         },
         invalidate,
     };

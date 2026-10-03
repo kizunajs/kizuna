@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { features } from '@/lib/features';
+import { features as kizunaFeatures, type Feature } from '@/lib/features';
 import styles from './feature-cards.module.css';
 
-export function FeatureCards() {
+export function FeatureCards({ features = kizunaFeatures }: { features?: Feature[] }) {
     return (
         <div className={styles.grid}>
             {features.map((feature) => (

@@ -26,6 +26,7 @@ import { ResponseError } from './response-error.js';
 import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
+export { queryFromSearchParams } from './query-params.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
 import type { ContentRuntime } from './content.js';
 export { contentOf, CONTENT_META_KEY, type ContentRuntime, type ContentCookies, type ContentMeta } from './content.js';

@@ -1,0 +1,55 @@
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 8px;
+}
+
+.split :global(pre) {
+    padding-block: 4px 18px !important;
+}
+
+.preview {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 10px;
+    border-radius: 10px;
+    background-color: var(--kizuna-window);
+    box-shadow: var(--kizuna-window-elevation);
+    padding: 12px;
+    --kizuna-window: var(--kizuna-raised);
+}
+
+.roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.roles svg {
+    width: 16px;
+    height: 16px;
+}
+
+.locked {
+    position: relative;
+}
+
+.locked > svg {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+
+.points {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+@media (max-width: 1023px) {
+    .split,
+    .points {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

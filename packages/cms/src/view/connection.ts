@@ -10,16 +10,12 @@ export interface ToolAnswer<Body = unknown> {
 }
 
 /**
- * What the editor sends with a call that needs approval: the person already
- * confirmed in the editor, so the route runs without asking again.
+ * The `_meta` the editor sends with a call the person already confirmed in
+ * it, so the route runs without asking again. `@kizunajs/mcp` reads it, and a
+ * model cannot set it, since it only writes a call's arguments.
  */
-const APPROVED = {
-    approved: {
-        action: 'accept',
-        content: {
-            approved: true,
-        },
-    },
+const APPROVED_META = {
+    'io.kizunajs/approved': true,
 };
 
 /**
@@ -62,7 +58,7 @@ export const connect = (app: App): Connection => ({
                 arguments: input ?? {},
                 ...(options?.approved === true
                     ? {
-                          inputResponses: APPROVED,
+                          _meta: APPROVED_META,
                       }
                     : {}),
             } as never);

@@ -1,0 +1,193 @@
+.layout {
+    --dash-h: repeating-linear-gradient(to right, var(--kizuna-line-strong) 0 4px, transparent 4px 9px);
+
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 40px;
+}
+
+.cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Each card is wired to the config it is declared in. */
+.card {
+    position: relative;
+    display: flex;
+    flex: 1;
+}
+
+.card::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 40px;
+    height: 1px;
+    background-image: var(--dash-h);
+}
+
+.cards[data-side='left'] .card::after {
+    left: 100%;
+}
+
+.cards[data-side='right'] .card::after {
+    right: 100%;
+}
+
+.link {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 14px;
+    border-radius: var(--kizuna-radius-card);
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    padding: 14px 18px;
+    color: var(--kizuna-ink);
+    text-decoration: none;
+    transition:
+        background-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+@media (hover: hover) {
+    .link:hover {
+        background-color: var(--kizuna-surface-hover);
+        box-shadow: var(--kizuna-elevation-hover);
+    }
+
+    .link:hover .arrow {
+        transform: translateX(2px);
+    }
+}
+
+.link:focus-visible {
+    outline: 2px solid var(--kizuna-ink);
+    outline-offset: 2px;
+}
+
+.icons {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    padding: 0 10px;
+}
+
+.icon {
+    width: 18px;
+    height: 18px;
+    color: var(--kizuna-ink);
+    stroke-width: 2.25;
+}
+
+.icon[aria-label='Model Context Protocol'] {
+    stroke-width: 12;
+}
+
+.body {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 1rem;
+    font-weight: var(--font-weight-600);
+    letter-spacing: -0.01em;
+}
+
+.arrow {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke-width: 2.5;
+    transition: transform 0.15s ease;
+}
+
+.text {
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--kizuna-muted);
+}
+
+.more {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 32px;
+}
+
+.moreLabel {
+    margin-right: 6px;
+    font-size: 0.9375rem;
+    font-weight: var(--font-weight-600);
+    color: var(--kizuna-ink);
+}
+
+.chip {
+    border-radius: var(--kizuna-radius-pill);
+    background-color: var(--kizuna-surface);
+    box-shadow: var(--kizuna-elevation);
+    padding: 7px 14px;
+    font-size: 0.875rem;
+    color: var(--kizuna-muted);
+    text-decoration: none;
+    transition:
+        color 0.15s ease,
+        background-color 0.15s ease;
+}
+
+@media (hover: hover) {
+    .chip:hover {
+        background-color: var(--kizuna-surface-hover);
+        color: var(--kizuna-ink);
+    }
+}
+
+.chip:focus-visible {
+    outline: 2px solid var(--kizuna-ink);
+    outline-offset: 2px;
+}
+
+@media (max-width: 1023px) {
+    .layout {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+    }
+
+    .layout > :nth-child(2) {
+        order: -1;
+        margin-bottom: 12px;
+    }
+
+    .card::after {
+        display: none;
+    }
+
+    .more {
+        justify-content: flex-start;
+    }
+
+    .moreLabel {
+        flex-basis: 100%;
+    }
+}

@@ -57,6 +57,25 @@ export const resetUsers = (): void => {
 };
 
 export const userRoutes = k.routes('api', {
+    queryLists: k
+        .route({
+            method: 'GET',
+            path: '/query-lists',
+            query: z.object({
+                ids: z.array(z.string()).optional(),
+                pages: z.array(z.int()).optional(),
+            }),
+            responses: {
+                200: z.object({
+                    ids: z.array(z.string()).optional(),
+                    pages: z.array(z.int()).optional(),
+                }),
+            },
+        })
+        .handler(({ query }) => ({
+            status: 200,
+            body: query,
+        })),
     getUser: k
         .route({
             method: 'GET',

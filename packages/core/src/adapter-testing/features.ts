@@ -39,6 +39,9 @@ export const ADAPTER_FEATURES = {
     'query.coercion': {
         summary: 'Query strings coerce to the declared types before validation.',
     },
+    'query.lists': {
+        summary: 'A list query param takes one value or the key repeated, `?ids=a&ids=b`, and reaches the handler as a list.',
+    },
     'body.json': {
         summary: 'A JSON body validates and reaches the handler typed.',
     },

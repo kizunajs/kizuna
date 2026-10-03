@@ -28,15 +28,16 @@ export interface DocumentViewConfig {
 export const CONFIG_PLACEHOLDER = '"__KIZUNA_CMS_VIEW_CONFIG__"';
 
 /**
- * The built editor: beside this module in `dist`, beside `src` when the tests
- * run the source, or wherever the package resolves from the app.
+ * A file the package build writes to `dist/views`: beside this module in
+ * `dist`, beside `src` when the tests run the source, or wherever the package
+ * resolves from the app.
  */
-const builtPage = async (): Promise<string> => {
+export const readBuilt = async (name: string): Promise<string> => {
     const here = dirname(fileURLToPath(import.meta.url));
-    const candidates = [join(here, 'views/document.html'), join(here, '../dist/views/document.html')];
+    const candidates = [join(here, 'views', name), join(here, '../dist/views', name)];
     try {
-        const manifest = createRequire(join(process.cwd(), 'package.json')).resolve('@kizunajs/cms/package.json');
-        candidates.push(join(dirname(manifest), 'dist/views/document.html'));
+        const entry = createRequire(join(process.cwd(), 'package.json')).resolve('@kizunajs/cms');
+        candidates.push(join(dirname(entry), 'views', name));
     } catch {
         // Not resolvable from the app, so one of the paths above has it.
     }
@@ -47,8 +48,10 @@ const builtPage = async (): Promise<string> => {
             continue;
         }
     }
-    throw new Error('The CMS editor is not built. Run `pnpm build` in @kizunajs/cms.');
+    throw new Error(`The CMS editor is not built (no views/${name}). Run \`pnpm build\` in @kizunajs/cms.`);
 };
+
+const builtPage = (): Promise<string> => readBuilt('document.html');
 
 const originOf = (url: string | undefined): string | undefined => {
     if (url === undefined) return undefined;
@@ -62,12 +65,24 @@ const originOf = (url: string | undefined): string | undefined => {
 
 /**
  * The editor a host renders a draft in, framing the site at `preview.url` and
- * loading images from it or from the media bucket.
+ * loading images from it, the media bucket, and the origins relationships
+ * name for their thumbnails.
  */
-export const documentViewFor = (options: Pick<ResolvedCmsOptions, 'preview' | 'media'>): ToolView => {
+export const documentViewFor = (options: {
+    preview?: ResolvedCmsOptions['preview'];
+    media?: ResolvedCmsOptions['media'];
+    relationships?: readonly { imageOrigins?: readonly string[] }[];
+    auth?: {
+        people?: {
+            imageOrigins?: readonly string[];
+        };
+    };
+}): ToolView => {
     const site = originOf(options.preview?.url);
     const bucket = originOf(options.media?.publicPath);
-    const images = [...new Set([site, bucket].filter((origin): origin is string => origin !== undefined))];
+    const thumbnails = (options.relationships ?? []).flatMap((relationship) => relationship.imageOrigins ?? []);
+    const faces = options.auth?.people?.imageOrigins ?? [];
+    const images = [...new Set([site, bucket, ...thumbnails, ...faces].filter((origin): origin is string => origin !== undefined))];
     const config: DocumentViewConfig = {
         siteUrl: site ?? null,
     };
@@ -81,6 +96,8 @@ export const documentViewFor = (options: Pick<ResolvedCmsOptions, 'preview' | 'm
                 ? {}
                 : {
                       frameDomains: [site],
+                      connectDomains: [site],
+                      baseUriDomains: [site],
                   }),
             ...(images.length === 0
                 ? {}

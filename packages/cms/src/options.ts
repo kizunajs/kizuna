@@ -108,11 +108,72 @@ export interface CmsAuthOptions {
      */
     author?: (context: Record<string, unknown>) => string;
     /**
+     * Everyone who edits, so the editor shows owners and reviewers by name and
+     * picture.
+     */
+    people?: PeopleOptions;
+    /**
      * Who may call the `invalidate` route, in a route's own words: usually
      * the app API's key, so the app refreshes the pages that show a product
      * it changed. Editors when left out.
      */
     invalidate?: RouteAuth;
+}
+
+/**
+ * Someone who edits, as the editor shows them.
+ */
+export interface Person {
+    /**
+     * The value `author` returns for them, so versions and reviews name them.
+     */
+    id: string;
+    name: string;
+    email?: string;
+    /**
+     * A picture, as a URL whose origin is under `imageOrigins`.
+     */
+    image?: string;
+    roles?: readonly string[];
+}
+
+export interface PeopleOptions {
+    /**
+     * Everyone who edits, read from the app's own users.
+     */
+    list: () => readonly Person[] | Promise<readonly Person[]>;
+    /**
+     * The origins people's pictures load from, which the editor is allowed to
+     * show.
+     */
+    imageOrigins?: readonly string[];
+}
+
+/**
+ * A review someone asked for, as `onReviewRequested` receives it.
+ */
+export interface ReviewRequest {
+    documents: ReadonlyArray<{
+        ref: string;
+        label: string;
+        path: string | null;
+    }>;
+    reviewers: readonly Person[];
+    requestedBy: Person;
+    note: string | null;
+}
+
+export interface ReviewOptions {
+    /**
+     * Roles that may approve any document without being asked, such as
+     * `admin`.
+     */
+    roles?: string | readonly string[];
+    /**
+     * Runs after someone asks for a review, to tell the reviewers by email or
+     * in a chat.
+     */
+    onReviewRequested?: (request: ReviewRequest) => void | Promise<void>;
 }
 
 /**
@@ -190,6 +251,10 @@ export interface CmsPluginOptions<
      */
     relationships?: readonly CmsRelationship<string, any>[];
     media?: MediaOptions;
+    /**
+     * Who may approve a review, and how reviewers hear of one.
+     */
+    reviews?: ReviewOptions;
     /**
      * Signs the tokens that open draft mode. Defaults to
      * `KIZUNA_CMS_PREVIEW_SECRET`.
@@ -301,6 +366,18 @@ export const CmsPluginOptionsSchema = z
             identity: z.string().min(1),
             roles: z.union([z.string(), z.array(z.string())]).optional(),
             author: z.custom<CmsAuthOptions['author']>(isFunction).optional(),
+            people: z
+                .object({
+                    list: z.custom<PeopleOptions['list']>(isFunction),
+                    imageOrigins: z
+                        .array(
+                            z.string().refine((origin) => URL.canParse(origin) && new URL(origin).origin === origin, {
+                                error: "is an origin, like 'https://cdn.example.com'",
+                            })
+                        )
+                        .optional(),
+                })
+                .optional(),
             invalidate: RouteAuthSchema.optional(),
         }),
         relationships: z
@@ -321,6 +398,12 @@ export const CmsPluginOptionsSchema = z
                 publicPath: z.string().optional(),
                 maxBytes: z.int().min(1).optional(),
                 storage: z.custom<MediaStorage>((value) => typeof value === 'object' && value !== null).optional(),
+            })
+            .optional(),
+        reviews: z
+            .object({
+                roles: z.union([z.string(), z.array(z.string())]).optional(),
+                onReviewRequested: z.custom<ReviewOptions['onReviewRequested']>(isFunction).optional(),
             })
             .optional(),
         previewSecret: z.string().optional(),

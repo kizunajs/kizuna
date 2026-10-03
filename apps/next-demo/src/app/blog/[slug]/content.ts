@@ -6,5 +6,6 @@ import { Articles } from '../../../cms/content';
  */
 export default definePage({
     name: 'articlePage',
+    label: 'Article',
     collection: Articles,
 });

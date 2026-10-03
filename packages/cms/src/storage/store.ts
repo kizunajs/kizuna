@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { and, asc, desc, eq, isNotNull, lt, max, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, lt, max, sql } from 'drizzle-orm';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
-import { cmsDocuments, cmsRefs, cmsVersions } from './schema.js';
+import { cmsDocuments, cmsRefs, cmsReviews, cmsVersions } from './schema.js';
 import { CMS_MIGRATION_SQL, likePrefix, type IndexType } from './migration.js';
 
 /**
@@ -35,6 +35,38 @@ export interface DocumentRow {
     migrationVersion: number;
     updatedAt: Date;
     updatedBy: string;
+    /**
+     * The person who looks after the document, or `null`.
+     */
+    owner: string | null;
+}
+
+/**
+ * Where a review stands: waiting for an answer, approved, or sent back with
+ * changes to make.
+ */
+export type ReviewStatus = 'open' | 'approved' | 'changes';
+
+export interface ReviewRow {
+    id: string;
+    requestId: string;
+    /**
+     * The document, as `formatRef` writes it.
+     */
+    ref: string;
+    documentId: string;
+    /**
+     * The draft version the review was asked about.
+     */
+    version: number;
+    reviewers: string[];
+    requestedBy: string;
+    note: string | null;
+    createdAt: Date;
+    status: ReviewStatus;
+    decidedBy: string | null;
+    decisionNote: string | null;
+    decidedAt: Date | null;
 }
 
 /**
@@ -143,6 +175,13 @@ const toRow = (row: typeof cmsDocuments.$inferSelect): DocumentRow => ({
     migrationVersion: row.migrationVersion,
     updatedAt: row.updatedAt,
     updatedBy: row.updatedBy,
+    owner: row.owner,
+});
+
+const toReview = (row: typeof cmsReviews.$inferSelect): ReviewRow => ({
+    ...row,
+    reviewers: row.reviewers as string[],
+    status: row.status as ReviewStatus,
 });
 
 /**
@@ -181,6 +220,80 @@ export class DocumentStore {
     async list(kind: DocumentKind): Promise<DocumentRow[]> {
         const rows = await this.db.select().from(cmsDocuments).where(eq(cmsDocuments.kind, kind)).orderBy(asc(cmsDocuments.key));
         return rows.map(toRow);
+    }
+
+    async setOwner(documentId: string, owner: string | null): Promise<void> {
+        await this.db
+            .update(cmsDocuments)
+            .set({
+                owner,
+            })
+            .where(eq(cmsDocuments.id, documentId));
+    }
+
+    async addReviews(
+        reviews: ReadonlyArray<Omit<ReviewRow, 'id' | 'status' | 'decidedBy' | 'decisionNote' | 'decidedAt'>>
+    ): Promise<ReviewRow[]> {
+        if (reviews.length === 0) return [];
+        const rows = await this.db
+            .insert(cmsReviews)
+            .values(
+                reviews.map((review) => ({
+                    ...review,
+                    id: randomUUID(),
+                    status: 'open',
+                }))
+            )
+            .returning();
+        return rows.map(toReview);
+    }
+
+    /**
+     * A document's reviews, newest first.
+     */
+    async reviewsOf(documentId: string): Promise<ReviewRow[]> {
+        const rows = await this.db
+            .select()
+            .from(cmsReviews)
+            .where(eq(cmsReviews.documentId, documentId))
+            .orderBy(desc(cmsReviews.createdAt));
+        return rows.map(toReview);
+    }
+
+    async reviews(ids: readonly string[]): Promise<ReviewRow[]> {
+        if (ids.length === 0) return [];
+        const rows = await this.db
+            .select()
+            .from(cmsReviews)
+            .where(inArray(cmsReviews.id, [...ids]));
+        return rows.map(toReview);
+    }
+
+    /**
+     * Every review still waiting for an answer, oldest first.
+     */
+    async openReviews(): Promise<ReviewRow[]> {
+        const rows = await this.db.select().from(cmsReviews).where(eq(cmsReviews.status, 'open')).orderBy(asc(cmsReviews.createdAt));
+        return rows.map(toReview);
+    }
+
+    /**
+     * Records an answer to a review, for the draft version the reviewer saw.
+     */
+    async decideReview(
+        id: string,
+        decision: { status: 'approved' | 'changes'; by: string; note: string | null; version: number }
+    ): Promise<void> {
+        await this.db
+            .update(cmsReviews)
+            .set({
+                status: decision.status,
+                decidedBy: decision.by,
+                decisionNote: decision.note,
+                decidedAt: new Date(),
+                version: decision.version,
+            })
+            .where(eq(cmsReviews.id, id));
     }
 
     async latestVersion(documentId: string): Promise<number> {

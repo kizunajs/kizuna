@@ -265,6 +265,63 @@ describe('mcpPlugin', () => {
         expect(deleted).toEqual([]);
     });
 
+    /**
+     * One tool call with no session first, the 2025 protocol a per-request
+     * bridge such as `mcp-remote` speaks. The server has no way to ask it
+     * anything.
+     */
+    const bareCall = async (meta?: Record<string, unknown>) => {
+        const started = await start();
+        running = started.server;
+        const response = await fetch(`http://127.0.0.1:${started.port}/mcp`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                accept: 'application/json, text/event-stream',
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'tools/call',
+                params: {
+                    name: 'delete_user',
+                    arguments: {
+                        params: {
+                            id: '7',
+                        },
+                    },
+                    ...(meta === undefined
+                        ? {}
+                        : {
+                              _meta: meta,
+                          }),
+                },
+            }),
+        });
+        const text = await response.text();
+        const data = text.split('\n').find((line) => line.startsWith('data: '));
+        return JSON.parse(data === undefined ? text : data.slice(6)).result as { isError?: boolean; content: Array<{ text: string }> };
+    };
+
+    it('refuses a call that needs approval when the client cannot ask, and says so', async () => {
+        deleted.length = 0;
+        const result = await bareCall();
+        expect(result.isError).toBe(true);
+        expect(result.content[0]!.text).toBe(
+            '"Delete a user" needs the person\'s approval, and this client cannot ask for it, so nothing ran. Ask the person to do it themselves, where they confirm first.'
+        );
+        expect(deleted).toEqual([]);
+    });
+
+    it('runs a call a view sends after the person confirmed in it', async () => {
+        deleted.length = 0;
+        const result = await bareCall({
+            'io.kizunajs/approved': true,
+        });
+        expect(result.isError).toBeFalsy();
+        expect(deleted).toEqual(['7']);
+    });
+
     it('leaves the endpoint out of the contract, so clients never see it', () => {
         expect(Object.keys(contract.routes)).toEqual(['deleteUser', 'greetUser', 'getUser']);
     });

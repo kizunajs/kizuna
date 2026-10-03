@@ -101,6 +101,8 @@ import kizuna from '@kizuna-config';
 
 It renders nothing outside draft mode. Inside the editor, it outlines the fields you can change and tells the editor which one you click, and which page a link took you to. Opened in a tab of its own, it shows the draft with a bar to leave draft mode.
 
+Some hosts, Claude among them, will not frame another site inside the editor. There the editor fetches the page's draft through the CMS, which renders it on your site in draft mode and serves it without its scripts. A Next.js page cannot start its client code in a frame with no address on your site, so the preview shows the page as the server renders it: client components appear in their first render, and what the browser would load or change after that does not. Pointing at a field and following links still work. `withKizunaCms` lets the editor's origin load your images and fonts in development.
+
 When a layout reads a global, put the preview in `not-found.tsx` too, since an unpublished global sends every page there and the editor needs the preview to point at it.
 
 The editor needs the site's address to show it, so give `cms()` a `preview`:

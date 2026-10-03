@@ -18,6 +18,7 @@ export const PageSummarySchema = Kizuna.model({
             .describe(
                 'page:<name>, page:<site>:<name> on a site of its own, or item:<collection>:<id> for an item a page shows at its address.'
             ),
+        label: z.string().nullable().describe('What editors call the page, when it declares a label.'),
         path: z.string(),
         status: PageStatusSchema,
         group: z.string().nullable(),
@@ -103,6 +104,7 @@ export const DescribedFieldSchema = Kizuna.model({
         label: z.string().optional(),
         options: z.record(z.string(), z.string()).optional().describe('For an enum, the label editors see for each value.'),
         description: z.string().optional(),
+        help: z.string().optional().describe('What an editor reads under the field: the description, without the guidance for agents.'),
         block: z.string().optional().describe('The block name, when the field is a block.'),
         parent: z.string().optional().describe('The path of the block field this one sits in.'),
         readOnly: z.boolean(),
@@ -127,12 +129,49 @@ export const UsedOnSchema = z
     })
     .describe('Where else the document appears, to say before changing shared content.');
 
+export const PersonSchema = Kizuna.model({
+    title: 'CmsPerson',
+    schema: z.object({
+        id: z.string(),
+        name: z.string(),
+        image: z.string().optional().describe('A picture of them, as a URL.'),
+    }),
+});
+
+export const ReviewStateSchema = Kizuna.model({
+    title: 'CmsReviewState',
+    schema: z.object({
+        id: z.string(),
+        status: z
+            .enum(['open', 'approved', 'changes', 'outdated'])
+            .describe('Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.'),
+        version: z.int().describe('The draft version it was asked about, or the one the reviewer answered.'),
+        reviewers: z.array(PersonSchema),
+        requestedBy: PersonSchema,
+        note: z.string().nullable(),
+        createdAt: z.iso.datetime(),
+        decidedBy: PersonSchema.nullable(),
+        decisionNote: z.string().nullable(),
+        decidedAt: z.iso.datetime().nullable(),
+    }),
+});
+
+/**
+ * Who looks after a document, and where its review stands.
+ */
+const ReviewFields = {
+    owner: PersonSchema.nullable().describe('The person who looks after it, if anyone does.'),
+    review: ReviewStateSchema.nullable().describe('Its latest review since it was last published.'),
+    requireReview: z.boolean().describe('Whether publishing waits for an approval.'),
+};
+
 export const DescribedPageSchema = Kizuna.model({
     title: 'CmsDescribed',
     schema: z.object({
         ref: z.string(),
         kind: z.enum(['page', 'global', 'item']),
         name: z.string(),
+        label: z.string().optional().describe('What editors call it. For an item, what they call its collection.'),
         path: z.string().nullable(),
         usedOn: UsedOnSchema,
         status: PageStatusSchema,
@@ -141,6 +180,7 @@ export const DescribedPageSchema = Kizuna.model({
         missing: z.array(z.string()),
         fields: z.array(DescribedFieldSchema),
         draft: z.record(z.string(), z.unknown()).nullable(),
+        ...ReviewFields,
     }),
 });
 
@@ -165,11 +205,52 @@ export const VersionSchema = Kizuna.model({
     }),
 });
 
+export const DraftChangesSchema = Kizuna.model({
+    title: 'CmsDraftChanges',
+    schema: z.object({
+        ref: z.string(),
+        label: z.string().describe('What editors call the document.'),
+        path: z.string().nullable(),
+        published: z.boolean().describe('Whether anything is published yet. When not, every filled field is a change.'),
+        ...ReviewFields,
+        changes: z
+            .array(
+                z.object({
+                    path: z.string().describe('The field, as a change to it is keyed.'),
+                    label: z.string(),
+                    before: z.unknown().optional().describe('What visitors see now. Absent when the field is not published.'),
+                    after: z.unknown().optional().describe('What publishing makes them see. Absent when the draft clears the field.'),
+                    writable: z.boolean().describe('Whether the caller may revert it.'),
+                })
+            )
+            .describe('One entry per field the draft changes, in the order the fields are shown.'),
+    }),
+});
+
+export const RevertBodySchema = Kizuna.model({
+    title: 'CmsRevert',
+    schema: z.object({
+        paths: z.array(z.string()).min(1).describe('The fields to set back to what is published, from the changes list.'),
+    }),
+});
+
 export const VersionListSchema = Kizuna.model({
     title: 'CmsVersionList',
     schema: z.object({
         name: z.string(),
         versions: z.array(VersionSchema),
+    }),
+});
+
+export const VersionContentSchema = Kizuna.model({
+    title: 'CmsVersionContent',
+    schema: z.object({
+        ref: z.string(),
+        version: z.int(),
+        summary: z.string().nullable(),
+        createdAt: z.iso.datetime(),
+        createdBy: z.string(),
+        content: z.record(z.string(), z.unknown()).describe('The content as that version saved it, migrated to the current schema.'),
     }),
 });
 
@@ -313,4 +394,57 @@ export const ImageQuerySchema = z.object({
 export const InvalidateBodySchema = z.object({
     relationship: z.string().min(1).describe('The name of the relationship, like products.'),
     id: z.string().min(1).describe('The id of the one that changed.'),
+});
+
+export const PeopleSchema = Kizuna.model({
+    title: 'CmsPeople',
+    schema: z.object({
+        me: z.string().describe('The caller, by their id.'),
+        people: z.array(PersonSchema).describe('Everyone who edits, to name as an owner or a reviewer.'),
+    }),
+});
+
+export const OwnerBodySchema = Kizuna.model({
+    title: 'CmsSetOwner',
+    schema: z.object({
+        owner: z.string().nullable().describe('The id of the person who looks after it, from the people list, or null for nobody.'),
+    }),
+});
+
+export const RequestReviewBodySchema = Kizuna.model({
+    title: 'CmsRequestReview',
+    schema: z.object({
+        refs: z.array(z.string()).min(1).describe('The documents to review, like page:frontPage. They are reviewed as one request.'),
+        reviewers: z.array(z.string()).min(1).describe('The ids of the people to ask, from the people list.'),
+        note: z.string().max(2000).optional().describe('Something for the reviewers to know.'),
+    }),
+});
+
+export const DecideReviewBodySchema = Kizuna.model({
+    title: 'CmsDecideReview',
+    schema: z.object({
+        ids: z.array(z.string()).min(1).describe('The reviews to answer, from the waiting list.'),
+        decision: z.enum(['approve', 'requestChanges']),
+        note: z.string().max(2000).optional().describe('Why, or what to change.'),
+    }),
+});
+
+export const WaitingReviewsSchema = Kizuna.model({
+    title: 'CmsWaitingReviews',
+    schema: z.object({
+        reviews: z.array(
+            ReviewStateSchema.extend({
+                ref: z.string(),
+                label: z.string(),
+                path: z.string().nullable(),
+            })
+        ),
+    }),
+});
+
+export const ReviewListSchema = Kizuna.model({
+    title: 'CmsReviews',
+    schema: z.object({
+        reviews: z.array(ReviewStateSchema),
+    }),
 });

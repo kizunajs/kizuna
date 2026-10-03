@@ -656,6 +656,7 @@ export class CmsService {
             name: string;
             site: string;
             ref: string;
+            label: string | null;
             path: string;
             group: string | null;
             status: PageStatus;
@@ -706,6 +707,7 @@ export class CmsService {
                 name,
                 site,
                 ref: formatRef(ref),
+                label: state.target.definition.label ?? null,
                 path,
                 group: state.target.definition.group ?? null,
                 status: state.status,
@@ -719,7 +721,7 @@ export class CmsService {
     }
 
     async globalSummaries(): Promise<
-        Array<{ name: string; group: string | null; status: PageStatus; version: number; updatedAt: string | null }>
+        Array<{ name: string; label: string | null; group: string | null; status: PageStatus; version: number; updatedAt: string | null }>
     > {
         const summaries = [];
         for (const [name, definition] of Object.entries(this.globals)) {
@@ -729,6 +731,7 @@ export class CmsService {
             });
             summaries.push({
                 name,
+                label: definition.label ?? null,
                 group: definition.group ?? null,
                 status: state.status,
                 version: state.version,
@@ -845,6 +848,26 @@ export class CmsService {
      * items included, with each one's status and, when a page shows it, its
      * address.
      */
+    /**
+     * Every collection, with what editors call it and how many items it holds.
+     */
+    async collectionSummaries(): Promise<Array<{ name: string; label: string; count: number }>> {
+        const rows = await this.store.list('item');
+        return Object.values(this.collections).map((definition) => {
+            const listing = this.listing(definition.name);
+            return {
+                name: definition.name,
+                label:
+                    definition.label ??
+                    definition.name
+                        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+                        .toLowerCase()
+                        .replace(/^./, (first) => first.toUpperCase()),
+                count: rows.filter((row) => row.key.startsWith(listing.keyPrefix)).length,
+            };
+        });
+    }
+
     async editorItems(name: string): Promise<
         Array<{
             id: string;
@@ -1076,6 +1099,12 @@ export class CmsService {
             const description = [field.description, brand === undefined ? undefined : this.brandHint(brand, isList), address]
                 .filter(Boolean)
                 .join(' ');
+            const help = [
+                field.description,
+                route === undefined ? undefined : 'In the address, so changing it after publishing breaks links.',
+            ]
+                .filter(Boolean)
+                .join(' ');
             const searchable = brand !== undefined && (this.listingFor(brand) !== undefined || this.relationshipFor(brand) !== undefined);
             described.push({
                 path: field.path,
@@ -1083,6 +1112,7 @@ export class CmsService {
                 ...(field.label === undefined ? {} : { label: field.label }),
                 ...(field.options === undefined ? {} : { options: { ...field.options } }),
                 ...(description === '' ? {} : { description }),
+                ...(help === '' ? {} : { help }),
                 ...(field.block === undefined ? {} : { block: field.block }),
                 ...(parent === undefined ? {} : { parent }),
                 readOnly: field.readOnly,
@@ -1258,12 +1288,28 @@ export class CmsService {
         return this.draftState(ref);
     }
 
-    async rollback(ref: DocumentRef, version: number, author: string): Promise<DraftState> {
+    /**
+     * An earlier version's content, migrated to the current schema.
+     */
+    async versionContent(
+        ref: DocumentRef,
+        version: number
+    ): Promise<{ content: Record<string, unknown>; summary: string | null; createdAt: Date; createdBy: string }> {
         const { target, row } = await this.document(ref);
         if (row === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no versions.` });
         const found = await this.store.version(row.id, version);
         if (found === undefined) throw new CmsHttpError(404, { detail: `'${formatRef(ref)}' has no version ${version}.` });
-        const migrated = migrateContent(target.definition, found.data, found.migrationVersion);
+        return {
+            content: migrateContent(target.definition, found.data, found.migrationVersion),
+            summary: found.summary,
+            createdAt: found.createdAt,
+            createdBy: found.createdBy,
+        };
+    }
+
+    async rollback(ref: DocumentRef, version: number, author: string): Promise<DraftState> {
+        const { target } = await this.document(ref);
+        const migrated = (await this.versionContent(ref, version)).content;
         await this.store.saveDraft({
             kind: target.kind,
             key: target.key,

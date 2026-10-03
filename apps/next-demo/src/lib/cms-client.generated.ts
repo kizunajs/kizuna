@@ -26,10 +26,26 @@ export namespace API {
         size: number;
     };
 
+    export type CmsDecideReview = {
+        /**
+         * The reviews to answer, from the waiting list.
+         */
+        ids: Array<string>;
+        decision: "approve" | "requestChanges";
+        /**
+         * Why, or what to change.
+         */
+        note?: string;
+    };
+
     export type CmsDescribed = {
         ref: string;
         kind: "page" | "global" | "item";
         name: string;
+        /**
+         * What editors call it. For an item, what they call its collection.
+         */
+        label?: string;
         path: string | null;
         /**
          * Where else the document appears, to say before changing shared content.
@@ -50,6 +66,18 @@ export namespace API {
         missing: Array<string>;
         fields: Array<CmsField>;
         draft: Record<string, unknown> | null;
+        /**
+         * The person who looks after it, if anyone does.
+         */
+        owner: CmsPerson | null;
+        /**
+         * Its latest review since it was last published.
+         */
+        review: CmsReviewState | null;
+        /**
+         * Whether publishing waits for an approval.
+         */
+        requireReview: boolean;
     };
 
     export type CmsDraft = {
@@ -76,6 +104,53 @@ export namespace API {
         missing: Array<string>;
         updatedAt: string | null;
         updatedBy: string | null;
+    };
+
+    export type CmsDraftChanges = {
+        ref: string;
+        /**
+         * What editors call the document.
+         */
+        label: string;
+        path: string | null;
+        /**
+         * Whether anything is published yet. When not, every filled field is a change.
+         */
+        published: boolean;
+        /**
+         * The person who looks after it, if anyone does.
+         */
+        owner: CmsPerson | null;
+        /**
+         * Its latest review since it was last published.
+         */
+        review: CmsReviewState | null;
+        /**
+         * Whether publishing waits for an approval.
+         */
+        requireReview: boolean;
+        /**
+         * One entry per field the draft changes, in the order the fields are shown.
+         */
+        changes: Array<{
+            /**
+             * The field, as a change to it is keyed.
+             */
+            path: string;
+            label: string;
+            /**
+             * What visitors see now. Absent when the field is not published.
+             */
+            before?: unknown;
+            /**
+             * What publishing makes them see. Absent when the draft clears the field.
+             */
+            after?: unknown;
+            /**
+             * Whether the caller may revert it.
+             */
+            writable: boolean;
+        }>;
     };
 
     export type CmsEditorItem = {
@@ -107,6 +182,10 @@ export namespace API {
          */
         options?: Record<string, string>;
         description?: string;
+        /**
+         * What an editor reads under the field: the description, without the guidance for agents.
+         */
+        help?: string;
         /**
          * The block name, when the field is a block.
          */
@@ -192,6 +271,10 @@ export namespace API {
          * page:<name>, page:<site>:<name> on a site of its own, or item:<collection>:<id> for an item a page shows at its address.
          */
         ref: string;
+        /**
+         * What editors call the page, when it declares a label.
+         */
+        label: string | null;
         path: string;
         status: "empty" | "draft" | "published" | "changed";
         group: string | null;
@@ -204,11 +287,83 @@ export namespace API {
         updatedBy: string | null;
     };
 
+    export type CmsPeople = {
+        /**
+         * The caller, by their id.
+         */
+        me: string;
+        /**
+         * Everyone who edits, to name as an owner or a reviewer.
+         */
+        people: Array<CmsPerson>;
+    };
+
+    export type CmsPerson = {
+        id: string;
+        name: string;
+        /**
+         * A picture of them, as a URL.
+         */
+        image?: string;
+    };
+
+    export type CmsRequestReview = {
+        /**
+         * The documents to review, like page:frontPage. They are reviewed as one request.
+         */
+        refs: Array<string>;
+        /**
+         * The ids of the people to ask, from the people list.
+         */
+        reviewers: Array<string>;
+        /**
+         * Something for the reviewers to know.
+         */
+        note?: string;
+    };
+
+    export type CmsRevert = {
+        /**
+         * The fields to set back to what is published, from the changes list.
+         */
+        paths: Array<string>;
+    };
+
+    export type CmsReviews = {
+        reviews: Array<CmsReviewState>;
+    };
+
+    export type CmsReviewState = {
+        id: string;
+        /**
+         * Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.
+         */
+        status: "open" | "approved" | "changes" | "outdated";
+        /**
+         * The draft version it was asked about, or the one the reviewer answered.
+         */
+        version: number;
+        reviewers: Array<CmsPerson>;
+        requestedBy: CmsPerson;
+        note: string | null;
+        createdAt: string;
+        decidedBy: CmsPerson | null;
+        decisionNote: string | null;
+        decidedAt: string | null;
+    };
+
     export type CmsRollback = {
         /**
          * The version to restore as a new draft.
          */
         version: number;
+    };
+
+    export type CmsSetOwner = {
+        /**
+         * The id of the person who looks after it, from the people list, or null for nobody.
+         */
+        owner: string | null;
     };
 
     export type CmsStoredContent = {
@@ -274,9 +429,45 @@ export namespace API {
         published: boolean;
     };
 
+    export type CmsVersionContent = {
+        ref: string;
+        version: number;
+        summary: string | null;
+        createdAt: string;
+        createdBy: string;
+        /**
+         * The content as that version saved it, migrated to the current schema.
+         */
+        content: Record<string, unknown>;
+    };
+
     export type CmsVersionList = {
         name: string;
         versions: Array<CmsVersion>;
+    };
+
+    export type CmsWaitingReviews = {
+        reviews: Array<{
+            id: string;
+            /**
+             * Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.
+             */
+            status: "open" | "approved" | "changes" | "outdated";
+            /**
+             * The draft version it was asked about, or the one the reviewer answered.
+             */
+            version: number;
+            reviewers: Array<CmsPerson>;
+            requestedBy: CmsPerson;
+            note: string | null;
+            createdAt: string;
+            decidedBy: CmsPerson | null;
+            decisionNote: string | null;
+            decidedAt: string | null;
+            ref: string;
+            label: string;
+            path: string | null;
+        }>;
     };
 
     export type CmsWhereUsed = {
@@ -359,11 +550,11 @@ export namespace API {
                     articles: Array<ArticleId>;
                     seo: {
                         /**
-                         * What search results show as the title.
+                         * What search results show as the title. 30 to 60 characters show in full.
                          */
                         title: string;
                         /**
-                         * One or two sentences for search results.
+                         * One or two sentences under the title. 70 to 160 characters show in full.
                          */
                         description: string;
                     };
@@ -812,6 +1003,53 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
+    export namespace EditingPagesGetVersion {
+        export type Params = {
+            name: string;
+            version: number;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsVersionContent; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingPagesChanges {
+        export type Params = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsDraftChanges; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingPagesRevert {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = CmsRevert;
+
+        export type Result =
+            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace EditingPagesPublish {
         export type Params = {
             name: string;
@@ -832,6 +1070,25 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace EditingPagesSetOwner {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = CmsSetOwner;
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace EditingPagesRollback {
         export type Params = {
             name: string;
@@ -847,6 +1104,24 @@ export namespace API {
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingGlobalsList {
+        export type Result =
+            | { status: 200; body: {
+                globals: Array<{
+                    name: string;
+                    label: string | null;
+                    group: string | null;
+                    status: "empty" | "draft" | "published" | "changed";
+                    version: number;
+                    updatedAt: string | null;
+                }>;
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingGlobalsGetDraft {
@@ -935,6 +1210,53 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
+    export namespace EditingGlobalsGetVersion {
+        export type Params = {
+            name: string;
+            version: number;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsVersionContent; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingGlobalsChanges {
+        export type Params = {
+            name: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsDraftChanges; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingGlobalsRevert {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = CmsRevert;
+
+        export type Result =
+            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace EditingGlobalsPublish {
         export type Params = {
             name: string;
@@ -955,6 +1277,25 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace EditingGlobalsSetOwner {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = CmsSetOwner;
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace EditingGlobalsRollback {
         export type Params = {
             name: string;
@@ -970,6 +1311,21 @@ export namespace API {
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsList {
+        export type Result =
+            | { status: 200; body: {
+                collections: Array<{
+                    name: string;
+                    label: string;
+                    count: number;
+                }>;
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingCollectionsListItems {
@@ -1118,6 +1474,56 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
+    export namespace EditingCollectionsGetVersion {
+        export type Params = {
+            name: string;
+            id: string;
+            version: number;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsVersionContent; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsChanges {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: CmsDraftChanges; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsRevert {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Body = CmsRevert;
+
+        export type Result =
+            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace EditingCollectionsPublish {
         export type Params = {
             name: string;
@@ -1136,6 +1542,26 @@ export namespace API {
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCollectionsSetOwner {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Body = CmsSetOwner;
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
@@ -1279,6 +1705,90 @@ export namespace API {
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
             | { status: 502; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingCreatePreview {
+        export type Body = {
+            /**
+             * The page to land on, like /blog/spring-sale.
+             */
+            path?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                /**
+                 * A link into draft mode, for a browser tab or a frame on the site.
+                 */
+                url: string;
+                /**
+                 * Where the editor fetches the draft through, with `token`, in a host that will not frame the site.
+                 */
+                proxy: string;
+                token: string;
+                expiresAt: string;
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingPeopleList {
+        export type Result =
+            | { status: 200; body: CmsPeople; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingReviewsList {
+        export type Query = {
+            /**
+             * `me` lists the reviews you were asked for.
+             */
+            for?: "me" | "anyone";
+        };
+
+        export type Result =
+            | { status: 200; body: CmsWaitingReviews; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingReviewsRequest {
+        export type Body = CmsRequestReview;
+
+        export type Result =
+            | { status: 201; body: CmsReviews; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingReviewsDecide {
+        export type Body = CmsDecideReview;
+
+        export type Result =
+            | { status: 200; body: CmsReviews; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
@@ -1544,9 +2054,67 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingPagesHistory.Result>;
             /**
+             * Read one earlier version of a page
+             *
+             * The content as it was saved in that version, to compare with the draft or decide what to restore.
+             *
+             * @example
+             * const result = await client.editing.pages.getVersion({
+             *     params: {
+             *         name: 'string',
+             *         version: 1,
+             *     },
+             * });
+             */
+            getVersion: ClientMethod<'GET', false, {
+                params: API.EditingPagesGetVersion.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPagesGetVersion.Result>;
+            /**
+             * List what the draft of a page changes from what is published
+             *
+             * Each changed field with what visitors see now and what publishing makes them see. Read it before publishing, so the person knows what goes live.
+             *
+             * @example
+             * const result = await client.editing.pages.changes({
+             *     params: {
+             *         name: 'string',
+             *     },
+             * });
+             */
+            changes: ClientMethod<'GET', false, {
+                params: API.EditingPagesChanges.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPagesChanges.Result>;
+            /**
+             * Set fields of the draft of a page back to what is published
+             *
+             * Undoes the draft changes to the fields named, from the changes list. Nothing is published by this.
+             *
+             * @example
+             * const result = await client.editing.pages.revert({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {
+             *         paths: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            revert: ClientMethod<'POST', false, {
+                params: API.EditingPagesRevert.Params;
+                body: API.EditingPagesRevert.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPagesRevert.Result>;
+            /**
              * Publish the draft of a page
              *
-             * Makes the current draft what every visitor sees. The person confirms before this runs.
+             * Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead.
              *
              * @example
              * const result = await client.editing.pages.publish({
@@ -1562,6 +2130,27 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingPagesPublish.Result>;
+            /**
+             * Name the person who looks after a page
+             *
+             * The owner is suggested first when someone asks for a review. Pass null for nobody.
+             *
+             * @example
+             * const result = await client.editing.pages.setOwner({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {
+             *         owner: 'string',
+             *     },
+             * });
+             */
+            setOwner: ClientMethod<'PUT', false, {
+                params: API.EditingPagesSetOwner.Params;
+                body: API.EditingPagesSetOwner.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPagesSetOwner.Result>;
             /**
              * Restore an earlier version of a page as a new draft
              *
@@ -1585,6 +2174,16 @@ export interface Client {
             }, API.EditingPagesRollback.Result>;
         };
         globals: {
+            /**
+             * List every global, like the footer or site settings, with its status
+             *
+             * @example
+             * const result = await client.editing.globals.list();
+             */
+            list: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingGlobalsList.Result>;
             /**
              * Read the draft of a global, which every page may show
              *
@@ -1667,9 +2266,67 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingGlobalsHistory.Result>;
             /**
+             * Read one earlier version of a global, which every page may show
+             *
+             * The content as it was saved in that version, to compare with the draft or decide what to restore.
+             *
+             * @example
+             * const result = await client.editing.globals.getVersion({
+             *     params: {
+             *         name: 'string',
+             *         version: 1,
+             *     },
+             * });
+             */
+            getVersion: ClientMethod<'GET', false, {
+                params: API.EditingGlobalsGetVersion.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingGlobalsGetVersion.Result>;
+            /**
+             * List what the draft of a global, which every page may show changes from what is published
+             *
+             * Each changed field with what visitors see now and what publishing makes them see. Read it before publishing, so the person knows what goes live.
+             *
+             * @example
+             * const result = await client.editing.globals.changes({
+             *     params: {
+             *         name: 'string',
+             *     },
+             * });
+             */
+            changes: ClientMethod<'GET', false, {
+                params: API.EditingGlobalsChanges.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingGlobalsChanges.Result>;
+            /**
+             * Set fields of the draft of a global, which every page may show back to what is published
+             *
+             * Undoes the draft changes to the fields named, from the changes list. Nothing is published by this.
+             *
+             * @example
+             * const result = await client.editing.globals.revert({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {
+             *         paths: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            revert: ClientMethod<'POST', false, {
+                params: API.EditingGlobalsRevert.Params;
+                body: API.EditingGlobalsRevert.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingGlobalsRevert.Result>;
+            /**
              * Publish the draft of a global, which every page may show
              *
-             * Makes the current draft what every visitor sees. The person confirms before this runs.
+             * Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead.
              *
              * @example
              * const result = await client.editing.globals.publish({
@@ -1685,6 +2342,27 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingGlobalsPublish.Result>;
+            /**
+             * Name the person who looks after a global, which every page may show
+             *
+             * The owner is suggested first when someone asks for a review. Pass null for nobody.
+             *
+             * @example
+             * const result = await client.editing.globals.setOwner({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {
+             *         owner: 'string',
+             *     },
+             * });
+             */
+            setOwner: ClientMethod<'PUT', false, {
+                params: API.EditingGlobalsSetOwner.Params;
+                body: API.EditingGlobalsSetOwner.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingGlobalsSetOwner.Result>;
             /**
              * Restore an earlier version of a global, which every page may show as a new draft
              *
@@ -1708,6 +2386,16 @@ export interface Client {
             }, API.EditingGlobalsRollback.Result>;
         };
         collections: {
+            /**
+             * List every collection, with how many items it holds
+             *
+             * @example
+             * const result = await client.editing.collections.list();
+             */
+            list: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsList.Result>;
             /**
              * List every item of a collection, drafts included, with its status and address
              *
@@ -1845,9 +2533,70 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingCollectionsHistory.Result>;
             /**
+             * Read one earlier version of an item of a collection
+             *
+             * The content as it was saved in that version, to compare with the draft or decide what to restore.
+             *
+             * @example
+             * const result = await client.editing.collections.getVersion({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *         version: 1,
+             *     },
+             * });
+             */
+            getVersion: ClientMethod<'GET', false, {
+                params: API.EditingCollectionsGetVersion.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsGetVersion.Result>;
+            /**
+             * List what the draft of an item of a collection changes from what is published
+             *
+             * Each changed field with what visitors see now and what publishing makes them see. Read it before publishing, so the person knows what goes live.
+             *
+             * @example
+             * const result = await client.editing.collections.changes({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             * });
+             */
+            changes: ClientMethod<'GET', false, {
+                params: API.EditingCollectionsChanges.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsChanges.Result>;
+            /**
+             * Set fields of the draft of an item of a collection back to what is published
+             *
+             * Undoes the draft changes to the fields named, from the changes list. Nothing is published by this.
+             *
+             * @example
+             * const result = await client.editing.collections.revert({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             *     body: {
+             *         paths: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            revert: ClientMethod<'POST', false, {
+                params: API.EditingCollectionsRevert.Params;
+                body: API.EditingCollectionsRevert.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsRevert.Result>;
+            /**
              * Publish the draft of an item of a collection
              *
-             * Makes the current draft what every visitor sees. The person confirms before this runs.
+             * Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead.
              *
              * @example
              * const result = await client.editing.collections.publish({
@@ -1864,6 +2613,28 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingCollectionsPublish.Result>;
+            /**
+             * Name the person who looks after an item of a collection
+             *
+             * The owner is suggested first when someone asks for a review. Pass null for nobody.
+             *
+             * @example
+             * const result = await client.editing.collections.setOwner({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             *     body: {
+             *         owner: 'string',
+             *     },
+             * });
+             */
+            setOwner: ClientMethod<'PUT', false, {
+                params: API.EditingCollectionsSetOwner.Params;
+                body: API.EditingCollectionsSetOwner.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsSetOwner.Result>;
             /**
              * Restore an earlier version of an item of a collection as a new draft
              *
@@ -2011,6 +2782,88 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.EditingSearchItems.Result>;
+        /**
+         * Open the site's draft
+         *
+         * A link into draft mode that holds for ten minutes, for the editor to frame the site or open it in a tab.
+         *
+         * @example
+         * const result = await client.editing.createPreview({
+         *     body: {},
+         * });
+         */
+        createPreview: ClientMethod<'POST', false, {
+            body: API.EditingCreatePreview.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingCreatePreview.Result>;
+        people: {
+            /**
+             * List the people who edit, to name an owner or ask someone for a review
+             *
+             * @example
+             * const result = await client.editing.people.list();
+             */
+            list: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPeopleList.Result>;
+        };
+        reviews: {
+            /**
+             * List the reviews waiting for an answer, for you or for anyone
+             *
+             * @example
+             * const result = await client.editing.reviews.list();
+             */
+            list: ClientMethod<'GET', false, {
+                query?: API.EditingReviewsList.Query;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReviewsList.Result>;
+            /**
+             * Ask people to review the drafts of one or more documents before they go live
+             *
+             * Each reviewer sees the request in the editor and when they ask what is waiting for them. Name reviewers by their id from the people list, and suggest the owner first.
+             *
+             * @example
+             * const result = await client.editing.reviews.request({
+             *     body: {
+             *         refs: [
+             *             'string',
+             *         ],
+             *         reviewers: [
+             *             'string',
+             *         ],
+             *     },
+             * });
+             */
+            request: ClientMethod<'POST', false, {
+                body: API.EditingReviewsRequest.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReviewsRequest.Result>;
+            /**
+             * Approve reviews, or send them back with changes to make
+             *
+             * An approval is the person's own judgement of what goes live, so they confirm first: in a host that cannot ask, such as Claude, they answer in the editor instead.
+             *
+             * @example
+             * const result = await client.editing.reviews.decide({
+             *     body: {
+             *         ids: [
+             *             'string',
+             *         ],
+             *         decision: 'approve',
+             *     },
+             * });
+             */
+            decide: ClientMethod<'POST', false, {
+                body: API.EditingReviewsDecide.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingReviewsDecide.Result>;
+        };
     };
     /**
      * Refresh every page that shows one item of a relationship
@@ -2203,6 +3056,38 @@ const routes: GeneratedRoutes = {
                     404: {},
                 },
             },
+            getVersion: {
+                method: 'GET',
+                path: '/editing/pages/:name/versions/:version',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
+            changes: {
+                method: 'GET',
+                path: '/editing/pages/:name/changes',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
+            revert: {
+                method: 'POST',
+                path: '/editing/pages/:name/revert',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    422: {},
+                    400: {},
+                },
+            },
             publish: {
                 method: 'POST',
                 path: '/editing/pages/:name/publish',
@@ -2212,6 +3097,19 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     409: {},
+                    400: {},
+                },
+            },
+            setOwner: {
+                method: 'PUT',
+                path: '/editing/pages/:name/owner',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
                     400: {},
                 },
             },
@@ -2228,6 +3126,15 @@ const routes: GeneratedRoutes = {
             },
         },
         globals: {
+            list: {
+                method: 'GET',
+                path: '/editing/globals',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                },
+            },
             getDraft: {
                 method: 'GET',
                 path: '/editing/globals/:name/draft',
@@ -2281,6 +3188,38 @@ const routes: GeneratedRoutes = {
                     404: {},
                 },
             },
+            getVersion: {
+                method: 'GET',
+                path: '/editing/globals/:name/versions/:version',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
+            changes: {
+                method: 'GET',
+                path: '/editing/globals/:name/changes',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
+            revert: {
+                method: 'POST',
+                path: '/editing/globals/:name/revert',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    422: {},
+                    400: {},
+                },
+            },
             publish: {
                 method: 'POST',
                 path: '/editing/globals/:name/publish',
@@ -2290,6 +3229,19 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     409: {},
+                    400: {},
+                },
+            },
+            setOwner: {
+                method: 'PUT',
+                path: '/editing/globals/:name/owner',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
                     400: {},
                 },
             },
@@ -2306,6 +3258,15 @@ const routes: GeneratedRoutes = {
             },
         },
         collections: {
+            list: {
+                method: 'GET',
+                path: '/editing/collections',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                },
+            },
             listItems: {
                 method: 'GET',
                 path: '/editing/collections/:name/items',
@@ -2392,6 +3353,38 @@ const routes: GeneratedRoutes = {
                     404: {},
                 },
             },
+            getVersion: {
+                method: 'GET',
+                path: '/editing/collections/:name/items/:id/versions/:version',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
+            changes: {
+                method: 'GET',
+                path: '/editing/collections/:name/items/:id/changes',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
+            revert: {
+                method: 'POST',
+                path: '/editing/collections/:name/items/:id/revert',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    422: {},
+                    400: {},
+                },
+            },
             publish: {
                 method: 'POST',
                 path: '/editing/collections/:name/items/:id/publish',
@@ -2401,6 +3394,19 @@ const routes: GeneratedRoutes = {
                     403: {},
                     404: {},
                     409: {},
+                    400: {},
+                },
+            },
+            setOwner: {
+                method: 'PUT',
+                path: '/editing/collections/:name/items/:id/owner',
+                responses: {
+                    204: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
                     400: {},
                 },
             },
@@ -2498,6 +3504,65 @@ const routes: GeneratedRoutes = {
                 404: {},
                 502: {},
                 400: {},
+            },
+        },
+        createPreview: {
+            method: 'POST',
+            path: '/editing/preview',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+                404: {},
+                400: {},
+            },
+        },
+        people: {
+            list: {
+                method: 'GET',
+                path: '/editing/people',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                },
+            },
+        },
+        reviews: {
+            list: {
+                method: 'GET',
+                path: '/editing/reviews',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    400: {},
+                },
+            },
+            request: {
+                method: 'POST',
+                path: '/editing/reviews',
+                responses: {
+                    201: {},
+                    400: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    422: {},
+                },
+            },
+            decide: {
+                method: 'POST',
+                path: '/editing/reviews/decide',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
             },
         },
     },

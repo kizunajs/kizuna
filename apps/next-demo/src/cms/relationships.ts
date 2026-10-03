@@ -9,6 +9,7 @@ import { apiClient } from '../lib/api-client';
 export const Products = defineRelationship({
     name: 'products',
     id: ProductId,
+    imageOrigins: ['https://picsum.photos', 'https://fastly.picsum.photos'],
     options: async ({ query, ids, headers }) => {
         const result = await apiClient.products.listProductOptions({
             query: {

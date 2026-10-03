@@ -1,25 +1,12 @@
-import { vercelStegaClean, vercelStegaCombine, vercelStegaDecode } from '@vercel/stega';
+import { vercelStegaClean, vercelStegaCombine } from '@vercel/stega';
 import type { z } from 'zod';
 import { readDef, readMetaBrand, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { isImageSchema } from './image.js';
 import { optionOf } from './union.js';
 import type { ContentDefinition } from './definitions.js';
+import { decodeSource, IMAGE_MARKER, SOURCE_ORIGIN, type SourcePayload } from './source-marks.js';
 
-const ORIGIN = 'kizuna-cms';
-
-interface SourcePayload {
-    origin: string;
-    ref?: string;
-    path: string;
-}
-
-/**
- * Where a rendered value came from: the document, and the field within it.
- */
-export interface Source {
-    ref: string | undefined;
-    path: string;
-}
+export { decodeImageSource, decodeSource, IMAGE_MARKER, type Source } from './source-marks.js';
 
 /**
  * A string carrying its document and field path as hidden characters, the way
@@ -29,22 +16,10 @@ export interface Source {
  */
 export const withSourcePath = (value: string, path: string, ref?: string): string =>
     vercelStegaCombine(value, {
-        origin: ORIGIN,
+        origin: SOURCE_ORIGIN,
         ...(ref === undefined ? {} : { ref }),
         path,
     } satisfies SourcePayload);
-
-/**
- * The document and field path hidden in a string, or `undefined`.
- */
-export const decodeSource = (text: string): Source | undefined => {
-    const payload = vercelStegaDecode<Partial<SourcePayload>>(text);
-    if (payload?.origin !== ORIGIN || typeof payload.path !== 'string') return undefined;
-    return {
-        ref: typeof payload.ref === 'string' ? payload.ref : undefined,
-        path: payload.path,
-    };
-};
 
 /**
  * The field path hidden in a string, or `undefined`.
@@ -55,23 +30,6 @@ export const decodePath = (text: string): string | undefined => decodeSource(tex
  * A value without any hidden paths.
  */
 export const stripPaths = <T>(value: T): T => vercelStegaClean(value);
-
-/**
- * The marker an image URL carries in draft mode, followed by the field path,
- * and the document after a `@`.
- */
-export const IMAGE_MARKER = '#kizuna-cms=';
-
-/**
- * The source an image URL's fragment names.
- */
-export const decodeImageSource = (fragment: string): Source => {
-    const [path, ref] = decodeURIComponent(fragment).split('@');
-    return {
-        ref: ref === undefined || ref === '' ? undefined : ref,
-        path: path ?? '',
-    };
-};
 
 /**
  * Whether a string is text a page shows, the only kind the preview marks. An

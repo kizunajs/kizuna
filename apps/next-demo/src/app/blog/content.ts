@@ -4,6 +4,7 @@ import { HeadingSchema } from '../../cms/schemas';
 
 export default definePage({
     name: 'blogIndexPage',
+    label: 'Blog',
     group: 'Blog',
     fields: [
         {

@@ -29,6 +29,10 @@ const navigation: NavigationItem[] = [
         href: '/docs/reference',
     },
     {
+        label: 'CMS',
+        href: '/cms',
+    },
+    {
         label: 'About',
         href: '/about',
     },

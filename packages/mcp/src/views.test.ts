@@ -173,7 +173,7 @@ describe('MCP views', () => {
         ]);
     });
 
-    it('runs a call that needs approval when it arrives with the approval, as a view sends it after its own confirm', async () => {
+    it('runs a call that needs approval when a view sends it after its own confirm', async () => {
         const client = await connect();
         const result = await client.request({
             method: 'tools/call',
@@ -184,13 +184,8 @@ describe('MCP views', () => {
                         id: '1',
                     },
                 },
-                inputResponses: {
-                    approved: {
-                        action: 'accept',
-                        content: {
-                            approved: true,
-                        },
-                    },
+                _meta: {
+                    'io.kizunajs/approved': true,
                 },
             },
         });

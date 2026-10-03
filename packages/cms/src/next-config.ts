@@ -31,6 +31,11 @@ export interface WithKizunaCmsOptions {
  * });
  * ```
  */
+/**
+ * Where hosts run the editor, whose preview loads the site's scripts.
+ */
+const EDITOR_ORIGINS = ['*.claudemcpcontent.com'];
+
 export const withKizunaCms = (nextConfig: NextConfig = {}, options: WithKizunaCmsOptions = {}): NextConfig => {
     const appDir = options.appDir === undefined ? findAppDir() : resolve(process.cwd(), options.appDir);
     if (appDir === undefined) {
@@ -45,5 +50,9 @@ export const withKizunaCms = (nextConfig: NextConfig = {}, options: WithKizunaCm
         });
         writeFileSync(output, rendered);
     }
-    return nextConfig;
+    return {
+        ...nextConfig,
+        // In development, Next refuses its scripts to other origins it is not told of. The editor runs on Claude's sandbox origin and loads the site's.
+        allowedDevOrigins: [...new Set([...(nextConfig.allowedDevOrigins ?? []), ...EDITOR_ORIGINS])],
+    };
 };

@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 /**
  * The tables the CMS owns, as `kizuna cms migrate` writes them into the app's
- * migrations folder. The CMS never runs DDL at startup.
+ * migrations folder. The CMS never runs DDL at startup. Every statement may run
+ * again, so a later migration brings an older database up to date.
  */
-export const CMS_MIGRATION_SQL = `create table cms_documents (
+export const CMS_MIGRATION_SQL = `create table if not exists cms_documents (
     id text primary key,
     kind text not null,
     site text not null default 'default',
@@ -19,7 +20,7 @@ export const CMS_MIGRATION_SQL = `create table cms_documents (
     constraint cms_documents_identity unique (kind, site, locale, key)
 );
 
-create table cms_versions (
+create table if not exists cms_versions (
     document_id text not null references cms_documents (id),
     version int not null,
     data jsonb not null,
@@ -31,14 +32,34 @@ create table cms_versions (
     primary key (document_id, version)
 );
 
-create table cms_refs (
+create table if not exists cms_refs (
     document_id text not null references cms_documents (id),
     brand text not null,
     ref_id text not null,
     field_path text not null
 );
 
-create index cms_refs_lookup on cms_refs (brand, ref_id);
+create index if not exists cms_refs_lookup on cms_refs (brand, ref_id);
+
+alter table cms_documents add column if not exists owner text;
+
+create table if not exists cms_reviews (
+    id text primary key,
+    request_id text not null,
+    ref text not null,
+    document_id text not null references cms_documents (id),
+    version int not null,
+    reviewers jsonb not null,
+    requested_by text not null,
+    note text,
+    created_at timestamptz not null,
+    status text not null,
+    decided_by text,
+    decision_note text,
+    decided_at timestamptz
+);
+
+create index if not exists cms_reviews_document on cms_reviews (document_id, created_at);
 `;
 
 /**

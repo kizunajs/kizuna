@@ -11,6 +11,10 @@ export interface EditorContextValue {
      * does not know where the site is.
      */
     resolveUrl: (url: string) => string | undefined;
+    /**
+     * Where the open document is on the site, for a control that shows it.
+     */
+    pageUrl: string | undefined;
 }
 
 export const EditorContext = createContext<EditorContextValue | null>(null);

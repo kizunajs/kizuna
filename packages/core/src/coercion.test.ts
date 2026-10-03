@@ -57,7 +57,7 @@ describe('coercion plans', () => {
         ]);
     });
 
-    it('plans array fields by their element type', () => {
+    it('plans every array field, by its element type', () => {
         const schema = z.object({
             ids: z.array(z.int()),
             tags: z.array(z.string()),
@@ -66,6 +66,11 @@ describe('coercion plans', () => {
             {
                 key: 'ids',
                 type: 'number',
+                array: true,
+            },
+            {
+                key: 'tags',
+                type: 'string',
                 array: true,
             },
         ]);
@@ -179,16 +184,25 @@ describe('applyCoercion', () => {
         });
     });
 
-    it('leaves an array field alone when its value is a single string', () => {
+    it('reads a single value of an array field as a list of one', () => {
         const plan = coercionPlanFor(
             z.object({
                 ids: z.array(z.int()),
+                tags: z.array(z.string()),
             })
         );
-        const input = {
-            ids: '3',
-        };
-        expect(applyCoercion(input, plan)).toBe(input);
+        expect(
+            applyCoercion(
+                {
+                    ids: '3',
+                    tags: 'new',
+                },
+                plan
+            )
+        ).toEqual({
+            ids: [3],
+            tags: ['new'],
+        });
     });
 });
 

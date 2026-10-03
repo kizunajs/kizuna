@@ -1,0 +1,214 @@
+.flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 32px;
+    border-radius: 10px;
+    background-color: var(--kizuna-window);
+    box-shadow: var(--kizuna-window-elevation);
+    padding: 24px 28px 40px;
+}
+
+.sources {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+}
+
+.sources svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Titles share a row and visuals share the next, so each wire sits halfway between two visuals. */
+.steps {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) 64px minmax(0, 0.75fr) 64px minmax(0, 1.25fr);
+    grid-template-rows: auto auto;
+    row-gap: 18px;
+}
+
+.first {
+    grid-column: 1;
+}
+
+.second {
+    grid-column: 3;
+}
+
+.third {
+    grid-column: 5;
+}
+
+.stepTitle {
+    display: flex;
+    grid-row: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-600);
+    color: var(--kizuna-ink);
+}
+
+.number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: var(--kizuna-radius-pill);
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    font-size: 0.75rem;
+}
+
+.visual {
+    display: flex;
+    grid-row: 2;
+    min-height: 236px;
+    align-items: center;
+    justify-content: center;
+}
+
+.wire {
+    position: relative;
+    display: block;
+    grid-row: 2;
+    align-self: center;
+    height: 10px;
+    margin-inline: 10px;
+    color: rgb(255 255 255 / 0.3);
+}
+
+/* The arrow is one stroke: a line and a head drawn in the same colour. */
+.wire::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 1px;
+    left: 0;
+    height: 1.5px;
+    background-color: currentColor;
+    transform: translateY(-50%);
+}
+
+.wire::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 1px;
+    width: 7px;
+    height: 7px;
+    border-top: 1.5px solid currentColor;
+    border-right: 1.5px solid currentColor;
+    transform: translateY(-50%) rotate(45deg);
+}
+
+.picker {
+    width: 100%;
+    max-width: 280px;
+}
+
+.ids {
+    display: flex;
+    max-width: 100%;
+    flex-direction: column;
+    gap: 8px;
+    border-radius: 12px;
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-control-elevation);
+    padding: 14px 16px;
+    font-family: var(--kizuna-mono);
+    font-size: 0.8125rem;
+}
+
+.idsKey {
+    color: var(--kizuna-muted);
+}
+
+.id {
+    overflow: hidden;
+    border-radius: 7px;
+    background-color: var(--kizuna-tint);
+    padding: 4px 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--kizuna-ink);
+}
+
+.code {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    --kizuna-window: var(--kizuna-control);
+    --kizuna-window-elevation: var(--kizuna-control-elevation);
+}
+
+.wireOne {
+    grid-column: 2;
+}
+
+.wireTwo {
+    grid-column: 4;
+}
+
+@media (max-width: 1023px) {
+    .flow {
+        padding: 20px 18px 28px;
+    }
+
+    .steps {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+    }
+
+    .stepTitle.first {
+        order: 1;
+    }
+
+    .visual.first {
+        order: 2;
+    }
+
+    .wireOne {
+        order: 3;
+    }
+
+    .stepTitle.second {
+        order: 4;
+    }
+
+    .visual.second {
+        order: 5;
+    }
+
+    .wireTwo {
+        order: 6;
+    }
+
+    .stepTitle.third {
+        order: 7;
+    }
+
+    .visual.third {
+        order: 8;
+    }
+
+    .visual {
+        min-height: 0;
+    }
+
+    .wire {
+        align-self: center;
+        width: 32px;
+        height: 16px;
+        margin: 0;
+        transform: rotate(90deg);
+    }
+}

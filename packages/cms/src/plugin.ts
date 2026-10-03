@@ -18,6 +18,7 @@ import type { Collection, ContentDefinition, Global } from './definitions.js';
 import { describeFields, type DescribedField } from './content.js';
 import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from './discovery.js';
 import { PREVIEW_COOKIE, PREVIEW_TTL_SECONDS } from './preview-token.js';
+import { PREVIEW_PROXY_PATH, PROXY_CORS, previewProxyUrl, proxyToSite } from './preview-proxy.js';
 import { routePrefix } from './options.js';
 import { resolve } from 'node:path';
 
@@ -250,6 +251,8 @@ const definition = definePlugin({
             generators,
             routes: {
                 draft: draftRoute(service, options, api, base),
+                previewProxy: previewProxyRoute(service, options, base),
+                previewProxyPreflight: previewProxyPreflightRoute(base),
             },
             validate: () => validate(service, options, api),
         };
@@ -395,6 +398,93 @@ const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
         }
         return rawResponse(redirect(target));
     });
+
+/**
+ * `GET /preview/proxy`: one of the site's URLs in draft mode, for the editor
+ * in a host that will not frame the site. See `preview-proxy.ts`.
+ */
+const previewProxyRoute = (service: CmsService, options: ResolvedCmsOptions, base: '' | `/${string}`) =>
+    route({
+        method: 'GET',
+        path: `${base}${PREVIEW_PROXY_PATH}`,
+        auth: false,
+        summary: "The site's draft, for the editor",
+        query: z.object({
+            path: z.string(),
+            token: z.string(),
+            document: z.string().optional(),
+        }),
+        responses: {
+            200: z.unknown(),
+        },
+    }).handler(async (args) => {
+        const query = args.query as {
+            path: string;
+            token: string;
+            document?: string;
+        };
+        if (options.preview === undefined) {
+            return rawResponse(
+                new Response('Set `preview.url` on cms() so the CMS knows where the site is.', {
+                    status: 404,
+                    headers: PROXY_CORS,
+                })
+            );
+        }
+        if (!service.verifiesPreview(query.token)) {
+            return rawResponse(
+                new Response('The preview link ran out. The editor fetches a new one.', {
+                    status: 401,
+                    headers: PROXY_CORS,
+                })
+            );
+        }
+        const apiPath = options.apiPath ?? '/api';
+        try {
+            return rawResponse(
+                await proxyToSite({
+                    target: {
+                        site: new URL(options.preview.url).origin,
+                        proxy: previewProxyUrl(options.preview.url, apiPath, base),
+                        token: query.token,
+                    },
+                    draftPath: `${apiPath}${base}/draft`,
+                    path: query.path.startsWith('/') ? query.path : `/${query.path}`,
+                    headers: args.headers as Record<string, string | string[] | undefined>,
+                    ttlMs: PREVIEW_TTL_SECONDS * 1000,
+                    document: query.document === '1',
+                })
+            );
+        } catch (error) {
+            return rawResponse(
+                new Response(`The site did not answer: ${error instanceof Error ? error.message : String(error)}`, {
+                    status: 502,
+                    headers: PROXY_CORS,
+                })
+            );
+        }
+    });
+
+/**
+ * `OPTIONS /preview/proxy`: lets the page's own requests through CORS.
+ */
+const previewProxyPreflightRoute = (base: '' | `/${string}`) =>
+    route({
+        method: 'OPTIONS',
+        path: `${base}${PREVIEW_PROXY_PATH}`,
+        auth: false,
+        summary: "Lets the editor's page call the proxy",
+        responses: {
+            204: z.void(),
+        },
+    }).handler(async () =>
+        rawResponse(
+            new Response(null, {
+                status: 204,
+                headers: PROXY_CORS,
+            })
+        )
+    );
 
 /**
  * The CMS's server half, installed by `cms()`: its service, the draft route,

@@ -528,6 +528,46 @@ describe('publishing', () => {
         });
     });
 
+    it('lists what the draft changes from what is published, and reverts one change or all', async () => {
+        await asAdmin(request(app).patch('/editing/pages/frontPage/draft')).send({
+            changes: validDraft,
+        });
+        await asEditor(request(app).post('/editing/pages/frontPage/publish'));
+        await asAdmin(request(app).patch('/editing/pages/frontPage/draft')).send({
+            changes: {
+                'hero.heading': 'Summer is here',
+                'hero.badge': 'New',
+            },
+        });
+
+        const changes = await asEditor(request(app).get('/editing/pages/frontPage/changes'));
+        expect(changes.status).toBe(200);
+        expect(changes.body.published).toBe(true);
+        expect(changes.body.changes.map((change: { path: string }) => change.path)).toEqual(['hero.heading', 'hero.badge']);
+        expect(changes.body.changes[0]).toMatchObject({
+            label: 'Hero › Heading',
+            before: 'Spring is here',
+            after: 'Summer is here',
+        });
+
+        const reverted = await asEditor(request(app).post('/editing/pages/frontPage/revert')).send({
+            paths: ['hero.heading'],
+        });
+        expect(reverted.status).toBe(200);
+        expect(reverted.body.content.hero.heading).toBe('Spring is here');
+        const left = await asEditor(request(app).get('/editing/pages/frontPage/changes'));
+        expect(left.body.changes.map((change: { path: string }) => change.path)).toEqual(['hero.badge']);
+
+        // `badge` takes the admin role, so only an admin may revert it.
+        expect(left.body.changes[0].writable).toBe(false);
+        const cleared = await asAdmin(request(app).post('/editing/pages/frontPage/revert')).send({
+            paths: ['hero.badge'],
+        });
+        expect(cleared.status).toBe(200);
+        const none = await asEditor(request(app).get('/editing/pages/frontPage/changes'));
+        expect(none.body.changes).toEqual([]);
+    });
+
     it('refuses to publish an incomplete draft', async () => {
         const response = await asEditor(request(app).post('/editing/pages/frontPage/publish'));
         expect(response.status).toBe(409);
@@ -542,6 +582,11 @@ describe('publishing', () => {
                 'hero.heading': 'Second',
             },
         });
+        const earlier = await asEditor(request(app).get('/editing/pages/frontPage/versions/1'));
+        expect(earlier.status).toBe(200);
+        expect(earlier.body.content.hero.heading).toBe('Spring is here');
+        expect((await asEditor(request(app).get('/editing/pages/frontPage/versions/9'))).status).toBe(404);
+
         const response = await asEditor(request(app).post('/editing/pages/frontPage/rollback')).send({
             version: 1,
         });
@@ -552,7 +597,7 @@ describe('publishing', () => {
         expect(history.body.versions[0].summary).toBe('Restored version 1');
     });
 
-    it('marks publish, rollback and writes to globals as needing approval', () => {
+    it('marks publish, deleting and writes to globals as needing approval, and lets a model restore a version as a draft', () => {
         const { editing } = cmsContent({
             db: {
                 select: () => undefined,
@@ -565,7 +610,10 @@ describe('publishing', () => {
         expect(editing.pages.publish.tool).toMatchObject({
             needsApproval: true,
         });
-        expect(editing.pages.rollback.tool).toMatchObject({
+        expect(editing.pages.rollback.tool).not.toMatchObject({
+            needsApproval: true,
+        });
+        expect(editing.globals.rollback.tool).toMatchObject({
             needsApproval: true,
         });
         expect(editing.collections.deleteItem.tool).toMatchObject({

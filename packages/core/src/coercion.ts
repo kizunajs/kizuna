@@ -41,15 +41,13 @@ const buildCoercionPlan = (schema: z.ZodType): CoercionPlan => {
     for (const [key, fieldSchema] of Object.entries(shape)) {
         const baseType = resolveBaseType(fieldSchema);
         if (baseType === 'array') {
+            // Every array field is planned: one value, `?ids=a`, is a list of one.
             const element = resolveArrayElement(fieldSchema);
-            const elementType = element ? resolveBaseType(element) : undefined;
-            if (elementType !== undefined && COERCIBLE_TYPES.has(elementType)) {
-                fields.push({
-                    key,
-                    type: elementType,
-                    array: true,
-                });
-            }
+            fields.push({
+                key,
+                type: element ? resolveBaseType(element) : 'unknown',
+                array: true,
+            });
             continue;
         }
         if (COERCIBLE_TYPES.has(baseType)) {
@@ -111,10 +109,17 @@ const coerceValue = (value: unknown, type: string): unknown => {
     return Number.isNaN(date.getTime()) ? value : date;
 };
 
+/**
+ * A list field's value: one string is a list of one, per the form style
+ * OpenAPI gives query arrays by default, and each item is coerced when its
+ * kind needs it.
+ */
 const coerceArray = (value: unknown, type: string): unknown => {
-    if (!Array.isArray(value)) return value;
-    let changed = false;
-    const coerced = value.map((item) => {
+    const list = typeof value === 'string' ? [value] : value;
+    if (!Array.isArray(list)) return value;
+    if (!COERCIBLE_TYPES.has(type)) return list;
+    let changed = list !== value;
+    const coerced = list.map((item) => {
         const next = coerceValue(item, type);
         if (next !== item) changed = true;
         return next;

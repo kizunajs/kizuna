@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { NumberField } from '@base-ui/react/number-field';
 import { Popover } from '@base-ui/react/popover';
 import { Select } from '@base-ui/react/select';
 import { Switch } from '@base-ui/react/switch';
-import { ArrowDown, ArrowUp, Check, ChevronsUpDown, Plus, Search, X } from 'lucide-react';
+import { Check, ChevronsUpDown, GripVertical, Plus, Search, X } from 'lucide-react';
 import { ICON, useEditorContext } from './context.js';
 import { MediaPicker, type MediaRecord } from './media.js';
 import { emptyFor, humanize, isImage, isRichText, resolveRef, typeOf, type JsonSchema } from './schema.js';
 import { RichTextControl } from './rich-text.js';
+import { isSeo, SeoControl } from './seo.js';
 
 export interface ControlProps {
     schema: JsonSchema;
@@ -441,11 +442,33 @@ function ImageControl({ value, onChange, disabled }: ControlProps) {
     );
 }
 
-const move = (items: unknown[], from: number, to: number): unknown[] => {
+const moveItem = (items: unknown[], from: number, to: number): unknown[] => {
     const next = [...items];
     const [item] = next.splice(from, 1);
     next.splice(to, 0, item);
     return next;
+};
+
+interface Drag {
+    from: number;
+    to: number;
+    offset: number;
+    /**
+     * How far the others move aside: the dragged item's height and the gap.
+     */
+    step: number;
+}
+
+/**
+ * Where an item sits while another is dragged: the dragged one follows the
+ * pointer, and the ones it passed move aside to show where it will land.
+ */
+const shiftFor = (index: number, drag: Drag | undefined): number => {
+    if (drag === undefined) return 0;
+    if (index === drag.from) return drag.offset;
+    if (drag.from < drag.to && index > drag.from && index <= drag.to) return -drag.step;
+    if (drag.to < drag.from && index >= drag.to && index < drag.from) return drag.step;
+    return 0;
 };
 
 function ArrayControl(props: ControlProps) {
@@ -456,14 +479,90 @@ function ArrayControl(props: ControlProps) {
     const min = schema.minItems ?? 0;
     // Editors like rich text read their value once, so a move or a removal remounts every item.
     const [generation, setGeneration] = useState(0);
+    const [drag, setDrag] = useState<Drag | undefined>();
+    const rows = useRef<Array<HTMLDivElement | null>>([]);
     const reorder = (next: unknown[]): void => {
         setGeneration((current) => current + 1);
         onChange(next);
     };
+
+    const startDrag = (index: number, event: React.PointerEvent<HTMLButtonElement>): void => {
+        if (disabled || event.button !== 0) return;
+        event.preventDefault();
+        const handle = event.currentTarget;
+        handle.setPointerCapture(event.pointerId);
+        const boxes = rows.current.map((row) => row?.getBoundingClientRect());
+        const own = boxes[index];
+        if (own === undefined) return;
+        const step = own.height + 8;
+        const startY = event.clientY;
+        let current: Drag = {
+            from: index,
+            to: index,
+            offset: 0,
+            step,
+        };
+        setDrag(current);
+        const move = (moved: PointerEvent): void => {
+            const offset = moved.clientY - startY;
+            const centre = own.top + own.height / 2 + offset;
+            let to = index;
+            boxes.forEach((box, at) => {
+                if (box === undefined || at === index) return;
+                const middle = box.top + box.height / 2;
+                if (at > index && centre > middle) to = Math.max(to, at);
+                if (at < index && centre < middle) to = Math.min(to, at);
+            });
+            current = {
+                ...current,
+                offset,
+                to,
+            };
+            setDrag(current);
+        };
+        const end = (): void => {
+            handle.removeEventListener('pointermove', move);
+            handle.removeEventListener('pointerup', end);
+            handle.removeEventListener('pointercancel', end);
+            setDrag(undefined);
+            if (current.to !== current.from) reorder(moveItem(items, current.from, current.to));
+        };
+        handle.addEventListener('pointermove', move);
+        handle.addEventListener('pointerup', end);
+        handle.addEventListener('pointercancel', end);
+    };
+
+    const keyMove = (index: number, event: React.KeyboardEvent<HTMLButtonElement>): void => {
+        const to = event.key === 'ArrowUp' ? index - 1 : event.key === 'ArrowDown' ? index + 1 : undefined;
+        if (to === undefined || to < 0 || to >= items.length) return;
+        event.preventDefault();
+        reorder(moveItem(items, index, to));
+        window.requestAnimationFrame(() => rows.current[to]?.querySelector<HTMLButtonElement>('.k-grip')?.focus());
+    };
+
     return (
-        <div className="k-list">
+        <div className="k-list" data-dragging={drag !== undefined}>
             {items.map((item, index) => (
-                <div key={`${generation}:${index}`} className="k-list-item">
+                <div
+                    key={`${generation}:${index}`}
+                    ref={(row) => {
+                        rows.current[index] = row;
+                    }}
+                    className="k-list-item"
+                    data-dragged={drag?.from === index}
+                    style={{
+                        transform: `translateY(${shiftFor(index, drag)}px)`,
+                    }}>
+                    {disabled ? null : (
+                        <button
+                            type="button"
+                            className="k-grip"
+                            aria-label={`Move item ${index + 1}. Drag, or use the arrow keys.`}
+                            onPointerDown={(event) => startDrag(index, event)}
+                            onKeyDown={(event) => keyMove(index, event)}>
+                            <GripVertical {...ICON} />
+                        </button>
+                    )}
                     <div className="k-list-body">
                         <Control
                             {...props}
@@ -476,32 +575,14 @@ function ArrayControl(props: ControlProps) {
                         />
                     </div>
                     {disabled ? null : (
-                        <div className="k-list-actions">
-                            <button
-                                type="button"
-                                className="k-icon-button"
-                                disabled={index === 0}
-                                onClick={() => reorder(move(items, index, index - 1))}
-                                aria-label="Move up">
-                                <ArrowUp {...ICON} />
-                            </button>
-                            <button
-                                type="button"
-                                className="k-icon-button"
-                                disabled={index === items.length - 1}
-                                onClick={() => reorder(move(items, index, index + 1))}
-                                aria-label="Move down">
-                                <ArrowDown {...ICON} />
-                            </button>
-                            <button
-                                type="button"
-                                className="k-icon-button"
-                                disabled={items.length <= min}
-                                onClick={() => reorder(items.filter((_, at) => at !== index))}
-                                aria-label="Remove">
-                                <X {...ICON} />
-                            </button>
-                        </div>
+                        <button
+                            type="button"
+                            className="k-icon-button"
+                            disabled={items.length <= min}
+                            onClick={() => reorder(items.filter((_, at) => at !== index))}
+                            aria-label={`Remove item ${index + 1}`}>
+                            <X {...ICON} />
+                        </button>
                     )}
                 </div>
             ))}
@@ -580,6 +661,7 @@ function ObjectControl(props: ControlProps) {
 export function Control(props: ControlProps) {
     const resolved = resolveRef(props.schema, props.root);
     if (isRichText(props.schema) || isRichText(resolved)) return <RichTextControl {...props} schema={resolved} />;
+    if (isSeo(props.schema) || isSeo(resolved)) return <SeoControl {...props} schema={resolved} />;
     const brand = props.brand ?? resolved.brand;
     if (isImage(props.schema, props.root)) return <ImageControl {...props} schema={resolved} />;
     if (brand !== undefined && typeOf(resolved) !== 'array') return <ReferenceControl {...props} schema={resolved} brand={brand} />;

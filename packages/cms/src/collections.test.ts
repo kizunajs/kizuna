@@ -168,6 +168,18 @@ describe('globals', () => {
         });
     });
 
+    it('lists every global with its status', async () => {
+        const listed = await asEditor(request(app).get('/editing/globals'));
+        expect(listed.status).toBe(200);
+        expect(listed.body.globals).toMatchObject([
+            {
+                name: 'site',
+                label: null,
+                status: 'empty',
+            },
+        ]);
+    });
+
     it('says a global appears everywhere', async () => {
         const described = await asEditor(request(app).get('/editing/describe').query({ ref: 'global:site' }));
         expect(described.body.usedOn).toEqual({
@@ -200,6 +212,15 @@ describe('collections', () => {
             },
         ]);
         expect((await request(app).get('/content/collections/employees')).body.items).toEqual([]);
+
+        const collections = await asEditor(request(app).get('/editing/collections'));
+        expect(collections.body.collections).toEqual([
+            {
+                name: 'employees',
+                label: 'Employees',
+                count: 1,
+            },
+        ]);
     });
 
     it('lists published items filtered and sorted by their indexes, a page at a time', async () => {

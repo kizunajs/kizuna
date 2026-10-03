@@ -3,6 +3,7 @@ import { inStoredOrder } from '@kizunajs/cms/next';
 import kizuna from '@kizuna-config';
 import { apiClient } from '../../lib/api-client';
 import { Hero } from '../../components/Hero';
+import { BrowseRange } from '../../components/BrowseRange';
 import { ProductGrid } from '../../components/ProductGrid';
 import { ArticleCard } from '../../components/ArticleCard';
 
@@ -67,6 +68,7 @@ export default async function FrontPage() {
             </nav>
             <Hero {...content.hero} />
             <ProductGrid products={featured} />
+            <BrowseRange />
             {articles.length > 0 ? (
                 <section
                     style={{

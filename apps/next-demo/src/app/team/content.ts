@@ -5,6 +5,7 @@ import { HeadingSchema } from '../../cms/schemas';
 
 export default definePage({
     name: 'teamPage',
+    label: 'Team',
     fields: [
         {
             name: 'heading',
