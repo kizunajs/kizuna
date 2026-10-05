@@ -140,7 +140,7 @@ export const PaginationQuery = z.object({
 ```ts title="users.ts"
 import { PaginationQuery } from './pagination.js';
 
-export const users = k.routes('users', {
+export const users = k.routes.users({
     listUsers: k
         .route({
             method: 'GET',

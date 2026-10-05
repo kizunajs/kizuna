@@ -8,19 +8,19 @@ import { InMemoryTransport } from '@modelcontextprotocol/client';
 import { buildInstructions, buildMcpTools, createMcpServer } from './mcp-server.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
-const contractRoutes = k.routes('api', {
+const contractRoutes = k.routes({
     users: {
         listUsers: k.route({
             method: 'GET',
@@ -141,7 +141,7 @@ const contractRoutes = k.routes('api', {
 
 const contract = defineConfig({
     ...config,
-    routes: contractRoutes,
+    routes: [contractRoutes],
 }).api;
 
 const router = {
@@ -294,7 +294,7 @@ describe('buildMcpTools: which routes publish', () => {
     });
 
     it('takes no route from a tree that declares none', () => {
-        const quiet = k.routes('api', {
+        const quiet = k.routes({
             hidden: k.route({
                 method: 'GET',
                 path: '/hidden',
@@ -311,7 +311,7 @@ describe('buildMcpTools: which routes publish', () => {
     });
 
     it('takes `tool: false` as a refusal', () => {
-        const refused = k.routes('api', {
+        const refused = k.routes({
             hidden: k.route({
                 method: 'GET',
                 path: '/hidden',
@@ -330,7 +330,7 @@ describe('buildMcpTools: which routes publish', () => {
 
     it('refuses a route that publishes but describes nothing', () => {
         expect(() =>
-            k.routes('api', {
+            k.routes({
                 bare: k.route({
                     method: 'GET',
                     path: '/bare',
@@ -402,7 +402,7 @@ describe('buildMcpTools: input schema', () => {
     });
 
     it('handles non-object body (discriminated union)', () => {
-        const unionContractRoutes = k.routes('api', {
+        const unionContractRoutes = k.routes({
             sendNotification: k.route({
                 method: 'POST',
                 path: '/notifications',
@@ -428,7 +428,7 @@ describe('buildMcpTools: input schema', () => {
 
         const unionContract = defineConfig({
             ...config,
-            routes: unionContractRoutes,
+            routes: [unionContractRoutes],
         }).api;
 
         const definitions = buildMcpTools(unionContract.routes);
@@ -439,7 +439,7 @@ describe('buildMcpTools: input schema', () => {
     });
 
     it('combines params, query, and body for complex routes', () => {
-        const complexContractRoutes = k.routes('api', {
+        const complexContractRoutes = k.routes({
             updateItem: k.route({
                 method: 'PUT',
                 path: '/items/:id',
@@ -461,7 +461,7 @@ describe('buildMcpTools: input schema', () => {
 
         const complexContract = defineConfig({
             ...config,
-            routes: complexContractRoutes,
+            routes: [complexContractRoutes],
         }).api;
 
         const definitions = buildMcpTools(complexContract.routes);
@@ -476,7 +476,7 @@ describe('buildMcpTools: input schema', () => {
     });
 
     it('keeps a query with a required field required', () => {
-        const contractRoutesWithRequiredQuery = k.routes('api', {
+        const contractRoutesWithRequiredQuery = k.routes({
             searchItems: k.route({
                 method: 'GET',
                 path: '/items',
@@ -497,7 +497,7 @@ describe('buildMcpTools: input schema', () => {
         const definitions = buildMcpTools(
             defineConfig({
                 ...config,
-                routes: contractRoutesWithRequiredQuery,
+                routes: [contractRoutesWithRequiredQuery],
             }).api.routes
         );
         const search = definitions.find((definition) => definition.name === 'search_items')!;
@@ -621,22 +621,51 @@ describe('buildMcpTools: output schema', () => {
 });
 
 describe('instructions', () => {
-    it('lists the contract tag groups', () => {
-        const instructions = buildInstructions(contract, buildMcpTools(contract.routes), undefined);
+    const instructionGroups = k.groups({
+        users: {
+            title: 'Users',
+            description: 'People with an account',
+        },
+    });
+    const instructionK = new Kizuna<{
+        groups: typeof instructionGroups;
+    }>();
+    const listUsers = instructionK.route({
+        method: 'GET',
+        path: '/users',
+        tool: true,
+        summary: 'List users',
+        responses: {
+            200: z.object({
+                ok: z.boolean(),
+            }),
+        },
+    });
+    const grouped = defineConfig({
+        groups: instructionGroups,
+        routes: [
+            instructionK.routes.users({
+                listUsers,
+            }),
+        ],
+    }).api;
+
+    it('lists the groups its tools are filed under', () => {
+        const instructions = buildInstructions(grouped, buildMcpTools(grouped.routes), undefined);
 
         expect(instructions).toContain('{ status, body }');
-        expect(instructions).toContain('- API');
+        expect(instructions).toContain('- Users: People with an account');
     });
 
     it('appends the authored text after the generated overview', () => {
-        const instructions = buildInstructions(contract, buildMcpTools(contract.routes), 'Every timestamp is UTC.');
+        const instructions = buildInstructions(grouped, buildMcpTools(grouped.routes), 'Every timestamp is UTC.');
 
-        expect(instructions.indexOf('- API')).toBeLessThan(instructions.indexOf('Every timestamp is UTC.'));
+        expect(instructions.indexOf('- Users')).toBeLessThan(instructions.indexOf('Every timestamp is UTC.'));
     });
 
     it('leaves out a group whose every route stayed quiet', () => {
-        const quiet = k.routes('api', {
-            hidden: k.route({
+        const quiet = instructionK.routes.users({
+            hidden: instructionK.route({
                 method: 'GET',
                 path: '/hidden',
                 responses: {
@@ -648,7 +677,46 @@ describe('instructions', () => {
             }),
         });
 
-        expect(buildInstructions(contract, buildMcpTools(quiet), undefined)).not.toContain('- API');
+        expect(buildInstructions(grouped, buildMcpTools(quiet), undefined)).not.toContain('- Users');
+    });
+
+    it('names a nested group after every group above it', () => {
+        const nestedGroups = k.groups({
+            workspaces: {
+                title: 'Workspaces',
+                groups: {
+                    members: {
+                        title: 'Members',
+                        description: 'Who belongs to a workspace',
+                    },
+                },
+            },
+        });
+        const nestedK = new Kizuna<{
+            groups: typeof nestedGroups;
+        }>();
+        const nested = defineConfig({
+            groups: nestedGroups,
+            routes: [
+                nestedK.routes.workspaces.members({
+                    listMembers: nestedK.route({
+                        method: 'GET',
+                        path: '/workspaces/:workspaceId/members',
+                        tool: true,
+                        summary: 'List the members of a workspace',
+                        responses: {
+                            200: z.object({
+                                members: z.array(z.string()),
+                            }),
+                        },
+                    }),
+                }),
+            ],
+        }).api;
+
+        expect(buildInstructions(nested, buildMcpTools(nested.routes), undefined)).toContain(
+            '- Workspaces / Members: Who belongs to a workspace'
+        );
     });
 
     it('reaches the client over the protocol', async () => {
@@ -1018,9 +1086,7 @@ describe('MCP server: guards', () => {
 
     const securedContract = defineConfig({
         ...securedKConfig,
-        routes: {
-            api: securedRoutes,
-        },
+        routes: [{ api: securedRoutes }],
     }).api;
 
     const makeSecuredApi = () => {
@@ -1214,7 +1280,7 @@ describe('MCP server: guards', () => {
 
 describe('streamed routes', () => {
     it('are never tools, since a tool result is one value', () => {
-        const streamRoutes = k.routes('api', {
+        const streamRoutes = k.routes({
             reply: k.route({
                 method: 'POST',
                 path: '/reply',
@@ -1295,22 +1361,24 @@ describe('MCP server: request context in guards', () => {
 
     const contextContract = defineConfig({
         ...contextKConfig,
-        routes: {
-            api: contextK.routes({
-                whoAmI: contextK.route({
-                    method: 'GET',
-                    path: '/who-am-i',
-                    tool: true,
-                    summary: 'Test route who am i',
-                    auth: 'user',
-                    responses: {
-                        200: z.object({
-                            userId: z.string(),
-                        }),
-                    },
-                }),
+        routes: [
+            contextK.routes({
+                api: {
+                    whoAmI: contextK.route({
+                        method: 'GET',
+                        path: '/who-am-i',
+                        tool: true,
+                        summary: 'Test route who am i',
+                        auth: 'user',
+                        responses: {
+                            200: z.object({
+                                userId: z.string(),
+                            }),
+                        },
+                    }),
+                },
             }),
-        },
+        ],
     }).api;
 
     const connectWithContext = async () => {

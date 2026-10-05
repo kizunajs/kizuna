@@ -132,10 +132,7 @@ const api = defineConfig({
             user,
         },
     },
-    routes: {
-        tools: toolRoutes,
-        assistant: assistantRoutes,
-    },
+    routes: [toolRoutes, assistantRoutes],
 }).api;
 
 const guards: GuardMap<Record<string, never>> = {

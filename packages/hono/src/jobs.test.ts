@@ -99,7 +99,7 @@ const jobs = k.jobs('scheduler', {
 const contract = defineConfig({
     ...config,
     adapter: honoAdapter(),
-    routes,
+    routes: [routes],
     jobRunner: {
         mode: 'http',
     },
@@ -180,7 +180,7 @@ describe('jobs that run in process', () => {
         const { api } = defineConfig({
             ...config,
             adapter: honoAdapter(),
-            routes,
+            routes: [routes],
             jobs: k.jobs({
                 sendDigests: k
                     .job({

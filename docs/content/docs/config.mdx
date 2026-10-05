@@ -52,7 +52,7 @@ See [`defineConfig`](/docs/reference/define-config) for every field it takes.
 | `jobs`           | Scheduled work. `api.mount` serves the two [job endpoints](/docs/jobs#the-two-job-endpoints) unless `jobRunner.mode` is `'in-process'`, and every handler receives a typed `jobs` runner so a route can run one in process. |
 | `plugins`        | Routes, jobs and helpers installed beside your own, as a list. See [below](#using-what-a-plugin-offers), and [Create a Plugin](/docs/extend/create-plugin) to write one.                                                    |
 | `validation`     | The `code` values [`k.issue`](/docs/reference/k-issue) may emit beyond Zod's own.                                                                                                                                           |
-| `tags`           | The OpenAPI tags route groups sit under. See [`k.tags`](/docs/reference/k-tags).                                                                                                                                            |
+| `groups`         | The groups routes are filed under, each an OpenAPI tag. See [`k.groups`](/docs/reference/k-groups).                                                                                                                         |
 
 ## Using what a plugin offers
 
@@ -201,9 +201,7 @@ import { admin } from './src/admin/routes';
 
 export default defineConfig({
     adapter: expressAdapter(),
-    routes: {
-        admin,
-    },
+    routes: [admin],
     auth: {
         identities: {
             operator,
@@ -337,11 +335,11 @@ The `Config` interface is read from your config's syntax, not by running it. Tha
  * and re-run `kizuna generate` to regenerate this file.
  */
 import type { expressAdapter } from '@kizunajs/express';
-import type { tags, user } from '@my-repo/api';
+import type { groups, user } from '@my-repo/api';
 
 export interface Config {
     adapter: ReturnType<typeof expressAdapter>;
-    tags: typeof tags;
+    groups: typeof groups;
     auth: {
         identities: {
             user: typeof user;
@@ -350,7 +348,7 @@ export interface Config {
 }
 ```
 
-It carries `adapter`, `tags`, `auth`, `requestContext`, `validation`, `jobs` and `plugins`. Your `routes` stay out: they are read at runtime, and typing against them would make the config a prerequisite for declaring the routes it serves.
+It carries `adapter`, `groups`, `auth`, `requestContext`, `validation`, `jobs` and `plugins`. Your `routes` stay out: they are read at runtime, and typing against them would make the config a prerequisite for declaring the routes it serves.
 
 Point `new Kizuna<Config>()` at it once and every name you write is checked against it:
 

@@ -43,16 +43,18 @@ const jobs = k.jobs('scheduler', {
 
 const contract = defineConfig({
     ...config,
-    routes: k.routes({
-        listUsers: k.route({
-            method: 'GET',
-            path: '/users',
-            auth: false,
-            responses: {
-                200: z.array(z.string()),
-            },
+    routes: [
+        k.routes({
+            listUsers: k.route({
+                method: 'GET',
+                path: '/users',
+                auth: false,
+                responses: {
+                    200: z.array(z.string()),
+                },
+            }),
         }),
-    }),
+    ],
     jobRunner: {
         mode: 'http',
     },
@@ -231,7 +233,7 @@ describe('createJobRunner', () => {
         });
         const nestedContract = defineConfig({
             ...config,
-            routes: k.routes({}),
+            routes: [k.routes({})],
             jobRunner: {
                 mode: 'http',
             },

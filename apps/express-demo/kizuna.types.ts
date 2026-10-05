@@ -7,12 +7,13 @@ import type { expressAdapter } from '@kizunajs/express';
 import type { mcpPlugin } from '@kizunajs/mcp';
 import type { openApiPlugin } from '@kizunajs/openapi';
 import type { resendPlugin } from '@kizunajs/resend';
-import type { GuardSchema, analytics, jobs, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import type { GuardSchema, analytics, jobs, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import type { groups } from './src/groups';
 import type { emailPlugin } from './src/plugins/email';
 
 export interface Config {
     adapter: ReturnType<typeof expressAdapter>;
-    tags: typeof tags;
+    groups: typeof groups;
     auth: {
         identities: {
             user: typeof user;

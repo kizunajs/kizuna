@@ -1,8 +1,8 @@
 import type { z } from 'zod';
-import { tagRoutes } from './routes.js';
+import { createGroupRoutes, type GroupRoutes } from './group-routes.js';
 import { addCodedIssue, type RegisteredIssue } from './coded-issue.js';
 import { buildJobs, type AuthoredJobs, type AuthoredJobDefinition, type CompiledJobs } from './jobs.js';
-import { createTags, type TagOptions } from './tags.js';
+import { createGroups, type GroupOptions, type GroupPaths } from './groups.js';
 import type { RolesOf } from './identity.js';
 import { createPermissions, createRoles, type CatalogOf, type PermissionSet, type RoleNamesOf } from './permissions.js';
 import { createRequestContext, type RequestContextConfig } from './request-context.js';
@@ -11,11 +11,11 @@ import { identityFactories, type IdentityFactories } from './identity-builder.js
 import { createModel } from './model.js';
 import { createBrand } from './brand.js';
 import { type GuardBody, type GuardOutput } from './problem-details.js';
-import type { Routes, AuthoredRoutes, AuthoredRouteDefinition, RouteHiddenToolCheck } from './types.js';
+import type { AuthoredRouteDefinition, RouteHiddenToolCheck } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
-import type { PathParamsCheck, RoutePathParamsCheck } from './path-params.js';
-import type { AuthCheck, RouteAuthCheck } from './auth-check.js';
+import type { RoutePathParamsCheck } from './path-params.js';
+import type { RouteAuthCheck } from './auth-check.js';
 import { createRoute, type RouteBuilder } from './route.js';
 import { createJob, type JobBuilder } from './job.js';
 import type { AnyAdapter } from './adapter.js';
@@ -30,7 +30,7 @@ import type {
     ConfiguredPlugins,
     ConfiguredRequestContext,
     ConfiguredRequestContextSchemas,
-    ConfiguredTags,
+    ConfiguredGroups,
     KizunaConfigShape,
 } from './configured.js';
 
@@ -87,7 +87,7 @@ export type RouteAuthRule<Id extends string = string, Identities = Record<string
  * What a {@link Kizuna} instance declares.
  */
 export interface KizunaSpec {
-    tags: Record<string, TagOptions>;
+    groups: Record<string, GroupOptions | string>;
     codes: string;
     identities: Record<string, SecurityScheme>;
     requestContext: Record<string, RequestContextSchema>;
@@ -97,9 +97,9 @@ export interface KizunaSpec {
 }
 
 /**
- * The tag names declared on a spec, e.g. `'health' | 'users'`.
+ * The dotted group paths a spec declares.
  */
-export type TagNamesOf<Spec extends KizunaSpec> = Extract<keyof Spec['tags'], string>;
+export type GroupNamesOf<Spec extends KizunaSpec> = GroupPaths<Spec['groups']>;
 
 /**
  * The identity names declared on a spec, e.g. `'user' | 'member'`.
@@ -115,7 +115,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      * `query` and `headers` are typed from the route, and the return is checked
      * against its `responses`.
      *
-     * Group routes with `k.routes`, which takes the routes this returns.
+     * File routes into a group with `k.routes`.
      *
      * @example
      * export const createUser = k
@@ -134,7 +134,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *         body: await db.users.create(body.name),
      *     }));
      */
-    route<const Definition extends AuthoredRouteDefinition<TagNamesOf<Spec>, IdentityNamesOf<Spec>>>(
+    route<const Definition extends AuthoredRouteDefinition<GroupNamesOf<Spec>, IdentityNamesOf<Spec>>>(
         definition: Definition &
             RoutePathParamsCheck<Definition> &
             RouteAuthCheck<Definition, Spec['identities']> &
@@ -144,16 +144,16 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
         HandlerContextFor<Spec, Definition>
     >;
     /**
-     * Define a group of routes. Pass a tag (one of the keys from `k.tags`)
-     * to group them in the OpenAPI document, or omit it for an untagged group.
+     * Declare routes into a group. Call `k.routes` itself for routes in no
+     * group.
+     *
+     * @example
+     * export const memberRoutes = k.routes.workspace.members({
+     *     listMembers,
+     *     removeMember,
+     * });
      */
-    routes<const T extends AuthoredRoutes<TagNamesOf<Spec>, IdentityNamesOf<Spec>>>(
-        tag: TagNamesOf<Spec>,
-        defs: T & PathParamsCheck<T> & AuthCheck<T, Spec['identities']>
-    ): T;
-    routes<const T extends AuthoredRoutes<string, IdentityNamesOf<Spec>>>(
-        defs: T & PathParamsCheck<T> & AuthCheck<T, Spec['identities']>
-    ): T;
+    routes: GroupRoutes<Spec['groups'], GroupNamesOf<Spec>, IdentityNamesOf<Spec>, Spec['identities']>;
     /**
      * Declare one job and the handler that runs it. `input` is typed from the
      * job's schema, and the return is checked against its `result`.
@@ -224,10 +224,19 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *     });
      */
     /**
-     * Declare the OpenAPI tags routes are grouped under. `k.routes` takes one of
-     * these names.
+     * Declare the groups routes are filed under.
+     *
+     * @example
+     * export const groups = k.groups({
+     *     workspace: {
+     *         title: 'Workspace',
+     *         groups: {
+     *             members: 'Members',
+     *         },
+     *     },
+     * });
      */
-    tags: typeof createTags;
+    groups: typeof createGroups;
     identity: IdentityFactories<
         ConfiguredAdapterContext<Spec['config']>,
         ConfiguredRequestContext<Spec['config']>,
@@ -279,7 +288,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
  * is checked against.
  */
 type SpecOf<Config> = {
-    tags: ConfiguredTags<Config>;
+    groups: ConfiguredGroups<Config>;
     codes: ConfiguredCodes<Config>;
     identities: ConfiguredIdentities<Config>;
     requestContext: ConfiguredRequestContextSchemas<Config>;
@@ -310,18 +319,15 @@ export type JobHandlerContextFor<Spec extends KizunaSpec> = ConfiguredPlugins<Sp
 const createSurface = <Config>(): K<SpecOf<Config>> => {
     type Spec = SpecOf<Config>;
 
-    const routes = ((tagOrDefs: string | Routes, defs?: Routes) =>
-        defs === undefined ? tagRoutes(tagOrDefs as Routes) : tagRoutes(tagOrDefs as string, defs as Routes)) as K<Spec>['routes'];
-
     const jobs = ((identityOrDefinitions: string | AuthoredJobs, definitions?: AuthoredJobs) =>
         definitions === undefined
             ? buildJobs(undefined, identityOrDefinitions as AuthoredJobs)
             : buildJobs(identityOrDefinitions as string, definitions)) as K<Spec>['jobs'];
 
     return {
-        tags: createTags,
+        groups: createGroups,
         route: createRoute as K<Spec>['route'],
-        routes,
+        routes: createGroupRoutes() as K<Spec>['routes'],
         job: createJob as K<Spec>['job'],
         jobs,
         identity: identityFactories as unknown as K<Spec>['identity'],
@@ -336,7 +342,7 @@ const createSurface = <Config>(): K<SpecOf<Config>> => {
  * `kizuna generate` writes, which is what every name on `k` is checked against
  * and what types everything a handler receives.
  *
- * `k.route` declares a route with its handler, `k.routes` groups them, and
+ * `k.route` declares a route with its handler, `k.routes` files them into groups, and
  * `k.job` and `k.jobs` do the same for jobs.
  * `defineConfig` assembles them.
  *
@@ -366,7 +372,7 @@ export class Kizuna<Config extends KizunaConfigShape = Record<string, never>> im
      */
     static readonly roles = createRoles;
 
-    declare readonly tags: K<SpecOf<Config>>['tags'];
+    declare readonly groups: K<SpecOf<Config>>['groups'];
     declare readonly route: K<SpecOf<Config>>['route'];
     declare readonly routes: K<SpecOf<Config>>['routes'];
     declare readonly job: K<SpecOf<Config>>['job'];

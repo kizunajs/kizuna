@@ -199,9 +199,7 @@ import { users } from './src/routes/users';
 
 export default defineConfig({
     adapter: nextAdapter(),
-    routes: {
-        users,
-    },
+    routes: [users],
 });
 ```
 
@@ -236,9 +234,7 @@ import { fetchClient } from '@kizunajs/fetch';
 
 export default defineConfig({
     adapter: nextAdapter(),
-    routes: {
-        users,
-    },
+    routes: [users],
     clients: [
         fetchClient({
             output: './src/lib/api-client.generated.ts',
@@ -265,7 +261,7 @@ export const apiClient = createClient({
 import { apiClient } from '@/lib/api-client';
 
 export default async function UsersPage() {
-    const { body } = await apiClient.users.listUsers({
+    const { body } = await apiClient.listUsers({
         query: {
             page: 1,
             limit: 10,

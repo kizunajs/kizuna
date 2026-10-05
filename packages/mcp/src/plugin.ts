@@ -32,7 +32,7 @@ const McpPluginOptionsSchema = z.object({
 
     /**
      * Guidance for the model, appended to the overview built from the
-     * contract's tags.
+     * API's groups.
      */
     instructions: z.string().optional(),
 

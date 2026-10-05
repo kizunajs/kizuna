@@ -111,10 +111,7 @@ const workspace = k.routes({
 
 const contract = defineConfig({
     ...config,
-    routes: {
-        users,
-        workspace,
-    },
+    routes: [{ users, workspace }],
 }).api;
 
 type Identities = NonNullable<typeof contract.securitySchemes>;
@@ -176,9 +173,7 @@ test('roles from names give the handler a role and no permissions', () => {
     });
     const plainContract = defineConfig({
         ...plainConfig,
-        routes: {
-            docs,
-        },
+        routes: [{ docs }],
     }).api;
     type Args = Parameters<
         HandlersFromRoutes<typeof plainContract.routes, {}, NonNullable<typeof plainContract.securitySchemes>>['docs']['listDocs']
@@ -289,9 +284,7 @@ test('an identity-less contract degrades to plain handlers', () => {
         }),
     });
     const plainContract = defineConfig({
-        routes: {
-            items,
-        },
+        routes: [{ items }],
     }).api;
     type PlainHandlers = HandlersFromRoutes<typeof plainContract.routes, {}, Record<string, never>>;
     type Args = Parameters<PlainHandlers['items']['listItems']>[0];
@@ -414,9 +407,7 @@ const members = k.routes({
 
 const nestedContract = defineConfig({
     ...config,
-    routes: {
-        members,
-    },
+    routes: [{ members }],
 }).api;
 
 type NestedHandlers = HandlersFromRoutes<typeof nestedContract.routes, {}, NonNullable<typeof nestedContract.securitySchemes>>;
@@ -464,9 +455,7 @@ test('GuardParams derives param names from every route an identity secures', () 
     });
     const paramContract = defineConfig({
         ...config,
-        routes: {
-            api: paramRoutes,
-        },
+        routes: [{ api: paramRoutes }],
     }).api;
     type Params = GuardParams<typeof paramContract.routes, 'member'>;
     expectTypeOf<Params>().toEqualTypeOf<{ workspaceId?: string; id?: string }>();
@@ -517,16 +506,18 @@ const inviteKConfig = {
 
 const inviteContract = defineConfig({
     ...inviteKConfig,
-    routes: {
-        invites: inviteK.routes({
-            getInvite: inviteK.route({
-                method: 'GET',
-                path: '/invites/:token',
-                auth: 'inviteToken',
-                ...okResponse,
-            }),
+    routes: [
+        inviteK.routes({
+            invites: {
+                getInvite: inviteK.route({
+                    method: 'GET',
+                    path: '/invites/:token',
+                    auth: 'inviteToken',
+                    ...okResponse,
+                }),
+            },
         }),
-    },
+    ],
 }).api;
 
 type InviteHandlers = HandlersFromRoutes<typeof inviteContract.routes, {}, NonNullable<typeof inviteContract.securitySchemes>>;

@@ -105,16 +105,18 @@ test('a status the job never declares is rejected', () => {
 
 const contract = defineConfig({
     ...config,
-    routes: k.routes({
-        listUsers: k.route({
-            method: 'GET',
-            path: '/users',
-            auth: false,
-            responses: {
-                200: z.array(z.string()),
-            },
+    routes: [
+        k.routes({
+            listUsers: k.route({
+                method: 'GET',
+                path: '/users',
+                auth: false,
+                responses: {
+                    200: z.array(z.string()),
+                },
+            }),
         }),
-    }),
+    ],
     jobRunner: {
         mode: 'http',
     },
@@ -189,7 +191,7 @@ test('a nested job tree keeps its shape', () => {
     });
     const nestedContract = defineConfig({
         ...config,
-        routes: k.routes({}),
+        routes: [k.routes({})],
         jobRunner: {
             mode: 'http',
         },
@@ -225,7 +227,7 @@ test('jobs declared without an identity still get a runner', () => {
     });
     const bareContract = defineConfig({
         ...bareConfig,
-        routes: bare.routes({}),
+        routes: [bare.routes({})],
         jobs: publicJobs,
         jobRunner: {
             mode: 'in-process',
@@ -240,7 +242,7 @@ test('jobs declared without an identity still get a runner', () => {
 test('jobs that run in process take none of the endpoint options', () => {
     defineConfig({
         ...config,
-        routes: k.routes({}),
+        routes: [k.routes({})],
         jobs: k.jobs('scheduler', {
             cleanup: k.job({
                 schedule: '0 3 * * *',

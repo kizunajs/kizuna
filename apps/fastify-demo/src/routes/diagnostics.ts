@@ -6,7 +6,7 @@ import { k } from '../k';
  * What only this demo can answer, because it reads the Fastify request the
  * adapter hands every handler.
  */
-export const diagnostics = k.routes({
+export const diagnostics = k.routes.diagnostics({
     whoAmI: k
         .route({
             method: 'GET',

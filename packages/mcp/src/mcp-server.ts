@@ -53,7 +53,7 @@ export interface McpServerOptions {
 
     /**
      * Guidance for the model, appended to the overview built from the
-     * contract's tags. Use it for what belongs to no single route: the order
+     * API's groups. Use it for what belongs to no single route: the order
      * operations happen in, the conventions every route shares.
      */
     instructions?: string;
@@ -179,7 +179,10 @@ export interface McpTool {
     outputSchema: z.ZodType;
     route: RouteDefinition;
     routeKey: string;
-    tags: string[];
+    /**
+     * The route's groups, as dotted paths.
+     */
+    groups: string[];
 }
 
 export const buildMcpTools = (routes: Routes): McpTool[] => {
@@ -192,7 +195,7 @@ export const buildMcpTools = (routes: Routes): McpTool[] => {
     );
     const definitions: McpTool[] = [];
 
-    for (const { routeKey, route, routeTags } of selected) {
+    for (const { routeKey, route, routeGroups } of selected) {
         const name = names.get(routeKey)!;
         definitions.push({
             name,
@@ -202,7 +205,7 @@ export const buildMcpTools = (routes: Routes): McpTool[] => {
             outputSchema: buildToolOutputSchema(route),
             route,
             routeKey,
-            tags: routeTags,
+            groups: routeGroups,
         });
     }
 
@@ -221,13 +224,16 @@ export const buildInstructions = (
     if (definitions.length > 0) {
         sections.push('Every tool named after an HTTP route returns `{ status, body }`. A status of 400 or more means the call failed.');
     }
-    const tags = contract?.tags?.tags;
-    if (tags !== undefined) {
+    const declared = contract?.groups?.groups;
+    if (declared !== undefined) {
         // A group whose every route was excluded is not a group the model has.
-        const exposed = new Set(definitions.flatMap((definition) => definition.tags));
-        const groups = Object.entries(tags)
-            .filter(([key]) => exposed.has(key))
-            .map(([, tag]) => (tag.description ? `- ${tag.title}: ${tag.description}` : `- ${tag.title}`));
+        const exposed = new Set(definitions.flatMap((definition) => definition.groups));
+        const groups = [...declared.values()]
+            .filter((group) => exposed.has(group.path))
+            .map((group) => {
+                const name = group.lineage.map((path) => declared.get(path)!.title).join(' / ');
+                return group.description ? `- ${name}: ${group.description}` : `- ${name}`;
+            });
         if (groups.length > 0) sections.push(`Groups:\n${groups.join('\n')}`);
     }
 

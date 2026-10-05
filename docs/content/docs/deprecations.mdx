@@ -19,7 +19,7 @@ Set `deprecated` on the route, either `true`, a migration message, or the object
 <Tab value="Boolean">
 
 ```ts title="src/routes/users.ts"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     deleteUser: k
         .route({
             method: 'DELETE',
@@ -40,7 +40,7 @@ export const users = k.routes('users', {
 <Tab value="Message">
 
 ```ts title="src/routes/users.ts"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     deleteUser: k
         .route({
             method: 'DELETE',
@@ -61,7 +61,7 @@ export const users = k.routes('users', {
 <Tab value="Message, date, and link">
 
 ```ts title="src/routes/users.ts"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     deleteUser: k
         .route({
             method: 'DELETE',
@@ -103,7 +103,7 @@ A route scheduled for removal declares when. The object form adds a link to the 
 <Tab value="Date">
 
 ```ts title="src/routes/users.ts"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     deleteUser: k
         .route({
             method: 'DELETE',
@@ -125,7 +125,7 @@ export const users = k.routes('users', {
 <Tab value="Date and link">
 
 ```ts title="src/routes/users.ts"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     deleteUser: k
         .route({
             method: 'DELETE',

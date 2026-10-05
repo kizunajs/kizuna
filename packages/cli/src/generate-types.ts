@@ -6,7 +6,7 @@ import ts from 'typescript';
  * them. Everything else a config declares, `routes` and `clients` included, is
  * read at runtime rather than typed against, so it stays out.
  */
-const CONFIG_KEYS = ['adapter', 'tags', 'auth', 'requestContext', 'validation', 'jobs', 'plugins'] as const;
+const CONFIG_KEYS = ['adapter', 'groups', 'auth', 'requestContext', 'validation', 'jobs', 'plugins'] as const;
 
 /**
  * The keys inside `auth`, which nests rather than flattening: `identities` is a

@@ -76,11 +76,13 @@ const resolve = (auth: Auth): RouteDefinition => {
     const route = routeDefinition(auth);
     defineConfig({
         ...config,
-        routes: k.routes({
-            workspace: {
-                getWorkspace: route,
-            },
-        }),
+        routes: [
+            k.routes({
+                workspace: {
+                    getWorkspace: route,
+                },
+            }),
+        ],
     });
     return route as RouteDefinition;
 };
@@ -163,13 +165,13 @@ describe('a route resolving its auth', () => {
         });
         defineConfig({
             ...k2Config,
-            routes,
+            routes: [routes],
         });
 
         route.auth = 'member';
         defineConfig({
             ...k2Config,
-            routes,
+            routes: [routes],
         });
 
         expect((route as RouteDefinition).requires).toBeUndefined();
@@ -246,20 +248,22 @@ describe('a route that declares no auth', () => {
             () =>
                 defineConfig({
                     ...k3Config,
-                    routes: k3.routes({
-                        workspace: {
-                            // @ts-expect-error every route needs an auth once an identity exists
-                            getWorkspace: k3.route({
-                                method: 'GET',
-                                path: '/workspace',
-                                responses: {
-                                    200: z.object({
-                                        ok: z.boolean(),
-                                    }),
-                                },
-                            }),
-                        },
-                    }),
+                    routes: [
+                        k3.routes({
+                            workspace: {
+                                // @ts-expect-error every route needs an auth once an identity exists
+                                getWorkspace: k3.route({
+                                    method: 'GET',
+                                    path: '/workspace',
+                                    responses: {
+                                        200: z.object({
+                                            ok: z.boolean(),
+                                        }),
+                                    },
+                                }),
+                            },
+                        }),
+                    ],
                 }).api
         ).toThrow(/declares no `auth`/);
     });
@@ -277,11 +281,13 @@ describe('a route that declares no auth', () => {
         };
 
         defineConfig({
-            routes: k4.routes({
-                health: {
-                    live: route,
-                },
-            }),
+            routes: [
+                k4.routes({
+                    health: {
+                        live: route,
+                    },
+                }),
+            ],
         });
 
         expect((route as RouteDefinition).security).toEqual([]);
@@ -289,17 +295,17 @@ describe('a route that declares no auth', () => {
 });
 
 describe('k.contract: plugins', () => {
-    const k5Tags = k.tags({
+    const k5Groups = k.groups({
         api: 'API',
     });
     const k5Config = {
-        tags: k5Tags,
+        groups: k5Groups,
     };
     const k5 = new Kizuna<{
-        tags: typeof k5Tags;
+        groups: typeof k5Groups;
     }>();
 
-    const routes = k5.routes('api', {
+    const routes = k5.routes({
         health: k5.route({
             method: 'GET',
             path: '/health',
@@ -339,7 +345,7 @@ describe('k.contract: plugins', () => {
     it('carries every plugin onto the contract, keyed by its own name', () => {
         const contract = defineConfig({
             ...k5Config,
-            routes,
+            routes: [routes],
             plugins: [probePlugin()],
         }).api;
 
@@ -351,17 +357,19 @@ describe('k.contract: plugins', () => {
             () =>
                 defineConfig({
                     ...k5Config,
-                    routes: k5.routes('api', {
-                        status: k5.route({
-                            method: 'GET',
-                            path: '/probe/status',
-                            responses: {
-                                200: z.object({
-                                    ok: z.boolean(),
-                                }),
-                            },
+                    routes: [
+                        k5.routes({
+                            status: k5.route({
+                                method: 'GET',
+                                path: '/probe/status',
+                                responses: {
+                                    200: z.object({
+                                        ok: z.boolean(),
+                                    }),
+                                },
+                            }),
                         }),
-                    }),
+                    ],
                     plugins: [probePlugin()],
                 }).api
         ).toThrow(/probe\/status/);
@@ -384,7 +392,7 @@ describe('k.contract: plugins', () => {
         expect(() =>
             defineConfig({
                 ...k5Config,
-                routes,
+                routes: [routes],
                 plugins: [
                     emailPlugin({
                         from: 'hello@example.com',
@@ -397,7 +405,7 @@ describe('k.contract: plugins', () => {
     it('hands the validated options to setup, and its exports to handlers', () => {
         const { api } = defineConfig({
             ...k5Config,
-            routes,
+            routes: [routes],
             plugins: [
                 emailPlugin({
                     apiKey: 'key',
@@ -417,7 +425,7 @@ describe('k.contract: plugins', () => {
     it('installs a plugin under the slug the app gives it', () => {
         const { api } = defineConfig({
             ...k5Config,
-            routes,
+            routes: [routes],
             plugins: [
                 emailPlugin({
                     slug: 'mail',
@@ -439,7 +447,7 @@ describe('k.contract: plugins', () => {
         expect(() =>
             defineConfig({
                 ...k5Config,
-                routes,
+                routes: [routes],
                 plugins: [
                     emailPlugin({
                         apiKey: 'key',
@@ -491,7 +499,7 @@ describe('k.contract: plugins', () => {
 
         const { api } = defineConfig({
             ...k5Config,
-            routes,
+            routes: [routes],
             plugins: [counter()],
         });
 
@@ -512,7 +520,7 @@ describe('k.contract: plugins', () => {
         expect(() =>
             defineConfig({
                 ...k5Config,
-                routes,
+                routes: [routes],
                 plugins: [eager()],
             })
         ).toThrow(/read the api during `setup`/);
@@ -530,7 +538,7 @@ describe('k.contract: plugins', () => {
 
         const { api } = defineConfig({
             ...k5Config,
-            routes,
+            routes: [routes],
             plugins: [reader()],
         });
 
@@ -563,7 +571,7 @@ describe('k.contract: plugins', () => {
         expect(() =>
             defineConfig({
                 ...k5Config,
-                routes,
+                routes: [routes],
                 plugins: [unanswered()],
             })
         ).toThrow(/declares the route 'status' without a handler/);
@@ -594,7 +602,7 @@ describe('k.contract: plugins', () => {
         });
 
         const { api } = defineConfig({
-            routes: {},
+            routes: [],
             auth: {
                 identities: {
                     user,
@@ -646,7 +654,7 @@ describe('a plugin base path', () => {
 
     it('serves the routes under the plugin base path, a route at / on the base path itself', () => {
         const { api } = defineConfig({
-            routes: {},
+            routes: [],
             plugins: [webhooks()],
         });
 
@@ -655,7 +663,7 @@ describe('a plugin base path', () => {
 
     it('serves them under the base path the app passes', () => {
         const { api } = defineConfig({
-            routes: {},
+            routes: [],
             plugins: [
                 webhooks(),
                 webhooks({
@@ -672,7 +680,7 @@ describe('a plugin base path', () => {
     it('throws on a base path that ends with /', () => {
         expect(() =>
             defineConfig({
-                routes: {},
+                routes: [],
                 plugins: [
                     webhooks({
                         basePath: '/integrations/',
@@ -690,7 +698,7 @@ describe('a plugin base path', () => {
 
         expect(() =>
             defineConfig({
-                routes: {},
+                routes: [],
                 plugins: [
                     status({
                         basePath: '/status',
@@ -702,62 +710,66 @@ describe('a plugin base path', () => {
 });
 
 describe('rawBody', () => {
-    const rawTags = k.tags({
+    const rawGroups = k.groups({
         api: 'API',
     });
     const rawK = new Kizuna<{
-        tags: typeof rawTags;
+        groups: typeof rawGroups;
     }>();
 
     it('throws when a multipart route declares rawBody', () => {
         expect(() =>
             defineConfig({
-                tags: rawTags,
-                routes: rawK.routes('api', {
-                    uploadAvatar: rawK.route({
-                        method: 'POST',
-                        path: '/avatar',
-                        rawBody: true,
-                        contentType: 'multipart/form-data',
-                        body: z.object({
-                            name: z.string(),
+                groups: rawGroups,
+                routes: [
+                    rawK.routes({
+                        uploadAvatar: rawK.route({
+                            method: 'POST',
+                            path: '/avatar',
+                            rawBody: true,
+                            contentType: 'multipart/form-data',
+                            body: z.object({
+                                name: z.string(),
+                            }),
+                            responses: {
+                                204: z.void(),
+                            },
                         }),
-                        responses: {
-                            204: z.void(),
-                        },
                     }),
-                }),
+                ],
             })
         ).toThrow(/Route 'uploadAvatar' declares `rawBody` on a `multipart\/form-data` body/);
     });
 });
 
 describe('hidden routes', () => {
-    const hiddenTags = k.tags({
+    const hiddenGroups = k.groups({
         api: 'API',
     });
     const hiddenK = new Kizuna<{
-        tags: typeof hiddenTags;
+        groups: typeof hiddenGroups;
     }>();
 
     it('throws when a hidden route declares tool', () => {
         expect(() =>
             defineConfig({
-                tags: hiddenTags,
-                routes: hiddenK.routes('api', {
-                    health: hiddenK.route({
-                        method: 'GET',
-                        path: '/health',
-                        summary: 'Check the service',
-                        hidden: true,
-                        tool: true,
-                        responses: {
-                            200: z.object({
-                                ok: z.boolean(),
-                            }),
-                        },
-                    } as never),
-                }),
+                groups: hiddenGroups,
+                routes: [
+                    hiddenK.routes({
+                        health: hiddenK.route({
+                            method: 'GET',
+                            path: '/health',
+                            summary: 'Check the service',
+                            hidden: true,
+                            tool: true,
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        } as never),
+                    }),
+                ],
             })
         ).toThrow(/Route 'health' is `hidden` and declares `tool`/);
     });
@@ -787,8 +799,8 @@ describe('hidden routes', () => {
         });
 
         const { api } = defineConfig({
-            tags: hiddenTags,
-            routes: {},
+            groups: hiddenGroups,
+            routes: [],
             plugins: [status()],
         });
 
@@ -824,8 +836,8 @@ describe('hidden routes', () => {
 
         expect(() =>
             defineConfig({
-                tags: hiddenTags,
-                routes: {},
+                groups: hiddenGroups,
+                routes: [],
                 plugins: [status()],
             })
         ).toThrow(/Plugin route 'status.check' declares `tool`/);

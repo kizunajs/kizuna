@@ -81,13 +81,13 @@ Called once for every [`Kizuna.model`](/docs/reference/kizuna-model) the client'
 
 Called once for every route in this client:
 
-| Property             | Type                  | Description                                                               |
-| -------------------- | --------------------- | ------------------------------------------------------------------------- |
-| `routeKey`           | `string`              | Dot-separated key path, e.g. `users.getUser`                              |
-| `route`              | `RouteDefinition`     | The full route definition                                                 |
-| `routeTags`          | `string[]`            | The tags of every `k.routes` group the route sits inside, outermost first |
-| `deprecated`         | `boolean`             | `true` when the route is deprecated                                       |
-| `deprecationMessage` | `string \| undefined` | The route's `deprecated` string, or the object form's `message`           |
+| Property             | Type                  | Description                                                                             |
+| -------------------- | --------------------- | --------------------------------------------------------------------------------------- |
+| `routeKey`           | `string`              | Dot-separated key path, e.g. `users.getUser`                                            |
+| `route`              | `RouteDefinition`     | The full route definition                                                               |
+| `routeGroups`        | `string[]`            | Every group the route is filed under, as dotted paths: its own first, then its `groups` |
+| `deprecated`         | `boolean`             | `true` when the route is deprecated                                                     |
+| `deprecationMessage` | `string \| undefined` | The route's `deprecated` string, or the object form's `message`                         |
 
 ### `finalize`
 

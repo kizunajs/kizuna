@@ -996,384 +996,6 @@ routes:
             optional: false
             schema:
               kind: boolean
-  members.listMembers:
-    method: GET
-    path: /workspace/members
-    statuses:
-      - 200
-      - 401
-      - 403
-    deprecated: false
-    responses:
-      "200":
-        kind: object
-        fields:
-          members:
-            optional: false
-            schema:
-              kind: array
-              element:
-                kind: object
-                fields:
-                  id:
-                    optional: false
-                    schema:
-                      kind: string
-                  name:
-                    optional: false
-                    schema:
-                      kind: string
-                  email:
-                    optional: false
-                    schema:
-                      kind: string
-                  email_address:
-                    optional: true
-                    schema:
-                      kind: string
-                  last_name:
-                    optional: true
-                    schema:
-                      kind: string
-                  avatar:
-                    optional: true
-                    schema:
-                      kind: object
-                      fields:
-                        id:
-                          optional: false
-                          schema:
-                            kind: string
-                        url:
-                          optional: false
-                          schema:
-                            kind: string
-                  avatars:
-                    optional: true
-                    schema:
-                      kind: array
-                      element:
-                        kind: object
-                        fields:
-                          id:
-                            optional: false
-                            schema:
-                              kind: string
-                          url:
-                            optional: false
-                            schema:
-                              kind: string
-                  metadata:
-                    optional: true
-                    schema:
-                      kind: record
-                  tags:
-                    optional: true
-                    schema:
-                      kind: array
-                      element:
-                        kind: string
-      "401":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
-          code:
-            optional: true
-            schema:
-              kind: enum
-              values:
-                - expired_token
-                - forbidden
-                - not_found
-                - unauthenticated
-      "403":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
-          code:
-            optional: true
-            schema:
-              kind: enum
-              values:
-                - expired_token
-                - forbidden
-                - not_found
-                - unauthenticated
-  members.inviteMember:
-    method: POST
-    path: /workspace/members
-    statuses:
-      - 201
-      - 401
-      - 403
-      - 409
-    deprecated: false
-    body:
-      kind: object
-      fields:
-        email:
-          optional: false
-          schema:
-            kind: string
-    responses:
-      "201":
-        kind: object
-        fields:
-          id:
-            optional: false
-            schema:
-              kind: string
-          name:
-            optional: false
-            schema:
-              kind: string
-          email:
-            optional: false
-            schema:
-              kind: string
-          email_address:
-            optional: true
-            schema:
-              kind: string
-          last_name:
-            optional: true
-            schema:
-              kind: string
-          avatar:
-            optional: true
-            schema:
-              kind: object
-              fields:
-                id:
-                  optional: false
-                  schema:
-                    kind: string
-                url:
-                  optional: false
-                  schema:
-                    kind: string
-          avatars:
-            optional: true
-            schema:
-              kind: array
-              element:
-                kind: object
-                fields:
-                  id:
-                    optional: false
-                    schema:
-                      kind: string
-                  url:
-                    optional: false
-                    schema:
-                      kind: string
-          metadata:
-            optional: true
-            schema:
-              kind: record
-          tags:
-            optional: true
-            schema:
-              kind: array
-              element:
-                kind: string
-      "401":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
-          code:
-            optional: true
-            schema:
-              kind: enum
-              values:
-                - expired_token
-                - forbidden
-                - not_found
-                - unauthenticated
-      "403":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
-          code:
-            optional: true
-            schema:
-              kind: enum
-              values:
-                - expired_token
-                - forbidden
-                - not_found
-                - unauthenticated
-      "409":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
-  members.cancelInvite:
-    method: DELETE
-    path: /workspace/invites/:inviteId
-    statuses:
-      - 200
-      - 401
-      - 403
-      - 404
-    deprecated: false
-    responses:
-      "200":
-        kind: object
-        fields:
-          cancelled:
-            optional: false
-            schema:
-              kind: boolean
-      "401":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
-          code:
-            optional: true
-            schema:
-              kind: enum
-              values:
-                - expired_token
-                - forbidden
-                - not_found
-                - unauthenticated
-      "403":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
-          code:
-            optional: true
-            schema:
-              kind: enum
-              values:
-                - expired_token
-                - forbidden
-                - not_found
-                - unauthenticated
-      "404":
-        kind: object
-        fields:
-          type:
-            optional: false
-            schema:
-              kind: string
-          title:
-            optional: false
-            schema:
-              kind: string
-          status:
-            optional: false
-            schema:
-              kind: number
-          detail:
-            optional: false
-            schema:
-              kind: string
   workspace.getWorkspace:
     method: GET
     path: /workspace
@@ -1601,7 +1223,385 @@ routes:
                 - forbidden
                 - not_found
                 - unauthenticated
-  invites.getInvite:
+  workspace.members.listMembers:
+    method: GET
+    path: /workspace/members
+    statuses:
+      - 200
+      - 401
+      - 403
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          members:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  name:
+                    optional: false
+                    schema:
+                      kind: string
+                  email:
+                    optional: false
+                    schema:
+                      kind: string
+                  email_address:
+                    optional: true
+                    schema:
+                      kind: string
+                  last_name:
+                    optional: true
+                    schema:
+                      kind: string
+                  avatar:
+                    optional: true
+                    schema:
+                      kind: object
+                      fields:
+                        id:
+                          optional: false
+                          schema:
+                            kind: string
+                        url:
+                          optional: false
+                          schema:
+                            kind: string
+                  avatars:
+                    optional: true
+                    schema:
+                      kind: array
+                      element:
+                        kind: object
+                        fields:
+                          id:
+                            optional: false
+                            schema:
+                              kind: string
+                          url:
+                            optional: false
+                            schema:
+                              kind: string
+                  metadata:
+                    optional: true
+                    schema:
+                      kind: record
+                  tags:
+                    optional: true
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+  workspace.members.inviteMember:
+    method: POST
+    path: /workspace/members
+    statuses:
+      - 201
+      - 401
+      - 403
+      - 409
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        email:
+          optional: false
+          schema:
+            kind: string
+    responses:
+      "201":
+        kind: object
+        fields:
+          id:
+            optional: false
+            schema:
+              kind: string
+          name:
+            optional: false
+            schema:
+              kind: string
+          email:
+            optional: false
+            schema:
+              kind: string
+          email_address:
+            optional: true
+            schema:
+              kind: string
+          last_name:
+            optional: true
+            schema:
+              kind: string
+          avatar:
+            optional: true
+            schema:
+              kind: object
+              fields:
+                id:
+                  optional: false
+                  schema:
+                    kind: string
+                url:
+                  optional: false
+                  schema:
+                    kind: string
+          avatars:
+            optional: true
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  id:
+                    optional: false
+                    schema:
+                      kind: string
+                  url:
+                    optional: false
+                    schema:
+                      kind: string
+          metadata:
+            optional: true
+            schema:
+              kind: record
+          tags:
+            optional: true
+            schema:
+              kind: array
+              element:
+                kind: string
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+      "409":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  workspace.members.cancelInvite:
+    method: DELETE
+    path: /workspace/invites/:inviteId
+    statuses:
+      - 200
+      - 401
+      - 403
+      - 404
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          cancelled:
+            optional: false
+            schema:
+              kind: boolean
+      "401":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+      "403":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+          code:
+            optional: true
+            schema:
+              kind: enum
+              values:
+                - expired_token
+                - forbidden
+                - not_found
+                - unauthenticated
+      "404":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
+  workspace.invites.getInvite:
     method: GET
     path: /invites/:token
     statuses:
@@ -1697,7 +1697,7 @@ routes:
             optional: false
             schema:
               kind: string
-  invites.acceptInvite:
+  workspace.invites.acceptInvite:
     method: POST
     path: /invites/:token/accept
     statuses:
@@ -1950,7 +1950,7 @@ routes:
                 - forbidden
                 - not_found
                 - unauthenticated
-  tools.getForecast:
+  assistant.tools.getForecast:
     method: GET
     path: /forecast/:city
     statuses:
@@ -1985,7 +1985,7 @@ routes:
             optional: false
             schema:
               kind: string
-  tools.plotSignups:
+  assistant.tools.plotSignups:
     method: GET
     path: /signups
     statuses:
@@ -2017,7 +2017,7 @@ routes:
                     optional: false
                     schema:
                       kind: number
-  tools.countWords:
+  assistant.tools.countWords:
     method: POST
     path: /text/word-count
     statuses:
@@ -2038,7 +2038,7 @@ routes:
             optional: false
             schema:
               kind: number
-  notes.list:
+  assistant.notes.list:
     method: GET
     path: /notes
     statuses:
@@ -2121,7 +2121,7 @@ routes:
                 - forbidden
                 - not_found
                 - unauthenticated
-  notes.add:
+  assistant.notes.add:
     method: POST
     path: /notes
     statuses:
@@ -2266,8 +2266,8 @@ jobs:
 tools:
   health.check: health_check
   workspace.deleteWorkspace: workspace_delete_workspace
-  tools.getForecast: tools_get_forecast
-  tools.plotSignups: tools_plot_signups
-  tools.countWords: tools_count_words
-  notes.list: notes_list
-  notes.add: notes_add
+  assistant.tools.getForecast: assistant_tools_get_forecast
+  assistant.tools.plotSignups: assistant_tools_plot_signups
+  assistant.tools.countWords: assistant_tools_count_words
+  assistant.notes.list: assistant_notes_list
+  assistant.notes.add: assistant_notes_add

@@ -22,7 +22,7 @@ description: Mount a Kizuna API on a Fastify application.
 ```ts title="src/routes/users.ts"
 import { k } from '../k';
 
-export const users = k.routes('users', {
+export const users = k.routes.users({
     listUsers: k
         .route({
             method: 'GET',
@@ -82,9 +82,7 @@ import { users } from './src/routes/users';
 
 export default defineConfig({
     adapter: fastifyAdapter(),
-    routes: {
-        users,
-    },
+    routes: [users],
 });
 ```
 

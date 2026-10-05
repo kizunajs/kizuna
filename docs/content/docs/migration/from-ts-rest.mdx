@@ -19,7 +19,7 @@ Kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered.
 In ts-rest a route is a shape, and its implementation lives in a parallel tree you keep in step by hand. In Kizuna a route carries the handler that answers it:
 
 ```ts title="Kizuna"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     getUser: k
         .route({
             method: 'GET',
@@ -57,7 +57,7 @@ import type { Config } from '../kizuna.types';
 
 export const k = new Kizuna<Config>();
 
-export const users = k.routes('users', { ... });
+export const users = k.routes.users({ ... });
 ```
 
 `Config` is written by `kizuna generate` from your `kizuna.config.ts`. It is what types every handler and checks every name you write. See [`new Kizuna()`](/docs/reference/Kizuna).
@@ -71,11 +71,11 @@ export const contract = c.router({
 ```
 
 ```ts title="Kizuna"
-export const users = k.routes('users', { ... });
-export const health = k.routes('health', { ... });
+export const users = k.routes.users({ ... });
+export const health = k.routes.health({ ... });
 ```
 
-The tag passed to `k.routes` (a key of your `k.tags` set) sets the OpenAPI tag for every route in that group.
+The group you reach on `k.routes`, one you declared with [`k.groups`](/docs/reference/k-groups), sets the OpenAPI tag for every route in it.
 
 ### `c.noBody()` → `z.void()`
 
@@ -95,7 +95,7 @@ export const contract = c.router({
 ```
 
 ```ts title="Kizuna"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     deleteUser: k
         .route({
             method: 'DELETE',
@@ -124,9 +124,7 @@ import { users } from './src/routes/users';
 
 export default defineConfig({
     adapter: expressAdapter(),
-    routes: {
-        users,
-    },
+    routes: [users],
 });
 ```
 
@@ -183,7 +181,7 @@ const router = s.router(contract, {
 ```
 
 ```ts title="Kizuna"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     getUser: k
         .route({
             method: 'GET',

@@ -38,7 +38,7 @@ Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin), and `
 | `operationMapper` | `(operation, route, id) => operation` | none      | Callback to transform each operation before it is added to the spec                     |
 | `derivedHead`     | `boolean`                             | `false`   | Document the derived `head` operation on every `GET` path without a declared one        |
 
-There are no security or tag options. Security is emitted from [each route's `auth`](#security-emission) and the document's tag list from [`k.tags`](/docs/reference/k-tags), so neither can disagree with what the server enforces.
+There are no security or tag options. Security is emitted from [each route's `auth`](#security-emission) and the document's tag list from [`k.groups`](/docs/reference/k-groups), so neither can disagree with what the server enforces.
 
 ## Returns
 

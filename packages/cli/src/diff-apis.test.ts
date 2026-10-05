@@ -8,11 +8,13 @@ const k = new Kizuna();
 
 const ok = { 200: z.object({ id: z.string() }) };
 
-const contractOf = (routes: AuthoredRoutes) =>
+const contractOf = (routes: AuthoredRoutes<never>) =>
     defineConfig({
-        routes: {
-            users: k.routes(routes),
-        },
+        routes: [
+            k.routes({
+                users: routes,
+            }),
+        ],
     }).api;
 
 const base = contractOf({
@@ -191,7 +193,7 @@ describe('schemas, compared field by field', () => {
 
 describe('what a document cannot carry', () => {
     const withJob = defineConfig({
-        routes: { users: k.routes('users', { listUsers: k.route({ method: 'GET', path: '/users', responses: ok }) }) },
+        routes: [k.routes({ listUsers: k.route({ method: 'GET', path: '/users', responses: ok }) })],
         jobs: k.jobs({
             reconcile: {
                 description: 'Reconciles invoices',
@@ -204,7 +206,7 @@ describe('what a document cannot carry', () => {
     }).api;
 
     const withoutJob = defineConfig({
-        routes: { users: k.routes('users', { listUsers: k.route({ method: 'GET', path: '/users', responses: ok }) }) },
+        routes: [k.routes({ listUsers: k.route({ method: 'GET', path: '/users', responses: ok }) })],
     }).api;
 
     it('says nothing about jobs until they are tracked', () => {

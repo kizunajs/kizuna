@@ -4,12 +4,12 @@ import { Kizuna, defineConfig } from 'kizunajs';
 import { formatRoutes, routeMap } from './route-map.js';
 
 interface Config {
-    tags: typeof tags;
+    groups: typeof groups;
     auth: { identities: { member: typeof member } };
 }
 
 const k = new Kizuna<Config>();
-const tags = k.tags({ users: 'Users' });
+const groups = k.groups({ users: 'Users' });
 
 const member = k.identity
     .apiKey({
@@ -19,7 +19,7 @@ const member = k.identity
     })
     .guard(({ apiKey, deny }) => (apiKey ? { userId: apiKey.value } : deny({ status: 401, body: { detail: 'no' } })));
 
-const routes = k.routes('users', {
+const routes = k.routes.users({
     listUsers: k
         .route({
             method: 'GET',
@@ -51,9 +51,9 @@ const routes = k.routes('users', {
 });
 
 const { api } = defineConfig({
-    tags,
+    groups,
     auth: { identities: { member } },
-    routes: { users: routes },
+    routes: [routes],
 });
 
 describe('routeMap', () => {
@@ -80,8 +80,8 @@ describe('routeMap', () => {
         expect(entries[0]?.deprecated).toBeUndefined();
     });
 
-    it('carries the tag each route sits under', () => {
-        expect(entries[1]?.tags).toEqual(['users']);
+    it('carries the group each route sits under', () => {
+        expect(entries[1]?.groups).toEqual(['users']);
     });
 });
 
@@ -105,18 +105,20 @@ describe('formatRoutes', () => {
 describe('hidden routes', () => {
     it('lists a hidden route, marked as hidden', () => {
         const contract = defineConfig({
-            routes: {
-                health: {
-                    method: 'GET',
-                    path: '/health',
-                    hidden: true,
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
+            routes: [
+                {
+                    health: {
+                        method: 'GET',
+                        path: '/health',
+                        hidden: true,
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
                     },
                 },
-            },
+            ],
         }).api;
         const entries = routeMap(contract, {});
 

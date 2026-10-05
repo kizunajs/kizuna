@@ -64,9 +64,7 @@ const routes = k.routes({
 
 const contract = defineConfig({
     ...config,
-    routes: {
-        api: routes,
-    },
+    routes: [{ api: routes }],
 }).api;
 
 type Guarded = (typeof contract.routes.api)['listUsers'];
@@ -120,9 +118,7 @@ const scopedRoutes = scopedK.routes({
 
 const scopedContract = defineConfig({
     ...scopedKConfig,
-    routes: {
-        api: scopedRoutes,
-    },
+    routes: [{ api: scopedRoutes }],
 }).api;
 
 type BodyOn<R> = R extends AutoResponsesBrand<number, infer Body> ? Body : never;

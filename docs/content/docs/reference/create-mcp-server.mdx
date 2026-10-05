@@ -32,15 +32,15 @@ createMcpServer(api: ApiWithRouter, options?: McpServerOptions): McpServer
 
 ## Options
 
-| Option              | Default              | Description                                                                                                         |
-| ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `name`              | `'MCP Server'`       | Human-readable name shown to AI assistants                                                                          |
-| `version`           | `'1.0.0'`            | Semantic version string                                                                                             |
-| `onlyReadOnly`      | `false`              | Keep only the methods RFC 9110 calls safe, so nothing an assistant calls can change data                            |
-| `instructions`      | built from your tags | Appended to the generated overview                                                                                  |
-| `handlerContext`    | none                 | Extra context spread into every handler call                                                                        |
-| `credentialHeaders` | none                 | Headers of the MCP transport request, used to run guards on secured tools                                           |
-| `transportAuth`     | none                 | A scheme the transport already verified: its guard is skipped, and `context` reaches handlers under `auth.<scheme>` |
+| Option              | Default                | Description                                                                                                         |
+| ------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `name`              | `'MCP Server'`         | Human-readable name shown to AI assistants                                                                          |
+| `version`           | `'1.0.0'`              | Semantic version string                                                                                             |
+| `onlyReadOnly`      | `false`                | Keep only the methods RFC 9110 calls safe, so nothing an assistant calls can change data                            |
+| `instructions`      | built from your groups | Appended to the generated overview                                                                                  |
+| `handlerContext`    | none                   | Extra context spread into every handler call                                                                        |
+| `credentialHeaders` | none                   | Headers of the MCP transport request, used to run guards on secured tools                                           |
+| `transportAuth`     | none                   | A scheme the transport already verified: its guard is skipped, and `context` reaches handlers under `auth.<scheme>` |
 
 Which routes it publishes is each route's own business: the ones declaring [`tool`](/docs/tools), less the ones whose shape a tool call cannot carry. A route whose `contentType` is `multipart/form-data` or `application/x-www-form-urlencoded` never publishes, because tool input is JSON, and neither does one whose response [streams](/docs/streaming), because a tool result is one value.
 

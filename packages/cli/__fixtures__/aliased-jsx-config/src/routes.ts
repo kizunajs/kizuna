@@ -4,7 +4,7 @@ import { welcomeSubject } from './welcome-email';
 
 const k = new Kizuna();
 
-export const routes = k.routes('users', {
+export const routes = k.routes({
     getWelcomeEmail: k.route({
         method: 'GET',
         path: '/users/:id/welcome-email',

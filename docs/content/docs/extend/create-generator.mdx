@@ -88,15 +88,15 @@ plugins: [
 
 `processRoute` is called once for every route the server serves, plugin routes included. `processModel` is called once for every named [model](/docs/reference/kizuna-model), and is optional.
 
-| Property             | Type                    | Description                                                               |
-| -------------------- | ----------------------- | ------------------------------------------------------------------------- |
-| `routeKey`           | `string`                | Dot-separated key path, e.g. `users.getUser`                              |
-| `route`              | `RouteDefinition`       | The full route definition                                                 |
-| `routeTags`          | `string[]`              | The tags of every `k.routes` group the route sits inside, outermost first |
-| `hidden`             | `boolean`               | `true` when the route is [hidden](/docs/routes#hidden-routes)             |
-| `deprecated`         | `boolean`               | `true` when the route is deprecated                                       |
-| `deprecationMessage` | `string \| undefined`   | The route's `deprecated` string, or the object form's `message`           |
-| `plugin`             | `{ slug } \| undefined` | The plugin whose route this is, under the slug the app installed it at    |
+| Property             | Type                    | Description                                                                             |
+| -------------------- | ----------------------- | --------------------------------------------------------------------------------------- |
+| `routeKey`           | `string`                | Dot-separated key path, e.g. `users.getUser`                                            |
+| `route`              | `RouteDefinition`       | The full route definition                                                               |
+| `routeGroups`        | `string[]`              | Every group the route is filed under, as dotted paths: its own first, then its `groups` |
+| `hidden`             | `boolean`               | `true` when the route is [hidden](/docs/routes#hidden-routes)                           |
+| `deprecated`         | `boolean`               | `true` when the route is deprecated                                                     |
+| `deprecationMessage` | `string \| undefined`   | The route's `deprecated` string, or the object form's `message`                         |
+| `plugin`             | `{ slug } \| undefined` | The plugin whose route this is, under the slug the app installed it at                  |
 
 A generator sees every served route and decides what to include. The OpenAPI document leaves hidden routes out unless it's told otherwise.
 

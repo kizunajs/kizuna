@@ -5,7 +5,7 @@ import type { RequestContextValues } from './handler-pipeline.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { PluginArgs, PluginList, PluginsBySlug } from './plugin.js';
-import type { TagOptions, TagSet } from './tags.js';
+import type { GroupOptions, GroupSet } from './groups.js';
 import type { z } from 'zod';
 
 /**
@@ -18,7 +18,7 @@ import type { z } from 'zod';
  * // src/kizuna.types.ts, generated
  * export interface Config {
  *     adapter: ReturnType<typeof expressAdapter>;
- *     tags: typeof tags;
+ *     groups: typeof groups;
  *     auth: { identities: { user: typeof user } };
  *     jobs: typeof jobs;
  * }
@@ -26,7 +26,7 @@ import type { z } from 'zod';
  */
 export interface KizunaConfigShape {
     adapter?: unknown;
-    tags?: unknown;
+    groups?: unknown;
     auth?: {
         identities?: unknown;
         guardSchema?: unknown;
@@ -66,9 +66,12 @@ export type JobsOfTree<Tree> = {
         : JobsOfTree<Tree[Key]>;
 };
 
-export type ConfiguredTags<Config> = Config extends { tags: TagSet<infer Tags extends Record<string, TagOptions>> }
-    ? Tags
-    : Record<string, never>;
+/**
+ * The groups a config declares, or none.
+ */
+export type ConfiguredGroups<Config> = Config extends { groups: GroupSet<infer Groups extends Record<string, GroupOptions | string>> }
+    ? Groups
+    : {};
 export type ConfiguredCodes<Config> = Config extends { validation: { issueCodes: infer Codes extends string } } ? Codes : never;
 export type ConfiguredIdentities<Config> = Config extends { auth: { identities: infer Identities extends Record<string, SecurityScheme> } }
     ? Identities

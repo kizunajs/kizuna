@@ -1,25 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { ROUTES_TAG, type Routes } from './types.js';
+import { ROUTES_GROUP, type Routes } from './types.js';
 import { Kizuna } from './kizuna.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     users: {
         title: 'Users',
         description: 'User management endpoints',
+    },
+    workspaces: {
+        title: 'Workspaces',
+        groups: {
+            members: 'Members',
+        },
     },
 });
 
 describe('k.routes', () => {
     it('throws when a route has an empty body schema', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 emptyAction: k.route({
                     method: 'POST',
                     path: '/empty',
@@ -36,7 +42,7 @@ describe('k.routes', () => {
 
     it('throws when a nested route has an empty body schema', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 management: {
                     update: k.route({
                         method: 'PUT',
@@ -55,7 +61,7 @@ describe('k.routes', () => {
 
     it('accepts a route with a non-empty body schema', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 createUser: k.route({
                     method: 'POST',
                     path: '/users',
@@ -74,7 +80,7 @@ describe('k.routes', () => {
 
     it('accepts a route with z.void() body', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 deleteUser: k.route({
                     method: 'DELETE',
                     path: '/users/:id',
@@ -89,7 +95,7 @@ describe('k.routes', () => {
 
     it('accepts a route with no body', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 getUser: k.route({
                     method: 'GET',
                     path: '/users/:id',
@@ -103,8 +109,8 @@ describe('k.routes', () => {
         ).not.toThrow();
     });
 
-    it('stamps ROUTES_TAG with the group tag', () => {
-        const routes = k.routes('users', {
+    it('stamps the group it was declared into', () => {
+        const routes = k.routes.users({
             getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
@@ -115,14 +121,44 @@ describe('k.routes', () => {
                 },
             }),
         });
-        expect((routes as Routes)[ROUTES_TAG]).toBe('users');
+        expect((routes as Routes)[ROUTES_GROUP]).toBe('users');
+    });
+
+    it('stamps a nested group by its dotted path', () => {
+        const routes = k.routes.workspaces.members({
+            listMembers: k.route({
+                method: 'GET',
+                path: '/workspaces/:workspaceId/members',
+                responses: {
+                    200: z.string(),
+                },
+            }),
+        });
+        expect((routes as Routes)[ROUTES_GROUP]).toBe('workspaces.members');
+    });
+
+    it('marks routes in no group with an empty path', () => {
+        const routes = k.routes({
+            health: k.route({
+                method: 'GET',
+                path: '/health',
+                responses: {
+                    200: z.string(),
+                },
+            }),
+        });
+        expect((routes as Routes)[ROUTES_GROUP]).toBe('');
+    });
+
+    it('hands back the same accessor for the same group', () => {
+        expect(k.routes.workspaces.members).toBe(k.routes.workspaces.members);
     });
 });
 
 describe('k.routes z.coerce ban', () => {
     it('throws when a top-level query schema is coerced', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 listItems: k.route({
                     method: 'GET',
                     path: '/items',
@@ -140,7 +176,7 @@ describe('k.routes z.coerce ban', () => {
 
     it('throws and points at the nested field path that uses z.coerce', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 listItems: k.route({
                     method: 'GET',
                     path: '/items',
@@ -160,7 +196,7 @@ describe('k.routes z.coerce ban', () => {
 
     it('finds z.coerce hidden inside arrays, wrappers, and unions', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 createItem: k.route({
                     method: 'POST',
                     path: '/items',
@@ -180,7 +216,7 @@ describe('k.routes z.coerce ban', () => {
 
     it('rejects z.coerce in a response schema', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 getItem: k.route({
                     method: 'GET',
                     path: '/items/:id',
@@ -197,7 +233,7 @@ describe('k.routes z.coerce ban', () => {
 
     it('accepts plain z.number()/z.date()/z.bigint() and z.any()/z.unknown()', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 listItems: k.route({
                     method: 'GET',
                     path: '/items',
@@ -222,7 +258,7 @@ describe('k.routes z.coerce ban', () => {
 describe('k.routes pathParams/path agreement', () => {
     it('throws when pathParams declares a key the path does not have', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 // @ts-expect-error intentional, asserts the mismatched key is refused
                 getPlace: k.route({
                     method: 'GET',
@@ -245,7 +281,7 @@ describe('k.routes pathParams/path agreement', () => {
 
     it('throws when the path has a placeholder pathParams omits', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 // @ts-expect-error intentional, asserts k.routes throws on a missing key
                 getVisit: k.route({
                     method: 'GET',
@@ -266,7 +302,7 @@ describe('k.routes pathParams/path agreement', () => {
 
     it('throws for a mismatch on a nested route', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 management: {
                     // @ts-expect-error intentional, asserts k.routes throws on a mismatched key
                     getPlace: k.route({
@@ -289,7 +325,7 @@ describe('k.routes pathParams/path agreement', () => {
 
     it('accepts pathParams whose keys match the path', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 getVisit: k.route({
                     method: 'GET',
                     path: '/places/:placeId/visits/:visitId',
@@ -309,7 +345,7 @@ describe('k.routes pathParams/path agreement', () => {
 
     it('accepts a path parameter followed by a literal in the same segment', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 getReport: k.route({
                     method: 'GET',
                     path: '/reports/:reportId.pdf',
@@ -328,7 +364,7 @@ describe('k.routes pathParams/path agreement', () => {
 
     it('accepts a route that omits pathParams entirely', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 getPlace: k.route({
                     method: 'GET',
                     path: '/places/:placeId',
@@ -344,7 +380,7 @@ describe('k.routes pathParams/path agreement', () => {
 
     it('leaves a pathParams schema without a known key set alone', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 getPlace: k.route({
                     method: 'GET',
                     path: '/places/:placeId',
@@ -362,7 +398,7 @@ describe('k.routes pathParams/path agreement', () => {
 
 describe('k.routes structured path params', () => {
     const routeWith = (schema: z.ZodType) => () =>
-        k.routes('users', {
+        k.routes.users({
             getPlace: k.route({
                 method: 'GET',
                 path: '/places/:value',
@@ -406,7 +442,7 @@ describe('k.routes structured path params', () => {
 
     it('leaves an array in query alone', () => {
         expect(() =>
-            k.routes('users', {
+            k.routes.users({
                 listPlaces: k.route({
                     method: 'GET',
                     path: '/places',

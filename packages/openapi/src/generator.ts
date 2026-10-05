@@ -27,7 +27,7 @@ import {
     cacheHeaders,
 } from 'kizunajs/generator';
 import { getStatusText } from 'kizunajs';
-import type { ApiDefinition, RequiredPermissions, SecurityRequirement, TagOptions } from 'kizunajs';
+import type { ApiDefinition, RequiredPermissions, SecurityRequirement } from 'kizunajs';
 import { OPENAPI_PLUGIN_SLUG } from './plugin.js';
 import type { StreamResponseDefinition } from 'kizunajs';
 import type {
@@ -240,11 +240,10 @@ const buildComponentSchemas = (): Record<string, unknown> | undefined => {
 };
 
 /**
- * Internal generator options: the public options plus a `key → TagOptions`
- * lookup built from the api's tag set, used to resolve tag keys to titles.
+ * The public options, plus the tags for each group path.
  */
 type GeneratorContext = GenerateOpenApiOptions & {
-    tagLookup?: ReadonlyMap<string, TagOptions>;
+    groupTags?: ReadonlyMap<string, readonly string[]>;
 };
 
 const deriveHeadOperation = (getOperation: OpenApiOperation): OpenApiOperation => {
@@ -260,7 +259,7 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
 
     return {
-        processRoute({ routeKey, route, routeTags, deprecated, hidden }) {
+        processRoute({ routeKey, route, routeGroups, deprecated, hidden }) {
             if (hidden && options.includeHidden !== true) return;
             const openApiPath = convertPath(route.path);
             const method = route.method.toLowerCase();
@@ -276,10 +275,9 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                     options.setOperationId === 'concatenated-path' ? routeKey : routeKey.slice(routeKey.lastIndexOf('.') + 1);
             }
             if (deprecated) operation.deprecated = true;
-            const resolveTagTitle = (key: string): string => options.tagLookup?.get(key)?.title ?? key;
-            const mergedTags = [...new Set([...routeTags, ...(route.tags ?? [])].map(resolveTagTitle))];
-            if (mergedTags.length > 0) {
-                operation.tags = mergedTags;
+            const tags = [...new Set(routeGroups.flatMap((group) => options.groupTags?.get(group) ?? [group]))];
+            if (tags.length > 0) {
+                operation.tags = tags;
             }
             if (route.security && route.security.length > 0) {
                 const emittedSecurity = toOpenApiSecurity(route.security, api);
@@ -616,20 +614,34 @@ const buildSecuritySchemes = (api: ApiDefinition): Record<string, unknown> | und
     return Object.keys(result).length > 0 ? result : undefined;
 };
 
-const buildTagLookup = (api: ApiDefinition): ReadonlyMap<string, TagOptions> => new Map(Object.entries(api.tags?.tags ?? {}));
+/**
+ * The tag for each group path: its top-level group's title, since OpenAPI 3.1.0
+ * has no nested tags.
+ */
+const buildGroupTags = (api: ApiDefinition): ReadonlyMap<string, readonly string[]> => {
+    const groups = api.groups?.groups;
+    const tags = new Map<string, readonly string[]>();
+    if (!groups) return tags;
+    for (const group of groups.values()) {
+        tags.set(group.path, [groups.get(group.lineage[0]!)!.title]);
+    }
+    return tags;
+};
 
 /**
- * Document-level tag definitions from the api's declared tag set, one
- * entry per declared tag, in declaration order, named by its `title`.
+ * One tag per top-level group.
  */
 const tagsFromApi = (api: ApiDefinition): OpenApiTag[] => {
-    const declared = api.tags?.tags;
-    if (!declared) return [];
+    const groups = api.groups?.groups;
+    if (!groups) return [];
     const tags: OpenApiTag[] = [];
-    for (const options of Object.values(declared)) {
-        const entry: OpenApiTag = { name: options.title };
-        if (options.description) entry.description = options.description;
-        if (options.externalDocs) entry.externalDocs = options.externalDocs;
+    for (const group of groups.values()) {
+        if (group.lineage.length > 1) continue;
+        const entry: OpenApiTag = {
+            name: group.title,
+        };
+        if (group.description) entry.description = group.description;
+        if (group.externalDocs) entry.externalDocs = group.externalDocs;
         tags.push(entry);
     }
     return tags;
@@ -654,7 +666,7 @@ export function renderOpenApi(api: ApiDefinition, options: GenerateOpenApiOption
         openApiWalk(
             {
                 ...options,
-                tagLookup: buildTagLookup(api),
+                groupTags: buildGroupTags(api),
             },
             api
         )

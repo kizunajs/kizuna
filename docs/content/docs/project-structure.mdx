@@ -13,7 +13,7 @@ my-api/
 ├── kizuna.types.ts         # written by kizuna generate
 └── src/
     ├── k.ts                # new Kizuna<Config>(), exports k
-    ├── tags.ts             # k.tags
+    ├── groups.ts           # k.groups
     ├── identities.ts       # k.identity.bearer(...).guard(...)
     ├── request-context.ts  # k.requestContext(...).handler(...)
     ├── permissions.ts      # Kizuna.permissions
@@ -26,17 +26,17 @@ my-api/
     │   └── tenancy/
     │       └── index.ts
     ├── routes/
-    │   ├── users.ts        # k.routes('users', { ... })
+    │   ├── users.ts        # k.routes.users({ ... })
     │   ├── events.ts
     │   ├── health.ts
-    │   └── index.ts        # re-exports the groups
+    │   └── index.ts        # lists the route files
     └── index.ts            # kizuna.api.mount(app)
 ```
 
 Each route carries the handler that answers it. The same holds for the rest: a guard sits on its identity, a resolver sits on its request context value, and a job's handler sits on the job.
 
 - **`k.ts`** constructs the surface once, typed by the `Config` in `kizuna.types.ts`. Everything else imports `k` from here.
-- **`routes/`** holds one file per group, each calling `k.routes`, with an `index.ts` re-exporting them so the config has one import to make. See [splitting routes across files](/docs/routes#splitting-routes-across-files).
+- **`routes/`** holds one file per group, each calling `k.routes.<group>`, with an `index.ts` listing them so the config has one import to make. See [splitting routes across files](/docs/routes#splitting-routes-across-files).
 - **`identities.ts`** names who can call the API, and each identity's `guard` is what authenticates them. See [Authentication](/docs/authentication).
 - **`roles.ts`** names who a caller can be, and each route's `auth` says who may call it. See [Access Control](/docs/access-control).
 - **`plugins/`** holds your app's own building blocks, one folder each, with what your handlers call. Every handler and job reaches them under `plugins`, typed. See [Create a Plugin](/docs/extend/create-plugin).

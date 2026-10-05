@@ -119,26 +119,26 @@ export default defineConfig({
     it('keeps an aliased import pointing at the name its module exports', () => {
         const types = generateConfigTypes(`
 import { defineConfig } from 'kizunajs';
-import { tags as apiTags } from './src/tags';
+import { groups as apiGroups } from './src/groups';
 
 export default defineConfig({
-    tags: apiTags,
+    groups: apiGroups,
 });
 `);
-        expect(types).toContain("import type { tags as apiTags } from './src/tags';");
-        expect(types).toContain('tags: typeof apiTags;');
+        expect(types).toContain("import type { groups as apiGroups } from './src/groups';");
+        expect(types).toContain('groups: typeof apiGroups;');
     });
 
     it('follows a default export through the const it was named as', () => {
         const types = generateConfigTypes(`
 import { defineConfig } from 'kizunajs';
-import { tags } from './src/tags';
+import { groups } from './src/groups';
 
-const config = defineConfig({ tags });
+const config = defineConfig({ groups });
 
 export default config;
 `);
-        expect(types).toContain('tags: typeof tags;');
+        expect(types).toContain('groups: typeof groups;');
     });
 
     it('refuses a config with no default export', () => {
@@ -160,27 +160,27 @@ export default defineConfig({ validation: { issueCodes: codes } });
         const source = `
 import { defineConfig } from 'kizunajs';
 import { expressAdapter } from '@kizunajs/express';
-import { tags } from './src/tags';
+import { groups } from './src/groups';
 
 export default defineConfig({
     adapter: expressAdapter(),
-    tags,
+    groups,
 });
 `;
         const types = generateConfigTypes(source, '/app/kizuna.config.ts', '/app/src/admin/kizuna.types.ts');
-        expect(types).toContain("import type { tags } from '../tags';");
+        expect(types).toContain("import type { groups } from '../groups';");
         expect(types).toContain("import type { expressAdapter } from '@kizunajs/express';");
     });
 
     it('leaves the imports alone when the output sits beside the config', () => {
         const source = `
 import { defineConfig } from 'kizunajs';
-import { tags } from './src/tags';
+import { groups } from './src/groups';
 
-export default defineConfig({ tags });
+export default defineConfig({ groups });
 `;
         const types = generateConfigTypes(source, '/app/kizuna.config.ts', '/app/kizuna.types.ts');
-        expect(types).toContain("import type { tags } from './src/tags';");
+        expect(types).toContain("import type { groups } from './src/groups';");
     });
 
     /**

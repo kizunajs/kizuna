@@ -20,7 +20,7 @@ const UserSchema = Kizuna.model({
     }),
 });
 
-const routes = k.routes('users', {
+const routes = k.routes({
     listUsers: k.route({
         method: 'GET',
         path: '/users',
@@ -74,9 +74,7 @@ const routes = k.routes('users', {
 });
 
 const contract = defineConfig({
-    routes: {
-        users: routes,
-    },
+    routes: [{ users: routes }],
 }).api;
 
 const source = generateFetchClient(contract, { source: '../src/contract.ts' });
@@ -196,7 +194,7 @@ describe('a model on something other than an object', () => {
         schema: z.enum(['low', 'high']),
     });
 
-    const shapeRoutes = k.routes('shapes', {
+    const shapeRoutes = k.routes({
         getShape: k.route({
             method: 'GET',
             path: '/shapes/:id',
@@ -219,7 +217,7 @@ describe('a model on something other than an object', () => {
 
     const output = generateFetchClient(
         defineConfig({
-            routes: shapeRoutes,
+            routes: [shapeRoutes],
         }).api
     );
 
@@ -236,7 +234,7 @@ describe('a model on something other than an object', () => {
 });
 
 describe('a literal that is not a string', () => {
-    const envelopeRoutes = k.routes('envelope', {
+    const envelopeRoutes = k.routes({
         read: k.route({
             method: 'GET',
             path: '/envelope',
@@ -252,7 +250,7 @@ describe('a literal that is not a string', () => {
 
     const output = generateFetchClient(
         defineConfig({
-            routes: envelopeRoutes,
+            routes: [envelopeRoutes],
         }).api
     );
 
@@ -302,25 +300,27 @@ const hiddenFixturePlugin = definePlugin({
 
 const hiddenFixtureContract = () =>
     defineConfig({
-        routes: {
-            listUsers: {
-                method: 'GET',
-                path: '/users',
-                responses: {
-                    200: z.array(z.string()),
+        routes: [
+            {
+                listUsers: {
+                    method: 'GET',
+                    path: '/users',
+                    responses: {
+                        200: z.array(z.string()),
+                    },
+                },
+                healthCheck: {
+                    method: 'GET',
+                    path: '/health-check',
+                    hidden: true,
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
                 },
             },
-            healthCheck: {
-                method: 'GET',
-                path: '/health-check',
-                hidden: true,
-                responses: {
-                    200: z.object({
-                        ok: z.boolean(),
-                    }),
-                },
-            },
-        },
+        ],
         plugins: [hiddenFixturePlugin()],
     }).api;
 
