@@ -54,20 +54,20 @@ In a monorepo, build the other packages your config imports before generating. T
 
 ## `kizuna routes`
 
-Every route, with what it asks of a caller and what it publishes:
+Every route, with what it asks of a caller, the group it is filed under, and what it publishes:
 
 ```sh title="Terminal"
 kizuna routes
 ```
 
 ```text
-GET      /users                users.listUsers          auth: public
-POST     /users                users.createUser         auth: user
-DELETE   /users/:id            users.deleteUser         auth: member, requires workspace:delete  deprecated, use `archiveUser` instead  sunset 2027-01-01
-GET      /forecast/:city       weather.getForecast      auth: public  tool: weather_get_forecast
+GET      /users                users.listUsers          auth: public  group: users
+POST     /users                users.createUser         auth: user  group: users
+DELETE   /users/:id            users.deleteUser         auth: member, requires workspace:delete  group: users  deprecated, use `archiveUser` instead  sunset 2027-01-01
+GET      /forecast/:city       weather.getForecast      auth: public  group: weather  tool: weather_get_forecast
 ```
 
-The path is the one the server matches, so a route in a group shows the path a caller reaches rather than the one the route declares. A route's `auth` reads as `public`, an identity name, or the identity with the roles and permissions it requires. A route publishing a [tool](/docs/tools) shows the name a model calls it by, resolved the same way the MCP endpoint resolves it.
+The path is the one the server matches. A route's `auth` reads as `public`, an identity name, or the identity with the roles and permissions it requires. A route publishing a [tool](/docs/tools) shows the name a model calls it by, resolved the same way the MCP endpoint resolves it.
 
 `--json` prints the same map as an array, for something other than a person to read:
 
@@ -82,11 +82,28 @@ kizuna routes --json
         "method": "GET",
         "path": "/forecast/:city",
         "auth": "public",
-        "tags": ["weather"],
+        "groups": ["weather"],
         "tool": "weather_get_forecast"
     }
 ]
 ```
+
+### Group problems
+
+Once your config declares [groups](/docs/reference/k-groups), `kizuna routes` also checks that every route is in one, and exits 1 when they are not, so a pipeline can fail on it:
+
+```text
+2 group problems:
+  getHealth is in no group. Declare it with k.routes.<group>(...).
+  The group billing holds no routes. Remove it, or file a route in it.
+```
+
+It reports two things:
+
+- A route in no group, which would sit at the top of every client beside your groups, and under a "default" heading in the documentation.
+- A group with no route in it or below it.
+
+A route's key always comes from its group, so the two cannot disagree. Hidden routes and plugin routes are left out, because neither reaches the OpenAPI document. With `--json`, the problems go to stderr and the map stays parseable.
 
 ## `kizuna diff`
 

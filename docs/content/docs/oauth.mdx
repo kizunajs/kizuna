@@ -74,7 +74,7 @@ For an OpenID Connect server, `k.identity.openIdConnect({ openIdConnectUrl, reso
 A route names what it requires, as for any identity:
 
 ```ts title="src/routes/users.ts"
-export const usersRoutes = k.routes('users', {
+export const usersRoutes = k.routes.users({
     createUser: k
         .route({
             method: 'POST',

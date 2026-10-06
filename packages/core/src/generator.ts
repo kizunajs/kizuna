@@ -80,7 +80,10 @@ export {
 export interface GeneratorRouteContext {
     routeKey: string;
     route: RouteDefinition;
-    routeTags: string[];
+    /**
+     * The route's groups, as dotted paths, its own first.
+     */
+    routeGroups: string[];
     /**
      * Whether the route is deprecated.
      */
@@ -135,7 +138,7 @@ const servedRoutes = (
 
 const withoutHidden = (routes: Routes): Routes => {
     const listed: Record<string | symbol, unknown> = {};
-    // A group's tag rides on a symbol, which `Object.entries` skips.
+    // `Object.entries` skips the group symbol.
     for (const symbol of Object.getOwnPropertySymbols(routes)) {
         listed[symbol] = (routes as Record<symbol, unknown>)[symbol];
     }
@@ -282,11 +285,11 @@ export const walkApi = <Output>(api: ApiDefinition, walk: GeneratorWalk<Output>,
     if (walk.processModel !== undefined) {
         for (const model of modelsOf(entries)) walk.processModel(model);
     }
-    for (const { routeKey, route, routeTags, plugin } of entries) {
+    for (const { routeKey, route, routeGroups, plugin } of entries) {
         walk.processRoute?.({
             routeKey,
             route,
-            routeTags,
+            routeGroups,
             hidden: route.hidden === true,
             plugin,
             deprecated: route.deprecated !== undefined && route.deprecated !== false,

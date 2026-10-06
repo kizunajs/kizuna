@@ -7,6 +7,7 @@ import { ConfigSyntaxError, generateConfigTypes } from './generate-types.js';
 import { checkFiles, formatStale, writeFiles } from './generate-clients.js';
 import { loadConfig } from './load-config.js';
 import { formatRoutes, routeMap } from './route-map.js';
+import { checkGroups, formatGroupProblems } from './group-check.js';
 import { diffAgainst, readSnapshot } from './diff-against.js';
 import { diffSnapshots, formatChange, hasBreakingChange } from './diff-apis.js';
 import { snapshotPathFor, snapshotTarget } from './snapshot.js';
@@ -15,7 +16,8 @@ const usage = `Usage: kizuna <command> [options]
 
 Commands:
   generate   Write kizuna.types.ts and every client the config declares.
-  routes     Print every route the config serves.
+  routes     Print every route the config serves. Exits 1 when a route is in
+             no group while others are, or a group holds no routes.
   diff       Compare the config against the same config at a git ref.
 
 Options:
@@ -137,7 +139,12 @@ const runGenerate = async (values: { check?: boolean; config?: string; types?: s
 const runRoutes = async (values: { config?: string; json?: boolean }): Promise<void> => {
     const config = await loadOrDie(configPathFrom(values.config));
     const entries = routeMap(config.api, {});
+    const problems = checkGroups(config.api);
     process.stdout.write(values.json ? `${JSON.stringify(entries, null, 2)}\n` : `${formatRoutes(entries)}\n`);
+    if (problems.length === 0) return;
+    // stderr, so `--json` stays parseable.
+    process.stderr.write(`\n${formatGroupProblems(problems)}\n`);
+    process.exit(1);
 };
 
 const runDiff = async (values: { config?: string; json?: boolean; against?: string; from?: string; to?: string }): Promise<void> => {

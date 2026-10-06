@@ -158,7 +158,7 @@ tool: {
 
 ### From the whole server
 
-`instructions` is a single string clients put in front of the model before it picks any tool. Kizuna builds one from your [tags](/docs/reference/k-tags), so the groups in your API arrive with their titles and descriptions, and your own text is appended to it:
+`instructions` is a single string clients put in front of the model before it picks any tool. Kizuna builds one from your [groups](/docs/reference/k-groups), so the groups in your API arrive with their titles and descriptions, and your own text is appended to it:
 
 ```ts title="kizuna.config.ts"
 mcpPlugin({
@@ -241,13 +241,13 @@ The guard runs once per request, its context reaches handlers under `auth.<schem
 
 ## Options
 
-| Option         | Default              | Description                                                          |
-| -------------- | -------------------- | -------------------------------------------------------------------- |
-| `path`         | `'/mcp'`             | Path the endpoint is served from                                     |
-| `name`         | `'MCP Server'`       | Human-readable name shown to AI assistants                           |
-| `version`      | `'1.0.0'`            | Semantic version string                                              |
-| `instructions` | built from your tags | Appended to the generated overview                                   |
-| `oauth`        | off                  | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth)) |
+| Option         | Default                | Description                                                          |
+| -------------- | ---------------------- | -------------------------------------------------------------------- |
+| `path`         | `'/mcp'`               | Path the endpoint is served from                                     |
+| `name`         | `'MCP Server'`         | Human-readable name shown to AI assistants                           |
+| `version`      | `'1.0.0'`              | Semantic version string                                              |
+| `instructions` | built from your groups | Appended to the generated overview                                   |
+| `oauth`        | off                    | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth)) |
 
 ## Connecting clients
 

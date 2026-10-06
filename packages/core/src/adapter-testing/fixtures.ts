@@ -6,7 +6,7 @@ import { rawResponse } from '../adapter.js';
 import { definePlugin, route } from '../plugin.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 interface SecuredKConfig {
@@ -19,18 +19,18 @@ interface SecuredKConfig {
 }
 
 interface PluginKConfig {
-    tags: typeof pluginKTags;
+    groups: typeof pluginKGroups;
 }
 
 const k = new Kizuna<Config>();
 const securedK = new Kizuna<SecuredKConfig>();
 const pluginK = new Kizuna<PluginKConfig>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
 export interface User {
@@ -56,7 +56,7 @@ export const resetUsers = (): void => {
     nextUserId = 1;
 };
 
-export const userRoutes = k.routes('api', {
+export const userRoutes = k.routes({
     getUser: k
         .route({
             method: 'GET',
@@ -184,7 +184,7 @@ export type UserRoutes = typeof userRoutes;
 
 export const userInput = {
     ...config,
-    routes: userRoutes,
+    routes: [userRoutes],
 };
 
 export const userContract = defineConfig(userInput).api;
@@ -192,7 +192,7 @@ export const userContract = defineConfig(userInput).api;
 /**
  * A route whose handler returns a body the api does not allow, for `responses.validation`.
  */
-export const brokenRoutes = k.routes('api', {
+export const brokenRoutes = k.routes({
     getBroken: k
         .route({
             method: 'GET',
@@ -213,7 +213,7 @@ export const brokenRoutes = k.routes('api', {
 
 export const brokenInput = {
     ...config,
-    routes: brokenRoutes,
+    routes: [brokenRoutes],
 };
 
 export const brokenContract = defineConfig(brokenInput).api;
@@ -448,9 +448,7 @@ export const securedRoutes = securedK.routes({
 
 export const securedInput = {
     ...securedKConfig,
-    routes: {
-        api: securedRoutes,
-    },
+    routes: [{ api: securedRoutes }],
 };
 
 export const securedContract = defineConfig(securedInput).api;
@@ -458,7 +456,7 @@ export const securedContract = defineConfig(securedInput).api;
 /**
  * A one-route group at a distinct path, for the sub-router composition tests each adapter repeated.
  */
-export const subUserRoutes = k.routes('api', {
+export const subUserRoutes = k.routes({
     getUser: k
         .route({
             method: 'GET',
@@ -479,9 +477,7 @@ export const subUserRoutes = k.routes('api', {
 
 export const subUserInput = {
     ...config,
-    routes: {
-        users: subUserRoutes,
-    },
+    routes: [{ users: subUserRoutes }],
 };
 
 export const subUserContract = defineConfig(subUserInput).api;
@@ -489,7 +485,7 @@ export const subUserContract = defineConfig(subUserInput).api;
 /**
  * Constraints covering each Zod issue code the kernel serializes, so every adapter proves it surfaces them.
  */
-export const issueRoutes = k.routes('api', {
+export const issueRoutes = k.routes({
     createProfile: k
         .route({
             method: 'POST',
@@ -519,7 +515,7 @@ export const issueRoutes = k.routes('api', {
 
 export const issueInput = {
     ...config,
-    routes: issueRoutes,
+    routes: [issueRoutes],
 };
 
 export const issueContract = defineConfig(issueInput).api;
@@ -530,7 +526,7 @@ export const issueContract = defineConfig(issueInput).api;
 export const csvBody = 'id,name\n1,Ada';
 export const badgeBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]);
 
-export const responseShapeRoutes = k.routes('api', {
+export const responseShapeRoutes = k.routes({
     exportCsv: k
         .route({
             method: 'GET',
@@ -624,12 +620,12 @@ export const signedBodyText = '{ "name" :  "Ada" }';
 
 export const responseShapeInput = {
     ...config,
-    routes: responseShapeRoutes,
+    routes: [responseShapeRoutes],
 };
 
 export const responseShapeContract = defineConfig(responseShapeInput).api;
 
-export const deprecatedRoutes = k.routes('api', {
+export const deprecatedRoutes = k.routes({
     deleteUser: k
         .route({
             method: 'DELETE',
@@ -686,12 +682,12 @@ export const deprecatedRoutes = k.routes('api', {
 
 export const deprecatedInput = {
     ...config,
-    routes: deprecatedRoutes,
+    routes: [deprecatedRoutes],
 };
 
 export const deprecatedContract = defineConfig(deprecatedInput).api;
 
-export const cachedRoutes = k.routes('api', {
+export const cachedRoutes = k.routes({
     listUsers: k
         .route({
             method: 'GET',
@@ -905,7 +901,7 @@ export const cachedRoutes = k.routes('api', {
 
 export const cachedInput = {
     ...config,
-    routes: cachedRoutes,
+    routes: [cachedRoutes],
 };
 
 export const cachedContract = defineConfig(cachedInput).api;
@@ -920,7 +916,7 @@ const echoMethod = (method: string) => () => ({
 /**
  * One route per HTTP method, so every adapter proves it registers and dispatches all of them.
  */
-export const methodRoutes = k.routes('api', {
+export const methodRoutes = k.routes({
     getItem: k
         .route({
             method: 'GET',
@@ -1024,7 +1020,7 @@ export const methodRoutes = k.routes('api', {
 
 export const methodInput = {
     ...config,
-    routes: methodRoutes,
+    routes: [methodRoutes],
 };
 
 export const methodContract = defineConfig(methodInput).api;
@@ -1089,14 +1085,14 @@ const probePlugin = definePlugin({
     }),
 });
 
-const pluginKTags = k.tags({
+const pluginKGroups = k.groups({
     api: 'API',
 });
 const pluginKConfig = {
-    tags: pluginKTags,
+    groups: pluginKGroups,
 };
 
-export const pluginRoutes = pluginK.routes('api', {
+export const pluginRoutes = pluginK.routes({
     whichLabel: pluginK
         .route({
             method: 'GET',
@@ -1133,7 +1129,7 @@ export const pluginRoutes = pluginK.routes('api', {
 
 export const pluginInput = {
     ...pluginKConfig,
-    routes: pluginRoutes,
+    routes: [pluginRoutes],
     plugins: [
         probePlugin({
             label: 'probed',
@@ -1181,7 +1177,7 @@ const createStreamGate = () => {
 
 export const streamGate = createStreamGate();
 
-export const streamRoutes = k.routes('api', {
+export const streamRoutes = k.routes({
     watchEvents: k
         .route({
             method: 'GET',
@@ -1299,7 +1295,7 @@ export const streamRoutes = k.routes('api', {
 
 export const streamInput = {
     ...config,
-    routes: streamRoutes,
+    routes: [streamRoutes],
 };
 
 export const streamContract = defineConfig(streamInput).api;

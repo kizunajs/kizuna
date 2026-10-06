@@ -72,11 +72,13 @@ describe('k.route', () => {
 
     it('reaches the contract with its handler', () => {
         const contract = defineConfig({
-            routes: k.routes({
-                users: {
-                    getUser,
-                },
-            }),
+            routes: [
+                k.routes({
+                    users: {
+                        getUser,
+                    },
+                }),
+            ],
         }).api;
 
         expect(contract.routes.users.getUser[HANDLER]).toBe(getUser[HANDLER]);

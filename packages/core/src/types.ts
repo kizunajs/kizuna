@@ -329,7 +329,7 @@ export interface RouteToolOptions {
     needsApproval?: boolean;
 }
 
-export interface RouteDefinition<TagKeys extends string = string, SchemeNames extends string = string> {
+export interface RouteDefinition<GroupPaths extends string = string, SchemeNames extends string = string> {
     method: Method;
     /**
      * What this route requires of its caller. See {@link RouteAuth}.
@@ -469,11 +469,9 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
               link?: string;
           };
     /**
-     * Tag keys grouping this route in the OpenAPI spec. Keys come from the tag set
-     * declared with `k.tags`; `k.routes` stamps the group's tag onto every
-     * route, and the generator resolves each key to its `title` for the spec.
+     * More groups to list this route under, as dotted paths.
      */
-    tags?: readonly TagKeys[];
+    groups?: readonly GroupPaths[];
     /**
      * The security schemes this route requires, referencing identities named
      * under `identities` on `defineConfig`. Each entry is a scheme name or a
@@ -538,11 +536,9 @@ export interface RouteDefinition<TagKeys extends string = string, SchemeNames ex
 }
 
 /**
- * Key under which a routes group carries its group tag key, the source
- * `flattenRoutes` and the generator use to apply the group's tag to every route
- * in it. Stamped by `k.routes`.
+ * Where a tree from `k.routes` carries its group's dotted path.
  */
-export const ROUTES_TAG: unique symbol = Symbol.for('kizuna.routes.tag') as symbol as typeof ROUTES_TAG;
+export const ROUTES_GROUP: unique symbol = Symbol.for('kizuna.routes.group') as symbol as typeof ROUTES_GROUP;
 
 /**
  * Type-only key under which `defineConfig` brands each route with its resolved
@@ -579,9 +575,9 @@ export interface AutoResponsesBrand<Statuses extends number, Body = ProblemDetai
  */
 export type GuardStatus = Extract<KnownStatus, 401 | 403>;
 
-export interface Routes<TagKeys extends string = string, SchemeNames extends string = string> {
-    [ROUTES_TAG]?: string;
-    [key: string]: RouteDefinition<TagKeys, SchemeNames> | Routes<TagKeys, SchemeNames>;
+export interface Routes<GroupPaths extends string = string, SchemeNames extends string = string> {
+    [ROUTES_GROUP]?: string;
+    [key: string]: RouteDefinition<GroupPaths, SchemeNames> | Routes<GroupPaths, SchemeNames>;
 }
 
 /**
@@ -589,8 +585,8 @@ export interface Routes<TagKeys extends string = string, SchemeNames extends str
  * `security`, `roles` and `requires`, which `defineConfig` resolves from its
  * `auth`. Writing any of them on a route is a type error.
  */
-export type AuthoredRouteDefinition<TagKeys extends string = string, Names extends string = string> = Omit<
-    RouteDefinition<TagKeys>,
+export type AuthoredRouteDefinition<GroupPaths extends string = string, Names extends string = string> = Omit<
+    RouteDefinition<GroupPaths>,
     'security' | 'roles' | 'requires' | 'auth'
 > & {
     security?: never;
@@ -605,7 +601,7 @@ export type AuthoredRouteDefinition<TagKeys extends string = string, Names exten
 /**
  * A tree of {@link AuthoredRouteDefinition}s, the shape `k.routes` accepts.
  */
-export interface AuthoredRoutes<TagKeys extends string = string, Names extends string = string> {
-    [ROUTES_TAG]?: string;
-    [key: string]: AuthoredRouteDefinition<TagKeys, Names> | AuthoredRoutes<TagKeys, Names>;
+export interface AuthoredRoutes<GroupPaths extends string = string, Names extends string = string> {
+    [ROUTES_GROUP]?: string;
+    [key: string]: AuthoredRouteDefinition<GroupPaths, Names> | AuthoredRoutes<GroupPaths, Names>;
 }

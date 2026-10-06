@@ -636,7 +636,7 @@ export {
 } from './tool-definitions.js';
 export { sortFlattenedRoutes } from './route-matcher.js';
 export {
-    ROUTES_TAG,
+    ROUTES_GROUP,
     HANDLER_CONTEXT_BRAND,
     type HandlerContextBrand,
     AUTO_RESPONSES_BRAND,
@@ -644,8 +644,8 @@ export {
     type AutoResponsesBrand,
 } from './types.js';
 export { authenticationChallenge, resolveSecurityRequirements } from './security-scheme.js';
-export { tagRoutes } from './routes.js';
-export { isTagSet, type NormalizeTags } from './tags.js';
+export { groupRoutes } from './routes.js';
+export { isGroupSet } from './groups.js';
 export { ResponseError } from './response-error.js';
 export { problemDetails, type ProblemDetails } from './problem-details.js';
 export type { MatchResult, RouteMatch } from './route-matcher.js';

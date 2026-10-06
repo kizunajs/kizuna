@@ -16,14 +16,14 @@ import { assistantRoutes } from './assistant';
 import { assistantTools } from './assistant-tools';
 import { noteRoutes } from './notes';
 
-export const routes = {
-    users: usersRoutes,
-    health: healthRoutes,
-    notifications: notificationsRoutes,
-    members: workspaceRoutes.members,
-    workspace: workspaceRoutes.info,
-    invites: inviteRoutes,
-    assistant: assistantRoutes,
-    tools: assistantTools,
-    notes: noteRoutes,
-};
+export const routes = [
+    usersRoutes,
+    healthRoutes,
+    notificationsRoutes,
+    workspaceRoutes.info,
+    workspaceRoutes.members,
+    inviteRoutes,
+    assistantRoutes,
+    assistantTools,
+    noteRoutes,
+];

@@ -142,7 +142,7 @@ Every route carries its own `auth`, so a route cannot be added without stating i
 A route names the identity it accepts:
 
 ```ts title="src/routes/projects.ts"
-export const projects = k.routes('projects', {
+export const projects = k.routes.projects({
     listProjects: k
         .route({
             method: 'GET',
@@ -173,7 +173,7 @@ export const projects = k.routes('projects', {
 A route names the identity, and the roles it accepts:
 
 ```ts title="src/routes/projects.ts"
-export const projects = k.routes('projects', {
+export const projects = k.routes.projects({
     listProjects: k
         .route({
             method: 'GET',
@@ -207,7 +207,7 @@ export const projects = k.routes('projects', {
 A route names the identity, and the permission it requires. Who may call it follows from what each role holds:
 
 ```ts title="src/routes/projects.ts"
-export const projects = k.routes('projects', {
+export const projects = k.routes.projects({
     listProjects: k
         .route({
             method: 'GET',
@@ -248,7 +248,7 @@ Members read, admins create projects and cancel invites, and only the owner dele
 A public route says so:
 
 ```ts title="src/routes/health.ts"
-export const health = k.routes('health', {
+export const health = k.routes.health({
     getHealth: k
         .route({
             method: 'GET',

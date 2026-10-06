@@ -8,22 +8,22 @@ import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/
 
 interface Config {
     adapter: ReturnType<typeof honoAdapter>;
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
 describe('Hono: handler context', () => {
     it('provides the Hono Context object as c', async () => {
         const contextApp = new Hono();
-        const contextRoutes = k.routes('api', {
+        const contextRoutes = k.routes({
             echo: k
                 .route({
                     method: 'GET',
@@ -44,7 +44,7 @@ describe('Hono: handler context', () => {
         const contextContract = defineConfig({
             adapter: honoAdapter(),
             ...config,
-            routes: contextRoutes,
+            routes: [contextRoutes],
         }).api;
         const contextApi = contextContract;
         contextApi.mount(contextApp);

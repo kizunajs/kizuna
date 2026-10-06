@@ -98,7 +98,7 @@ const jobs = k.jobs('scheduler', {
 const contract = defineConfig({
     ...config,
     adapter: nextAdapter(),
-    routes,
+    routes: [routes],
     jobRunner: {
         mode: 'http',
     },
@@ -171,7 +171,7 @@ describe('jobs that run in process', () => {
     const closed = defineConfig({
         ...config,
         adapter: nextAdapter(),
-        routes,
+        routes: [routes],
         jobs: k.jobs({
             sendDigests: k
                 .job({

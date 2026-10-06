@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { k } from '../k';
 
-export const healthRoutes = k.routes('health', {
+export const healthRoutes = k.routes.health({
     check: k
         .route({
             method: 'GET',

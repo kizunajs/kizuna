@@ -12,7 +12,7 @@ Caching is new and still settling, so `cache` and `etag` may change while v2 is 
 Declare a cache policy on the response it describes, and every adapter sends it:
 
 ```ts title="src/routes/users.ts"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     getUser: k
         .route({
             method: 'GET',

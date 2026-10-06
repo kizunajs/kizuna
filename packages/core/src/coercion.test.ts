@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { applyCoercion, coercionPlanFor, resolveCoercionPlans } from './coercion.js';
-import { tagRoutes } from './routes.js';
+import { groupRoutes } from './routes.js';
 import { readDef } from './zod-internals.js';
 import type { RouteDefinition } from './types.js';
 
@@ -226,7 +226,7 @@ describe('startup resolution', () => {
         const query = z.object({
             page: z.number(),
         });
-        tagRoutes({
+        groupRoutes({
             listEvents: {
                 method: 'GET',
                 path: '/events',

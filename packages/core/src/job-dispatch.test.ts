@@ -42,16 +42,18 @@ const jobs = k.jobs('scheduler', {
 
 const contract = defineConfig({
     ...config,
-    routes: k.routes({
-        listUsers: k.route({
-            method: 'GET',
-            path: '/users',
-            auth: false,
-            responses: {
-                200: z.array(z.string()),
-            },
+    routes: [
+        k.routes({
+            listUsers: k.route({
+                method: 'GET',
+                path: '/users',
+                auth: false,
+                responses: {
+                    200: z.array(z.string()),
+                },
+            }),
         }),
-    }),
+    ],
     jobRunner: {
         mode: 'http',
     },
@@ -86,7 +88,7 @@ describe('dueJobs', () => {
     it('reports nothing for a contract with no jobs', () => {
         const bare = defineConfig({
             ...config,
-            routes: k.routes({}),
+            routes: [k.routes({})],
         }).api as unknown as ApiDefinition;
         expect(dueJobs(bare, { at: at('2026-08-05T05:00:00Z') })).toEqual([]);
     });
@@ -169,7 +171,7 @@ describe('dispatchDueJobs', () => {
     it('succeeds vacuously when nothing is due', async () => {
         const bare = defineConfig({
             ...config,
-            routes: k.routes({}),
+            routes: [k.routes({})],
         }).api as unknown as ApiDefinition;
         const result = await dispatchDueJobs(bare, {}, { at: at('2026-08-05T05:00:00Z') });
         expect(result.due).toEqual([]);

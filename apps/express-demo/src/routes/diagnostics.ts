@@ -6,7 +6,7 @@ import { k } from '../k';
  * adapter hands every handler. `ready` is for the load balancer, so it's
  * hidden from the clients, the OpenAPI document and MCP.
  */
-export const diagnostics = k.routes({
+export const diagnostics = k.routes.diagnostics({
     whoAmI: k
         .route({
             method: 'GET',

@@ -89,7 +89,7 @@ const makeContract = () => {
     };
     return defineConfig({
         ...config,
-        routes,
+        routes: [routes],
     }).api;
 };
 
@@ -422,9 +422,7 @@ describe('guard pipeline', () => {
         });
         const contract = defineConfig({
             ...plainConfig,
-            routes: {
-                docs,
-            },
+            routes: [{ docs }],
         }).api;
         const { adapter, results } = makeAdapter();
         let received: unknown;
@@ -640,20 +638,22 @@ describe('extractCredential', () => {
 describe('guard params and several roles', () => {
     const withParams = defineConfig({
         ...config,
-        routes: {
-            items: k.routes({
-                getWorkspaceUser: k.route({
-                    method: 'GET',
-                    path: '/workspaces/:workspaceId/users/:id',
-                    auth: 'user',
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
-                }),
+        routes: [
+            k.routes({
+                items: {
+                    getWorkspaceUser: k.route({
+                        method: 'GET',
+                        path: '/workspaces/:workspaceId/users/:id',
+                        auth: 'user',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    }),
+                },
             }),
-        },
+        ],
     }).api;
 
     it('passes the matched route params to the guard', async () => {
@@ -727,25 +727,27 @@ describe('guard params and several roles', () => {
 
     const teamContract = defineConfig({
         ...teamKConfig,
-        routes: {
-            users: teamK.routes({
-                exportUsers: teamK.route({
-                    method: 'GET',
-                    path: '/users/export',
-                    auth: {
-                        identity: 'member',
-                        requires: {
-                            user: ['export'],
+        routes: [
+            teamK.routes({
+                users: {
+                    exportUsers: teamK.route({
+                        method: 'GET',
+                        path: '/users/export',
+                        auth: {
+                            identity: 'member',
+                            requires: {
+                                user: ['export'],
+                            },
                         },
-                    },
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
-                }),
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    }),
+                },
             }),
-        },
+        ],
     }).api;
 
     const teamRouter = {
@@ -820,20 +822,22 @@ describe('custom identity guard', () => {
 
     const inviteContract = defineConfig({
         ...inviteKConfig,
-        routes: {
-            invites: inviteK.routes({
-                getInvite: inviteK.route({
-                    method: 'GET',
-                    path: '/invites/:token',
-                    auth: 'inviteToken',
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
-                }),
+        routes: [
+            inviteK.routes({
+                invites: {
+                    getInvite: inviteK.route({
+                        method: 'GET',
+                        path: '/invites/:token',
+                        auth: 'inviteToken',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    }),
+                },
             }),
-        },
+        ],
     }).api;
 
     it('extracts no credential for a custom identity', () => {
@@ -953,9 +957,7 @@ describe('permissions within a role', () => {
 
     const contract = defineConfig({
         ...grantedConfig,
-        routes: {
-            reports,
-        },
+        routes: [{ reports }],
     }).api;
 
     const run = async (returned: Record<string, unknown>) => {
@@ -1089,9 +1091,7 @@ describe('OAuth tokens', () => {
 
     const contract = defineConfig({
         ...oauthConfig,
-        routes: {
-            users,
-        },
+        routes: [{ users }],
     }).api;
 
     const run = async (path: `/${string}`, tokenScopes: string[]) => {

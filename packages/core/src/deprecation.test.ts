@@ -152,11 +152,13 @@ describe('k.contract date validation', () => {
     const contractWith = (overrides: Partial<RouteDefinition>) => {
         return () =>
             defineConfig({
-                routes: {
-                    users: {
-                        deleteUser: route(overrides),
+                routes: [
+                    {
+                        users: {
+                            deleteUser: route(overrides),
+                        },
                     },
-                },
+                ],
             }).api;
     };
 

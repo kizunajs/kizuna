@@ -468,48 +468,6 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
-    export namespace MembersListMembers {
-        export type Result =
-            | { status: 200; body: {
-                members: Array<User>;
-            }; headers: Record<string, string> }
-            | { status: 401; body: GuardDenial; headers: {
-                "www-authenticate": string;
-            } }
-            | { status: 403; body: GuardDenial; headers: Record<string, string> };
-    }
-
-    export namespace MembersInviteMember {
-        export type Body = {
-            email: string;
-        };
-
-        export type Result =
-            | { status: 201; body: User; headers: Record<string, string> }
-            | { status: 401; body: GuardDenial; headers: {
-                "www-authenticate"?: string;
-            } }
-            | { status: 403; body: GuardDenial; headers: Record<string, string> }
-            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
-            | { status: 400; body: ValidationError; headers: Record<string, string> };
-    }
-
-    export namespace MembersCancelInvite {
-        export type Params = {
-            inviteId: string;
-        };
-
-        export type Result =
-            | { status: 200; body: {
-                cancelled: boolean;
-            }; headers: Record<string, string> }
-            | { status: 401; body: GuardDenial; headers: {
-                "www-authenticate"?: string;
-            } }
-            | { status: 403; body: GuardDenial; headers: Record<string, string> }
-            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
-    }
-
     export namespace WorkspaceGetWorkspace {
         export type Result =
             | { status: 200; body: {
@@ -543,7 +501,49 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
-    export namespace InvitesGetInvite {
+    export namespace WorkspaceMembersListMembers {
+        export type Result =
+            | { status: 200; body: {
+                members: Array<User>;
+            }; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> };
+    }
+
+    export namespace WorkspaceMembersInviteMember {
+        export type Body = {
+            email: string;
+        };
+
+        export type Result =
+            | { status: 201; body: User; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate"?: string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace WorkspaceMembersCancelInvite {
+        export type Params = {
+            inviteId: string;
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                cancelled: boolean;
+            }; headers: Record<string, string> }
+            | { status: 401; body: GuardDenial; headers: {
+                "www-authenticate"?: string;
+            } }
+            | { status: 403; body: GuardDenial; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace WorkspaceInvitesGetInvite {
         export type Params = {
             token: string;
         };
@@ -558,7 +558,7 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
-    export namespace InvitesAcceptInvite {
+    export namespace WorkspaceInvitesAcceptInvite {
         export type Params = {
             token: string;
         };
@@ -706,7 +706,7 @@ export namespace API {
             | { status: 403; body: GuardDenial; headers: Record<string, string> };
     }
 
-    export namespace ToolsGetForecast {
+    export namespace AssistantToolsGetForecast {
         export type Params = {
             city: string;
         };
@@ -724,7 +724,7 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
-    export namespace ToolsPlotSignups {
+    export namespace AssistantToolsPlotSignups {
         export type Query = {
             days: number;
         };
@@ -739,7 +739,7 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
-    export namespace ToolsCountWords {
+    export namespace AssistantToolsCountWords {
         export type Body = {
             text: string;
         };
@@ -751,7 +751,7 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
-    export namespace NotesList {
+    export namespace AssistantNotesList {
         export type Result =
             | { status: 200; body: {
                 notes: Array<{
@@ -765,7 +765,7 @@ export namespace API {
             | { status: 403; body: GuardDenial; headers: Record<string, string> };
     }
 
-    export namespace NotesAdd {
+    export namespace AssistantNotesAdd {
         export type Body = {
             text: string;
         };
@@ -1117,48 +1117,6 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.NotificationsWebhook.Result>;
     };
-    members: {
-        /**
-         * List workspace members
-         *
-         * @example
-         * const result = await client.members.listMembers();
-         */
-        listMembers: ClientMethod<'GET', false, {
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.MembersListMembers.Result>;
-        /**
-         * Invite a member to the workspace
-         *
-         * @example
-         * const result = await client.members.inviteMember({
-         *     body: {
-         *         email: 'ada@example.com',
-         *     },
-         * });
-         */
-        inviteMember: ClientMethod<'POST', false, {
-            body: API.MembersInviteMember.Body;
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.MembersInviteMember.Result>;
-        /**
-         * Cancel an invite, an admin only their own
-         *
-         * @example
-         * const result = await client.members.cancelInvite({
-         *     params: {
-         *         inviteId: '1',
-         *     },
-         * });
-         */
-        cancelInvite: ClientMethod<'DELETE', false, {
-            params: API.MembersCancelInvite.Params;
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.MembersCancelInvite.Result>;
-    };
     workspace: {
         /**
          * Get workspace info
@@ -1195,42 +1153,84 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.WorkspaceTransfer.Result>;
-    };
-    invites: {
-        /**
-         * Resolve an invite by its capability-URL token, guarded by a custom path-token identity
-         *
-         * @example
-         * const result = await client.invites.getInvite({
-         *     params: {
-         *         token: '1',
-         *     },
-         * });
-         */
-        getInvite: ClientMethod<'GET', false, {
-            params: API.InvitesGetInvite.Params;
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.InvitesGetInvite.Result>;
-        /**
-         * Accept an invite via the capability URL
-         *
-         * @example
-         * const result = await client.invites.acceptInvite({
-         *     params: {
-         *         token: '1',
-         *     },
-         *     body: {
-         *         name: 'string',
-         *     },
-         * });
-         */
-        acceptInvite: ClientMethod<'POST', false, {
-            params: API.InvitesAcceptInvite.Params;
-            body: API.InvitesAcceptInvite.Body;
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.InvitesAcceptInvite.Result>;
+        members: {
+            /**
+             * List workspace members
+             *
+             * @example
+             * const result = await client.workspace.members.listMembers();
+             */
+            listMembers: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.WorkspaceMembersListMembers.Result>;
+            /**
+             * Invite a member to the workspace
+             *
+             * @example
+             * const result = await client.workspace.members.inviteMember({
+             *     body: {
+             *         email: 'ada@example.com',
+             *     },
+             * });
+             */
+            inviteMember: ClientMethod<'POST', false, {
+                body: API.WorkspaceMembersInviteMember.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.WorkspaceMembersInviteMember.Result>;
+            /**
+             * Cancel an invite, an admin only their own
+             *
+             * @example
+             * const result = await client.workspace.members.cancelInvite({
+             *     params: {
+             *         inviteId: '1',
+             *     },
+             * });
+             */
+            cancelInvite: ClientMethod<'DELETE', false, {
+                params: API.WorkspaceMembersCancelInvite.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.WorkspaceMembersCancelInvite.Result>;
+        };
+        invites: {
+            /**
+             * Resolve an invite by its capability-URL token, guarded by a custom path-token identity
+             *
+             * @example
+             * const result = await client.workspace.invites.getInvite({
+             *     params: {
+             *         token: '1',
+             *     },
+             * });
+             */
+            getInvite: ClientMethod<'GET', false, {
+                params: API.WorkspaceInvitesGetInvite.Params;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.WorkspaceInvitesGetInvite.Result>;
+            /**
+             * Accept an invite via the capability URL
+             *
+             * @example
+             * const result = await client.workspace.invites.acceptInvite({
+             *     params: {
+             *         token: '1',
+             *     },
+             *     body: {
+             *         name: 'string',
+             *     },
+             * });
+             */
+            acceptInvite: ClientMethod<'POST', false, {
+                params: API.WorkspaceInvitesAcceptInvite.Params;
+                body: API.WorkspaceInvitesAcceptInvite.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.WorkspaceInvitesAcceptInvite.Result>;
+        };
     };
     assistant: {
         /**
@@ -1263,81 +1263,81 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.AssistantChat.Result>;
-    };
-    tools: {
-        /**
-         * Look up tomorrow forecast for one city
-         *
-         * @example
-         * const result = await client.tools.getForecast({
-         *     params: {
-         *         city: 'string',
-         *     },
-         * });
-         */
-        getForecast: ClientMethod<'GET', false, {
-            params: API.ToolsGetForecast.Params;
-            query?: API.ToolsGetForecast.Query;
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.ToolsGetForecast.Result>;
-        /**
-         * Plot signups per day over the last N days, for the client to draw as a chart
-         *
-         * @example
-         * const result = await client.tools.plotSignups({
-         *     query: {
-         *         days: 1,
-         *     },
-         * });
-         */
-        plotSignups: ClientMethod<'GET', false, {
-            query: API.ToolsPlotSignups.Query;
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.ToolsPlotSignups.Result>;
-        /**
-         * Count the words in a piece of text
-         *
-         * @example
-         * const result = await client.tools.countWords({
-         *     body: {
-         *         text: 'string',
-         *     },
-         * });
-         */
-        countWords: ClientMethod<'POST', false, {
-            body: API.ToolsCountWords.Body;
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.ToolsCountWords.Result>;
-    };
-    notes: {
-        /**
-         * List the notes the signed-in user has saved
-         *
-         * @example
-         * const result = await client.notes.list();
-         */
-        list: ClientMethod<'GET', false, {
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.NotesList.Result>;
-        /**
-         * Save a note for the signed-in user
-         *
-         * @example
-         * const result = await client.notes.add({
-         *     body: {
-         *         text: 'string',
-         *     },
-         * });
-         */
-        add: ClientMethod<'POST', false, {
-            body: API.NotesAdd.Body;
-            headers?: Record<string, string>;
-            fetchOptions?: RequestInit;
-        }, API.NotesAdd.Result>;
+        tools: {
+            /**
+             * Look up tomorrow forecast for one city
+             *
+             * @example
+             * const result = await client.assistant.tools.getForecast({
+             *     params: {
+             *         city: 'string',
+             *     },
+             * });
+             */
+            getForecast: ClientMethod<'GET', false, {
+                params: API.AssistantToolsGetForecast.Params;
+                query?: API.AssistantToolsGetForecast.Query;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.AssistantToolsGetForecast.Result>;
+            /**
+             * Plot signups per day over the last N days, for the client to draw as a chart
+             *
+             * @example
+             * const result = await client.assistant.tools.plotSignups({
+             *     query: {
+             *         days: 1,
+             *     },
+             * });
+             */
+            plotSignups: ClientMethod<'GET', false, {
+                query: API.AssistantToolsPlotSignups.Query;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.AssistantToolsPlotSignups.Result>;
+            /**
+             * Count the words in a piece of text
+             *
+             * @example
+             * const result = await client.assistant.tools.countWords({
+             *     body: {
+             *         text: 'string',
+             *     },
+             * });
+             */
+            countWords: ClientMethod<'POST', false, {
+                body: API.AssistantToolsCountWords.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.AssistantToolsCountWords.Result>;
+        };
+        notes: {
+            /**
+             * List the notes the signed-in user has saved
+             *
+             * @example
+             * const result = await client.assistant.notes.list();
+             */
+            list: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.AssistantNotesList.Result>;
+            /**
+             * Save a note for the signed-in user
+             *
+             * @example
+             * const result = await client.assistant.notes.add({
+             *     body: {
+             *         text: 'string',
+             *     },
+             * });
+             */
+            add: ClientMethod<'POST', false, {
+                body: API.AssistantNotesAdd.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.AssistantNotesAdd.Result>;
+        };
     };
     diagnostics: {
         /**
@@ -1541,38 +1541,6 @@ const routes: GeneratedRoutes = {
             },
         },
     },
-    members: {
-        listMembers: {
-            method: 'GET',
-            path: '/workspace/members',
-            responses: {
-                200: {},
-                401: {},
-                403: {},
-            },
-        },
-        inviteMember: {
-            method: 'POST',
-            path: '/workspace/members',
-            responses: {
-                201: {},
-                401: {},
-                403: {},
-                409: {},
-                400: {},
-            },
-        },
-        cancelInvite: {
-            method: 'DELETE',
-            path: '/workspace/invites/:inviteId',
-            responses: {
-                200: {},
-                401: {},
-                403: {},
-                404: {},
-            },
-        },
-    },
     workspace: {
         getWorkspace: {
             method: 'GET',
@@ -1602,27 +1570,59 @@ const routes: GeneratedRoutes = {
                 400: {},
             },
         },
-    },
-    invites: {
-        getInvite: {
-            method: 'GET',
-            path: '/invites/:token',
-            responses: {
-                200: {},
-                401: {},
-                403: {},
-                404: {},
+        members: {
+            listMembers: {
+                method: 'GET',
+                path: '/workspace/members',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                },
+            },
+            inviteMember: {
+                method: 'POST',
+                path: '/workspace/members',
+                responses: {
+                    201: {},
+                    401: {},
+                    403: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            cancelInvite: {
+                method: 'DELETE',
+                path: '/workspace/invites/:inviteId',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
             },
         },
-        acceptInvite: {
-            method: 'POST',
-            path: '/invites/:token/accept',
-            responses: {
-                201: {},
-                401: {},
-                403: {},
-                404: {},
-                400: {},
+        invites: {
+            getInvite: {
+                method: 'GET',
+                path: '/invites/:token',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                },
+            },
+            acceptInvite: {
+                method: 'POST',
+                path: '/invites/:token/accept',
+                responses: {
+                    201: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    400: {},
+                },
             },
         },
     },
@@ -1645,51 +1645,51 @@ const routes: GeneratedRoutes = {
                 403: {},
             },
         },
-    },
-    tools: {
-        getForecast: {
-            method: 'GET',
-            path: '/forecast/:city',
-            responses: {
-                200: {},
-                400: {},
+        tools: {
+            getForecast: {
+                method: 'GET',
+                path: '/forecast/:city',
+                responses: {
+                    200: {},
+                    400: {},
+                },
+            },
+            plotSignups: {
+                method: 'GET',
+                path: '/signups',
+                responses: {
+                    200: {},
+                    400: {},
+                },
+            },
+            countWords: {
+                method: 'POST',
+                path: '/text/word-count',
+                responses: {
+                    200: {},
+                    400: {},
+                },
             },
         },
-        plotSignups: {
-            method: 'GET',
-            path: '/signups',
-            responses: {
-                200: {},
-                400: {},
+        notes: {
+            list: {
+                method: 'GET',
+                path: '/notes',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                },
             },
-        },
-        countWords: {
-            method: 'POST',
-            path: '/text/word-count',
-            responses: {
-                200: {},
-                400: {},
-            },
-        },
-    },
-    notes: {
-        list: {
-            method: 'GET',
-            path: '/notes',
-            responses: {
-                200: {},
-                401: {},
-                403: {},
-            },
-        },
-        add: {
-            method: 'POST',
-            path: '/notes',
-            responses: {
-                201: {},
-                401: {},
-                403: {},
-                400: {},
+            add: {
+                method: 'POST',
+                path: '/notes',
+                responses: {
+                    201: {},
+                    401: {},
+                    403: {},
+                    400: {},
+                },
             },
         },
     },

@@ -2,7 +2,7 @@
     "title": "API Reference",
     "pages": [
         "kizuna",
-        "k-tags",
+        "k-groups",
         "k-identity",
         "kizuna-roles",
         "kizuna-permissions",

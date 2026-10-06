@@ -895,78 +895,6 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
-    object MembersListMembers {
-
-        @Serializable
-        data class Response(val members: List<OpenEnumAPI.User>)
-
-        data class Result(val body: Response)
-
-        sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
-            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
-            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
-        }
-    }
-
-    object MembersInviteMember {
-
-        @Serializable
-        data class Input(val email: String)
-
-        data class Body(val email: String)
-
-        sealed interface Args {
-            val body: Body
-        }
-
-        object Scope {
-            fun body(email: String): AfterBody = AfterBody(body = Body(email = email))
-        }
-
-        class AfterBody internal constructor(override val body: Body) : Args
-
-        data class Result(val body: OpenEnumAPI.User)
-
-        sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
-            data class Conflict(val body: OpenEnumAPI.ProblemDetails) : Failure()
-            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
-            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
-            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
-        }
-    }
-
-    object MembersCancelInvite {
-
-        @Serializable
-        data class Response(val cancelled: Boolean)
-
-        data class Params(val inviteId: String)
-
-        sealed interface Args {
-            val params: Params
-        }
-
-        object Scope {
-            fun params(inviteId: String): AfterParams = AfterParams(params = Params(inviteId = inviteId))
-        }
-
-        class AfterParams internal constructor(override val params: Params) : Args
-
-        data class Result(val body: Response)
-
-        sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
-            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
-            data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
-            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
-            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
-        }
-    }
-
     object WorkspaceGetWorkspace {
 
         @Serializable
@@ -1031,7 +959,79 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
-    object InvitesGetInvite {
+    object WorkspaceMembersListMembers {
+
+        @Serializable
+        data class Response(val members: List<OpenEnumAPI.User>)
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object WorkspaceMembersInviteMember {
+
+        @Serializable
+        data class Input(val email: String)
+
+        data class Body(val email: String)
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(email: String): AfterBody = AfterBody(body = Body(email = email))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        data class Result(val body: OpenEnumAPI.User)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Conflict(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object WorkspaceMembersCancelInvite {
+
+        @Serializable
+        data class Response(val cancelled: Boolean)
+
+        data class Params(val inviteId: String)
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(inviteId: String): AfterParams = AfterParams(params = Params(inviteId = inviteId))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class Forbidden(val body: OpenEnumAPI.GuardDenial) : Failure()
+            data class NotFound(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object WorkspaceInvitesGetInvite {
 
         @Serializable
         data class Response(
@@ -1062,7 +1062,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
-    object InvitesAcceptInvite {
+    object WorkspaceInvitesAcceptInvite {
 
         @Serializable
         data class Input(val name: String)
@@ -1636,7 +1636,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
-    object ToolsGetForecast {
+    object AssistantToolsGetForecast {
 
         @Serializable(with = QueryUnit.Serializer::class)
         sealed interface QueryUnit : KizunaQueryValue {
@@ -1728,7 +1728,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
-    object ToolsPlotSignups {
+    object AssistantToolsPlotSignups {
 
         @Serializable
         data class Response(val points: List<ResponsePointsItem>)
@@ -1760,7 +1760,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
-    object ToolsCountWords {
+    object AssistantToolsCountWords {
 
         @Serializable
         data class Input(val text: String)
@@ -1789,7 +1789,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
-    object NotesList {
+    object AssistantNotesList {
 
         @Serializable
         data class Response(val notes: List<ResponseNotesItem>)
@@ -1810,7 +1810,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
-    object NotesAdd {
+    object AssistantNotesAdd {
 
         @Serializable
         data class Input(val text: String)
@@ -1921,17 +1921,9 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
     val notifications = OpenEnumAPINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
-    val members = OpenEnumAPIMembersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
-
     val workspace = OpenEnumAPIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
-    val invites = OpenEnumAPIInvitesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
-
     val assistant = OpenEnumAPIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
-
-    val tools = OpenEnumAPIToolsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
-
-    val notes = OpenEnumAPINotesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val diagnostics = OpenEnumAPIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
@@ -2788,152 +2780,6 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
     }
 }
 
-class OpenEnumAPIMembersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
-
-    /** List workspace members */
-    @Throws(OpenEnumAPIClient.MembersListMembers.Failure::class)
-    suspend fun listMembers(): OpenEnumAPIClient.MembersListMembers.Result {
-        val path = "/workspace/members"
-        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
-        var requestBuilder = Request.Builder()
-            .url(urlBuilder.build())
-            .method("GET", null)
-        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
-        requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
-        return httpResponse.use {
-            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
-            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
-            when (val statusCode = httpResponse.code) {
-                200 -> {
-                    try {
-                        val payload = json.decodeFromString<OpenEnumAPIClient.MembersListMembers.Response>(data.decodeToString())
-                        return@use OpenEnumAPIClient.MembersListMembers.Result(body = payload)
-                    }
-                    catch (error: Exception) { throw OpenEnumAPIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
-                }
-                401 -> {
-                    val payload = try {
-                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.MembersListMembers.Failure.Unauthorized(body = payload)
-                }
-                403 -> {
-                    val payload = try {
-                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.MembersListMembers.Failure.Forbidden(body = payload)
-                }
-                else -> throw OpenEnumAPIClient.MembersListMembers.Failure.Unexpected(statusCode = statusCode, data = data)
-            }
-        }
-    }
-
-    /** Invite a member to the workspace */
-    @Throws(OpenEnumAPIClient.MembersInviteMember.Failure::class)
-    suspend fun inviteMember(build: OpenEnumAPIClient.MembersInviteMember.Scope.() -> OpenEnumAPIClient.MembersInviteMember.Args): OpenEnumAPIClient.MembersInviteMember.Result {
-        val args = OpenEnumAPIClient.MembersInviteMember.Scope.build()
-        val body = args.body
-        val path = "/workspace/members"
-        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
-        val requestBody: RequestBody
-        val payload = OpenEnumAPIClient.MembersInviteMember.Input(email = body.email)
-        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
-        var requestBuilder = Request.Builder()
-            .url(urlBuilder.build())
-            .method("POST", requestBody)
-        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
-        requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
-        return httpResponse.use {
-            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
-            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
-            when (val statusCode = httpResponse.code) {
-                201 -> {
-                    try {
-                        val payload = json.decodeFromString<OpenEnumAPI.User>(data.decodeToString())
-                        return@use OpenEnumAPIClient.MembersInviteMember.Result(body = payload)
-                    }
-                    catch (error: Exception) { throw OpenEnumAPIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                }
-                401 -> {
-                    val payload = try {
-                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.MembersInviteMember.Failure.Unauthorized(body = payload)
-                }
-                403 -> {
-                    val payload = try {
-                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.MembersInviteMember.Failure.Forbidden(body = payload)
-                }
-                409 -> {
-                    val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.MembersInviteMember.Failure.Conflict(body = payload)
-                }
-                400 -> {
-                    val payload = try {
-                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.MembersInviteMember.Failure.BadRequest(body = payload)
-                }
-                else -> throw OpenEnumAPIClient.MembersInviteMember.Failure.Unexpected(statusCode = statusCode, data = data)
-            }
-        }
-    }
-
-    /** Cancel an invite, an admin only their own */
-    @Throws(OpenEnumAPIClient.MembersCancelInvite.Failure::class)
-    suspend fun cancelInvite(build: OpenEnumAPIClient.MembersCancelInvite.Scope.() -> OpenEnumAPIClient.MembersCancelInvite.Args): OpenEnumAPIClient.MembersCancelInvite.Result {
-        val args = OpenEnumAPIClient.MembersCancelInvite.Scope.build()
-        val params = args.params
-        var path = "/workspace/invites/:inviteId"
-        path = path.replace(":inviteId", Kizuna.encodePathSegment(params.inviteId))
-        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
-        var requestBuilder = Request.Builder()
-            .url(urlBuilder.build())
-            .method("DELETE", null)
-        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
-        requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
-        return httpResponse.use {
-            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
-            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
-            when (val statusCode = httpResponse.code) {
-                200 -> {
-                    try {
-                        val payload = json.decodeFromString<OpenEnumAPIClient.MembersCancelInvite.Response>(data.decodeToString())
-                        return@use OpenEnumAPIClient.MembersCancelInvite.Result(body = payload)
-                    }
-                    catch (error: Exception) { throw OpenEnumAPIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
-                }
-                401 -> {
-                    val payload = try {
-                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.MembersCancelInvite.Failure.Unauthorized(body = payload)
-                }
-                403 -> {
-                    val payload = try {
-                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.MembersCancelInvite.Failure.Forbidden(body = payload)
-                }
-                404 -> {
-                    val payload = try {
-                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.MembersCancelInvite.Failure.NotFound(body = payload)
-                }
-                else -> throw OpenEnumAPIClient.MembersCancelInvite.Failure.Unexpected(statusCode = statusCode, data = data)
-            }
-        }
-    }
-}
-
 class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Get workspace info */
@@ -3063,14 +2909,154 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
             }
         }
     }
-}
 
-class OpenEnumAPIInvitesClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+    /** List workspace members */
+    @Throws(OpenEnumAPIClient.WorkspaceMembersListMembers.Failure::class)
+    suspend fun membersListMembers(): OpenEnumAPIClient.WorkspaceMembersListMembers.Result {
+        val path = "/workspace/members"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.WorkspaceMembersListMembers.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.WorkspaceMembersListMembers.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.Forbidden(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Invite a member to the workspace */
+    @Throws(OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure::class)
+    suspend fun membersInviteMember(build: OpenEnumAPIClient.WorkspaceMembersInviteMember.Scope.() -> OpenEnumAPIClient.WorkspaceMembersInviteMember.Args): OpenEnumAPIClient.WorkspaceMembersInviteMember.Result {
+        val args = OpenEnumAPIClient.WorkspaceMembersInviteMember.Scope.build()
+        val body = args.body
+        val path = "/workspace/members"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = OpenEnumAPIClient.WorkspaceMembersInviteMember.Input(email = body.email)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                201 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPI.User>(data.decodeToString())
+                        return@use OpenEnumAPIClient.WorkspaceMembersInviteMember.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.Forbidden(body = payload)
+                }
+                409 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.Conflict(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.BadRequest(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Cancel an invite, an admin only their own */
+    @Throws(OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure::class)
+    suspend fun membersCancelInvite(build: OpenEnumAPIClient.WorkspaceMembersCancelInvite.Scope.() -> OpenEnumAPIClient.WorkspaceMembersCancelInvite.Args): OpenEnumAPIClient.WorkspaceMembersCancelInvite.Result {
+        val args = OpenEnumAPIClient.WorkspaceMembersCancelInvite.Scope.build()
+        val params = args.params
+        var path = "/workspace/invites/:inviteId"
+        path = path.replace(":inviteId", Kizuna.encodePathSegment(params.inviteId))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("DELETE", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.WorkspaceMembersCancelInvite.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.WorkspaceMembersCancelInvite.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.Forbidden(body = payload)
+                }
+                404 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.NotFound(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
 
     /** Resolve an invite by its capability-URL token, guarded by a custom path-token identity */
-    @Throws(OpenEnumAPIClient.InvitesGetInvite.Failure::class)
-    suspend fun getInvite(build: OpenEnumAPIClient.InvitesGetInvite.Scope.() -> OpenEnumAPIClient.InvitesGetInvite.Args): OpenEnumAPIClient.InvitesGetInvite.Result {
-        val args = OpenEnumAPIClient.InvitesGetInvite.Scope.build()
+    @Throws(OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure::class)
+    suspend fun invitesGetInvite(build: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Scope.() -> OpenEnumAPIClient.WorkspaceInvitesGetInvite.Args): OpenEnumAPIClient.WorkspaceInvitesGetInvite.Result {
+        val args = OpenEnumAPIClient.WorkspaceInvitesGetInvite.Scope.build()
         val params = args.params
         var path = "/invites/:token"
         path = path.replace(":token", Kizuna.encodePathSegment(params.token))
@@ -3087,45 +3073,45 @@ class OpenEnumAPIInvitesClient(private val client: OkHttpClient, private val bas
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<OpenEnumAPIClient.InvitesGetInvite.Response>(data.decodeToString())
-                        return@use OpenEnumAPIClient.InvitesGetInvite.Result(body = payload)
+                        val payload = json.decodeFromString<OpenEnumAPIClient.WorkspaceInvitesGetInvite.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.WorkspaceInvitesGetInvite.Result(body = payload)
                     }
-                    catch (error: Exception) { throw OpenEnumAPIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.InvitesGetInvite.Failure.Unauthorized(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.InvitesGetInvite.Failure.Forbidden(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.Forbidden(body = payload)
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.InvitesGetInvite.Failure.NotFound(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.NotFound(body = payload)
                 }
-                else -> throw OpenEnumAPIClient.InvitesGetInvite.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
 
     /** Accept an invite via the capability URL */
-    @Throws(OpenEnumAPIClient.InvitesAcceptInvite.Failure::class)
-    suspend fun acceptInvite(build: OpenEnumAPIClient.InvitesAcceptInvite.Scope.() -> OpenEnumAPIClient.InvitesAcceptInvite.Args): OpenEnumAPIClient.InvitesAcceptInvite.Result {
-        val args = OpenEnumAPIClient.InvitesAcceptInvite.Scope.build()
+    @Throws(OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure::class)
+    suspend fun invitesAcceptInvite(build: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Scope.() -> OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Args): OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Result {
+        val args = OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Scope.build()
         val params = args.params
         val body = args.body
         var path = "/invites/:token/accept"
         path = path.replace(":token", Kizuna.encodePathSegment(params.token))
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
-        val payload = OpenEnumAPIClient.InvitesAcceptInvite.Input(name = body.name)
+        val payload = OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Input(name = body.name)
         requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -3139,36 +3125,36 @@ class OpenEnumAPIInvitesClient(private val client: OkHttpClient, private val bas
             when (val statusCode = httpResponse.code) {
                 201 -> {
                     try {
-                        val payload = json.decodeFromString<OpenEnumAPIClient.InvitesAcceptInvite.Response201>(data.decodeToString())
-                        return@use OpenEnumAPIClient.InvitesAcceptInvite.Result(body = payload)
+                        val payload = json.decodeFromString<OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Response201>(data.decodeToString())
+                        return@use OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Result(body = payload)
                     }
-                    catch (error: Exception) { throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Unauthorized(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Forbidden(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.Forbidden(body = payload)
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.NotFound(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.NotFound(body = payload)
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.BadRequest(body = payload)
                 }
-                else -> throw OpenEnumAPIClient.InvitesAcceptInvite.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
@@ -3284,16 +3270,13 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
             }
         }
     }
-}
-
-class OpenEnumAPIToolsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Look up tomorrow forecast for one city */
-    @Throws(OpenEnumAPIClient.ToolsGetForecast.Failure::class)
-    suspend fun getForecast(build: OpenEnumAPIClient.ToolsGetForecast.Scope.() -> OpenEnumAPIClient.ToolsGetForecast.Args): OpenEnumAPIClient.ToolsGetForecast.Result {
-        val args = OpenEnumAPIClient.ToolsGetForecast.Scope.build()
+    @Throws(OpenEnumAPIClient.AssistantToolsGetForecast.Failure::class)
+    suspend fun toolsGetForecast(build: OpenEnumAPIClient.AssistantToolsGetForecast.Scope.() -> OpenEnumAPIClient.AssistantToolsGetForecast.Args): OpenEnumAPIClient.AssistantToolsGetForecast.Result {
+        val args = OpenEnumAPIClient.AssistantToolsGetForecast.Scope.build()
         val params = args.params
-        val query = args.query ?: OpenEnumAPIClient.ToolsGetForecast.Query()
+        val query = args.query ?: OpenEnumAPIClient.AssistantToolsGetForecast.Query()
         var path = "/forecast/:city"
         path = path.replace(":city", Kizuna.encodePathSegment(params.city))
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
@@ -3314,26 +3297,26 @@ class OpenEnumAPIToolsClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<OpenEnumAPIClient.ToolsGetForecast.Response>(data.decodeToString())
-                        return@use OpenEnumAPIClient.ToolsGetForecast.Result(body = payload)
+                        val payload = json.decodeFromString<OpenEnumAPIClient.AssistantToolsGetForecast.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.AssistantToolsGetForecast.Result(body = payload)
                     }
-                    catch (error: Exception) { throw OpenEnumAPIClient.ToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw OpenEnumAPIClient.AssistantToolsGetForecast.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.ToolsGetForecast.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.ToolsGetForecast.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantToolsGetForecast.Failure.BadRequest(body = payload)
                 }
-                else -> throw OpenEnumAPIClient.ToolsGetForecast.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw OpenEnumAPIClient.AssistantToolsGetForecast.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
 
     /** Plot signups per day over the last N days, for the client to draw as a chart */
-    @Throws(OpenEnumAPIClient.ToolsPlotSignups.Failure::class)
-    suspend fun plotSignups(build: OpenEnumAPIClient.ToolsPlotSignups.Scope.() -> OpenEnumAPIClient.ToolsPlotSignups.Args): OpenEnumAPIClient.ToolsPlotSignups.Result {
-        val args = OpenEnumAPIClient.ToolsPlotSignups.Scope.build()
+    @Throws(OpenEnumAPIClient.AssistantToolsPlotSignups.Failure::class)
+    suspend fun toolsPlotSignups(build: OpenEnumAPIClient.AssistantToolsPlotSignups.Scope.() -> OpenEnumAPIClient.AssistantToolsPlotSignups.Args): OpenEnumAPIClient.AssistantToolsPlotSignups.Result {
+        val args = OpenEnumAPIClient.AssistantToolsPlotSignups.Scope.build()
         val query = args.query
         val path = "/signups"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
@@ -3352,31 +3335,31 @@ class OpenEnumAPIToolsClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<OpenEnumAPIClient.ToolsPlotSignups.Response>(data.decodeToString())
-                        return@use OpenEnumAPIClient.ToolsPlotSignups.Result(body = payload)
+                        val payload = json.decodeFromString<OpenEnumAPIClient.AssistantToolsPlotSignups.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.AssistantToolsPlotSignups.Result(body = payload)
                     }
-                    catch (error: Exception) { throw OpenEnumAPIClient.ToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw OpenEnumAPIClient.AssistantToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.ToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.ToolsPlotSignups.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantToolsPlotSignups.Failure.BadRequest(body = payload)
                 }
-                else -> throw OpenEnumAPIClient.ToolsPlotSignups.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw OpenEnumAPIClient.AssistantToolsPlotSignups.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
 
     /** Count the words in a piece of text */
-    @Throws(OpenEnumAPIClient.ToolsCountWords.Failure::class)
-    suspend fun countWords(build: OpenEnumAPIClient.ToolsCountWords.Scope.() -> OpenEnumAPIClient.ToolsCountWords.Args): OpenEnumAPIClient.ToolsCountWords.Result {
-        val args = OpenEnumAPIClient.ToolsCountWords.Scope.build()
+    @Throws(OpenEnumAPIClient.AssistantToolsCountWords.Failure::class)
+    suspend fun toolsCountWords(build: OpenEnumAPIClient.AssistantToolsCountWords.Scope.() -> OpenEnumAPIClient.AssistantToolsCountWords.Args): OpenEnumAPIClient.AssistantToolsCountWords.Result {
+        val args = OpenEnumAPIClient.AssistantToolsCountWords.Scope.build()
         val body = args.body
         val path = "/text/word-count"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
-        val payload = OpenEnumAPIClient.ToolsCountWords.Input(text = body.text)
+        val payload = OpenEnumAPIClient.AssistantToolsCountWords.Input(text = body.text)
         requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -3390,28 +3373,25 @@ class OpenEnumAPIToolsClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<OpenEnumAPIClient.ToolsCountWords.Response>(data.decodeToString())
-                        return@use OpenEnumAPIClient.ToolsCountWords.Result(body = payload)
+                        val payload = json.decodeFromString<OpenEnumAPIClient.AssistantToolsCountWords.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.AssistantToolsCountWords.Result(body = payload)
                     }
-                    catch (error: Exception) { throw OpenEnumAPIClient.ToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw OpenEnumAPIClient.AssistantToolsCountWords.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.ToolsCountWords.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.ToolsCountWords.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantToolsCountWords.Failure.BadRequest(body = payload)
                 }
-                else -> throw OpenEnumAPIClient.ToolsCountWords.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw OpenEnumAPIClient.AssistantToolsCountWords.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
-}
-
-class OpenEnumAPINotesClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** List the notes the signed-in user has saved */
-    @Throws(OpenEnumAPIClient.NotesList.Failure::class)
-    suspend fun list(): OpenEnumAPIClient.NotesList.Result {
+    @Throws(OpenEnumAPIClient.AssistantNotesList.Failure::class)
+    suspend fun notesList(): OpenEnumAPIClient.AssistantNotesList.Result {
         val path = "/notes"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -3426,37 +3406,37 @@ class OpenEnumAPINotesClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<OpenEnumAPIClient.NotesList.Response>(data.decodeToString())
-                        return@use OpenEnumAPIClient.NotesList.Result(body = payload)
+                        val payload = json.decodeFromString<OpenEnumAPIClient.AssistantNotesList.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.AssistantNotesList.Result(body = payload)
                     }
-                    catch (error: Exception) { throw OpenEnumAPIClient.NotesList.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw OpenEnumAPIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesList.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.NotesList.Failure.Unauthorized(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantNotesList.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesList.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.NotesList.Failure.Forbidden(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantNotesList.Failure.Forbidden(body = payload)
                 }
-                else -> throw OpenEnumAPIClient.NotesList.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw OpenEnumAPIClient.AssistantNotesList.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
 
     /** Save a note for the signed-in user */
-    @Throws(OpenEnumAPIClient.NotesAdd.Failure::class)
-    suspend fun add(build: OpenEnumAPIClient.NotesAdd.Scope.() -> OpenEnumAPIClient.NotesAdd.Args): OpenEnumAPIClient.NotesAdd.Result {
-        val args = OpenEnumAPIClient.NotesAdd.Scope.build()
+    @Throws(OpenEnumAPIClient.AssistantNotesAdd.Failure::class)
+    suspend fun notesAdd(build: OpenEnumAPIClient.AssistantNotesAdd.Scope.() -> OpenEnumAPIClient.AssistantNotesAdd.Args): OpenEnumAPIClient.AssistantNotesAdd.Result {
+        val args = OpenEnumAPIClient.AssistantNotesAdd.Scope.build()
         val body = args.body
         val path = "/notes"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
-        val payload = OpenEnumAPIClient.NotesAdd.Input(text = body.text)
+        val payload = OpenEnumAPIClient.AssistantNotesAdd.Input(text = body.text)
         requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -3470,30 +3450,30 @@ class OpenEnumAPINotesClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 201 -> {
                     try {
-                        val payload = json.decodeFromString<OpenEnumAPIClient.NotesAdd.Response201>(data.decodeToString())
-                        return@use OpenEnumAPIClient.NotesAdd.Result(body = payload)
+                        val payload = json.decodeFromString<OpenEnumAPIClient.AssistantNotesAdd.Response201>(data.decodeToString())
+                        return@use OpenEnumAPIClient.AssistantNotesAdd.Result(body = payload)
                     }
-                    catch (error: Exception) { throw OpenEnumAPIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw OpenEnumAPIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.NotesAdd.Failure.Unauthorized(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantNotesAdd.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPI.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.NotesAdd.Failure.Forbidden(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantNotesAdd.Failure.Forbidden(body = payload)
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw OpenEnumAPIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
-                    throw OpenEnumAPIClient.NotesAdd.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw OpenEnumAPIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.AssistantNotesAdd.Failure.BadRequest(body = payload)
                 }
-                else -> throw OpenEnumAPIClient.NotesAdd.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw OpenEnumAPIClient.AssistantNotesAdd.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

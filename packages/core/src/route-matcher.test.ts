@@ -5,16 +5,16 @@ import { matchRoute } from './route-matcher.js';
 import { Kizuna } from './kizuna.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 
-const routes = k.routes('api', {
+const routes = k.routes({
     getUser: k.route({
         method: 'GET',
         path: '/users/:id',
@@ -58,7 +58,7 @@ const routes = k.routes('api', {
 
 describe('duplicate route detection', () => {
     it('throws on exact duplicate method + path', () => {
-        const duplicateRoutes = k.routes('api', {
+        const duplicateRoutes = k.routes({
             getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
@@ -76,7 +76,7 @@ describe('duplicate route detection', () => {
     });
 
     it('throws on parametric conflict (same structure, different param names)', () => {
-        const conflictingRoutes = k.routes('api', {
+        const conflictingRoutes = k.routes({
             getUser: k.route({
                 method: 'GET',
                 path: '/users/:id',
@@ -92,7 +92,7 @@ describe('duplicate route detection', () => {
     });
 
     it('throws on duplicate across nested sub-routes with dot-notated keys in message', () => {
-        const nestedRoutes = k.routes('api', {
+        const nestedRoutes = k.routes({
             users: {
                 getUser: k.route({
                     method: 'GET',
@@ -165,7 +165,7 @@ describe('matchRoute', () => {
     });
 
     it('prefers a declared HEAD route over the GET fallback', () => {
-        const withHead = k.routes('api', {
+        const withHead = k.routes({
             getReport: k.route({
                 method: 'GET',
                 path: '/report',
@@ -189,7 +189,7 @@ describe('matchRoute', () => {
     });
 
     it('does not allow HEAD on a path without GET', () => {
-        const postOnly = k.routes('api', {
+        const postOnly = k.routes({
             createUser: k.route({
                 method: 'POST',
                 path: '/users',
@@ -226,7 +226,7 @@ describe('matchRoute', () => {
     });
 
     it('prefers static segments over parameterized ones regardless of declaration order', () => {
-        const cartRoutes = k.routes('api', {
+        const cartRoutes = k.routes({
             addItem: k.route({
                 method: 'POST',
                 path: '/cart/:itemId',
@@ -243,7 +243,7 @@ describe('matchRoute', () => {
     });
 
     it('prefers static over dynamic at the same segment position with equal param counts', () => {
-        const meRoutes = k.routes('api', {
+        const meRoutes = k.routes({
             getByUserId: k.route({
                 method: 'GET',
                 path: '/users/:id',
@@ -260,7 +260,7 @@ describe('matchRoute', () => {
     });
 
     it('prefers static over dynamic in deeper paths with equal param counts', () => {
-        const postRoutes = k.routes('api', {
+        const postRoutes = k.routes({
             getUserPosts: k.route({
                 method: 'GET',
                 path: '/users/:id/posts',
@@ -277,7 +277,7 @@ describe('matchRoute', () => {
     });
 
     it('matches distinct routes with identical structure but different static segments', () => {
-        const collectionRoutes = k.routes('api', {
+        const collectionRoutes = k.routes({
             getUserPosts: k.route({
                 method: 'GET',
                 path: '/users/:id/posts',

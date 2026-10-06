@@ -136,7 +136,7 @@ const jobs = k.jobs('scheduler', {
 const contract = defineConfig({
     ...config,
     adapter: expressAdapter(),
-    routes,
+    routes: [routes],
     jobRunner: {
         mode: 'http',
     },
@@ -302,7 +302,7 @@ describe('a job outside a tick', () => {
         const { api } = defineConfig({
             ...config,
             adapter: expressAdapter(),
-            routes,
+            routes: [routes],
             jobRunner: {
                 mode: 'http',
             },
@@ -329,7 +329,7 @@ describe('onJobError', () => {
         const { api } = defineConfig({
             ...config,
             adapter: expressAdapter(),
-            routes,
+            routes: [routes],
             jobs: k.jobs('scheduler', {
                 sendDigests: k
                     .job({
@@ -396,7 +396,7 @@ describe('jobs that run in process', () => {
         const { api } = defineConfig({
             ...config,
             adapter: expressAdapter(),
-            routes,
+            routes: [routes],
             jobs: k.jobs({
                 reconcile: k
                     .job({

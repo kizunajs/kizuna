@@ -10,7 +10,7 @@ const NoteSchema = z.object({
 /**
  * The signed-in user's notes. `assistant.chat` runs them as tools.
  */
-export const noteRoutes = k.routes('assistant', {
+export const noteRoutes = k.routes.assistant.notes({
     list: k
         .route({
             method: 'GET',

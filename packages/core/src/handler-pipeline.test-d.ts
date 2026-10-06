@@ -5,16 +5,16 @@ import type { RouteHandler, HandlerArgs, HandlerReturn, Router } from './handler
 import { Kizuna } from './kizuna.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 
-const contractRoutes = k.routes('api', {
+const contractRoutes = k.routes({
     getUser: k.route({
         method: 'GET',
         path: '/users/:id',
@@ -74,7 +74,7 @@ test('HandlerReturn rejects body that does not match the status', () => {
 });
 
 test('error statuses (4xx/5xx) require a Problem Details schema: non-envelope shapes resolve to never', () => {
-    const customErrorContractRoutes = k.routes('api', {
+    const customErrorContractRoutes = k.routes({
         getThing: k.route({
             method: 'GET',
             path: '/things/:id',

@@ -35,7 +35,7 @@ Use `ProblemDetailsSchema` in a route's `responses` to document error status cod
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { k } from './k';
 
-const usersRoutes = k.routes('users', {
+const usersRoutes = k.routes.users({
     getUser: k
         .route({
             method: 'GET',
@@ -93,7 +93,7 @@ import { z } from 'zod';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { k } from '../k';
 
-const users = k.routes('users', {
+const users = k.routes.users({
     createUser: k
         .route({
             method: 'POST',

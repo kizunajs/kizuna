@@ -21,8 +21,8 @@ export const k = new Kizuna<Config>();
 | Member             | Signature                                                              | Description                                                                                          |
 | ------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `k.route`          | `(definition) => RouteBuilder`                                         | Declare one route and the [`handler`](/docs/reference/k-route) that answers it.                      |
-| `k.routes`         | `(tag, defs) => Routes`                                                | Group routes under one of the tag set's keys.                                                        |
-| `k.tags`           | `(tags) => TagSet`                                                     | Declare the [OpenAPI tags](/docs/reference/k-tags) routes are grouped under.                         |
+| `k.routes`         | `.<group>(routes) => Routes`                                           | File [routes](/docs/reference/k-routes) into one of your groups.                                     |
+| `k.groups`         | `(groups) => GroupSet`                                                 | Declare the [groups](/docs/reference/k-groups) routes are filed under.                               |
 | `k.identity`       | `.bearer`, `.apiKey`, `.basic`, `.oauth2`, `.openIdConnect`, `.custom` | Declare an [identity](/docs/reference/k-identity) and the `guard` that authenticates it.             |
 | `k.requestContext` | `(config) => RequestContextBuilder`                                    | Declare a [request-scoped value](/docs/reference/k-request-context) and the `handler` that fills it. |
 | `k.job`            | `(definition) => JobBuilder`                                           | Declare one job and the handler that runs it.                                                        |
@@ -47,7 +47,7 @@ Some declarations are shared across APIs rather than bound to one, so they stay 
 ```ts title="kizuna.types.ts"
 export interface Config {
     adapter: ReturnType<typeof expressAdapter>;
-    tags: typeof tags;
+    groups: typeof groups;
     auth: {
         identities: {
             user: typeof user;
@@ -64,7 +64,7 @@ export interface Config {
 }
 ```
 
-So a route's `auth` only accepts a declared identity, `k.routes('users', ...)` only accepts a declared tag, and a handler reads `auth.user`, `requestContext.analytics`, `jobs.indexUser` and your framework's own request without importing any of them.
+So a route's `auth` only accepts a declared identity, `k.routes.users(...)` only reaches a declared group, and a handler reads `auth.user`, `requestContext.analytics`, `jobs.indexUser` and your framework's own request without importing any of them.
 
 ## Example
 
@@ -72,7 +72,7 @@ So a route's `auth` only accepts a declared identity, `k.routes('users', ...)` o
 import { z } from 'zod';
 import { k } from '../k';
 
-export const usersRoutes = k.routes('users', {
+export const usersRoutes = k.routes.users({
     getUser: k
         .route({
             method: 'GET',

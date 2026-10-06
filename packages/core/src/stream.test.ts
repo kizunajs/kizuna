@@ -7,12 +7,12 @@ import { encodeStreamBody, formatEvent, streamMode } from './stream.js';
 import type { RouteDefinition } from './types.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 
@@ -387,7 +387,7 @@ describe('encodeStreamBody', () => {
 
 describe('k.routes stream validation', () => {
     const define = (route: Record<string, unknown>) =>
-        k.routes('api', {
+        k.routes({
             watch: route,
         } as never);
 

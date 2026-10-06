@@ -13,44 +13,46 @@ const ok = {
 } as const;
 
 const contract = defineConfig({
-    routes: {
-        users: k.routes('users', {
-            getUser: k.route({
-                method: 'GET',
-                path: '/users/:id',
-                ...ok,
-            }),
-            listUsers: k.route({
-                method: 'GET',
-                path: '/users',
-                deprecated: 'Use searchUsers instead.',
-                sunset: '2026-10-01',
-                ...ok,
-            }),
-            oldSearch: k.route({
-                method: 'GET',
-                path: '/users/search',
-                deprecated: true,
-                ...ok,
-            }),
-            legacyExport: k.route({
-                method: 'GET',
-                path: '/users/export',
-                deprecated: {
-                    message: 'Use the reporting API.',
-                    date: '2026-01-01',
-                },
-                sunset: '2026-09-20',
-                ...ok,
-            }),
-            retired: k.route({
-                method: 'GET',
-                path: '/users/retired',
-                sunset: '2026-09-01',
-                ...ok,
-            }),
+    routes: [
+        k.routes({
+            users: {
+                getUser: k.route({
+                    method: 'GET',
+                    path: '/users/:id',
+                    ...ok,
+                }),
+                listUsers: k.route({
+                    method: 'GET',
+                    path: '/users',
+                    deprecated: 'Use searchUsers instead.',
+                    sunset: '2026-10-01',
+                    ...ok,
+                }),
+                oldSearch: k.route({
+                    method: 'GET',
+                    path: '/users/search',
+                    deprecated: true,
+                    ...ok,
+                }),
+                legacyExport: k.route({
+                    method: 'GET',
+                    path: '/users/export',
+                    deprecated: {
+                        message: 'Use the reporting API.',
+                        date: '2026-01-01',
+                    },
+                    sunset: '2026-09-20',
+                    ...ok,
+                }),
+                retired: k.route({
+                    method: 'GET',
+                    path: '/users/retired',
+                    sunset: '2026-09-01',
+                    ...ok,
+                }),
+            },
         }),
-    },
+    ],
 }).api;
 
 const now = new Date('2026-09-15T00:00:00Z');

@@ -6,11 +6,12 @@
 import type { nextAdapter } from '@kizunajs/next';
 import type { mcpPlugin } from '@kizunajs/mcp';
 import type { openApiPlugin } from '@kizunajs/openapi';
-import type { GuardSchema, analytics, jobs, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import type { GuardSchema, analytics, jobs, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import type { groups } from './src/groups';
 
 export interface Config {
     adapter: ReturnType<typeof nextAdapter>;
-    tags: typeof tags;
+    groups: typeof groups;
     auth: {
         identities: {
             user: typeof user;
