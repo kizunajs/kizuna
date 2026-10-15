@@ -9,6 +9,7 @@ import { Card, Cards } from './cards';
 import { SideBySide } from './comparison';
 import { EditorFigure } from './cms-figures';
 import { EditingDemo } from './editing-demo';
+import { LocalizationDemo } from './localization-demo';
 import { AccessStyle, AccessStyleSwitch } from './access-style';
 import { ConfigExplorer } from '@/components/code/config-explorer';
 import { AlphaNotice } from './alpha-notice';
@@ -33,6 +34,7 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         Cards,
         EditorFigure,
         EditingDemo,
+        LocalizationDemo,
         SideBySide,
         Step,
         Steps,
