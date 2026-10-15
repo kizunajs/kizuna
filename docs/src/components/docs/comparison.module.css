@@ -55,8 +55,15 @@
     color: var(--kizuna-muted);
 }
 
+.cellText {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .cellText :global(code) {
     font-size: 0.8125rem;
+    white-space: normal;
+    overflow-wrap: normal;
 }
 
 .mark {
@@ -127,9 +134,8 @@
 }
 
 .flow {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     gap: 8px;
     margin-block: 20px 28px;
     padding: 0;
@@ -140,8 +146,7 @@
 .step {
     position: relative;
     display: flex;
-    flex: 1 1 160px;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     border-radius: 12px;
     background-color: var(--kizuna-surface);
@@ -168,6 +173,13 @@
     color: var(--kizuna-canvas);
 }
 
+.stepText {
+    display: block;
+    min-width: 0;
+    padding-top: 1px;
+}
+
 .step :global(code) {
     font-size: 0.8125rem;
+    white-space: normal;
 }

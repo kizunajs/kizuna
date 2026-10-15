@@ -1,22 +1,33 @@
 ---
 title: Sites
-description: Content every site reads, written once, and each site's own content beside it, in one CMS.
+description: Content every site reads, and each site's own, in one CMS. Kizuna's multi-tenancy.
 ---
 
-A main site and one per country. The people and the offices show on all of them, and the UK's news on the UK's alone. One CMS holds both, and every piece of content has one owner:
+One CMS, several Next.js apps, one database. This is multi-tenancy without the wall: a tenant is a site, shared content is listed once, and a site adds to it instead of copying it.
 
-- **A page belongs to its site.** It is declared beside its route, in the site's app.
-- **A global or a collection listed on `cms()` is read by every site.** Listed under a site, it is that site's.
+<Comparison first="Every site" other="One site">
+    <Row label="Pages" kizuna="Never" other="Declared beside the site's routes" />
+    <Row
+        label="Globals and collections"
+        kizuna={
+            <>
+                Listed on <code>cms()</code>
+            </>
+        }
+        other="Listed under the site"
+    />
+    <Row label="Read at" kizuna={<code>collections.offices</code>} other={<code>sites.uk.collections.events</code>} />
+    <Row label="Over HTTP" kizuna={<code>…/collections/offices</code>} other={<code>…/sites/uk/collections/events</code>} />
+    <Row label="Editors" kizuna="Admins publish, others draft" other="The site's editors publish" />
+</Comparison>
 
-The path that reads it says which, in process and over HTTP alike.
-
-## Declaring the sites
-
-Each site is a Next.js app with its own pages. List each under `sites`, with its generated pages module, its `app` directory, and the `url` its API is mounted at:
+## Declaring
 
 ```ts title="packages/content/kizuna.cms.config.ts"
 content: cms({
     db,
+    globals: [PrivacyPolicy],
+    collections: [Employees, Offices],
     sites: {
         web: {
             pages: webPages,
@@ -27,189 +38,82 @@ content: cms({
             pages: ukPages,
             app: '../../apps/uk/src/app',
             url: 'https://example.co.uk/api',
+            globals: [Announcement],
+            collections: [Articles, Events],
         },
         norway: {
             pages: norwayPages,
             app: '../../apps/norway/src/app',
             url: 'https://example.no/api',
+            collections: [Articles],
         },
     },
-    auth: {
-        identity: 'editor',
-    },
 }),
 ```
 
-Every site's app mounts the same config, so each serves its own draft mode and hears when content changes. Each site's pages are stored apart, so every app can have a `frontPage`, read under its site:
+Both the UK and Norway declare `Articles`: one shape, each its own items. `kizuna.content.sites.norway.collections.events` does not compile.
 
-```tsx title="apps/uk/src/app/page.tsx"
-const content = await kizuna.content.sites.uk.pages.frontPage.get();
-```
+## Pointing at shared content
 
-`<KizunaPreview content={kizuna.content.sites.uk} />` knows which site it is on.
+A UK event holds an office by id, like any collection:
 
-## Content every site reads
-
-Globals and collections listed on `cms()` are stored once, and every site reads them at the same path:
-
-```ts title="packages/content/kizuna.cms.config.ts"
-content: cms({
-    db,
-    sites,
-    globals: [PrivacyPolicy],
-    collections: [Employees, Offices],
-    auth: {
-        identity: 'editor',
-    },
-}),
-```
-
-```tsx title="apps/norway/src/app/contact/page.tsx"
-const { items } = await kizuna.content.collections.offices.list();
-```
-
-The UK and Norway list the same offices. An editor who moves an office edits it once, and every site shows the change when it publishes.
-
-## A site's own content
-
-Globals and collections listed under a site belong to that site:
-
-```ts title="packages/content/kizuna.cms.config.ts"
-sites: {
-    uk: {
-        pages: ukPages,
-        app: '../../apps/uk/src/app',
-        url: 'https://example.co.uk/api',
-        globals: [Announcement],
-        collections: [Articles, Events],
-    },
-    norway: {
-        pages: norwayPages,
-        app: '../../apps/norway/src/app',
-        url: 'https://example.no/api',
-        collections: [Articles],
-    },
+```ts
+{
+    name: 'office',
+    schema: Offices.id,
 },
 ```
 
-They are read under the site, the way its pages are:
+Shared content never holds a site's ids, and a site never holds another site's. The `editing` routes refuse both.
 
-```tsx title="apps/uk/src/app/events/page.tsx"
-const { items } = await kizuna.content.sites.uk.collections.events.list();
-```
+## Adding to shared content
 
-Norway declares no events, so `kizuna.content.sites.norway.collections.events` fails to compile. Both declare `Articles`, so they share its fields and its `ArticleId`, and each keeps its own items. The UK blog lists the UK's articles, and a unique field like `slug` is unique within the site, so both blogs can have `/welcome`.
-
-## Pointing at content every site reads
-
-A site's content holds ids from `cms()`, the way a page holds any collection's. A UK event names the office it is held at:
-
-```ts title="packages/content/events.ts"
-export const Events = defineCollection({
-    name: 'events',
-    id: EventId,
-    fields: [
-        {
-            name: 'title',
-            schema: z.string().min(1).max(80),
-        },
-        {
-            name: 'office',
-            schema: Offices.id,
-        },
-    ],
-});
-```
-
-The editor's picker lists the offices, and the page reads the one the event holds:
-
-```tsx title="apps/uk/src/app/events/[id]/page.tsx"
-const { id } = await params;
-const event = await kizuna.content.sites.uk.collections.events.get({
-    id,
-});
-const office = await kizuna.content.collections.offices.get({
-    id: event.office,
-});
-```
-
-Content on `cms()` shows on every site, so it never holds a site's ids. A collection on `cms()` with an `Events.id` field fails when the config assembles. A site's content holds ids from `cms()` and from its own site, and nothing of another site's. The `editing` routes refuse an id from elsewhere wherever it sits, in a field, inside a block or in rich text, so the rule holds for the editor and the agent alike.
-
-## Building on it
-
-The UK shows the offices with opening hours nobody else keeps, and a local phone number in place of the switchboard. `extendCollection` adds a site's own fields to every item of a collection on `cms()`:
+The UK wants opening hours on every office, and its own phone number instead of the switchboard:
 
 ```ts title="packages/content/uk.ts"
-import { z } from 'zod';
-import { extendCollection } from '@kizunajs/cms';
-import { Offices } from './offices';
-
 export const UkOffices = extendCollection(Offices, {
     overrides: ['phone'],
     fields: [
         {
             name: 'openingHours',
-            label: 'Opening hours',
             schema: z.string().max(120),
         },
     ],
 });
 ```
 
-List it under the site, and the site reads the offices with its own fields beside them:
-
-```ts title="packages/content/kizuna.cms.config.ts"
-uk: {
-    pages: ukPages,
-    app: '../../apps/uk/src/app',
-    url: 'https://example.co.uk/api',
-    collections: [UkOffices, Events],
-},
-```
-
 ```tsx title="apps/uk/src/app/contact/page.tsx"
 const { items } = await kizuna.content.sites.uk.collections.offices.list();
+// items[0].address      shared
+// items[0].openingHours the UK's
 ```
 
-Each item has the office's `address` and the UK's `openingHours`. The UK's fields are stored as the UK's own, keyed by the office's id, so there is no UK office without the office itself. `overrides` names the fields the UK may replace: an empty `phone` shows the office's own, and a filled one shows on the UK site alone. `extendGlobal` does the same for a global, like the footer with the UK's own phone number.
-
-`kizuna.content.collections.offices` still reads the offices as every other site sees them.
-
-The merged item follows a few rules, each the answer to something that goes wrong in CMSs that copy content between sites:
-
-- **Empty means the original.** A site cannot override a field to blank. Clearing an override shows the original value again, so "revert" is deleting what the site wrote, and nothing records a cancelled inheritance that drifts unnoticed.
-- **The editor says whose value it is.** Every field on an extended item shows whether the value is the site's or the original, and an editor opening the office sees which sites override each field.
-- **Identity stays with the original.** `overrides` refuses `id`, `slug` and any unique field.
-- **A list is replaced whole.** A site that wants to add to a list declares a field of its own instead.
-- **One level.** A site extends content on `cms()`, and nothing extends a site's.
-- **Published reads published.** A page reads the published item with the site's published fields, never a draft of either. A site that publishes its fields before the item is published sees "waiting for the office to publish".
-- **Deleting an item names the sites that extended it**, and removes their fields with it. A site's fields cannot outlive the item they belong to.
-- **A type change on an overridden field fails [`kizuna diff`](/docs/breaking-changes#content)**, and a `migrate` step on the collection runs over every site's fields too. Removing a field from `overrides` leaves stored site values behind, which `kizuna diff` reports and the next migration drops.
+| Rule                            | So that                                              |
+| ------------------------------- | ---------------------------------------------------- |
+| Empty means the shared value    | "Revert" is clearing the field                       |
+| The editor shows whose value    | Nothing drifts unnoticed                             |
+| `id`, `slug`, unique: no        | Identity stays shared                                |
+| Lists replace whole             | No merging inside arrays                             |
+| One level                       | Nothing extends a site                               |
+| Published reads published       | A site never shows a shared draft                    |
+| Delete names extending sites    | A site's fields never outlive the item               |
+| Type change fails `kizuna diff` | An override's type is always the shared field's type |
 
 ## What one country does differently
 
-Every country has something the others do not: a field that is normal there, a block only its pages use, a route nobody else has. A page belongs to its site, so most of this needs nothing beyond declaring it in that site's app.
+| A country needs          | Declare it as                              |
+| ------------------------ | ------------------------------------------ |
+| A field on a shared page | One more field in that site's `content.ts` |
+| A block only it uses     | A block in that site's app                 |
+| A field on a shared item | `extendCollection`                         |
+| Its own collection       | Listed under the site                      |
+| A route nobody else has  | A page in that site's app                  |
+| A rule that holds there  | The field's schema                         |
+| A language               | [Locales](/docs/cms/localization)          |
 
-The sites share a page's shape by sharing its fields. The front page's fields live in the content package, and each site's `content.ts` spreads them and adds its own:
-
-```ts title="packages/content/front-page.ts"
-export const frontPageFields = [
-    {
-        name: 'hero',
-        schema: HeroBlockSchema,
-    },
-    {
-        name: 'intro',
-        schema: z.string().max(400),
-    },
-];
-```
+Shared page shapes are shared fields. A site spreads them and adds its own:
 
 ```ts title="apps/switzerland/src/app/content.ts"
-import { definePage } from '@kizunajs/cms';
-import { frontPageFields } from '@acme/content/front-page';
-import { CantonPickerBlockSchema } from '../cms/blocks';
-
 export default definePage({
     name: 'frontPage',
     fields: [
@@ -222,27 +126,9 @@ export default definePage({
 });
 ```
 
-The Swiss front page has the hero and intro every site has, and a canton picker, and the shared `FrontPage` component renders the picker when the content has one. The block is declared beside the Swiss app, since no other site uses it.
-
-| A country needs                     | Declare it as                                                                               |
-| ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| A field on a page the others share  | One more entry in that site's `content.ts`, beside the shared fields                        |
-| A block only its pages use          | A block in that site's app                                                                  |
-| A field on an item every site reads | `extendCollection`, [above](#building-on-it)                                                |
-| A collection or global of its own   | Listed under the site                                                                       |
-| A route nobody else has             | A page in that site's app                                                                   |
-| A rule that holds there             | The field's schema: an organisation number as Norway writes them, a postcode as the UK does |
-| A locale                            | Named on the site, see [locales](#locales)                                                  |
-
-What a country adds stays in that country's app, and the shared components take it as optional, so a site that adds nothing renders as before.
-
 ## Editors
 
-Editors work in one editor for every site. The switcher lists the content every site reads first, then each site an editor may change. The agent addresses content by its owner, so "add an event to the UK site" reaches the UK's `events`, and "the Aberdeen office moved" reaches `offices`.
-
-`sites` names the sites an editor writes, read from the identity they sign in with, and `publish` says who publishes the content on `cms()`:
-
-```ts title="packages/content/kizuna.cms.config.ts"
+```ts
 auth: {
     identity: 'editor',
     sites: (editor) => editor.sites,
@@ -252,85 +138,32 @@ auth: {
 },
 ```
 
-| Editor                | Content on `cms()`          | Their own sites   | Other sites       |
-| --------------------- | --------------------------- | ----------------- | ----------------- |
-| With the role `admin` | Write and publish           | Write and publish | Write and publish |
-| Everyone else         | Draft, and ask for a review | Write and publish | Read              |
+| Editor        | Shared content              | Own sites         | Other sites |
+| ------------- | --------------------------- | ----------------- | ----------- |
+| `admin`       | Write and publish           | Write and publish | Write       |
+| Everyone else | Draft, and ask for a review | Write and publish | Read        |
 
-A country editor whose office phone changed drafts the change to the office, and the agent asks the office's [owner](/docs/cms/reviews#owners) to review it. An admin approves, and every site shows it. A site's own fields on an extended item are the site's, so a UK editor publishes the opening hours without asking anyone.
+Before a shared item publishes, the editor says where it shows: "9 pages on 4 sites".
 
-Before an item every site reads publishes, the editor shows where it appears, like "9 pages on 4 sites", so whoever approves sees what the change reaches. The preview shows every draft the page depends on together, so an editor sees the page as it will publish.
+## Publishing reaches every site
 
-Which sites an editor belongs to is changed by an admin, never by the editor. The site a document belongs to is where it is stored, never a field on its form, so nothing moves a page to another site by accident.
+<Flow
+    steps={[
+        'An office publishes',
+        <>
+            A job per site calls its <code>invalidate</code> with <code>{'{ brand, id }'}</code>
+        </>,
+        'Each site refreshes the pages that hold the id',
+        '"Refreshed 3 of 4 sites. The UK did not answer, retrying."',
+    ]}
+/>
 
-## Keeping every site fresh
-
-Each site is a deployment with a cache of its own. Publishing queues a [job](/docs/jobs) for every site that shows the content, which calls the site's `invalidate` route with the brand and id that changed:
-
-```json
-{
-    "brand": "OfficeId",
-    "id": "off_aberdeen"
-}
-```
-
-The site refreshes every page that holds the id, from the index the CMS keeps as it saves, and every page that lists the collection, since a new office is held by no page yet. A call that fails is retried by your jobs transport, and the editor shows the result after publishing: "Refreshed 3 of 4 sites. The UK site did not answer, retrying."
-
-A site's own content refreshes that site alone. An item a site extends refreshes that site too, since the merged item changed, and one site that is down never holds up the others.
-
-Media is one library for every site. A site uploads into it, and an image uploaded for the UK is there for Norway to use.
-
-## Locales
-
-Each site names the languages it serves, and the content every site reads is translated into every one of them. [Localization](/docs/cms/localization) covers it: a site's `locales` and `fallback`, translating, and which translations are behind their source.
-
-## A site in another repository
-
-A site in a repository of its own, run by another team, still shows the offices. It cannot hold pages in this CMS, since a page is declared beside its route, so it runs a CMS of its own for its pages and news. List it with its `url` and the `headers` its `invalidate` expects, and no pages:
-
-```ts title="packages/content/kizuna.cms.config.ts"
-sites: {
-    parkSite: {
-        url: 'https://park.example.com/api',
-        headers: {
-            authorization: `Bearer ${process.env.PARK_SITE_KEY}`,
-        },
-    },
-},
-```
-
-It hears every publish of content on `cms()`, like the sites in this repository. Its own CMS refreshes the pages that hold the id, from its own index.
-
-It reads the content through a [published client](/docs/cms/api#publishing-a-client), and its CMS holds the records through a [relationship](/docs/cms/content/relationships#from-another-kizuna-api). Where the UK extends the offices, a site in another repository keeps a collection of its own keyed by `OfficeId`, and its page reads both.
+A site in another repository lists `url` and `headers` and no pages. It hears every publish, reads through a [published client](/docs/cms/api#publishing-a-client), and holds shared records through a [relationship](/docs/cms/content/relationships#from-another-kizuna-api).
 
 ## Starting with one site
-
-A project that started with `pages` adds sites by listing them. Its content stays where it is, since every document is already stored under a site, and `kizuna cms rename-site` moves the first site's pages to the name it gets:
 
 ```sh
 kizuna cms rename-site default uk
 ```
 
-Nothing needs to be split later, since content on `cms()` and a site's own were apart from the start.
-
-## Where the data lives
-
-A site holds the records it shows by id wherever they live:
-
-| The data lives in              | The site holds it through                                                                       |
-| ------------------------------ | ----------------------------------------------------------------------------------------------- |
-| This CMS                       | A collection on `cms()`, as above                                                               |
-| Another Kizuna API or CMS      | A [relationship](/docs/cms/content/relationships#from-another-kizuna-api) fed by its client     |
-| A service like Stripe or a CRM | A [relationship](/docs/cms/content/relationships#from-another-service) fed by the service's SDK |
-
-## Reading from outside
-
-Every path above is also a route in the `content` group, under the CMS's `apiPath`, so another app or a phone reads the same content over HTTP:
-
-| In process                                           | Over HTTP                                       |
-| ---------------------------------------------------- | ----------------------------------------------- |
-| `kizuna.content.collections.offices.list()`          | `GET /api/content/collections/offices`          |
-| `kizuna.content.sites.uk.collections.offices.list()` | `GET /api/content/sites/uk/collections/offices` |
-| `kizuna.content.sites.uk.pages.frontPage.get()`      | `GET /api/content/sites/uk/pages/frontPage`     |
-
-A client generated for one site holds that site's routes and those on `cms()`, and nothing of the other sites. See [Publishing a client](/docs/cms/api#publishing-a-client).
+Content is already stored per site, so adding `sites` later moves nothing.

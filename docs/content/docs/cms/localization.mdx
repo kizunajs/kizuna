@@ -1,28 +1,21 @@
 ---
 title: Localization
-description: Every page, global and item in every language the site serves, translated field by field or by the model, and published one language at a time.
+description: Every page in every language the site serves, published one language at a time.
 ---
 
-Every page, global and item has a copy per language, with its own draft, publish state and address. Norwegian can go live on Monday and English on Thursday.
-
-## Declaring the locales
-
-Name the languages on `cms()`. The first is the source, the one content is written in before it is translated:
+Each language is its own copy, with its own draft, publish state and address.
 
 ```ts title="kizuna.config.ts"
 content: cms({
     db,
     pages,
     locales: ['nb', 'en'],
-    auth: {
-        identity: 'editor',
-    },
 }),
 ```
 
-A locale is a [BCP 47](https://www.rfc-editor.org/rfc/rfc5646) tag, so `de-CH` is as valid as `de`. A site that serves several, like Switzerland, says what to show when a translation does not exist yet:
+The first locale is the source. A site serving several says what to fall back to:
 
-```ts title="kizuna.config.ts"
+```ts
 locales: ['de', 'fr', 'it'],
 fallback: {
     fr: ['de'],
@@ -30,23 +23,30 @@ fallback: {
 },
 ```
 
-Without `fallback`, a page that is not translated is not found in that language, which keeps an untranslated page out of search results. A fallback only ever shows a published translation, never the source's draft.
+Without `fallback`, an untranslated page is not found in that language. A fallback only shows a published translation.
+
+## Reading
+
+```tsx title="src/app/[locale]/page.tsx"
+const { locale } = await params;
+const content = await kizuna.content.pages.frontPage.get({
+    locale,
+});
+```
+
+`list`, `getMany` and a global's `get` take `locale` the same way. Over HTTP it is `?locale=nb`. An id is the same in every language.
 
 ## What is translated
 
-A translator writes the words. A price, a date, an office's coordinates, an `EmployeeId` and an image's crop are the same in every language, and nobody is asked to translate them. Which fields translate follows from the schema:
+<Comparison first="Translated" other="Shared">
+    <Row label="Text and rich text" kizuna="Yes" other="" kizunaMark="yes" />
+    <Row label="Image" kizuna="Alt text" other="File, crop, focal point" />
+    <Row label="Numbers, booleans, dates" kizuna="" other="Yes" otherMark="yes" />
+    <Row label="Enums, ids, relationships" kizuna="" other="Yes" otherMark="yes" />
+    <Row label="Slug" kizuna="Yes" other="" kizunaMark="yes" />
+</Comparison>
 
-| Field                     | In a translation                                                          |
-| ------------------------- | ------------------------------------------------------------------------- |
-| `z.string()`              | Translated                                                                |
-| `RichTextSchema`          | Translated                                                                |
-| `ImageSchema`             | The file, crop and focal point are shared, and the alt text is translated |
-| Numbers, booleans, dates  | Shared                                                                    |
-| `z.enum()`                | Shared, and its `options` labels are what the editor shows per language   |
-| An id or a relationship   | Shared                                                                    |
-| `z.object()`, `z.array()` | Each field inside follows its own schema                                  |
-
-`localized` on a field says otherwise when the schema's default is wrong. A string that is a code rather than words, like a product number, is shared:
+`localized` overrides the default:
 
 ```ts
 {
@@ -56,100 +56,28 @@ A translator writes the words. A price, a date, an office's coordinates, an `Emp
 },
 ```
 
-An image with words in it, like a screenshot of the app, is translated:
-
-```ts
-{
-    name: 'screenshot',
-    schema: ImageSchema,
-    localized: true,
-},
-```
-
-Shared fields live on the source and publish with it. Change the price in the source and publish, and every language shows the new price. A translation holds only the fields that translate, so there is nothing to keep in step. The editor shows a shared field once, in the source, and greyed in a translation with "same in every language", and the model leaves it alone when it translates.
-
-## Reading a language
-
-The page passes the locale it renders. In Next, that is the route's `[locale]` segment:
-
-```tsx title="src/app/[locale]/page.tsx"
-export default async function FrontPage({ params }: { params: Promise<{ locale: string }> }) {
-    const { locale } = await params;
-    const content = await kizuna.content.pages.frontPage.get({
-        locale,
-    });
-
-    return <h1>{content.heading}</h1>;
-}
-```
-
-`list`, `getMany` and a global's `get` take `locale` the same way, and a site that serves one language leaves it out. Over HTTP it is `?locale=nb` on every `content` route.
-
-An id is the same in every language. An article holds one `EmployeeId` for its author, and the page reads that employee in the language it renders, so a translation never re-picks what the source chose.
-
-## Addresses
-
-A field that is part of a page's address, like an article's `slug`, is translated like any other, so `/blog/ny-kontor` and `/blog/new-office` are one article. A page that shows a collection reads the item by the slug in that locale:
-
-```tsx title="src/app/[locale]/blog/[slug]/page.tsx"
-const { locale, slug } = await params;
-const article = await kizuna.content.pages.articlePage.get({
-    locale,
-    slug,
-});
-```
-
-Every translation's address is known, so a page can tell search engines about its other languages. [SEO](/docs/cms/seo#languages) covers `hreflang` and the sitemap per language.
+Shared fields live on the source and publish with it. Change the price once, and every language shows it.
 
 ## Translating
 
-The editor shows one language at a time, and beside every field, the source's value, so nothing is translated blind. Switch the language in the header, and the form shows that translation's draft with its own publish state and its own reviews.
-
-Ask the model to draft what is missing:
+The editor shows one language at a time, with the source beside each field. Ask the model for the rest:
 
 > Translate the front page to Norwegian.
 
-It reads the source and writes the translation as a draft, which a person reads and publishes. A field with a `.max()` holds in every language, so a translation that runs long is caught before anyone sees it.
-
-### Behind the source
-
-Every translation remembers which version of the source it was made from. When a translated field of the English office changes, the Norwegian one shows as **behind** in the editor and in the API, and the page keeps showing it until someone updates it. A change to a shared field, like the office's phone number, reaches every language on its own and flags nothing. The editor lists every translation that is behind, and the model can be asked for the lot:
-
-> Update every Norwegian page that is behind its English.
-
-A translation is never hidden for being behind. An old translation is better than a page that disappears.
+A translation remembers the source version it came from. When a translated field changes in the source, the translation shows as **behind**, and the page keeps showing it until someone updates it.
 
 ## With several sites
 
-With [several sites](/docs/cms/sites), `cms()` declares every locale its sites use, and each site names which it serves. Content every site reads is written once, in the source, and translated into every language a site needs. Country editors draft the translations for their own languages, and an admin publishes them, like any change to that content.
-
-```ts title="packages/content/kizuna.cms.config.ts"
-content: cms({
-    db,
-    locales: ['en', 'nb', 'de', 'fr', 'it'],
-    sites: {
-        norway: {
-            pages: norwayPages,
-            app: '../../apps/norway/src/app',
-            url: 'https://example.no/api',
-            locales: ['nb', 'en'],
-        },
-        switzerland: {
-            pages: switzerlandPages,
-            app: '../../apps/switzerland/src/app',
-            url: 'https://example.ch/api',
-            locales: ['de', 'fr', 'it'],
-            fallback: {
-                fr: ['de'],
-                it: ['de'],
-            },
-        },
+```ts
+locales: ['en', 'nb', 'de'],
+sites: {
+    norway: {
+        locales: ['nb', 'en'],
     },
-}),
+    switzerland: {
+        locales: ['de'],
+    },
+},
 ```
 
-Caches are tagged by site and language, so publishing the Italian office refreshes the Italian pages that show it and no other.
-
-## Adding a language later
-
-Add it to `locales`, and every page, global and item gains an empty translation that falls back to nothing until it is written. `kizuna cms check` lists what is untranslated in the new language, and the editor shows the same list, so the work is visible until it is done.
+Shared content is written once and translated into every language a site serves. Country editors draft, an admin publishes. Caches are tagged by site and language.

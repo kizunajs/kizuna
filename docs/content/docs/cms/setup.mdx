@@ -195,23 +195,30 @@ export const content = kizuna.content;
 
 ## The shared UI
 
-Components live in `packages/ui` and read their colours from the app, so one `OfficeCard` renders in every brand. Each app's stylesheet declares its theme and tells Tailwind to look inside the package:
+Components live in `packages/ui` and read their colours from variables the app sets, so one `OfficeCard` renders in every brand:
 
 ```css title="apps/uk/src/app/globals.css"
-@import 'tailwindcss';
-@source '../../../../packages/ui/src';
+:root {
+    --brand: #0f3d5e;
+    --ink: #111111;
+}
+```
 
-@theme {
-    --color-brand: #0f3d5e;
+```css title="packages/ui/src/office-card.module.css"
+.card {
+    border-top: 3px solid var(--brand);
+    color: var(--ink);
 }
 ```
 
 A component takes a site's own fields as optional, so a site that adds nothing renders as before:
 
 ```tsx title="packages/ui/src/office-card.tsx"
+import styles from './office-card.module.css';
+
 export function OfficeCard({ office }: { office: { name: string; address: string; openingHours?: string } }) {
     return (
-        <article>
+        <article className={styles.card}>
             <h3>{office.name}</h3>
             <p>{office.address}</p>
             {office.openingHours !== undefined && <p>{office.openingHours}</p>}

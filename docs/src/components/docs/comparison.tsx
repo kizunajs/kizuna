@@ -96,7 +96,7 @@ export function Flow({ steps }: { steps: ReactNode[] }) {
         <ol className={styles.flow}>
             {steps.map((step, index) => (
                 <li key={index} className={styles.step}>
-                    {step}
+                    <span className={styles.stepText}>{step}</span>
                 </li>
             ))}
         </ol>

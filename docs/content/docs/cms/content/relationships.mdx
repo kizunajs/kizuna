@@ -3,7 +3,7 @@ title: Relationships
 description: Records that live outside the CMS, in your own API, another Kizuna API or a service like Stripe, held by id and picked from a list.
 ---
 
-A page can hold things that live outside the CMS: products in your own API, or in a service like Stripe. The page holds their ids and fetches whatever it shows of them itself, so the CMS never reads a product for a visitor. What the CMS needs is the list an editor picks from, and a relationship gives it that list.
+A page holds ids of records that live elsewhere, and fetches them itself. A relationship gives the editor the list to pick from.
 
 ## From your own API
 
@@ -28,9 +28,9 @@ export const Products = defineRelationship({
 });
 ```
 
-`options` feeds the picker and nothing else: an id, a label and an optional image for each product. It gets `query` when an editor searches, and `ids` to name the products a field already holds. It runs as the editor, with their sign-in in `headers`, so your route decides what they may see. `ProductId` is the same type on your routes and in the generated client, so the ids pass straight through.
+`options` feeds the picker: id, label and an optional image. `query` when an editor searches, `ids` for what a field already holds. It runs as the editor, so your route decides what they see.
 
-Point it at a route that reads only those three, so the picker fetches no more than it shows:
+The route reads only those three:
 
 ```ts title="src/routes/products.ts"
 listProductOptions: k
@@ -76,7 +76,7 @@ listProductOptions: k
 
 ## From another Kizuna API
 
-When the employees live in another Kizuna CMS, like the head office's, its [content client](/docs/cms/api#a-client-for-readers) already has the route a picker needs, since every collection serves its options:
+Every Kizuna collection serves its options, so another Kizuna CMS's [content client](/docs/cms/api#a-client-for-readers) is the picker:
 
 ```ts title="src/cms/relationships.ts"
 import { z } from 'zod';
@@ -101,11 +101,11 @@ export const HeadOfficeEmployees = defineRelationship({
 });
 ```
 
-`EmployeeId` carries the head office's brand name, so the ids its client returns are the ones a field of this type holds. Published content is public, so the call needs no sign-in.
+`EmployeeId` carries the head office's brand name, so its ids are the ones this field holds.
 
 ## From another service
 
-Ids from another service get a type of their own, named after it, so a Stripe product id never passes for one of yours:
+A Stripe id gets a type of its own, so it never passes for one of yours:
 
 ```ts title="src/cms/relationships.ts"
 import Stripe from 'stripe';
