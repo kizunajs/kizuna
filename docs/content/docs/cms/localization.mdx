@@ -46,13 +46,23 @@ A translator writes the words. A price, a date, an office's coordinates, an `Emp
 | An id or a relationship   | Shared                                                                    |
 | `z.object()`, `z.array()` | Each field inside follows its own schema                                  |
 
-A string that is a code rather than words, like a product number, says so:
+`localized` on a field says otherwise when the schema's default is wrong. A string that is a code rather than words, like a product number, is shared:
 
 ```ts
 {
     name: 'productCode',
     schema: z.string().max(20),
     localized: false,
+},
+```
+
+An image with words in it, like a screenshot of the app, is translated:
+
+```ts
+{
+    name: 'screenshot',
+    schema: ImageSchema,
+    localized: true,
 },
 ```
 

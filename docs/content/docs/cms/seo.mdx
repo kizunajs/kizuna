@@ -5,100 +5,100 @@ description: What search engines read from a page, generated from typed content,
 
 Most of what a search engine reads from a page is already in its content: the title, the dates, the author, the office's address, the languages it exists in. The CMS generates those from the typed fields and leaves a person two things to write, the search title and the description. The site renders what the CMS hands it, so nothing here needs a plugin.
 
-## The search result
+## A page owns its search result
 
-`SeoSchema` is the field a page shows in a search result. The editor shows it as one, with each length measured against what a result shows in full:
+A page says what search engines see of it, beside its fields, typed from them. It gives its own words and nothing of the site's:
 
-```ts title="src/app/(front-page)/content.ts"
-import { SeoSchema } from '@kizunajs/cms/schemas';
-
+```ts title="src/app/blog/[slug]/content.ts"
 export default definePage({
-    name: 'frontPage',
-    fields: [
-        {
-            name: 'heading',
-            schema: z.string().max(60),
-        },
-        {
-            name: 'seo',
-            label: 'Search result',
-            schema: SeoSchema,
-        },
-    ],
+    name: 'articlePage',
+    collection: Articles,
+    metadata: {
+        title: ({ content }) => content.title,
+        description: ({ content }) => content.summary,
+        image: ({ content }) => content.cover,
+        type: 'Article',
+    },
 });
 ```
 
-| Field         | What it is                                                                                        |
-| ------------- | ------------------------------------------------------------------------------------------------- |
-| `title`       | The result's title. 30 to 60 characters show in full                                              |
-| `description` | One or two sentences under it. 70 to 160 characters show in full                                  |
-| `image`       | The image a shared link shows. Falls back to the page's first image                               |
-| `canonical`   | Another address this page is a copy of. Empty for nearly every page                               |
-| `noindex`     | Keep the page out of search results, like a campaign page that should only be reached by its link |
+| Field         | What it is                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `title`       | The page's own words in the result. 30 to 60 characters show in full, suffix included         |
+| `description` | One or two sentences under it. 70 to 160 characters show in full                              |
+| `image`       | The image a shared link shows. Without one, the page's first image                            |
+| `type`        | The [structured data](#structured-data) the page carries, `Article`, `LocalBusiness`, `Event` |
+| `noindex`     | Keep the page out of search results, like a campaign page only reached by its link            |
+| `suffix`      | `false` for a page whose title stands alone, like the front page                              |
 
-Leave `title` empty and the result shows the page's heading. Leave `description` empty and it shows the page's first paragraph. A page has a result the moment it is published, and the editor shows what a person could improve.
+`content` is the page's fields, and a field the function names that the page does not have fails to compile. A page without `metadata` uses its heading, its first paragraph and its first image.
 
-## Titles
+### The site joins them
 
-A page's stored title is its own words, `Offices`, and never the site's name after it. How the two are joined is a function in code, typed from the page's fields and the site global, so changing `|` to `–`, or dropping the suffix on the front page, is one line and no content changes.
-
-The default for every page sits on `cms()`:
+The site's name and the separator live in one place, on `cms()`, and every page's title goes through it:
 
 ```ts title="kizuna.config.ts"
 content: cms({
     db,
     pages,
     globals: [Site],
-    seo: {
+    metadata: {
         title: ({ title, site }) => `${title} | ${site.name}`,
     },
 }),
 ```
 
-`title` is the page's search title, or its heading when the search title is empty, and `site` is the `Site` global's published fields. A page that wants its own says so where its fields are, with `content` typed from them:
+`title` is what the page gave, and `site` is the `Site` global's published fields, so editors rename the site without a deploy and changing `|` to `–` is this one line. A section that wants a suffix of its own, like the blog, gets it here too, from the page's name, so the separator still lives in one place:
 
-```ts title="src/app/(front-page)/content.ts"
-export default definePage({
-    name: 'frontPage',
-    fields: [
-        {
-            name: 'tagline',
-            schema: z.string().max(80),
-        },
-    ],
-    seo: {
-        title: ({ content, site }) => `${site.name}: ${content.tagline}`,
-    },
-});
+```ts
+title: ({ title, site, page }) => (page === 'articlePage' ? `${title} | ${site.name} Blog` : `${title} | ${site.name}`),
 ```
 
-A collection does the same for the page that shows each item, `({ content }) => content.title`, and a function that returns the title alone has no suffix. A field the function names that the page does not have fails to compile.
+With [several sites](/docs/cms/sites), each site has its own `Site` global, and a site sets its own `metadata` only to differ from what is on `cms()`.
 
-The editor renders the function, so the search result it shows is the one a visitor gets, and the length it measures is the whole title, suffix included. Social cards often want the page's words alone, so the Open Graph title has a function of its own, `og: { title: ({ title }) => title }`, and otherwise follows the page's.
+### What a person writes
 
-With [several sites](/docs/cms/sites), each site has its own `Site` global and may set its own `seo`, and a site that sets none uses what is on `cms()`.
+The functions give every page a result the moment it is published. `MetadataSchema` is the field for the pages a person wants to write by hand:
+
+```ts
+{
+    name: 'metadata',
+    label: 'Search result',
+    schema: MetadataSchema,
+},
+```
+
+The editor shows it as a search result, with the function's title and description filled in as placeholders and each length measured against what a result shows in full, suffix included. What a person types wins over the function for that page, and goes through the site's join like any other title.
 
 ## Rendering
 
-The page renders it with Next's metadata, and the Open Graph and Twitter tags come from the same values:
+A page's metadata is one export. The CMS knows the page's `metadata`, the site's join, the Open Graph and Twitter tags that follow from them, the canonical address and the page's other languages:
 
-```tsx title="src/app/(front-page)/page.tsx"
-import { metadataOf } from '@kizunajs/cms/seo';
+```tsx title="src/app/blog/[slug]/page.tsx"
+export const generateMetadata = kizuna.content.pages.articlePage.metadata;
+```
 
-export async function generateMetadata(): Promise<Metadata> {
-    const content = await kizuna.content.pages.frontPage.get();
-    return metadataOf(content);
+It reads the route's `params` the way `get` does, and returns the title as `absolute`, so Next's own `title.template` never adds a second suffix. A page that adds something of its own spreads it:
+
+```tsx title="src/app/blog/[slug]/page.tsx"
+export async function generateMetadata(props: PageProps): Promise<Metadata> {
+    return {
+        ...(await kizuna.content.pages.articlePage.metadata(props)),
+        openGraph: {
+            type: 'article',
+        },
+    };
 }
 ```
 
-`metadataOf` returns the title as `absolute`, so Next's own `title.template` never adds a second suffix, and it fills `description`, `alternates.canonical`, `robots`, `openGraph` and `twitter` from the page. Pass a second argument to add what the page alone cannot know, like a type-specific Open Graph `type`.
+Social cards often want the page's words alone, so `og.title` on `cms()` is a join of its own, `({ title }) => title`, and otherwise the Open Graph title follows the page's.
 
 ## Structured data
 
 A search engine shows an office's opening hours, an article's date and an event's venue when the page says what they are in [schema.org](https://schema.org) terms. The CMS writes that from the typed content, so an office that moves updates its structured data with the rest:
 
 ```tsx title="src/app/offices/[id]/page.tsx"
-import { JsonLd } from '@kizunajs/cms/seo';
+import { JsonLd } from '@kizunajs/cms/metadata';
 
 export default async function OfficePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -131,26 +131,35 @@ export default async function OfficePage({ params }: { params: Promise<{ id: str
 
 ## Addresses
 
-An address is for life. When an editor changes an article's slug, the CMS stores the old one and the site answers it with a `301` to the new, so a link in an old newsletter still arrives. A chain never forms, since a second rename points the first old address at the newest one.
+An address is for life. The CMS keeps a `redirects` collection, listed in the editor with the rest, and `nextAdapter()` answers every address in it at request time, so a new redirect works the moment it publishes and nothing redeploys.
 
-Redirects an editor needs for other reasons, like a campaign address or a page that moved to another site, live in the `redirects` global, which `nextAdapter()` serves:
+A redirect is an address and where it goes:
 
-```ts
-{
-    from: '/spring-offer',
-    to: '/offers/spring',
-    status: 301,
-},
-```
+| Field       | What it is                                                                                                  |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| `from`      | The old address, a path on this site, unique                                                                |
+| `to`        | A path on this site, a full URL, or a page or item, which keeps working when that one is renamed again      |
+| `permanent` | `true` answers `308`, for a page that moved. `false` answers `307`, for a campaign address that will change |
+
+An editor adds one by hand for a campaign address or a page that moved to another site, and the agent adds them when asked. The rest the CMS writes itself:
+
+- **A rename makes a redirect.** When an article's published slug changes, the old address redirects to the article. A draft with a new slug makes nothing until it publishes, since the old address is still the live one.
+- **Chains collapse.** When the article is renamed again, every redirect that points at it follows to the new address, so no visitor goes through two.
+- **Loops cannot form.** A redirect from the new address is removed the moment that address goes live, so renaming a page back to an earlier slug just works.
+- **A written redirect is read-only.** The ones a rename made show in the editor with the rename that made them, and deleting the article deletes them.
+
+A path includes its language, `/nb/kontor` and `/en/offices` are two addresses, so a redirect never needs translating. With [several sites](/docs/cms/sites), each site has its own redirects, since each has its own domain.
 
 Paths match exactly, as [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) says they do, so `/offices` and `/offices/` are two addresses. Pick one shape for the site and the CMS writes every address in it.
+
+Outside Next, `GET /content/redirects` lists the published redirects for whatever serves the site, and the list is cached and refreshed like any other content.
 
 ## The sitemap
 
 The site's `sitemap.ts` asks the CMS for every published page, with `lastmod` from the day it was last published, which is the one thing a search engine reads from a sitemap:
 
 ```ts title="src/app/sitemap.ts"
-import { sitemapOf } from '@kizunajs/cms/seo';
+import { sitemapOf } from '@kizunajs/cms/metadata';
 
 export default async function sitemap() {
     return sitemapOf(kizuna.content, {
@@ -166,13 +175,10 @@ A site in several languages gets one sitemap per language under an index, and a 
 A page that exists in Norwegian and English tells search engines so, and each language points at the others. The CMS knows every published translation's address, so a page's alternates come from it:
 
 ```tsx title="src/app/[locale]/blog/[slug]/page.tsx"
-export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }): Promise<Metadata> {
-    const article = await kizuna.content.pages.articlePage.get(await params);
-    return metadataOf(article);
-}
+export const generateMetadata = kizuna.content.pages.articlePage.metadata;
 ```
 
-`metadataOf` writes `alternates.languages` with an absolute address per published language and the page's own, which search engines require of each other, and `x-default` for the main site when there is one. Region tags follow [BCP 47](https://www.rfc-editor.org/rfc/rfc5646), `en-GB` for the UK, and a language that is not published is not listed. A page that falls back to another language's content is listed under the language it shows, so two addresses never claim the same words.
+The page's `metadata` writes `alternates.languages` with an absolute address per published language and the page's own, which search engines require of each other, and `x-default` for the main site when there is one. Region tags follow [BCP 47](https://www.rfc-editor.org/rfc/rfc5646), `en-GB` for the UK, and a language that is not published is not listed. A page that falls back to another language's content is listed under the language it shows, so two addresses never claim the same words.
 
 ## Images
 
