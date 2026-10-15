@@ -114,7 +114,7 @@ export const content = createClient({
 });
 ```
 
-The branded ids come with it, so an `OfficeId` is the same type in the client as in the CMS. A [site in another repository](/docs/cms/sites#a-site-in-another-repository) holds no pages here, so its client names the group's groups alone: `content.globals`, `content.collections` and `content.media`. Gate the group's releases with [`kizuna diff`](/docs/breaking-changes): a field removed or a type narrowed fails the pull request before a published client can break a site that installed it.
+The branded ids come with it, so an `OfficeId` is the same type in the client as in the CMS. A [site in another repository](/docs/cms/sites/publishing#a-site-in-another-repository) holds no pages here, so its client names the group's groups alone: `content.globals`, `content.collections` and `content.media`. Gate the group's releases with [`kizuna diff`](/docs/breaking-changes): a field removed or a type narrowed fails the pull request before a published client can break a site that installed it.
 
 ## What stays apart
 

@@ -1,0 +1,50 @@
+---
+title: One app per site
+description: 'Sites that differ in pages and features, sharing a UI package, one Next.js app each.'
+---
+
+<Comparison first="Every site" other="One site">
+    <Row label="Pages" kizuna="Never" other="Declared beside the site's routes" />
+    <Row
+        label="Globals and collections"
+        kizuna={
+            <>
+                Listed on <code>cms()</code>
+            </>
+        }
+        other="Listed under the site"
+    />
+    <Row label="Read at" kizuna={<code>collections.offices</code>} other={<code>sites.uk.collections.events</code>} />
+    <Row label="Over HTTP" kizuna={<code>…/collections/offices</code>} other={<code>…/sites/uk/collections/events</code>} />
+    <Row label="Editors" kizuna="Admins publish, others draft" other="The site's editors publish" />
+</Comparison>
+
+```ts title="packages/content/kizuna.cms.config.ts"
+content: cms({
+    db,
+    globals: [PrivacyPolicy],
+    collections: [Employees, Offices],
+    sites: {
+        web: {
+            pages: webPages,
+            app: '../../apps/web/src/app',
+            url: 'https://example.com/api',
+        },
+        uk: {
+            pages: ukPages,
+            app: '../../apps/uk/src/app',
+            url: 'https://example.co.uk/api',
+            globals: [Announcement],
+            collections: [Articles, Events],
+        },
+        norway: {
+            pages: norwayPages,
+            app: '../../apps/norway/src/app',
+            url: 'https://example.no/api',
+            collections: [Articles],
+        },
+    },
+}),
+```
+
+Both the UK and Norway declare `Articles`: one shape, each its own items. `kizuna.content.sites.norway.collections.events` does not compile.

@@ -1,0 +1,40 @@
+---
+title: One app, many deployments
+description: 'The same site in every country, each run by its own company, from one Next.js app.'
+---
+
+```ts title="kizuna.config.ts"
+content: cms({
+    db,
+    pages,
+    globals: [PrivacyPolicy],
+    collections: [Treatments, Centers],
+    sites: {
+        norway: {
+            url: 'https://example.no/api',
+            locales: ['nb'],
+        },
+        denmark: {
+            url: 'https://example.dk/api',
+            locales: ['da'],
+        },
+        sweden: {
+            url: 'https://example.se/api',
+            locales: ['sv'],
+        },
+    },
+    site: () => process.env.KIZUNA_SITE,
+}),
+```
+
+`kizuna.content` is the deployment's site, so pages read `kizuna.content.pages.frontPage.get()` as they always did. `kizuna.content.sites.norway` names one. A field one country has and the others do not:
+
+```ts
+{
+    name: 'swishNumber',
+    schema: z.string().max(20),
+    sites: ['sweden'],
+},
+```
+
+It is optional in the type and absent from the other sites' forms.

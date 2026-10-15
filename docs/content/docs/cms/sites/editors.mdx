@@ -1,0 +1,32 @@
+---
+title: Editors
+description: "Each site's editors are that site's company. Membership and roles per site."
+---
+
+Each site's editors are that site's company. Membership and roles come from the identity, per site:
+
+```ts
+auth: {
+    identity: 'editor',
+    sites: (editor) => editor.sites,
+    publish: {
+        roles: 'admin',
+    },
+},
+```
+
+```ts
+// what the identity carries
+sites: {
+    norway: ['admin'],
+    denmark: ['editor'],
+}
+```
+
+| Editor             | Shared content              | Sites they belong to | Other sites |
+| ------------------ | --------------------------- | -------------------- | ----------- |
+| `admin` on `cms()` | Write and publish           | Write and publish    | Write       |
+| `admin` on a site  | Draft, and ask for a review | Write and publish    | Nothing     |
+| `editor` on a site | Draft, and ask for a review | Write                | Nothing     |
+
+A deployment per country shows that country alone: its editor, its people, its reviews and its MCP endpoint. `people.list` is called with the site, so each company sees its own people. Before a shared item publishes, the editor says where it shows: "9 pages on 4 sites".

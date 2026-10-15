@@ -1,0 +1,17 @@
+---
+title: Publishing
+description: 'One publish reaches every site that shows the change, in this repository or another.'
+---
+
+<Flow
+    steps={[
+        'An office publishes',
+        <>
+            A job per site calls its <code>invalidate</code> with <code>{'{ brand, id }'}</code>
+        </>,
+        'Each site refreshes the pages that hold the id',
+        '"Refreshed 3 of 4 sites. The UK did not answer, retrying."',
+    ]}
+/>
+
+A site in another repository lists `url` and `headers` and no pages. It hears every publish, reads through a [published client](/docs/cms/api#publishing-a-client), and holds shared records through a [relationship](/docs/cms/content/relationships#from-another-kizuna-api).

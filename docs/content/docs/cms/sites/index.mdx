@@ -1,0 +1,21 @@
+---
+title: Sites
+description: 'One CMS, one database, several sites. Shared content is listed once, and each site adds its own.'
+---
+
+A site is a tenant with its own editors. Pick the shape that matches the business:
+
+| The business                                             | Shape                                                                         |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| One company, one site, several languages                 | No `sites`. [Localization](/docs/cms/localization)                            |
+| The same site in several countries, each its own company | [One app, many deployments](/docs/cms/sites/one-app)                          |
+| Country sites that differ, sharing a UI                  | [One app per site](/docs/cms/sites/one-app-per-site)                          |
+| A site run by someone else that shows your content       | [Another repository](/docs/cms/sites/publishing#a-site-in-another-repository) |
+
+In every shape, globals and collections on `cms()` are read by every site, and a site [adds its own](/docs/cms/sites/shared-content). [Editors](/docs/cms/sites/editors) belong to sites, and [publishing](/docs/cms/sites/publishing) reaches every site that shows the change.
+
+A project that started with one site adds `sites` later without moving anything:
+
+```sh
+kizuna cms rename-site default uk
+```

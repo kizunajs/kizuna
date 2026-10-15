@@ -1,0 +1,77 @@
+---
+title: Shared content
+description: 'Pointing at content every site reads, adding to it, and what one country does differently.'
+---
+
+## Pointing at it
+
+A UK event holds an office by id, like any collection:
+
+```ts
+{
+    name: 'office',
+    schema: Offices.id,
+},
+```
+
+Shared content never holds a site's ids, and a site never holds another site's. The `editing` routes refuse both.
+
+## Adding to it
+
+The UK wants opening hours on every office, and its own phone number instead of the switchboard:
+
+```ts title="packages/content/uk.ts"
+export const UkOffices = extendCollection(Offices, {
+    overrides: ['phone'],
+    fields: [
+        {
+            name: 'openingHours',
+            schema: z.string().max(120),
+        },
+    ],
+});
+```
+
+```tsx title="apps/uk/src/app/contact/page.tsx"
+const { items } = await kizuna.content.sites.uk.collections.offices.list();
+// items[0].address      shared
+// items[0].openingHours the UK's
+```
+
+| Rule                            | So that                                              |
+| ------------------------------- | ---------------------------------------------------- |
+| Empty means the shared value    | "Revert" is clearing the field                       |
+| The editor shows whose value    | Nothing drifts unnoticed                             |
+| `id`, `slug`, unique: no        | Identity stays shared                                |
+| Lists replace whole             | No merging inside arrays                             |
+| One level                       | Nothing extends a site                               |
+| Published reads published       | A site never shows a shared draft                    |
+| Delete names extending sites    | A site's fields never outlive the item               |
+| Type change fails `kizuna diff` | An override's type is always the shared field's type |
+
+## What one country does differently
+
+| A country needs          | Declare it as                              |
+| ------------------------ | ------------------------------------------ |
+| A field on a shared page | One more field in that site's `content.ts` |
+| A block only it uses     | A block in that site's app                 |
+| A field on a shared item | `extendCollection`                         |
+| Its own collection       | Listed under the site                      |
+| A route nobody else has  | A page in that site's app                  |
+| A rule that holds there  | The field's schema                         |
+| A language               | [Locales](/docs/cms/localization)          |
+
+Shared page shapes are shared fields. A site spreads them and adds its own:
+
+```ts title="apps/switzerland/src/app/content.ts"
+export default definePage({
+    name: 'frontPage',
+    fields: [
+        ...frontPageFields,
+        {
+            name: 'cantons',
+            schema: CantonPickerBlockSchema,
+        },
+    ],
+});
+```
