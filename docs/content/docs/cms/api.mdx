@@ -200,7 +200,7 @@ The reader returns published content alone, since the route has no draft mode. `
 
 The phone needs a full URL, so set `media.publicPath` to one, `'https://example.com/cms-api/content/media'`, and every image's `url` starts with it. The phone asks for the size it shows by adding `w`, as [below](#image-sizes).
 
-With [several sites](/docs/cms/sites), the route reads the site the app belongs to, `content.sites.norway.collections.articles.list()`.
+With [sites](/docs/cms/sites), the route reads the site the app belongs to, `content.sites.norway.collections.articles.list()`.
 
 ## Images
 
@@ -228,9 +228,9 @@ With `w` alone the height follows the crop. With both, the image is cropped to f
 
 Uploads are checked by their bytes, never their name. SVG is refused, location metadata is stripped, and files over ten megabytes are refused unless `media.maxBytes` says otherwise.
 
-## Several sites
+## Sites
 
-When a group runs several sites, like its own and one for each country, one CMS serves them all. The group's content is written once and every site reads it, and each site adds content of its own. See [Several sites](/docs/cms/sites).
+A group with a site per country runs one CMS. The group's content is written once and every site reads it, and each site adds content of its own. See [Sites](/docs/cms/sites).
 
 ## Deployment
 

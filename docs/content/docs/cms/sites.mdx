@@ -1,6 +1,6 @@
 ---
-title: Several sites
-description: One CMS for a group and its sites. The group's content is written once and every site reads it, each site keeps and adds content of its own, and one publish refreshes every site that shows it.
+title: Sites
+description: A group's content, written once and shown on every site, and each site's own content beside it, in one CMS.
 ---
 
 A group runs several sites: its own, and one for each country it works in. Some content belongs to the group, like the people, the offices and the privacy policy, and every site shows it. Some belongs to one site, like the UK's news. One CMS holds both, and every piece of content has one owner:
@@ -284,47 +284,7 @@ Media is one library for the whole group. A site uploads into it, and an image u
 
 ## Locales
 
-The group's offices show in every language its sites use. The group declares the locales content is written in, and each site names which it serves, in the order it falls back through:
-
-```ts title="packages/content/kizuna.cms.config.ts"
-content: cms({
-    db,
-    locales: ['en', 'nb', 'de', 'fr', 'it'],
-    sites: {
-        norway: {
-            pages: norwayPages,
-            app: '../../apps/norway/src/app',
-            url: 'https://example.no/api',
-            locales: ['nb', 'en'],
-        },
-        switzerland: {
-            pages: switzerlandPages,
-            app: '../../apps/switzerland/src/app',
-            url: 'https://example.ch/api',
-            locales: ['de', 'fr', 'it'],
-            fallback: {
-                fr: ['de'],
-                it: ['de'],
-            },
-        },
-    },
-}),
-```
-
-A document is translated as a whole: each locale is a copy of its own, with its own slug and its own draft and publish state, so the Norwegian office can publish before the English one is written. Nothing falls back unless the site says so, and a fallback only ever shows a published locale. An id stays the same in every language, so a UK event holds one `OfficeId` whichever language a visitor reads it in.
-
-The page reads the locale it renders:
-
-```tsx title="apps/switzerland/src/app/[locale]/contact/page.tsx"
-const { locale } = await params;
-const { items } = await kizuna.content.collections.offices.list({
-    locale,
-});
-```
-
-Group content is written in one locale, its source, and translated into the others. Every translation remembers which version of the source it came from, so when the group changes the English office, the Italian copy shows as outdated in the editor and in the API, and a page keeps showing it until someone updates it. Country editors draft the translations for the locales their site serves, and the group publishes them, like any change to the group's content.
-
-Caches are tagged by site and locale, so publishing the Italian office refreshes the Italian pages that show it and no other.
+Each site names the languages it serves, and the group's content is translated into every one of them. [Localization](/docs/cms/localization) covers it: a site's `locales` and `fallback`, translating the group's content, and which translations are behind their source.
 
 ## A site in another repository
 
