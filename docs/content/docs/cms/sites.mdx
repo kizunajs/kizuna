@@ -98,7 +98,7 @@ They are read under the site, the way its pages are:
 const { items } = await kizuna.content.sites.uk.collections.events.list();
 ```
 
-Norway declares no events, so `kizuna.content.sites.norway.collections.events` fails to compile. Both declare `Articles`, so they share its fields and its `ArticleId`, and each keeps its own items. The UK blog lists the UK's articles.
+Norway declares no events, so `kizuna.content.sites.norway.collections.events` fails to compile. Both declare `Articles`, so they share its fields and its `ArticleId`, and each keeps its own items. The UK blog lists the UK's articles, and a unique field like `slug` is unique within the site, so both blogs can have `/welcome`.
 
 ## Pointing at the group's content
 
@@ -133,7 +133,7 @@ const office = await kizuna.content.collections.offices.get({
 });
 ```
 
-The group's content shows on every site, so it never holds a site's ids. A group collection with an `Events.id` field fails when the config assembles.
+The group's content shows on every site, so it never holds a site's ids. A group collection with an `Events.id` field fails when the config assembles. A site's content holds the group's ids and its own site's, and nothing of another site's. The `editing` routes refuse an id from elsewhere wherever it sits, in a field, inside a block or in rich text, so the rule holds for the editor and the agent alike.
 
 ## Building on the group's content
 
@@ -175,6 +175,67 @@ Each item has the group's `address` and the UK's `openingHours`. The UK's fields
 
 `kizuna.content.collections.offices` still reads the offices as the group keeps them.
 
+The merged item follows a few rules, each the answer to something that goes wrong in CMSs that copy content between sites:
+
+- **Empty means the group's.** A site cannot override a field to blank. Clearing an override shows the group's value again, so "revert to the group" is deleting what the site wrote, and nothing records a cancelled inheritance that drifts unnoticed.
+- **The editor says whose value it is.** Every field on an extended item shows whether the value is the site's or the group's, and a group editor opening the office sees which sites override each field.
+- **Identity stays the group's.** `overrides` refuses `id`, `slug` and any unique field.
+- **A list is replaced whole.** A site that wants to add to the group's list declares a field of its own instead.
+- **One level.** A site extends the group's content, and nothing extends a site's.
+- **Published reads published.** A page reads the group's published item with the site's published fields, never a draft of either. A site that publishes its fields before the group publishes the item sees "waiting for the group to publish".
+- **Deleting a group item names the sites that extended it**, and removes their fields with it. A site's fields cannot outlive the item they belong to.
+- **A type change on an overridden field fails [`kizuna diff`](/docs/breaking-changes#content)**, and a `migrate` step on the group's collection runs over every site's fields too. Removing a field from `overrides` leaves stored site values behind, which `kizuna diff` reports and the next migration drops.
+
+## What one country does differently
+
+Every country has something the others do not: a field that is normal there, a block only its pages use, a route nobody else has. A page belongs to its site, so most of this needs nothing beyond declaring it in that site's app.
+
+The sites share a page's shape by sharing its fields. The front page's fields live in the content package, and each site's `content.ts` spreads them and adds its own:
+
+```ts title="packages/content/front-page.ts"
+export const frontPageFields = [
+    {
+        name: 'hero',
+        schema: HeroBlockSchema,
+    },
+    {
+        name: 'intro',
+        schema: z.string().max(400),
+    },
+];
+```
+
+```ts title="apps/switzerland/src/app/content.ts"
+import { definePage } from '@kizunajs/cms';
+import { frontPageFields } from '@acme/content/front-page';
+import { CantonPickerBlockSchema } from '../cms/blocks';
+
+export default definePage({
+    name: 'frontPage',
+    fields: [
+        ...frontPageFields,
+        {
+            name: 'cantons',
+            schema: CantonPickerBlockSchema,
+        },
+    ],
+});
+```
+
+The Swiss front page has the group's hero and intro and a canton picker, and the shared `FrontPage` component renders the picker when the content has one. The block is declared beside the Swiss app, since no other site uses it.
+
+| A country needs                    | Declare it as                                                                               |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| A field on a page the others share | One more entry in that site's `content.ts`, beside the shared fields                        |
+| A block only its pages use         | A block in that site's app                                                                  |
+| A field on a group record          | `extendCollection`, [above](#building-on-the-groups-content)                                |
+| A collection or global of its own  | Listed under the site                                                                       |
+| A route nobody else has            | A page in that site's app                                                                   |
+| A rule that holds there            | The field's schema: an organisation number as Norway writes them, a postcode as the UK does |
+| A locale                           | Named on the site, see [locales](#locales)                                                  |
+
+What a country adds stays in that country's app, and the shared components take it as optional, so a site that adds nothing renders as before.
+
 ## Editors
 
 Editors work in one editor for the whole group. The switcher lists the group's content first, then each site an editor may change. The agent addresses content by its owner, so "add an event to the UK site" reaches the UK's `events`, and "the Aberdeen office moved" reaches the group's `offices`.
@@ -200,7 +261,9 @@ auth: {
 
 A country editor whose office phone changed drafts the change to the group's office, and the agent asks the office's [owner](/docs/cms/reviews#owners) to review it. Group marketing approves, and every site shows it. A site's own fields on an extended item are the site's, so a UK editor publishes the opening hours without asking anyone.
 
-Before a group record publishes, the editor shows where it appears, like "9 pages on 4 sites", so whoever approves sees what the change reaches.
+Before a group record publishes, the editor shows where it appears, like "9 pages on 4 sites", so whoever approves sees what the change reaches. The preview shows the group's drafts and the site's together, so an editor sees the page as it will publish.
+
+Which sites an editor belongs to is changed by someone with the `group` role, never by the editor. The site a document belongs to is where it is stored, never a field on its form, so nothing moves a page to another site by accident.
 
 ## Keeping every site fresh
 
@@ -215,7 +278,53 @@ Each site is a deployment with a cache of its own. Publishing queues a [job](/do
 
 The site refreshes every page that holds the id, from the index the CMS keeps as it saves, and every page that lists the collection, since a new office is held by no page yet. A call that fails is retried by your jobs transport, and the editor shows the result after publishing: "Refreshed 3 of 4 sites. The UK site did not answer, retrying."
 
-A site's own content refreshes that site alone.
+A site's own content refreshes that site alone. A group item a site extends refreshes that site too, since the merged item changed, and one site that is down never holds up the others.
+
+Media is one library for the whole group. A site uploads into it, and an image uploaded for the UK is there for Norway to use.
+
+## Locales
+
+The group's offices show in every language its sites use. The group declares the locales content is written in, and each site names which it serves, in the order it falls back through:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+content: cms({
+    db,
+    locales: ['en', 'nb', 'de', 'fr', 'it'],
+    sites: {
+        norway: {
+            pages: norwayPages,
+            app: '../../apps/norway/src/app',
+            url: 'https://example.no/api',
+            locales: ['nb', 'en'],
+        },
+        switzerland: {
+            pages: switzerlandPages,
+            app: '../../apps/switzerland/src/app',
+            url: 'https://example.ch/api',
+            locales: ['de', 'fr', 'it'],
+            fallback: {
+                fr: ['de'],
+                it: ['de'],
+            },
+        },
+    },
+}),
+```
+
+A document is translated as a whole: each locale is a copy of its own, with its own slug and its own draft and publish state, so the Norwegian office can publish before the English one is written. Nothing falls back unless the site says so, and a fallback only ever shows a published locale. An id stays the same in every language, so a UK event holds one `OfficeId` whichever language a visitor reads it in.
+
+The page reads the locale it renders:
+
+```tsx title="apps/switzerland/src/app/[locale]/contact/page.tsx"
+const { locale } = await params;
+const { items } = await kizuna.content.collections.offices.list({
+    locale,
+});
+```
+
+Group content is written in one locale, its source, and translated into the others. Every translation remembers which version of the source it came from, so when the group changes the English office, the Italian copy shows as outdated in the editor and in the API, and a page keeps showing it until someone updates it. Country editors draft the translations for the locales their site serves, and the group publishes them, like any change to the group's content.
+
+Caches are tagged by site and locale, so publishing the Italian office refreshes the Italian pages that show it and no other.
 
 ## A site in another repository
 
@@ -235,6 +344,16 @@ sites: {
 It hears every publish of the group's content, like the sites in this repository. Its own CMS refreshes the pages that hold the id, from its own index.
 
 It reads the group's content through a [published client](/docs/cms/api#publishing-a-client), and its CMS holds the group's records through a [relationship](/docs/cms/content#from-another-kizuna-api). Where the UK extends the group's offices, a site in another repository keeps a collection of its own keyed by the group's `OfficeId`, and its page reads both.
+
+## Starting with one site
+
+A project that started with `pages` becomes a group with sites by listing them. Its content stays where it is, since every document is already stored under a site, and `kizuna cms rename-site` moves the first site's pages to the name it gets:
+
+```sh
+kizuna cms rename-site default uk
+```
+
+Nothing needs to be split later, since the group's content and a site's own were apart from the start.
 
 ## Where the group's data lives
 

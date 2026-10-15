@@ -52,6 +52,14 @@ Moves a renamed page's stored content, with its versions and history, to the new
 kizuna cms rename-page pricingPage plansPage
 ```
 
+## `kizuna cms rename-site`
+
+Moves a site's stored pages, globals and collections, with their versions, to a new site name. A project that started with `pages` runs it once when it [adds sites](/docs/cms/sites#starting-with-one-site). The command refuses a name that is still declared, and a target that has content of its own.
+
+```sh
+kizuna cms rename-site default uk
+```
+
 ## `kizuna cms export`
 
 Writes every published item of one collection as JSON, each with its id, to stdout or the file `--out` names. Use it to [move a collection into a table](/docs/cms/content#moving-between-them).
