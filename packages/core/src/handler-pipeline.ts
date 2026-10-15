@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import {
-    ROUTES_TAG,
+    ROUTES_GROUP,
     HANDLER_CONTEXT_BRAND,
     type HandlerContextBrand,
     type AutoResponsesBrand,
@@ -312,12 +312,19 @@ export const isRouteDefinition = (value: unknown): value is RouteDefinition => {
 export interface FlattenedRoute {
     routeKey: string;
     route: RouteDefinition;
-    routeTags: string[];
+    /**
+     * The route's groups, as dotted paths, its own first.
+     */
+    routeGroups: string[];
 }
 
-export const flattenRoutes = (routes: Routes, prefix?: string, inheritedTags: string[] = []): FlattenedRoute[] => {
-    const ownTag = (routes as Record<typeof ROUTES_TAG, string | undefined>)[ROUTES_TAG];
-    const activeTags = ownTag ? [...inheritedTags, ownTag] : inheritedTags;
+/**
+ * Flatten a tree of routes, each with its groups.
+ */
+export const flattenRoutes = (routes: Routes, prefix?: string, inheritedGroup?: string): FlattenedRoute[] => {
+    const declared = (routes as Record<typeof ROUTES_GROUP, string | undefined>)[ROUTES_GROUP];
+    // `''` is no group, so the group around it applies.
+    const group = declared === undefined || declared === '' ? inheritedGroup : declared;
     const collected: FlattenedRoute[] = [];
     for (const [key, value] of Object.entries(routes)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
@@ -325,10 +332,10 @@ export const flattenRoutes = (routes: Routes, prefix?: string, inheritedTags: st
             collected.push({
                 routeKey: fullKey,
                 route: value,
-                routeTags: activeTags,
+                routeGroups: [...new Set([...(group === undefined ? [] : [group]), ...(value.groups ?? [])])],
             });
         } else if (value && typeof value === 'object') {
-            collected.push(...flattenRoutes(value as Routes, fullKey, activeTags));
+            collected.push(...flattenRoutes(value as Routes, fullKey, group));
         }
     }
     return collected;

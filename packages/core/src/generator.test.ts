@@ -57,25 +57,27 @@ const webhooksPlugin = definePlugin({
 });
 
 const { api } = defineConfig({
-    routes: {
-        users: k.routes({
-            getUser: k.route({
+    routes: [
+        {
+            users: k.routes({
+                getUser: k.route({
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: UserSchema,
+                    },
+                }),
+            }),
+            health: k.route({
                 method: 'GET',
-                path: '/users/:id',
+                path: '/health',
+                hidden: true,
                 responses: {
-                    200: UserSchema,
+                    200: HealthSchema,
                 },
             }),
-        }),
-        health: k.route({
-            method: 'GET',
-            path: '/health',
-            hidden: true,
-            responses: {
-                200: HealthSchema,
-            },
-        }),
-    },
+        },
+    ],
     plugins: [webhooksPlugin()],
 });
 
@@ -194,7 +196,7 @@ describe('defineGenerator', () => {
         });
 
         const { generators } = defineConfig({
-            routes: {},
+            routes: [],
             plugins: [manifestPlugin()],
         });
 

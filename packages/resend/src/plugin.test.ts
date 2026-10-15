@@ -81,7 +81,7 @@ const jobs = k.jobs({
 const install = (on?: ResendEventHandlers, intercept?: ResendPluginProps['intercept']) =>
     defineConfig({
         adapter: expressAdapter(),
-        routes: {},
+        routes: [],
         jobs,
         jobRunner: {
             mode: 'in-process',
@@ -109,7 +109,7 @@ describe('resendPlugin options', () => {
     it('stops the app without an API key, naming the field', () => {
         expect(() =>
             defineConfig({
-                routes: {},
+                routes: [],
                 plugins: [
                     resendPlugin({
                         apiKey: undefined as never,
@@ -123,7 +123,7 @@ describe('resendPlugin options', () => {
     it('stops the app on a sender Resend would refuse', () => {
         expect(() =>
             defineConfig({
-                routes: {},
+                routes: [],
                 plugins: [
                     resendPlugin({
                         apiKey: 're_test',
@@ -138,7 +138,7 @@ describe('resendPlugin options', () => {
         for (const from of ['hello@example.com', 'Kizuna <hello@example.com>', 'Blåbær <post@blåbær.no>']) {
             expect(() =>
                 defineConfig({
-                    routes: {},
+                    routes: [],
                     plugins: [
                         resendPlugin({
                             apiKey: 're_test',
@@ -153,7 +153,7 @@ describe('resendPlugin options', () => {
     it('needs a webhook secret when on is set', () => {
         expect(() =>
             defineConfig({
-                routes: {},
+                routes: [],
                 plugins: [
                     resendPlugin({
                         apiKey: 're_test',
@@ -653,7 +653,7 @@ describe('the webhook route', () => {
         const app = express();
         defineConfig({
             adapter: expressAdapter(),
-            routes: {},
+            routes: [],
             plugins: [
                 resendPlugin({
                     apiKey: 're_test',

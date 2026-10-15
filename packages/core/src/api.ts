@@ -10,7 +10,7 @@ import type { JobErrorHandler } from './job-runner.js';
 import type { ApiPlugins } from './plugin.js';
 import type { Routes } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
-import type { TagSet, TagOptions } from './tags.js';
+import type { GroupSet } from './groups.js';
 import type { RequestContextSchema } from './request-context.js';
 
 /**
@@ -44,7 +44,7 @@ export interface ApiImplementations {
 }
 
 export interface BuildApiConfig {
-    tags?: TagSet<Record<string, TagOptions>>;
+    groups?: GroupSet;
     securitySchemes?: Record<string, SecurityScheme>;
     guardSchema?: z.ZodType;
     requestContext?: Record<string, RequestContextSchema>;

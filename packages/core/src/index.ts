@@ -5,7 +5,7 @@ export {
     Kizuna,
     type K,
     type KizunaSpec,
-    type TagNamesOf,
+    type GroupNamesOf,
     type IdentityNamesOf,
     type RouteAuthValue,
     type RouteAuthRule,
@@ -35,7 +35,7 @@ export {
     type PluginExportsOf,
 } from './plugin.js';
 export { type ModelOptions } from './model.js';
-export { type TagOptions, type TagSet, type TagKeysOf, type NormalizeTags } from './tags.js';
+export { type GroupOptions, type GroupSet, type GroupPaths, type GroupPathsOf, type ResolvedGroup } from './groups.js';
 export {
     type Identity,
     type Credential,
@@ -231,6 +231,8 @@ export { type AuthCheck, type RouteAuthCheck } from './auth-check.js';
 export { type JobFnOf, type JobsOfTree, type KizunaConfigShape } from './configured.js';
 export { defineConfig, type KizunaConfigInput, type ConfiguredApi } from './define-config.js';
 export { DECLARATION, type DeclarationKind, type RouteToolOptions } from './types.js';
+export { ROUTES_GROUP } from './types.js';
+export { type DeclaredRoutes, type AssembledRoutes } from './group-routes.js';
 export { isRouteDefinition } from './handler-pipeline.js';
 export { type Api, type ApiImplementations } from './api.js';
 export { type RouteBuilder, type RouteWithHandler } from './route.js';

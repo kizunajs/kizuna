@@ -4,19 +4,19 @@ import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     users: 'Users',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
-const routes = k.routes('users', {
+const routes = k.routes.users({
     getUser: k.route({
         method: 'GET',
         path: '/users/:id',
@@ -46,7 +46,7 @@ const routes = k.routes('users', {
 
 const contract = defineConfig({
     ...config,
-    routes,
+    routes: [routes],
 }).api;
 
 test('routes preserve literal method and path strings', () => {
@@ -62,13 +62,13 @@ test('createUser has body, getUser does not', () => {
 });
 
 test('path must start with /', () => {
-    k.routes('users', {
+    k.routes.users({
         // @ts-expect-error path must start with /
         bad: k.route({ method: 'GET', path: 'users/:id', responses: { 200: z.string() } }),
     });
 });
 
-test('contract carries the route literals', () => {
-    expectTypeOf(contract.routes.getUser.method).toEqualTypeOf<'GET'>();
-    expectTypeOf(contract.routes.getUser.path).toEqualTypeOf<'/users/:id'>();
+test('contract carries the route literals, keyed under their group', () => {
+    expectTypeOf(contract.routes.users.getUser.method).toEqualTypeOf<'GET'>();
+    expectTypeOf(contract.routes.users.getUser.path).toEqualTypeOf<'/users/:id'>();
 });

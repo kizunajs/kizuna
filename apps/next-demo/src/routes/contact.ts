@@ -3,7 +3,7 @@ import { k } from '../k';
 
 const messages: Array<{ name: string; email: string; message: string }> = [];
 
-export const contact = k.routes({
+export const contact = k.routes.contact({
     send: k
         .route({
             method: 'POST',

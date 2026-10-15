@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { k } from '../k';
 
-export const newsletter = k.routes({
+export const newsletter = k.routes.newsletter({
     subscribe: k
         .route({
             method: 'POST',

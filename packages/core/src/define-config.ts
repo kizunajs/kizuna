@@ -9,7 +9,9 @@ import { assertValidViews } from './tool-view.js';
 import { injectGuardResponses } from './guard-responses.js';
 import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline.js';
 import { assertJobRunner, jobClaims, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
-import type { TagOptions, TagSet } from './tags.js';
+import type { GroupOptions, GroupSet } from './groups.js';
+import type { AssembledRoutes } from './group-routes.js';
+import { assembleRoutes } from './routes.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
 import type { Routes, RouteDefinition, RouteAuth, SecurityRequirement, RequiredPermissions } from './types.js';
@@ -148,14 +150,30 @@ const handlersOf = (declarations: Record<string, unknown> | undefined, key: stri
 };
 
 /**
+ * Throw on a route in a group the config does not declare.
+ */
+const assertDeclaredGroups = (routes: Routes, groups: GroupSet | undefined): void => {
+    for (const { routeKey, routeGroups } of flattenRoutes(routes)) {
+        for (const group of routeGroups) {
+            if (groups?.groups.has(group)) continue;
+            throw new Error(
+                groups === undefined
+                    ? `Route '${routeKey}' is filed under the group '${group}', but the config declares no groups. Pass \`groups\` to defineConfig.`
+                    : `Route '${routeKey}' is filed under the group '${group}', which \`groups\` does not declare.`
+            );
+        }
+    }
+};
+
+/**
  * What one API is made of. Everything kizuna knows about an API is written
  * here: what it declares, and what serves it.
  */
 export type KizunaConfigInput<
-    R extends Routes,
+    R extends readonly Routes[],
     J extends Jobs,
     P extends PluginList,
-    Tags extends Record<string, TagOptions>,
+    Groups extends Record<string, GroupOptions | string>,
     Codes extends string,
     Identities extends Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema>,
@@ -173,8 +191,10 @@ export type KizunaConfigInput<
      */
     adapter?: AdapterValue;
     /**
-     * The route groups this API answers, as `k.routes` returned them. Omit it
-     * while setting up, before there is a route to name.
+     * What `k.routes` returned, as a list in any order.
+     *
+     * @example
+     * routes: [userRoutes, memberRoutes, healthRoutes],
      */
     routes?: R;
     jobs?: J;
@@ -201,7 +221,10 @@ export type KizunaConfigInput<
      * }),
      */
     content?: ContentValue;
-    tags?: TagSet<Tags>;
+    /**
+     * The groups from `k.groups`.
+     */
+    groups?: GroupSet<Groups>;
     /**
      * Who may call this API: the identities a route's `auth` names, and the
      * body their guards refuse with.
@@ -296,10 +319,10 @@ type JobRunnerInput<J extends Jobs> = string extends keyof J
  * that serves it.
  */
 export type ConfiguredApi<
-    R extends Routes,
+    R extends readonly Routes[],
     J extends Jobs,
     P extends PluginList,
-    Tags extends Record<string, TagOptions>,
+    Groups extends Record<string, GroupOptions | string>,
     Codes extends string,
     Identities extends Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema>,
@@ -308,14 +331,14 @@ export type ConfiguredApi<
 > = Api<
     ApiDefinition<
         RoutesWithHandlerContext<
-            R,
+            AssembledRoutes<R>,
             Identities,
             RequestContext,
             PluginArgs<PluginsBySlug<P>> & JobsArg<J>,
             GuardOutput<GuardSchema>,
             GuardBody<GuardSchema>
         >,
-        Tags,
+        Groups,
         Codes,
         Identities,
         RequestContext,
@@ -344,10 +367,10 @@ export type ConfiguredApi<
  * });
  */
 export const defineConfig = <
-    const R extends Routes = Record<string, never>,
+    const R extends readonly Routes[] = readonly [],
     const J extends Jobs = Record<string, never>,
     const P extends PluginList = readonly [],
-    const Tags extends Record<string, TagOptions> = Record<string, never>,
+    const Groups extends Record<string, GroupOptions | string> = {},
     const Codes extends string = never,
     const Identities extends Record<string, SecurityScheme> = Record<string, never>,
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
@@ -355,9 +378,9 @@ export const defineConfig = <
     const AdapterValue extends AnyAdapter | undefined = undefined,
     const ContentValue extends ContentProvider | undefined = undefined,
 >(
-    options: KizunaConfigInput<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue, ContentValue>
+    options: KizunaConfigInput<R, J, P, Groups, Codes, Identities, RequestContext, GuardSchema, AdapterValue, ContentValue>
 ): {
-    api: ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
+    api: ConfiguredApi<R, J, P, Groups, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
     /**
      * Reads the content `content` provides, typed from its documents.
      */
@@ -374,9 +397,7 @@ export const defineConfig = <
     if (content !== undefined && !isContentProvider(content)) {
         throw new Error('`content` takes a content provider, such as `cms({ ... })` from `@kizunajs/cms`.');
     }
-    const routes = {
-        ...((options.routes ?? {}) as Routes),
-    } as Routes;
+    const routes = assembleRoutes((options.routes ?? []) as readonly Routes[]);
     for (const [group, provided] of Object.entries(content?.routes ?? {})) {
         if (group in routes) {
             throw new Error(
@@ -395,6 +416,7 @@ export const defineConfig = <
     assertJobRunner(jobs, options.jobRunner);
     assertValidDeprecationDates(routes);
     assertValidDeprecationDates(pluginRoutes);
+    assertDeclaredGroups(routes, options.groups as GroupSet | undefined);
 
     for (const { route, routeKey } of flattenRoutes(pluginRoutes)) {
         if (route.tool !== undefined && route.tool !== false) {
@@ -448,7 +470,7 @@ export const defineConfig = <
     const contract = buildApiDefinition({
         routes,
         jobs,
-        tags: options.tags as TagSet<Record<string, TagOptions>> | undefined,
+        groups: options.groups as GroupSet | undefined,
         securitySchemes: identities,
         guardSchema,
         requestContext: options.requestContext as Record<string, RequestContextSchema> | undefined,
@@ -474,7 +496,7 @@ export const defineConfig = <
             onJobError: options.jobRunner?.onError,
         },
         options.adapter
-    ) as unknown as ConfiguredApi<R, J, P, Tags, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
+    ) as unknown as ConfiguredApi<R, J, P, Groups, Codes, Identities, RequestContext, GuardSchema, AdapterValue>;
     apiReference.bind(api);
     for (const plugin of Object.values(plugins)) plugin.validate?.();
 

@@ -1,0 +1,93 @@
+---
+title: k.groups
+description: Declare the groups routes are organised into, nested as deep as the API needs.
+---
+
+Declare the groups routes are organised into. Name the result under `groups` on [`defineConfig`](/docs/reference/define-config), and declare routes into a group with [`k.routes`](/docs/reference/k-routes).
+
+## Parameters
+
+```ts
+k.groups(groups: Record<string, GroupOptions | string>): GroupSet
+```
+
+Each entry is keyed by a name you choose. A value is either a `GroupOptions` object or a plain title string:
+
+| Option         | Type     | Required | Description                                             |
+| -------------- | -------- | -------- | ------------------------------------------------------- |
+| `title`        | `string` | Yes      | The group's name in the docs. Unique among its siblings |
+| `description`  | `string` | No       | Shown beside the tag in the OpenAPI document            |
+| `externalDocs` | `object` | No       | `{ url, description? }` external docs for the group     |
+| `groups`       | `object` | No       | The groups nested under this one, in the same shape     |
+
+A group is addressed by its dotted path, `workspaces.members`. `k.groups` throws when two siblings share a title, since a reader could not tell them apart.
+
+## Returns
+
+A `GroupSet`. Once your `Config` carries it, `k.routes` offers every group by name, and a route's own `groups` completes their dotted paths. The generated OpenAPI document lists each top-level group as a tag.
+
+## Example
+
+```ts title="src/groups.ts"
+import { k } from './k';
+
+export const groups = k.groups({
+    workspaces: {
+        title: 'Workspaces',
+        description: 'Shared spaces and the people in them',
+        groups: {
+            members: 'Members',
+            invites: 'Invites',
+        },
+    },
+    health: 'Health',
+});
+```
+
+```ts title="kizuna.config.ts"
+import { defineConfig } from 'kizunajs';
+import { groups } from './src/groups';
+import { routes } from './src/routes';
+
+export default defineConfig({
+    groups,
+    routes,
+});
+```
+
+```ts title="src/routes/members.ts"
+import { k } from '../k';
+import { listMembers } from './list-members';
+import { removeMember } from './remove-member';
+
+export const memberRoutes = k.routes.workspaces.members({
+    listMembers,
+    removeMember,
+});
+```
+
+The group is also the route's key: `listMembers` is `workspaces.members.listMembers`, so clients call routes where the documentation files them. List the trees on `defineConfig` in any order, `routes: [memberRoutes, inviteRoutes]`. [`kizuna routes`](/docs/cli#group-problems) fails when a route is in no group once groups exist, and when a group holds no routes.
+
+## Nested groups in OpenAPI
+
+OpenAPI 3.1 has no nested tags, so each top-level group becomes a tag and a route in a nested group is listed under the group at the top of its path. `listMembers` shows under Workspaces.
+
+A title only has to differ from its siblings, since nested titles never become tags of their own. `workspace.notes` and `assistant.notes` can both be titled "Notes".
+
+## Listing a route under more groups
+
+A route's own `groups` adds it to more groups, by dotted path, with completion:
+
+```ts title="src/routes/list-my-invites.ts"
+export const listMyInvites = k
+    .route({
+        method: 'GET',
+        path: '/me/invites',
+        auth: 'user',
+        groups: ['workspaces.invites'],
+        // ...
+    })
+    .handler(/* ... */);
+```
+
+See the [Routes guide](/docs/routes#splitting-routes-across-files) for laying groups out across files.

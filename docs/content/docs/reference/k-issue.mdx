@@ -73,13 +73,13 @@ By default `errors[].code` is typed as [`ValidationIssueCode`](/docs/reference/i
 
 To make the client suggest your custom codes, declare them under `validation.issueCodes` on `defineConfig` and regenerate the [fetch client](/docs/clients/fetch):
 
-```ts title="k.ts"
+```ts title="kizuna.config.ts"
 import { defineConfig } from 'kizunajs';
-import { tags } from './src/tags';
+import { groups } from './src/groups';
 import { routes } from './src/routes';
 
 export default defineConfig({
-    tags,
+    groups,
     routes,
     validation: {
         issueCodes: ['invalid_phone_number'],

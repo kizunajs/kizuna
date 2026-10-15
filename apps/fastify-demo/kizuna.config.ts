@@ -3,23 +3,21 @@ import { fetchClient } from '@kizunajs/fetch';
 import { fastifyAdapter } from '@kizunajs/fastify';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';
-import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import { GuardSchema, analytics, jobs, routes, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import { groups } from './src/groups';
 import { diagnostics } from './src/routes/diagnostics';
 
 /**
  * The shared routes every demo serves, plus the ones only this demo can answer.
  */
-const served = {
-    ...routes,
-    diagnostics,
-};
+const served = [...routes, diagnostics];
 
 export default defineConfig({
     adapter: fastifyAdapter(),
     typescript: {
         outputFile: './kizuna.types.ts',
     },
-    tags,
+    groups,
     auth: {
         identities: {
             user,

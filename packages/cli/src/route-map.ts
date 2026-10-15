@@ -9,7 +9,10 @@ export interface RouteEntry {
     method: string;
     path: string;
     auth: string;
-    tags: string[];
+    /**
+     * The route's groups, as dotted paths.
+     */
+    groups: string[];
     tool?: string;
     deprecated?: string;
     sunset?: string;
@@ -54,14 +57,14 @@ export const routeMap = (api: ApiDefinition, _options: Record<string, never> = {
     const toolKeys: Array<{ key: string; origin: 'route' }> = [];
 
     return walkApi(api, {
-        processRoute({ routeKey, route, routeTags, deprecated, deprecationMessage, hidden }) {
+        processRoute({ routeKey, route, routeGroups, deprecated, deprecationMessage, hidden }) {
             if (route.tool) toolKeys.push({ key: routeKey, origin: 'route' });
             entries.push({
                 key: routeKey,
                 method: route.method,
                 path: route.path,
                 auth: describeAuth(route.auth),
-                tags: routeTags,
+                groups: routeGroups,
                 deprecated: deprecated ? (deprecationMessage ?? '') : undefined,
                 sunset: describeSunset(route.sunset),
                 ...(hidden
@@ -99,6 +102,7 @@ export const formatRoutes = (entries: readonly RouteEntry[]): string => {
         .map((entry) => {
             const notes = [
                 `auth: ${entry.auth}`,
+                entry.groups.length > 0 && `group: ${entry.groups.join(', ')}`,
                 entry.tool && `tool: ${entry.tool}`,
                 entry.deprecated !== undefined && `deprecated${entry.deprecated ? `, ${entry.deprecated}` : ''}`,
                 entry.sunset && `sunset ${entry.sunset}`,

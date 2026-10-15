@@ -8,7 +8,7 @@ const TemperatureUnit = z.enum(['celsius', 'fahrenheit']);
  * The routes a model may call, over MCP or while the assistant streams a reply.
  * Each is an ordinary route, so an HTTP caller reaches it the same way.
  */
-export const assistantTools = k.routes('assistant', {
+export const assistantTools = k.routes.assistant.tools({
     getForecast: k
         .route({
             method: 'GET',

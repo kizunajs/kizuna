@@ -112,7 +112,7 @@ const UserPathParams = z.object({
     id: UserId,
 });
 
-export const usersRoutes = k.routes('users', {
+export const usersRoutes = k.routes.users({
     listUsers: k
         .route({
             method: 'GET',

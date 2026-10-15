@@ -7,10 +7,10 @@ import type { GuardSchema } from './guard-schema';
 import type { user, member, inviteToken, scheduler } from './identities';
 import type { jobs } from './jobs';
 import type { analytics } from './request-context';
-import type { tags } from './tags';
+import type { groups } from './groups';
 
 export interface Config {
-    tags: typeof tags;
+    groups: typeof groups;
     auth: {
         identities: {
             user: typeof user;

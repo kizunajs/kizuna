@@ -5,7 +5,7 @@ import { k } from '../k';
 import { assistantTools } from './assistant-tools';
 import { noteRoutes } from './notes';
 
-export const assistantRoutes = k.routes('assistant', {
+export const assistantRoutes = k.routes.assistant({
     reply: k
         .route({
             method: 'POST',

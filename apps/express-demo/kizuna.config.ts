@@ -6,7 +6,8 @@ import { expressAdapter } from '@kizunajs/express';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';
 import { resendPlugin } from '@kizunajs/resend';
-import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import { GuardSchema, analytics, jobs, routes, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import { groups } from './src/groups';
 import { diagnostics } from './src/routes/diagnostics';
 import { contact } from './src/routes/contact';
 import { newsletter } from './src/routes/newsletter';
@@ -16,19 +17,14 @@ import { resendEvents } from './src/resend-events';
 /**
  * The shared routes every demo serves, plus the ones only this demo can answer.
  */
-const served = {
-    ...routes,
-    diagnostics,
-    contact,
-    newsletter,
-};
+const served = [...routes, diagnostics, contact, newsletter];
 
 export default defineConfig({
     adapter: expressAdapter(),
     typescript: {
         outputFile: './kizuna.types.ts',
     },
-    tags,
+    groups,
     auth: {
         identities: {
             user,

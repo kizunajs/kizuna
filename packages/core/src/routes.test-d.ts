@@ -1,11 +1,11 @@
 import { expectTypeOf, test } from 'vitest';
 import { z } from 'zod';
-import { tagRoutes } from './routes.js';
+import { groupRoutes } from './routes.js';
 import { Kizuna } from './kizuna.js';
 
 const k = new Kizuna();
 
-const routes = tagRoutes({
+const routes = groupRoutes({
     getUser: {
         method: 'GET',
         path: '/users/:id',
@@ -47,24 +47,33 @@ test('createUser has body, getUser does not', () => {
 
 test('path must start with /', () => {
     // @ts-expect-error path must start with /
-    tagRoutes({ bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } } });
+    groupRoutes({ bad: { method: 'GET', path: 'users/:id', responses: { 200: z.string() } } });
 });
 
-const tags = k.tags({
+const groups = k.groups({
     users: {
         title: 'Users',
         description: 'User management endpoints',
+    },
+    workspaces: {
+        title: 'Workspaces',
+        groups: {
+            members: 'Members',
+        },
     },
     health: {
         title: 'Health',
     },
 });
+const grouped = new Kizuna<{
+    groups: typeof groups;
+}>();
 
-const tagged = tagRoutes(tags, 'users', {
+const usersRoutes = grouped.routes.users({
     getUser: {
         method: 'GET',
         path: '/users/:id',
-        tags: ['health'],
+        groups: ['health'],
         responses: {
             200: z.object({
                 id: z.string(),
@@ -73,14 +82,27 @@ const tagged = tagRoutes(tags, 'users', {
     },
 });
 
-test('tagged routes preserves literal types', () => {
-    expectTypeOf(tagged.getUser.method).toEqualTypeOf<'GET'>();
-    expectTypeOf(tagged.getUser.path).toEqualTypeOf<'/users/:id'>();
+test('grouped routes preserve literal types', () => {
+    expectTypeOf(usersRoutes.getUser.method).toEqualTypeOf<'GET'>();
+    expectTypeOf(usersRoutes.getUser.path).toEqualTypeOf<'/users/:id'>();
 });
 
-test('group key must be a declared tag key', () => {
-    // @ts-expect-error 'unknown' is not a declared tag key
-    tagRoutes(tags, 'unknown', {
+test('k.routes reaches a nested group by its path', () => {
+    const memberRoutes = grouped.routes.workspaces.members({
+        listMembers: {
+            method: 'GET',
+            path: '/workspaces/:workspaceId/members',
+            responses: {
+                200: z.string(),
+            },
+        },
+    });
+    expectTypeOf(memberRoutes.listMembers.path).toEqualTypeOf<'/workspaces/:workspaceId/members'>();
+});
+
+test('a group must be declared', () => {
+    // @ts-expect-error 'unknown' is not a declared group
+    grouped.routes.unknown({
         getUser: {
             method: 'GET',
             path: '/users/:id',
@@ -93,13 +115,23 @@ test('group key must be a declared tag key', () => {
     });
 });
 
-test('route-level tags must be declared tag keys', () => {
-    tagRoutes(tags, 'users', {
+test('a nested group is reached through its parent, never at the root', () => {
+    // @ts-expect-error 'members' sits under 'workspaces'
+    void grouped.routes.members;
+});
+
+test('a k without groups offers none', () => {
+    // @ts-expect-error no groups are declared
+    void k.routes.users;
+});
+
+test('route-level groups must be declared group paths', () => {
+    grouped.routes.users({
         getUser: {
             method: 'GET',
             path: '/users/:id',
-            // @ts-expect-error 'unknown' is not a declared tag key
-            tags: ['unknown'],
+            // @ts-expect-error 'unknown' is not a declared group
+            groups: ['unknown'],
             responses: {
                 200: z.object({
                     id: z.string(),
@@ -109,12 +141,27 @@ test('route-level tags must be declared tag keys', () => {
     });
 });
 
-test('tagless tagRoutes accepts arbitrary tag strings', () => {
-    tagRoutes({
+test('route-level groups take nested paths', () => {
+    grouped.routes.users({
         getUser: {
             method: 'GET',
             path: '/users/:id',
-            tags: ['anything'],
+            groups: ['workspaces.members'],
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                }),
+            },
+        },
+    });
+});
+
+test('groupRoutes on its own accepts any group path', () => {
+    groupRoutes({
+        getUser: {
+            method: 'GET',
+            path: '/users/:id',
+            groups: ['anything'],
             responses: {
                 200: z.object({
                     id: z.string(),
@@ -125,7 +172,7 @@ test('tagless tagRoutes accepts arbitrary tag strings', () => {
 });
 
 test('pathParams keys must match the path placeholders', () => {
-    tagRoutes({
+    groupRoutes({
         getPlace: {
             method: 'GET',
             path: '/places/:plackeId',
@@ -143,7 +190,7 @@ test('pathParams keys must match the path placeholders', () => {
 });
 
 test('every path placeholder must appear in pathParams', () => {
-    tagRoutes({
+    groupRoutes({
         getVisit: {
             method: 'GET',
             path: '/places/:placeId/visits/:visitId',
@@ -161,7 +208,7 @@ test('every path placeholder must appear in pathParams', () => {
 });
 
 test('matching pathParams are accepted, in nested groups too', () => {
-    const checked = tagRoutes({
+    const checked = groupRoutes({
         getPlace: {
             method: 'GET',
             path: '/places/:placeId',
@@ -195,7 +242,7 @@ test('matching pathParams are accepted, in nested groups too', () => {
 });
 
 test('routes that omit pathParams are left alone', () => {
-    tagRoutes({
+    groupRoutes({
         getPlace: {
             method: 'GET',
             path: '/places/:placeId',
@@ -209,7 +256,7 @@ test('routes that omit pathParams are left alone', () => {
 });
 
 test('a pathParams schema without a known key set switches the check off', () => {
-    tagRoutes({
+    groupRoutes({
         getPlace: {
             method: 'GET',
             path: '/places/:placeId',

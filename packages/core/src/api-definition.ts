@@ -1,19 +1,19 @@
 import type { z } from 'zod';
 import type { Routes } from './types.js';
-import type { TagSet, TagOptions } from './tags.js';
+import type { GroupSet, GroupOptions, GroupPaths } from './groups.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
 import type { Jobs, JobsConfig } from './jobs.js';
 import type { ApiPlugins } from './plugin.js';
 
 /**
- * A kizuna API definition: its routes plus tags, identities, and validation
+ * A kizuna API definition: its routes plus groups, identities, and validation
  * settings. Produced by `defineConfig` and consumed by the server adapters,
  * fetch client, OpenAPI generator, and SDK generators.
  */
 export interface ApiDefinition<
     Routes_ extends Routes = Routes,
-    Tags extends Record<string, TagOptions> = Record<string, TagOptions>,
+    Groups extends Record<string, GroupOptions | string> = Record<string, GroupOptions | string>,
     Codes extends string = string,
     Schemes extends Record<string, SecurityScheme> = Record<string, SecurityScheme>,
     RequestContext extends Record<string, RequestContextSchema> = Record<string, RequestContextSchema>,
@@ -46,10 +46,9 @@ export interface ApiDefinition<
      */
     jobsConfig?: JobsConfig;
     /**
-     * The tag set declared with `k.tags`. Routes reference its keys; the
-     * OpenAPI generator resolves each key to its title and description.
+     * The groups declared with `k.groups`.
      */
-    tags?: TagSet<Tags>;
+    groups?: GroupSet<Groups>;
     /**
      * The identities named in `defineConfig`. A route's `auth` names them,
      * `defineConfig` writes each route's `security` from it, and the
@@ -74,18 +73,15 @@ export interface ApiDefinition<
 }
 
 /**
- * Internal helper that builds a {@link ApiDefinition} from routes, tags, identities,
+ * Internal helper that builds a {@link ApiDefinition} from routes, groups, identities,
  * and issue codes. Called by `defineConfig`. Not part of the public surface;
  * author contracts through `k`.
  */
 export function buildApiDefinition<
-    const Tags extends Record<string, TagOptions> = Record<string, never>,
+    const Groups extends Record<string, GroupOptions | string> = {},
     const Codes extends string = never,
     const Schemes extends Record<string, SecurityScheme> = Record<string, never>,
-    const R extends Routes<Extract<keyof Tags, string>, Extract<keyof Schemes, string>> = Routes<
-        Extract<keyof Tags, string>,
-        Extract<keyof Schemes, string>
-    >,
+    const R extends Routes<GroupPaths<Groups>, Extract<keyof Schemes, string>> = Routes<GroupPaths<Groups>, Extract<keyof Schemes, string>>,
     const RequestContext extends Record<string, RequestContextSchema> = Record<string, never>,
     const Plugins extends ApiPlugins = Record<string, never>,
     const Jobs_ extends Jobs = Record<string, never>,
@@ -95,21 +91,21 @@ export function buildApiDefinition<
     guardSchema?: GuardSchema;
     jobs?: Jobs_;
     jobsConfig?: JobsConfig;
-    tags?: TagSet<Tags>;
+    groups?: GroupSet<Groups>;
     securitySchemes?: Schemes;
     requestContext?: RequestContext;
     validation?: {
         issueCodes?: readonly Codes[];
     };
     plugins?: Plugins;
-}): ApiDefinition<R, Tags, Codes, Schemes, RequestContext, Plugins, Jobs_, GuardSchema> {
+}): ApiDefinition<R, Groups, Codes, Schemes, RequestContext, Plugins, Jobs_, GuardSchema> {
     return {
         routes: config.routes,
         guardSchema: config.guardSchema,
         plugins: config.plugins,
         jobs: config.jobs,
         jobsConfig: config.jobsConfig,
-        tags: config.tags,
+        groups: config.groups,
         securitySchemes: config.securitySchemes,
         requestContext: config.requestContext,
         validation: config.validation,

@@ -2,7 +2,7 @@ export { k } from './k';
 export * from './routes/index';
 export { GuardSchema } from './guard-schema';
 export { analytics } from './request-context';
-export { tags } from './tags';
+export { groups } from './groups';
 export type { Config } from './kizuna.types';
 export { user, member, inviteToken, scheduler } from './identities';
 export { type User } from './types';

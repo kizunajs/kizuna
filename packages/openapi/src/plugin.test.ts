@@ -9,16 +9,16 @@ import { generateOpenApi } from './generator.js';
 import { openApiPlugin } from './plugin.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
 const contract = defineConfig({
@@ -33,24 +33,26 @@ const contract = defineConfig({
             docsPath: '/docs',
         }),
     ],
-    routes: k.routes('api', {
-        getUser: k
-            .route({
-                method: 'GET',
-                path: '/users/:id',
-                responses: {
-                    200: z.object({
-                        id: z.string(),
-                    }),
-                },
-            })
-            .handler(({ params }) => ({
-                status: 200,
-                body: {
-                    id: params.id,
-                },
-            })),
-    }),
+    routes: [
+        k.routes({
+            getUser: k
+                .route({
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                })
+                .handler(({ params }) => ({
+                    status: 200,
+                    body: {
+                        id: params.id,
+                    },
+                })),
+        }),
+    ],
 }).api;
 
 const serve = () => {
@@ -89,14 +91,14 @@ describe('openApiPlugin', () => {
     });
 
     it('hands its options to generateOpenApi, so a build step cannot drift from what is served', async () => {
-        const servedKTags = k.tags({
+        const servedKGroups = k.groups({
             api: 'API',
         });
         const servedKConfig = {
-            tags: servedKTags,
+            groups: servedKGroups,
         };
         const servedK = new Kizuna<{
-            tags: typeof servedKTags;
+            groups: typeof servedKGroups;
         }>();
         const servedContract = defineConfig({
             adapter: expressAdapter(),
@@ -110,24 +112,26 @@ describe('openApiPlugin', () => {
                     jsonPath: '/openapi.json',
                 }),
             ],
-            routes: servedK.routes('api', {
-                ping: servedK
-                    .route({
-                        method: 'GET',
-                        path: '/ping',
-                        responses: {
-                            200: z.object({
-                                ok: z.boolean(),
-                            }),
-                        },
-                    })
-                    .handler(() => ({
-                        status: 200,
-                        body: {
-                            ok: true,
-                        },
-                    })),
-            }),
+            routes: [
+                servedK.routes({
+                    ping: servedK
+                        .route({
+                            method: 'GET',
+                            path: '/ping',
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        })
+                        .handler(() => ({
+                            status: 200,
+                            body: {
+                                ok: true,
+                            },
+                        })),
+                }),
+            ],
         }).api;
 
         const app = express();
@@ -140,42 +144,44 @@ describe('openApiPlugin', () => {
     });
 
     it('says what to do when there are no options and no plugin', () => {
-        const bareKTags = k.tags({
+        const bareKGroups = k.groups({
             api: 'API',
         });
         const bareKConfig = {
-            tags: bareKTags,
+            groups: bareKGroups,
         };
         const bareK = new Kizuna<{
-            tags: typeof bareKTags;
+            groups: typeof bareKGroups;
         }>();
         const bare = defineConfig({
             ...bareKConfig,
-            routes: bareK.routes('api', {
-                ping: bareK.route({
-                    method: 'GET',
-                    path: '/ping',
-                    responses: {
-                        200: z.object({
-                            ok: z.boolean(),
-                        }),
-                    },
+            routes: [
+                bareK.routes({
+                    ping: bareK.route({
+                        method: 'GET',
+                        path: '/ping',
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    }),
                 }),
-            }),
+            ],
         }).api;
 
         expect(() => generateOpenApi(bare)).toThrow(/Name `openApiPlugin` under `plugins`/);
     });
 
     it('serves the document with no UI when only a document path is given', async () => {
-        const specOnlyKTags = k.tags({
+        const specOnlyKGroups = k.groups({
             api: 'API',
         });
         const specOnlyKConfig = {
-            tags: specOnlyKTags,
+            groups: specOnlyKGroups,
         };
         const specOnlyK = new Kizuna<{
-            tags: typeof specOnlyKTags;
+            groups: typeof specOnlyKGroups;
         }>();
         const specOnly = defineConfig({
             adapter: expressAdapter(),
@@ -189,24 +195,26 @@ describe('openApiPlugin', () => {
                     jsonPath: '/openapi.json',
                 }),
             ],
-            routes: specOnlyK.routes('api', {
-                ping: specOnlyK
-                    .route({
-                        method: 'GET',
-                        path: '/ping',
-                        responses: {
-                            200: z.object({
-                                ok: z.boolean(),
-                            }),
-                        },
-                    })
-                    .handler(() => ({
-                        status: 200,
-                        body: {
-                            ok: true,
-                        },
-                    })),
-            }),
+            routes: [
+                specOnlyK.routes({
+                    ping: specOnlyK
+                        .route({
+                            method: 'GET',
+                            path: '/ping',
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        })
+                        .handler(() => ({
+                            status: 200,
+                            body: {
+                                ok: true,
+                            },
+                        })),
+                }),
+            ],
         }).api;
 
         const app = express();
@@ -217,14 +225,14 @@ describe('openApiPlugin', () => {
     });
 
     it('takes a path for each of the three', async () => {
-        const customKTags = k.tags({
+        const customKGroups = k.groups({
             api: 'API',
         });
         const customKConfig = {
-            tags: customKTags,
+            groups: customKGroups,
         };
         const customK = new Kizuna<{
-            tags: typeof customKTags;
+            groups: typeof customKGroups;
         }>();
         const custom = defineConfig({
             adapter: expressAdapter(),
@@ -239,24 +247,26 @@ describe('openApiPlugin', () => {
                     yamlPath: '/spec.yaml',
                 }),
             ],
-            routes: customK.routes('api', {
-                ping: customK
-                    .route({
-                        method: 'GET',
-                        path: '/ping',
-                        responses: {
-                            200: z.object({
-                                ok: z.boolean(),
-                            }),
-                        },
-                    })
-                    .handler(() => ({
-                        status: 200,
-                        body: {
-                            ok: true,
-                        },
-                    })),
-            }),
+            routes: [
+                customK.routes({
+                    ping: customK
+                        .route({
+                            method: 'GET',
+                            path: '/ping',
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        })
+                        .handler(() => ({
+                            status: 200,
+                            body: {
+                                ok: true,
+                            },
+                        })),
+                }),
+            ],
         }).api;
 
         const app = express();
@@ -269,14 +279,14 @@ describe('openApiPlugin', () => {
     });
 
     it('serves the document at the paths it is given', async () => {
-        const jsonOnlyKTags = k.tags({
+        const jsonOnlyKGroups = k.groups({
             api: 'API',
         });
         const jsonOnlyKConfig = {
-            tags: jsonOnlyKTags,
+            groups: jsonOnlyKGroups,
         };
         const jsonOnlyK = new Kizuna<{
-            tags: typeof jsonOnlyKTags;
+            groups: typeof jsonOnlyKGroups;
         }>();
         const jsonOnly = defineConfig({
             adapter: expressAdapter(),
@@ -291,24 +301,26 @@ describe('openApiPlugin', () => {
                     yamlPath: '/openapi.yaml',
                 }),
             ],
-            routes: jsonOnlyK.routes('api', {
-                ping: jsonOnlyK
-                    .route({
-                        method: 'GET',
-                        path: '/ping',
-                        responses: {
-                            200: z.object({
-                                ok: z.boolean(),
-                            }),
-                        },
-                    })
-                    .handler(() => ({
-                        status: 200,
-                        body: {
-                            ok: true,
-                        },
-                    })),
-            }),
+            routes: [
+                jsonOnlyK.routes({
+                    ping: jsonOnlyK
+                        .route({
+                            method: 'GET',
+                            path: '/ping',
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        })
+                        .handler(() => ({
+                            status: 200,
+                            body: {
+                                ok: true,
+                            },
+                        })),
+                }),
+            ],
         }).api;
 
         const app = express();

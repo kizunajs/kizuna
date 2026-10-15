@@ -1,7 +1,6 @@
 import type { z } from 'zod';
-import { ROUTES_TAG, type Routes, type RouteDefinition, type ResponseDefinition } from './types.js';
+import { ROUTES_GROUP, type Routes, type RouteDefinition, type ResponseDefinition } from './types.js';
 import { isRouteDefinition } from './handler-pipeline.js';
-import { type TagSet, type TagKeysOf, isTagSet } from './tags.js';
 import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
@@ -125,38 +124,87 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
     }
 };
 
+const isDeclared = (value: unknown): boolean => typeof value === 'object' && value !== null && ROUTES_GROUP in value;
+
+const groupOf = (value: unknown): string | undefined =>
+    isDeclared(value) ? (value as Record<typeof ROUTES_GROUP, string>)[ROUTES_GROUP] : undefined;
+
 /**
- * Define a group of routes under a tag. Pass the tag set declared with
- * `k.tags` for completion on the group tag and route-level `tags`; the
- * tag is stamped onto every route in the group.
+ * Throw on a grouped tree nested inside another. It belongs in `defineConfig`'s
+ * list.
  */
-export function tagRoutes<const T extends Routes<TagKeysOf<Set>>, Set extends TagSet>(
-    tags: Set,
-    tag: TagKeysOf<Set>,
-    routes: T & PathParamsCheck<T>
-): T;
-export function tagRoutes<const T extends Routes<TagKeysOf<Set>>, Set extends TagSet>(tags: Set, routes: T & PathParamsCheck<T>): T;
-export function tagRoutes<const T extends Routes>(tag: string, routes: T & PathParamsCheck<T>): T;
-export function tagRoutes<const T extends Routes>(routes: T & PathParamsCheck<T>): T;
-export function tagRoutes(first: TagSet | string | Routes, second?: string | Routes, third?: Routes): Routes {
-    if (isTagSet(first)) {
-        if (third !== undefined) {
-            const result = third;
-            (result as Record<typeof ROUTES_TAG, string>)[ROUTES_TAG] = second as string;
-            validateRoutes(result);
-            return result;
+const assertNoGroupInside = (routes: Routes, prefix?: string): void => {
+    for (const [key, value] of Object.entries(routes)) {
+        if (isRouteDefinition(value) || !value || typeof value !== 'object') continue;
+        const fullKey = prefix ? `${prefix}.${key}` : key;
+        const group = groupOf(value);
+        if (group !== undefined && group !== '') {
+            throw new Error(
+                `"${fullKey}" was declared into the group ${group}, so its key comes from there. List it in defineConfig's \`routes\` instead of nesting it.`
+            );
         }
-        const result = second as Routes;
-        validateRoutes(result);
-        return result;
+        assertNoGroupInside(value as Routes, fullKey);
     }
-    if (typeof first === 'string') {
-        const result = second as Routes;
-        (result as Record<typeof ROUTES_TAG, string>)[ROUTES_TAG] = first;
-        validateRoutes(result);
-        return result;
-    }
-    const result = first;
-    validateRoutes(result);
-    return result;
+};
+
+/**
+ * Validate a tree of routes and stamp its group's path, `''` for none.
+ */
+export function groupRoutes<const T extends Routes>(routes: T & PathParamsCheck<T>): T;
+export function groupRoutes<const T extends Routes>(group: string, routes: T & PathParamsCheck<T>): T;
+export function groupRoutes(first: string | Routes, second?: Routes): Routes {
+    const routes = typeof first === 'string' ? second! : first;
+    assertNoGroupInside(routes);
+    (routes as Record<typeof ROUTES_GROUP, string>)[ROUTES_GROUP] = typeof first === 'string' ? first : '';
+    validateRoutes(routes);
+    return routes;
 }
+
+/**
+ * Merge `source` into `target`, throwing when both hold the same key.
+ */
+const mergeRoutes = (target: Routes, source: Routes, path: string): void => {
+    for (const [key, value] of Object.entries(source)) {
+        const fullKey = path === '' ? key : `${path}.${key}`;
+        const existing = target[key];
+        if (existing === undefined) {
+            target[key] = value;
+            continue;
+        }
+        if (isRouteDefinition(existing) || isRouteDefinition(value)) {
+            throw new Error(`Two routes claim the key "${fullKey}". Rename one, or declare it into another group.`);
+        }
+        // A spread keeps the group symbol.
+        const merged: Routes = {
+            ...existing,
+        };
+        mergeRoutes(merged, value as Routes, fullKey);
+        target[key] = merged;
+    }
+};
+
+/**
+ * The route tree a list of declared trees makes, each at its group's path.
+ */
+export const assembleRoutes = (declared: readonly Routes[]): Routes => {
+    const root: Routes = {};
+    for (const entry of declared) {
+        // A plain object is routes in no group.
+        const routes = isDeclared(entry) ? entry : groupRoutes(entry);
+        const group = (routes as Record<typeof ROUTES_GROUP, string>)[ROUTES_GROUP];
+        let node = root;
+        let path = '';
+        for (const segment of group === '' ? [] : group.split('.')) {
+            path = path === '' ? segment : `${path}.${segment}`;
+            const existing = node[segment];
+            if (isRouteDefinition(existing)) {
+                throw new Error(`The route "${path}" sits where the group ${group} needs its key. Rename the route, or the group.`);
+            }
+            if (existing === undefined) node[segment] = {};
+            node = node[segment] as Routes;
+        }
+        if (group !== '') (node as Record<typeof ROUTES_GROUP, string>)[ROUTES_GROUP] = group;
+        mergeRoutes(node, routes, path);
+    }
+    return root;
+};

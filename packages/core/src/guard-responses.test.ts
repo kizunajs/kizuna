@@ -89,9 +89,11 @@ type DemoRoutes = ReturnType<typeof makeRoutes>;
 const contractFor = (routes: DemoRoutes) =>
     defineConfig({
         ...config,
-        routes: {
-            api: routes,
-        },
+        routes: [
+            {
+                api: routes,
+            },
+        ],
     }).api;
 
 const routeOf = (contract: ReturnType<typeof contractFor>, name: string): RouteDefinition =>
@@ -126,19 +128,21 @@ describe('injectGuardResponses', () => {
         const build = () =>
             defineConfig({
                 ...config,
-                routes: {
-                    api: k.routes({
-                        listUsers: k.route({
-                            method: 'GET',
-                            path: '/users',
-                            auth: 'user',
-                            responses: {
-                                ...okResponse(),
-                                401: ProblemDetailsSchema,
-                            },
-                        }),
+                routes: [
+                    k.routes({
+                        api: {
+                            listUsers: k.route({
+                                method: 'GET',
+                                path: '/users',
+                                auth: 'user',
+                                responses: {
+                                    ...okResponse(),
+                                    401: ProblemDetailsSchema,
+                                },
+                            }),
+                        },
                     }),
-                },
+                ],
             }).api;
 
         expect(build).toThrow(/declares a 401/);
@@ -210,22 +214,24 @@ describe('injectGuardResponses', () => {
         const shared = okResponse();
         const contract = defineConfig({
             ...config,
-            routes: {
-                api: k.routes({
-                    guarded: k.route({
-                        method: 'GET',
-                        path: '/guarded',
-                        auth: 'user',
-                        responses: shared,
-                    }),
-                    open: k.route({
-                        method: 'GET',
-                        path: '/open',
-                        auth: false,
-                        responses: shared,
-                    }),
+            routes: [
+                k.routes({
+                    api: {
+                        guarded: k.route({
+                            method: 'GET',
+                            path: '/guarded',
+                            auth: 'user',
+                            responses: shared,
+                        }),
+                        open: k.route({
+                            method: 'GET',
+                            path: '/open',
+                            auth: false,
+                            responses: shared,
+                        }),
+                    },
                 }),
-            },
+            ],
         }).api;
         const routes = contract.routes.api as Record<string, RouteDefinition>;
 
@@ -264,16 +270,18 @@ describe('a contract that declares a guardSchema', () => {
     const build = () =>
         defineConfig({
             ...scopedConfig,
-            routes: {
-                api: scoped.routes({
-                    listUsers: scoped.route({
-                        method: 'GET',
-                        path: '/users',
-                        auth: 'user',
-                        responses: okResponse(),
-                    }),
+            routes: [
+                scoped.routes({
+                    api: {
+                        listUsers: scoped.route({
+                            method: 'GET',
+                            path: '/users',
+                            auth: 'user',
+                            responses: okResponse(),
+                        }),
+                    },
                 }),
-            },
+            ],
         }).api;
 
     const routeOfScoped = (name: string): RouteDefinition => (build().routes.api as Record<string, RouteDefinition>)[name]!;
@@ -288,7 +296,7 @@ describe('a contract that declares a guardSchema', () => {
     it('refuses a schema that is not Problem Details at all', () => {
         expect(() =>
             defineConfig({
-                routes: {},
+                routes: [],
                 auth: {
                     guardSchema: z.object({
                         reason: z.string(),
@@ -301,7 +309,7 @@ describe('a contract that declares a guardSchema', () => {
     it('refuses a schema kizuna cannot build from a status and a detail alone', () => {
         expect(() =>
             defineConfig({
-                routes: {},
+                routes: [],
                 auth: {
                     guardSchema: ProblemDetailsSchema.extend({
                         code: z.string(),

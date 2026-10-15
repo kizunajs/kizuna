@@ -286,7 +286,7 @@ describe('k.contract with jobs', () => {
         });
         const contract = defineConfig({
             ...config,
-            routes,
+            routes: [routes],
             jobRunner: {
                 mode: 'http',
             },
@@ -299,7 +299,7 @@ describe('k.contract with jobs', () => {
     it('leaves jobs undefined when none are declared', () => {
         const contract = defineConfig({
             ...config,
-            routes,
+            routes: [routes],
         }).api;
         expect(contract.jobs).toBeUndefined();
     });
@@ -314,7 +314,7 @@ describe('k.contract with jobs', () => {
             () =>
                 defineConfig({
                     ...config,
-                    routes,
+                    routes: [routes],
                     jobRunner: {
                         mode: 'http',
                     },
@@ -348,7 +348,7 @@ describe('a job endpoint colliding with a route', () => {
             () =>
                 defineConfig({
                     ...config,
-                    routes: routesAt(path),
+                    routes: [routesAt(path)],
                     jobRunner: {
                         mode: 'http',
                     },
@@ -362,7 +362,7 @@ describe('a job endpoint colliding with a route', () => {
             () =>
                 defineConfig({
                     ...config,
-                    routes: routesAt('/jobs'),
+                    routes: [routesAt('/jobs')],
                     jobRunner: {
                         mode: 'http',
                     },
@@ -394,16 +394,18 @@ describe('a job endpoint colliding with a route', () => {
                         mode: 'http',
                         path: '/internal/tick',
                     },
-                    routes: moved.routes({
-                        listJobs: moved.route({
-                            method: 'POST',
-                            path: '/jobs/dispatch',
-                            auth: false,
-                            responses: {
-                                200: z.array(z.string()),
-                            },
+                    routes: [
+                        moved.routes({
+                            listJobs: moved.route({
+                                method: 'POST',
+                                path: '/jobs/dispatch',
+                                auth: false,
+                                responses: {
+                                    200: z.array(z.string()),
+                                },
+                            }),
                         }),
-                    }),
+                    ],
                     jobs: moved.jobs('scheduler', {
                         sendDigests: moved.job({
                             schedule: '0 5 * * *',
@@ -421,7 +423,7 @@ describe('a job endpoint colliding with a route', () => {
                     jobRunner: {
                         mode: 'in-process',
                     },
-                    routes: routesAt('/jobs/dispatch'),
+                    routes: [routesAt('/jobs/dispatch')],
                     jobs: scheduled,
                 }).api
         ).not.toThrow();
@@ -447,7 +449,7 @@ describe('how jobs run', () => {
                 // @ts-expect-error `jobRunner` is required once `jobs` declares one
                 defineConfig({
                     ...config,
-                    routes: {},
+                    routes: [],
                     jobs: scheduled,
                 }).api
         ).toThrow('The jobs do not say how they run.');
@@ -458,7 +460,7 @@ describe('how jobs run', () => {
             () =>
                 defineConfig({
                     ...config,
-                    routes: {},
+                    routes: [],
                     jobs: unguarded,
                     jobRunner: {
                         mode: 'http',
@@ -472,7 +474,7 @@ describe('how jobs run', () => {
             () =>
                 defineConfig({
                     ...config,
-                    routes: {},
+                    routes: [],
                     jobs: unguarded,
                     jobRunner: {
                         mode: 'in-process',
@@ -486,7 +488,7 @@ describe('how jobs run', () => {
             () =>
                 defineConfig({
                     ...config,
-                    routes: {},
+                    routes: [],
                 }).api
         ).not.toThrow();
     });
@@ -554,7 +556,7 @@ describe('job handlers and plugins', () => {
         });
         const { api } = defineConfig({
             ...config,
-            routes: {},
+            routes: [],
             jobRunner: {
                 mode: 'http',
             },

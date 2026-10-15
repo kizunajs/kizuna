@@ -81,7 +81,7 @@ const jobs = k.jobs('scheduler', {
 const contract = defineConfig({
     ...config,
     adapter: expressAdapter(),
-    routes,
+    routes: [routes],
     jobRunner: {
         mode: 'http',
     },
@@ -195,7 +195,7 @@ describe('startJobsDevRunner', () => {
             jobRunner: {
                 mode: 'in-process',
             },
-            routes,
+            routes: [routes],
             jobs,
         });
         expect(() =>

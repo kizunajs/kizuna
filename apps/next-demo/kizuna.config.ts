@@ -3,7 +3,8 @@ import { fetchClient } from '@kizunajs/fetch';
 import { nextAdapter } from '@kizunajs/next';
 import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';
-import { GuardSchema, analytics, jobs, routes, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import { GuardSchema, analytics, jobs, routes, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import { groups } from './src/groups';
 import { diagnostics } from './src/routes/diagnostics';
 import { products } from './src/routes/products';
 import { contact } from './src/routes/contact';
@@ -12,19 +13,14 @@ import { site, staff } from './src/identities';
 /**
  * The shared routes every demo serves, plus the ones only this demo can answer.
  */
-const served = {
-    ...routes,
-    diagnostics,
-    products,
-    contact,
-};
+const served = [...routes, diagnostics, products, contact];
 
 export default defineConfig({
     adapter: nextAdapter(),
     typescript: {
         outputFile: './kizuna.types.ts',
     },
-    tags,
+    groups,
     auth: {
         identities: {
             user,

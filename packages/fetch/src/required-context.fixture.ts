@@ -33,17 +33,19 @@ export const requiredContextContract = defineConfig({
         analytics: analyticsContext,
         tenant: tenantContext,
     },
-    routes: {
-        users: k.routes({
-            listUsers: k.route({
-                method: 'GET',
-                path: '/users',
-                responses: {
-                    200: z.object({
-                        ok: z.boolean(),
-                    }),
-                },
-            }),
+    routes: [
+        k.routes({
+            users: {
+                listUsers: k.route({
+                    method: 'GET',
+                    path: '/users',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                }),
+            },
         }),
-    },
+    ],
 }).api;

@@ -17,9 +17,7 @@ import { fetchClient } from '@kizunajs/fetch';
 
 export default defineConfig({
     adapter: expressAdapter(),
-    routes: {
-        users,
-    },
+    routes: [users],
     clients: [
         fetchClient({
             output: './src/lib/api-client.generated.ts',

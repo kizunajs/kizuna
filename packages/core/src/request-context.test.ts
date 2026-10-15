@@ -41,30 +41,32 @@ const config = {
 
 const contract = defineConfig({
     ...config,
-    routes: {
-        api: k.routes({
-            publicRoute: k.route({
-                method: 'GET',
-                path: '/public',
-                auth: false,
-                responses: {
-                    200: z.object({
-                        ok: z.boolean(),
-                    }),
-                },
-            }),
-            whoAmI: k.route({
-                method: 'GET',
-                path: '/users/:id',
-                auth: 'user',
-                responses: {
-                    200: z.object({
-                        ok: z.boolean(),
-                    }),
-                },
-            }),
+    routes: [
+        k.routes({
+            api: {
+                publicRoute: k.route({
+                    method: 'GET',
+                    path: '/public',
+                    auth: false,
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                }),
+                whoAmI: k.route({
+                    method: 'GET',
+                    path: '/users/:id',
+                    auth: 'user',
+                    responses: {
+                        200: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                }),
+            },
         }),
-    },
+    ],
 }).api;
 
 const makeRequest = (path: string, headers: Record<string, string> = {}): AdapterRequest<null> => ({

@@ -127,9 +127,11 @@ describe('content', () => {
     it('refuses a group of routes under the same name as the content', () => {
         expect(() =>
             defineConfig({
-                routes: {
-                    content: k.routes({}),
-                },
+                routes: [
+                    {
+                        content: k.routes({}),
+                    },
+                ],
                 content: notesContent(),
             })
         ).toThrow("serves its routes under 'content'");
@@ -155,7 +157,7 @@ describe('authenticate', () => {
                 editor,
             },
         },
-        routes: {},
+        routes: [],
     });
 
     it("answers the guard's context for a credential it accepts", async () => {

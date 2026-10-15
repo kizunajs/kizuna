@@ -54,7 +54,7 @@ const jobs = k.jobs('scheduler', {
 
 const contract = defineConfig({
     ...config,
-    routes,
+    routes: [routes],
     jobRunner: {
         mode: 'http',
     },

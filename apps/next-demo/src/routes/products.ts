@@ -33,7 +33,7 @@ const catalogue = new Map<string, Product>(
     ])
 );
 
-export const products = k.routes({
+export const products = k.routes.products({
     listProducts: k
         .route({
             method: 'GET',

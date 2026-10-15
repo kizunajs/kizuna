@@ -794,78 +794,6 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    object MembersListMembers {
-
-        @Serializable
-        data class Response(val members: List<API.User>)
-
-        data class Result(val body: Response)
-
-        sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.GuardDenial) : Failure()
-            data class Forbidden(val body: API.GuardDenial) : Failure()
-            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
-            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
-        }
-    }
-
-    object MembersInviteMember {
-
-        @Serializable
-        data class Input(val email: String)
-
-        data class Body(val email: String)
-
-        sealed interface Args {
-            val body: Body
-        }
-
-        object Scope {
-            fun body(email: String): AfterBody = AfterBody(body = Body(email = email))
-        }
-
-        class AfterBody internal constructor(override val body: Body) : Args
-
-        data class Result(val body: API.User)
-
-        sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.GuardDenial) : Failure()
-            data class Forbidden(val body: API.GuardDenial) : Failure()
-            data class Conflict(val body: API.ProblemDetails) : Failure()
-            data class BadRequest(val body: APIClient.ValidationError) : Failure()
-            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
-            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
-        }
-    }
-
-    object MembersCancelInvite {
-
-        @Serializable
-        data class Response(val cancelled: Boolean)
-
-        data class Params(val inviteId: String)
-
-        sealed interface Args {
-            val params: Params
-        }
-
-        object Scope {
-            fun params(inviteId: String): AfterParams = AfterParams(params = Params(inviteId = inviteId))
-        }
-
-        class AfterParams internal constructor(override val params: Params) : Args
-
-        data class Result(val body: Response)
-
-        sealed class Failure(message: String? = null) : Exception(message) {
-            data class Unauthorized(val body: API.GuardDenial) : Failure()
-            data class Forbidden(val body: API.GuardDenial) : Failure()
-            data class NotFound(val body: API.ProblemDetails) : Failure()
-            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
-            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
-        }
-    }
-
     object WorkspaceGetWorkspace {
 
         @Serializable
@@ -930,7 +858,79 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    object InvitesGetInvite {
+    object WorkspaceMembersListMembers {
+
+        @Serializable
+        data class Response(val members: List<API.User>)
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object WorkspaceMembersInviteMember {
+
+        @Serializable
+        data class Input(val email: String)
+
+        data class Body(val email: String)
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(email: String): AfterBody = AfterBody(body = Body(email = email))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        data class Result(val body: API.User)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
+            data class Conflict(val body: API.ProblemDetails) : Failure()
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object WorkspaceMembersCancelInvite {
+
+        @Serializable
+        data class Response(val cancelled: Boolean)
+
+        data class Params(val inviteId: String)
+
+        sealed interface Args {
+            val params: Params
+        }
+
+        object Scope {
+            fun params(inviteId: String): AfterParams = AfterParams(params = Params(inviteId = inviteId))
+        }
+
+        class AfterParams internal constructor(override val params: Params) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class Unauthorized(val body: API.GuardDenial) : Failure()
+            data class Forbidden(val body: API.GuardDenial) : Failure()
+            data class NotFound(val body: API.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object WorkspaceInvitesGetInvite {
 
         @Serializable
         data class Response(
@@ -961,7 +961,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    object InvitesAcceptInvite {
+    object WorkspaceInvitesAcceptInvite {
 
         @Serializable
         data class Input(val name: String)
@@ -1448,7 +1448,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    object ToolsGetForecast {
+    object AssistantToolsGetForecast {
 
         @Serializable
         enum class QueryUnit(override val wireValue: String) : KizunaQueryValue {
@@ -1498,7 +1498,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    object ToolsPlotSignups {
+    object AssistantToolsPlotSignups {
 
         @Serializable
         data class Response(val points: List<ResponsePointsItem>)
@@ -1530,7 +1530,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    object ToolsCountWords {
+    object AssistantToolsCountWords {
 
         @Serializable
         data class Input(val text: String)
@@ -1559,7 +1559,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    object NotesList {
+    object AssistantNotesList {
 
         @Serializable
         data class Response(val notes: List<ResponseNotesItem>)
@@ -1580,7 +1580,7 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    object NotesAdd {
+    object AssistantNotesAdd {
 
         @Serializable
         data class Input(val text: String)
@@ -1691,17 +1691,9 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
     val notifications = APINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
-    val members = APIMembersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
-
     val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
-    val invites = APIInvitesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
-
     val assistant = APIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
-
-    val tools = APIToolsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
-
-    val notes = APINotesClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
     val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
 
@@ -2558,152 +2550,6 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
     }
 }
 
-class APIMembersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
-
-    /** List workspace members */
-    @Throws(APIClient.MembersListMembers.Failure::class)
-    suspend fun listMembers(): APIClient.MembersListMembers.Result {
-        val path = "/workspace/members"
-        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
-        var requestBuilder = Request.Builder()
-            .url(urlBuilder.build())
-            .method("GET", null)
-        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
-        requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
-        return httpResponse.use {
-            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
-            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
-            when (val statusCode = httpResponse.code) {
-                200 -> {
-                    try {
-                        val payload = json.decodeFromString<APIClient.MembersListMembers.Response>(data.decodeToString())
-                        return@use APIClient.MembersListMembers.Result(body = payload)
-                    }
-                    catch (error: Exception) { throw APIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
-                }
-                401 -> {
-                    val payload = try {
-                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.MembersListMembers.Failure.Unauthorized(body = payload)
-                }
-                403 -> {
-                    val payload = try {
-                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.MembersListMembers.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.MembersListMembers.Failure.Forbidden(body = payload)
-                }
-                else -> throw APIClient.MembersListMembers.Failure.Unexpected(statusCode = statusCode, data = data)
-            }
-        }
-    }
-
-    /** Invite a member to the workspace */
-    @Throws(APIClient.MembersInviteMember.Failure::class)
-    suspend fun inviteMember(build: APIClient.MembersInviteMember.Scope.() -> APIClient.MembersInviteMember.Args): APIClient.MembersInviteMember.Result {
-        val args = APIClient.MembersInviteMember.Scope.build()
-        val body = args.body
-        val path = "/workspace/members"
-        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
-        val requestBody: RequestBody
-        val payload = APIClient.MembersInviteMember.Input(email = body.email)
-        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
-        var requestBuilder = Request.Builder()
-            .url(urlBuilder.build())
-            .method("POST", requestBody)
-        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
-        requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
-        return httpResponse.use {
-            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
-            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
-            when (val statusCode = httpResponse.code) {
-                201 -> {
-                    try {
-                        val payload = json.decodeFromString<API.User>(data.decodeToString())
-                        return@use APIClient.MembersInviteMember.Result(body = payload)
-                    }
-                    catch (error: Exception) { throw APIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                }
-                401 -> {
-                    val payload = try {
-                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.MembersInviteMember.Failure.Unauthorized(body = payload)
-                }
-                403 -> {
-                    val payload = try {
-                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.MembersInviteMember.Failure.Forbidden(body = payload)
-                }
-                409 -> {
-                    val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.MembersInviteMember.Failure.Conflict(body = payload)
-                }
-                400 -> {
-                    val payload = try {
-                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.MembersInviteMember.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.MembersInviteMember.Failure.BadRequest(body = payload)
-                }
-                else -> throw APIClient.MembersInviteMember.Failure.Unexpected(statusCode = statusCode, data = data)
-            }
-        }
-    }
-
-    /** Cancel an invite, an admin only their own */
-    @Throws(APIClient.MembersCancelInvite.Failure::class)
-    suspend fun cancelInvite(build: APIClient.MembersCancelInvite.Scope.() -> APIClient.MembersCancelInvite.Args): APIClient.MembersCancelInvite.Result {
-        val args = APIClient.MembersCancelInvite.Scope.build()
-        val params = args.params
-        var path = "/workspace/invites/:inviteId"
-        path = path.replace(":inviteId", Kizuna.encodePathSegment(params.inviteId))
-        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
-        var requestBuilder = Request.Builder()
-            .url(urlBuilder.build())
-            .method("DELETE", null)
-        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
-        requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
-        return httpResponse.use {
-            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
-            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
-            when (val statusCode = httpResponse.code) {
-                200 -> {
-                    try {
-                        val payload = json.decodeFromString<APIClient.MembersCancelInvite.Response>(data.decodeToString())
-                        return@use APIClient.MembersCancelInvite.Result(body = payload)
-                    }
-                    catch (error: Exception) { throw APIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
-                }
-                401 -> {
-                    val payload = try {
-                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.MembersCancelInvite.Failure.Unauthorized(body = payload)
-                }
-                403 -> {
-                    val payload = try {
-                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.MembersCancelInvite.Failure.Forbidden(body = payload)
-                }
-                404 -> {
-                    val payload = try {
-                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.MembersCancelInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.MembersCancelInvite.Failure.NotFound(body = payload)
-                }
-                else -> throw APIClient.MembersCancelInvite.Failure.Unexpected(statusCode = statusCode, data = data)
-            }
-        }
-    }
-}
-
 class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Get workspace info */
@@ -2833,14 +2679,154 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             }
         }
     }
-}
 
-class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+    /** List workspace members */
+    @Throws(APIClient.WorkspaceMembersListMembers.Failure::class)
+    suspend fun membersListMembers(): APIClient.WorkspaceMembersListMembers.Result {
+        val path = "/workspace/members"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.WorkspaceMembersListMembers.Response>(data.decodeToString())
+                        return@use APIClient.WorkspaceMembersListMembers.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceMembersListMembers.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceMembersListMembers.Failure.Forbidden(body = payload)
+                }
+                else -> throw APIClient.WorkspaceMembersListMembers.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Invite a member to the workspace */
+    @Throws(APIClient.WorkspaceMembersInviteMember.Failure::class)
+    suspend fun membersInviteMember(build: APIClient.WorkspaceMembersInviteMember.Scope.() -> APIClient.WorkspaceMembersInviteMember.Args): APIClient.WorkspaceMembersInviteMember.Result {
+        val args = APIClient.WorkspaceMembersInviteMember.Scope.build()
+        val body = args.body
+        val path = "/workspace/members"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = APIClient.WorkspaceMembersInviteMember.Input(email = body.email)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                201 -> {
+                    try {
+                        val payload = json.decodeFromString<API.User>(data.decodeToString())
+                        return@use APIClient.WorkspaceMembersInviteMember.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceMembersInviteMember.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceMembersInviteMember.Failure.Forbidden(body = payload)
+                }
+                409 -> {
+                    val payload = try {
+                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceMembersInviteMember.Failure.Conflict(body = payload)
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceMembersInviteMember.Failure.BadRequest(body = payload)
+                }
+                else -> throw APIClient.WorkspaceMembersInviteMember.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Cancel an invite, an admin only their own */
+    @Throws(APIClient.WorkspaceMembersCancelInvite.Failure::class)
+    suspend fun membersCancelInvite(build: APIClient.WorkspaceMembersCancelInvite.Scope.() -> APIClient.WorkspaceMembersCancelInvite.Args): APIClient.WorkspaceMembersCancelInvite.Result {
+        val args = APIClient.WorkspaceMembersCancelInvite.Scope.build()
+        val params = args.params
+        var path = "/workspace/invites/:inviteId"
+        path = path.replace(":inviteId", Kizuna.encodePathSegment(params.inviteId))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("DELETE", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.WorkspaceMembersCancelInvite.Response>(data.decodeToString())
+                        return@use APIClient.WorkspaceMembersCancelInvite.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                }
+                401 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceMembersCancelInvite.Failure.Unauthorized(body = payload)
+                }
+                403 -> {
+                    val payload = try {
+                        json.decodeFromString<API.GuardDenial>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceMembersCancelInvite.Failure.Forbidden(body = payload)
+                }
+                404 -> {
+                    val payload = try {
+                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceMembersCancelInvite.Failure.NotFound(body = payload)
+                }
+                else -> throw APIClient.WorkspaceMembersCancelInvite.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
 
     /** Resolve an invite by its capability-URL token, guarded by a custom path-token identity */
-    @Throws(APIClient.InvitesGetInvite.Failure::class)
-    suspend fun getInvite(build: APIClient.InvitesGetInvite.Scope.() -> APIClient.InvitesGetInvite.Args): APIClient.InvitesGetInvite.Result {
-        val args = APIClient.InvitesGetInvite.Scope.build()
+    @Throws(APIClient.WorkspaceInvitesGetInvite.Failure::class)
+    suspend fun invitesGetInvite(build: APIClient.WorkspaceInvitesGetInvite.Scope.() -> APIClient.WorkspaceInvitesGetInvite.Args): APIClient.WorkspaceInvitesGetInvite.Result {
+        val args = APIClient.WorkspaceInvitesGetInvite.Scope.build()
         val params = args.params
         var path = "/invites/:token"
         path = path.replace(":token", Kizuna.encodePathSegment(params.token))
@@ -2857,45 +2843,45 @@ class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: St
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.InvitesGetInvite.Response>(data.decodeToString())
-                        return@use APIClient.InvitesGetInvite.Result(body = payload)
+                        val payload = json.decodeFromString<APIClient.WorkspaceInvitesGetInvite.Response>(data.decodeToString())
+                        return@use APIClient.WorkspaceInvitesGetInvite.Result(body = payload)
                     }
-                    catch (error: Exception) { throw APIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.InvitesGetInvite.Failure.Unauthorized(body = payload)
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceInvitesGetInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.InvitesGetInvite.Failure.Forbidden(body = payload)
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceInvitesGetInvite.Failure.Forbidden(body = payload)
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.InvitesGetInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.InvitesGetInvite.Failure.NotFound(body = payload)
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceInvitesGetInvite.Failure.NotFound(body = payload)
                 }
-                else -> throw APIClient.InvitesGetInvite.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw APIClient.WorkspaceInvitesGetInvite.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
 
     /** Accept an invite via the capability URL */
-    @Throws(APIClient.InvitesAcceptInvite.Failure::class)
-    suspend fun acceptInvite(build: APIClient.InvitesAcceptInvite.Scope.() -> APIClient.InvitesAcceptInvite.Args): APIClient.InvitesAcceptInvite.Result {
-        val args = APIClient.InvitesAcceptInvite.Scope.build()
+    @Throws(APIClient.WorkspaceInvitesAcceptInvite.Failure::class)
+    suspend fun invitesAcceptInvite(build: APIClient.WorkspaceInvitesAcceptInvite.Scope.() -> APIClient.WorkspaceInvitesAcceptInvite.Args): APIClient.WorkspaceInvitesAcceptInvite.Result {
+        val args = APIClient.WorkspaceInvitesAcceptInvite.Scope.build()
         val params = args.params
         val body = args.body
         var path = "/invites/:token/accept"
         path = path.replace(":token", Kizuna.encodePathSegment(params.token))
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
-        val payload = APIClient.InvitesAcceptInvite.Input(name = body.name)
+        val payload = APIClient.WorkspaceInvitesAcceptInvite.Input(name = body.name)
         requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -2909,36 +2895,36 @@ class APIInvitesClient(private val client: OkHttpClient, private val baseUrl: St
             when (val statusCode = httpResponse.code) {
                 201 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.InvitesAcceptInvite.Response201>(data.decodeToString())
-                        return@use APIClient.InvitesAcceptInvite.Result(body = payload)
+                        val payload = json.decodeFromString<APIClient.WorkspaceInvitesAcceptInvite.Response201>(data.decodeToString())
+                        return@use APIClient.WorkspaceInvitesAcceptInvite.Result(body = payload)
                     }
-                    catch (error: Exception) { throw APIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.InvitesAcceptInvite.Failure.Unauthorized(body = payload)
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.InvitesAcceptInvite.Failure.Forbidden(body = payload)
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Forbidden(body = payload)
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.InvitesAcceptInvite.Failure.NotFound(body = payload)
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceInvitesAcceptInvite.Failure.NotFound(body = payload)
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.InvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.InvitesAcceptInvite.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.WorkspaceInvitesAcceptInvite.Failure.BadRequest(body = payload)
                 }
-                else -> throw APIClient.InvitesAcceptInvite.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
@@ -3054,16 +3040,13 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             }
         }
     }
-}
-
-class APIToolsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** Look up tomorrow forecast for one city */
-    @Throws(APIClient.ToolsGetForecast.Failure::class)
-    suspend fun getForecast(build: APIClient.ToolsGetForecast.Scope.() -> APIClient.ToolsGetForecast.Args): APIClient.ToolsGetForecast.Result {
-        val args = APIClient.ToolsGetForecast.Scope.build()
+    @Throws(APIClient.AssistantToolsGetForecast.Failure::class)
+    suspend fun toolsGetForecast(build: APIClient.AssistantToolsGetForecast.Scope.() -> APIClient.AssistantToolsGetForecast.Args): APIClient.AssistantToolsGetForecast.Result {
+        val args = APIClient.AssistantToolsGetForecast.Scope.build()
         val params = args.params
-        val query = args.query ?: APIClient.ToolsGetForecast.Query()
+        val query = args.query ?: APIClient.AssistantToolsGetForecast.Query()
         var path = "/forecast/:city"
         path = path.replace(":city", Kizuna.encodePathSegment(params.city))
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
@@ -3084,26 +3067,26 @@ class APIToolsClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.ToolsGetForecast.Response>(data.decodeToString())
-                        return@use APIClient.ToolsGetForecast.Result(body = payload)
+                        val payload = json.decodeFromString<APIClient.AssistantToolsGetForecast.Response>(data.decodeToString())
+                        return@use APIClient.AssistantToolsGetForecast.Result(body = payload)
                     }
-                    catch (error: Exception) { throw APIClient.ToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw APIClient.AssistantToolsGetForecast.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.ToolsGetForecast.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.ToolsGetForecast.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw APIClient.AssistantToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantToolsGetForecast.Failure.BadRequest(body = payload)
                 }
-                else -> throw APIClient.ToolsGetForecast.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw APIClient.AssistantToolsGetForecast.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
 
     /** Plot signups per day over the last N days, for the client to draw as a chart */
-    @Throws(APIClient.ToolsPlotSignups.Failure::class)
-    suspend fun plotSignups(build: APIClient.ToolsPlotSignups.Scope.() -> APIClient.ToolsPlotSignups.Args): APIClient.ToolsPlotSignups.Result {
-        val args = APIClient.ToolsPlotSignups.Scope.build()
+    @Throws(APIClient.AssistantToolsPlotSignups.Failure::class)
+    suspend fun toolsPlotSignups(build: APIClient.AssistantToolsPlotSignups.Scope.() -> APIClient.AssistantToolsPlotSignups.Args): APIClient.AssistantToolsPlotSignups.Result {
+        val args = APIClient.AssistantToolsPlotSignups.Scope.build()
         val query = args.query
         val path = "/signups"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
@@ -3122,31 +3105,31 @@ class APIToolsClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.ToolsPlotSignups.Response>(data.decodeToString())
-                        return@use APIClient.ToolsPlotSignups.Result(body = payload)
+                        val payload = json.decodeFromString<APIClient.AssistantToolsPlotSignups.Response>(data.decodeToString())
+                        return@use APIClient.AssistantToolsPlotSignups.Result(body = payload)
                     }
-                    catch (error: Exception) { throw APIClient.ToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw APIClient.AssistantToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.ToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.ToolsPlotSignups.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw APIClient.AssistantToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantToolsPlotSignups.Failure.BadRequest(body = payload)
                 }
-                else -> throw APIClient.ToolsPlotSignups.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw APIClient.AssistantToolsPlotSignups.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
 
     /** Count the words in a piece of text */
-    @Throws(APIClient.ToolsCountWords.Failure::class)
-    suspend fun countWords(build: APIClient.ToolsCountWords.Scope.() -> APIClient.ToolsCountWords.Args): APIClient.ToolsCountWords.Result {
-        val args = APIClient.ToolsCountWords.Scope.build()
+    @Throws(APIClient.AssistantToolsCountWords.Failure::class)
+    suspend fun toolsCountWords(build: APIClient.AssistantToolsCountWords.Scope.() -> APIClient.AssistantToolsCountWords.Args): APIClient.AssistantToolsCountWords.Result {
+        val args = APIClient.AssistantToolsCountWords.Scope.build()
         val body = args.body
         val path = "/text/word-count"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
-        val payload = APIClient.ToolsCountWords.Input(text = body.text)
+        val payload = APIClient.AssistantToolsCountWords.Input(text = body.text)
         requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -3160,28 +3143,25 @@ class APIToolsClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.ToolsCountWords.Response>(data.decodeToString())
-                        return@use APIClient.ToolsCountWords.Result(body = payload)
+                        val payload = json.decodeFromString<APIClient.AssistantToolsCountWords.Response>(data.decodeToString())
+                        return@use APIClient.AssistantToolsCountWords.Result(body = payload)
                     }
-                    catch (error: Exception) { throw APIClient.ToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw APIClient.AssistantToolsCountWords.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.ToolsCountWords.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.ToolsCountWords.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw APIClient.AssistantToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantToolsCountWords.Failure.BadRequest(body = payload)
                 }
-                else -> throw APIClient.ToolsCountWords.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw APIClient.AssistantToolsCountWords.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
-}
-
-class APINotesClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
 
     /** List the notes the signed-in user has saved */
-    @Throws(APIClient.NotesList.Failure::class)
-    suspend fun list(): APIClient.NotesList.Result {
+    @Throws(APIClient.AssistantNotesList.Failure::class)
+    suspend fun notesList(): APIClient.AssistantNotesList.Result {
         val path = "/notes"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
@@ -3196,37 +3176,37 @@ class APINotesClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.NotesList.Response>(data.decodeToString())
-                        return@use APIClient.NotesList.Result(body = payload)
+                        val payload = json.decodeFromString<APIClient.AssistantNotesList.Response>(data.decodeToString())
+                        return@use APIClient.AssistantNotesList.Result(body = payload)
                     }
-                    catch (error: Exception) { throw APIClient.NotesList.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.NotesList.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.NotesList.Failure.Unauthorized(body = payload)
+                    } catch (error: Exception) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantNotesList.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.NotesList.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.NotesList.Failure.Forbidden(body = payload)
+                    } catch (error: Exception) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantNotesList.Failure.Forbidden(body = payload)
                 }
-                else -> throw APIClient.NotesList.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw APIClient.AssistantNotesList.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
 
     /** Save a note for the signed-in user */
-    @Throws(APIClient.NotesAdd.Failure::class)
-    suspend fun add(build: APIClient.NotesAdd.Scope.() -> APIClient.NotesAdd.Args): APIClient.NotesAdd.Result {
-        val args = APIClient.NotesAdd.Scope.build()
+    @Throws(APIClient.AssistantNotesAdd.Failure::class)
+    suspend fun notesAdd(build: APIClient.AssistantNotesAdd.Scope.() -> APIClient.AssistantNotesAdd.Args): APIClient.AssistantNotesAdd.Result {
+        val args = APIClient.AssistantNotesAdd.Scope.build()
         val body = args.body
         val path = "/notes"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
-        val payload = APIClient.NotesAdd.Input(text = body.text)
+        val payload = APIClient.AssistantNotesAdd.Input(text = body.text)
         requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -3240,30 +3220,30 @@ class APINotesClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 201 -> {
                     try {
-                        val payload = json.decodeFromString<APIClient.NotesAdd.Response201>(data.decodeToString())
-                        return@use APIClient.NotesAdd.Result(body = payload)
+                        val payload = json.decodeFromString<APIClient.AssistantNotesAdd.Response201>(data.decodeToString())
+                        return@use APIClient.AssistantNotesAdd.Result(body = payload)
                     }
-                    catch (error: Exception) { throw APIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
+                    catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.NotesAdd.Failure.Unauthorized(body = payload)
+                    } catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantNotesAdd.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.NotesAdd.Failure.Forbidden(body = payload)
+                    } catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantNotesAdd.Failure.Forbidden(body = payload)
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.NotesAdd.Failure.Decoding(error, statusCode, data) }
-                    throw APIClient.NotesAdd.Failure.BadRequest(body = payload)
+                    } catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.AssistantNotesAdd.Failure.BadRequest(body = payload)
                 }
-                else -> throw APIClient.NotesAdd.Failure.Unexpected(statusCode = statusCode, data = data)
+                else -> throw APIClient.AssistantNotesAdd.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

@@ -196,9 +196,11 @@ beforeAll(async () => {
                 editor,
             },
         },
-        routes: {
-            products,
-        },
+        routes: [
+            {
+                products,
+            },
+        ],
         content,
     });
     app = express();

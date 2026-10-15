@@ -5,7 +5,7 @@ import { ProblemDetailsSchema } from 'kizunajs/schemas';
 
 interface Config {
     adapter: ReturnType<typeof expressAdapter>;
-    tags: typeof kTags;
+    groups: typeof kGroups;
     requestContext: {
         analytics: typeof analyticsContext;
     };
@@ -18,7 +18,7 @@ interface Config {
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 
@@ -69,7 +69,7 @@ export const MissingRelationSchema = ProblemDetailsSchema.extend({
 
 const users = new Map<string, { id: string; name: string; email: string }>();
 
-const routes = k.routes('api', {
+const routes = k.routes({
     users: {
         getUser: k
             .route({
@@ -575,7 +575,7 @@ const routes = k.routes('api', {
 
 export const apiContract = defineConfig({
     adapter: expressAdapter(),
-    tags: kTags,
+    groups: kGroups,
     requestContext: {
         analytics: analyticsContext,
     },
@@ -584,5 +584,5 @@ export const apiContract = defineConfig({
             user: userIdentity,
         },
     },
-    routes,
+    routes: [routes],
 }).api;

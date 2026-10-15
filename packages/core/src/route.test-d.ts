@@ -6,12 +6,12 @@ import { HANDLER } from './types.js';
 import { defineView } from './tool-view.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     users: 'Users',
 });
 
@@ -80,7 +80,7 @@ test('the route keeps its literal method and path', () => {
 });
 
 test('a route carrying a handler goes into a group', () => {
-    const routes = k.routes('users', {
+    const routes = k.routes.users({
         createUser,
         getUser,
     });

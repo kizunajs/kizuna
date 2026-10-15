@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { k } from '../k';
 import { UserSchema } from './users';
 
-const workspaceMembers = k.routes('members', {
+const workspaceMembers = k.routes.workspace.members({
     listMembers: k
         .route({
             method: 'GET',
@@ -112,7 +112,7 @@ const workspaceMembers = k.routes('members', {
         }),
 });
 
-const workspaceInfo = k.routes('workspace', {
+const workspaceInfo = k.routes.workspace({
     getWorkspace: k
         .route({
             method: 'GET',

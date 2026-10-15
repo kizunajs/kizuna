@@ -7,7 +7,7 @@ import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { definePlugin, route } from 'kizunajs/plugin';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 interface SecuredKConfig {
@@ -40,7 +40,7 @@ interface RequestContextKConfig {
 }
 
 interface PluginTypeKConfig {
-    tags: typeof pluginTypeKTags;
+    groups: typeof pluginTypeKGroups;
 }
 
 const k = new Kizuna<Config>();
@@ -49,17 +49,17 @@ const gateK = new Kizuna<GateKConfig>();
 const requestContextK = new Kizuna<RequestContextKConfig>();
 const pluginTypeK = new Kizuna<PluginTypeKConfig>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
 /**
  * Two routes, not the runtime suite's four: every `router.*` feature writes one handler per route, once per adapter.
  */
-export const inferenceRoutes = k.routes('api', {
+export const inferenceRoutes = k.routes({
     getUser: k.route({
         method: 'GET',
         path: '/users/:id',
@@ -92,29 +92,31 @@ export const inferenceRoutes = k.routes('api', {
 
 export const inferenceContract = defineConfig({
     ...config,
-    routes: inferenceRoutes,
+    routes: [inferenceRoutes],
 }).api;
 
 export const rawBodyContract = defineConfig({
     ...config,
-    routes: k.routes('api', {
-        receiveSigned: k.route({
-            method: 'POST',
-            path: '/signed',
-            rawBody: true,
-            body: z.object({
-                name: z.string(),
-            }),
-            responses: {
-                200: z.object({
-                    ok: z.boolean(),
+    routes: [
+        k.routes({
+            receiveSigned: k.route({
+                method: 'POST',
+                path: '/signed',
+                rawBody: true,
+                body: z.object({
+                    name: z.string(),
                 }),
-            },
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+            }),
         }),
-    }),
+    ],
 }).api;
 
-export const streamInferenceRoutes = k.routes('api', {
+export const streamInferenceRoutes = k.routes({
     reply: k.route({
         method: 'POST',
         path: '/reply',
@@ -139,10 +141,10 @@ export const streamInferenceRoutes = k.routes('api', {
 
 export const streamInferenceContract = defineConfig({
     ...config,
-    routes: streamInferenceRoutes,
+    routes: [streamInferenceRoutes],
 }).api;
 
-const toolInferenceRoutes = k.routes('api', {
+const toolInferenceRoutes = k.routes({
     countWords: k.route({
         method: 'POST',
         path: '/word-count',
@@ -161,35 +163,35 @@ const toolInferenceRoutes = k.routes('api', {
 
 export const toolInferenceContract = defineConfig({
     ...config,
-    routes: toolInferenceRoutes,
+    routes: [toolInferenceRoutes],
 }).api;
 
 export const streamToolsContract = defineConfig({
     ...config,
-    routes: k.routes('api', {
-        tools: toolInferenceRoutes,
-        reply: k.route({
-            method: 'POST',
-            path: '/tool-reply',
-            responses: {
-                200: {
-                    stream: {
-                        done: z.object({
-                            ok: z.boolean(),
-                        }),
+    routes: [
+        k.routes({
+            tools: toolInferenceRoutes,
+            reply: k.route({
+                method: 'POST',
+                path: '/tool-reply',
+                responses: {
+                    200: {
+                        stream: {
+                            done: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                        tools: toolInferenceRoutes,
                     },
-                    tools: toolInferenceRoutes,
                 },
-            },
+            }),
         }),
-    }),
+    ],
 }).api;
 
 export const inferenceGroupContract = defineConfig({
     ...config,
-    routes: {
-        users: inferenceRoutes,
-    },
+    routes: [{ users: inferenceRoutes }],
 }).api;
 
 export const userIdentity = k.identity.bearer({
@@ -291,9 +293,7 @@ export const securedRoutes = securedK.routes({
 
 export const securedContract = defineConfig({
     ...securedKConfig,
-    routes: {
-        api: securedRoutes,
-    },
+    routes: [{ api: securedRoutes }],
 }).api;
 
 export const apiConsumerIdentity = k.identity.apiKey({
@@ -345,9 +345,7 @@ export const gateRoutes = gateK.routes({
 
 export const gateContract = defineConfig({
     ...gateKConfig,
-    routes: {
-        api: gateRoutes,
-    },
+    routes: [{ api: gateRoutes }],
 }).api;
 
 export const analyticsContext = k.requestContext(
@@ -382,9 +380,7 @@ export const requestContextRoutes = requestContextK.routes({
 
 export const requestContextContract = defineConfig({
     ...requestContextKConfig,
-    routes: {
-        api: requestContextRoutes,
-    },
+    routes: [{ api: requestContextRoutes }],
 }).api;
 
 const typedProbePlugin = definePlugin({
@@ -412,27 +408,29 @@ const typedProbePlugin = definePlugin({
     }),
 });
 
-const pluginTypeKTags = k.tags({
+const pluginTypeKGroups = k.groups({
     api: 'API',
 });
 const pluginTypeKConfig = {
-    tags: pluginTypeKTags,
+    groups: pluginTypeKGroups,
 };
 
 export const pluginTypeContract = defineConfig({
     ...pluginTypeKConfig,
     plugins: [typedProbePlugin()],
-    routes: pluginTypeK.routes('api', {
-        whichLabel: pluginTypeK.route({
-            method: 'GET',
-            path: '/which-label',
-            responses: {
-                200: z.object({
-                    label: z.string(),
-                }),
-            },
+    routes: [
+        pluginTypeK.routes({
+            whichLabel: pluginTypeK.route({
+                method: 'GET',
+                path: '/which-label',
+                responses: {
+                    200: z.object({
+                        label: z.string(),
+                    }),
+                },
+            }),
         }),
-    }),
+    ],
     jobRunner: {
         mode: 'http',
     },

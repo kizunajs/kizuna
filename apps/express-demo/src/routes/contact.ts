@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { k } from '../k';
 import { EmailSchema } from '../plugins/email/types';
 
-export const contact = k.routes({
+export const contact = k.routes.contact({
     sendMessage: k
         .route({
             method: 'POST',

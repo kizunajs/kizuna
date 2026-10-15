@@ -10,7 +10,7 @@ import { definePlugin, route } from 'kizunajs/plugin';
 interface Config {
     plugins: [ReturnType<typeof probePlugin>];
     adapter: ReturnType<typeof expressAdapter>;
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
@@ -43,14 +43,14 @@ const probePlugin = definePlugin({
     }),
 });
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
-const routes = k.routes('api', {
+const routes = k.routes({
     indexUser: k
         .route({
             method: 'POST',
@@ -77,7 +77,7 @@ const contract = defineConfig({
             label: 'probed',
         }),
     ],
-    routes,
+    routes: [routes],
 }).api;
 
 const serve = () => {
@@ -132,11 +132,11 @@ describe('plugin lane', () => {
             }),
         });
 
-        const collidingKTags = k.tags({
+        const collidingKGroups = k.groups({
             api: 'API',
         });
         const collidingKConfig = {
-            tags: collidingKTags,
+            groups: collidingKGroups,
         };
         // ApiDefinition time, because the plugins are on the kizuna instance that built it.
         expect(
@@ -144,7 +144,7 @@ describe('plugin lane', () => {
                 defineConfig({
                     ...collidingKConfig,
                     plugins: [collidingPlugin()],
-                    routes,
+                    routes: [routes],
                 }).api
         ).toThrow(/collides with/);
     });

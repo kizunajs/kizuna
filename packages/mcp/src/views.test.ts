@@ -23,7 +23,7 @@ const UserSchema = z.object({
     name: z.string(),
 });
 
-const routes = k.routes('api', {
+const routes = k.routes({
     getUser: k.route({
         method: 'GET',
         path: '/users/:id',
@@ -87,7 +87,7 @@ const routes = k.routes('api', {
 
 const api = assembleApi(
     defineConfig({
-        routes,
+        routes: [routes],
     }).api,
     {
         router: {
@@ -216,30 +216,32 @@ describe('defineConfig: views', () => {
         });
         expect(() =>
             defineConfig({
-                routes: k.routes('api', {
-                    first: k.route({
-                        method: 'GET',
-                        path: '/first',
-                        summary: 'First',
-                        tool: {
-                            ui: userView,
-                        },
-                        responses: {
-                            204: z.void(),
-                        },
+                routes: [
+                    k.routes({
+                        first: k.route({
+                            method: 'GET',
+                            path: '/first',
+                            summary: 'First',
+                            tool: {
+                                ui: userView,
+                            },
+                            responses: {
+                                204: z.void(),
+                            },
+                        }),
+                        second: k.route({
+                            method: 'GET',
+                            path: '/second',
+                            summary: 'Second',
+                            tool: {
+                                ui: other,
+                            },
+                            responses: {
+                                204: z.void(),
+                            },
+                        }),
                     }),
-                    second: k.route({
-                        method: 'GET',
-                        path: '/second',
-                        summary: 'Second',
-                        tool: {
-                            ui: other,
-                        },
-                        responses: {
-                            204: z.void(),
-                        },
-                    }),
-                }),
+                ],
             })
         ).toThrow("Two different views share the uri 'ui://users/user'");
     });
@@ -247,19 +249,21 @@ describe('defineConfig: views', () => {
     it('throws on a tool only a view may call when there is no view', () => {
         expect(() =>
             defineConfig({
-                routes: k.routes('api', {
-                    createPreview: k.route({
-                        method: 'POST',
-                        path: '/preview',
-                        summary: 'Mint a preview token',
-                        tool: {
-                            visibility: ['app'],
-                        },
-                        responses: {
-                            204: z.void(),
-                        },
+                routes: [
+                    k.routes({
+                        createPreview: k.route({
+                            method: 'POST',
+                            path: '/preview',
+                            summary: 'Mint a preview token',
+                            tool: {
+                                visibility: ['app'],
+                            },
+                            responses: {
+                                204: z.void(),
+                            },
+                        }),
                     }),
-                }),
+                ],
             })
         ).toThrow("Route 'createPreview' is a tool only a view may call");
     });
@@ -267,19 +271,21 @@ describe('defineConfig: views', () => {
     it('throws on an empty visibility', () => {
         expect(() =>
             defineConfig({
-                routes: k.routes('api', {
-                    health: k.route({
-                        method: 'GET',
-                        path: '/health',
-                        summary: 'Check health',
-                        tool: {
-                            visibility: [],
-                        },
-                        responses: {
-                            204: z.void(),
-                        },
+                routes: [
+                    k.routes({
+                        health: k.route({
+                            method: 'GET',
+                            path: '/health',
+                            summary: 'Check health',
+                            tool: {
+                                visibility: [],
+                            },
+                            responses: {
+                                204: z.void(),
+                            },
+                        }),
                     }),
-                }),
+                ],
             })
         ).toThrow("Route 'health' declares an empty `visibility`");
     });

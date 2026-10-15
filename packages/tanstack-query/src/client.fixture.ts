@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Kizuna, defineConfig } from 'kizunajs';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
     auth: {
         identities: {
             user: typeof user;
@@ -12,7 +12,7 @@ interface Config {
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     users: 'Users',
 });
 
@@ -28,14 +28,14 @@ const UserSchema = z.object({
 });
 
 export const contract = defineConfig({
-    tags: kTags,
+    groups: kGroups,
     auth: {
         identities: {
             user,
         },
     },
-    routes: {
-        users: k.routes('users', {
+    routes: [
+        k.routes.users({
             listUsers: k.route({
                 method: 'GET',
                 path: '/users',
@@ -92,52 +92,58 @@ export const contract = defineConfig({
                 },
             }),
         }),
-        guarded: k.routes('users', {
-            getUser: k.route({
-                method: 'GET',
-                path: '/guarded/users/:id',
-                auth: 'user',
-                responses: {
-                    200: UserSchema,
-                },
-            }),
-        }),
-        collisions: k.routes('users', {
-            key: k.route({
-                method: 'GET',
-                path: '/key',
-                auth: false,
-                responses: {
-                    200: z.object({
-                        value: z.string(),
-                    }),
-                },
-            }),
-        }),
-        assistant: k.routes('users', {
-            reply: k.route({
-                method: 'POST',
-                path: '/reply',
-                auth: false,
-                body: z.object({
-                    prompt: z.string(),
-                }),
-                responses: {
-                    200: {
-                        stream: {
-                            delta: z.object({
-                                text: z.string(),
-                            }),
-                            done: z.object({
-                                count: z.int(),
-                            }),
-                        },
+        k.routes({
+            guarded: {
+                getUser: k.route({
+                    method: 'GET',
+                    path: '/guarded/users/:id',
+                    auth: 'user',
+                    responses: {
+                        200: UserSchema,
                     },
-                    404: z.object({
-                        detail: z.string(),
-                    }),
-                },
-            }),
+                }),
+            },
         }),
-    },
+        k.routes({
+            collisions: {
+                key: k.route({
+                    method: 'GET',
+                    path: '/key',
+                    auth: false,
+                    responses: {
+                        200: z.object({
+                            value: z.string(),
+                        }),
+                    },
+                }),
+            },
+        }),
+        k.routes({
+            assistant: {
+                reply: k.route({
+                    method: 'POST',
+                    path: '/reply',
+                    auth: false,
+                    body: z.object({
+                        prompt: z.string(),
+                    }),
+                    responses: {
+                        200: {
+                            stream: {
+                                delta: z.object({
+                                    text: z.string(),
+                                }),
+                                done: z.object({
+                                    count: z.int(),
+                                }),
+                            },
+                        },
+                        404: z.object({
+                            detail: z.string(),
+                        }),
+                    },
+                }),
+            },
+        }),
+    ],
 }).api;

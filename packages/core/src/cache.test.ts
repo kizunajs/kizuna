@@ -85,20 +85,22 @@ describe('cacheHeaders', () => {
 
 const contractWith = (cache: CachePolicy) =>
     defineConfig({
-        routes: k.routes('users', {
-            listUsers: k.route({
-                method: 'GET',
-                path: '/users',
-                responses: {
-                    200: {
-                        body: z.object({
-                            ok: z.boolean(),
-                        }),
-                        cache,
+        routes: [
+            k.routes({
+                listUsers: k.route({
+                    method: 'GET',
+                    path: '/users',
+                    responses: {
+                        200: {
+                            body: z.object({
+                                ok: z.boolean(),
+                            }),
+                            cache,
+                        },
                     },
-                },
+                }),
             }),
-        }),
+        ],
     }).api;
 
 describe('assertValidCache', () => {
@@ -225,25 +227,27 @@ describe('assertValidCache', () => {
         expect(
             () =>
                 defineConfig({
-                    routes: k.routes('users', {
-                        getUser: k.route({
-                            method: 'GET',
-                            path: '/users/:id',
-                            responses: {
-                                200: z.object({
-                                    ok: z.boolean(),
-                                }),
-                                404: {
-                                    body: z.object({
-                                        detail: z.string(),
+                    routes: [
+                        k.routes({
+                            getUser: k.route({
+                                method: 'GET',
+                                path: '/users/:id',
+                                responses: {
+                                    200: z.object({
+                                        ok: z.boolean(),
                                     }),
-                                    cache: {
-                                        maxAge: -10,
+                                    404: {
+                                        body: z.object({
+                                            detail: z.string(),
+                                        }),
+                                        cache: {
+                                            maxAge: -10,
+                                        },
                                     },
                                 },
-                            },
+                            }),
                         }),
-                    }),
+                    ],
                 }).api
         ).toThrow(/cache\.maxAge as -10 on its 404 response/);
     });
@@ -264,7 +268,7 @@ describe('assertValidCache', () => {
                 };
             };
         }>();
-        const routes = secured.routes('users', {
+        const routes = secured.routes({
             listUsers: secured.route({
                 method: 'GET',
                 path: '/users',
@@ -286,9 +290,7 @@ describe('assertValidCache', () => {
             () =>
                 defineConfig({
                     ...securedConfig,
-                    routes: {
-                        users: routes,
-                    },
+                    routes: [{ users: routes }],
                 }).api
         ).toThrow(/declares cache\.scope 'public' on its 200 response, but the route is behind authentication/);
     });
@@ -299,83 +301,85 @@ describe('the policies the caching guide shows', () => {
         expect(
             () =>
                 defineConfig({
-                    routes: k.routes('docs', {
-                        badge: k.route({
-                            method: 'GET',
-                            path: '/users/:id/badge/:version',
-                            responses: {
-                                200: {
-                                    body: BinarySchema,
-                                    contentType: 'image/png',
-                                    cache: {
-                                        scope: 'public',
-                                        maxAge: 31536000,
-                                        immutable: true,
+                    routes: [
+                        k.routes({
+                            badge: k.route({
+                                method: 'GET',
+                                path: '/users/:id/badge/:version',
+                                responses: {
+                                    200: {
+                                        body: BinarySchema,
+                                        contentType: 'image/png',
+                                        cache: {
+                                            scope: 'public',
+                                            maxAge: 31536000,
+                                            immutable: true,
+                                        },
                                     },
                                 },
-                            },
-                        }),
-                        badgeFallback: k.route({
-                            method: 'GET',
-                            path: '/users/:id/badge',
-                            responses: {
-                                200: {
-                                    body: BinarySchema,
-                                    contentType: 'image/png',
-                                    cache: {
-                                        scope: 'public',
-                                        noCache: true,
-                                    },
-                                    etag: true,
-                                },
-                            },
-                        }),
-                        catalogue: k.route({
-                            method: 'GET',
-                            path: '/catalogue',
-                            responses: {
-                                200: {
-                                    body: z.array(z.string()),
-                                    cache: {
-                                        scope: 'public',
-                                        maxAge: 0,
-                                        sharedMaxAge: 600,
-                                        staleWhileRevalidate: 60,
+                            }),
+                            badgeFallback: k.route({
+                                method: 'GET',
+                                path: '/users/:id/badge',
+                                responses: {
+                                    200: {
+                                        body: BinarySchema,
+                                        contentType: 'image/png',
+                                        cache: {
+                                            scope: 'public',
+                                            noCache: true,
+                                        },
+                                        etag: true,
                                     },
                                 },
-                            },
-                        }),
-                        invoices: k.route({
-                            method: 'GET',
-                            path: '/invoices',
-                            responses: {
-                                200: {
-                                    body: z.array(z.string()),
-                                    cache: {
-                                        scope: 'private',
-                                        noCache: true,
-                                        vary: ['authorization'],
-                                    },
-                                    etag: true,
-                                },
-                            },
-                        }),
-                        fingerprinted: k.route({
-                            method: 'GET',
-                            path: '/assets/:hash',
-                            responses: {
-                                200: {
-                                    body: BinarySchema,
-                                    contentType: 'image/png',
-                                    cache: {
-                                        scope: 'public',
-                                        maxAge: 31536000,
-                                        immutable: true,
+                            }),
+                            catalogue: k.route({
+                                method: 'GET',
+                                path: '/catalogue',
+                                responses: {
+                                    200: {
+                                        body: z.array(z.string()),
+                                        cache: {
+                                            scope: 'public',
+                                            maxAge: 0,
+                                            sharedMaxAge: 600,
+                                            staleWhileRevalidate: 60,
+                                        },
                                     },
                                 },
-                            },
+                            }),
+                            invoices: k.route({
+                                method: 'GET',
+                                path: '/invoices',
+                                responses: {
+                                    200: {
+                                        body: z.array(z.string()),
+                                        cache: {
+                                            scope: 'private',
+                                            noCache: true,
+                                            vary: ['authorization'],
+                                        },
+                                        etag: true,
+                                    },
+                                },
+                            }),
+                            fingerprinted: k.route({
+                                method: 'GET',
+                                path: '/assets/:hash',
+                                responses: {
+                                    200: {
+                                        body: BinarySchema,
+                                        contentType: 'image/png',
+                                        cache: {
+                                            scope: 'public',
+                                            maxAge: 31536000,
+                                            immutable: true,
+                                        },
+                                    },
+                                },
+                            }),
                         }),
-                    }),
+                    ],
                 }).api
         ).not.toThrow();
     });

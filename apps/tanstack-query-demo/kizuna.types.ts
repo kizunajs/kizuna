@@ -3,10 +3,10 @@
  * DO NOT MODIFY IT BY HAND. Instead, modify your source kizuna config,
  * and re-run `kizuna generate` to regenerate this file.
  */
-import type { GuardSchema, analytics, jobs, tags, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
+import type { GuardSchema, analytics, groups, jobs, user, member, inviteToken, scheduler } from '@kizunajs-demo/shared';
 
 export interface Config {
-    tags: typeof tags;
+    groups: typeof groups;
     auth: {
         identities: {
             user: typeof user;

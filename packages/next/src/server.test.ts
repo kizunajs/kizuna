@@ -8,19 +8,19 @@ import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/
 
 interface Config {
     adapter: ReturnType<typeof nextAdapter>;
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
-const contractRoutes = k.routes('api', {
+const contractRoutes = k.routes({
     getUser: k
         .route({
             method: 'GET',
@@ -85,7 +85,7 @@ const contractRoutes = k.routes('api', {
 const contract = defineConfig({
     adapter: nextAdapter(),
     ...config,
-    routes: contractRoutes,
+    routes: [contractRoutes],
 }).api;
 
 interface User {
@@ -129,7 +129,7 @@ describe('Next.js handler', () => {
     });
 
     it('routes onError hook overrides the default 500', async () => {
-        const throwingRoutes = k.routes('api', {
+        const throwingRoutes = k.routes({
             boom: k
                 .route({
                     method: 'GET',
@@ -147,7 +147,7 @@ describe('Next.js handler', () => {
         const { api: throwingApi } = defineConfig({
             ...config,
             adapter: nextAdapter(),
-            routes: throwingRoutes,
+            routes: [throwingRoutes],
         });
         const { GET: boomGET } = throwingApi.mount({
             basePath: '/api',
@@ -167,7 +167,7 @@ describe('Next.js handler', () => {
 });
 
 describe('Next.js handler: alternate content types', () => {
-    const uploadRoutes = k.routes('api', {
+    const uploadRoutes = k.routes({
         uploadAvatar: k
             .route({
                 method: 'POST',
@@ -225,7 +225,7 @@ describe('Next.js handler: alternate content types', () => {
     const uploadContract = defineConfig({
         adapter: nextAdapter(),
         ...config,
-        routes: uploadRoutes,
+        routes: [uploadRoutes],
     }).api;
     const uploadApi = uploadContract;
 
@@ -272,7 +272,7 @@ describe('Next.js handler: alternate content types', () => {
 describe('Next.js handler: requestMiddleware', () => {
     let handlerRan = false;
 
-    const middlewareContractRoutes = k.routes('api', {
+    const middlewareContractRoutes = k.routes({
         getResource: k
             .route({
                 method: 'GET',
@@ -299,7 +299,7 @@ describe('Next.js handler: requestMiddleware', () => {
     const middlewareContract = defineConfig({
         adapter: nextAdapter(),
         ...config,
-        routes: middlewareContractRoutes,
+        routes: [middlewareContractRoutes],
     }).api;
 
     it('runs requestMiddleware before the handler with the matched route', async () => {

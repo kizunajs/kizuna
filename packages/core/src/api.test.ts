@@ -77,11 +77,13 @@ const getUser = k
 
 const contract = defineConfig({
     ...config,
-    routes: k.routes({
-        users: {
-            getUser,
-        },
-    }),
+    routes: [
+        k.routes({
+            users: {
+                getUser,
+            },
+        }),
+    ],
 }).api;
 
 describe('defineConfig', () => {
@@ -100,26 +102,28 @@ describe('defineConfig', () => {
         const plain = new Kizuna();
         const { api } = defineConfig({
             adapter: probeAdapter,
-            routes: plain.routes({
-                health: {
-                    live: plain
-                        .route({
-                            method: 'GET',
-                            path: '/health',
-                            responses: {
-                                200: z.object({
-                                    ok: z.boolean(),
-                                }),
-                            },
-                        })
-                        .handler(() => ({
-                            status: 200,
-                            body: {
-                                ok: true,
-                            },
-                        })),
-                },
-            }),
+            routes: [
+                plain.routes({
+                    health: {
+                        live: plain
+                            .route({
+                                method: 'GET',
+                                path: '/health',
+                                responses: {
+                                    200: z.object({
+                                        ok: z.boolean(),
+                                    }),
+                                },
+                            })
+                            .handler(() => ({
+                                status: 200,
+                                body: {
+                                    ok: true,
+                                },
+                            })),
+                    },
+                }),
+            ],
         });
 
         expect(api.mount('other-app')).toBe('other-app');
@@ -128,19 +132,21 @@ describe('defineConfig', () => {
     it('refuses to mount when the config names no adapter', () => {
         const plain2 = new Kizuna();
         const { api } = defineConfig({
-            routes: plain2.routes({
-                health: {
-                    live: plain2.route({
-                        method: 'GET',
-                        path: '/health',
-                        responses: {
-                            200: z.object({
-                                ok: z.boolean(),
-                            }),
-                        },
-                    }),
-                },
-            }),
+            routes: [
+                plain2.routes({
+                    health: {
+                        live: plain2.route({
+                            method: 'GET',
+                            path: '/health',
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        }),
+                    },
+                }),
+            ],
         });
 
         expect(() => (api as unknown as { mount: (...args: unknown[]) => unknown }).mount('app')).toThrow(/no adapter to mount on/);

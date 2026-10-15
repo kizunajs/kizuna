@@ -2,7 +2,7 @@ import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { z } from 'zod';
 import { k } from '../k';
 
-export const inviteRoutes = k.routes('invites', {
+export const inviteRoutes = k.routes.workspace.invites({
     getInvite: k
         .route({
             method: 'GET',

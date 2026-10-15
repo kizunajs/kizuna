@@ -21,7 +21,7 @@ A tool is usually written three times: a JSON Schema for the model, a typed even
 import { z } from 'zod';
 import { k } from '../k';
 
-export const weatherRoutes = k.routes('weather', {
+export const weatherRoutes = k.routes.weather({
     getForecast: k
         .route({
             method: 'GET',

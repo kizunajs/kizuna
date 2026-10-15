@@ -9,22 +9,22 @@ import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/a
 
 interface Config {
     adapter: ReturnType<typeof fastifyAdapter>;
-    tags: typeof kTags;
+    groups: typeof kGroups;
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
 describe('Fastify: handler context', () => {
     it('provides the Fastify request and reply objects', async () => {
         const contextApp = Fastify();
-        const contextRoutes = k.routes('api', {
+        const contextRoutes = k.routes({
             echo: k
                 .route({
                     method: 'GET',
@@ -45,7 +45,7 @@ describe('Fastify: handler context', () => {
         const contextContract = defineConfig({
             adapter: fastifyAdapter(),
             ...config,
-            routes: contextRoutes,
+            routes: [contextRoutes],
         }).api;
         const contextApi = contextContract;
         await contextApi.mount(contextApp);

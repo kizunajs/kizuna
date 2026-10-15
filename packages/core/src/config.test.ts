@@ -7,7 +7,7 @@ import type { GeneratedFile } from './config.js';
 
 const k = new Kizuna();
 
-const routes = k.routes('users', {
+const routes = k.routes({
     getUser: k.route({
         method: 'GET',
         path: '/users/:id',
@@ -28,9 +28,7 @@ const swiftClient: GeneratedFile = {
 describe('defineConfig', () => {
     it('hands back the api it assembled', () => {
         const { api } = defineConfig({
-            routes: {
-                users: routes,
-            },
+            routes: [{ users: routes }],
         });
 
         expect(Object.keys(api.routes)).toEqual(['users']);
@@ -38,9 +36,7 @@ describe('defineConfig', () => {
 
     it('carries the clients it was given', () => {
         const { clients } = defineConfig({
-            routes: {
-                users: routes,
-            },
+            routes: [{ users: routes }],
             clients: [swiftClient],
         });
 
@@ -49,9 +45,7 @@ describe('defineConfig', () => {
 
     it('has no clients when none are declared', () => {
         const { clients } = defineConfig({
-            routes: {
-                users: routes,
-            },
+            routes: [{ users: routes }],
         });
 
         expect(clients).toEqual([]);
@@ -61,9 +55,7 @@ describe('defineConfig', () => {
 describe('apiEntries', () => {
     it('reads the config a module default-exports', () => {
         const config = defineConfig({
-            routes: {
-                users: routes,
-            },
+            routes: [{ users: routes }],
         });
 
         expect(apiEntries({ default: config }).map(([name]) => name)).toEqual(['default']);
@@ -71,9 +63,7 @@ describe('apiEntries', () => {
 
     it('carries the clients the config declares', () => {
         const config = defineConfig({
-            routes: {
-                users: routes,
-            },
+            routes: [{ users: routes }],
             clients: [swiftClient],
         });
 

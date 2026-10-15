@@ -12,7 +12,7 @@ import { mcpPlugin } from './plugin.js';
 import { assertCanonicalResource, protectedResourceMetadataPath, protectedResourceMetadataUrl } from './oauth.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
     auth: {
         identities: {
             user: typeof user;
@@ -136,7 +136,7 @@ const member = k.identity
             });
     });
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const kAnalytics = k
@@ -152,7 +152,7 @@ const kAnalytics = k
         sessionId: headers['x-session-id'] ?? null,
     }));
 const config = {
-    tags: kTags,
+    groups: kGroups,
     auth: {
         identities: {
             user,
@@ -164,7 +164,7 @@ const config = {
     },
 };
 
-const apiRoutes = k.routes('api', {
+const apiRoutes = k.routes({
     getUser: k
         .route({
             method: 'GET',
@@ -261,9 +261,7 @@ const apiRoutes = k.routes('api', {
 const contract = defineConfig({
     adapter: expressAdapter(),
     ...config,
-    routes: {
-        api: apiRoutes,
-    },
+    routes: [{ api: apiRoutes }],
     plugins: [
         mcpPlugin({
             name: 'OAuth API',
@@ -525,9 +523,7 @@ describe('mcpPlugin: oauth declaration', () => {
                         defineConfig({
                             ...config,
                             adapter: expressAdapter(),
-                            routes: {
-                                api: apiRoutes,
-                            },
+                            routes: [{ api: apiRoutes }],
                             plugins: [plugin],
                         }).api
                     ) as Record<string, Record<string, unknown>>
@@ -563,9 +559,7 @@ describe('mcpPlugin: oauth declaration', () => {
             defineConfig({
                 ...config,
                 adapter: expressAdapter(),
-                routes: {
-                    api: apiRoutes,
-                },
+                routes: [{ api: apiRoutes }],
                 plugins: [
                     mcpPlugin({
                         oauth: {

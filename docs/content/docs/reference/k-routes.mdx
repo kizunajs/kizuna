@@ -1,15 +1,17 @@
 ---
 title: k.routes
-description: Define a group of routes under one tag, with full path-param and response checking.
+description: Declare routes into one of your groups, with full path-param and response checking.
 ---
 
-`k.routes(tag, defs)` defines a group of routes under one tag. The tag must be a key of the tag set your `Config` carries, and TypeScript completes it.
+`k.routes.<group>(routes)` declares routes into a group from [`k.groups`](/docs/reference/k-groups). Reach a nested group through its parents, `k.routes.workspaces.members(...)`. TypeScript completes every group your `Config` carries. Call `k.routes(routes)` for routes in no group.
+
+A route's key is its group's path, then its place inside the call: `listUsers` below is `users.listUsers`. Pass what `k.routes` returns to `defineConfig` as a list, `routes: [usersRoutes, healthRoutes]`. A call declared into a group can't be nested inside another call, since its key already comes from its group.
 
 ```ts title="users.ts"
 import { z } from 'zod';
 import { k } from './k';
 
-export const usersRoutes = k.routes('users', {
+export const usersRoutes = k.routes.users({
     listUsers: k
         .route({
             method: 'GET',
@@ -68,7 +70,7 @@ export const usersRoutes = k.routes('users', {
 | `summary`      | No       | Short description shown in OpenAPI                                                                                           |
 | `description`  | No       | Longer description shown in OpenAPI                                                                                          |
 | `externalDocs` | No       | `{ url, description? }`, emitted on the operation                                                                            |
-| `tags`         | No       | OpenAPI tag keys (from the tag set), resolved to titles in the spec                                                          |
+| `groups`       | No       | More groups to list the route under, as dotted paths from [`k.groups`](/docs/reference/k-groups)                             |
 | `deprecated`   | No       | `boolean \| string \| { message?, date?, link? }`, see [Deprecations](/docs/deprecations)                                    |
 | `sunset`       | No       | `string \| { date, link? }`, see [Deprecations](/docs/deprecations)                                                          |
 | `rawBody`      | No       | `true` to receive the unparsed body as `rawBody` beside `body`, see [Routes](/docs/routes#verifying-signed-requests)         |
@@ -82,7 +84,7 @@ A route's `security` is resolved from its [`auth`](/docs/reference/k-route); wri
 
 `pathParams` keys must be exactly the `:name` placeholders in `path`. A mismatch is a type error on `pathParams`, and `k.routes` throws on it at runtime.
 
-`k.routes` also throws on:
+`defineConfig` throws on a route in a group its `groups` does not declare, and on two routes that claim the same key. `k.routes` also throws on:
 
 - an empty `z.object({})` as a `body`
 - any `z.coerce` schema, anywhere in the route

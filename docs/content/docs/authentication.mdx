@@ -196,7 +196,7 @@ The key is the name everything else uses: a route's `auth`, and the handler's `a
 Every route states its rule, so public is an explicit `false` and a forgotten route is a type error:
 
 ```ts title="src/routes/users.ts"
-export const users = k.routes('users', {
+export const users = k.routes.users({
     listUsers: k
         .route({
             method: 'GET',

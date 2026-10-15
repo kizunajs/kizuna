@@ -5,7 +5,7 @@ import { defineConfig } from './define-config.js';
 import { HANDLER_ARG_KEYS, adapterContextOf, assembleApi, defineAdapter, type AdapterRequest } from './adapter.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
     auth: {
         identities: {
             user: typeof kUser;
@@ -18,7 +18,7 @@ interface Config {
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const kUser = k.identity.bearer({
@@ -32,7 +32,7 @@ const kAnalytics = k.requestContext({
     }),
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
     auth: {
         identities: {
             user: kUser,
@@ -60,33 +60,35 @@ const tools = k.routes({
 
 const contract = defineConfig({
     ...config,
-    routes: k.routes('api', {
-        everything: k.route({
-            method: 'POST',
-            path: '/everything/:id',
-            auth: 'user',
-            rawBody: true,
-            query: z.object({
-                page: z.number(),
-            }),
-            body: z.object({
-                name: z.string(),
-            }),
-            responses: {
-                200: z.object({
-                    ok: z.boolean(),
+    routes: [
+        k.routes({
+            everything: k.route({
+                method: 'POST',
+                path: '/everything/:id',
+                auth: 'user',
+                rawBody: true,
+                query: z.object({
+                    page: z.number(),
                 }),
-                206: {
-                    stream: {
-                        done: z.object({
-                            ok: z.boolean(),
-                        }),
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                    206: {
+                        stream: {
+                            done: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                        tools,
                     },
-                    tools,
                 },
-            },
+            }),
         }),
-    }),
+    ],
 }).api;
 
 /**

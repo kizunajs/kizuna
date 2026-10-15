@@ -16,19 +16,19 @@ import type { Config } from '../kizuna.types';
 export const k = new Kizuna<Config>();
 ```
 
-Declare a tag set beside it, so route groups have a tag to sit under. Its keys become the group names `k.routes` accepts.
+Declare your groups beside it, so routes have somewhere to be filed. Each group becomes a name `k.routes` offers, and a tag in the OpenAPI document.
 
-```ts title="src/tags.ts"
+```ts title="src/groups.ts"
 import { k } from './k';
 
-export const tags = k.tags({
+export const groups = k.groups({
     users: 'Users',
 });
 ```
 
 ## Declare your routes
 
-`k.route` takes what the route is, and `.handler()` takes what answers it. `k.routes` groups them under one of your tags:
+`k.route` takes what the route is, and `.handler()` takes what answers it. `k.routes.users` files them under the Users group, at the bottom of the file:
 
 ```ts title="src/routes/users.ts"
 import { z } from 'zod';
@@ -41,49 +41,53 @@ export const UserSchema = z.object({
     email: z.email(),
 });
 
-export const users = k.routes('users', {
-    listUsers: k
-        .route({
-            method: 'GET',
-            path: '/users',
-            query: z.object({
-                page: z.int().min(1).default(1),
-                limit: z.int().min(1).max(100).default(10),
+const listUsers = k
+    .route({
+        method: 'GET',
+        path: '/users',
+        query: z.object({
+            page: z.int().min(1).default(1),
+            limit: z.int().min(1).max(100).default(10),
+        }),
+        responses: {
+            200: z.object({
+                users: z.array(UserSchema),
+                total: z.number(),
             }),
-            responses: {
-                200: z.object({
-                    users: z.array(UserSchema),
-                    total: z.number(),
-                }),
-            },
-        })
-        .handler(async ({ query }) => ({
-            status: 200,
-            body: {
-                users: await db.users.findMany({
-                    skip: (query.page - 1) * query.limit,
-                    take: query.limit,
-                }),
-                total: await db.users.count(),
-            },
-        })),
-    createUser: k
-        .route({
-            method: 'POST',
-            path: '/users',
-            body: z.object({
-                name: z.string().min(1),
-                email: z.email(),
+        },
+    })
+    .handler(async ({ query }) => ({
+        status: 200,
+        body: {
+            users: await db.users.findMany({
+                skip: (query.page - 1) * query.limit,
+                take: query.limit,
             }),
-            responses: {
-                201: UserSchema,
-                400: ProblemDetailsSchema,
-            },
-        })
-        .handler(async ({ body }) => ({
-            status: 201,
-            body: await db.users.create(body),
-        })),
+            total: await db.users.count(),
+        },
+    }));
+
+const createUser = k
+    .route({
+        method: 'POST',
+        path: '/users',
+        body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+        }),
+        responses: {
+            201: UserSchema,
+            400: ProblemDetailsSchema,
+        },
+    })
+    .handler(async ({ body }) => ({
+        status: 201,
+        body: await db.users.create(body),
+    }));
+
+export const users = k.routes.users({
+    listUsers,
+    createUser,
 });
 ```
 
@@ -105,7 +109,7 @@ A route only a generator or a client reads can skip `.handler()`. One your confi
 | `contentType` | No       | `'application/json'` (default), `'multipart/form-data'`, `'application/x-www-form-urlencoded'`                                                                                                             |
 | `summary`     | No       | Short description shown in OpenAPI, and what a model reads when the route publishes as a tool                                                                                                              |
 | `description` | No       | The longer account, for OpenAPI and for a model                                                                                                                                                            |
-| `tags`        | No       | OpenAPI tags                                                                                                                                                                                               |
+| `groups`      | No       | More [groups](/docs/reference/k-groups) to list the route under, beside the one `k.routes` files it in                                                                                                     |
 | `auth`        | No       | The identity this route requires, and the roles or permissions it accepts. Required once your config declares an identity, so public takes an explicit `false`. See [Access Control](/docs/access-control) |
 | `tool`        | No       | Publish this route as a [tool](/docs/tools) a model can call                                                                                                                                               |
 | `rawBody`     | No       | `true` to receive the body as sent, as `rawBody`, for checking a signature. See [below](#verifying-signed-requests)                                                                                        |
@@ -452,7 +456,7 @@ import { k } from '../../k';
 import { createUser } from './create-user';
 import { getUser } from './get-user';
 
-export const users = k.routes('users', {
+export const users = k.routes.users({
     createUser,
     getUser,
 });
@@ -597,15 +601,22 @@ export const UserSchema = Kizuna.model({
 
 ### Splitting routes across files
 
-Large APIs split into groups. Declare the tags once with [`k.tags`](/docs/reference/k-tags), name them on `defineConfig`, then declare each group with `k.routes` in its own file:
+Large APIs split into groups, nested as deep as the API needs. Declare them once with [`k.groups`](/docs/reference/k-groups) and name them on `defineConfig`:
 
-```ts title="src/tags.ts"
+```ts title="src/groups.ts"
 import { k } from './k';
 
-export const tags = k.tags({
+export const groups = k.groups({
     users: {
         title: 'Users',
         description: 'User management endpoints',
+    },
+    workspaces: {
+        title: 'Workspaces',
+        groups: {
+            members: 'Members',
+            invites: 'Invites',
+        },
     },
     health: 'Health',
 });
@@ -613,60 +624,67 @@ export const tags = k.tags({
 
 ```ts title="kizuna.config.ts"
 import { defineConfig } from 'kizunajs';
-import { tags } from './src/tags';
+import { groups } from './src/groups';
 import { routes } from './src/routes';
 
 export default defineConfig({
-    tags,
+    groups,
     routes,
 });
 ```
 
-```ts title="src/routes/users.ts"
+Each file declares its routes, then files them into a group at the bottom. A nested group is reached through its parent:
+
+```ts title="src/routes/members.ts"
 import { k } from '../k';
 
-export const users = k.routes('users', {
-    listUsers: k.route({ ... }).handler(...),
-    createUser: k.route({ ... }).handler(...),
+const listMembers = k.route({ ... }).handler(...);
+const removeMember = k.route({ ... }).handler(...);
+
+export const memberRoutes = k.routes.workspaces.members({
+    listMembers,
+    removeMember,
 });
 ```
 
-An `index.ts` beside them collects the groups, so the config has one import to make:
+An `index.ts` beside them lists the files, in any order, so the config has one import to make:
 
 ```ts title="src/routes/index.ts"
 import { users } from './users';
+import { memberRoutes } from './members';
+import { inviteRoutes } from './invites';
 import { health } from './health';
 
-export const routes = {
-    users,
-    health,
-};
+export const routes = [users, memberRoutes, inviteRoutes, health];
 ```
 
-```ts title="kizuna.config.ts"
-import { defineConfig } from 'kizunajs';
-import { routes } from './src/routes';
+Each route's key is its group's path, then its name: `listMembers` is `workspaces.members.listMembers`, and clients call `client.workspaces.members.listMembers()`. An object inside the group call adds a level without adding a group:
 
-export default defineConfig({
-    adapter: expressAdapter(),
-    tags,
-    routes,
+```ts
+export const projectRoutes = k.routes.projects({
+    listProjects,
+    settings: {
+        get: getProjectSettings,
+        update: updateProjectSettings,
+    },
 });
 ```
 
+That is `client.projects.settings.update()`, filed under Projects in the docs. Two routes that claim the same key make `defineConfig` throw.
+
 See [Project Structure](/docs/project-structure) for where the rest of the pieces go.
 
-The group tag's `title` becomes the OpenAPI tag for every route in the group, and the `description` is included in the tag definition. A route can also cross-tag by listing tag keys directly:
+Each top-level group becomes an OpenAPI tag, with its `title` as the tag's name and its `description` in the tag definition. OpenAPI 3.1 has no nested tags, so a route in a nested group is listed under the group at the top of its path: `listMembers` shows under Workspaces. A route can also list more groups by dotted path:
 
 ```ts
-cancelAccount: k
+const listMyInvites = k
     .route({
-        method: 'POST',
-        path: '/account/cancel',
-        tags: ['users', 'health'],
+        method: 'GET',
+        path: '/me/invites',
+        groups: ['workspaces.invites'],
         // ...
     })
-    .handler(/* ... */),
+    .handler(/* ... */);
 ```
 
 ### Deprecating routes and fields
@@ -715,7 +733,7 @@ Your editor, the OpenAPI spec, and the Swift and Kotlin clients pick both up. A 
 - [`new Kizuna()`](/docs/reference/Kizuna)
 - [`k.route`](/docs/reference/k-route)
 - [`Kizuna.model`](/docs/reference/kizuna-model)
-- [`k.tags`](/docs/reference/k-tags)
+- [`k.groups`](/docs/reference/k-groups)
 - [`isValidationError`](/docs/reference/is-validation-error)
 
 ## Next steps

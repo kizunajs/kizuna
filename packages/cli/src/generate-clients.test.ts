@@ -10,15 +10,17 @@ import { checkFiles, formatStale, writeFiles } from './generate-clients.js';
 const k = new Kizuna();
 
 const contract = defineConfig({
-    routes: {
-        users: k.routes({
-            getUser: k.route({
-                method: 'GET',
-                path: '/users/:id',
-                responses: { 200: z.object({ id: z.string() }) },
-            }),
+    routes: [
+        k.routes({
+            users: {
+                getUser: k.route({
+                    method: 'GET',
+                    path: '/users/:id',
+                    responses: { 200: z.object({ id: z.string() }) },
+                }),
+            },
         }),
-    },
+    ],
 }).api;
 
 const directories: string[] = [];

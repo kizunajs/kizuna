@@ -186,7 +186,7 @@ export default defineConfig({
 A route's `auth` names the identity it requires, keyed by the names above:
 
 ```ts title="src/routes/workspace.ts"
-export const workspaceRoutes = k.routes('workspace', {
+export const workspaceRoutes = k.routes.workspace({
     getWorkspace: k
         .route({
             method: 'GET',

@@ -64,7 +64,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const anthropic = new Anthropic();
 
-export const assistant = k.routes('assistant', {
+export const assistant = k.routes.assistant({
     reply: replyRoute.handler(async ({ body }) => ({
         status: 200,
         body: async function* ({ signal }) {
@@ -343,7 +343,7 @@ const cannedReply: StreamBody<typeof replyRoute, 200> = async function* () {
     };
 };
 
-export const assistant = k.routes('assistant', {
+export const assistant = k.routes.assistant({
     reply: replyRoute.handler(async () => ({
         status: 200,
         body: cannedReply,

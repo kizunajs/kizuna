@@ -46,25 +46,27 @@ export const securedContract = defineConfig({
         },
         guardSchema: GuardRefusalSchema,
     },
-    routes: {
-        account: k.routes({
-            whoAmI: k
-                .route({
-                    method: 'GET',
-                    path: '/who-am-i',
-                    auth: 'user',
-                    responses: {
-                        200: z.object({
-                            userId: z.string(),
-                        }),
-                    },
-                })
-                .handler(({ auth }) => ({
-                    status: 200,
-                    body: {
-                        userId: auth.user.userId,
-                    },
-                })),
+    routes: [
+        k.routes({
+            account: {
+                whoAmI: k
+                    .route({
+                        method: 'GET',
+                        path: '/who-am-i',
+                        auth: 'user',
+                        responses: {
+                            200: z.object({
+                                userId: z.string(),
+                            }),
+                        },
+                    })
+                    .handler(({ auth }) => ({
+                        status: 200,
+                        body: {
+                            userId: auth.user.userId,
+                        },
+                    })),
+            },
         }),
-    },
+    ],
 }).api;

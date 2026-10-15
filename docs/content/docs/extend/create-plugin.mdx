@@ -209,7 +209,7 @@ A route your apps call is part of your API, so it lives with your routes and cal
 ```ts title="src/routes/contact.ts"
 import { EmailSchema } from '@/plugins/email/types';
 
-export const contact = k.routes('contact', {
+export const contact = k.routes.contact({
     send: k
         .route({
             method: 'POST',

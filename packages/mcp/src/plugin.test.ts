@@ -11,17 +11,17 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';
 
 interface Config {
-    tags: typeof kTags;
+    groups: typeof kGroups;
     plugins: [ReturnType<typeof mcpPlugin>, ReturnType<typeof greetingPlugin>];
 }
 
 const k = new Kizuna<Config>();
 
-const kTags = k.tags({
+const kGroups = k.groups({
     api: 'API',
 });
 const config = {
-    tags: kTags,
+    groups: kGroups,
 };
 
 const greetingPlugin = definePlugin({
@@ -35,7 +35,7 @@ const greetingPlugin = definePlugin({
 
 const deleted: string[] = [];
 
-const routes = k.routes('api', {
+const routes = k.routes({
     deleteUser: k
         .route({
             method: 'DELETE',
@@ -108,7 +108,7 @@ const contract = defineConfig({
         }),
         greetingPlugin(),
     ],
-    routes,
+    routes: [routes],
 }).api;
 
 const api = contract;
@@ -338,7 +338,7 @@ describe('mcpPlugin', () => {
     });
 });
 
-const selective = k.routes('api', {
+const selective = k.routes({
     listUsers: k
         .route({
             method: 'GET',
@@ -375,7 +375,7 @@ const selective = k.routes('api', {
 const selectiveContract = defineConfig({
     adapter: expressAdapter(),
     ...config,
-    routes: selective,
+    routes: [selective],
     plugins: [
         mcpPlugin({
             name: 'Selective API',
@@ -457,7 +457,7 @@ describe('mcpPlugin: the routes that publish', () => {
                         path: 'mcp' as never,
                     }),
                 ],
-                routes,
+                routes: [routes],
             })
         ).toThrow(/\[kizuna\] Plugin 'mcp' has invalid options: path: must start with \//);
     });
