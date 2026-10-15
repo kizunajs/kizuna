@@ -1,0 +1,29 @@
+---
+title: defineRelationship()
+description: 'Records that live outside the CMS, held by id, with the list an editor picks from.'
+---
+
+```ts
+defineRelationship(definition: { name: string; id: Brand; options: (input) => Promise<Option[]>; imageOrigins?: string[] }): Relationship
+```
+
+`options` receives `{ query, ids, headers }` and returns `{ id, label, image? }[]`. It runs as the editor. `Relationship.id` is the field schema a page uses.
+
+```ts
+export const Products = defineRelationship({
+    name: 'products',
+    id: ProductId,
+    options: async ({ query, ids, headers }) => {
+        const result = await apiClient.products.listProductOptions({
+            query: {
+                q: query,
+                ids,
+            },
+            headers,
+        });
+        return result.status === 200 ? result.body.options : [];
+    },
+});
+```
+
+See [Relationships](/docs/cms/relationships).

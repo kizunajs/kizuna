@@ -1,5 +1,5 @@
 ---
-title: More sites
+title: Sites
 description: 'The same CMS serving several sites: what every site reads, what each site owns, and who edits what.'
 ---
 
@@ -92,7 +92,7 @@ sites: declareSites(Site, {
 }),
 ```
 
-One repository: a content package with this config, a UI package both apps render, and the two apps. [Setting it up](/docs/cms/reference/options#a-monorepo) is in the reference.
+One repository: a content package with this config, a UI package both apps render, and the two apps. [Setting it up](/docs/cms/deployment) is in the reference.
 
 **What a UK editor sees:** the UK's pages and events, and the group's employees and offices marked as shared. A group admin sees every site.
 
@@ -176,7 +176,7 @@ Publishing queues a job per site that shows the document, calling its `invalidat
 
 ## Another repository
 
-A site someone else runs, showing your offices. It lists a `url` and `headers` and no pages, hears every publish, reads through a [published client](/docs/cms/connecting#publishing-a-client), and holds your records through a [relationship](/docs/cms/connecting#from-another-kizuna-api).
+A site someone else runs, showing your offices. It lists a `url` and `headers` and no pages, hears every publish, reads through a [published client](/docs/cms/api#publishing-a-client), and holds your records through a [relationship](/docs/cms/relationships#from-another-kizuna-api).
 
 ## Starting with one site
 
@@ -185,3 +185,14 @@ Content is stored per site from the start, so adding `sites` later moves nothing
 ```sh
 kizuna cms rename-site default norway
 ```
+
+## The rules between sites
+
+1. A document belongs to one site, and every site under it reads it. To share across siblings, move it up. To show it in two places, reference it.
+2. Names are unique across the tree, so a reader resolves upward.
+3. An editor belongs to sites with roles, and a grant reaches everything below. Grants add, nothing denies.
+4. A site adds to what it inherits, never takes away. Empty means inherited. `id`, `slug` and unique fields never override.
+5. Published reads published. A site never shows a shared draft.
+6. Sites are addressed by id, never by URL.
+7. Publishing refreshes every deployment that shows the document, and one site that is down never holds up the others.
+8. A locale is a copy of a document, not a site.

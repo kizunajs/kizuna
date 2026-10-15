@@ -1,0 +1,18 @@
+---
+title: @kizunajs/cms/next
+description: "What the Next.js app imports: the preview, links, the proxy and metadata."
+---
+
+| Export                              | What it does                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------- |
+| `KizunaPreview`                     | Renders the preview overlay in draft mode. Takes `content`, the site's reader                 |
+| `RichText`                          | Renders Portable Text with your components                                                    |
+| `href(page, params)`                | The address of a page in the current language, from its `paths`                               |
+| `inStoredOrder(ids, records, idOf)` | Records in the order a field holds them, dropping ids that found nothing                      |
+| `withKizunaCms(config)`             | From `@kizunajs/cms/next/config`: collects `content.ts` files into `cms.pages.ts`             |
+| `contentProxy(kizuna)`              | From `@kizunajs/cms/next/proxy`: rewrites localized addresses when `paths.rewrite` is on      |
+| `JsonLd`, `sitemapOf`               | From `@kizunajs/cms/metadata`: structured data from an item, and the sitemap from the content |
+
+A page's own metadata is `kizuna.content.pages.<name>.metadata`, exported as `generateMetadata`.
+
+See [Next.js](/docs/cms/next) and [SEO](/docs/cms/seo).

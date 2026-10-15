@@ -1,0 +1,37 @@
+---
+title: defineCollection()
+description: 'Many items of one shape, each with an id type of its own.'
+---
+
+```ts
+defineCollection(definition: CollectionDefinition): Collection
+```
+
+| Option                                             | Type                | Description                                                    |
+| -------------------------------------------------- | ------------------- | -------------------------------------------------------------- |
+| `name`                                             | `string`            | How it is read: `kizuna.content.collections.<name>`            |
+| `id`                                               | `Kizuna.brand(...)` | The id type its items get, shared with your routes and clients |
+| `fields`                                           | `Field[]`           | What editors may change                                        |
+| `indexes`                                          | `string[]`          | Fields a list may filter and sort by                           |
+| `immutable`                                        | `string[]`          | Fields that never change once published, like a SKU            |
+| `label`, `group`, `requireReview`, `migrate`, `on` |                     | As on a global                                                 |
+
+`Collection.id` is the field schema a page uses to hold one item. `extendCollection(collection, { fields, overrides })` adds a site's own fields to every item.
+
+```ts
+export const EmployeeId = Kizuna.brand('EmployeeId', z.string());
+
+export const Employees = defineCollection({
+    name: 'employees',
+    id: EmployeeId,
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().max(60),
+        },
+    ],
+    indexes: ['name'],
+});
+```
+
+See [Collections](/docs/cms/collections).

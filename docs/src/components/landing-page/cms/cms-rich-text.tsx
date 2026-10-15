@@ -140,12 +140,12 @@ const points: Point[] = [
     {
         title: 'Never HTML',
         text: 'It stores Portable Text, structured JSON your page renders its own way.',
-        href: '/docs/cms/content/rich-text',
+        href: '/docs/cms/rich-text',
     },
     {
         title: 'Links that are safe',
         text: 'https, mailto, tel and paths on the site. A javascript: link fails the schema.',
-        href: '/docs/cms/content/rich-text',
+        href: '/docs/cms/rich-text',
     },
     {
         title: 'Blocks of your own',
@@ -157,7 +157,7 @@ const points: Point[] = [
 export function CmsRichText() {
     return (
         <Section
-            aside={<DocsLink href="/docs/cms/content/rich-text" />}
+            aside={<DocsLink href="/docs/cms/rich-text" />}
             title="Your articles, richly formatted"
             description="Headings, lists, links, images and blocks of your own, in the form or written by the model.">
             <div className={panel.panel}>

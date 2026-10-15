@@ -126,7 +126,7 @@ export function Review() {
 export function CmsReviews() {
     return (
         <Section
-            aside={<DocsLink href="/docs/cms/editing#reviews" />}
+            aside={<DocsLink href="/docs/cms/reviews" />}
             title="Your changes, reviewed"
             description="Ask a colleague to look before anything goes live. They approve in the editor, or from their chat.">
             <div className={panel.panel}>
@@ -166,7 +166,7 @@ export function CmsReviews() {
                             </div>
                         </div>
                         <div className={panel.body}>
-                            <Link href="/docs/cms/editing#asking-for-a-review" className={panel.title}>
+                            <Link href="/docs/cms/reviews#asking-for-a-review" className={panel.title}>
                                 Review from the chat
                                 <ArrowRight className={panel.arrow} aria-hidden />
                             </Link>
@@ -187,7 +187,7 @@ export function CmsReviews() {
                             </Editor>
                         </div>
                         <div className={panel.body}>
-                            <Link href="/docs/cms/editing#asking-for-a-review" className={panel.title}>
+                            <Link href="/docs/cms/reviews#asking-for-a-review" className={panel.title}>
                                 Email or Slack
                                 <ArrowRight className={panel.arrow} aria-hidden />
                             </Link>
@@ -210,7 +210,7 @@ export function CmsReviews() {
                             </Editor>
                         </div>
                         <div className={panel.body}>
-                            <Link href="/docs/cms/editing#requiring-a-review" className={panel.title}>
+                            <Link href="/docs/cms/reviews#requiring-a-review" className={panel.title}>
                                 Nothing slips through
                                 <ArrowRight className={panel.arrow} aria-hidden />
                             </Link>

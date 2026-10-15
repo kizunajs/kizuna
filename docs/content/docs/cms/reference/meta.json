@@ -1,4 +1,14 @@
 {
     "title": "Reference",
-    "pages": ["options", "cli", "comparison"]
+    "pages": [
+        "cms",
+        "define-page",
+        "define-block",
+        "define-global",
+        "define-collection",
+        "define-relationship",
+        "define-site",
+        "schemas",
+        "next"
+    ]
 }

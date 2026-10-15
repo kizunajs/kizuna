@@ -14,7 +14,7 @@ migrate: {
 },
 ```
 
-Reads run the step in memory, and the document's next save stores the result, so migrating never publishes anything. [`kizuna diff`](/docs/breaking-changes#content) fails a pull request that adds a required field with neither. If one ships anyway, visitors see the newest earlier version that still passes, or nothing when none does, and [`kizuna cms check`](/docs/cms/reference/cli#kizuna-cms-check) lists the page.
+Reads run the step in memory, and the document's next save stores the result, so migrating never publishes anything. [`kizuna diff`](/docs/breaking-changes#content) fails a pull request that adds a required field with neither. If one ships anyway, visitors see the newest earlier version that still passes, or nothing when none does, and [`kizuna cms check`](/docs/cms/cli#kizuna-cms-check) lists the page.
 
 A rename is a removal and an addition, so write a step that moves the value. `richTextFromPlain` turns a text field into rich text:
 

@@ -1,0 +1,67 @@
+---
+title: API and clients
+description: 'The content routes, a client for readers, publishing one as a package, and content in your own API.'
+---
+
+The CMS routes come in three groups:
+
+| Group        | Called by                | What it holds                                 |
+| ------------ | ------------------------ | --------------------------------------------- |
+| `content`    | Anyone                   | Published pages, globals, items and images    |
+| `editing`    | Editors and their agents | Drafts, publishing, versions, reviews, search |
+| `invalidate` | Your app                 | Refreshing pages that hold an id that changed |
+
+`GET /api/content/collections/employees` is the REST API. Every collection also serves `.../options`, and a site's content is under `/content/sites/<site>/...`.
+
+## A client for readers
+
+```ts title="kizuna.config.ts"
+clients: [
+    fetchClient({
+        output: './src/lib/content-client.generated.ts',
+        groups: ['content'],
+    }),
+],
+```
+
+`contentClient.content.pages.frontPage()` over HTTP reads what `kizuna.content.pages.frontPage.get()` reads in process. Swift, Kotlin and OpenAPI take `groups` the same way.
+
+## Publishing a client
+
+Another repository installs the client as a package. Generate it for the site it serves, put it in a package of its own, and publish it where your packages go. `kizuna diff` fails a release that would break it.
+
+```ts
+fetchClient({
+    output: './packages/uk-content/src/index.ts',
+    groups: ['content.sites.uk', 'content.globals', 'content.collections', 'content.media'],
+}),
+```
+
+## Content in the app API
+
+A mobile app reads content through a route on your API, which reads the CMS in process:
+
+```ts
+.handler(async () => {
+    const { items } = await content.collections.articles.list({
+        select: ['title', 'image'],
+        limit: 20,
+    });
+    return {
+        status: 200,
+        body: {
+            articles: items,
+        },
+    };
+}),
+```
+
+Set `media.publicPath` to a full URL so image URLs are absolute.
+
+## Talking to the app
+
+When your app changes a product, it calls `invalidate` with the relationship's name and the id, through the CMS client, as the identity `auth.invalidate` names. Every page that shows the product refreshes.
+
+## A config of its own
+
+When the site has an app API too, give the CMS its own `kizuna.cms.config.ts`, mounted at its own `apiPath`, so editors, content tools and content clients never mix with the app's.

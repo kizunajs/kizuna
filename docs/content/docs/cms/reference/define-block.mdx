@@ -1,0 +1,28 @@
+---
+title: defineBlock()
+description: 'A set of fields several pages share, returned as a Zod object schema.'
+---
+
+```ts
+defineBlock(definition: { name: string; fields: Field[] }): ZodObject
+```
+
+The result is a Zod object schema, so a page field takes it where it takes any schema. `Output<typeof HeroBlockSchema>` is the type a component receives, with images resolved.
+
+```ts title="src/cms/blocks.ts"
+export const HeroBlockSchema = defineBlock({
+    name: 'hero',
+    fields: [
+        {
+            name: 'heading',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'image',
+            schema: ImageSchema,
+        },
+    ],
+});
+```
+
+See [Blocks](/docs/cms/blocks).

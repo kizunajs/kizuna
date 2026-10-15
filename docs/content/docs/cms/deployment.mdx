@@ -1,0 +1,26 @@
+---
+title: Deployment
+description: 'One app or several, one database, draft mode on every domain, and a monorepo for a group.'
+---
+
+## A monorepo
+
+For a group app and a countries app:
+
+```text
+packages/
+  content/      kizuna.cms.config.ts, the collections every site reads
+  ui/           components every app renders
+apps/
+  group/        example.com
+  countries/    example.co.uk, example.no, deployed once per country
+```
+
+- One React, one Zod and one Kizuna, pinned in the pnpm catalog. The packages list them as peer dependencies.
+- The content package has no build. Its `exports` point at source, and apps import it by package name.
+- Every app mounts the config at the same `apiPath`, and `withKizunaCms()` in each app's `next.config.ts` collects that app's `content.ts` files.
+- `outputFileTracingRoot` points at the repository root, so a standalone build traces the content package.
+- `DATABASE_URL`, `KIZUNA_CMS_PREVIEW_SECRET` and the `CMS_S3_*` variables are the same in every app. Turborepo needs them in `globalEnv`.
+- `kizuna cms migrate` and `drizzle-kit migrate` run once from the content package, never from an app's build.
+- One Vercel project per app, root directory the app, `installCommand` filtered to it. A container image is built per app from the repository root with `turbo prune`.
+- Draft mode is a cookie per domain, so every site has a `url` and the editor opens each site's own `/api/draft`. A starter's `X-Frame-Options: SAMEORIGIN` blocks the preview; allow the editor's origin with `frame-ancestors` instead.

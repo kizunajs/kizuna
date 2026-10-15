@@ -1,0 +1,32 @@
+---
+title: defineGlobal()
+description: 'Content every page shows, kept as one copy.'
+---
+
+```ts
+defineGlobal(definition: GlobalDefinition): Global
+```
+
+| Option          | Type                                     | Description                                     |
+| --------------- | ---------------------------------------- | ----------------------------------------------- |
+| `name`          | `string`                                 | How it is read: `kizuna.content.globals.<name>` |
+| `label`         | `string`                                 | What editors see it called                      |
+| `fields`        | `Field[]`                                | What editors may change                         |
+| `group`         | `string`                                 | A heading it is listed under in the editor      |
+| `requireReview` | `boolean`                                | Publishing waits for an approval                |
+| `migrate`       | `Record<number, (document) => document>` | Steps for stored content                        |
+| `on`            | `{ published, unpublished, deleted }`    | Functions that run after the fact               |
+
+```ts
+export const Site = defineGlobal({
+    name: 'site',
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().max(40),
+        },
+    ],
+});
+```
+
+See [Globals](/docs/cms/globals).

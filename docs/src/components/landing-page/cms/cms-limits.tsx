@@ -84,7 +84,7 @@ const limits: Limit[] = [
 export function CmsLimits() {
     return (
         <Section
-            aside={<DocsLink href="/docs/cms/content#limits-that-keep-the-design" />}
+            aside={<DocsLink href="/docs/cms/fields#limits-that-keep-the-design" />}
             title="Your design, kept intact"
             description="Every field is plain Zod, so its limits hold for editors, models and the API alike.">
             <div className={styles.bento}>

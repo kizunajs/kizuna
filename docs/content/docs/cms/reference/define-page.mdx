@@ -1,0 +1,40 @@
+---
+title: definePage()
+description: 'Declare a page beside its route: its fields, or the collection it shows one item of.'
+---
+
+```ts
+definePage(definition: PageDefinition): Page
+```
+
+| Option          | Type                                                   | Description                                                           |
+| --------------- | ------------------------------------------------------ | --------------------------------------------------------------------- |
+| `name`          | `string`                                               | How the page is read and addressed, camelCase with a `Page` suffix    |
+| `label`         | `string`                                               | What editors see it called                                            |
+| `fields`        | `Field[]`                                              | What editors may change, in order                                     |
+| `collection`    | `Collection`                                           | For a dynamic route: the collection one item of which this page shows |
+| `paths`         | `Record<Locale, string>`                               | The page's address per language, with the route's `[params]`          |
+| `sites`         | `string[]`                                             | The sites this page exists on. Elsewhere it is not found              |
+| `metadata`      | `{ title, description, image, type, noindex, suffix }` | What its search result shows, as functions of `({ content, site })`   |
+| `requireReview` | `boolean`                                              | Publishing waits for an approval                                      |
+| `migrate`       | `Record<number, (document) => document>`               | Steps that bring stored content up to the current fields              |
+| `on`            | `{ published, unpublished, deleted }`                  | Functions that run after the fact, with `plugins` and `jobs`          |
+
+## Example
+
+```ts title="src/app/blog/[slug]/content.ts"
+export default definePage({
+    name: 'articlePage',
+    collection: Articles,
+    paths: {
+        nb: '/blogg/[slug]',
+        en: '/blog/[slug]',
+    },
+    metadata: {
+        title: ({ content }) => content.title,
+        type: 'Article',
+    },
+});
+```
+
+See [Pages](/docs/cms/pages).

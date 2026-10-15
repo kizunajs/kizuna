@@ -1,0 +1,72 @@
+---
+title: Relationships
+description: "One collection holding another's ids, and records outside the CMS, in your API, another Kizuna API or a service."
+---
+
+A field holds the id of a record, and the page fetches the record.
+
+## Within this CMS
+
+An article's author is an employee. The field is the collection's id type, and the picker lists the employees:
+
+```ts
+{
+    name: 'author',
+    schema: Employees.id,
+},
+```
+
+```tsx
+const author = await kizuna.content.collections.employees.get({
+    id: article.author,
+});
+```
+
+Every article by one author is a `where` on the field. Deleting an employee that articles hold is refused, and the editor lists the articles.
+
+## From your own API
+
+A record in your own tables. `defineRelationship` gives the editor the list to pick from, through a route that returns id, label and image:
+
+```ts title="src/cms/relationships.ts"
+export const Products = defineRelationship({
+    name: 'products',
+    id: ProductId,
+    options: async ({ query, ids, headers }) => {
+        const result = await apiClient.products.listProductOptions({
+            query: {
+                q: query,
+                ids,
+            },
+            headers,
+        });
+        return result.status === 200 ? result.body.options : [];
+    },
+});
+```
+
+It runs as the editor, so your route decides what they see. The page holds `z.array(Products.id)` and fetches the products itself:
+
+```tsx
+const featured = inStoredOrder(content.featured, result.body.products, (product) => product.id);
+```
+
+## From another Kizuna API
+
+Every collection serves its options, so another Kizuna CMS's content client is the picker:
+
+```ts
+options: async ({ query, ids }) => {
+    const result = await headOffice.content.collections.employees.options({
+        query: {
+            q: query,
+            ids,
+        },
+    });
+    return result.status === 200 ? result.body.options : [];
+},
+```
+
+## From another service
+
+A Stripe id gets a brand of its own, `StripeProductId`, and `options` calls Stripe with your key. When a product changes there, a webhook route calls `invalidate` with the relationship's name, and every page that holds it refreshes.

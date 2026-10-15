@@ -1,5 +1,5 @@
 ---
-title: Languages
+title: Localization
 description: Every page in every language the site serves, published one language at a time.
 ---
 
@@ -60,7 +60,7 @@ Shared fields live on the source and publish with it. Change the price once, and
 
 ## Addresses per language
 
-A route's folder is its address in code. A page names its address in each language, and visitors never see the folder:
+A route's folder is its address in code. The page names its address in each language, with the same params:
 
 ```ts title="src/app/products/[slug]/content.ts"
 export default definePage({
@@ -73,27 +73,56 @@ export default definePage({
 });
 ```
 
-`href` builds the address for the current language from the page's name and its params, so a link never carries a path:
+Links are built from the page's name, so a component never writes a path and never knows the language:
 
-```tsx
-<Link href={href('productPage', { slug: product.slug })}>{product.name}</Link>
+```tsx title="src/components/product-card.tsx"
+import Link from 'next/link';
+import { href } from '@kizunajs/cms/next';
+
+export function ProductCard({ product }: { product: Product }) {
+    return (
+        <Link
+            href={href('productPage', {
+                slug: product.slug,
+            })}>
+            {product.name}
+        </Link>
+    );
+}
 ```
 
-Serving those addresses is a rewrite on every request, so it is turned on in the config, and the proxy is one export:
+On the Norwegian site that renders `/produkter/oak-desk`. Serving that address means rewriting it to the route on every request, so it is turned on in the config:
 
 ```ts title="kizuna.config.ts"
-paths: {
-    rewrite: true,
-},
+content: cms({
+    db,
+    pages,
+    locales: ['nb', 'en'],
+    paths: {
+        rewrite: true,
+    },
+}),
 ```
+
+The proxy does the rewrite, and composes with anything else your proxy does:
 
 ```ts title="src/proxy.ts"
-export { proxy, config } from '@kizunajs/cms/next/proxy';
+import type { NextRequest } from 'next/server';
+import { contentProxy } from '@kizunajs/cms/next/proxy';
+import kizuna from '@kizuna-config';
+
+const rewriteContent = contentProxy(kizuna);
+
+export function proxy(request: NextRequest) {
+    return rewriteContent(request);
+}
+
+export const config = {
+    matcher: ['/((?!api|_next|.*\\..*).*)'],
+};
 ```
 
-`/produkter/oak-desk` reaches the route, and the folder's own address, `/products/oak-desk` on the Norwegian site, answers `404`. Without `rewrite`, the routes answer at their folders and `paths` feeds only `href`, the sitemap and the alternates.
-
-The [sitemap and the language alternates](/docs/cms/seo#languages) come from the same declarations.
+`/produkter/oak-desk` reaches `src/app/products/[slug]`, and the folder's own address, `/products/oak-desk`, answers `404` on the Norwegian site. Without `rewrite`, the routes answer at their folders and `paths` feeds only `href`, the sitemap and the language alternates.
 
 ## Translating
 

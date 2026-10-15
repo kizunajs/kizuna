@@ -1,0 +1,26 @@
+---
+title: Events
+description: 'What runs when content publishes, unpublishes or is deleted.'
+---
+
+A collection names what happens after it publishes, with `plugins` and `jobs` like a route handler:
+
+```ts
+on: {
+    published: async (product, { plugins, jobs }) => {
+        await plugins.medusa.upsertProduct(product);
+        await jobs.indexProduct.queue({
+            input: {
+                id: product.id,
+            },
+        });
+    },
+    deleted: async (product, { plugins }) => {
+        await plugins.medusa.removeProduct(product.id);
+    },
+},
+```
+
+`published`, `unpublished` and `deleted`. They run after the write and cannot change it. An error is logged and the publish stands. Drafts have no event. `on` on `cms()` runs for every document.
+
+Validation is the field's schema, access is `auth`, and derived values belong to the page. None of them are events.

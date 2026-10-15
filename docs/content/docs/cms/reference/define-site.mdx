@@ -1,0 +1,50 @@
+---
+title: defineSite() and declareSites()
+description: 'What a site is, and the sites a config declares.'
+---
+
+A site has `label`, `slug`, `domains`, `locales` and `status`. `SiteSchema` is that shape as a Zod object, for sites declared in code:
+
+```ts
+export const Site = SiteSchema.extend({
+    companyName: z.string().max(60),
+});
+
+sites: declareSites(Site, {
+    norway: {
+        label: 'Example Norge',
+        url: 'https://example.no/api',
+        locales: ['nb'],
+        companyName: 'Example Norge AS',
+    },
+}),
+```
+
+`defineSite({ fields })` is the shape when admins create sites in the editor, with labels on the fields:
+
+```ts
+export const Site = defineSite({
+    fields: [
+        {
+            name: 'theme',
+            schema: z.enum(['classic', 'bold']),
+        },
+    ],
+});
+
+sites: Site,
+```
+
+| On a declared site       | Description                                                       |
+| ------------------------ | ----------------------------------------------------------------- |
+| `label`                  | What editors see                                                  |
+| `url`                    | Where its API is mounted, which publishing calls                  |
+| `headers`                | What its `invalidate` expects, for a site in another repository   |
+| `app`                    | The app directory that renders it, when sites have different apps |
+| `locales`, `fallback`    | The languages it serves                                           |
+| `globals`, `collections` | Its own content                                                   |
+| `sites`                  | Sites under it                                                    |
+
+`kizuna.content.site.get()` returns the current site, with `slug` typed as the union of declared slugs.
+
+See [Sites](/docs/cms/sites).
