@@ -2,10 +2,23 @@ import { Chat } from '@/components/landing-page/cms/cms-chat';
 import { FrontPageEditor } from '@/components/landing-page/cms/cms-editor-mock';
 import { Preview, Publish } from '@/components/landing-page/cms/cms-on-page';
 import { Ask, Review } from '@/components/landing-page/cms/cms-reviews';
+import { FanOut, SearchResult, SharedItem, SharedReview, Switcher, Switchers } from './cms-flows';
 import panel from '@/components/landing-page/panel.module.css';
 import styles from './cms-figures.module.css';
 
-type Kind = 'chat' | 'preview' | 'publish' | 'ask' | 'review';
+type Kind =
+    | 'chat'
+    | 'preview'
+    | 'publish'
+    | 'ask'
+    | 'review'
+    | 'switchers'
+    | 'switcher-admin'
+    | 'switcher-country'
+    | 'shared-item'
+    | 'shared-review'
+    | 'fan-out'
+    | 'search-result';
 
 /**
  * The editor as the landing page draws it, for the docs: beside the chat,
@@ -25,8 +38,22 @@ export function EditorFigure({ kind }: { kind: Kind }) {
                 <Publish />
             ) : kind === 'ask' ? (
                 <Ask />
-            ) : (
+            ) : kind === 'review' ? (
                 <Review />
+            ) : kind === 'switchers' ? (
+                <Switchers />
+            ) : kind === 'switcher-admin' ? (
+                <Switcher as="admin" />
+            ) : kind === 'switcher-country' ? (
+                <Switcher as="country" />
+            ) : kind === 'shared-item' ? (
+                <SharedItem />
+            ) : kind === 'shared-review' ? (
+                <SharedReview />
+            ) : kind === 'fan-out' ? (
+                <FanOut />
+            ) : (
+                <SearchResult />
             )}
         </div>
     );

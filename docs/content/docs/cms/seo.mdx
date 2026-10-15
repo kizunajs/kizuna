@@ -5,12 +5,19 @@ description: 'What search engines and answer engines read from a page, written f
 
 ## The page's result
 
-A page says what its search result shows, from its own fields:
+Editors write a page's search title and description in a field. The page says what to show when they have written nothing:
 
 ```ts title="src/app/blog/[slug]/content.ts"
 export default definePage({
     name: 'articlePage',
     collection: Articles,
+    fields: [
+        {
+            name: 'searchResult',
+            label: 'Search result',
+            schema: MetadataSchema,
+        },
+    ],
     metadata: {
         title: ({ content }) => content.title,
         description: ({ content }) => content.summary,
@@ -20,14 +27,20 @@ export default definePage({
 });
 ```
 
-| Field         | What it is                                                      |
-| ------------- | --------------------------------------------------------------- |
-| `title`       | The page's own words. 30 to 60 characters show, suffix included |
-| `description` | 70 to 160 characters show                                       |
-| `image`       | For shared links. Falls back to the page's first image          |
-| `type`        | The [structured data](#structured-data) type                    |
-| `noindex`     | Keep the page out of search                                     |
-| `suffix`      | `false` for a title that stands alone                           |
+`searchResult` is what the editor writes. `metadata` is what shows when they have written nothing.
+
+The editor shows the field as a search result, with what the page generates as the placeholder:
+
+<EditorFigure kind="search-result" />
+
+| `metadata`    | What it is                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| `title`       | Shown when the editor wrote no title. The site adds its name, [below](#the-site-joins-the-title) |
+| `description` | Shown when the editor wrote no description                                                       |
+| `image`       | For shared links. Without one, the page's first image                                            |
+| `type`        | The [structured data](#structured-data) the page carries                                         |
+| `noindex`     | Keep the page out of search                                                                      |
+| `suffix`      | `false` for a title that stands alone                                                            |
 
 A page without `metadata` uses its heading, first paragraph and first image.
 
@@ -56,18 +69,6 @@ The front page stands alone:
 metadata: {
     title: ({ content, site }) => `${site.name}: ${content.tagline}`,
     suffix: false,
-},
-```
-
-## What a person writes
-
-`MetadataSchema` is the field for pages written by hand. The editor shows it as a search result, with the function's values as placeholders and the lengths measured, suffix included:
-
-```ts
-{
-    name: 'metadata',
-    label: 'Search result',
-    schema: MetadataSchema,
 },
 ```
 
