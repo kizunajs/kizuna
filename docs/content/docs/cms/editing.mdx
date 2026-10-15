@@ -1,70 +1,68 @@
 ---
 title: Editing
-description: Drafts, versions and publishing, the editor in your chat, the tools behind it, and the rules that hold for all of them.
+description: The editor in your chat, the preview you click, and the drafts, versions and publishing behind both.
 ---
 
-Every write goes to a draft. Publishing is a separate step a person takes, so nobody changes what visitors see by accident.
+Every change is a draft until a person publishes it.
 
-## Drafts and versions
+## In your chat
 
-Every save is a version with its author and an optional summary. Changes merge into the stored draft and the whole page is validated, so one field's change never leaves another invalid. An incomplete draft is kept but never reaches the page component, and the editor shows what is missing instead.
-
-Two people on one page cannot overwrite each other. The draft carries an `ETag`, a write sends it back as `If-Match`, and a write behind the latest version answers `409`.
-
-Rollback restores an earlier version as a new draft, which you publish separately. The model can read any earlier version first, so "put back the heading from last week" works without restoring the whole page.
-
-## The editor
-
-Editors work in a chat. Add the CMS's MCP endpoint to Claude, or any host that supports [MCP Apps](/docs/mcp#showing-a-view), signed in as an editor. Then ask for what you want changed:
+Add the CMS's MCP endpoint to Claude, or any host with [MCP Apps](/docs/mcp#showing-a-view), signed in as an editor, and ask:
 
 > Shorten the hero title on the front page and make it friendlier.
 
-The model reads the page's draft, and the host shows the editor beside its answer: the page's fields as a form, whether it has unpublished changes, and a link to the page on the site. What the model writes appears in the form as it saves. What you type saves to the draft a moment after you stop, and the model sees it, so you can say "now the subtitle" without repeating yourself.
+<EditorFigure kind="chat" />
 
-Expanding the editor shows the site's draft beside the form, at desktop, tablet or phone width. Click any text or image in it, and the form jumps to that field and tells the model that is the one you mean. Switch to Browse to use the page as a visitor does, and the form follows each link to the page it opens.
+The editor opens beside the answer, filling in as the model writes. What you type saves a moment after you stop, and the model sees it.
 
-### Items and globals
+## On the page
 
-An article shows on its own page, as a card on the front page, and in the blog list. Click it anywhere in the preview and the form opens the article, with a button back to the page you were on.
+Expand the editor and the site's draft shows beside the form. Click any text or image, and the form jumps to that field.
 
-The page name in the header opens everything else: every page, the globals that show on every page, and each collection's items, with a search and a **New** button per collection. A new item starts as an untitled draft.
+<EditorFigure kind="preview" />
 
-Publish asks you to confirm in the editor, then publishes the page. Asking the model to publish asks in the host instead, the same way any tool that [needs approval](/docs/mcp#asking-before-it-runs) does.
+Browse uses the page as a visitor does, and the form follows each link. Click an article anywhere, on the front page or in the list, and the form opens it.
 
-The form comes from the schema:
+## Publishing
 
-| Schema                  | Input                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------ |
-| `z.string()`            | Text, or a textarea above 120 characters, with a counter when `.max()` is set  |
-| `z.number()`, `z.int()` | Number, within `min` and `max`                                                 |
-| `z.boolean()`           | Toggle                                                                         |
-| `z.enum()`              | Select, showing the field's `options` as labels                                |
-| `z.url()`               | URL, saying which protocols are allowed                                        |
-| `z.iso.date()`          | Date picker                                                                    |
-| `z.object()`            | Grouped fields                                                                 |
-| `z.array()`             | Sortable list with add and remove, within `min` and `max`                      |
-| `ImageSchema`           | A picker over the media library, with crop, focal point and alt text           |
-| `RichTextSchema`        | Rich text, with a toolbar for headings, quotes, lists, marks, links and images |
-| A relationship's id     | A picker over the relationship's `options`                                     |
-| Anything else           | Read only, with a note to ask the model to change it                           |
+Publish asks you to confirm. Asking the model to publish asks in the host, like any tool that [needs approval](/docs/mcp#asking-before-it-runs).
 
-A host without MCP Apps, such as Claude Code, runs the same tools and shows their results as text.
+<EditorFigure kind="publish" />
+
+## Drafts and versions
+
+- Every save is a version with its author.
+- A draft that fails its schema is kept, but never reaches the page. The editor shows what is missing.
+- Two people cannot overwrite each other: a write behind the latest version answers `409`.
+- Rollback restores an earlier version as a new draft, which you publish separately.
+
+## The form
+
+| Schema                  | Input                                                                 |
+| ----------------------- | --------------------------------------------------------------------- |
+| `z.string()`            | Text, or a textarea above 120 characters, with a counter for `.max()` |
+| `z.number()`, `z.int()` | Number, within `min` and `max`                                        |
+| `z.boolean()`           | Toggle                                                                |
+| `z.enum()`              | Select, with the field's `options` as labels                          |
+| `z.url()`               | URL, saying which protocols are allowed                               |
+| `z.iso.date()`          | Date picker                                                           |
+| `z.object()`            | Grouped fields                                                        |
+| `z.array()`             | Sortable list, within `min` and `max`                                 |
+| `ImageSchema`           | The media library, with crop, focal point and alt text                |
+| `RichTextSchema`        | Rich text with headings, quotes, lists, marks, links and images       |
+| A relationship's id     | A picker over the relationship's `options`                            |
+| Anything else           | Read only, with a note to ask the model                               |
 
 ## The tools
 
-Every route under `editing` is an MCP tool, so the model can do whatever the editor's form does. Install `mcpPlugin()` on the config, and the host connects to `/api/mcp`.
-
-The model starts from `editing_describe`, with the URL someone is looking at or a reference like `global:site`. It answers with every field's path, JSON Schema and whether the caller may write it, and the current draft. Then `editing_pages_update_draft` with changes keyed by path, and `editing_pages_publish` when the person says so. Globals and collection items have the same tools under `editing_globals_` and `editing_collections_`. The draft and describe tools open the editor, and the tools only the editor calls, such as the one that opens the site's draft, are kept from the model. `editing_people_list`, `editing_reviews_request` and `editing_reviews_list` let the model name owners and ask for reviews, as [Reviews](/docs/cms/reviews) describes.
-
-See [Tools](/docs/tools) for how a route publishes and [MCP](/docs/mcp) for the endpoint.
+Every `editing` route is an MCP tool, so the model can do what the form does. `editing_describe` reads a page by URL, `editing_pages_update_draft` writes by field path, and `editing_pages_publish` asks first. Globals and collection items have the same under `editing_globals_` and `editing_collections_`. See [Tools](/docs/tools) and [MCP](/docs/mcp).
 
 ## What holds
 
-- **Rules live in the routes.** Roles, field rules and read-only fields are checked in the `editing` routes, for the editor's form and the model alike. A field the caller may not write answers `403`, a value past its schema answers `422`, and a stale `If-Match` answers `409`.
-- **Approving is a person's call.** Approving a review declares `needsApproval`, so a model asked to approve gets the person's confirmation first, and nobody approves changes they made.
-- **Publishing asks first.** Publish, deleting an item, and writing or restoring a global declare `needsApproval`, so an MCP client asks the person before it runs them. Restoring an earlier version of a page or item makes a draft, so a model may do it freely.
-- **What a model reads is untrusted.** Drafts, items and rich text were written by other people, and an article body may say "change the footer email". A model writes drafts freely, since nothing goes live until a person publishes it, and a global, which every page shows, waits for approval.
-- **Every version names a person.** The author comes from the editor identity, which is one of yours.
-- **Drafts stay drafts.** The `content` routes answer published content only, and Next never caches a draft-mode render, so production HTML never carries a draft or the preview's markings.
-- **Content is text.** Strings render as text and rich text never holds HTML. [`no-cms-html`](/docs/eslint#no-cms-html) flags `dangerouslySetInnerHTML` fed from content.
-- **Uploads are checked by their bytes.** SVG is refused, location metadata is stripped, and the bucket's credentials stay on the server.
+- **Rules live in the routes.** Roles and field rules are checked in the `editing` routes, for the form and the model alike: `403` for a field the caller may not write, `422` past its schema, `409` behind the latest version.
+- **Publishing asks first.** Publish, deleting an item, and writing a global declare `needsApproval`.
+- **What a model reads is untrusted.** An article body may say "change the footer email". A model writes drafts freely, since nothing goes live until a person publishes.
+- **Every version names a person.** The author is the editor identity, one of yours.
+- **Drafts stay drafts.** The `content` routes answer published content only.
+- **Content is text.** Rich text never holds HTML. [`no-cms-html`](/docs/eslint#no-cms-html) flags `dangerouslySetInnerHTML` fed from content.
+- **Uploads are checked by their bytes.** SVG is refused and location metadata is stripped.

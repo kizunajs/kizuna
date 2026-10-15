@@ -50,7 +50,7 @@ export function CmsChat() {
     );
 }
 
-function Chat() {
+export function Chat() {
     return (
         <div className={styles.chat}>
             <div className={styles.titleBar}>

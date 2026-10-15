@@ -54,11 +54,11 @@ export default async function FrontPage() {
 }
 ```
 
-That one declaration is what everything else is written from: the form an editor fills in, the tools a model calls, the limits that hold in both, the content routes, the clients that read them, and what search engines are told about the page. The content lives in your Postgres, as drafts until a person publishes.
+That declaration is what the editor, the tools, the content routes, the clients and the search metadata are written from. The content lives in your Postgres.
 
 ## Editors work where they are
 
-There is no admin panel. An editor asks for a change in their chat, and the editor opens beside the answer with the page's draft filling in as the model writes. Or they open the site, click the heading, and type. Both save to the same draft, and nothing goes live until someone publishes.
+An editor asks in their chat, or clicks the page. Both save a draft, and a person publishes.
 
 <Cards>
     <Card title="Editing" href="/docs/cms/editing">
@@ -77,7 +77,7 @@ There is no admin panel. An editor asks for a change in their chat, and the edit
 
 ## Content, typed like the rest of your system
 
-A collection's items get an id type of their own, and a page holds one the way it holds a product from your own API or from Stripe. The id is the same type in the CMS, your routes and the Swift, Kotlin and fetch clients, so content and data meet without a copy of anything.
+An `EmployeeId` is one type in the CMS, your routes and the generated clients.
 
 <Cards>
     <Card title="Content" href="/docs/cms/content">
@@ -96,7 +96,7 @@ A collection's items get an id type of their own, and a page holds one the way i
 
 ## One site, or a business full of them
 
-A site starts with a few pages. When the business adds countries, the content every site shows is written once, each site keeps content of its own, a country adds the field that is normal there, and one publish refreshes every site that shows the change.
+Content every site shows is written once. Each site keeps its own, and one publish refreshes every site.
 
 <Cards>
     <Card title="Sites" href="/docs/cms/sites">
@@ -109,7 +109,7 @@ A site starts with a few pages. When the business adds countries, the content ev
 
 ## Found by search engines and answer engines
 
-Most of what a search engine reads from a page is in its content already. The CMS writes the structured data, the sitemap, the language alternates and the redirects from the typed fields, and leaves a person the search title and description, measured as a search result shows them.
+Structured data, the sitemap, language alternates and redirects come from the fields. A person writes the title and description.
 
 <Cards>
     <Card title="SEO" href="/docs/cms/seo">

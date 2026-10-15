@@ -45,7 +45,7 @@ export function CmsOnPage() {
     );
 }
 
-function Preview() {
+export function Preview() {
     return (
         <Editor className={styles.window}>
             <div className={editor.previewBar}>
@@ -109,7 +109,7 @@ function Preview() {
     );
 }
 
-function Publish() {
+export function Publish() {
     return (
         <div className={clsx(styles.window, styles.dialogStage)}>
             <Editor className={editor.dialog}>

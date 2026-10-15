@@ -1,10 +1,110 @@
 ---
 title: Sanity
-description: Where Kizuna CMS and Sanity differ, and when a hosted content lake with GROQ and a Studio is the better choice.
+description: Kizuna CMS and Sanity side by side, the same page written in both, and when to pick which.
 ---
 
-Sanity keeps the content in its own cloud, the content lake, and you query it with GROQ. Studio, the editor, is a React app you configure and host. It is the most flexible of the hosted ones: schemas are code, localization can be per document or per field, and the 2026 Shared Content feature lets one dataset read another's documents.
+Sanity keeps content in its own cloud, the content lake, queried with GROQ, and the editor is a Studio you configure and host.
 
-Choose Sanity when you want a hosted content store with a real query language and a Studio you can shape, and the content has no need to sit beside an API of your own. Choose Kizuna when the content belongs in the same database and the same types as the app, when editors should work in their chat and on the page rather than in a Studio, or when you would rather not pay per seat.
+<Comparison other="Sanity">
+    <Row label="Where content lives" kizuna="Your Postgres" other="Sanity's content lake" />
+    <Row label="Content is declared" kizuna="Beside the route, as what that page needs" other="Schemas, queried from any page" />
+    <Row label="Schema" kizuna="Zod" other={<code>defineType</code>} />
+    <Row
+        label="Reading"
+        kizuna={
+            <>
+                <code>pages.articlePage.get()</code>, typed
+            </>
+        }
+        other="GROQ, typed with TypeGen"
+    />
+    <Row
+        label="Related records"
+        kizuna={
+            <>
+                An id, fetched with <code>get</code>
+            </>
+        }
+        other="A reference, resolved in the query"
+    />
+    <Row label="Ids" kizuna="One branded type in the CMS, your API and the Swift, Kotlin and fetch clients" other="Document ids" />
+    <Row label="Editor" kizuna="Your chat, and clicking the page" other="Sanity Studio, with visual editing" />
+    <Row label="AI" kizuna="The model edits as the signed-in editor, and publishing asks first" other="Agent actions and AI Assist" />
+    <Row label="Data outside the CMS" kizuna="A relationship: the page holds the id" other="Custom input components" />
+    <Row
+        label="Several sites"
+        kizuna="Content every site reads, and each site's own, in one CMS"
+        other="Datasets, with Shared Content between them"
+    />
+    <Row label="Where is this used, across sites" kizuna="Kept as it saves" other="Not across datasets" kizunaMark="yes" otherMark="no" />
+    <Row label="Localization" kizuna="Per document, shared fields, one language at a time" other="Per document or per field, your choice" />
+    <Row label="Rich text" kizuna="Portable Text" other="Portable Text" kizunaMark="yes" otherMark="yes" />
+    <Row label="Hosting" kizuna="Your Next.js app" other="Content lake hosted, Studio yours" />
+    <Row label="Price" kizuna="MIT, your hosting" other="Free tier, then per seat and usage" />
+</Comparison>
 
-The one thing to know before picking Sanity for several sites: a reference across datasets cannot be looked up in reverse, and a release's integrity checks skip it, so "where is this office used" has to be answered on your side.
+## The same page, both ways
+
+An article page that shows the author's name.
+
+<SideBySide>
+
+```ts title="Kizuna: src/app/blog/[slug]/content.ts"
+export default definePage({
+    name: 'articlePage',
+    collection: Articles,
+});
+```
+
+```ts title="Sanity: schemaTypes/article.ts"
+export const article = defineType({
+    name: 'article',
+    type: 'document',
+    fields: [
+        defineField({
+            name: 'title',
+            type: 'string',
+        }),
+        defineField({
+            name: 'author',
+            type: 'reference',
+            to: [{ type: 'employee' }],
+        }),
+    ],
+});
+```
+
+```tsx title="Kizuna: src/app/blog/[slug]/page.tsx"
+const article = await kizuna.content.pages.articlePage.get(await params);
+const author = await kizuna.content.collections.employees.get({
+    id: article.author,
+});
+```
+
+```tsx title="Sanity: src/app/blog/[slug]/page.tsx"
+const article = await client.fetch(
+    `*[_type == "article" && slug.current == $slug][0]{
+        title,
+        author->{ name }
+    }`,
+    { slug }
+);
+```
+
+</SideBySide>
+
+Both store Portable Text and both have a typed read. In Kizuna the page is declared beside its route and the content is in your database. In Sanity the page writes a query against a hosted store.
+
+## Pick Sanity when
+
+- You want a hosted content store and a real query language.
+- The Studio's visual editing is what editors want.
+- Content has no API of its own to share types with.
+- Per-seat pricing fits the team.
+
+## Pick Kizuna when
+
+- Content belongs in the same database and the same types as the app.
+- Editors are happy in their chat and on the page.
+- Several sites share content and "where is this used" has to work across them.
+- You would rather not pay per seat.

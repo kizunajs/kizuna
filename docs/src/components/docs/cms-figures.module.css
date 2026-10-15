@@ -1,0 +1,15 @@
+.figure {
+    margin-block: 20px 28px;
+}
+
+.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 8px;
+}
+
+@media (max-width: 1023px) {
+    .split {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

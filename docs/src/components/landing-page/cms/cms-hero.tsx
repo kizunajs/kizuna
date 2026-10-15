@@ -13,7 +13,9 @@ export function CmsHero({ className }: { className?: string }) {
             <HeroBackdrop className={hero.backdrop} />
 
             <h1 className={hero.headline}>The content system for your whole business</h1>
-            <p className={hero.tagline}>Content declared beside the code that shows it. One config, one database, every site you run.</p>
+            <p className={hero.tagline}>
+                Declare the fields beside the route. Get the editor in your chat, the preview, a typed content API, and more.
+            </p>
 
             <div className={hero.actions}>
                 <ButtonLink href="/docs/cms/quickstart">

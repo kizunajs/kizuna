@@ -22,7 +22,7 @@ import styles from '../page.module.css';
 
 export const metadata: Metadata = {
     title: 'Kizuna CMS',
-    description: 'Your sites, their content and the API behind them in one config. Editors change it in their chat or on the page.',
+    description: 'Declare the fields beside the route. Get the editor in your chat, the preview, a typed content API, and more.',
 };
 
 export default function CmsPage() {

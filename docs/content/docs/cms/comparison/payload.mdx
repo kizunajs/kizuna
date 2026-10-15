@@ -1,32 +1,129 @@
 ---
 title: Payload CMS
-description: Where Kizuna CMS and Payload CMS differ, where Payload is the better fit, and what teams report, for a team choosing.
+description: Kizuna CMS and Payload CMS side by side, the same page written in both, and when to pick which.
 ---
 
-Payload is the closest in spirit: TypeScript, your database, MIT, and a Next.js app as the host. It has an admin panel, three databases, GraphQL, eleven official plugins and, since 2025, Figma behind it. Teams moving a Next.js site off HubSpot or WordPress weigh the two against each other most often.
+Payload is the closest in spirit: TypeScript, your database, MIT, and a Next.js app as the host.
 
-## Where they differ
+<Comparison other="Payload CMS">
+    <Row label="Content is declared" kizuna="Beside the route, as what that page needs" other="As collections, which pages query" />
+    <Row label="Schema" kizuna="Zod" other="Payload's field types" />
+    <Row
+        label="Reading"
+        kizuna={
+            <>
+                <code>pages.articlePage.get()</code>, typed
+            </>
+        }
+        other={
+            <>
+                <code>payload.find()</code> with <code>depth</code>
+            </>
+        }
+    />
+    <Row
+        label="Related records"
+        kizuna={
+            <>
+                An id, fetched with <code>get</code>
+            </>
+        }
+        other={
+            <>
+                Populated by <code>depth</code>, typed <code>string | Doc</code>
+            </>
+        }
+    />
+    <Row
+        label="Ids"
+        kizuna="One branded type in the CMS, your API and the Swift, Kotlin and fetch clients"
+        other="Strings, with types copied to the frontend"
+    />
+    <Row label="Editor" kizuna="Your chat, and clicking the page" other="The admin panel" />
+    <Row
+        label="AI"
+        kizuna="The model edits as the signed-in editor, and publishing asks first"
+        other="MCP data access by API key, and vector embeddings"
+    />
+    <Row label="Data outside the CMS" kizuna="A relationship: the page holds the id" other="Synced into a collection" />
+    <Row label="Several sites" kizuna="Content every site reads, and each site's own" other="The multi-tenant plugin" />
+    <Row label="Localization" kizuna="Per document, shared fields, one language at a time" other="Per field, every language at once" />
+    <Row label="Rich text" kizuna="Portable Text" other="Lexical" />
+    <Row label="Database" kizuna="Postgres" other="MongoDB, Postgres, SQLite" />
+    <Row label="GraphQL" kizuna="REST and generated clients" other="REST, GraphQL, Local API" kizunaMark="no" otherMark="yes" />
+    <Row label="Reviews and roles" kizuna="In the package" other="Enterprise" kizunaMark="yes" otherMark="partly" />
+    <Row label="On-page editing" kizuna="In the package" other="Enterprise" kizunaMark="yes" otherMark="partly" />
+    <Row label="Admin panel to host" kizuna="None" other="A React panel in your app" />
+    <Row label="Licence" kizuna="MIT" other="MIT" kizunaMark="yes" otherMark="yes" />
+</Comparison>
 
-- **A page says what it needs.** In Kizuna, a `content.ts` beside the route lists the fields that page renders, so there is no query, no `depth` and no `string | Doc` union to narrow. Payload models content as collections and the page fetches it, which is the shape a CMS has had for twenty years, and it carries the cost of deciding how deep to populate on every read.
-- **One system.** The config that declares the content declares the app's routes, jobs and identities, and generates the OpenAPI document and the Swift, Kotlin and fetch clients. An `EmployeeId` is one type in the CMS, the API and the iOS app. Payload is a CMS beside your app, and its types reach the app by copying a file.
-- **Editing where the editor is.** An editor asks for a change in their chat and sees the page's draft fill in beside the answer, or clicks the text on the page. The model works as them, under their roles, and publishing asks a person first. Payload's MCP plugin gives an outside agent data access through an API key, and its live preview renders a draft without editing it.
-- **Data stays where it lives.** A page holds a product's id and fetches the product from the app's API or from Stripe, and the editor picks from a list the relationship provides. Payload's Stripe plugin syncs products into a collection.
-- **Several sites.** Content every site reads is written once, each country adds its own fields and content, and one publish refreshes every site that shows the change. Payload's multi-tenant plugin keeps tenants apart, and content between them is the app's problem.
-- **Nothing to host but the site.** There is no panel to theme, upgrade or secure. The editor is one file the MCP endpoint serves.
+## The same page, both ways
 
-## Where Payload is the better fit
+An article page that shows the author's name.
 
-- **Editors who want a panel.** A list view, bulk edit, folders, trash and a version diff, in thirty languages, that an editor who has used WordPress already understands. A team that does not want a model in the loop will miss it.
-- **GraphQL or MongoDB.** Kizuna generates REST and typed clients, and runs on Postgres.
-- **The ecosystem.** Eleven official plugins, a large community, templates and agencies that know it. Form building, search and e-commerce are solved there, and Kizuna leaves forms and search to the app.
-- **Maturity.** Payload is years old with a funded team. Kizuna's CMS is in alpha.
+<SideBySide>
 
-## What teams report
+```ts title="Kizuna: src/app/blog/[slug]/content.ts"
+export default definePage({
+    name: 'articlePage',
+    collection: Articles,
+});
+```
 
-These are the themes in Payload's own issue tracker and in production write-ups, as of October 2026. They are what a team should expect to spend time on, not a verdict.
+```ts title="Payload: src/collections/Articles.ts"
+export const Articles: CollectionConfig = {
+    slug: 'articles',
+    fields: [
+        {
+            name: 'title',
+            type: 'text',
+            required: true,
+        },
+        {
+            name: 'author',
+            type: 'relationship',
+            relationTo: 'employees',
+        },
+    ],
+};
+```
 
-- **Migrations.** Payload pushes schema changes to the database in development and generates SQL migrations for production, and the two modes meet badly: renamed fields that look like a drop and a create, enum changes that fail to cast, and no cascading deletes on relationships, which is its most-reacted open issue. Kizuna writes one SQL file for its tables and keeps the content as JSON, so a field change is a `migrate` step on the document and never a table change.
-- **Cost tied to the admin panel.** The panel runs inside your Next.js app, and its edit form calls a server action as the editor types, which on serverless hosting shows up as a bill. Deep `depth` queries return large documents and fan out.
-- **Rich text.** Lexical is the editor, and it is the single largest topic in the tracker. Kizuna stores Portable Text, structured JSON that never holds HTML, and renders it with your components.
-- **It is an application to maintain.** Agencies that like Payload say the same thing: adding a section type or changing the design is a code change, and approval workflows and SSO are enterprise or custom. Kizuna has the same honest answer for the first, a field is a line of Zod, and ships reviews and roles for the second.
-- **Hosting.** Payload Cloud is closed to new projects since the Figma acquisition, and self-hosting is the path.
+```tsx title="Kizuna: src/app/blog/[slug]/page.tsx"
+const article = await kizuna.content.pages.articlePage.get(await params);
+const author = await kizuna.content.collections.employees.get({
+    id: article.author,
+});
+```
+
+```tsx title="Payload: src/app/blog/[slug]/page.tsx"
+const payload = await getPayload({ config });
+const { docs } = await payload.find({
+    collection: 'articles',
+    where: {
+        slug: {
+            equals: slug,
+        },
+    },
+    depth: 1,
+});
+const article = docs[0];
+const author = typeof article.author === 'string' ? undefined : article.author;
+```
+
+</SideBySide>
+
+In Kizuna the page is declared beside its route and `author` is an `EmployeeId`. In Payload the page queries a collection and `author` is a string or a document, depending on `depth`.
+
+## Pick Payload when
+
+- Editors want a panel with list views, bulk edit and folders.
+- You need GraphQL or MongoDB.
+- A plugin already does it: forms, search, e-commerce.
+- You want a years-old project with a funded team.
+
+## Pick Kizuna when
+
+- The site has an API of its own and the content should share its types.
+- Editors are happy in their chat and on the page.
+- Several sites share content without a tenant wall.
+- Reviews, roles and on-page editing should come without an enterprise contract.
