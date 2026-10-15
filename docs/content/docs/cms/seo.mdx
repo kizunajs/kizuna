@@ -33,6 +33,26 @@ export default definePage({
 
 `content` is the page's fields, and a field the function names that the page does not have fails to compile. A page without `metadata` uses its heading, its first paragraph and its first image.
 
+The front page is the one page whose title is the site's, so it stands alone:
+
+```ts title="src/app/(front-page)/content.ts"
+export default definePage({
+    name: 'frontPage',
+    fields: [
+        {
+            name: 'tagline',
+            schema: z.string().max(80),
+        },
+    ],
+    metadata: {
+        title: ({ content, site }) => `${site.name}: ${content.tagline}`,
+        suffix: false,
+    },
+});
+```
+
+`site` is the `Site` global's published fields, so the front page reads the site's name without the join adding it again. Any page can do the same when its title is a whole of its own, like a campaign page named after the campaign.
+
 ### The site joins them
 
 The site's name and the separator live in one place, on `cms()`, and every page's title goes through it:
