@@ -54,19 +54,19 @@ export const cmsFeatures: Feature[] = [
     {
         icons: [Link2],
         title: 'Relationships',
-        href: '/docs/cms/content/relationships',
+        href: '/docs/cms/connecting#relationships',
         description: 'Pick products from your own API or Stripe. The page holds their ids.',
     },
     {
         icons: [UserCheck],
         title: 'Reviews',
-        href: '/docs/cms/reviews',
+        href: '/docs/cms/editing#reviews',
         description: 'Ask a colleague to look before a page goes live, and name who owns each page.',
     },
     {
         icons: [Languages],
         title: 'Localization',
-        href: '/docs/cms/localization',
+        href: '/docs/cms/languages',
         description: 'Every page in every language the site serves, published one language at a time.',
     },
     {
@@ -84,7 +84,7 @@ export const cmsFeatures: Feature[] = [
     {
         icons: [ArrowLeftRight],
         title: 'Environments',
-        href: '/docs/cms/cli#environments',
+        href: '/docs/cms/reference/cli#environments',
         description: 'Copy drafts between local, staging and production with kizuna cms push and pull.',
     },
 ];

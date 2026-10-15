@@ -62,7 +62,7 @@ kizuna cms rename-site default uk
 
 ## `kizuna cms import-redirects`
 
-Creates a redirect for each row of a CSV with `from` and `to` columns, like the one HubSpot or a crawl of the old site exports, and skips rows whose `from` already redirects. A `to` that is another row's `from` is collapsed to that row's target, so the import never makes a chain. Use it when [moving from another platform](/docs/cms/guides/migrating).
+Creates a redirect for each row of a CSV with `from` and `to` columns, like the one HubSpot or a crawl of the old site exports, and skips rows whose `from` already redirects. A `to` that is another row's `from` is collapsed to that row's target, so the import never makes a chain. Use it when [moving from another platform](/docs/cms/seo#moving-from-another-platform).
 
 ```sh
 kizuna cms import-redirects old-site.csv
@@ -114,7 +114,7 @@ Copies one page's draft from `local`, or `--from`, into the target as a new draf
 kizuna cms push frontPage --to staging
 ```
 
-Every id a page holds through a [relationship](/docs/cms/content/relationships) is checked against the target's own picker list, and missing ids are listed rather than kept silently. The command exits `2` when any are missing.
+Every id a page holds through a [relationship](/docs/cms/connecting#relationships) is checked against the target's own picker list, and missing ids are listed rather than kept silently. The command exits `2` when any are missing.
 
 ```json
 {

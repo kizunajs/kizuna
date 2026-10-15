@@ -1,0 +1,123 @@
+---
+title: cms() options
+description: 'Everything cms() takes, the rules behind sites, image storage, and setting up a monorepo.'
+---
+
+```ts
+content: cms({
+    db,
+    pages,
+    sites,
+    site,
+    locales,
+    fallback,
+    globals,
+    collections,
+    relationships,
+    auth,
+    reviews,
+    media,
+    metadata,
+    paths,
+    on,
+    preview,
+    signInPath,
+    apiPath,
+    path,
+    revalidate,
+    environments,
+}),
+```
+
+| Option          | What it is                                                                                |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| `db`            | The Drizzle database the `cms_` tables live in                                            |
+| `pages`         | The pages module `kizuna generate` writes, or one per site under `sites`                  |
+| `sites`         | `declareSites(Site, { ... })`, or a `defineSite` for admin-created sites                  |
+| `site`          | Which site this deployment is: `() => process.env.KIZUNA_SITE`, or `({ request }) => ...` |
+| `locales`       | The languages, the first being the source                                                 |
+| `fallback`      | Per locale, what to show when a translation is missing                                    |
+| `globals`       | `defineGlobal` results, shared by every site                                              |
+| `collections`   | `defineCollection` results, shared by every site                                          |
+| `relationships` | `defineRelationship` results                                                              |
+| `auth`          | `identity`, `roles`, `sites`, `publish`, `people`, `invalidate`                           |
+| `reviews`       | `roles` that may approve, `onReviewRequested`                                             |
+| `media`         | S3 settings or a `storage`, `publicPath`, `maxBytes`                                      |
+| `metadata`      | `title` and `og.title` joins for search results                                           |
+| `paths`         | `rewrite: true` to serve localized addresses                                              |
+| `on`            | `published`, `unpublished`, `deleted` for every document                                  |
+| `preview`       | `url` of the site, for the editor's preview                                               |
+| `signInPath`    | Where a signed-out editor is sent                                                         |
+| `apiPath`       | Where the config is mounted, default `/api`                                               |
+| `path`          | Where the CMS routes sit under it, default `/cms`                                         |
+| `revalidate`    | A function that revalidates tags, when the site runs elsewhere                            |
+| `environments`  | Named environments for `kizuna cms push` and `pull`                                       |
+
+## A site
+
+```ts
+declareSites(Site, {
+    norway: {
+        label,
+        url,
+        headers,
+        app,
+        locales,
+        fallback,
+        globals,
+        collections,
+        sites,
+        // and the fields Site adds
+    },
+}),
+```
+
+`url` is where the site's API is mounted, which publishing calls. `headers` is what its `invalidate` expects, for a site in another repository. `app` is the app directory that renders it, when sites have different apps. `sites` nests sites under a site that owns content for them.
+
+## The rules between sites
+
+1. A document belongs to one site, and every site under it reads it. To share across siblings, move it up. To show it in two places, reference it.
+2. Names are unique across the tree, so a reader resolves upward.
+3. An editor belongs to sites with roles, and a grant reaches everything below. Grants add, nothing denies.
+4. A site adds to what it inherits, never takes away. Empty means inherited. `id`, `slug` and unique fields never override.
+5. Published reads published. A site never shows a shared draft.
+6. Sites are addressed by id, never by URL.
+7. Publishing refreshes every deployment that shows the document, and one site that is down never holds up the others.
+8. A locale is a copy of a document, not a site.
+
+## Images
+
+Files live in an S3-compatible bucket:
+
+| Variable                    | What it is                                                   |
+| --------------------------- | ------------------------------------------------------------ |
+| `CMS_S3_BUCKET`             | The bucket                                                   |
+| `CMS_S3_ENDPOINT`           | The endpoint, for R2, Supabase or MinIO. Unset for AWS       |
+| `CMS_S3_REGION`             | `auto` for R2, the bucket's region otherwise                 |
+| `CMS_S3_ACCESS_KEY_ID`      | Falls back to the SDK's own lookup                           |
+| `CMS_S3_SECRET_ACCESS_KEY`  | Falls back to the SDK's own lookup                           |
+| `KIZUNA_CMS_PREVIEW_SECRET` | Signs preview tokens. Production refuses to start without it |
+
+The bucket can stay private: browsers upload through a presigned URL and read through `GET /content/media/:id/image`, which renders the crop at `?w=` and caches for a year. Uploads are checked by their bytes, SVG is refused, and location metadata is stripped.
+
+## A monorepo
+
+For a group app and a countries app:
+
+```text
+packages/
+  content/      kizuna.cms.config.ts, the collections every site reads
+  ui/           components every app renders
+apps/
+  group/        example.com
+  countries/    example.co.uk, example.no, deployed once per country
+```
+
+- One React, one Zod and one Kizuna, pinned in the pnpm catalog. The packages list them as peer dependencies.
+- The content package has no build. Its `exports` point at source, and apps import it by package name.
+- Every app mounts the config at the same `apiPath`, and `withKizunaCms()` in each app's `next.config.ts` collects that app's `content.ts` files.
+- `outputFileTracingRoot` points at the repository root, so a standalone build traces the content package.
+- `DATABASE_URL`, `KIZUNA_CMS_PREVIEW_SECRET` and the `CMS_S3_*` variables are the same in every app. Turborepo needs them in `globalEnv`.
+- `kizuna cms migrate` and `drizzle-kit migrate` run once from the content package, never from an app's build.
+- One Vercel project per app, root directory the app, `installCommand` filtered to it. A container image is built per app from the repository root with `turbo prune`.
+- Draft mode is a cookie per domain, so every site has a `url` and the editor opens each site's own `/api/draft`. A starter's `X-Frame-Options: SAMEORIGIN` blocks the preview; allow the editor's origin with `frame-ancestors` instead.

@@ -1,6 +1,6 @@
 ---
 title: Editing
-description: The editor in your chat, the preview you click, and the drafts, versions and publishing behind both.
+description: 'The editor in your chat, the preview you click, drafts, publishing and reviews.'
 ---
 
 Every change is a draft until a person publishes it.
@@ -66,3 +66,84 @@ Every `editing` route is an MCP tool, so the model can do what the form does. `e
 - **Drafts stay drafts.** The `content` routes answer published content only.
 - **Content is text.** Rich text never holds HTML. [`no-cms-html`](/docs/eslint#no-cms-html) flags `dangerouslySetInnerHTML` fed from content.
 - **Uploads are checked by their bytes.** SVG is refused and location metadata is stripped.
+
+## Reviews
+
+### People
+
+The editor shows people by name and picture. `people.list` reads them from your own users:
+
+```ts title="kizuna.cms.config.ts"
+auth: {
+    identity: 'editor',
+    people: {
+        list: async () => {
+            const editors = await db
+                .select()
+                .from(users)
+                .where(inArray(users.role, ['editor', 'admin']));
+            return editors.map((editor) => ({
+                id: editor.email,
+                name: editor.name,
+                image: editor.image ?? undefined,
+                roles: [editor.role],
+            }));
+        },
+        imageOrigins: ['https://lh3.googleusercontent.com'],
+    },
+},
+```
+
+### Owners
+
+A page, global or item can have an owner. The editor shows them beside the page name, and the owner is suggested first for a review.
+
+> Make Kari the owner of the investor pages.
+
+### Asking for a review
+
+Beside Publish, the editor offers **Ask for review**:
+
+<EditorFigure kind="ask" />
+
+The reviewer sees it in the editor, in their chat, and wherever you send it:
+
+```ts title="kizuna.cms.config.ts"
+reviews: {
+    onReviewRequested: async ({ documents, reviewers, requestedBy, note }, { plugins }) => {
+        await plugins.resend.sendEmail({
+            to: reviewers.map((reviewer) => reviewer.email),
+            subject: `${requestedBy.name} asked you to review ${documents.length} pages`,
+            text: note ?? '',
+        });
+    },
+},
+```
+
+Every function the CMS calls gets `plugins` and `jobs`, like a route handler, so [Resend](/docs/resend) sends it.
+
+They approve or ask for changes:
+
+<EditorFigure kind="review" />
+
+An approval covers the draft as it was. A save after it marks the approval outdated.
+
+### Requiring a review
+
+```ts title="src/app/investor-relations/content.ts"
+export default definePage({
+    name: 'investorRelationsPage',
+    requireReview: true,
+    fields: [
+        // ...
+    ],
+});
+```
+
+Publishing waits for an approval from someone other than the person who changed it. Anyone with a role under `reviews.roles` may approve without being asked. The rule holds in the routes, so the model gets the same answer.
+
+### Several pages at once
+
+The Publish dialog lists every page with changes. Tick the ones to publish, or ask for one review of all of them.
+
+> Publish everything Kari approved today.

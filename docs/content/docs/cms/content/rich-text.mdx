@@ -1,6 +1,6 @@
 ---
 title: Rich text and images
-description: Formatted text as Portable Text, which never holds HTML, and images with a crop, focal point and alt text per use.
+description: 'Portable Text that never holds HTML, and images with a crop, focal point and alt text per use.'
 ---
 
 `RichTextSchema` is a field for formatted text, like an article body:
@@ -29,4 +29,4 @@ It stores [Portable Text](https://www.portabletext.org), structured JSON that ne
 }
 ```
 
-The page receives `{ id, url, alt, width, height }`, where `url` renders that crop. Editors upload in the preview. Where the files are stored is set up on [the CMS API](/docs/cms/api#images).
+The page receives `{ id, url, alt, width, height }`, where `url` renders that crop. Editors upload in the preview. Where the files are stored is set up on [the CMS API](/docs/cms/reference/options#images).

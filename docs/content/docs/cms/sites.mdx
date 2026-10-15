@@ -1,0 +1,187 @@
+---
+title: More sites
+description: 'The same CMS serving several sites: what every site reads, what each site owns, and who edits what.'
+---
+
+Start from one site. When the business adds a country, a brand or a dealer, that is a site: it owns content and has editors. Content on `cms()` stays shared by every site.
+
+```text
+cms()            employees, offices, privacy policy      every site reads these
+├── norway       its pages, its news, its people
+└── denmark      its pages, its news, its people
+```
+
+Three ways to run that, by how the sites relate.
+
+## One app for every site
+
+The same site in four countries, each run by its own company. One Next.js app, deployed once per country.
+
+```ts title="src/cms/site.ts"
+export const Site = SiteSchema.extend({
+    companyName: z.string().max(60),
+    currency: z.enum(['NOK', 'DKK', 'SEK']),
+});
+```
+
+```ts title="kizuna.config.ts"
+content: cms({
+    db,
+    pages,
+    globals: [PrivacyPolicy],
+    collections: [Treatments, Centers],
+    sites: declareSites(Site, {
+        norway: {
+            label: 'Example Norge',
+            url: 'https://example.no/api',
+            locales: ['nb'],
+            companyName: 'Example Norge AS',
+            currency: 'NOK',
+            collections: [Articles],
+        },
+        denmark: {
+            label: 'Example Danmark',
+            url: 'https://example.dk/api',
+            locales: ['da'],
+            companyName: 'Example Danmark ApS',
+            currency: 'DKK',
+            collections: [Articles],
+        },
+    }),
+    site: () => process.env.KIZUNA_SITE,
+}),
+```
+
+Each deployment sets `KIZUNA_SITE`. Pages read as before, and the site itself is typed:
+
+```tsx
+const content = await kizuna.content.pages.frontPage.get();
+const site = await kizuna.content.site.get();
+
+<span>{site.companyName}</span>;
+```
+
+`site.slug` is `'norway' | 'denmark'`, so a `switch` on it is exhaustive. A field or a page that one country has says `sites: ['norway']` and is absent elsewhere.
+
+**What a Norwegian editor sees:** their chat connects to `example.no/api/mcp`. The switcher lists Norway's pages, Norway's articles, and the shared treatments and centres marked as shared. They edit Norway's and draft changes to shared items for an admin to publish.
+
+## A group app and a countries app
+
+A main site with pages of its own, and country sites that share a second app. Same config, with `app` naming which app renders each site:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+sites: declareSites(Site, {
+    group: {
+        label: 'Example Group',
+        url: 'https://example.com/api',
+        app: '../../apps/group/src/app',
+    },
+    uk: {
+        label: 'Example UK',
+        url: 'https://example.co.uk/api',
+        app: '../../apps/countries/src/app',
+        locales: ['en'],
+        collections: [Events],
+    },
+    norway: {
+        label: 'Example Norge',
+        url: 'https://example.no/api',
+        app: '../../apps/countries/src/app',
+        locales: ['nb', 'en'],
+    },
+}),
+```
+
+One repository: a content package with this config, a UI package both apps render, and the two apps. [Setting it up](/docs/cms/reference/options#a-monorepo) is in the reference.
+
+**What a UK editor sees:** the UK's pages and events, and the group's employees and offices marked as shared. A group admin sees every site.
+
+## Sites created by admins
+
+Forty dealers, each with a site and a domain. One app, one deployment, and a developer never hears about a new site:
+
+```ts title="src/cms/site.ts"
+export const Site = defineSite({
+    fields: [
+        {
+            name: 'theme',
+            schema: z.enum(['classic', 'bold']),
+        },
+        {
+            name: 'phone',
+            schema: z.string().max(30),
+        },
+    ],
+});
+```
+
+```ts title="kizuna.config.ts"
+content: cms({
+    db,
+    pages,
+    collections: [Services],
+    sites: Site,
+}),
+```
+
+The host picks the site from the domains the admin entered. `site.theme` and `site.phone` are what the admin filled in.
+
+**What an admin does:** creates the site in the editor, adds its domain, adds its people. **What a dealer's editor sees:** their site alone.
+
+## Shared content
+
+Content on `cms()` is read by every site at the same path, `kizuna.content.collections.offices`. A site's own content is listed under the site and read the same way on that site. A site's content holds shared ids, like an event holding `Offices.id`, and never another site's.
+
+A site adds to a shared item, like opening hours on every office:
+
+```ts
+export const UkOffices = extendCollection(Offices, {
+    overrides: ['phone'],
+    fields: [
+        {
+            name: 'openingHours',
+            schema: z.string().max(120),
+        },
+    ],
+});
+```
+
+Empty means the shared value. The editor shows whose value a field holds. `id`, `slug` and unique fields never override.
+
+## Editors
+
+An editor belongs to sites with roles, from your identity:
+
+```ts
+auth: {
+    identity: 'editor',
+    sites: (editor) => editor.sites,
+    publish: {
+        roles: 'admin',
+    },
+},
+```
+
+| Editor             | Shared content          | Their sites       | Other sites |
+| ------------------ | ----------------------- | ----------------- | ----------- |
+| `admin` on `cms()` | Write and publish       | Write and publish | Write       |
+| `admin` on a site  | Draft, ask for a review | Write and publish | Nothing     |
+| `editor` on a site | Draft, ask for a review | Write             | Nothing     |
+
+Before a shared item publishes, the editor says where it shows: "9 pages on 4 sites".
+
+## Publishing
+
+Publishing queues a job per site that shows the document, calling its `invalidate` with `{ brand, id }`. Each site refreshes the pages that hold it. The editor shows the result: "Refreshed 3 of 4 sites. The UK did not answer, retrying."
+
+## Another repository
+
+A site someone else runs, showing your offices. It lists a `url` and `headers` and no pages, hears every publish, reads through a [published client](/docs/cms/connecting#publishing-a-client), and holds your records through a [relationship](/docs/cms/connecting#from-another-kizuna-api).
+
+## Starting with one site
+
+Content is stored per site from the start, so adding `sites` later moves nothing:
+
+```sh
+kizuna cms rename-site default norway
+```

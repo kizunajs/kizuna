@@ -1,6 +1,6 @@
 ---
 title: Pages
-description: A content.ts beside each route lists what that page needs, and a dynamic route shows one item of a collection.
+description: 'A content.ts beside each route lists what that page needs. A dynamic route shows one item of a collection.'
 ---
 
 ```ts title="src/app/(front-page)/content.ts"
@@ -22,7 +22,7 @@ export default definePage({
 
 `name` is how the page is read, `kizuna.content.pages.frontPage`, and how tools address it. Write it in camelCase with a `Page` suffix, unique across the site, and as a literal so discovery can read it.
 
-Content is stored under the page's name, so moving the route's folder keeps it. A new name starts the page afresh, and the old content waits, listed by [`kizuna cms orphans`](/docs/cms/cli#kizuna-cms-orphans), until you move it:
+Content is stored under the page's name, so moving the route's folder keeps it. A new name starts the page afresh, and the old content waits, listed by [`kizuna cms orphans`](/docs/cms/reference/cli#kizuna-cms-orphans), until you move it:
 
 ```sh
 kizuna cms rename-page pricingPage plansPage

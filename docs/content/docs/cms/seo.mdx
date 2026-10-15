@@ -1,6 +1,6 @@
 ---
 title: SEO
-description: What search engines read from a page, written from the typed fields.
+description: 'What search engines and answer engines read from a page, written from the typed fields.'
 ---
 
 ## The page's result
@@ -133,3 +133,28 @@ The page's `metadata` writes `alternates.languages`: an absolute address per pub
 ## Images
 
 `ImageSchema` requires alt text. The media record keeps width and height, and `?w=` serves each size for `srcset`.
+
+## AI search
+
+Answer engines cite pages the way search engines rank them: indexed, plain, with an author and a date. The CMS makes those true on every page:
+
+- **Visible dates and a named author.** An article shows `datePublished` and `dateModified` on the page and in its structured data, and the author is a person with a page of their own.
+- **Plain facts in typed fields.** An office's address, hours and phone number are fields, so the page states them rather than burying them in a paragraph.
+- **The crawlers that cite are let in.** The site's `robots.txt` names the answer engines' search crawlers, `OAI-SearchBot`, `Claude-SearchBot` and `PerplexityBot`, and `robots.ts` from the CMS writes the groups. Whether the training crawlers, `GPTBot` and `ClaudeBot`, may read the site is a site setting, off by default.
+- **Each publish tells the engines that read pings.** Bing, DuckDuckGo and the engines built on them learn of a change through [IndexNow](https://www.indexnow.org) the moment a page publishes or an address changes. Google does not take pings, and reads the sitemap.
+
+Two things sound like they should matter and the evidence says they do not. Structured data on a page does not make it cited more often, in a matched study of nearly two thousand pages. A `llms.txt` file is fetched on three percent of the sites that have one, and Google does not read it. The CMS writes neither for that reason, and what moves citations most, by the same studies, is the site being mentioned elsewhere, which is marketing's work rather than the CMS's.
+
+Search Console reports AI results under "Web", and Bing Webmaster Tools has a report of its own for Copilot citations.
+
+## Moving from another platform
+
+A move keeps its search standing when every old address answers. Export the old platform's redirect table and crawl the live site, including blog posts, PDFs and uploaded files, and import the map:
+
+```sh
+kizuna cms import-redirects old-site.csv
+```
+
+Each old address answers with a `301` straight to its new page, never to the front page, and never through another redirect. Imported articles keep their original `datePublished`. Keep the old domain pointing at the new site for a year, since links to it are still out there.
+
+HubSpot keeps its forms inside HubSpot, and they embed on the new site as they are, so lead capture carries on while the site moves. Its uploaded files, under `/hubfs/`, cannot be redirected from HubSpot's side, so copy them into the media library and map their addresses with the rest.

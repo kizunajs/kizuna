@@ -15,16 +15,16 @@ A page is a list of fields beside its route. A block is a set of fields several 
 },
 ```
 
-| Option        | What it is                                                                                                                              |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`        | The key the value is stored under. An identifier, since fields form paths like `hero.heading`.                                          |
-| `label`       | What editors see the field called. Without one, they see its `name`.                                                                    |
-| `schema`      | Any Zod schema. Its limits hold in the API, the tools and the inline editor alike.                                                      |
-| `description` | Guidance under the input, for editors and the agent. Overrides the schema's `.describe()` here.                                         |
-| `auth`        | Who may write the field, in a route's own words: `roles`, or `requires` for permissions.                                                |
-| `readOnly`    | Visible to editors and the agent, writable by nobody.                                                                                   |
-| `options`     | For an enum, the label editors see for each value: `{ design: 'Design' }`.                                                              |
-| `localized`   | Whether the field is translated, when the schema's own default is wrong. See [Localization](/docs/cms/localization#what-is-translated). |
+| Option        | What it is                                                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`        | The key the value is stored under. An identifier, since fields form paths like `hero.heading`.                                       |
+| `label`       | What editors see the field called. Without one, they see its `name`.                                                                 |
+| `schema`      | Any Zod schema. Its limits hold in the API, the tools and the inline editor alike.                                                   |
+| `description` | Guidance under the input, for editors and the agent. Overrides the schema's `.describe()` here.                                      |
+| `auth`        | Who may write the field, in a route's own words: `roles`, or `requires` for permissions.                                             |
+| `readOnly`    | Visible to editors and the agent, writable by nobody.                                                                                |
+| `options`     | For an enum, the label editors see for each value: `{ design: 'Design' }`.                                                           |
+| `localized`   | Whether the field is translated, when the schema's own default is wrong. See [Localization](/docs/cms/languages#what-is-translated). |
 
 A field listed twice fails to compile, and a role the editor identity does not declare fails when the config assembles.
 
