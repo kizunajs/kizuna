@@ -204,31 +204,42 @@ export function LocalizationDemo() {
                                     {field.label}
                                     {field.localized ? <span className={styles.marker}>{locale.toUpperCase()}</span> : null}
                                 </span>
-                                <div className={styles.stack}>
-                                    {isSource || shared ? null : (
-                                        <span className={clsx(styles.source, fieldBehind && styles.sourceChanged)}>
-                                            <span className={styles.code}>EN</span>
-                                            {fieldBehind ? (
-                                                <>
-                                                    <del>{copy.from?.[field.name]}</del> {source.published?.[field.name]}
-                                                </>
-                                            ) : (
-                                                source.published?.[field.name]
-                                            )}
-                                        </span>
-                                    )}
+                                {isSource || shared ? (
                                     <input
                                         className={clsx(
                                             demo.input,
                                             !shared && copy.values[field.name] !== (copy.published?.[field.name] ?? '') && demo.inputChanged
                                         )}
                                         aria-label={`${field.label}, ${label}`}
-                                        placeholder="Not translated yet"
                                         readOnly={shared}
                                         value={shared ? (source.published?.[field.name] ?? '') : copy.values[field.name]}
                                         onChange={(event) => edit(field.name, event.target.value)}
                                     />
-                                </div>
+                                ) : (
+                                    <div
+                                        className={clsx(
+                                            styles.translation,
+                                            copy.values[field.name] !== (copy.published?.[field.name] ?? '') && styles.translationChanged
+                                        )}>
+                                        <input
+                                            className={styles.translationInput}
+                                            aria-label={`${field.label}, ${label}`}
+                                            placeholder="Not translated yet"
+                                            value={copy.values[field.name]}
+                                            onChange={(event) => edit(field.name, event.target.value)}
+                                        />
+                                        <span className={clsx(styles.source, fieldBehind && styles.sourceChanged)}>
+                                            <span className={styles.code}>EN</span>
+                                            {fieldBehind ? (
+                                                <span>
+                                                    <del>{copy.from?.[field.name]}</del> {source.published?.[field.name]}
+                                                </span>
+                                            ) : (
+                                                <span>{source.published?.[field.name]}</span>
+                                            )}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
