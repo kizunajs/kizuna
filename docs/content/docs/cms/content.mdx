@@ -396,21 +396,21 @@ listProductOptions: k
 
 ### From another Kizuna API
 
-When the employees live in another Kizuna CMS, like the group's, its [content client](/docs/cms/api#a-client-for-readers) already has the route a picker needs, since every collection serves its options:
+When the employees live in another Kizuna CMS, like the head office's, its [content client](/docs/cms/api#a-client-for-readers) already has the route a picker needs, since every collection serves its options:
 
 ```ts title="src/cms/relationships.ts"
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { defineRelationship } from '@kizunajs/cms';
-import { groupContent } from '../lib/group-content';
+import { headOffice } from '../lib/head-office';
 
 export const EmployeeId = Kizuna.brand('EmployeeId', z.string());
 
-export const GroupEmployees = defineRelationship({
-    name: 'groupEmployees',
+export const HeadOfficeEmployees = defineRelationship({
+    name: 'headOfficeEmployees',
     id: EmployeeId,
     options: async ({ query, ids }) => {
-        const result = await groupContent.content.collections.employees.options({
+        const result = await headOffice.content.collections.employees.options({
             query: {
                 q: query,
                 ids,
@@ -421,7 +421,7 @@ export const GroupEmployees = defineRelationship({
 });
 ```
 
-`EmployeeId` carries the group's brand name, so the ids its client returns are the ones a field of this type holds. Published content is public, so the call needs no sign-in.
+`EmployeeId` carries the head office's brand name, so the ids its client returns are the ones a field of this type holds. Published content is public, so the call needs no sign-in.
 
 ### From another service
 

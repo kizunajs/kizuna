@@ -1,16 +1,16 @@
 ---
-title: Setting up a group
+title: Setting up several sites
 description: One repository for the content package, the shared UI and one Next.js app per site, deployed on its own domain and sharing one database.
 ---
 
-A group and its country sites live in one repository: the content package holds the CMS config, the UI package holds the components every site renders, and each site is a Next.js app with its own pages and its own deployment. This page sets that up from an empty folder.
+A main site and its country sites live in one repository: the content package holds the CMS config, the UI package holds the components every site renders, and each site is a Next.js app with its own pages and its own deployment. This page sets that up from an empty folder.
 
 ```text
 packages/
-  content/      kizuna.cms.config.ts, the group's collections, shared blocks and fields
+  content/      kizuna.cms.config.ts, the collections every site reads, shared blocks and fields
   ui/           components every site renders
 apps/
-  group/        example.com
+  web/          example.com
   uk/           example.co.uk
   norway/       example.no
 ```
@@ -64,19 +64,20 @@ The content package has no build step. Its `exports` point at source, and each a
 }
 ```
 
-Import it by its package name, `@acme/content/group`, never through a `paths` alias, since an alias does not cross the package boundary.
+Import it by its package name, `@acme/content/offices`, never through a `paths` alias, since an alias does not cross the package boundary.
 
-The config lists the sites with their pages modules, which the apps generate into themselves, and the group's content:
+The config lists the sites with their pages modules, which the apps generate into themselves, and the content every site reads:
 
 ```ts title="packages/content/kizuna.cms.config.ts"
 import { defineConfig } from 'kizunajs';
 import { nextAdapter } from '@kizunajs/next';
 import { cms } from '@kizunajs/cms';
 import { mcpPlugin } from '@kizunajs/mcp';
-import { pages as groupPages } from '../../apps/group/src/cms.pages';
+import { pages as webPages } from '../../apps/web/src/cms.pages';
 import { pages as ukPages } from '../../apps/uk/src/cms.pages';
 import { pages as norwayPages } from '../../apps/norway/src/cms.pages';
-import { PrivacyPolicy, Employees, Offices } from './src/group';
+import { PrivacyPolicy } from './src/privacy-policy';
+import { Employees, Offices } from './src/offices';
 import { Articles } from './src/articles';
 import { UkOffices } from './src/uk';
 import { editor } from './src/identities';
@@ -95,9 +96,9 @@ export default defineConfig({
         globals: [PrivacyPolicy],
         collections: [Employees, Offices],
         sites: {
-            group: {
-                pages: groupPages,
-                app: '../../apps/group/src/app',
+            web: {
+                pages: webPages,
+                app: '../../apps/web/src/app',
                 url: 'https://example.com/api',
                 locales: ['en'],
             },
@@ -119,10 +120,8 @@ export default defineConfig({
         auth: {
             identity: 'editor',
             sites: (editor) => editor.sites,
-            shared: {
-                publish: {
-                    roles: 'group',
-                },
+            publish: {
+                roles: 'admin',
             },
         },
         signInPath: '/login',
@@ -187,7 +186,7 @@ A small module per app keeps the site out of every page:
 import kizuna from '@acme/content/config';
 
 export const site = kizuna.content.sites.uk;
-export const group = kizuna.content;
+export const content = kizuna.content;
 ```
 
 </Step>
@@ -227,7 +226,7 @@ export function OfficeCard({ office }: { office: { name: string; address: string
 
 ## Environment
 
-One database and one media bucket serve every site, so those variables are shared. The preview secret is shared too: every site signs and checks preview tokens, and a token minted on the group site opens draft mode on the UK site.
+One database and one media bucket serve every site, so those variables are shared. The preview secret is shared too: every site signs and checks preview tokens, and a token minted on the main site opens draft mode on the UK site.
 
 | Variable                    | Shared by every app | What it is                                                                         |
 | --------------------------- | ------------------- | ---------------------------------------------------------------------------------- |
@@ -316,11 +315,11 @@ headers: async () => [
 
 ## Day to day
 
-| You change                    | Then                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------- |
-| A page's `content.ts`         | `next dev` regenerates that app's `cms.pages.ts`; commit it                |
-| A group collection or a block | `kizuna diff` in the content package says what it breaks across every site |
-| A site's own collection       | `kizuna cms migrate` for its indexes, from the content package             |
-| An editor's sites             | Their record in your own users, which `auth.sites` reads                   |
+| You change                         | Then                                                                       |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| A page's `content.ts`              | `next dev` regenerates that app's `cms.pages.ts`; commit it                |
+| A collection on `cms()` or a block | `kizuna diff` in the content package says what it breaks across every site |
+| A site's own collection            | `kizuna cms migrate` for its indexes, from the content package             |
+| An editor's sites                  | Their record in your own users, which `auth.sites` reads                   |
 
 `kizuna generate` runs from the content package and writes every site's pages module and client in one go.

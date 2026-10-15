@@ -109,9 +109,9 @@ Every translation remembers which version of the source it was made from. When a
 
 A translation is never hidden for being behind. An old translation is better than a page that disappears.
 
-## In a group
+## With several sites
 
-In a [group with several sites](/docs/cms/sites), the group declares every locale its sites use, and each site names which it serves. The group's content is written once, in the source, and translated into every language a site needs. Country editors draft the translations for their own languages, and the group publishes them, like any change to the group's content.
+With [several sites](/docs/cms/sites), `cms()` declares every locale its sites use, and each site names which it serves. Content every site reads is written once, in the source, and translated into every language a site needs. Country editors draft the translations for their own languages, and an admin publishes them, like any change to that content.
 
 ```ts title="packages/content/kizuna.cms.config.ts"
 content: cms({

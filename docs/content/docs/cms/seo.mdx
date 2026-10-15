@@ -1,0 +1,195 @@
+---
+title: SEO and AI search
+description: What search engines and AI answer engines read from a page, generated from typed content, with the parts that need a person kept short.
+---
+
+Most of what a search engine reads from a page is already in its content: the title, the dates, the author, the office's address, the languages it exists in. The CMS generates those from the typed fields and leaves a person two things to write, the search title and the description. The site renders what the CMS hands it, so nothing here needs a plugin.
+
+## The search result
+
+`SeoSchema` is the field a page shows in a search result. The editor shows it as one, with each length measured against what a result shows in full:
+
+```ts title="src/app/(front-page)/content.ts"
+import { SeoSchema } from '@kizunajs/cms/schemas';
+
+export default definePage({
+    name: 'frontPage',
+    fields: [
+        {
+            name: 'heading',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'seo',
+            label: 'Search result',
+            schema: SeoSchema,
+        },
+    ],
+});
+```
+
+| Field         | What it is                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| `title`       | The result's title. 30 to 60 characters show in full                                              |
+| `description` | One or two sentences under it. 70 to 160 characters show in full                                  |
+| `image`       | The image a shared link shows. Falls back to the page's first image                               |
+| `canonical`   | Another address this page is a copy of. Empty for nearly every page                               |
+| `noindex`     | Keep the page out of search results, like a campaign page that should only be reached by its link |
+
+Leave `title` empty and the result shows the page's heading. Leave `description` empty and it shows the page's first paragraph. A page has a result the moment it is published, and the editor shows what a person could improve.
+
+## Titles
+
+A page's stored title is its own words, `Offices`, and never the site's name after it. How the two are joined is a template in code, so changing `|` to `–`, or dropping the suffix on the front page, is one line and no content changes:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    db,
+    pages,
+    seo: {
+        siteName: 'Acme',
+        title: '{{title}} | {{siteName}}',
+        titles: {
+            frontPage: '{{siteName}}: {{tagline}}',
+            articlePage: '{{title}} | {{siteName}} Blog',
+        },
+    },
+}),
+```
+
+`title` is the template every page uses, and `titles` names the pages that use another. A placeholder is a field of the page, `{{title}}`, `{{heading}}`, a field of the site global, `{{tagline}}`, or `{{siteName}}`, and a placeholder that names no field fails when the config assembles. A template that is only `{{title}}` has no suffix, and a template may be a function when a string is not enough:
+
+```ts
+titles: {
+    articlePage: (article) => `${article.title} by ${article.author.name}`,
+},
+```
+
+The editor renders the template, so the search result it shows is the one a visitor gets, and the length it measures is the whole title, suffix included. Social cards often want the page's words alone, so the Open Graph title has a template of its own, `og: { title: '{{title}}' }`, and otherwise follows the page's.
+
+With [several sites](/docs/cms/sites), each site sets its own `siteName` and templates, and a site that sets none uses those on `cms()`.
+
+## Rendering
+
+The page renders it with Next's metadata, and the Open Graph and Twitter tags come from the same values:
+
+```tsx title="src/app/(front-page)/page.tsx"
+import { metadataOf } from '@kizunajs/cms/seo';
+
+export async function generateMetadata(): Promise<Metadata> {
+    const content = await kizuna.content.pages.frontPage.get();
+    return metadataOf(content);
+}
+```
+
+`metadataOf` returns the title as `absolute`, so Next's own `title.template` never adds a second suffix, and it fills `description`, `alternates.canonical`, `robots`, `openGraph` and `twitter` from the page. Pass a second argument to add what the page alone cannot know, like a type-specific Open Graph `type`.
+
+## Structured data
+
+A search engine shows an office's opening hours, an article's date and an event's venue when the page says what they are in [schema.org](https://schema.org) terms. The CMS writes that from the typed content, so an office that moves updates its structured data with the rest:
+
+```tsx title="src/app/offices/[id]/page.tsx"
+import { JsonLd } from '@kizunajs/cms/seo';
+
+export default async function OfficePage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
+    const office = await kizuna.content.collections.offices.get({
+        id,
+    });
+
+    return (
+        <main>
+            <JsonLd type="LocalBusiness" of={office} />
+            <h1>{office.name}</h1>
+        </main>
+    );
+}
+```
+
+`JsonLd` maps the fields a type expects from the fields the item has, `name`, `address`, `telephone`, `openingHours`, and takes any it cannot find by name:
+
+| Type             | From                                           |
+| ---------------- | ---------------------------------------------- |
+| `Organization`   | The site global: name, logo, address, `sameAs` |
+| `LocalBusiness`  | An office                                      |
+| `Person`         | An employee, with the page that is theirs      |
+| `Article`        | An article: headline, dates, author, images    |
+| `Event`          | An event: dates, venue, offers                 |
+| `JobPosting`     | A vacancy                                      |
+| `BreadcrumbList` | The page's place in the site                   |
+
+`Organization` belongs on the front page and the about page, and nowhere else. A `FAQPage` is not in the list: Google stopped showing FAQ and how-to rich results in 2026, so a list of questions is better as visible content on the page.
+
+## Addresses
+
+An address is for life. When an editor changes an article's slug, the CMS stores the old one and the site answers it with a `301` to the new, so a link in an old newsletter still arrives. A chain never forms, since a second rename points the first old address at the newest one.
+
+Redirects an editor needs for other reasons, like a campaign address or a page that moved to another site, live in the `redirects` global, which `nextAdapter()` serves:
+
+```ts
+{
+    from: '/spring-offer',
+    to: '/offers/spring',
+    status: 301,
+},
+```
+
+Paths match exactly, as [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) says they do, so `/offices` and `/offices/` are two addresses. Pick one shape for the site and the CMS writes every address in it.
+
+## The sitemap
+
+The site's `sitemap.ts` asks the CMS for every published page, with `lastmod` from the day it was last published, which is the one thing a search engine reads from a sitemap:
+
+```ts title="src/app/sitemap.ts"
+import { sitemapOf } from '@kizunajs/cms/seo';
+
+export default async function sitemap() {
+    return sitemapOf(kizuna.content, {
+        siteUrl: 'https://example.co.uk',
+    });
+}
+```
+
+A site in several languages gets one sitemap per language under an index, and a page marked `noindex` is left out.
+
+## Languages
+
+A page that exists in Norwegian and English tells search engines so, and each language points at the others. The CMS knows every published translation's address, so a page's alternates come from it:
+
+```tsx title="src/app/[locale]/blog/[slug]/page.tsx"
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }): Promise<Metadata> {
+    const article = await kizuna.content.pages.articlePage.get(await params);
+    return metadataOf(article);
+}
+```
+
+`metadataOf` writes `alternates.languages` with an absolute address per published language and the page's own, which search engines require of each other, and `x-default` for the main site when there is one. Region tags follow [BCP 47](https://www.rfc-editor.org/rfc/rfc5646), `en-GB` for the UK, and a language that is not published is not listed. A page that falls back to another language's content is listed under the language it shows, so two addresses never claim the same words.
+
+## Images
+
+Alt text is the one thing a search engine reads from an image. `ImageSchema` requires it per use, and the media record keeps the width and height, so a page renders an image at the size it shows with no layout shift. `?w=` on the image route serves each size, which the page uses for `srcset`.
+
+## AI answer engines
+
+ChatGPT, Perplexity, Claude and Google's AI results cite pages the way search engines rank them: the page is indexed, it answers a question plainly, and it says who wrote it and when. Nothing on this list needs a file or a tag of its own, and Google says so of its own AI results. What the CMS does is make the ordinary signals true on every page:
+
+- **Visible dates and a named author.** An article shows `datePublished` and `dateModified` on the page and in its structured data, and the author is a person with a page of their own.
+- **Plain facts in typed fields.** An office's address, hours and phone number are fields, so the page states them rather than burying them in a paragraph.
+- **The crawlers that cite are let in.** The site's `robots.txt` names the answer engines' search crawlers, `OAI-SearchBot`, `Claude-SearchBot` and `PerplexityBot`, and `robots.ts` from the CMS writes the groups. Whether the training crawlers, `GPTBot` and `ClaudeBot`, may read the site is a site setting, off by default.
+- **Each publish tells the engines that read pings.** Bing, DuckDuckGo and the engines built on them learn of a change through [IndexNow](https://www.indexnow.org) the moment a page publishes or an address changes. Google does not take pings, and reads the sitemap.
+
+Two things sound like they should matter and the evidence says they do not. Structured data on a page does not make it cited more often, in a matched study of nearly two thousand pages. A `llms.txt` file is fetched on three percent of the sites that have one, and Google does not read it. The CMS writes neither for that reason, and what moves citations most, by the same studies, is the site being mentioned elsewhere, which is marketing's work rather than the CMS's.
+
+Search Console reports AI results under "Web", and Bing Webmaster Tools has a report of its own for Copilot citations.
+
+## Moving from another platform
+
+A move keeps its search standing when every old address answers. Export the old platform's redirect table and crawl the live site, including blog posts, PDFs and uploaded files, and import the map:
+
+```sh
+kizuna cms import-redirects old-site.csv
+```
+
+Each old address answers with a `301` straight to its new page, never to the front page, and never through another redirect. Imported articles keep their original `datePublished`. Keep the old domain pointing at the new site for a year, since links to it are still out there.
+
+HubSpot keeps its forms inside HubSpot, and they embed on the new site as they are, so lead capture carries on while the site moves. Its uploaded files, under `/hubfs/`, cannot be redirected from HubSpot's side, so copy them into the media library and map their addresses with the rest.

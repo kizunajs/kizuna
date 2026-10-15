@@ -77,7 +77,7 @@ A client without `groups` holds every route, which is what an app that edits con
 
 ## Publishing a client
 
-Another repository reads content through a client it installs, like the UK's booking app built by another team. Generate one for the site it serves: the UK's routes and the group's, and nothing of the other sites or the editing routes:
+Another repository reads content through a client it installs, like the UK's booking app built by another team. Generate one for the site it serves: the UK's routes and those every site reads, and nothing of the other sites or the editing routes:
 
 ```ts title="packages/content/kizuna.cms.config.ts"
 clients: [
@@ -104,7 +104,7 @@ The output is a package of its own, with a name and a version, published whereve
 }
 ```
 
-The generated file imports nothing, so the package has no dependencies. The site installs the version it wants and calls the group's API:
+The generated file imports nothing, so the package has no dependencies. The site installs the version it wants and calls the API:
 
 ```ts title="booking-app/src/lib/content.ts"
 import { createClient } from '@acme/uk-content';
@@ -230,7 +230,7 @@ Uploads are checked by their bytes, never their name. SVG is refused, location m
 
 ## Sites
 
-A group with a site per country runs one CMS. The group's content is written once and every site reads it, and each site adds content of its own. See [Sites](/docs/cms/sites).
+A business with a site per country runs one CMS. Content listed on `cms()` is written once and every site reads it, and each site adds content of its own. See [Sites](/docs/cms/sites).
 
 ## Deployment
 
