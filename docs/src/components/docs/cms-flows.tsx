@@ -122,15 +122,6 @@ export function Switcher({ as }: { as: 'admin' | 'country' }) {
     );
 }
 
-function Whose({ children, own = false }: { children: ReactNode; own?: boolean }) {
-    return (
-        <span className={clsx(styles.chip, styles.whose, own && styles.chipYou)}>
-            {own ? <FileText aria-hidden /> : <Globe aria-hidden />}
-            {children}
-        </span>
-    );
-}
-
 /**
  * The group's admin beside a country's editor, so the difference is one look.
  */
@@ -150,37 +141,42 @@ export function Switchers() {
 }
 
 /**
- * A country's editor on a shared office: they draft the phone number, add
- * their own opening hours, and ask for a review instead of publishing.
+ * A country's editor on a shared office: the shared fields are a draft for
+ * an admin, the site's own fields they publish.
  */
 export function SharedItem() {
     return (
         <Shell title="Harbour Office" status="Unpublished changes" saved>
-            <div className={styles.banner}>
-                <span className={styles.bannerLabel}>Shared by</span>
-                {['Example Group', 'Example UK', 'Example Norge', 'Example Danmark'].map((site) => (
-                    <span key={site} className={clsx(styles.chip, site === 'Example UK' && styles.chipYou)}>
-                        <Globe aria-hidden />
-                        {site}
+            <div className={styles.part}>
+                <div className={styles.partTitle}>
+                    <span>Shared with every site</span>
+                    <span className={styles.partNote}>
+                        <Lock aria-hidden />
+                        You draft, an admin publishes
                     </span>
-                ))}
+                </div>
+                <FormSection>
+                    <Row label="Address">
+                        <TextInput value="12 Harbour Street" />
+                    </Row>
+                    <Row label="Phone">
+                        <TextInput value="+44 20 0000 0111" mark="changed" />
+                    </Row>
+                </FormSection>
             </div>
-            <FormSection>
-                <Row label="Address">
-                    <TextInput value="12 Harbour Street" />
-                    <Whose>Shared</Whose>
-                </Row>
-                <Row label="Phone">
-                    <TextInput value="+44 1224 000 111" mark="changed" />
-                    <Whose>Shared, your draft</Whose>
-                </Row>
-                <Row label="Opening hours">
-                    <TextInput value="Mon to Fri, 08:00 to 16:00" />
-                    <Whose own>Example UK's own</Whose>
-                </Row>
-            </FormSection>
+            <div className={styles.part}>
+                <div className={styles.partTitle}>
+                    <span>Example UK only</span>
+                    <span className={styles.partNote}>You publish</span>
+                </div>
+                <FormSection>
+                    <Row label="Opening hours">
+                        <TextInput value="Mon to Fri, 08:00 to 16:00" />
+                    </Row>
+                </FormSection>
+            </div>
             <Footer>
-                <Help>Opening hours publish now. Phone waits for an admin.</Help>
+                <Button variant="secondary">Publish UK changes</Button>
                 <Button variant="primary">Ask for review</Button>
             </Footer>
         </Shell>
@@ -198,7 +194,7 @@ export function SharedReview() {
             <div className={styles.diff}>
                 <span className={styles.diffLabel}>Phone</span>
                 <span>
-                    <del>+44 1224 000 000</del> <ins>+44 1224 000 111</ins>
+                    <del>+44 20 0000 0000</del> <ins>+44 20 0000 0111</ins>
                 </span>
             </div>
             <div className={styles.reachList}>

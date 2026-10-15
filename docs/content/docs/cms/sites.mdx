@@ -172,7 +172,7 @@ Before a shared item publishes, the editor says where it shows: "9 pages on 4 si
 
 ## Publishing
 
-Publishing queues a job per site that shows the document, calling its `invalidate` with `{ brand, id }`. Each site refreshes the pages that hold it. The editor shows the result: "Refreshed 3 of 4 sites. The UK did not answer, retrying."
+Publishing queues a job per site that shows the document, calling its `invalidate` with `{ brand, id }`. Each site refreshes the pages that hold it. The editor shows the result: "Refreshed 3 of 4 sites. The UK did not answer, retrying." The calls are [jobs](/docs/jobs), so a config with `sites` names a `jobRunner`, and your transport does the retrying.
 
 ## Another repository
 

@@ -242,3 +242,37 @@
     font-weight: 500;
     color: var(--k-ink);
 }
+
+.part {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.partTitle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 4px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--k-muted);
+}
+
+.partNote {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.partNote svg {
+    width: 12px;
+    height: 12px;
+}
