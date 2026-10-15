@@ -1,0 +1,181 @@
+---
+title: Several sites
+description: One CMS for a group and its sites, where the group's content is written once and every site reads it, and each site adds content of its own.
+---
+
+A group runs several sites: its own, and one for each country it works in. Some content belongs to the group, like the people, the offices and the privacy policy, and every site shows it. Some belongs to one site, like Norway's news or the events only Norway runs. One CMS holds both, so the group's content is written once, a site's own content stays with that site, and a site's content points at the group's with typed ids.
+
+## Declaring the sites
+
+Each site is a Next.js app with its own pages. List each under `sites`, with its generated pages module and its `app` directory:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+content: cms({
+    db,
+    sites: {
+        group: {
+            pages: groupPages,
+            app: '../../apps/group/src/app',
+        },
+        norway: {
+            pages: norwayPages,
+            app: '../../apps/norway/src/app',
+        },
+        sweden: {
+            pages: swedenPages,
+            app: '../../apps/sweden/src/app',
+        },
+    },
+    auth: {
+        identity: 'editor',
+    },
+}),
+```
+
+Each site's pages are stored apart, so every app can have a `frontPage`. An app reads its own site:
+
+```ts title="apps/norway/src/content.ts"
+import kizuna from '@acme/content/kizuna.cms.config';
+
+export const content = kizuna.content.sites.norway;
+```
+
+Pages call `content.pages.frontPage.get()`, and `<KizunaPreview content={content} />` knows which site it is on.
+
+## The group's content
+
+Globals and collections listed on `cms()` belong to the group. They are stored once, and every site reads them:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+content: cms({
+    db,
+    sites,
+    globals: [PrivacyPolicy],
+    collections: [Employees, Offices],
+    auth: {
+        identity: 'editor',
+    },
+}),
+```
+
+```tsx title="apps/sweden/src/app/contact/page.tsx"
+const { items } = await content.collections.offices.list();
+```
+
+Norway and Sweden list the same offices. An editor who moves an office edits it once, and both sites show the change when it publishes.
+
+## A site's own content
+
+Globals and collections listed under a site belong to that site:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+sites: {
+    norway: {
+        pages: norwayPages,
+        app: '../../apps/norway/src/app',
+        globals: [Announcement],
+        collections: [Events],
+    },
+    sweden: {
+        pages: swedenPages,
+        app: '../../apps/sweden/src/app',
+    },
+},
+```
+
+Only Norway's reader has them:
+
+```tsx title="apps/norway/src/app/events/page.tsx"
+const announcement = await content.globals.announcement.get();
+const { items } = await content.collections.events.list();
+```
+
+Sweden's reader has no `events`, so `kizuna.content.sites.sweden.collections.events` fails to compile. A field that only one site needs goes in that site's own global, and the other sites never see it.
+
+## One shape, each site its own items
+
+Every country publishes news, and each country writes its own. List the same collection under each site:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+sites: {
+    norway: {
+        pages: norwayPages,
+        app: '../../apps/norway/src/app',
+        collections: [Articles, Events],
+    },
+    sweden: {
+        pages: swedenPages,
+        app: '../../apps/sweden/src/app',
+        collections: [Articles],
+    },
+},
+```
+
+The articles have one shape, one set of fields and one `ArticleId`, and each site keeps its own items. Norway's blog lists Norway's articles, and an `ArticleId` on a Norwegian page names a Norwegian article.
+
+## Pointing at the group's content
+
+A site's content holds the group's ids, the way a page holds an item from any collection. An event names the employee to contact and the office it is held at:
+
+```ts title="packages/content/events.ts"
+import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
+import { defineCollection } from '@kizunajs/cms';
+import { Employees, Offices } from './group';
+
+export const EventId = Kizuna.brand('EventId', z.string());
+
+export const Events = defineCollection({
+    name: 'events',
+    id: EventId,
+    fields: [
+        {
+            name: 'title',
+            schema: z.string().min(1).max(80),
+        },
+        {
+            name: 'startsAt',
+            label: 'Starts at',
+            schema: z.iso.datetime(),
+        },
+        {
+            name: 'office',
+            schema: Offices.id,
+        },
+        {
+            name: 'contactPerson',
+            label: 'Contact person',
+            schema: Employees.id,
+        },
+    ],
+    indexes: ['startsAt'],
+});
+```
+
+The editor's picker for `contactPerson` lists the group's employees, and the page reads the one it holds:
+
+```tsx title="apps/norway/src/app/events/[id]/page.tsx"
+const { id } = await params;
+const event = await content.collections.events.get({
+    id,
+});
+const contactPerson = await content.collections.employees.get({
+    id: event.contactPerson,
+});
+```
+
+The group's content shows on every site, so it never holds a site's ids. A group collection with an `Events.id` field fails when the config assembles.
+
+## Reading over HTTP
+
+Every site's content is in the `content` routes, under the site's name. A client generated from the CMS config reads it from any app:
+
+```ts title="src/lib/events.ts"
+const result = await cmsClient.content.sites.norway.collections.events.list();
+```
+
+The group's content keeps its own path, `cmsClient.content.collections.offices.list()`, whichever site asks.
+
+## Editing
+
+Editors work in one editor for the whole group. The switcher lists the group's content first, then each site with its pages, globals and collections. The agent addresses a site's own content by its site, so "add an event to the Norwegian site" reaches Norway's `events`, and "update Anna's phone number" reaches the group's `employees`, once for every site.

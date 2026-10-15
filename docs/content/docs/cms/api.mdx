@@ -101,38 +101,7 @@ Uploads are checked by their bytes, never their name. SVG is refused, location m
 
 ## Several sites
 
-When several Next.js apps share one CMS, like a main site and a campaign site, list each under `sites`, with its generated pages module and its `app` directory:
-
-```ts title="packages/content/kizuna.cms.config.ts"
-content: cms({
-    db,
-    sites: {
-        web: {
-            pages: webPages,
-            app: '../../apps/web/src/app',
-        },
-        campaign: {
-            pages: campaignPages,
-            app: '../../apps/campaign/src/app',
-        },
-    },
-    globals: [Footer],
-    collections: [Articles],
-    auth: {
-        identity: 'editor',
-    },
-}),
-```
-
-Each site's pages are stored apart, so both apps can have a `frontPage`. Globals and collections are shared. An app reads its own site:
-
-```ts title="apps/web/src/content.ts"
-import kizuna from '@acme/content/kizuna.cms.config';
-
-export const content = kizuna.content.sites.web;
-```
-
-Pages call `content.pages.frontPage.get()`, and `<KizunaPreview content={content} />` knows which site it is on.
+When a group runs several sites, like its own and one for each country, one CMS serves them all. The group's content is written once and every site reads it, and each site adds content of its own. See [Several sites](/docs/cms/sites).
 
 ## Deployment
 
