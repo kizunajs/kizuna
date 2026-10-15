@@ -289,7 +289,7 @@
     outline-color: var(--k-ink);
 }
 
-.input:read-only {
+input.input:read-only {
     color: var(--k-muted);
 }
 

@@ -1,5 +1,5 @@
 {
     "title": "Editing",
     "defaultOpen": true,
-    "pages": ["index", "permissions", "reviews", "drafts", "the-form", "agents"]
+    "pages": ["index", "permissions", "access", "reviews", "drafts", "the-form", "agents"]
 }

@@ -1,0 +1,307 @@
+---
+title: Access
+description: 'Who may edit what: everything, one page, their own item, one language or one field.'
+---
+
+Editors sign in as an identity of your API, with the roles and permissions from [Access control](/docs/access-control). This is the editor as five people see it:
+
+<AccessDemo />
+
+| You want                                | You write                                                       |
+| --------------------------------------- | --------------------------------------------------------------- |
+| Everyone edits and publishes everything | `auth: { identity: 'editor' }`                                  |
+| Editors write, admins publish           | [`publish` on `cms()`](#editors-write-admins-publish)           |
+| One page for one role                   | [`auth` on the page](#one-page)                                 |
+| Each person edits their own item        | [`item` on the collection](#their-own-item)                     |
+| A translator edits one language         | [`locales`](#one-language)                                      |
+| A field only some may change            | [`auth` on the field](#one-field)                               |
+| A country's editors edit their country  | [`sites`](/docs/cms/sites#editors)                              |
+| Someone looks before it goes live       | [`requireReview`](/docs/cms/editing/reviews#requiring-a-review) |
+
+`auth` on `cms()` covers every document. On a page, global or collection it replaces that, and on a field it narrows it. A list of rules passes when any one does, and nothing denies. The editor lists only what someone may write, and the model gets `403` for the rest.
+
+The examples follow the way your API checks access:
+
+<AccessStyleSwitch />
+
+<AccessStyle value="permissions">
+
+They use this catalog:
+
+```ts title="src/permissions.ts"
+export const permissions = Kizuna.permissions({
+    content: ['edit', 'publish'],
+    careers: ['edit', 'publish'],
+    profile: ['edit'],
+    legal: ['edit'],
+});
+
+export const roles = Kizuna.roles(permissions, {
+    editor: {
+        content: ['edit'],
+    },
+    recruiter: {
+        careers: ['edit', 'publish'],
+    },
+    employee: {
+        profile: ['edit'],
+    },
+    translator: {
+        content: ['edit'],
+    },
+    admin: 'all',
+});
+```
+
+</AccessStyle>
+
+## Editors write, admins publish
+
+<AccessStyle value="identity">
+
+Everyone who signs in writes and publishes. Telling editors from admins takes roles.
+
+</AccessStyle>
+
+<AccessStyle value="roles">
+
+```ts title="kizuna.config.ts"
+auth: {
+    identity: 'editor',
+    roles: ['editor', 'admin'],
+    publish: {
+        roles: 'admin',
+    },
+},
+```
+
+</AccessStyle>
+
+<AccessStyle value="permissions">
+
+```ts title="kizuna.config.ts"
+auth: {
+    identity: 'editor',
+    requires: {
+        content: ['edit'],
+    },
+    publish: {
+        requires: {
+            content: ['publish'],
+        },
+    },
+},
+```
+
+</AccessStyle>
+
+Someone who may not publish asks for a [review](/docs/cms/editing/reviews), and anyone who may publish approves it.
+
+## One page
+
+<AccessStyle value="identity">
+
+Keeping a page to some editors takes roles.
+
+</AccessStyle>
+
+<AccessStyle value="roles">
+
+```ts title="src/app/careers/content.ts"
+export default definePage({
+    name: 'careersPage',
+    auth: {
+        roles: ['recruiter', 'admin'],
+    },
+    publish: {
+        roles: ['recruiter', 'admin'],
+    },
+    fields: [
+        // ...
+    ],
+});
+```
+
+</AccessStyle>
+
+<AccessStyle value="permissions">
+
+```ts title="src/app/careers/content.ts"
+export default definePage({
+    name: 'careersPage',
+    auth: {
+        requires: {
+            careers: ['edit'],
+        },
+    },
+    publish: {
+        requires: {
+            careers: ['publish'],
+        },
+    },
+    fields: [
+        // ...
+    ],
+});
+```
+
+To give one person Careers without a new role, return `careers:edit` in their [permissions](/docs/access-control#permissions-per-member).
+
+</AccessStyle>
+
+A recruiter's editor opens on Careers and lists nothing else.
+
+## Their own item
+
+<AccessStyle value="identity">
+
+Every editor edits their own profile:
+
+```ts title="src/cms/employees.ts"
+export const Employees = defineCollection({
+    name: 'employees',
+    auth: {
+        item: ({ item, editor }) => item.email === editor.email,
+    },
+    fields: [
+        // ...
+    ],
+});
+```
+
+</AccessStyle>
+
+<AccessStyle value="roles">
+
+Every employee edits their own profile, and editors edit them all:
+
+```ts title="src/cms/employees.ts"
+export const Employees = defineCollection({
+    name: 'employees',
+    auth: [
+        {
+            roles: ['editor', 'admin'],
+        },
+        {
+            roles: 'employee',
+            item: ({ item, editor }) => item.email === editor.email,
+        },
+    ],
+    fields: [
+        // ...
+    ],
+});
+```
+
+</AccessStyle>
+
+<AccessStyle value="permissions">
+
+Every employee edits their own profile, and editors edit them all:
+
+```ts title="src/cms/employees.ts"
+export const Employees = defineCollection({
+    name: 'employees',
+    auth: [
+        {
+            requires: {
+                content: ['edit'],
+            },
+        },
+        {
+            requires: {
+                profile: ['edit'],
+            },
+            item: ({ item, editor }) => item.email === editor.email,
+        },
+    ],
+    fields: [
+        // ...
+    ],
+});
+```
+
+</AccessStyle>
+
+`item` runs on the stored item, so changing the email in the form never hands a profile to someone else. A rule with `item` edits existing items, and never creates or deletes them.
+
+## One language
+
+<AccessStyle value="identity">
+
+```ts title="kizuna.config.ts"
+auth: {
+    identity: 'editor',
+    locales: (editor) => editor.locales,
+},
+```
+
+</AccessStyle>
+
+<AccessStyle value="roles">
+
+```ts title="kizuna.config.ts"
+auth: {
+    identity: 'editor',
+    roles: ['editor', 'admin', 'translator'],
+    locales: (editor) => editor.locales,
+},
+```
+
+</AccessStyle>
+
+<AccessStyle value="permissions">
+
+```ts title="kizuna.config.ts"
+auth: {
+    identity: 'editor',
+    requires: {
+        content: ['edit'],
+    },
+    locales: (editor) => editor.locales,
+},
+```
+
+</AccessStyle>
+
+The identity returns `locales: ['nb']` for a Norwegian translator. They see every page in Norwegian alone, with fields shared by every language read-only. Without `locales`, an editor writes every language.
+
+## One field
+
+<AccessStyle value="identity">
+
+Keeping a field to some editors takes roles.
+
+</AccessStyle>
+
+<AccessStyle value="roles">
+
+```ts
+{
+    name: 'legalName',
+    schema: z.string().max(120),
+    auth: {
+        roles: 'admin',
+    },
+},
+```
+
+</AccessStyle>
+
+<AccessStyle value="permissions">
+
+```ts
+{
+    name: 'legalName',
+    schema: z.string().max(120),
+    auth: {
+        requires: {
+            legal: ['edit'],
+        },
+    },
+},
+```
+
+</AccessStyle>
+
+Everyone else sees the field greyed out.

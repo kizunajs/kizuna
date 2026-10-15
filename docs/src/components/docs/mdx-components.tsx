@@ -8,8 +8,10 @@ import { CodeBlock } from './code-block';
 import { Card, Cards } from './cards';
 import { SideBySide } from './comparison';
 import { EditorFigure } from './cms-figures';
+import { AccessDemo } from './access-demo';
 import { EditingDemo } from './editing-demo';
 import { LocalizationDemo } from './localization-demo';
+import { SeoDemo } from './seo-demo';
 import { AccessStyle, AccessStyleSwitch } from './access-style';
 import { ConfigExplorer } from '@/components/code/config-explorer';
 import { AlphaNotice } from './alpha-notice';
@@ -33,8 +35,10 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         Card,
         Cards,
         EditorFigure,
+        AccessDemo,
         EditingDemo,
         LocalizationDemo,
+        SeoDemo,
         SideBySide,
         Step,
         Steps,

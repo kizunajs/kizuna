@@ -1,0 +1,25 @@
+.signedIn {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 6px 0 4px;
+    font-size: 0.8125rem;
+    color: var(--kizuna-muted);
+}
+
+.window {
+    min-height: 260px;
+}
+
+.value {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.locked {
+    color: var(--k-muted);
+    box-shadow: none;
+    background: var(--k-surface);
+}

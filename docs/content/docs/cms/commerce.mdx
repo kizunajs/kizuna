@@ -150,10 +150,6 @@ Two reads by the same id. Content from the CMS, cached until the next publish. P
 export default definePage({
     name: 'productPage',
     collection: Products,
-    metadata: {
-        title: ({ content }) => content.name,
-        image: ({ content }) => content.gallery[0],
-    },
 });
 ```
 

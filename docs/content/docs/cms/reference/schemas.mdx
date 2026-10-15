@@ -1,16 +1,15 @@
 ---
 title: Schemas
-description: 'The field schemas the CMS ships: images, files, rich text, search metadata.'
+description: 'The field schemas the CMS ships: images, files, rich text and sites.'
 ---
 
 From `@kizunajs/cms/schemas`:
 
-| Schema           | Stores                                        | The page receives                 |
-| ---------------- | --------------------------------------------- | --------------------------------- |
-| `ImageSchema`    | Media id, alt text, crop, focal point         | `{ id, url, alt, width, height }` |
-| `FileSchema`     | Media id, a label                             | `{ id, url, label, size }`        |
-| `RichTextSchema` | Portable Text                                 | Portable Text, for `<RichText>`   |
-| `MetadataSchema` | A search title and description a person wrote | `{ title, description }`          |
-| `SiteSchema`     | A site's built-in shape, to `extend`          |                                   |
+| Schema           | Stores                                | The page receives                 |
+| ---------------- | ------------------------------------- | --------------------------------- |
+| `ImageSchema`    | Media id, alt text, crop, focal point | `{ id, url, alt, width, height }` |
+| `FileSchema`     | Media id, a label                     | `{ id, url, label, size }`        |
+| `RichTextSchema` | Portable Text                         | Portable Text, for `<RichText>`   |
+| `SiteSchema`     | A site's built-in shape, to `extend`  |                                   |
 
 `Output<T>` is a block's or field's type with images resolved. `richTextFromPlain(text)` turns a string into rich text, for a `migrate` step.

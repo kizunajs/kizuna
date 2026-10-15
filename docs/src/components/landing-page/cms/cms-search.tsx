@@ -5,15 +5,25 @@ import panel from '../panel.module.css';
 import styles from './cms-search.module.css';
 import views from './cms-views.module.css';
 
-const pageCode = `export default definePage({
-    name: 'articlePage',
-    collection: Articles,
-    metadata: {
-        title: ({ content }) => content.title,
-        description: ({ content }) => content.summary,
-        image: ({ content }) => content.cover,
-        type: 'Article',
-    },
+const pageCode = `export const Articles = defineCollection({
+    name: 'articles',
+    fields: [
+        {
+            name: 'title',
+            schema: z.string().max(80),
+            metadata: 'title',
+        },
+        {
+            name: 'teaser',
+            schema: z.string().max(200),
+            metadata: 'description',
+        },
+        {
+            name: 'cover',
+            schema: ImageSchema,
+            metadata: 'image',
+        },
+    ],
 });`;
 
 const points = [
@@ -66,7 +76,7 @@ export function CmsSearch() {
             aside={<DocsLink href="/docs/cms/seo" />}>
             <div className={panel.panel}>
                 <div className={styles.split}>
-                    <CodeWindow lang="ts" code={pageCode} title="src/app/blog/[slug]/content.ts" />
+                    <CodeWindow lang="ts" code={pageCode} title="src/cms/articles.ts" />
                     <SearchResult />
                 </div>
                 <div className={styles.points}>
