@@ -1,9 +1,58 @@
 ---
 title: Relationships
-description: Records that live outside the CMS, in your own API, another Kizuna API or a service like Stripe, held by id and picked from a list.
+description: One collection holding another's ids, and records outside the CMS, in your own API, another Kizuna API or a service like Stripe.
 ---
 
-A page holds ids of records that live elsewhere, and fetches them itself. A relationship gives the editor the list to pick from.
+A field holds the id of a record, and the page fetches the record. Within the CMS that needs nothing but the collection's id type. Outside it, a relationship gives the editor the list to pick from.
+
+## Within this CMS
+
+An article has an author, and the authors are the `employees` collection. The field is the collection's id type:
+
+```ts title="src/cms/content.ts"
+export const Articles = defineCollection({
+    name: 'articles',
+    id: ArticleId,
+    fields: [
+        {
+            name: 'title',
+            schema: z.string().max(80),
+        },
+        {
+            name: 'author',
+            schema: Employees.id,
+        },
+        {
+            name: 'related',
+            schema: z.array(ArticleId).max(3),
+        },
+    ],
+});
+```
+
+The editor's picker lists the employees. The page reads the one the article holds:
+
+```tsx title="src/app/blog/[slug]/page.tsx"
+const article = await kizuna.content.pages.articlePage.get(await params);
+const author = await kizuna.content.collections.employees.get({
+    id: article.author,
+});
+const related = await kizuna.content.collections.articles.getMany({
+    ids: article.related,
+});
+```
+
+A collection can hold its own ids, as `related` does. The other direction, every article by one author, is a `where` on the field, since the CMS records every id an item holds:
+
+```ts
+const { items } = await kizuna.content.collections.articles.list({
+    where: {
+        author: employee.id,
+    },
+});
+```
+
+Deleting an employee that articles hold is refused until they hold someone else, and the editor says which articles.
 
 ## From your own API
 

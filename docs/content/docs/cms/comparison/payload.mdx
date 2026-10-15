@@ -5,57 +5,25 @@ description: Kizuna CMS and Payload CMS side by side, the same page written in b
 
 Payload is the closest in spirit: TypeScript, your database, MIT, and a Next.js app as the host.
 
-<Comparison other="Payload CMS">
-    <Row label="Content is declared" kizuna="Beside the route, as what that page needs" other="As collections, which pages query" />
-    <Row label="Schema" kizuna="Zod" other="Payload's field types" />
-    <Row
-        label="Reading"
-        kizuna={
-            <>
-                <code>pages.articlePage.get()</code>, typed
-            </>
-        }
-        other={
-            <>
-                <code>payload.find()</code> with <code>depth</code>
-            </>
-        }
-    />
-    <Row
-        label="Related records"
-        kizuna={
-            <>
-                An id, fetched with <code>get</code>
-            </>
-        }
-        other={
-            <>
-                Populated by <code>depth</code>, typed <code>string | Doc</code>
-            </>
-        }
-    />
-    <Row
-        label="Ids"
-        kizuna="One branded type in the CMS, your API and the Swift, Kotlin and fetch clients"
-        other="Strings, with types copied to the frontend"
-    />
-    <Row label="Editor" kizuna="Your chat, and clicking the page" other="The admin panel" />
-    <Row
-        label="AI"
-        kizuna="The model edits as the signed-in editor, and publishing asks first"
-        other="MCP data access by API key, and vector embeddings"
-    />
-    <Row label="Data outside the CMS" kizuna="A relationship: the page holds the id" other="Synced into a collection" />
-    <Row label="Several sites" kizuna="Content every site reads, and each site's own" other="The multi-tenant plugin" />
-    <Row label="Localization" kizuna="Per document, shared fields, one language at a time" other="Per field, every language at once" />
-    <Row label="Rich text" kizuna="Portable Text" other="Lexical" />
-    <Row label="Database" kizuna="Postgres" other="MongoDB, Postgres, SQLite" />
-    <Row label="GraphQL" kizuna="REST and generated clients" other="REST, GraphQL, Local API" kizunaMark="no" otherMark="yes" />
-    <Row label="Reviews and roles" kizuna="In the package" other="Enterprise" kizunaMark="yes" otherMark="partly" />
-    <Row label="On-page editing" kizuna="In the package" other="Enterprise" kizunaMark="yes" otherMark="partly" />
-    <Row label="Admin panel to host" kizuna="None" other="A React panel in your app" />
-    <Row label="Licence" kizuna="MIT" other="MIT" kizunaMark="yes" otherMark="yes" />
-</Comparison>
+|                      | Kizuna CMS                                                                    |                          |
+| -------------------- | ----------------------------------------------------------------------------- | ------------------------ |
+| Content is declared  | Beside the route, as what that page needs                                     |                          |
+| Schema               | Zod                                                                           |                          |
+| Reading              |                                                                               |                          |
+| Related records      |                                                                               |                          |
+| Ids                  | One branded type in the CMS, your API and the Swift, Kotlin and fetch clients |                          |
+| Editor               | Your chat, and clicking the page                                              |                          |
+| AI                   | The model edits as the signed-in editor, and publishing asks first            |                          |
+| Data outside the CMS | A relationship: the page holds the id                                         |                          |
+| Several sites        | Content every site reads, and each site's own                                 |                          |
+| Localization         | Per document, shared fields, one language at a time                           |                          |
+| Rich text            | Portable Text                                                                 |                          |
+| Database             | Postgres                                                                      |                          |
+| GraphQL              | REST and generated clients                                                    | REST, GraphQL, Local API |
+| Reviews and roles    | In the package                                                                | Enterprise               |
+| On-page editing      | In the package                                                                | Enterprise               |
+| Admin panel to host  | None                                                                          |                          |
+| Licence              | MIT                                                                           | MIT                      |
 
 ## The same page, both ways
 

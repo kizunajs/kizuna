@@ -76,6 +76,44 @@ export default definePage({
 });
 ```
 
+## Sites inside a site
+
+A division that owns content for several country sites is a site without a domain, and its sites are under it:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+sites: declareSites(Site, {
+    energy: {
+        label: 'Energy',
+        collections: [EnergyProducts, EnergyReferences],
+        sites: {
+            norway: {
+                label: 'Energy Norge',
+                url: 'https://energy.example.no/api',
+                locales: ['nb'],
+            },
+            uk: {
+                label: 'Energy UK',
+                url: 'https://energy.example.co.uk/api',
+                locales: ['en'],
+            },
+        },
+    },
+    containers: {
+        label: 'Offshore containers',
+        collections: [Containers],
+        sites: {
+            web: {
+                label: 'Containers',
+                url: 'https://containers.example.com/api',
+                locales: ['en'],
+            },
+        },
+    },
+}),
+```
+
+On the Norwegian energy site, `kizuna.content.collections.products` is energy's and `kizuna.content.collections.employees` is shared by all. An editor of `energy` edits every energy site. A reference both divisions show lives on `cms()`.
+
 ## Publishing reaches every site
 
 1. An office publishes.

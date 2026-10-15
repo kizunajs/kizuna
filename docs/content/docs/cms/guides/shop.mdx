@@ -1,18 +1,17 @@
 ---
 title: A shop
-description: Products as a collection editors manage, carts and orders as your own tables, Stripe for the payment.
+description: Products in the CMS as the PIM, pushed to the commerce engine on publish. The engine owns price, stock, cart and orders.
 ---
 
-<Comparison first="Kizuna CMS" other="Your API">
-    <Row label="Products, prices, variants" kizuna="A collection, with drafts" other="" kizunaMark="yes" />
-    <Row label="Descriptions, galleries, campaigns" kizuna="Editors, in the chat" other="" kizunaMark="yes" />
-    <Row label="Stock" kizuna="" other="A table the webhook decrements" otherMark="yes" />
-    <Row label="Cart" kizuna="" other="A table behind routes" otherMark="yes" />
-    <Row label="Orders" kizuna="" other="A table, written when the payment settles" otherMark="yes" />
-    <Row label="Payment" kizuna="" other="A Stripe PaymentIntent" otherMark="yes" />
-</Comparison>
+|                                           | Kizuna CMS                   |                                  |
+| ----------------------------------------- | ---------------------------- | -------------------------------- |
+| Copy, specs, media, categories, relations | Yes, with drafts             |                                  |
+| Variants and SKUs                         | Declared here, SKU immutable |                                  |
+| Price, stock, tax                         |                              | Yes, read live by the storefront |
+| Cart, checkout, payment, orders           |                              | Yes                              |
+| Pages, campaigns, search metadata         | Yes                          |                                  |
 
-Prices are read from the CMS in process on every route, so a customer never sends one.
+Kizuna never holds a price or a stock count. On publish it pushes product information to the engine, keyed by its own id, and the engine never writes back. The engine is Medusa here, and Shopify or your own routes work the same way.
 
 ## Products
 
@@ -32,9 +31,20 @@ export const Products = defineCollection({
             schema: z.string().max(80),
         },
         {
-            name: 'price',
-            schema: z.int().min(0),
-            description: 'In øre.',
+            name: 'category',
+            schema: Categories.id,
+        },
+        {
+            name: 'description',
+            schema: RichTextSchema,
+        },
+        {
+            name: 'specs',
+            schema: z.object({
+                weightKg: z.number().min(0),
+                volumeLitres: z.number().min(0),
+                hsCode: z.string().max(10),
+            }),
         },
         {
             name: 'variants',
@@ -42,24 +52,99 @@ export const Products = defineCollection({
                 z.object({
                     sku: z.string().max(40),
                     label: z.string().max(60),
-                    price: z.int().min(0).optional(),
+                    options: z.record(z.string(), z.string()),
                 })
             ),
-        },
-        {
-            name: 'description',
-            schema: RichTextSchema,
+            immutable: ['sku'],
         },
         {
             name: 'gallery',
             schema: z.array(ImageSchema).max(8),
         },
+        {
+            name: 'accessories',
+            schema: z.array(ProductId),
+        },
+        {
+            name: 'datasheets',
+            schema: z.array(FileSchema),
+        },
     ],
-    indexes: ['slug'],
+    indexes: ['slug', 'category'],
+    on: {
+        published: async (product, { plugins }) => {
+            await plugins.medusa.upsertProduct(product);
+        },
+        deleted: async (product, { plugins }) => {
+            await plugins.medusa.removeProduct(product.id);
+        },
+    },
 });
 ```
 
+A required field a product lacks is what `kizuna cms check` lists, so completeness is the schema. A SKU never changes once published.
+
+## Pushing to the engine
+
+The push is a plugin of yours, a few lines over Medusa's admin client. The product's kizuna id goes in `external_id`, which Medusa can look up by:
+
+```ts title="src/plugins/medusa.ts"
+export const medusaPlugin = definePlugin({
+    slug: 'medusa',
+    options: z.object({
+        url: z.url(),
+        token: z.string(),
+    }),
+    setup: ({ options }) => {
+        const medusa = new Medusa({
+            baseUrl: options.url,
+            apiKey: options.token,
+        });
+
+        return {
+            exports: {
+                upsertProduct: async (product: Product) => {
+                    const { products } = await medusa.admin.product.list({
+                        external_id: product.id,
+                    });
+                    const body = {
+                        title: product.name,
+                        handle: product.slug,
+                        external_id: product.id,
+                        weight: product.specs.weightKg * 1000,
+                        hs_code: product.specs.hsCode,
+                        images: product.gallery.map((image) => ({
+                            url: image.url,
+                        })),
+                        variants: product.variants.map((variant) => ({
+                            title: variant.label,
+                            sku: variant.sku,
+                            options: variant.options,
+                        })),
+                    };
+                    if (products[0] === undefined) {
+                        await medusa.admin.product.create(body);
+                    } else {
+                        await medusa.admin.product.update(products[0].id, body);
+                    }
+                },
+                removeProduct: async (id: string) => {
+                    const { products } = await medusa.admin.product.list({
+                        external_id: id,
+                    });
+                    if (products[0] !== undefined) await medusa.admin.product.delete(products[0].id);
+                },
+            },
+        };
+    },
+});
+```
+
+Prices, stock locations and sales channels are set in Medusa, once per variant, by the people who own them. A product published before they are set is in Medusa and not for sale.
+
 ## The product page
+
+Two reads by the same id. Content from the CMS, cached until the next publish. Price and stock from the engine, cached for seconds:
 
 ```ts title="src/app/products/[slug]/content.ts"
 export default definePage({
@@ -77,193 +162,49 @@ export const generateMetadata = kizuna.content.pages.productPage.metadata;
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
     const product = await kizuna.content.pages.productPage.get(await params);
-    const stock = await stockOf(product.id);
+    const live = await liveProduct(product.id);
 
     return (
         <main>
             <h1>{product.name}</h1>
-            <Price amount={product.price} />
+            {live === undefined ? <p>Not available</p> : <Price variants={live.variants} />}
             <RichText value={product.description} />
             <Gallery images={product.gallery} />
-            <AddToCart product={product.id} variants={product.variants} inStock={stock > 0} />
+            <Specs {...product.specs} />
+            {live !== undefined && <AddToCart product={live} />}
         </main>
     );
 }
 ```
 
-## The cart
-
-A `carts` table, a cookie with the cart's id, and routes. The route reads the price from the CMS:
-
-```ts title="src/routes/cart.ts"
-addItem: k
-    .route({
-        method: 'POST',
-        path: '/cart/items',
-        auth: false,
-        body: z.object({
-            product: ProductId,
-            sku: z.string().optional(),
-            quantity: z.int().min(1),
-        }),
-        responses: {
-            200: CartSchema,
-        },
-    })
-    .handler(async ({ body, request }) => {
-        const product = await kizuna.content.collections.products.get({
-            id: body.product,
-        });
-        const variant = product.variants.find(
-            (candidate) => candidate.sku === body.sku
-        );
-        const cart = await carts.addItem(cartIdFrom(request), {
-            product: product.id,
-            sku: body.sku,
-            quantity: body.quantity,
-            price: variant?.price ?? product.price,
-        });
-
-        return {
-            status: 200,
-            body: cart,
-        };
-    }),
-```
-
-```tsx title="src/app/products/[slug]/add-to-cart.tsx"
-'use server';
-
-import { apiClient } from '../../../lib/api-client';
-
-export async function addToCart(formData: FormData) {
-    await apiClient.cart.addItem({
-        body: {
-            product: toProductId(String(formData.get('product'))),
-            sku: formData.get('sku')?.toString(),
-            quantity: Number(formData.get('quantity') ?? 1),
-        },
+```ts title="src/lib/live-product.ts"
+export async function liveProduct(id: ProductId) {
+    'use cache';
+    cacheLife('seconds');
+    const { products } = await medusa.store.product.list({
+        external_id: id,
+        fields: '*variants.calculated_price,+variants.inventory_quantity',
     });
+    return products[0];
 }
 ```
 
-## Checkout
+The cart and checkout talk to the engine from the browser, as in any Medusa storefront.
 
-The route sums the cart from the CMS's prices, creates a PaymentIntent, and writes a pending order. The page confirms it with Stripe Elements:
+## Search
 
-```ts title="src/routes/checkout.ts"
-createPayment: k
-    .route({
-        method: 'POST',
-        path: '/checkout',
-        auth: false,
-        body: z.object({
-            email: z.email(),
-            shipping: AddressSchema,
-        }),
-        responses: {
-            200: z.object({
-                clientSecret: z.string(),
-            }),
-        },
-    })
-    .handler(async ({ body, request }) => {
-        const cart = await carts.get(cartIdFrom(request));
-        const amount = cart.items.reduce(
-            (sum, item) => sum + item.price * item.quantity,
-            0
-        );
-        const intent = await stripe.paymentIntents.create({
-            amount,
-            currency: 'nok',
-            metadata: {
-                cart: cart.id,
-            },
-        });
-        await orders.create({
-            cart: cart.id,
-            email: body.email,
-            shipping: body.shipping,
-            amount,
-            paymentIntent: intent.id,
-            status: 'pending',
-        });
+Index by product id: content from the CMS on `published`, a flat `minPrice` from the engine on its price events, merged with partial updates so a stock change touches one field.
 
-        return {
-            status: 200,
-            body: {
-                clientSecret: intent.client_secret!,
-            },
-        };
-    }),
-```
+## Storefronts per market
 
-## When the payment settles
-
-```ts title="src/routes/stripe-webhook.ts"
-stripeWebhook: k
-    .route({
-        method: 'POST',
-        path: '/stripe/webhook',
-        auth: false,
-        hidden: true,
-        body: z.unknown(),
-        responses: {
-            200: z.object({}),
-        },
-    })
-    .handler(async ({ body, headers, jobs }) => {
-        const event = stripe.webhooks.constructEvent(
-            JSON.stringify(body),
-            headers['stripe-signature']!,
-            process.env.STRIPE_WEBHOOK_SECRET!
-        );
-
-        if (event.type === 'payment_intent.succeeded') {
-            const order = await orders.markPaid(event.data.object.id);
-            await stock.decrement(order.items);
-            await jobs.sendReceipt.queue({
-                input: {
-                    order: order.id,
-                },
-            });
-        }
-
-        return {
-            status: 200,
-            body: {},
-        };
-    }),
-```
-
-## Orders
-
-```ts title="src/routes/orders.ts"
-listMyOrders: k
-    .route({
-        method: 'GET',
-        path: '/orders',
-        auth: 'customer',
-        responses: {
-            200: z.object({
-                orders: z.array(OrderSchema),
-            }),
-        },
-    })
-    .handler(async ({ auth }) => ({
-        status: 200,
-        body: {
-            orders: await orders.listFor(auth.customerId),
-        },
-    })),
-```
-
-The account page reads it through the client, and the same route serves the iOS app.
+Storefronts are [sites](/docs/cms/sites). Products are shared on `cms()`, and a market adds its own copy and campaigns with `extendCollection`. One engine per market, or sales channels, is the engine's side.
 
 ## What editors change
 
-Products, prices, variants, descriptions and galleries, as drafts until published, and every page around them:
+Everything about a product except its price and stock, as drafts until published, and every page around it:
 
-> Put the oak desk on sale at 7 990 and feature it on the front page.
+> Add the new oak desk from the supplier sheet, with three variants, and feature it on the front page.
 
-Shipping, tax and discounts are routes of yours. A shop that already runs on Medusa or Shopify keeps its products there, and a page holds them through a [relationship](/docs/cms/content/relationships).
+## Without an engine
+
+A small shop can be its own engine: a `carts` and an `orders` table behind routes that read prices from a `price` field on the product, and a Stripe PaymentIntent for the money. The product collection is the same.

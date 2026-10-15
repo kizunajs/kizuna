@@ -38,13 +38,13 @@ const content = await kizuna.content.pages.frontPage.get({
 
 ## What is translated
 
-<Comparison first="Translated" other="Shared">
-    <Row label="Text and rich text" kizuna="Yes" other="" kizunaMark="yes" />
-    <Row label="Image" kizuna="Alt text" other="File, crop, focal point" />
-    <Row label="Numbers, booleans, dates" kizuna="" other="Yes" otherMark="yes" />
-    <Row label="Enums, ids, relationships" kizuna="" other="Yes" otherMark="yes" />
-    <Row label="Slug" kizuna="Yes" other="" kizunaMark="yes" />
-</Comparison>
+|                           | Translated |     |
+| ------------------------- | ---------- | --- |
+| Text and rich text        | Yes        |     |
+| Image                     | Alt text   |     |
+| Numbers, booleans, dates  |            | Yes |
+| Enums, ids, relationships |            | Yes |
+| Slug                      | Yes        |     |
 
 `localized` overrides the default:
 
@@ -73,18 +73,25 @@ export default definePage({
 });
 ```
 
-Two things follow from it, and you write neither:
+`href` builds the address for the current language from the page's name and its params, so a link never carries a path:
 
-- **The rewrite.** `proxy.ts` sends `/produkter/oak-desk` to the route, and answers the folder's own address, `/products/oak-desk` on the Norwegian site, with `404`.
-- **Links.** `href` builds the address for the current language, from the page's name and its params, so a link never carries a path:
+```tsx
+<Link href={href('productPage', { slug: product.slug })}>{product.name}</Link>
+```
+
+Serving those addresses is a rewrite on every request, so it is turned on in the config, and the proxy is one export:
+
+```ts title="kizuna.config.ts"
+paths: {
+    rewrite: true,
+},
+```
 
 ```ts title="src/proxy.ts"
 export { proxy, config } from '@kizunajs/cms/next/proxy';
 ```
 
-```tsx
-<Link href={href('productPage', { slug: product.slug })}>{product.name}</Link>
-```
+`/produkter/oak-desk` reaches the route, and the folder's own address, `/products/oak-desk` on the Norwegian site, answers `404`. Without `rewrite`, the routes answer at their folders and `paths` feeds only `href`, the sitemap and the alternates.
 
 The [sitemap and the language alternates](/docs/cms/seo#languages) come from the same declarations.
 
