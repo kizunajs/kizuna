@@ -32,18 +32,18 @@ content: cms({
     collections: [Treatments, Centers],
     sites: declareSites(Site, {
         norway: {
-            label: 'Example Norge',
+            label: 'Norway',
             url: 'https://example.no/api',
             locales: ['nb'],
-            companyName: 'Example Norge AS',
+            companyName: 'Acme Norge AS',
             currency: 'NOK',
             collections: [Articles],
         },
         denmark: {
-            label: 'Example Danmark',
+            label: 'Denmark',
             url: 'https://example.dk/api',
             locales: ['da'],
-            companyName: 'Example Danmark ApS',
+            companyName: 'Acme Danmark ApS',
             currency: 'DKK',
             collections: [Articles],
         },
@@ -72,19 +72,19 @@ A main site with pages of its own, and country sites that share a second app. Sa
 ```ts title="packages/content/kizuna.cms.config.ts"
 sites: declareSites(Site, {
     group: {
-        label: 'Example Group',
+        label: 'Group',
         url: 'https://example.com/api',
         app: '../../apps/group/src/app',
     },
     uk: {
-        label: 'Example UK',
+        label: 'United Kingdom',
         url: 'https://example.co.uk/api',
         app: '../../apps/countries/src/app',
         locales: ['en'],
         collections: [Events],
     },
     norway: {
-        label: 'Example Norge',
+        label: 'Norway',
         url: 'https://example.no/api',
         app: '../../apps/countries/src/app',
         locales: ['nb', 'en'],

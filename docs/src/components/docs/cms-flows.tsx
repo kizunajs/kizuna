@@ -42,7 +42,7 @@ const shared: Group = {
 };
 
 const uk: Group = {
-    title: 'Example UK',
+    title: 'United Kingdom',
     entries: [
         {
             label: 'Front Page',
@@ -60,7 +60,7 @@ const uk: Group = {
 };
 
 const norway: Group = {
-    title: 'Example Norge',
+    title: 'Norway',
     entries: [
         {
             label: 'Front Page',
@@ -117,7 +117,7 @@ export function Switcher({ as }: { as: 'admin' | 'country' }) {
                     })}
                 </div>
             ))}
-            {as === 'country' ? <p className={styles.footnote}>Example Norge and the other sites are not listed.</p> : null}
+            {as === 'country' ? <p className={styles.footnote}>Norway, Denmark and the other sites are not listed.</p> : null}
         </Editor>
     );
 }
@@ -133,7 +133,7 @@ export function Switchers() {
                 <Switcher as="admin" />
             </div>
             <div className={styles.column}>
-                <span className={styles.who}>Sam, editor of Example UK</span>
+                <span className={styles.who}>Sam, the UK's editor</span>
                 <Switcher as="country" />
             </div>
         </div>
@@ -166,7 +166,7 @@ export function SharedItem() {
             </div>
             <div className={styles.part}>
                 <div className={styles.partTitle}>
-                    <span>Example UK only</span>
+                    <span>United Kingdom only</span>
                     <span className={styles.partNote}>You publish</span>
                 </div>
                 <FormSection>
@@ -176,7 +176,7 @@ export function SharedItem() {
                 </FormSection>
             </div>
             <Footer>
-                <Button variant="secondary">Publish UK changes</Button>
+                <Button variant="secondary">Publish United Kingdom changes</Button>
                 <Button variant="primary">Ask for review</Button>
             </Footer>
         </Shell>
@@ -190,7 +190,7 @@ export function SharedReview() {
     return (
         <Editor className={editor.dialog}>
             <p className={editor.dialogTitle}>Publish Harbour Office?</p>
-            <p className={styles.muted}>Sam from Example UK asked you to review this.</p>
+            <p className={styles.muted}>Sam, the UK's editor, asked you to review this.</p>
             <div className={styles.diff}>
                 <span className={styles.diffLabel}>Phone</span>
                 <span>
@@ -201,19 +201,19 @@ export function SharedReview() {
                 <span className={styles.bannerLabel}>Shows on</span>
                 {[
                     {
-                        site: 'Example Group',
+                        site: 'Group',
                         pages: ['Contact', 'About Us'],
                     },
                     {
-                        site: 'Example UK',
+                        site: 'United Kingdom',
                         pages: ['Contact', 'Front Page', 'Events'],
                     },
                     {
-                        site: 'Example Norge',
+                        site: 'Norway',
                         pages: ['Contact', 'Kontor'],
                     },
                     {
-                        site: 'Example Danmark',
+                        site: 'Denmark',
                         pages: ['Kontakt', 'Forside'],
                     },
                 ].map((entry) => (
@@ -243,19 +243,19 @@ export function SharedReview() {
 
 const refreshed = [
     {
-        site: 'Example Group',
+        site: 'Group',
         ok: true,
     },
     {
-        site: 'Example UK',
+        site: 'United Kingdom',
         ok: true,
     },
     {
-        site: 'Example Norge',
+        site: 'Norway',
         ok: true,
     },
     {
-        site: 'Example Danmark',
+        site: 'Denmark',
         ok: false,
     },
 ];
