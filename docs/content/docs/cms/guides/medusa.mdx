@@ -1,0 +1,141 @@
+---
+title: A shop with Medusa
+description: Products, carts and orders in Medusa, the pages that sell them in the CMS.
+---
+
+<Comparison first="Medusa" other="Kizuna">
+    <Row label="Products, prices, inventory" kizuna="Yes" other="Held by id on a page" kizunaMark="yes" />
+    <Row label="Cart and checkout" kizuna="The Store API, from the browser" other="" />
+    <Row label="Orders and customers" kizuna="Yes" other="" kizunaMark="yes" />
+    <Row label="Pages, campaigns, the words" kizuna="" other="Edited in the chat" otherMark="yes" />
+</Comparison>
+
+## The relationship
+
+Medusa's JS SDK searches products and fetches them by id, which is what a picker needs:
+
+```ts title="src/cms/relationships.ts"
+import Medusa from '@medusajs/js-sdk';
+import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
+import { defineRelationship } from '@kizunajs/cms';
+
+const medusa = new Medusa({
+    baseUrl: process.env.MEDUSA_URL!,
+    publishableKey: process.env.MEDUSA_PUBLISHABLE_KEY!,
+});
+
+export const MedusaProductId = Kizuna.brand('MedusaProductId', z.string());
+
+export const MedusaProducts = defineRelationship({
+    name: 'medusaProducts',
+    id: MedusaProductId,
+    options: async ({ query, ids }) => {
+        const { products } = await medusa.store.product.list({
+            q: query,
+            id: ids,
+            limit: 20,
+        });
+        return products.map((product) => ({
+            id: product.id,
+            label: product.title,
+            image: product.thumbnail ?? undefined,
+        }));
+    },
+});
+```
+
+## The page
+
+```ts title="src/app/(front-page)/content.ts"
+{
+    name: 'featured',
+    schema: z.array(MedusaProducts.id).max(6),
+},
+```
+
+```tsx title="src/app/(front-page)/page.tsx"
+const content = await kizuna.content.pages.frontPage.get();
+const { products } = await medusa.store.product.list({
+    id: content.featured,
+    fields: '*variants.calculated_price',
+});
+const featured = inStoredOrder(content.featured, products, (product) => product.id);
+```
+
+The cart and checkout talk to Medusa's Store API from the browser, as in any Medusa storefront. The CMS is not in that path.
+
+## When a product changes
+
+A Medusa subscriber tells the CMS, and every page that shows the product refreshes:
+
+```ts title="medusa/src/subscribers/product-updated.ts"
+import type { SubscriberArgs, SubscriberConfig } from '@medusajs/framework';
+import { cmsClient } from '../lib/cms-client';
+
+export default async function productUpdated({ event }: SubscriberArgs<{ id: string }>) {
+    await cmsClient.invalidate({
+        body: {
+            relationship: 'medusaProducts',
+            id: event.data.id,
+        },
+    });
+}
+
+export const config: SubscriberConfig = {
+    event: ['product.updated', 'product.deleted'],
+};
+```
+
+`cmsClient` is the [content client](/docs/cms/api#a-client-for-readers) with the `invalidate` key, generated from the CMS config and installed in the Medusa project.
+
+## The words around a product
+
+A title, a price and a stock count come from the shop. The description, the gallery, the story and the questions are content. A collection keyed by the product's id holds them, one item per product:
+
+```ts title="src/cms/content.ts"
+export const ProductStories = defineCollection({
+    name: 'productStories',
+    id: MedusaProducts.id,
+    fields: [
+        {
+            name: 'description',
+            schema: RichTextSchema,
+        },
+        {
+            name: 'gallery',
+            schema: z.array(ImageSchema).max(8),
+        },
+        {
+            name: 'questions',
+            schema: z.array(
+                z.object({
+                    question: z.string().max(120),
+                    answer: z.string().max(600),
+                })
+            ),
+        },
+    ],
+});
+```
+
+Creating an item means picking the product, so no story exists without one. The product page reads both by the same id:
+
+```tsx title="src/app/products/[handle]/page.tsx"
+const { product } = await medusa.store.product.retrieve(id);
+const story = await kizuna.content.collections.productStories.get({
+    id: product.id,
+});
+```
+
+An editor opens the product page in the preview, clicks the description, and writes. Or asks:
+
+> Write a description for the oak desk from its specs, and three questions buyers ask.
+
+## Reviews
+
+Customer reviews are records: customers write them, and they need moderation. They go in your own table, through a route on the app API, and the product page lists them by product id. Testimonials an editor chooses for a campaign page are content, a collection like any other, holding the product's id.
+
+## What editors change
+
+Which products the front page features, the campaign pages, and every product's description, gallery and questions. A product's title, price and stock are Medusa's.

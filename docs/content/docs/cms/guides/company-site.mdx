@@ -1,0 +1,369 @@
+---
+title: A company site
+description: The whole thing, start to finish. Pages, the team, the offices, a blog, a contact form, search metadata and editors.
+---
+
+```text
+src/
+  cms/
+    content.ts          Site global, Employees, Offices, Articles
+    blocks.ts           HeroBlockSchema
+  app/
+    layout.tsx          Site global, preview
+    (front-page)/
+      content.ts        frontPage
+      page.tsx
+    about/
+      content.ts        aboutPage
+      page.tsx
+    offices/
+      page.tsx          Lists the offices
+    blog/
+      page.tsx          Lists the articles
+      [slug]/
+        content.ts      articlePage, one per article
+        page.tsx
+    contact/
+      content.ts        contactPage
+      page.tsx
+    sitemap.ts
+    api/[...kizuna]/route.ts
+  routes/
+    contact.ts          The form posts here
+kizuna.config.ts
+```
+
+## The content
+
+```ts title="src/cms/content.ts"
+export const Site = defineGlobal({
+    name: 'site',
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().max(40),
+        },
+        {
+            name: 'logo',
+            schema: ImageSchema,
+        },
+        {
+            name: 'footerText',
+            schema: z.string().max(160),
+        },
+    ],
+});
+
+export const EmployeeId = Kizuna.brand('EmployeeId', z.string());
+export const OfficeId = Kizuna.brand('OfficeId', z.string());
+export const ArticleId = Kizuna.brand('ArticleId', z.string());
+
+export const Employees = defineCollection({
+    name: 'employees',
+    id: EmployeeId,
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'role',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'photo',
+            schema: ImageSchema,
+        },
+        {
+            name: 'office',
+            schema: OfficeId,
+        },
+    ],
+});
+
+export const Offices = defineCollection({
+    name: 'offices',
+    id: OfficeId,
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'address',
+            schema: z.string().max(120),
+        },
+        {
+            name: 'phone',
+            schema: z.string().max(30),
+        },
+    ],
+});
+
+export const Articles = defineCollection({
+    name: 'articles',
+    id: ArticleId,
+    fields: [
+        {
+            name: 'title',
+            schema: z.string().max(80),
+        },
+        {
+            name: 'slug',
+            schema: z.string().max(80),
+        },
+        {
+            name: 'summary',
+            schema: z.string().max(200),
+        },
+        {
+            name: 'cover',
+            schema: ImageSchema,
+        },
+        {
+            name: 'author',
+            schema: EmployeeId,
+        },
+        {
+            name: 'body',
+            schema: RichTextSchema,
+        },
+    ],
+});
+```
+
+## The config
+
+```ts title="kizuna.config.ts"
+export default defineConfig({
+    adapter: nextAdapter(),
+    auth: {
+        identities: {
+            editor,
+        },
+    },
+    routes,
+    content: cms({
+        db,
+        pages,
+        globals: [Site],
+        collections: [Employees, Offices, Articles],
+        auth: {
+            identity: 'editor',
+            roles: ['editor', 'admin'],
+        },
+        metadata: {
+            title: ({ title, site }) => `${title} | ${site.name}`,
+        },
+        signInPath: '/login',
+        preview: {
+            url: 'https://example.com',
+        },
+    }),
+    plugins: [mcpPlugin()],
+});
+```
+
+## The layout
+
+```tsx title="src/app/layout.tsx"
+export default async function Layout({ children }: { children: React.ReactNode }) {
+    const site = await kizuna.content.globals.site.get();
+
+    return (
+        <html lang="en">
+            <body>
+                <header>
+                    <img src={site.logo.url} alt={site.logo.alt} />
+                </header>
+                {children}
+                <footer>{site.footerText}</footer>
+                <KizunaPreview content={kizuna.content} />
+            </body>
+        </html>
+    );
+}
+```
+
+## The front page
+
+```ts title="src/app/(front-page)/content.ts"
+export default definePage({
+    name: 'frontPage',
+    fields: [
+        {
+            name: 'hero',
+            schema: HeroBlockSchema,
+        },
+        {
+            name: 'featured',
+            schema: z.array(ArticleId).max(3),
+        },
+    ],
+    metadata: {
+        title: ({ site }) => site.name,
+        suffix: false,
+    },
+});
+```
+
+```tsx title="src/app/(front-page)/page.tsx"
+export const generateMetadata = kizuna.content.pages.frontPage.metadata;
+
+export default async function FrontPage() {
+    const content = await kizuna.content.pages.frontPage.get();
+    const featured = await kizuna.content.collections.articles.getMany({
+        ids: content.featured,
+    });
+
+    return (
+        <main>
+            <Hero {...content.hero} />
+            <ArticleCards articles={featured} />
+        </main>
+    );
+}
+```
+
+## The offices and the team
+
+```tsx title="src/app/offices/page.tsx"
+export default async function OfficesPage() {
+    const { items: offices } = await kizuna.content.collections.offices.list();
+    const { items: employees } = await kizuna.content.collections.employees.list();
+
+    return offices.map((office) => (
+        <section key={office.id}>
+            <JsonLd type="LocalBusiness" of={office} />
+            <h2>{office.name}</h2>
+            <p>{office.address}</p>
+            <ul>
+                {employees
+                    .filter((employee) => employee.office === office.id)
+                    .map((employee) => (
+                        <li key={employee.id}>{employee.name}</li>
+                    ))}
+            </ul>
+        </section>
+    ));
+}
+```
+
+## The blog
+
+[A blog](/docs/cms/guides/blog), as it is.
+
+## The contact form
+
+The page's words are content. The form posts to a route on the app API, which is not:
+
+```ts title="src/app/contact/content.ts"
+export default definePage({
+    name: 'contactPage',
+    fields: [
+        {
+            name: 'heading',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'intro',
+            schema: z.string().max(300),
+        },
+    ],
+});
+```
+
+```ts title="src/routes/contact.ts"
+submitContact: k
+    .route({
+        method: 'POST',
+        path: '/contact',
+        auth: false,
+        body: z.object({
+            name: z.string().max(80),
+            email: z.email(),
+            message: z.string().max(2000),
+        }),
+        responses: {
+            204: z.void(),
+        },
+    })
+    .handler(async ({ body, plugins }) => {
+        await plugins.resend.send({
+            to: 'hello@example.com',
+            subject: `Message from ${body.name}`,
+            text: body.message,
+        });
+
+        return {
+            status: 204,
+        };
+    }),
+```
+
+The page shows the words and the form. The form calls the route through the generated client:
+
+```tsx title="src/app/contact/page.tsx"
+export default async function ContactPage() {
+    const content = await kizuna.content.pages.contactPage.get();
+
+    return (
+        <main>
+            <h1>{content.heading}</h1>
+            <p>{content.intro}</p>
+            <ContactForm />
+        </main>
+    );
+}
+```
+
+```tsx title="src/app/contact/contact-form.tsx"
+'use client';
+
+import { useState } from 'react';
+import { apiClient } from '../../lib/api-client';
+
+export function ContactForm() {
+    const [sent, setSent] = useState(false);
+
+    async function submit(formData: FormData) {
+        const result = await apiClient.contact.submitContact({
+            body: {
+                name: String(formData.get('name')),
+                email: String(formData.get('email')),
+                message: String(formData.get('message')),
+            },
+        });
+        setSent(result.status === 204);
+    }
+
+    if (sent) return <p>Thanks, we will be in touch.</p>;
+
+    return (
+        <form action={submit}>
+            <input name="name" required maxLength={80} />
+            <input name="email" type="email" required />
+            <textarea name="message" required maxLength={2000} />
+            <button type="submit">Send</button>
+        </form>
+    );
+}
+```
+
+## Found
+
+```ts title="src/app/sitemap.ts"
+export default async function sitemap() {
+    return sitemapOf(kizuna.content, {
+        siteUrl: 'https://example.com',
+    });
+}
+```
+
+## Editors
+
+Sign in, add `/api/mcp` to Claude, and:
+
+> Add a new office in Bergen at Strandgaten 12, and make Kari its contact.
+
+Publishing asks first. Everything else, from the hero to the footer, works the same way.

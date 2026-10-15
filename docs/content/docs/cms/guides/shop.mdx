@@ -113,6 +113,53 @@ stripeWebhook: k
     }),
 ```
 
+## The words around a product
+
+A title, a price and a stock count come from the shop. The description, the gallery, the story and the questions are content. A collection keyed by the product's id holds them, one item per product:
+
+```ts title="src/cms/content.ts"
+export const ProductStories = defineCollection({
+    name: 'productStories',
+    id: StripeProducts.id,
+    fields: [
+        {
+            name: 'description',
+            schema: RichTextSchema,
+        },
+        {
+            name: 'gallery',
+            schema: z.array(ImageSchema).max(8),
+        },
+        {
+            name: 'questions',
+            schema: z.array(
+                z.object({
+                    question: z.string().max(120),
+                    answer: z.string().max(600),
+                })
+            ),
+        },
+    ],
+});
+```
+
+Creating an item means picking the product, so no story exists without one. The product page reads both by the same id:
+
+```tsx title="src/app/products/[id]/page.tsx"
+const product = await stripe.products.retrieve(id);
+const story = await kizuna.content.collections.productStories.get({
+    id: product.id,
+});
+```
+
+An editor opens the product page in the preview, clicks the description, and writes. Or asks:
+
+> Write a description for the oak desk from its specs, and three questions buyers ask.
+
+## Reviews
+
+Customer reviews are records: customers write them, and they need moderation. They go in your own table, through a route on the app API, and the product page lists them by product id. Testimonials an editor chooses for a campaign page are content, a collection like any other, holding the product's id.
+
 ## What editors change
 
-The front page, the campaign pages and the words around the products, in their chat or on the page. A product's name and price are Stripe's, and the picker shows them as they are.
+The front page, the campaign pages, and every product's description, gallery and questions. A product's name, price and stock are Stripe's.
