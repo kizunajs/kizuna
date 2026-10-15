@@ -25,18 +25,19 @@ openApiPlugin(props: OpenApiPluginProps): PluginDeclaration
 
 `OpenApiPluginProps` extends `GenerateOpenApiOptions`, so `info`, `servers`, `setOperationId` and the rest work exactly as they do on `generateOpenApi`. On top of those:
 
-| Option          | Default            | Description                                              |
-| --------------- | ------------------ | -------------------------------------------------------- |
-| `slug`          | `'openApi'`        | What handlers reach this plugin under                    |
-| `output`        | none               | Where `kizuna generate` writes the document              |
-| `includeHidden` | `false`            | Document [hidden](/docs/routes#hidden-routes) routes too |
-| `docsPath`      | off                | The reference UI. Give it a path to serve it             |
-| `jsonPath`      | off                | The document. A path ending in `.json`                   |
-| `yamlPath`      | off                | The document as YAML. A path ending in `.yaml`           |
-| `provider`      | `'scalar'`         | Which reference UI to render, `'scalar'` or `'swagger'`  |
-| `cdnUrl`        | the provider's CDN | Where to load the UI's assets from                       |
-| `pageTitle`     | the document title | The page's `<title>`                                     |
-| `configuration` | none               | Extra config merged into the UI's initializer            |
+| Option          | Default            | Description                                                                                   |
+| --------------- | ------------------ | --------------------------------------------------------------------------------------------- |
+| `slug`          | `'openApi'`        | What handlers reach this plugin under                                                         |
+| `output`        | none               | Where `kizuna generate` writes the document                                                   |
+| `includeHidden` | `false`            | Document [hidden](/docs/routes#hidden-routes) routes too                                      |
+| `groups`        | every group        | Document only the routes in these [groups](/docs/reference/k-groups), and the models they use |
+| `docsPath`      | off                | The reference UI. Give it a path to serve it                                                  |
+| `jsonPath`      | off                | The document. A path ending in `.json`                                                        |
+| `yamlPath`      | off                | The document as YAML. A path ending in `.yaml`                                                |
+| `provider`      | `'scalar'`         | Which reference UI to render, `'scalar'` or `'swagger'`                                       |
+| `cdnUrl`        | the provider's CDN | Where to load the UI's assets from                                                            |
+| `pageTitle`     | the document title | The page's `<title>`                                                                          |
+| `configuration` | none               | Extra config merged into the UI's initializer                                                 |
 
 They are also the options [`generateOpenApi`](/docs/reference/generate-openapi) uses when you call it without any, so a build step and the served document cannot disagree.
 

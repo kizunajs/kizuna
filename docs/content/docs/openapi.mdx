@@ -209,15 +209,16 @@ openApiPlugin({
 });
 ```
 
-| Option            | Default  | Description                                                                             |
-| ----------------- | -------- | --------------------------------------------------------------------------------------- |
-| `info`            | required | OpenAPI `info` object                                                                   |
-| `output`          | none     | Where `kizuna generate` writes the document. `.json` for JSON, anything else for YAML   |
-| `includeHidden`   | `false`  | Document [hidden](/docs/routes#hidden-routes) routes too                                |
-| `servers`         | none     | Server URLs                                                                             |
-| `setOperationId`  | `false`  | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
-| `operationMapper` | none     | Callback to transform each operation before it is added to the spec                     |
-| `derivedHead`     | `false`  | Document the derived `head` operation on every `GET` path without a declared one        |
+| Option            | Default     | Description                                                                                   |
+| ----------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `info`            | required    | OpenAPI `info` object                                                                         |
+| `output`          | none        | Where `kizuna generate` writes the document. `.json` for JSON, anything else for YAML         |
+| `includeHidden`   | `false`     | Document [hidden](/docs/routes#hidden-routes) routes too                                      |
+| `groups`          | every group | Document only the routes in these [groups](/docs/reference/k-groups), and the models they use |
+| `servers`         | none        | Server URLs                                                                                   |
+| `setOperationId`  | `false`     | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys.       |
+| `operationMapper` | none        | Callback to transform each operation before it is added to the spec                           |
+| `derivedHead`     | `false`     | Document the derived `head` operation on every `GET` path without a declared one              |
 
 ## Security
 

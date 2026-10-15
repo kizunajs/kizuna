@@ -58,13 +58,14 @@ export default defineConfig({
 kizuna generate
 ```
 
-| Option                | Description                                                                                         |
-| --------------------- | --------------------------------------------------------------------------------------------------- |
-| `output`              | Where the generated `.kt` file goes                                                                 |
-| `namespace`           | Object wrapping all generated types, `API` by default                                               |
-| `package`             | Package declaration for the generated file, such as `com.example.api`                               |
-| `camelCaseProperties` | Convert wire field names to camelCase properties, mapped back via `@SerialName`                     |
-| `unknownEnumCase`     | Emit enums as a sealed interface with an `Unknown` member so new server values don't break decoding |
+| Option                | Description                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `output`              | Where the generated `.kt` file goes                                                                          |
+| `namespace`           | Object wrapping all generated types, `API` by default                                                        |
+| `package`             | Package declaration for the generated file, such as `com.example.api`                                        |
+| `camelCaseProperties` | Convert wire field names to camelCase properties, mapped back via `@SerialName`                              |
+| `unknownEnumCase`     | Emit enums as a sealed interface with an `Unknown` member so new server values don't break decoding          |
+| `groups`              | Only the routes in these [groups](/docs/reference/k-groups), and the models they use. Every route by default |
 
 The path is relative to the config, so a client can land outside the TypeScript project. When the Android app lives in the same repository, `../android/app/src/main/kotlin/com/example/APIClient.kt` writes straight into it. An app in its own repository takes the generated file the way it takes any other vendored source, by copying it in from a build step or committing it.
 

@@ -24,11 +24,12 @@ generateSwiftClient(api: ApiDefinition, config: SwiftConfig): string
 
 ## `SwiftConfig`
 
-| Option                | Type      | Required | Description                                                                                                           |
-| --------------------- | --------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `namespaceName`       | `string`  | Yes      | Name for the generated Swift enum and client type (e.g. `'API'`)                                                      |
-| `camelCaseProperties` | `boolean` | No       | Convert wire field names to camelCase properties, mapped back via `CodingKeys`. Default `false`                       |
-| `unknownEnumCase`     | `boolean` | No       | Emit enums with an `unknown(String)` fallback so unrecognised wire values decode instead of throwing. Default `false` |
+| Option                | Type       | Required | Description                                                                                                           |
+| --------------------- | ---------- | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| `namespaceName`       | `string`   | Yes      | Name for the generated Swift enum and client type (e.g. `'API'`)                                                      |
+| `camelCaseProperties` | `boolean`  | No       | Convert wire field names to camelCase properties, mapped back via `CodingKeys`. Default `false`                       |
+| `unknownEnumCase`     | `boolean`  | No       | Emit enums with an `unknown(String)` fallback so unrecognised wire values decode instead of throwing. Default `false` |
+| `groups`              | `string[]` | No       | Only the routes in these [groups](/docs/reference/k-groups), and the models they use. Every route by default          |
 
 ## Example
 

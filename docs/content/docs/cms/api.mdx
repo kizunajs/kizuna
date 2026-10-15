@@ -29,7 +29,7 @@ export default defineConfig({
 
 Mount it at `apiPath`, in `src/app/cms-api/[...kizuna-cms]/route.ts`, and point `@kizuna-config` at `kizuna.cms.config.ts`, since that is the config pages read content from. Editors enter draft mode at `/cms-api/draft`.
 
-## The client
+## The routes
 
 The CMS routes come in three groups, one for each kind of caller:
 
@@ -39,27 +39,47 @@ The CMS routes come in three groups, one for each kind of caller:
 | `editing`    | Editors and their agents | Drafts, publishing, versions, media, describe, where-used, search and preview |
 | `invalidate` | The app                  | Refreshing the pages that show an id the app changed                          |
 
-Generate a client from the CMS config, and a frontend that reads the front page finds it under `content`:
+`content` is a REST API of everything editors publish, generated from your fields: `GET /cms-api/content/pages/frontPage`, `GET /cms-api/content/collections/employees`. A collection's list takes `select`, `?select=name,photo`, and answers with those fields and the id. Every collection also answers `GET /cms-api/content/collections/employees/options`, the id and label of each published item, searchable by `q` and looked up by `ids`, which is what a [relationship](/docs/cms/content#from-another-kizuna-api) in another CMS reads. The label is the item's first text field.
+
+## A client for readers
+
+A frontend, a phone or another repository reads content and nothing else. `groups` keeps a generated client to the groups it names:
 
 ```ts title="kizuna.cms.config.ts"
 clients: [
     fetchClient({
-        output: './src/lib/cms-client.generated.ts',
+        output: './src/lib/content-client.generated.ts',
+        groups: ['content'],
     }),
 ],
 ```
 
 ```ts title="src/lib/front-page.ts"
-const result = await cmsClient.content.pages.frontPage();
+const result = await contentClient.content.pages.frontPage();
 ```
 
-`kizuna.content.pages.frontPage.get()` in process and `cmsClient.content.pages.frontPage()` over HTTP read the same content by the same path.
+`kizuna.content.pages.frontPage.get()` in process and `contentClient.content.pages.frontPage()` over HTTP read the same content by the same path. The Swift and Kotlin clients take `groups` the same way, and so does the OpenAPI document, for readers that generate their own:
+
+```ts title="kizuna.cms.config.ts"
+plugins: [
+    openApiPlugin({
+        info: {
+            title: 'Content',
+            version: '1.0.0',
+        },
+        groups: ['content'],
+        docsPath: '/cms-api/docs',
+    }),
+],
+```
+
+A client without `groups` holds every route, which is what an app that edits content needs.
 
 ## What stays apart
 
 - **Identities.** `editor` lives on the CMS config, so an app route that names it fails to compile. When a [relationship's](/docs/cms/content#relationships) `options` calls a route that is not public, the editor also needs an identity on the app API, since `options` runs as them.
 - **MCP.** An editor's agent connects to `/cms-api/mcp` and sees content tools alone.
-- **Clients and OpenAPI.** Each API generates its own. A mobile app gets the app client, and the site uses both. A mobile app that shows content reads it through [a route on the app API](#content-in-the-app-api).
+- **Clients and OpenAPI.** Each API generates its own. A mobile app gets the app client, and reads content through [a route on the app API](#content-in-the-app-api) or a [client of the content routes](#a-client-for-readers).
 - **Shared ids.** Ids both sides use, like `ProductId`, live in a module both configs import.
 
 ## Talking to the app
@@ -118,6 +138,7 @@ listNews: k
     })
     .handler(async () => {
         const { items } = await content.collections.articles.list({
+            select: ['title', 'image'],
             limit: 20,
         });
 
@@ -127,14 +148,16 @@ listNews: k
                 articles: items.map((article) => ({
                     id: article.id,
                     title: article.title,
-                    imageUrl: new URL(article.image.url, process.env.SITE_URL).href,
+                    imageUrl: article.image.url,
                 })),
             },
         };
     }),
 ```
 
-The reader returns published content alone, since the route has no draft mode. An image's `url` is a path on the CMS API, so the route makes it a full URL for the phone. `ArticleId` is the collection's own id type, so a later route that takes one, like `getNewsArticle`, accepts the ids this one returned.
+The reader returns published content alone, since the route has no draft mode. `select` reads the title and image of each article and leaves its body behind, and the items are typed to what it names. `ArticleId` is the collection's own id type, so a later route that takes one, like `getNewsArticle`, accepts the ids this one returned.
+
+The phone needs a full URL, so set `media.publicPath` to one, `'https://example.com/cms-api/content/media'`, and every image's `url` starts with it. The phone asks for the size it shows by adding `w`, as [below](#image-sizes).
 
 With [several sites](/docs/cms/sites), the route reads the site the app belongs to, `content.sites.norway.collections.articles.list()`.
 
@@ -151,6 +174,16 @@ Files live in an S3 bucket, so any S3-compatible store works. Point the CMS at y
 | `CMS_S3_SECRET_ACCESS_KEY` | Falls back to the SDK's own lookup                                                  |
 
 The same names go under `media` on `cms()`. The bucket can stay private: browsers upload through a presigned URL and read through `GET /content/media/:id/image`, which renders the crop and caches for a year. Without a bucket, development keeps files in memory and production refuses to start.
+
+### Image sizes
+
+An image's `url` renders the crop an editor chose. `w` and `h` render it at a size, up to 4096 pixels, and each size is cached on its own:
+
+```text
+/cms-api/content/media/med_3f2a9c1e8b7d4a5f6c0e1d2b/image?crop=0.1,0,0.8,1&w=800
+```
+
+With `w` alone the height follows the crop. With both, the image is cropped to fit around the focal point the editor set, so a square thumbnail keeps the face in it.
 
 Uploads are checked by their bytes, never their name. SVG is refused, location metadata is stripped, and files over ten megabytes are refused unless `media.maxBytes` says otherwise.
 

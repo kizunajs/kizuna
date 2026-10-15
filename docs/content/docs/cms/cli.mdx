@@ -42,7 +42,7 @@ Lists every page's path and name from the `content.ts` files under `src/app` or 
 
 ## `kizuna cms orphans`
 
-Lists stored page content that no page claims anymore, what a page renamed or deleted in code leaves behind. It exits `1` when there is some, so CI with a database can fail on it.
+Lists stored content that nothing in the config claims anymore: pages renamed or deleted in code, and the items of a collection that was removed. It exits `1` when there is some, so CI with a database can fail on it.
 
 ## `kizuna cms rename-page`
 
@@ -50,6 +50,22 @@ Moves a renamed page's stored content, with its versions and history, to the new
 
 ```sh
 kizuna cms rename-page pricingPage plansPage
+```
+
+## `kizuna cms export`
+
+Writes every published item of one collection as JSON, each with its id, to stdout or the file `--out` names. Use it to [move a collection into a table](/docs/cms/content#moving-between-them).
+
+```sh
+kizuna cms export employees --out employees.json
+```
+
+## `kizuna cms import`
+
+Creates an item of one collection for each record in a JSON file, keeping the record's id, as a draft. Records that fail the collection's schema are listed and skipped, and the command exits `1` when there are any. `--publish` publishes the items that pass.
+
+```sh
+kizuna cms import employees employees.json
 ```
 
 ## Environments

@@ -28,15 +28,16 @@ It lives on `@kizunajs/openapi`, beside [`openApiPlugin`](/docs/reference/openap
 
 Options are declared on [`openApiPlugin`](/docs/reference/openapi-plugin), and `generateOpenApi` reads them off the api, so a build step cannot write a document that differs from the one your server serves. Pass `overrides` for what only a build step knows, such as the public `servers` list.
 
-| Option            | Type                                  | Default   | Description                                                                             |
-| ----------------- | ------------------------------------- | --------- | --------------------------------------------------------------------------------------- |
-| `info`            | `{ title, version, description? }`    | required  | OpenAPI `info` object                                                                   |
-| `openApiVersion`  | `'3.1.0'`                             | `'3.1.0'` | OpenAPI specification version for the generated document                                |
-| `servers`         | `{ url, description? }[]`             | none      | Server URLs                                                                             |
-| `setOperationId`  | `boolean \| 'concatenated-path'`      | `false`   | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys. |
-| `externalDocs`    | `{ url, description? }`               | none      | Top-level external documentation link                                                   |
-| `operationMapper` | `(operation, route, id) => operation` | none      | Callback to transform each operation before it is added to the spec                     |
-| `derivedHead`     | `boolean`                             | `false`   | Document the derived `head` operation on every `GET` path without a declared one        |
+| Option            | Type                                  | Default     | Description                                                                                   |
+| ----------------- | ------------------------------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `info`            | `{ title, version, description? }`    | required    | OpenAPI `info` object                                                                         |
+| `openApiVersion`  | `'3.1.0'`                             | `'3.1.0'`   | OpenAPI specification version for the generated document                                      |
+| `servers`         | `{ url, description? }[]`             | none        | Server URLs                                                                                   |
+| `setOperationId`  | `boolean \| 'concatenated-path'`      | `false`     | Set `operationId` from the route key. Use `'concatenated-path'` to include parent keys.       |
+| `externalDocs`    | `{ url, description? }`               | none        | Top-level external documentation link                                                         |
+| `operationMapper` | `(operation, route, id) => operation` | none        | Callback to transform each operation before it is added to the spec                           |
+| `derivedHead`     | `boolean`                             | `false`     | Document the derived `head` operation on every `GET` path without a declared one              |
+| `groups`          | `string[]`                            | every group | Document only the routes in these [groups](/docs/reference/k-groups), and the models they use |
 
 There are no security or tag options. Security is emitted from [each route's `auth`](#security-emission) and the document's tag list from [`k.groups`](/docs/reference/k-groups), so neither can disagree with what the server enforces.
 

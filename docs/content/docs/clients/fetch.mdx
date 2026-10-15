@@ -396,6 +396,21 @@ clients: [
 ],
 ```
 
+## Only some groups
+
+A client for one kind of caller holds only the routes that caller uses. `groups` names the [groups](/docs/reference/k-groups) it keeps, and the client holds their routes and the models they use:
+
+```ts title="kizuna.config.ts"
+clients: [
+    fetchClient({
+        output: './src/lib/public-client.generated.ts',
+        groups: ['catalog'],
+    }),
+],
+```
+
+A dotted path keeps one nested group, `workspaces.members`. Without `groups`, the client holds every route.
+
 ## Branded IDs
 
 A [branded ID](/docs/zod#branded-ids) becomes a named type, `API.UserId`, and a `toUserId` function that makes one. The parameter's type shows it, and passing a plain `string` does not compile.

@@ -1,9 +1,12 @@
 ---
 title: Several sites
-description: One CMS for a group and its sites, where the group's content is written once and every site reads it, and each site adds content of its own.
+description: One CMS for a group and its sites. The group's content is written once and every site reads it, and each site keeps content of its own.
 ---
 
-A group runs several sites: its own, and one for each country it works in. Some content belongs to the group, like the people, the offices and the privacy policy, and every site shows it. Some belongs to one site, like Norway's news or the events only Norway runs. One CMS holds both, so the group's content is written once, a site's own content stays with that site, and a site's content points at the group's with typed ids.
+A group runs several sites: its own, and one for each country it works in. Some content belongs to the group, like the people, the offices and the privacy policy, and every site shows it. Some belongs to one site, like Norway's news. One CMS holds both, and every piece of content has one owner:
+
+- **A page belongs to its site.** It is declared beside its route, in the site's app.
+- **A global or a collection belongs to the group or to one site.** Listed on `cms()`, it is the group's. Listed under a site, it is that site's.
 
 ## Declaring the sites
 
@@ -32,19 +35,17 @@ content: cms({
 }),
 ```
 
-Each site's pages are stored apart, so every app can have a `frontPage`. An app reads its own site:
+Each site's pages are stored apart, so every app can have a `frontPage`. An app reads its own pages under its site:
 
-```ts title="apps/norway/src/content.ts"
-import kizuna from '@acme/content/kizuna.cms.config';
-
-export const content = kizuna.content.sites.norway;
+```tsx title="apps/norway/src/app/page.tsx"
+const content = await kizuna.content.sites.norway.pages.frontPage.get();
 ```
 
-Pages call `content.pages.frontPage.get()`, and `<KizunaPreview content={content} />` knows which site it is on.
+and `<KizunaPreview content={kizuna.content.sites.norway} />` knows which site it is on.
 
 ## The group's content
 
-Globals and collections listed on `cms()` belong to the group. They are stored once, and every site reads them:
+Globals and collections listed on `cms()` belong to the group. They are stored once, and every site reads them at the same path:
 
 ```ts title="packages/content/kizuna.cms.config.ts"
 content: cms({
@@ -59,7 +60,7 @@ content: cms({
 ```
 
 ```tsx title="apps/sweden/src/app/contact/page.tsx"
-const { items } = await content.collections.offices.list();
+const { items } = await kizuna.content.collections.offices.list();
 ```
 
 Norway and Sweden list the same offices. An editor who moves an office edits it once, and both sites show the change when it publishes.
@@ -74,33 +75,6 @@ sites: {
         pages: norwayPages,
         app: '../../apps/norway/src/app',
         globals: [Announcement],
-        collections: [Events],
-    },
-    sweden: {
-        pages: swedenPages,
-        app: '../../apps/sweden/src/app',
-    },
-},
-```
-
-Only Norway's reader has them:
-
-```tsx title="apps/norway/src/app/events/page.tsx"
-const announcement = await content.globals.announcement.get();
-const { items } = await content.collections.events.list();
-```
-
-Sweden's reader has no `events`, so `kizuna.content.sites.sweden.collections.events` fails to compile. A field that only one site needs goes in that site's own global, and the other sites never see it.
-
-## One shape, each site its own items
-
-Every country publishes news, and each country writes its own. List the same collection under each site:
-
-```ts title="packages/content/kizuna.cms.config.ts"
-sites: {
-    norway: {
-        pages: norwayPages,
-        app: '../../apps/norway/src/app',
         collections: [Articles, Events],
     },
     sweden: {
@@ -111,20 +85,19 @@ sites: {
 },
 ```
 
-The articles have one shape, one set of fields and one `ArticleId`, and each site keeps its own items. Norway's blog lists Norway's articles, and an `ArticleId` on a Norwegian page names a Norwegian article.
+They are read under the site, the way its pages are:
+
+```tsx title="apps/norway/src/app/events/page.tsx"
+const { items } = await kizuna.content.sites.norway.collections.events.list();
+```
+
+Sweden declares no events, so `kizuna.content.sites.sweden.collections.events` fails to compile. Both declare `Articles`, so they share its fields and its `ArticleId`, and each keeps its own items. Norway's blog lists Norway's articles.
 
 ## Pointing at the group's content
 
-A site's content holds the group's ids, the way a page holds an item from any collection. An event names the employee to contact and the office it is held at:
+A site's content holds the group's ids, the way a page holds any collection's. An event names the employee to contact:
 
 ```ts title="packages/content/events.ts"
-import { z } from 'zod';
-import { Kizuna } from 'kizunajs';
-import { defineCollection } from '@kizunajs/cms';
-import { Employees, Offices } from './group';
-
-export const EventId = Kizuna.brand('EventId', z.string());
-
 export const Events = defineCollection({
     name: 'events',
     id: EventId,
@@ -134,48 +107,52 @@ export const Events = defineCollection({
             schema: z.string().min(1).max(80),
         },
         {
-            name: 'startsAt',
-            label: 'Starts at',
-            schema: z.iso.datetime(),
-        },
-        {
-            name: 'office',
-            schema: Offices.id,
-        },
-        {
             name: 'contactPerson',
             label: 'Contact person',
             schema: Employees.id,
         },
     ],
-    indexes: ['startsAt'],
 });
 ```
 
-The editor's picker for `contactPerson` lists the group's employees, and the page reads the one it holds:
+The editor's picker lists the group's employees, and the page reads the one the event holds:
 
 ```tsx title="apps/norway/src/app/events/[id]/page.tsx"
 const { id } = await params;
-const event = await content.collections.events.get({
+const event = await kizuna.content.sites.norway.collections.events.get({
     id,
 });
-const contactPerson = await content.collections.employees.get({
+const contactPerson = await kizuna.content.collections.employees.get({
     id: event.contactPerson,
 });
 ```
 
 The group's content shows on every site, so it never holds a site's ids. A group collection with an `Events.id` field fails when the config assembles.
 
-## Reading over HTTP
+## Where the group's data lives
 
-Every site's content is in the `content` routes, under the site's name. A client generated from the CMS config reads it from any app:
+A site holds the group's data by id wherever it lives:
 
-```ts title="src/lib/events.ts"
-const result = await cmsClient.content.sites.norway.collections.events.list();
-```
+| The data lives in                 | The site holds it through                                                         |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| This CMS                          | A group collection, as above                                                      |
+| The group's own Kizuna API or CMS | A [relationship](/docs/cms/content#from-another-kizuna-api) fed by its client     |
+| A service like Stripe or a CRM    | A [relationship](/docs/cms/content#from-another-service) fed by the service's SDK |
 
-The group's content keeps its own path, `cmsClient.content.collections.offices.list()`, whichever site asks.
+A page is declared beside its route, so a site's pages live in the repository its app does. When the sites share one repository, one CMS holds every site's pages. When a site lives in a repository of its own, it runs a CMS of its own for its pages, and reaches the group's data through a relationship.
+
+## Reading from outside
+
+Every path above is also a route in the `content` group, under the CMS's `apiPath`, so another app or a phone reads the same content over HTTP:
+
+| In process                                              | Over HTTP                                          |
+| ------------------------------------------------------- | -------------------------------------------------- |
+| `kizuna.content.collections.offices.list()`             | `GET /api/content/collections/offices`             |
+| `kizuna.content.sites.norway.collections.events.list()` | `GET /api/content/sites/norway/collections/events` |
+| `kizuna.content.sites.norway.pages.frontPage.get()`     | `GET /api/content/sites/norway/pages/frontPage`    |
+
+A [client of the content routes](/docs/cms/api#a-client-for-readers) calls them with the same path, `contentClient.content.sites.norway.collections.events.list()`.
 
 ## Editing
 
-Editors work in one editor for the whole group. The switcher lists the group's content first, then each site with its pages, globals and collections. The agent addresses a site's own content by its site, so "add an event to the Norwegian site" reaches Norway's `events`, and "update Anna's phone number" reaches the group's `employees`, once for every site.
+Editors work in one editor for the whole group. The switcher lists the group's content first, then each site with its pages, globals and collections. The agent addresses a site's content by its site, so "add an event to the Norwegian site" reaches Norway's `events`, and "update Anna's phone number" reaches the group's `employees`, once for every site.

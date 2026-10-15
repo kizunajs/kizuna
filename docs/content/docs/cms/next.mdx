@@ -56,6 +56,17 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
 A layout that reads a global calls `notFound()` on every route until the global is published, so publish it before the layout ships.
 
+A blog index shows a card for each article and none of its body. `select` on `list` or `getMany` reads only the fields it names, with the id, and types each item to them:
+
+```tsx title="src/app/blog/page.tsx"
+const { items } = await kizuna.content.collections.articles.list({
+    select: ['title', 'slug', 'image'],
+    limit: 20,
+});
+```
+
+`items[0].body` fails to compile, since the body was never read.
+
 ## Rich text
 
 `RichText` renders a rich text field as plain HTML elements. Replace any of them through `components`, keyed the way [`@portabletext/react`](https://github.com/portabletext/react-portabletext) keys them:

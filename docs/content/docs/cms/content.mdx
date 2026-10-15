@@ -194,6 +194,44 @@ const contactPerson = await kizuna.content.collections.employees.get({
 
 `get` reads one item and caches it on its own. A field that holds several, `z.array(Employees.id)`, reads them with `getMany({ ids })` in the order the page holds them.
 
+A read returns the ids a page holds and never follows them, so the page fetches exactly the items it shows, typed by the collection it reads them from, and each one is cached and refreshed on its own.
+
+### The other direction
+
+An office page lists the people who work there. The employees hold the office's id, so the office page lists the employees that hold it:
+
+```tsx title="src/app/offices/[id]/page.tsx"
+const { items } = await kizuna.content.collections.employees.list({
+    where: {
+        office: id,
+    },
+});
+```
+
+`where` on a field that holds ids matches every item that holds this one, whether the field holds one id or a list. The CMS records every id an item holds as it saves, so the field needs no index of its own. Nothing is stored on the office, so there is no second copy of the link to keep in step.
+
+### One of several kinds
+
+A field that holds an employee or an office names which in a `_type`, the way a list of blocks does:
+
+```ts
+{
+    name: 'contact',
+    schema: z.discriminatedUnion('_type', [
+        z.object({
+            _type: z.literal('employee'),
+            id: Employees.id,
+        }),
+        z.object({
+            _type: z.literal('office'),
+            id: Offices.id,
+        }),
+    ]),
+},
+```
+
+The picker offers both, and the page reads `contact._type` to know which collection to read the id from.
+
 Hand globals and collections to `cms()` beside the pages. `group` on either sorts it under a heading in the content overview:
 
 ```ts title="kizuna.config.ts"
@@ -216,6 +254,26 @@ One question decides it: would you keep this record if the website did not exist
 - **Yes.** It is a record your business keeps, and it goes in a table of yours with routes: products, orders, users, employees in an HR system. Customers, syncs and your code write to it, and your handlers run on every change.
 
 A page holds both. It holds a record of yours by id, through a [relationship](#relationships), so you never copy one into a collection to put it on a page.
+
+### Moving between them
+
+The answer can change. The team page started with an `employees` collection, and now HR keeps the employees in a system of its own. Both sides use the same `EmployeeId`, so the move changes where the records live and leaves every page that holds one as it is:
+
+1. Export the published items, ids included:
+
+    ```sh
+    kizuna cms export employees --out employees.json
+    ```
+
+2. Insert them into your table with their ids, and serve them through a route.
+3. Replace the collection with a [relationship](#relationships) of the same name and id type. A field that held `Employees.id` holds the relationship's `Employees.id`, and the stored ids still resolve.
+4. Remove the stored items, which [`kizuna cms orphans`](/docs/cms/cli#kizuna-cms-orphans) now lists.
+
+The other way, from a table of yours into a collection, replaces the relationship with a collection of the same name and id type, and imports the records as drafts an editor publishes:
+
+```sh
+kizuna cms import employees employees.json
+```
 
 ## Pages that show a collection
 
@@ -335,6 +393,35 @@ listProductOptions: k
         };
     }),
 ```
+
+### From another Kizuna API
+
+When the employees live in another Kizuna CMS, like the group's, its [content client](/docs/cms/api#a-client-for-readers) already has the route a picker needs, since every collection serves its options:
+
+```ts title="src/cms/relationships.ts"
+import { z } from 'zod';
+import { Kizuna } from 'kizunajs';
+import { defineRelationship } from '@kizunajs/cms';
+import { groupContent } from '../lib/group-content';
+
+export const EmployeeId = Kizuna.brand('EmployeeId', z.string());
+
+export const GroupEmployees = defineRelationship({
+    name: 'groupEmployees',
+    id: EmployeeId,
+    options: async ({ query, ids }) => {
+        const result = await groupContent.content.collections.employees.options({
+            query: {
+                q: query,
+                ids,
+            },
+        });
+        return result.status === 200 ? result.body.options : [];
+    },
+});
+```
+
+`EmployeeId` carries the group's brand name, so the ids its client returns are the ones a field of this type holds. Published content is public, so the call needs no sign-in.
 
 ### From another service
 
