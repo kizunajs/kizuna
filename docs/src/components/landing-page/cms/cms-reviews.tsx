@@ -41,7 +41,7 @@ function Avatar({ initials }: { initials: string }) {
     );
 }
 
-function Ask() {
+export function Ask() {
     return (
         <Editor className={editor.dialog}>
             <p className={editor.dialogTitle}>Ask for review</p>
@@ -75,7 +75,7 @@ function Ask() {
     );
 }
 
-function Review() {
+export function Review() {
     return (
         <Editor className={editor.dialog}>
             <p className={editor.dialogTitle}>Publish 2 documents?</p>

@@ -1,0 +1,118 @@
+---
+title: A shop with Stripe
+description: Products and checkout in Stripe, the pages that sell them in the CMS, orders in your own table.
+---
+
+<Comparison first="Stripe" other="Kizuna">
+    <Row label="Products and prices" kizuna="Yes" other="Held by id on a page" kizunaMark="yes" />
+    <Row label="Checkout" kizuna="Checkout Sessions" other="A route that creates one" />
+    <Row label="Orders" kizuna="Payments" other="Your own table, written by the webhook" />
+    <Row label="The front page, the campaign page" kizuna="" other="Pages, edited in the chat" otherMark="yes" />
+</Comparison>
+
+## The products, on a page
+
+A [relationship](/docs/cms/content/relationships#from-another-service) gives the editor Stripe's products to pick from, and the page holds their ids:
+
+```ts title="src/app/(front-page)/content.ts"
+{
+    name: 'featured',
+    schema: z.array(StripeProducts.id).max(6),
+},
+```
+
+```tsx title="src/app/(front-page)/page.tsx"
+const content = await kizuna.content.pages.frontPage.get();
+const products = await stripe.products.list({
+    ids: content.featured,
+    expand: ['data.default_price'],
+});
+const featured = inStoredOrder(content.featured, products.data, (product) => product.id);
+```
+
+## Checkout
+
+A route on the app API creates the session. The fetch client calls it from the cart:
+
+```ts title="src/routes/checkout.ts"
+createCheckout: k
+    .route({
+        method: 'POST',
+        path: '/checkout',
+        auth: false,
+        body: z.object({
+            items: z.array(
+                z.object({
+                    price: StripePriceId,
+                    quantity: z.int().min(1),
+                })
+            ),
+        }),
+        responses: {
+            200: z.object({
+                url: z.url(),
+            }),
+        },
+    })
+    .handler(async ({ body }) => {
+        const session = await stripe.checkout.sessions.create({
+            mode: 'payment',
+            line_items: body.items,
+            success_url: `${process.env.SITE_URL}/thanks`,
+            cancel_url: `${process.env.SITE_URL}/cart`,
+        });
+
+        return {
+            status: 200,
+            body: {
+                url: session.url!,
+            },
+        };
+    }),
+```
+
+## The webhook
+
+Stripe calls one route. It writes the order to your table, and tells the CMS when a product changed so every page that shows it refreshes:
+
+```ts title="src/routes/stripe-webhook.ts"
+stripeWebhook: k
+    .route({
+        method: 'POST',
+        path: '/stripe/webhook',
+        auth: false,
+        hidden: true,
+        body: z.unknown(),
+        responses: {
+            200: z.object({}),
+        },
+    })
+    .handler(async ({ body, headers }) => {
+        const event = stripe.webhooks.constructEvent(
+            JSON.stringify(body),
+            headers['stripe-signature']!,
+            process.env.STRIPE_WEBHOOK_SECRET!
+        );
+
+        if (event.type === 'checkout.session.completed') {
+            await db.insert(orders).values(orderFrom(event.data.object));
+        }
+        if (event.type === 'product.updated') {
+            await cmsClient.invalidate({
+                body: {
+                    relationship: 'stripeProducts',
+                    id: event.data.object.id,
+                },
+            });
+        }
+
+        return {
+            status: 200,
+            body: {},
+        };
+    }),
+```
+
+## What editors change
+
+The front page, the campaign pages and the words around the products, in their chat or on the page. A product's name and price are Stripe's, and the picker shows them as they are.

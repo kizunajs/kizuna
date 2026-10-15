@@ -62,7 +62,7 @@ kizuna cms rename-site default uk
 
 ## `kizuna cms import-redirects`
 
-Creates a redirect for each row of a CSV with `from` and `to` columns, like the one HubSpot or a crawl of the old site exports, and skips rows whose `from` already redirects. A `to` that is another row's `from` is collapsed to that row's target, so the import never makes a chain. Use it when [moving from another platform](/docs/cms/migrating).
+Creates a redirect for each row of a CSV with `from` and `to` columns, like the one HubSpot or a crawl of the old site exports, and skips rows whose `from` already redirects. A `to` that is another row's `from` is collapsed to that row's target, so the import never makes a chain. Use it when [moving from another platform](/docs/cms/guides/migrating).
 
 ```sh
 kizuna cms import-redirects old-site.csv

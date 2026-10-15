@@ -1,10 +1,11 @@
 import { Chat } from '@/components/landing-page/cms/cms-chat';
 import { FrontPageEditor } from '@/components/landing-page/cms/cms-editor-mock';
 import { Preview, Publish } from '@/components/landing-page/cms/cms-on-page';
+import { Ask, Review } from '@/components/landing-page/cms/cms-reviews';
 import panel from '@/components/landing-page/panel.module.css';
 import styles from './cms-figures.module.css';
 
-type Kind = 'chat' | 'preview' | 'publish';
+type Kind = 'chat' | 'preview' | 'publish' | 'ask' | 'review';
 
 /**
  * The editor as the landing page draws it, for the docs: beside the chat,
@@ -20,8 +21,12 @@ export function EditorFigure({ kind }: { kind: Kind }) {
                 </div>
             ) : kind === 'preview' ? (
                 <Preview />
-            ) : (
+            ) : kind === 'publish' ? (
                 <Publish />
+            ) : kind === 'ask' ? (
+                <Ask />
+            ) : (
+                <Review />
             )}
         </div>
     );

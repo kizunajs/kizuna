@@ -44,7 +44,10 @@ metadata: {
 `site` is the `Site` global, so editors rename the site without a deploy. A section with its own suffix branches on `page`:
 
 ```ts
-title: ({ title, site, page }) => (page === 'articlePage' ? `${title} | ${site.name} Blog` : `${title} | ${site.name}`),
+title: ({ title, site, page }) => {
+    if (page === 'articlePage') return `${title} | ${site.name} Blog`;
+    return `${title} | ${site.name}`;
+},
 ```
 
 The front page stands alone:

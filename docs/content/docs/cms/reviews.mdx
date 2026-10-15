@@ -1,78 +1,70 @@
 ---
 title: Reviews
-description: Who owns a page, asking someone to look before it goes live, and approving several pages at once.
+description: Who owns a page, and asking someone to look before it goes live.
 ---
-
-A second pair of eyes catches the typo in the headline and the price that changed last week. Reviews let an editor ask a colleague to look at a draft before it goes live, and let a team say who looks after which page.
 
 ## People
 
-The editor shows people by name and picture, so the CMS needs to know who they are. `people.list` returns everyone who edits, read from your own users:
+The editor shows people by name and picture. `people.list` reads them from your own users:
 
 ```ts title="kizuna.cms.config.ts"
-content: cms({
-    db,
-    pages,
-    auth: {
-        identity: 'editor',
-        people: {
-            list: async () => {
-                const editors = await db.select().from(users).where(inArray(users.role, ['editor', 'admin']));
-                return editors.map((editor) => ({
-                    id: editor.email,
-                    name: editor.name,
-                    image: editor.image ?? undefined,
-                    roles: [editor.role],
-                }));
-            },
-            imageOrigins: ['https://lh3.googleusercontent.com'],
+auth: {
+    identity: 'editor',
+    people: {
+        list: async () => {
+            const editors = await db
+                .select()
+                .from(users)
+                .where(inArray(users.role, ['editor', 'admin']));
+            return editors.map((editor) => ({
+                id: editor.email,
+                name: editor.name,
+                image: editor.image ?? undefined,
+                roles: [editor.role],
+            }));
         },
+        imageOrigins: ['https://lh3.googleusercontent.com'],
     },
-}),
+},
 ```
-
-A person's `id` is what a version names as its author, the same value `author` returns. `image` is a URL, and `imageOrigins` lists where those load from, so the editor may show them. A person without a picture shows their initials.
 
 ## Owners
 
-A page, global or collection item can have an owner: the person who looks after it. Nothing requires one. The editor shows the owner's picture beside the page name, and anyone who may edit the page can change it there, or ask the model:
+A page, global or item can have an owner. The editor shows them beside the page name, and the owner is suggested first for a review.
 
 > Make Kari the owner of the investor pages.
 
-When someone asks for a review, the owner is suggested first.
-
 ## Asking for a review
 
-The Publish dialog lists every change, and beside Publish it offers **Ask for review**. Pick one or more people, add a note if you want, and each of them sees the request:
+Beside Publish, the editor offers **Ask for review**:
 
-- in the editor, as "Waiting for Kari" on the page, with her picture;
-- in their chat, when they ask the model what is waiting for them;
-- wherever your app sends it, through `onReviewRequested`, for an email or a Slack message.
+<EditorFigure kind="ask" />
+
+The reviewer sees it in the editor, in their chat, and wherever you send it:
 
 ```ts title="kizuna.cms.config.ts"
 reviews: {
     onReviewRequested: async ({ documents, reviewers, requestedBy, note }) => {
         await sendEmail({
             to: reviewers.map((reviewer) => reviewer.email),
-            subject: `${requestedBy.name} asked you to review ${documents.map((document) => document.label).join(', ')}`,
+            subject: `${requestedBy.name} asked you to review ${documents.length} pages`,
             text: note ?? '',
         });
     },
 },
 ```
 
-A request covering several pages calls it once, with every page under `documents`.
+They approve or ask for changes:
 
-The reviewer's Publish button reads **Review** with the number waiting for them. It opens the same list of changes, and they approve or ask for changes with a note. An approval covers the draft as it was. A save after it shows the approval as outdated, so nobody publishes changes the reviewer never saw. Publishing closes the review, and the next round of changes starts without one.
+<EditorFigure kind="review" />
+
+An approval covers the draft as it was. A save after it marks the approval outdated.
 
 ## Requiring a review
 
-By default a review is a request, and anyone who may publish still can. Set `requireReview` on a page, global or collection, and publishing waits for an approval of the current draft from someone other than the person who changed it:
-
 ```ts title="src/app/investor-relations/content.ts"
-export const InvestorRelationsPage = definePage({
+export default definePage({
     name: 'investorRelationsPage',
-    label: 'Investor Relations',
     requireReview: true,
     fields: [
         // ...
@@ -80,12 +72,10 @@ export const InvestorRelationsPage = definePage({
 });
 ```
 
-A requested reviewer may approve. So may anyone with a role under `reviews.roles`, such as `admin`, who can approve any page without being asked. The rule holds in the routes, so a model asked to publish an unapproved page gets the same answer the editor does.
+Publishing waits for an approval from someone other than the person who changed it. Anyone with a role under `reviews.roles` may approve without being asked. The rule holds in the routes, so the model gets the same answer.
 
 ## Several pages at once
 
-Editing a site often touches several pages in one sitting. The Publish dialog covers every page with unpublished changes, each with a checkbox. Publish the ones you tick, or ask for a review of all of them in one request. A reviewer sees every page they were asked about and approves them together.
-
-The model can do the same:
+The Publish dialog lists every page with changes. Tick the ones to publish, or ask for one review of all of them.
 
 > Publish everything Kari approved today.
