@@ -80,15 +80,15 @@ Every article now has a search result: its title, its teaser and its cover. An e
 
 Each article starts with what the code gave it. An editor changes it for one article:
 
-|             | Starts as                                     | The editor can      |
-| ----------- | --------------------------------------------- | ------------------- |
-| Title       | The article's title, then "\| Acme Blog"      | Write another       |
-| Description | The article's teaser                          | Write another       |
-| Image       | The article's cover                           | Pick another        |
-| Site name   | After the title, unless it ends in it already | Switch it off       |
-| Index       | Yes                                           | Switch it off       |
-| Follow      | Yes                                           | Switch it off       |
-| Canonical   | The page's own address                        | Point it at another |
+|              | Starts as                                           | The editor can      |
+| ------------ | --------------------------------------------------- | ------------------- |
+| Title        | The article's title, then "\| Acme Blog"            | Write another       |
+| Description  | The article's teaser                                | Write another       |
+| Image        | The article's cover                                 | Pick another        |
+| Title suffix | "\| Acme Blog", unless the title ends in it already | Pick No suffix      |
+| Index        | Yes                                                 | Switch it off       |
+| Follow       | Yes                                                 | Switch it off       |
+| Canonical    | The page's own address                              | Point it at another |
 
 What it starts as shows as the placeholder, and clearing a field goes back to it. A page with Index off is left out of the sitemap too. Try it, open Tags to see what the page renders, then open Front Page, whose title is the site's name:
 

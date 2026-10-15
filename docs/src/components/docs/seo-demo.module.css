@@ -27,14 +27,6 @@
     outline-color: var(--k-ink);
 }
 
-.titleInput {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    gap: 5px;
-    min-width: 0;
-}
-
 .bare {
     flex: 1;
     min-width: 0;
@@ -48,11 +40,6 @@
 
 .bare::placeholder {
     color: var(--k-muted);
-}
-
-.titleInput .bare {
-    field-sizing: content;
-    flex: 0 1 auto;
 }
 
 .counter {
@@ -242,12 +229,6 @@
     color: var(--k-ink);
 }
 
-.suffix {
-    flex-shrink: 0;
-    white-space: nowrap;
-    color: var(--k-muted);
-}
-
 .switches {
     display: flex;
     flex-wrap: wrap;
@@ -262,6 +243,34 @@
     gap: 8px;
     font-size: 12.5px;
     color: var(--k-ink);
+}
+
+.titleField {
+    gap: 6px;
+    padding-right: 4px;
+}
+
+.titleField .bare {
+    field-sizing: content;
+    flex: 0 1 auto;
+}
+
+.titleField .inlineCounter {
+    margin-left: auto;
+}
+
+.suffix {
+    flex-shrink: 0;
+    white-space: nowrap;
+    color: var(--k-muted);
+}
+
+.inlineCounter {
+    flex-shrink: 0;
+    padding-right: 6px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--k-muted);
 }
 
 @container (max-width: 520px) {

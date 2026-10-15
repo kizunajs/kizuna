@@ -163,25 +163,40 @@ export function SeoDemo() {
                 </div>
 
                 <div className={demo.fields}>
-                    <label className={demo.row}>
+                    <div className={demo.row}>
                         <span className={demo.label}>Search title</span>
-                        <span className={styles.field}>
-                            <span className={styles.titleInput}>
-                                <input
-                                    className={styles.bare}
-                                    placeholder={page.generatedTitle}
-                                    value={values.title}
-                                    onChange={(event) =>
+                        <span className={clsx(styles.field, styles.titleField)}>
+                            <input
+                                className={styles.bare}
+                                aria-label="Search title"
+                                placeholder={page.generatedTitle}
+                                value={values.title}
+                                onChange={(event) =>
+                                    write({
+                                        title: event.target.value,
+                                    })
+                                }
+                            />
+                            {suffix === '' ? null : <span className={styles.suffix}>{suffix.trim()}</span>}
+                            <span className={clsx(styles.inlineCounter, title.length > 60 && styles.over)}>{title.length}/60</span>
+                        </span>
+                    </div>
+                    {repeats ? null : (
+                        <div className={demo.row}>
+                            <span className={demo.label}>Title suffix</span>
+                            <span className={styles.switches}>
+                                <Switch
+                                    label={SUFFIX.trim()}
+                                    checked={values.siteName}
+                                    onChange={(checked) =>
                                         write({
-                                            title: event.target.value,
+                                            siteName: checked,
                                         })
                                     }
                                 />
-                                {suffix === '' ? null : <span className={styles.suffix}>{suffix.trim()}</span>}
                             </span>
-                            <span className={clsx(styles.counter, title.length > 60 && styles.over)}>{title.length}/60</span>
-                        </span>
-                    </label>
+                        </div>
+                    )}
                     <label className={demo.row}>
                         <span className={demo.label}>Description</span>
                         <span className={styles.field}>
@@ -227,17 +242,8 @@ export function SeoDemo() {
                         </span>
                     </div>
                     <div className={demo.row}>
-                        <span />
+                        <span className={demo.label}>Robots</span>
                         <span className={styles.switches}>
-                            <Switch
-                                label="Site name"
-                                checked={values.siteName}
-                                onChange={(checked) =>
-                                    write({
-                                        siteName: checked,
-                                    })
-                                }
-                            />
                             <Switch
                                 label="Index"
                                 checked={values.indexed}
