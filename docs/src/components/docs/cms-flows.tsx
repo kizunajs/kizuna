@@ -24,7 +24,7 @@ const icons = {
 };
 
 const shared: Group = {
-    title: 'Shared by every site',
+    title: 'Shared',
     entries: [
         {
             label: 'Employees',
@@ -35,7 +35,7 @@ const shared: Group = {
             icon: 'collection',
         },
         {
-            label: 'Privacy policy',
+            label: 'Privacy Policy',
             icon: 'global',
         },
     ],
@@ -45,7 +45,7 @@ const uk: Group = {
     title: 'Example UK',
     entries: [
         {
-            label: 'Front page',
+            label: 'Front Page',
             icon: 'page',
         },
         {
@@ -63,7 +63,7 @@ const norway: Group = {
     title: 'Example Norge',
     entries: [
         {
-            label: 'Front page',
+            label: 'Front Page',
             icon: 'page',
         },
         {
@@ -84,7 +84,7 @@ export function Switcher({ as }: { as: 'admin' | 'country' }) {
             : [
                   {
                       ...shared,
-                      note: 'Draft, an admin publishes',
+                      note: 'You draft, an admin publishes',
                   },
                   uk,
               ];
@@ -100,7 +100,7 @@ export function Switcher({ as }: { as: 'admin' | 'country' }) {
                     <div className={styles.groupTitle}>
                         <span>{group.title}</span>
                         {group.note === undefined ? null : (
-                            <span className={styles.note}>
+                            <span className={clsx(styles.chip, styles.note)}>
                                 <Lock aria-hidden />
                                 {group.note}
                             </span>
@@ -122,8 +122,13 @@ export function Switcher({ as }: { as: 'admin' | 'country' }) {
     );
 }
 
-function Whose({ children }: { children: ReactNode }) {
-    return <span className={styles.whose}>{children}</span>;
+function Whose({ children, own = false }: { children: ReactNode; own?: boolean }) {
+    return (
+        <span className={clsx(styles.chip, styles.whose, own && styles.chipYou)}>
+            {own ? <FileText aria-hidden /> : <Globe aria-hidden />}
+            {children}
+        </span>
+    );
 }
 
 /**
@@ -137,7 +142,7 @@ export function Switchers() {
                 <Switcher as="admin" />
             </div>
             <div className={styles.column}>
-                <span className={styles.who}>Kari, editor of Example UK</span>
+                <span className={styles.who}>Sam, editor of Example UK</span>
                 <Switcher as="country" />
             </div>
         </div>
@@ -150,11 +155,19 @@ export function Switchers() {
  */
 export function SharedItem() {
     return (
-        <Shell title="Aberdeen office" status="Unpublished changes" saved>
-            <div className={styles.banner}>Shared by 4 sites. Your changes to shared fields are a draft until an admin publishes them.</div>
+        <Shell title="Harbour Office" status="Unpublished changes" saved>
+            <div className={styles.banner}>
+                <span className={styles.bannerLabel}>Shared by</span>
+                {['Example Group', 'Example UK', 'Example Norge', 'Example Danmark'].map((site) => (
+                    <span key={site} className={clsx(styles.chip, site === 'Example UK' && styles.chipYou)}>
+                        <Globe aria-hidden />
+                        {site}
+                    </span>
+                ))}
+            </div>
             <FormSection>
                 <Row label="Address">
-                    <TextInput value="12 Union Street, Aberdeen" />
+                    <TextInput value="12 Harbour Street" />
                     <Whose>Shared</Whose>
                 </Row>
                 <Row label="Phone">
@@ -163,11 +176,11 @@ export function SharedItem() {
                 </Row>
                 <Row label="Opening hours">
                     <TextInput value="Mon to Fri, 08:00 to 16:00" />
-                    <Whose>Example UK's own</Whose>
+                    <Whose own>Example UK's own</Whose>
                 </Row>
             </FormSection>
             <Footer>
-                <Help>Opening hours publish now. The phone number waits for a review.</Help>
+                <Help>Opening hours publish now. Phone waits for an admin.</Help>
                 <Button variant="primary">Ask for review</Button>
             </Footer>
         </Shell>
@@ -180,15 +193,50 @@ export function SharedItem() {
 export function SharedReview() {
     return (
         <Editor className={editor.dialog}>
-            <p className={editor.dialogTitle}>Publish Aberdeen office?</p>
-            <p className={styles.muted}>Kari from Example UK asked you to review this.</p>
+            <p className={editor.dialogTitle}>Publish Harbour Office?</p>
+            <p className={styles.muted}>Sam from Example UK asked you to review this.</p>
             <div className={styles.diff}>
                 <span className={styles.diffLabel}>Phone</span>
                 <span>
                     <del>+44 1224 000 000</del> <ins>+44 1224 000 111</ins>
                 </span>
             </div>
-            <p className={styles.reach}>Shows on 9 pages on 4 sites.</p>
+            <div className={styles.reachList}>
+                <span className={styles.bannerLabel}>Shows on</span>
+                {[
+                    {
+                        site: 'Example Group',
+                        pages: ['Contact', 'About Us'],
+                    },
+                    {
+                        site: 'Example UK',
+                        pages: ['Contact', 'Front Page', 'Events'],
+                    },
+                    {
+                        site: 'Example Norge',
+                        pages: ['Contact', 'Kontor'],
+                    },
+                    {
+                        site: 'Example Danmark',
+                        pages: ['Kontakt', 'Forside'],
+                    },
+                ].map((entry) => (
+                    <div key={entry.site} className={styles.reachRow}>
+                        <span className={styles.reachSite}>
+                            <Globe aria-hidden />
+                            {entry.site}
+                        </span>
+                        <span className={styles.reachPages}>
+                            {entry.pages.map((pageName) => (
+                                <span key={pageName} className={styles.chip}>
+                                    <FileText aria-hidden />
+                                    {pageName}
+                                </span>
+                            ))}
+                        </span>
+                    </div>
+                ))}
+            </div>
             <Footer>
                 <Button variant="secondary">Request changes</Button>
                 <Button variant="primary">Approve and publish</Button>
@@ -222,7 +270,7 @@ const refreshed = [
 export function FanOut() {
     return (
         <Editor className={editor.dialog}>
-            <p className={editor.dialogTitle}>Published Aberdeen office</p>
+            <p className={editor.dialogTitle}>Published Harbour Office</p>
             <div className={styles.sites}>
                 {refreshed.map((entry) => (
                     <div key={entry.site} className={clsx(styles.site, !entry.ok && styles.waiting)}>
@@ -242,28 +290,28 @@ export function FanOut() {
  */
 export function SearchResult() {
     return (
-        <Shell title="New office, same people" status="Unpublished changes">
+        <Shell title="New Office, Same People" status="Unpublished changes">
             <FormSection>
                 <Row label="Search title">
                     <div className={clsx(editor.input, editor.withCounter)}>
-                        <span className={styles.placeholderText}>New office, same people</span>
+                        <span className={styles.placeholderText}>New Office, Same People</span>
                         <span className={editor.counter}>34/60</span>
                     </div>
                     <Help>From the title. The site adds "| Acme Blog". Type to write your own.</Help>
                 </Row>
                 <Row label="Description">
                     <TextInput
-                        value="We have moved to 12 Union Street. Same team, same phone number, a better view."
+                        value="We have moved to 12 Harbour Street. Same team, same phone number, a better view."
                         max={160}
                         mark="changed"
                     />
-                    <Help>Written by Kari. Clear it to use the summary again.</Help>
+                    <Help>Written by Sam. Clear it to use the summary again.</Help>
                 </Row>
             </FormSection>
             <div className={styles.result}>
                 <span className={styles.muted}>example.com › blog › new-office</span>
-                <span className={styles.resultTitle}>New office, same people | Acme Blog</span>
-                <span className={styles.muted}>We have moved to 12 Union Street. Same team, same phone number, a better view.</span>
+                <span className={styles.resultTitle}>New Office, Same People | Acme Blog</span>
+                <span className={styles.muted}>We have moved to 12 Harbour Street. Same team, same phone number, a better view.</span>
             </div>
         </Shell>
     );

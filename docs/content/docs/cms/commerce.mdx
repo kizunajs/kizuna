@@ -43,7 +43,7 @@ export const Products = defineCollection({
             schema: z.object({
                 weightKg: z.number().min(0),
                 volumeLitres: z.number().min(0),
-                hsCode: z.string().max(10),
+                material: z.string().max(60),
             }),
         },
         {
@@ -112,7 +112,7 @@ export const medusaPlugin = definePlugin({
                         handle: product.slug,
                         external_id: product.id,
                         weight: product.specs.weightKg * 1000,
-                        hs_code: product.specs.hsCode,
+                        material: product.specs.material,
                         images: product.gallery.map((image) => ({
                             url: image.url,
                         })),

@@ -39,7 +39,7 @@ function SearchResult() {
             </div>
             <p className={styles.title}>New office, same people | Acme</p>
             <p className={styles.description}>
-                We have moved to 12 Union Street. The team, the phone number and the coffee are the same, and the view is better.
+                We have moved to 12 Harbour Street. The team, the phone number and the coffee are the same, and the view is better.
             </p>
             <div className={styles.meters}>
                 <span>
