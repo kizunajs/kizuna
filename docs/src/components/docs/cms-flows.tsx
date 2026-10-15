@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import { Check, Clock, FileText, Globe, Library, List, Lock, Pin, Search } from 'lucide-react';
+import { Check, Clock, FileText, Globe, Library, Lock, Search } from 'lucide-react';
 import { Button, Editor, Footer, FormSection, Help, Row, Shell, TextInput } from '@/components/landing-page/cms/cms-editor-mock';
 import editor from '@/components/landing-page/cms/cms-editor.module.css';
 import styles from './cms-flows.module.css';
@@ -24,19 +24,15 @@ const icons = {
 };
 
 const shared: Group = {
-    title: 'Shared',
+    title: 'Group',
     entries: [
-        {
-            label: 'Employees',
-            icon: 'collection',
-        },
-        {
-            label: 'Offices',
-            icon: 'collection',
-        },
         {
             label: 'Privacy Policy',
             icon: 'global',
+        },
+        {
+            label: 'Products',
+            icon: 'collection',
         },
     ],
 };
@@ -49,12 +45,12 @@ const uk: Group = {
             icon: 'page',
         },
         {
-            label: 'Events',
+            label: 'Offices',
             icon: 'collection',
         },
         {
-            label: 'Contact',
-            icon: 'page',
+            label: 'Events',
+            icon: 'collection',
         },
     ],
 };
@@ -117,7 +113,7 @@ export function Switcher({ as }: { as: 'admin' | 'country' }) {
                     })}
                 </div>
             ))}
-            {as === 'country' ? <p className={styles.footnote}>Norway, Denmark and the other sites are not listed.</p> : null}
+            {as === 'country' ? <p className={styles.footnote}>Norway and the other sites are not listed.</p> : null}
         </Editor>
     );
 }
@@ -141,42 +137,62 @@ export function Switchers() {
 }
 
 /**
- * A country's editor on a shared office: the shared fields are a draft for
- * an admin, the site's own fields they publish.
+ * The UK's own office: the UK's editor writes and publishes it.
  */
-export function SharedItem() {
+export function OwnItem() {
     return (
         <Shell title="Harbour Office" status="Unpublished changes" saved>
-            <div className={styles.part}>
-                <div className={styles.partTitle}>
-                    <span>Shared with every site</span>
-                    <span className={styles.partNote}>
-                        <Lock aria-hidden />
-                        You draft, an admin publishes
-                    </span>
-                </div>
-                <FormSection>
-                    <Row label="Address">
-                        <TextInput value="12 Harbour Street" />
-                    </Row>
-                    <Row label="Phone">
-                        <TextInput value="+44 20 0000 0111" mark="changed" />
-                    </Row>
-                </FormSection>
+            <div className={styles.banner}>
+                <span className={styles.bannerLabel}>Owned by</span>
+                <span className={styles.chip}>
+                    <Globe aria-hidden />
+                    United Kingdom
+                </span>
             </div>
-            <div className={styles.part}>
-                <div className={styles.partTitle}>
-                    <span>United Kingdom only</span>
-                    <span className={styles.partNote}>You publish</span>
-                </div>
-                <FormSection>
-                    <Row label="Opening hours">
-                        <TextInput value="Mon to Fri, 08:00 to 16:00" />
-                    </Row>
-                </FormSection>
-            </div>
+            <FormSection>
+                <Row label="Address">
+                    <TextInput value="12 Harbour Street" />
+                </Row>
+                <Row label="Phone">
+                    <TextInput value="+44 20 0000 0111" mark="changed" />
+                </Row>
+                <Row label="Opening hours">
+                    <TextInput value="Mon to Fri, 08:00 to 16:00" />
+                </Row>
+            </FormSection>
             <Footer>
-                <Button variant="secondary">Publish United Kingdom changes</Button>
+                <span />
+                <Button variant="primary">Publish</Button>
+            </Footer>
+        </Shell>
+    );
+}
+
+/**
+ * The group's Privacy Policy, as the UK's editor sees it: they draft, an
+ * admin publishes.
+ */
+export function GroupItem() {
+    return (
+        <Shell title="Privacy Policy" status="Unpublished changes" saved>
+            <div className={styles.banner}>
+                <span className={styles.bannerLabel}>Owned by</span>
+                <span className={styles.chip}>
+                    <Globe aria-hidden />
+                    Group
+                </span>
+                <span className={styles.partNote}>
+                    <Lock aria-hidden />
+                    You draft, an admin publishes
+                </span>
+            </div>
+            <FormSection>
+                <Row label="Contact email">
+                    <TextInput value="privacy@acme.com" mark="changed" />
+                </Row>
+            </FormSection>
+            <Footer>
+                <span />
                 <Button variant="primary">Ask for review</Button>
             </Footer>
         </Shell>
@@ -189,12 +205,12 @@ export function SharedItem() {
 export function SharedReview() {
     return (
         <Editor className={editor.dialog}>
-            <p className={editor.dialogTitle}>Publish Harbour Office?</p>
+            <p className={editor.dialogTitle}>Publish Privacy Policy?</p>
             <p className={styles.muted}>Sam, the UK's editor, asked you to review this.</p>
             <div className={styles.diff}>
-                <span className={styles.diffLabel}>Phone</span>
+                <span className={styles.diffLabel}>Contact email</span>
                 <span>
-                    <del>+44 20 0000 0000</del> <ins>+44 20 0000 0111</ins>
+                    <del>legal@acme.com</del> <ins>privacy@acme.com</ins>
                 </span>
             </div>
             <div className={styles.reachList}>
@@ -202,18 +218,15 @@ export function SharedReview() {
                 {[
                     {
                         site: 'Group',
-                        holds: [],
-                        lists: ['Contact'],
+                        pages: ['Privacy'],
                     },
                     {
                         site: 'United Kingdom',
-                        holds: ['Open House, 12 March'],
-                        lists: ['Contact'],
+                        pages: ['Privacy'],
                     },
                     {
                         site: 'Norway',
-                        holds: [],
-                        lists: ['Kontakt'],
+                        pages: ['Personvern'],
                     },
                 ].map((entry) => (
                     <div key={entry.site} className={styles.reachRow}>
@@ -222,31 +235,15 @@ export function SharedReview() {
                             {entry.site}
                         </span>
                         <span className={styles.reachPages}>
-                            {entry.holds.map((pageName) => (
-                                <span key={pageName} className={clsx(styles.chip, styles.chipYou)}>
-                                    <Pin aria-hidden />
-                                    {pageName}
-                                </span>
-                            ))}
-                            {entry.lists.map((pageName) => (
+                            {entry.pages.map((pageName) => (
                                 <span key={pageName} className={styles.chip}>
-                                    <List aria-hidden />
+                                    <FileText aria-hidden />
                                     {pageName}
                                 </span>
                             ))}
                         </span>
                     </div>
                 ))}
-                <span className={styles.legend}>
-                    <span>
-                        <Pin aria-hidden />
-                        Holds this office
-                    </span>
-                    <span>
-                        <List aria-hidden />
-                        Lists offices
-                    </span>
-                </span>
             </div>
             <Footer>
                 <Button variant="secondary">Request changes</Button>
@@ -277,7 +274,7 @@ const refreshed = [
 export function FanOut() {
     return (
         <Editor className={editor.dialog}>
-            <p className={editor.dialogTitle}>Published Harbour Office</p>
+            <p className={editor.dialogTitle}>Published Privacy Policy</p>
             <div className={styles.sites}>
                 {refreshed.map((entry) => (
                     <div key={entry.site} className={clsx(styles.site, !entry.ok && styles.waiting)}>

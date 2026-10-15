@@ -18,7 +18,7 @@ export function CmsOnPage() {
                         <Preview />
                     </div>
                     <div className={panel.body}>
-                        <Link href="/docs/cms/editing#the-editor" className={panel.title}>
+                        <Link href="/docs/cms/editing" className={panel.title}>
                             Click to edit
                             <ArrowRight className={panel.arrow} aria-hidden />
                         </Link>
@@ -33,7 +33,7 @@ export function CmsOnPage() {
                         <Publish />
                     </div>
                     <div className={panel.body}>
-                        <Link href="/docs/cms/reviews" className={panel.title}>
+                        <Link href="/docs/cms/editing/reviews" className={panel.title}>
                             Review before it goes live
                             <ArrowRight className={panel.arrow} aria-hidden />
                         </Link>

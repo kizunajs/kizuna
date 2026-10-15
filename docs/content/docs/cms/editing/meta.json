@@ -1,0 +1,5 @@
+{
+    "title": "Editing",
+    "defaultOpen": true,
+    "pages": ["index", "permissions", "reviews", "drafts", "the-form", "agents"]
+}

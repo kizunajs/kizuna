@@ -1,0 +1,19 @@
+---
+title: The form
+description: 'The input each Zod schema becomes in the editor.'
+---
+
+| Schema                  | Input                                                                 |
+| ----------------------- | --------------------------------------------------------------------- |
+| `z.string()`            | Text, or a textarea above 120 characters, with a counter for `.max()` |
+| `z.number()`, `z.int()` | Number, within `min` and `max`                                        |
+| `z.boolean()`           | Toggle                                                                |
+| `z.enum()`              | Select, with the field's `options` as labels                          |
+| `z.url()`               | URL, saying which protocols are allowed                               |
+| `z.iso.date()`          | Date picker                                                           |
+| `z.object()`            | Grouped fields                                                        |
+| `z.array()`             | Sortable list, within `min` and `max`                                 |
+| `ImageSchema`           | The media library, with crop, focal point and alt text                |
+| `RichTextSchema`        | Rich text with headings, quotes, lists, marks, links and images       |
+| A relationship's id     | A picker over the relationship's `options`                            |
+| Anything else           | Read only, with a note to ask the model                               |

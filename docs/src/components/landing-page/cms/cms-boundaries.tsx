@@ -50,7 +50,7 @@ const columns: Column[] = [
 export function CmsBoundaries() {
     return (
         <Section
-            aside={<DocsLink href="/docs/cms/editing#what-holds" />}
+            aside={<DocsLink href="/docs/cms/editing/agents#what-holds" />}
             title="Your rules, everywhere"
             description="Editors change the fields you declare, and the model asks before anything goes live.">
             <div className={styles.columns}>

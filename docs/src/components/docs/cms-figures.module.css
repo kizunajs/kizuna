@@ -7,3 +7,10 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
 }
+
+:global(.kizuna-docs-content [role='tabpanel']) > .figure {
+    margin: 4px 0 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+}

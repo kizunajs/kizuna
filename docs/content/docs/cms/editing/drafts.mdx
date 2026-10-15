@@ -1,0 +1,9 @@
+---
+title: Drafts and versions
+description: 'How drafts are saved, versioned, protected from overwriting, and rolled back.'
+---
+
+- Every save is a version with its author.
+- A draft that fails its schema is kept, but never reaches the page. The editor shows what is missing.
+- Two people cannot overwrite each other: a write behind the latest version answers `409`.
+- Rollback restores an earlier version as a new draft, which you publish separately.

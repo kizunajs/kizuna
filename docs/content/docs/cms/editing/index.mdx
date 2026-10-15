@@ -1,0 +1,42 @@
+---
+title: The editor
+description: 'Editors change content in their chat, or by clicking the page. Nothing goes live until someone publishes.'
+---
+
+Every change is a draft until a person publishes it. Editors work in two places, and both save to the same draft.
+
+<Tabs items={['In the chat', 'On the page', 'Publishing']}>
+
+<Tab value="In the chat">
+
+Add the CMS's MCP endpoint to Claude, or any host with [MCP Apps](/docs/mcp#showing-a-view), signed in as an editor, and ask:
+
+> Shorten the hero title on the front page and make it friendlier.
+
+<EditorFigure kind="chat" />
+
+The editor opens beside the answer, filling in as the model writes. What you type saves a moment after you stop, and the model sees it.
+
+</Tab>
+
+<Tab value="On the page">
+
+Expand the editor and the site's draft shows beside the form. Click any text or image, and the form jumps to that field.
+
+<EditorFigure kind="preview" />
+
+Browse uses the page as a visitor does, and the form follows each link.
+
+</Tab>
+
+<Tab value="Publishing">
+
+Publish lists every change and asks you to confirm. Asking the model to publish asks in the host, like any tool that [needs approval](/docs/mcp#asking-before-it-runs).
+
+<EditorFigure kind="publish" />
+
+</Tab>
+
+</Tabs>
+
+Next: [who can do what](/docs/cms/editing/permissions), and [reviews](/docs/cms/editing/reviews) when someone should look first.

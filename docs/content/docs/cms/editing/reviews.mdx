@@ -1,7 +1,51 @@
 ---
 title: Reviews
-description: 'Who owns a page, and asking someone to look before it goes live.'
+description: 'Asking someone to look before a change goes live, approving it, and requiring it.'
 ---
+
+<Tabs items={['Asking', 'Reviewing']}>
+
+<Tab value="Asking">
+
+Beside Publish, the editor offers **Ask for review**. Pick one or more people, add a note:
+
+<EditorFigure kind="ask" />
+
+The reviewer sees it in the editor, in their chat, and wherever you send it with `onReviewRequested`.
+
+</Tab>
+
+<Tab value="Reviewing">
+
+The reviewer sees every change, approves, or asks for changes with a note:
+
+<EditorFigure kind="review" />
+
+An approval covers the draft as it was. A save after it marks the approval outdated.
+
+</Tab>
+
+</Tabs>
+
+## Requiring a review
+
+```ts title="src/app/investor-relations/content.ts"
+export default definePage({
+    name: 'investorRelationsPage',
+    requireReview: true,
+    fields: [
+        // ...
+    ],
+});
+```
+
+Publishing waits for an approval from someone other than the person who changed it. Anyone with a role under `reviews.roles` may approve without being asked. The rule holds in the routes, so the model gets the same answer.
+
+## Several pages at once
+
+The Publish dialog lists every page with changes. Tick the ones to publish, or ask for one review of all of them.
+
+> Publish everything Kari approved today.
 
 ## People
 
@@ -34,13 +78,7 @@ A page, global or item can have an owner. The editor shows them beside the page 
 
 > Make Kari the owner of the investor pages.
 
-## Asking for a review
-
-Beside Publish, the editor offers **Ask for review**:
-
-<EditorFigure kind="ask" />
-
-The reviewer sees it in the editor, in their chat, and wherever you send it:
+## Sending the request
 
 ```ts title="kizuna.cms.config.ts"
 reviews: {
@@ -53,31 +91,3 @@ reviews: {
     },
 },
 ```
-
-Every function the CMS calls gets `plugins` and `jobs`, like a route handler, so [Resend](/docs/resend) sends it.
-
-They approve or ask for changes:
-
-<EditorFigure kind="review" />
-
-An approval covers the draft as it was. A save after it marks the approval outdated.
-
-## Requiring a review
-
-```ts title="src/app/investor-relations/content.ts"
-export default definePage({
-    name: 'investorRelationsPage',
-    requireReview: true,
-    fields: [
-        // ...
-    ],
-});
-```
-
-Publishing waits for an approval from someone other than the person who changed it. Anyone with a role under `reviews.roles` may approve without being asked. The rule holds in the routes, so the model gets the same answer.
-
-## Several pages at once
-
-The Publish dialog lists every page with changes. Tick the ones to publish, or ask for one review of all of them.
-
-> Publish everything Kari approved today.

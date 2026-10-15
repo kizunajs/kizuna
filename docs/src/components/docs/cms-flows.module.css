@@ -3,6 +3,9 @@
     flex: 1;
     flex-direction: column;
     gap: 14px;
+    border-radius: 14px;
+    background: var(--k-popup);
+    box-shadow: var(--k-popup-shadow);
     padding: 14px;
 }
 

@@ -2,7 +2,7 @@ import { Chat } from '@/components/landing-page/cms/cms-chat';
 import { FrontPageEditor } from '@/components/landing-page/cms/cms-editor-mock';
 import { Preview, Publish } from '@/components/landing-page/cms/cms-on-page';
 import { Ask, Review } from '@/components/landing-page/cms/cms-reviews';
-import { FanOut, SearchResult, SharedItem, SharedReview, Switcher, Switchers } from './cms-flows';
+import { FanOut, GroupItem, OwnItem, SearchResult, SharedReview, Switcher, Switchers } from './cms-flows';
 import panel from '@/components/landing-page/panel.module.css';
 import styles from './cms-figures.module.css';
 
@@ -15,7 +15,8 @@ type Kind =
     | 'switchers'
     | 'switcher-admin'
     | 'switcher-country'
-    | 'shared-item'
+    | 'own-item'
+    | 'group-item'
     | 'shared-review'
     | 'fan-out'
     | 'search-result';
@@ -46,8 +47,10 @@ export function EditorFigure({ kind }: { kind: Kind }) {
                 <Switcher as="admin" />
             ) : kind === 'switcher-country' ? (
                 <Switcher as="country" />
-            ) : kind === 'shared-item' ? (
-                <SharedItem />
+            ) : kind === 'own-item' ? (
+                <OwnItem />
+            ) : kind === 'group-item' ? (
+                <GroupItem />
             ) : kind === 'shared-review' ? (
                 <SharedReview />
             ) : kind === 'fan-out' ? (

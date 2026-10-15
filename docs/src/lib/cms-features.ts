@@ -60,7 +60,7 @@ export const cmsFeatures: Feature[] = [
     {
         icons: [UserCheck],
         title: 'Reviews',
-        href: '/docs/cms/reviews',
+        href: '/docs/cms/editing/reviews',
         description: 'Ask a colleague to look before a page goes live, and name who owns each page.',
     },
     {

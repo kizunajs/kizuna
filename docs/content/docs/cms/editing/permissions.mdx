@@ -1,0 +1,79 @@
+---
+title: Who can do what
+description: 'What an editor sees and may change depends on their role and, with several sites, on where they belong.'
+---
+
+## On one site
+
+Every editor sees everything. A field's `auth` says who may change it, and `requireReview` says who must look before it goes live.
+
+| Role     | Writes                     | Publishes                     |
+| -------- | -------------------------- | ----------------------------- |
+| `editor` | Every field without `auth` | Pages without `requireReview` |
+| `admin`  | Every field                | Everything                    |
+
+A field an editor may not change shows greyed out, and the model gets the same answer: `403`.
+
+## With several sites
+
+Pick who is looking:
+
+<Tabs items={['The group\'s admin', 'A country\'s editor']}>
+
+<Tab value="The group's admin">
+
+Every site, and the group's own content. They write and publish all of it.
+
+<EditorFigure kind="switcher-admin" />
+
+</Tab>
+
+<Tab value="A country's editor">
+
+Their own site, and the group's content. Their site's content they publish. The group's they draft, and an admin publishes.
+
+<EditorFigure kind="switcher-country" />
+
+</Tab>
+
+</Tabs>
+
+| Editor             | The group's content         | Their site        | Other sites       |
+| ------------------ | --------------------------- | ----------------- | ----------------- |
+| `admin` on `cms()` | Write and publish           | Write and publish | Write and publish |
+| `admin` on a site  | Draft, and ask for a review | Write and publish | Not shown         |
+| `editor` on a site | Draft, and ask for a review | Write             | Not shown         |
+
+Roles come from your identity. [Sites](/docs/cms/sites#editors) shows the config.
+
+## A change, start to finish
+
+Sam is the UK's editor. Pick what Sam changes:
+
+<Tabs items={['The UK\'s office', 'The group\'s Privacy Policy']}>
+
+<Tab value="The UK's office">
+
+The office is the UK's, so Sam publishes it. Only the UK site refreshes.
+
+<EditorFigure kind="own-item" />
+
+</Tab>
+
+<Tab value="The group's Privacy Policy">
+
+The policy is the group's, so Sam's change is a draft and Sam asks for a review.
+
+<EditorFigure kind="group-item" />
+
+The group's admin sees the change and every page it shows on, and approves:
+
+<EditorFigure kind="shared-review" />
+
+Every site that shows it refreshes. One that does not answer is retried:
+
+<EditorFigure kind="fan-out" />
+
+</Tab>
+
+</Tabs>
