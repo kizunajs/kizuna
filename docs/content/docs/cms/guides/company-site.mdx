@@ -301,7 +301,7 @@ submitContact: k
     }),
 ```
 
-The page shows the words and the form. The form calls the route through the generated client:
+The page shows the words and the form. A server action calls the route:
 
 ```tsx title="src/app/contact/page.tsx"
 export default async function ContactPage() {
@@ -311,42 +311,32 @@ export default async function ContactPage() {
         <main>
             <h1>{content.heading}</h1>
             <p>{content.intro}</p>
-            <ContactForm />
+            <form action={sendMessage}>
+                <input name="name" required maxLength={80} />
+                <input name="email" type="email" required />
+                <textarea name="message" required maxLength={2000} />
+                <button type="submit">Send</button>
+            </form>
         </main>
     );
 }
 ```
 
-```tsx title="src/app/contact/contact-form.tsx"
-'use client';
+```ts title="src/app/contact/actions.ts"
+'use server';
 
-import { useState } from 'react';
+import { redirect } from 'next/navigation';
 import { apiClient } from '../../lib/api-client';
 
-export function ContactForm() {
-    const [sent, setSent] = useState(false);
-
-    async function submit(formData: FormData) {
-        const result = await apiClient.contact.submitContact({
-            body: {
-                name: String(formData.get('name')),
-                email: String(formData.get('email')),
-                message: String(formData.get('message')),
-            },
-        });
-        setSent(result.status === 204);
-    }
-
-    if (sent) return <p>Thanks, we will be in touch.</p>;
-
-    return (
-        <form action={submit}>
-            <input name="name" required maxLength={80} />
-            <input name="email" type="email" required />
-            <textarea name="message" required maxLength={2000} />
-            <button type="submit">Send</button>
-        </form>
-    );
+export async function sendMessage(formData: FormData) {
+    await apiClient.contact.submitContact({
+        body: {
+            name: String(formData.get('name')),
+            email: String(formData.get('email')),
+            message: String(formData.get('message')),
+        },
+    });
+    redirect('/contact/thanks');
 }
 ```
 
