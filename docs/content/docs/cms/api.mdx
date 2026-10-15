@@ -75,6 +75,47 @@ plugins: [
 
 A client without `groups` holds every route, which is what an app that edits content needs.
 
+## Publishing a client
+
+Another repository reads content through a client it installs, like the UK's booking app built by another team. Generate one for the site it serves: the UK's routes and the group's, and nothing of the other sites or the editing routes:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+clients: [
+    fetchClient({
+        output: './packages/uk-content/src/index.ts',
+        groups: ['content.sites.uk', 'content.globals', 'content.collections', 'content.media'],
+    }),
+],
+```
+
+The output is a package of its own, with a name and a version, published wherever your packages go, like npm or GitHub Packages:
+
+```json title="packages/uk-content/package.json"
+{
+    "name": "@acme/uk-content",
+    "version": "1.4.0",
+    "type": "module",
+    "exports": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "files": ["dist"],
+    "scripts": {
+        "build": "tsc"
+    }
+}
+```
+
+The generated file imports nothing, so the package has no dependencies. The site installs the version it wants and calls the group's API:
+
+```ts title="booking-app/src/lib/content.ts"
+import { createClient } from '@acme/uk-content';
+
+export const content = createClient({
+    baseUrl: 'https://example.com/api',
+});
+```
+
+The branded ids come with it, so an `OfficeId` is the same type in the client as in the CMS. A [site in another repository](/docs/cms/sites#a-site-in-another-repository) holds no pages here, so its client names the group's groups alone: `content.globals`, `content.collections` and `content.media`. Gate the group's releases with [`kizuna diff`](/docs/breaking-changes): a field removed or a type narrowed fails the pull request before a published client can break a site that installed it.
+
 ## What stays apart
 
 - **Identities.** `editor` lives on the CMS config, so an app route that names it fails to compile. When a [relationship's](/docs/cms/content#relationships) `options` calls a route that is not public, the editor also needs an identity on the app API, since `options` runs as them.

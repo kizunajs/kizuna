@@ -1,16 +1,18 @@
 ---
 title: Several sites
-description: One CMS for a group and its sites. The group's content is written once and every site reads it, and each site keeps content of its own.
+description: One CMS for a group and its sites. The group's content is written once and every site reads it, each site keeps and adds content of its own, and one publish refreshes every site that shows it.
 ---
 
-A group runs several sites: its own, and one for each country it works in. Some content belongs to the group, like the people, the offices and the privacy policy, and every site shows it. Some belongs to one site, like Norway's news. One CMS holds both, and every piece of content has one owner:
+A group runs several sites: its own, and one for each country it works in. Some content belongs to the group, like the people, the offices and the privacy policy, and every site shows it. Some belongs to one site, like the UK's news. One CMS holds both, and every piece of content has one owner:
 
 - **A page belongs to its site.** It is declared beside its route, in the site's app.
 - **A global or a collection belongs to the group or to one site.** Listed on `cms()`, it is the group's. Listed under a site, it is that site's.
 
+The path that reads it says who owns it, in process and over HTTP alike.
+
 ## Declaring the sites
 
-Each site is a Next.js app with its own pages. List each under `sites`, with its generated pages module and its `app` directory:
+Each site is a Next.js app with its own pages. List each under `sites`, with its generated pages module, its `app` directory, and the `url` its API is mounted at:
 
 ```ts title="packages/content/kizuna.cms.config.ts"
 content: cms({
@@ -19,14 +21,17 @@ content: cms({
         group: {
             pages: groupPages,
             app: '../../apps/group/src/app',
+            url: 'https://example.com/api',
+        },
+        uk: {
+            pages: ukPages,
+            app: '../../apps/uk/src/app',
+            url: 'https://example.co.uk/api',
         },
         norway: {
             pages: norwayPages,
             app: '../../apps/norway/src/app',
-        },
-        sweden: {
-            pages: swedenPages,
-            app: '../../apps/sweden/src/app',
+            url: 'https://example.no/api',
         },
     },
     auth: {
@@ -35,13 +40,13 @@ content: cms({
 }),
 ```
 
-Each site's pages are stored apart, so every app can have a `frontPage`. An app reads its own pages under its site:
+Every site's app mounts the same config, so each serves its own draft mode and hears when content changes. Each site's pages are stored apart, so every app can have a `frontPage`, read under its site:
 
-```tsx title="apps/norway/src/app/page.tsx"
-const content = await kizuna.content.sites.norway.pages.frontPage.get();
+```tsx title="apps/uk/src/app/page.tsx"
+const content = await kizuna.content.sites.uk.pages.frontPage.get();
 ```
 
-and `<KizunaPreview content={kizuna.content.sites.norway} />` knows which site it is on.
+`<KizunaPreview content={kizuna.content.sites.uk} />` knows which site it is on.
 
 ## The group's content
 
@@ -59,11 +64,11 @@ content: cms({
 }),
 ```
 
-```tsx title="apps/sweden/src/app/contact/page.tsx"
+```tsx title="apps/norway/src/app/contact/page.tsx"
 const { items } = await kizuna.content.collections.offices.list();
 ```
 
-Norway and Sweden list the same offices. An editor who moves an office edits it once, and both sites show the change when it publishes.
+The UK and Norway list the same offices. An editor who moves an office edits it once, and every site shows the change when it publishes.
 
 ## A site's own content
 
@@ -71,15 +76,17 @@ Globals and collections listed under a site belong to that site:
 
 ```ts title="packages/content/kizuna.cms.config.ts"
 sites: {
-    norway: {
-        pages: norwayPages,
-        app: '../../apps/norway/src/app',
+    uk: {
+        pages: ukPages,
+        app: '../../apps/uk/src/app',
+        url: 'https://example.co.uk/api',
         globals: [Announcement],
         collections: [Articles, Events],
     },
-    sweden: {
-        pages: swedenPages,
-        app: '../../apps/sweden/src/app',
+    norway: {
+        pages: norwayPages,
+        app: '../../apps/norway/src/app',
+        url: 'https://example.no/api',
         collections: [Articles],
     },
 },
@@ -87,15 +94,15 @@ sites: {
 
 They are read under the site, the way its pages are:
 
-```tsx title="apps/norway/src/app/events/page.tsx"
-const { items } = await kizuna.content.sites.norway.collections.events.list();
+```tsx title="apps/uk/src/app/events/page.tsx"
+const { items } = await kizuna.content.sites.uk.collections.events.list();
 ```
 
-Sweden declares no events, so `kizuna.content.sites.sweden.collections.events` fails to compile. Both declare `Articles`, so they share its fields and its `ArticleId`, and each keeps its own items. Norway's blog lists Norway's articles.
+Norway declares no events, so `kizuna.content.sites.norway.collections.events` fails to compile. Both declare `Articles`, so they share its fields and its `ArticleId`, and each keeps its own items. The UK blog lists the UK's articles.
 
 ## Pointing at the group's content
 
-A site's content holds the group's ids, the way a page holds any collection's. An event names the employee to contact:
+A site's content holds the group's ids, the way a page holds any collection's. A UK event names the office it is held at:
 
 ```ts title="packages/content/events.ts"
 export const Events = defineCollection({
@@ -107,27 +114,127 @@ export const Events = defineCollection({
             schema: z.string().min(1).max(80),
         },
         {
-            name: 'contactPerson',
-            label: 'Contact person',
-            schema: Employees.id,
+            name: 'office',
+            schema: Offices.id,
         },
     ],
 });
 ```
 
-The editor's picker lists the group's employees, and the page reads the one the event holds:
+The editor's picker lists the group's offices, and the page reads the one the event holds:
 
-```tsx title="apps/norway/src/app/events/[id]/page.tsx"
+```tsx title="apps/uk/src/app/events/[id]/page.tsx"
 const { id } = await params;
-const event = await kizuna.content.sites.norway.collections.events.get({
+const event = await kizuna.content.sites.uk.collections.events.get({
     id,
 });
-const contactPerson = await kizuna.content.collections.employees.get({
-    id: event.contactPerson,
+const office = await kizuna.content.collections.offices.get({
+    id: event.office,
 });
 ```
 
 The group's content shows on every site, so it never holds a site's ids. A group collection with an `Events.id` field fails when the config assembles.
+
+## Building on the group's content
+
+The UK shows the group's offices with opening hours the group does not keep, and a local phone number in place of the group's switchboard. `extendCollection` adds a site's own fields to every item of a group collection:
+
+```ts title="packages/content/uk.ts"
+import { z } from 'zod';
+import { extendCollection } from '@kizunajs/cms';
+import { Offices } from './group';
+
+export const UkOffices = extendCollection(Offices, {
+    overrides: ['phone'],
+    fields: [
+        {
+            name: 'openingHours',
+            label: 'Opening hours',
+            schema: z.string().max(120),
+        },
+    ],
+});
+```
+
+List it under the site, and the site reads the group's offices with its own fields beside them:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+uk: {
+    pages: ukPages,
+    app: '../../apps/uk/src/app',
+    url: 'https://example.co.uk/api',
+    collections: [UkOffices, Events],
+},
+```
+
+```tsx title="apps/uk/src/app/contact/page.tsx"
+const { items } = await kizuna.content.sites.uk.collections.offices.list();
+```
+
+Each item has the group's `address` and the UK's `openingHours`. The UK's fields are stored as the UK's own, keyed by the group office's id, so there is no UK office without a group one. `overrides` names the group fields the UK may replace: an empty `phone` shows the group's, and a filled one shows on the UK site alone. `extendGlobal` does the same for a global, like the group's footer with the UK's own phone number.
+
+`kizuna.content.collections.offices` still reads the offices as the group keeps them.
+
+## Editors
+
+Editors work in one editor for the whole group. The switcher lists the group's content first, then each site an editor may change. The agent addresses content by its owner, so "add an event to the UK site" reaches the UK's `events`, and "the Aberdeen office moved" reaches the group's `offices`.
+
+`sites` names the sites an editor writes, read from the identity they sign in with, and `shared` says who publishes the group's content:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+auth: {
+    identity: 'editor',
+    sites: (editor) => editor.sites,
+    shared: {
+        publish: {
+            roles: 'group',
+        },
+    },
+},
+```
+
+| Editor                | The group's content         | Their own sites   | Other sites       |
+| --------------------- | --------------------------- | ----------------- | ----------------- |
+| With the role `group` | Write and publish           | Write and publish | Write and publish |
+| Everyone else         | Draft, and ask for a review | Write and publish | Read              |
+
+A country editor whose office phone changed drafts the change to the group's office, and the agent asks the office's [owner](/docs/cms/reviews#owners) to review it. Group marketing approves, and every site shows it. A site's own fields on an extended item are the site's, so a UK editor publishes the opening hours without asking anyone.
+
+Before a group record publishes, the editor shows where it appears, like "9 pages on 4 sites", so whoever approves sees what the change reaches.
+
+## Keeping every site fresh
+
+Each site is a deployment with a cache of its own. Publishing queues a [job](/docs/jobs) for every site that shows the content, which calls the site's `invalidate` route with the brand and id that changed:
+
+```json
+{
+    "brand": "OfficeId",
+    "id": "off_aberdeen"
+}
+```
+
+The site refreshes every page that holds the id, from the index the CMS keeps as it saves, and every page that lists the collection, since a new office is held by no page yet. A call that fails is retried by your jobs transport, and the editor shows the result after publishing: "Refreshed 3 of 4 sites. The UK site did not answer, retrying."
+
+A site's own content refreshes that site alone.
+
+## A site in another repository
+
+A site in a repository of its own, run by another team, still shows the group's offices. It cannot hold pages in this CMS, since a page is declared beside its route, so it runs a CMS of its own for its pages and news. List it with its `url` and the `headers` its `invalidate` expects, and no pages:
+
+```ts title="packages/content/kizuna.cms.config.ts"
+sites: {
+    parkSite: {
+        url: 'https://park.example.com/api',
+        headers: {
+            authorization: `Bearer ${process.env.PARK_SITE_KEY}`,
+        },
+    },
+},
+```
+
+It hears every publish of the group's content, like the sites in this repository. Its own CMS refreshes the pages that hold the id, from its own index.
+
+It reads the group's content through a [published client](/docs/cms/api#publishing-a-client), and its CMS holds the group's records through a [relationship](/docs/cms/content#from-another-kizuna-api). Where the UK extends the group's offices, a site in another repository keeps a collection of its own keyed by the group's `OfficeId`, and its page reads both.
 
 ## Where the group's data lives
 
@@ -139,20 +246,14 @@ A site holds the group's data by id wherever it lives:
 | The group's own Kizuna API or CMS | A [relationship](/docs/cms/content#from-another-kizuna-api) fed by its client     |
 | A service like Stripe or a CRM    | A [relationship](/docs/cms/content#from-another-service) fed by the service's SDK |
 
-A page is declared beside its route, so a site's pages live in the repository its app does. When the sites share one repository, one CMS holds every site's pages. When a site lives in a repository of its own, it runs a CMS of its own for its pages, and reaches the group's data through a relationship.
-
 ## Reading from outside
 
 Every path above is also a route in the `content` group, under the CMS's `apiPath`, so another app or a phone reads the same content over HTTP:
 
-| In process                                              | Over HTTP                                          |
-| ------------------------------------------------------- | -------------------------------------------------- |
-| `kizuna.content.collections.offices.list()`             | `GET /api/content/collections/offices`             |
-| `kizuna.content.sites.norway.collections.events.list()` | `GET /api/content/sites/norway/collections/events` |
-| `kizuna.content.sites.norway.pages.frontPage.get()`     | `GET /api/content/sites/norway/pages/frontPage`    |
+| In process                                           | Over HTTP                                       |
+| ---------------------------------------------------- | ----------------------------------------------- |
+| `kizuna.content.collections.offices.list()`          | `GET /api/content/collections/offices`          |
+| `kizuna.content.sites.uk.collections.offices.list()` | `GET /api/content/sites/uk/collections/offices` |
+| `kizuna.content.sites.uk.pages.frontPage.get()`      | `GET /api/content/sites/uk/pages/frontPage`     |
 
-A [client of the content routes](/docs/cms/api#a-client-for-readers) calls them with the same path, `contentClient.content.sites.norway.collections.events.list()`.
-
-## Editing
-
-Editors work in one editor for the whole group. The switcher lists the group's content first, then each site with its pages, globals and collections. The agent addresses a site's content by its site, so "add an event to the Norwegian site" reaches Norway's `events`, and "update Anna's phone number" reaches the group's `employees`, once for every site.
+A client generated for one site holds that site's routes and the group's, and nothing of the other sites. See [Publishing a client](/docs/cms/api#publishing-a-client).
