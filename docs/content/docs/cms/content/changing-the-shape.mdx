@@ -1,0 +1,28 @@
+---
+title: Changing the shape
+description: A new field, a rename, or a type change, and what stored content gets, so a schema change never loses what editors wrote.
+---
+
+A new field says what stored content gets. Give it a `.default()`, or a `migrate` step keyed by the next version number:
+
+```ts
+migrate: {
+    1: (document) => ({
+        ...document,
+        subheading: '',
+    }),
+},
+```
+
+Reads run the step in memory, and the document's next save stores the result, so migrating never publishes anything. [`kizuna diff`](/docs/breaking-changes#content) fails a pull request that adds a required field with neither. If one ships anyway, visitors see the newest earlier version that still passes, or nothing when none does, and [`kizuna cms check`](/docs/cms/cli#kizuna-cms-check) lists the page.
+
+A rename is a removal and an addition, so write a step that moves the value. `richTextFromPlain` turns a text field into rich text:
+
+```ts
+migrate: {
+    2: (document) => ({
+        ...document,
+        body: richTextFromPlain(String(document['body'] ?? '')),
+    }),
+},
+```

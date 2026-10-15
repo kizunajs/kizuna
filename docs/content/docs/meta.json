@@ -1,4 +1,6 @@
 {
+    "title": "Core",
+    "description": "Routes, auth, jobs and clients",
     "pages": [
         "---Getting started---",
         "index",
@@ -21,7 +23,6 @@
         "jobs",
         "---Clients---",
         "clients",
-        "---CMS---",
         "cms",
         "---Plugins---",
         "openapi",

@@ -1,28 +1,11 @@
 ---
-title: Comparison
-description: Kizuna CMS beside Payload CMS and Sanity, for a team choosing where its content should live.
+title: Payload CMS
+description: Where Kizuna CMS and Payload CMS differ, where Payload is the better fit, and what teams report, for a team choosing.
 ---
-
-A team choosing a CMS for a Next.js site has good options, and each one is built around a different idea of where content lives and who changes it. This page puts Kizuna CMS beside the two that come up most, Payload CMS and Sanity, as plainly as we can, with the cases where one of them is the better choice.
-
-## The shape of each
-
-|                     | Kizuna CMS                                                               | Payload CMS                             | Sanity                                     |
-| ------------------- | ------------------------------------------------------------------------ | --------------------------------------- | ------------------------------------------ |
-| Where content lives | Your Postgres                                                            | Your MongoDB, Postgres or SQLite        | Sanity's content lake                      |
-| Content is declared | Beside the route that shows it, in Zod                                   | Collections and globals, in TypeScript  | Schemas, in TypeScript                     |
-| Editors work in     | Their chat, and by clicking the page                                     | The admin panel                         | Sanity Studio                              |
-| Reading it          | In process, typed, and over REST with generated clients                  | Local API, REST, GraphQL                | GROQ and GraphQL                           |
-| Ids and types       | Branded ids shared with your API and the Swift, Kotlin and fetch clients | Generated types, copied to the frontend | Generated types with TypeGen               |
-| Localization        | Per document, with shared fields, published one language at a time       | Per field                               | Per document or per field, your choice     |
-| Several sites       | Content every site reads, and each site's own, in one CMS                | The multi-tenant plugin                 | Datasets, with Shared Content between them |
-| Licence and price   | MIT, your hosting                                                        | MIT, your hosting                       | Free tier, then per seat and usage         |
-
-## Kizuna CMS and Payload CMS
 
 Payload is the closest in spirit: TypeScript, your database, MIT, and a Next.js app as the host. It has an admin panel, three databases, GraphQL, eleven official plugins and, since 2025, Figma behind it. Teams moving a Next.js site off HubSpot or WordPress weigh the two against each other most often.
 
-### Where they differ
+## Where they differ
 
 - **A page says what it needs.** In Kizuna, a `content.ts` beside the route lists the fields that page renders, so there is no query, no `depth` and no `string | Doc` union to narrow. Payload models content as collections and the page fetches it, which is the shape a CMS has had for twenty years, and it carries the cost of deciding how deep to populate on every read.
 - **One system.** The config that declares the content declares the app's routes, jobs and identities, and generates the OpenAPI document and the Swift, Kotlin and fetch clients. An `EmployeeId` is one type in the CMS, the API and the iOS app. Payload is a CMS beside your app, and its types reach the app by copying a file.
@@ -31,14 +14,14 @@ Payload is the closest in spirit: TypeScript, your database, MIT, and a Next.js 
 - **Several sites.** Content every site reads is written once, each country adds its own fields and content, and one publish refreshes every site that shows the change. Payload's multi-tenant plugin keeps tenants apart, and content between them is the app's problem.
 - **Nothing to host but the site.** There is no panel to theme, upgrade or secure. The editor is one file the MCP endpoint serves.
 
-### Where Payload is the better fit
+## Where Payload is the better fit
 
 - **Editors who want a panel.** A list view, bulk edit, folders, trash and a version diff, in thirty languages, that an editor who has used WordPress already understands. A team that does not want a model in the loop will miss it.
 - **GraphQL or MongoDB.** Kizuna generates REST and typed clients, and runs on Postgres.
 - **The ecosystem.** Eleven official plugins, a large community, templates and agencies that know it. Form building, search and e-commerce are solved there, and Kizuna leaves forms and search to the app.
 - **Maturity.** Payload is years old with a funded team. Kizuna's CMS is in alpha.
 
-### What teams report
+## What teams report
 
 These are the themes in Payload's own issue tracker and in production write-ups, as of October 2026. They are what a team should expect to spend time on, not a verdict.
 
@@ -47,15 +30,3 @@ These are the themes in Payload's own issue tracker and in production write-ups,
 - **Rich text.** Lexical is the editor, and it is the single largest topic in the tracker. Kizuna stores Portable Text, structured JSON that never holds HTML, and renders it with your components.
 - **It is an application to maintain.** Agencies that like Payload say the same thing: adding a section type or changing the design is a code change, and approval workflows and SSO are enterprise or custom. Kizuna has the same honest answer for the first, a field is a line of Zod, and ships reviews and roles for the second.
 - **Hosting.** Payload Cloud is closed to new projects since the Figma acquisition, and self-hosting is the path.
-
-## Kizuna CMS and Sanity
-
-Sanity keeps the content in its own cloud, the content lake, and you query it with GROQ. Studio, the editor, is a React app you configure and host. It is the most flexible of the hosted ones: schemas are code, localization can be per document or per field, and the 2026 Shared Content feature lets one dataset read another's documents.
-
-Choose Sanity when you want a hosted content store with a real query language and a Studio you can shape, and the content has no need to sit beside an API of your own. Choose Kizuna when the content belongs in the same database and the same types as the app, when editors should work in their chat and on the page rather than in a Studio, or when you would rather not pay per seat.
-
-The one thing to know before picking Sanity for several sites: a reference across datasets cannot be looked up in reverse, and a release's integrity checks skip it, so "where is this office used" has to be answered on your side.
-
-## Choosing
-
-Pick Payload when editors want a panel, when you need GraphQL or MongoDB, or when a plugin already does what you need. Pick Sanity for a hosted store with GROQ and a Studio of your own. Pick Kizuna when the site has an API of its own, when the content should be typed with it, when editors are happy to work in their chat and on the page, or when several sites share content. All three keep content as JSON, and a collection moves between them.

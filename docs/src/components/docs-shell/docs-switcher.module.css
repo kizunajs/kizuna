@@ -1,0 +1,132 @@
+.root {
+    position: relative;
+    flex-shrink: 0;
+    margin: 8px 10px 0;
+}
+
+.trigger {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    border-radius: 9px;
+    background-color: var(--kizuna-raised);
+    box-shadow: var(--kizuna-elevation-hover);
+    padding: 7px 10px;
+    font: inherit;
+    text-align: left;
+    color: var(--kizuna-ink);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+@media (hover: hover) {
+    .trigger:hover {
+        background-color: var(--kizuna-control);
+    }
+}
+
+.iconBox {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background-color: var(--kizuna-control);
+    box-shadow: var(--kizuna-elevation);
+}
+
+.icon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2.25;
+    color: var(--kizuna-ink);
+}
+
+.trigger .name {
+    flex: 1;
+}
+
+.itemText {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.name {
+    font-size: 0.8125rem;
+    font-weight: var(--font-weight-500);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.description {
+    font-size: 0.75rem;
+    line-height: 1.3;
+    color: var(--kizuna-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chevron,
+.check {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    stroke-width: 2.25;
+    color: var(--kizuna-muted);
+}
+
+.check {
+    color: var(--kizuna-ink);
+}
+
+.menu {
+    position: absolute;
+    inset-inline: 0;
+    top: calc(100% + 6px);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border: var(--kizuna-hairline) solid var(--kizuna-line-strong);
+    border-radius: 11px;
+    background-color: var(--kizuna-raised);
+    box-shadow: var(--kizuna-control-elevation);
+    padding: 4px;
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 8px;
+    padding: 7px 8px;
+    color: var(--kizuna-ink);
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+
+@media (hover: hover) {
+    .item:hover {
+        background-color: var(--kizuna-hover);
+    }
+}
+
+.itemActive {
+    background-color: var(--kizuna-control);
+}
+
+.trigger:focus-visible,
+.item:focus-visible {
+    outline: 2px solid var(--kizuna-ink);
+    outline-offset: 2px;
+}

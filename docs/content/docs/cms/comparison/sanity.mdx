@@ -1,0 +1,10 @@
+---
+title: Sanity
+description: Where Kizuna CMS and Sanity differ, and when a hosted content lake with GROQ and a Studio is the better choice.
+---
+
+Sanity keeps the content in its own cloud, the content lake, and you query it with GROQ. Studio, the editor, is a React app you configure and host. It is the most flexible of the hosted ones: schemas are code, localization can be per document or per field, and the 2026 Shared Content feature lets one dataset read another's documents.
+
+Choose Sanity when you want a hosted content store with a real query language and a Studio you can shape, and the content has no need to sit beside an API of your own. Choose Kizuna when the content belongs in the same database and the same types as the app, when editors should work in their chat and on the page rather than in a Studio, or when you would rather not pay per seat.
+
+The one thing to know before picking Sanity for several sites: a reference across datasets cannot be looked up in reverse, and a release's integrity checks skip it, so "where is this office used" has to be answered on your side.

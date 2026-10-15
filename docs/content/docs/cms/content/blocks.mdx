@@ -1,0 +1,51 @@
+---
+title: Blocks
+description: A set of fields several pages share, like a hero, with its rules wherever it goes.
+---
+
+A block is a set of fields you use wherever it belongs. Its rules and descriptions travel with it:
+
+```ts title="src/cms/blocks.ts"
+import { z } from 'zod';
+import { defineBlock } from '@kizunajs/cms';
+import { ImageSchema } from '@kizunajs/cms/schemas';
+import { CtaSchema, HeadingSchema } from './schemas';
+
+export const HeroBlockSchema = defineBlock({
+    name: 'hero',
+    fields: [
+        {
+            name: 'heading',
+            schema: HeadingSchema,
+        },
+        {
+            name: 'subheading',
+            schema: z.string().max(200),
+        },
+        {
+            name: 'image',
+            schema: ImageSchema,
+        },
+        {
+            name: 'cta',
+            schema: CtaSchema,
+        },
+    ],
+});
+```
+
+`defineBlock()` returns a Zod object schema, and `Output<T>` is that schema with images resolved, so the component is typed from the block:
+
+```tsx title="src/components/Hero.tsx"
+import type { Output } from '@kizunajs/cms';
+import type { HeroBlockSchema } from '../cms/blocks';
+
+export function Hero(props: Output<typeof HeroBlockSchema>) {
+    return (
+        <section>
+            <img src={props.image.url} alt={props.image.alt} width={props.image.width} height={props.image.height} />
+            <h1>{props.heading}</h1>
+        </section>
+    );
+}
+```

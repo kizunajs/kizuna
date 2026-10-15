@@ -39,7 +39,7 @@ The CMS routes come in three groups, one for each kind of caller:
 | `editing`    | Editors and their agents | Drafts, publishing, versions, media, describe, where-used, search and preview |
 | `invalidate` | The app                  | Refreshing the pages that show an id the app changed                          |
 
-`content` is a REST API of everything editors publish, generated from your fields: `GET /cms-api/content/pages/frontPage`, `GET /cms-api/content/collections/employees`. A collection's list takes `select`, `?select=name,photo`, and answers with those fields and the id. Every collection also answers `GET /cms-api/content/collections/employees/options`, the id and label of each published item, searchable by `q` and looked up by `ids`, which is what a [relationship](/docs/cms/content#from-another-kizuna-api) in another CMS reads. The label is the item's first text field.
+`content` is a REST API of everything editors publish, generated from your fields: `GET /cms-api/content/pages/frontPage`, `GET /cms-api/content/collections/employees`. A collection's list takes `select`, `?select=name,photo`, and answers with those fields and the id. Every collection also answers `GET /cms-api/content/collections/employees/options`, the id and label of each published item, searchable by `q` and looked up by `ids`, which is what a [relationship](/docs/cms/content/relationships#from-another-kizuna-api) in another CMS reads. The label is the item's first text field.
 
 ## A client for readers
 
@@ -118,7 +118,7 @@ The branded ids come with it, so an `OfficeId` is the same type in the client as
 
 ## What stays apart
 
-- **Identities.** `editor` lives on the CMS config, so an app route that names it fails to compile. When a [relationship's](/docs/cms/content#relationships) `options` calls a route that is not public, the editor also needs an identity on the app API, since `options` runs as them.
+- **Identities.** `editor` lives on the CMS config, so an app route that names it fails to compile. When a [relationship's](/docs/cms/content/relationships) `options` calls a route that is not public, the editor also needs an identity on the app API, since `options` runs as them.
 - **MCP.** An editor's agent connects to `/cms-api/mcp` and sees content tools alone.
 - **Clients and OpenAPI.** Each API generates its own. A mobile app gets the app client, and reads content through [a route on the app API](#content-in-the-app-api) or a [client of the content routes](#a-client-for-readers).
 - **Shared ids.** Ids both sides use, like `ProductId`, live in a module both configs import.

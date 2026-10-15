@@ -1,0 +1,43 @@
+---
+title: Fields
+description: 'Every page, block, global and collection is a list of fields: a name, a Zod schema, and who may edit it.'
+---
+
+A page is a list of fields beside its route. A block is a set of fields several pages share. A global is content every page shows, and a collection holds many items of one shape, like articles. Each field is a name, a Zod schema, and who may edit it.
+
+```ts
+{
+    name: 'subheading',
+    schema: z.string().max(200).describe('One sentence under the heading.'),
+    auth: {
+        roles: 'admin',
+    },
+},
+```
+
+| Option        | What it is                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `name`        | The key the value is stored under. An identifier, since fields form paths like `hero.heading`.  |
+| `label`       | What editors see the field called. Without one, they see its `name`.                            |
+| `schema`      | Any Zod schema. Its limits hold in the API, the tools and the inline editor alike.              |
+| `description` | Guidance under the input, for editors and the agent. Overrides the schema's `.describe()` here. |
+| `auth`        | Who may write the field, in a route's own words: `roles`, or `requires` for permissions.        |
+| `readOnly`    | Visible to editors and the agent, writable by nobody.                                           |
+| `options`     | For an enum, the label editors see for each value: `{ design: 'Design' }`.                      |
+
+A field listed twice fails to compile, and a role the editor identity does not declare fails when the config assembles.
+
+## Limits that keep the design
+
+A page keeps its design because its fields refuse what would break it. Designers say what they want, and the schema holds it for the editor, the agent and the API alike:
+
+| You want                                   | The schema says                      | The editor sees                          |
+| ------------------------------------------ | ------------------------------------ | ---------------------------------------- |
+| A short heading                            | `z.string().max(60)`                 | A counter that stops at 60 characters    |
+| One of a few looks                         | `z.enum(['light', 'dark'])`          | A select                                 |
+| Two to six products                        | `z.array(products.id).min(2).max(6)` | A sortable list that stops adding at six |
+| A link that is https                       | `z.url({ protocol: /^https$/ })`     | A URL input that says https only         |
+| An image with a crop and alt text          | `ImageSchema`                        | Upload, crop and alt text                |
+| A field only the client's admin may change | `auth: { roles: 'admin' }`           | The field, greyed out                    |
+
+A character limit keeps a heading short, and letters differ in width, so check the design with the longest heading the limit allows. `.describe()` is what the editor and the agent read under the input, so give the reason: `'Under 8 words. No full stop.'`

@@ -54,7 +54,7 @@ export function CmsSetup() {
                 <ol className={styles.steps}>
                     {steps.map((step, index) => (
                         <li key={step.anchor}>
-                            <Link href={`/docs/cms#${step.anchor}`} className={styles.step}>
+                            <Link href={`/docs/cms/quickstart#${step.anchor}`} className={styles.step}>
                                 <span className={styles.number}>{index + 1}</span>
                                 <span className={styles.title}>{step.title}</span>
                                 <code className={styles.code}>{step.code}</code>

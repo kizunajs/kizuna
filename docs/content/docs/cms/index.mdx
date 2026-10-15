@@ -1,6 +1,6 @@
 ---
-title: CMS
-description: Let editors change a Next.js site's text and images by clicking on the page, or by asking an agent.
+title: What is Kizuna CMS?
+description: 'The content system for your whole business: one config holds your sites, their content and the API behind them, and editors change it in their chat or on the page.'
 ---
 
 <AlphaNotice>
@@ -11,142 +11,42 @@ The CMS is new. Its routes, options and generated files may change while v2 is i
 
 <Supports items={['Next.js 16+', 'Postgres through Drizzle']} />
 
-Editors change what the site says. You decide, in code beside each route, what they may change:
-
-- **A page** has fields editors fill in, like a heading and an intro.
-- **A global** shows on every page, like the footer.
-- **A collection** holds many items of one kind, like articles.
-
-The content lives in your database. Editors click text on the page to change it, and nothing goes live until they publish.
-
-<InstallTabs packageName="@kizunajs/cms drizzle-orm" />
-
-<Steps>
-
-<Step>
-
-## Create the tables
-
-```sh
-kizuna cms migrate --out drizzle
-```
-
-This writes the three `cms_` tables into your migrations folder. Run it with the rest.
-
-</Step>
-
-<Step>
-
-## Declare a page
-
-A `content.ts` beside the route lists what editors may change. Every field is plain Zod:
+You declare what each page needs, beside the route that shows it, in Zod:
 
 ```ts title="src/app/(front-page)/content.ts"
 import { z } from 'zod';
 import { definePage } from '@kizunajs/cms';
+import { ImageSchema } from '@kizunajs/cms/schemas';
 
 export default definePage({
     name: 'frontPage',
     fields: [
         {
             name: 'heading',
-            schema: z.string().max(60),
+            schema: z.string().max(60).describe('Under 8 words. No full stop.'),
         },
         {
             name: 'intro',
+            label: 'Introduction',
             schema: z.string().max(400),
+        },
+        {
+            name: 'hero',
+            schema: ImageSchema,
         },
     ],
 });
 ```
 
-</Step>
-
-<Step>
-
-## Let Next find the pages
-
-```ts title="next.config.ts"
-import { withKizunaCms } from '@kizunajs/cms/next/config';
-
-export default withKizunaCms({});
-```
-
-It collects every `content.ts` into `src/cms.pages.ts` whenever Next starts or builds. Commit that file.
-
-</Step>
-
-<Step>
-
-## Add the CMS to your config
-
-```ts title="kizuna.config.ts"
-import { defineConfig } from 'kizunajs';
-import { nextAdapter } from '@kizunajs/next';
-import { cms } from '@kizunajs/cms';
-import { mcpPlugin } from '@kizunajs/mcp';
-import { editor } from './src/identities';
-import { pages } from './src/cms.pages';
-import { db } from './src/db';
-
-export default defineConfig({
-    adapter: nextAdapter(),
-    auth: {
-        identities: {
-            editor,
-        },
-    },
-    content: cms({
-        db,
-        pages,
-        auth: {
-            identity: 'editor',
-        },
-        signInPath: '/login',
-        preview: {
-            url: 'https://example.com',
-        },
-    }),
-    plugins: [mcpPlugin()],
-});
-```
-
-`editor` is the [identity](/docs/authentication) your editors sign in as, checked by your own sign-in. `mcpPlugin()` serves the [MCP](/docs/mcp) endpoint editors connect their chat to, and `preview.url` is where the site is, so the editor can show its draft. Mount the config once, and it serves everything the CMS needs, from the content to the images to draft mode:
-
-```ts title="src/app/api/[...kizuna]/route.ts"
-import kizuna from '@kizuna-config';
-
-export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
-    basePath: '/api',
-});
-```
-
-`@kizuna-config` points at the config from anywhere, through `tsconfig.json`:
-
-```json title="tsconfig.json"
-{
-    "compilerOptions": {
-        "paths": {
-            "@kizuna-config": ["./kizuna.config.ts"]
-        }
-    }
-}
-```
-
-</Step>
-
-<Step>
-
-## Read it in the page
+The page reads it, typed from those fields:
 
 ```tsx title="src/app/(front-page)/page.tsx"
-import kizuna from '@kizuna-config';
-
 export default async function FrontPage() {
     const content = await kizuna.content.pages.frontPage.get();
 
     return (
         <main>
+            <img src={content.hero.url} alt={content.hero.alt} />
             <h1>{content.heading}</h1>
             <p>{content.intro}</p>
         </main>
@@ -154,35 +54,91 @@ export default async function FrontPage() {
 }
 ```
 
-`content` is typed from the page's fields. Until someone publishes the page, it answers 404.
+That one declaration is what everything else is written from: the form an editor fills in, the tools a model calls, the limits that hold in both, the content routes, the clients that read them, and what search engines are told about the page. The content lives in your Postgres, as drafts until a person publishes.
 
-</Step>
+## Editors work where they are
 
-<Step>
+There is no admin panel. An editor asks for a change in their chat, and the editor opens beside the answer with the page's draft filling in as the model writes. Or they open the site, click the heading, and type. Both save to the same draft, and nothing goes live until someone publishes.
 
-## Add the preview
+<Cards>
+    <Card title="Editing" href="/docs/cms/editing">
+        Drafts, versions, the editor in your chat, and the tools behind it.
+    </Card>
+    <Card title="Reviews" href="/docs/cms/reviews">
+        Who owns a page, and asking a colleague to look before it goes live.
+    </Card>
+    <Card title="Localization" href="/docs/cms/localization">
+        Every page in every language the site serves, published one at a time.
+    </Card>
+    <Card title="What holds" href="/docs/cms/editing#what-holds">
+        Roles and field rules checked in the routes, for the form and the model alike.
+    </Card>
+</Cards>
 
-```tsx title="src/app/layout.tsx"
-import { KizunaPreview } from '@kizunajs/cms/next';
-import kizuna from '@kizuna-config';
+## Content, typed like the rest of your system
 
-<body>
-    {children}
-    <KizunaPreview content={kizuna.content} />
-</body>;
-```
+A collection's items get an id type of their own, and a page holds one the way it holds a product from your own API or from Stripe. The id is the same type in the CMS, your routes and the Swift, Kotlin and fetch clients, so content and data meet without a copy of anything.
 
-The preview shows drafts in the editor, which runs in your chat. Add the MCP endpoint to Claude or another host that supports MCP Apps, signed in as an editor, and ask it to change the front page. See [Editing](/docs/cms/editing#the-editor).
+<Cards>
+    <Card title="Content" href="/docs/cms/content">
+        Fields, pages, blocks, globals and collections, each a list of Zod fields.
+    </Card>
+    <Card title="Relationships" href="/docs/cms/content/relationships">
+        Records in your API, another Kizuna API or Stripe, held by id and picked from a list.
+    </Card>
+    <Card title="Next.js" href="/docs/cms/next">
+        Reading, caching, draft mode and the preview.
+    </Card>
+    <Card title="The CMS API" href="/docs/cms/api">
+        The content routes, a client for readers, and publishing one as a package.
+    </Card>
+</Cards>
 
-</Step>
+## One site, or a business full of them
 
-</Steps>
+A site starts with a few pages. When the business adds countries, the content every site shows is written once, each site keeps content of its own, a country adds the field that is normal there, and one publish refreshes every site that shows the change.
 
-## Where to go next
+<Cards>
+    <Card title="Sites" href="/docs/cms/sites">
+        Content every site reads, each site's own, and building on one from the other.
+    </Card>
+    <Card title="Setting up several sites" href="/docs/cms/setup">
+        One repository, one database, one Next.js app per site on its own domain.
+    </Card>
+</Cards>
 
-- [Content](/docs/cms/content): fields, blocks, globals, collections, images, and relationships
-- [Editing](/docs/cms/editing): drafts, the editor in your chat, its tools, and what holds for all of them
-- [Next.js](/docs/cms/next): reading, caching and draft mode
-- [Sites](/docs/cms/sites): content every site reads, written once, and each site's own beside it
-- [The CMS API](/docs/cms/api): when the site has an app API too
-- [CLI](/docs/cms/cli): checks, renames, and moving content between environments
+## Found by search engines and answer engines
+
+Most of what a search engine reads from a page is in its content already. The CMS writes the structured data, the sitemap, the language alternates and the redirects from the typed fields, and leaves a person the search title and description, measured as a search result shows them.
+
+<Cards>
+    <Card title="SEO" href="/docs/cms/seo">
+        Titles from a template in code, structured data from typed content, addresses that last.
+    </Card>
+    <Card title="AI search" href="/docs/cms/ai-search">
+        What gets a page cited, what the evidence says does not, and what the CMS does about it.
+    </Card>
+    <Card title="Moving from another platform" href="/docs/cms/migrating">
+        Every old address answering, the blog's dates intact, lead capture running.
+    </Card>
+</Cards>
+
+## Start here
+
+<Cards>
+    <Card title="Quickstart" href="/docs/cms/quickstart">
+        A page editors can change, in six steps.
+    </Card>
+    <Card title="Content" href="/docs/cms/content">
+        What a field is, and what a schema's limits do for the design.
+    </Card>
+    <Card title="Editing" href="/docs/cms/editing">
+        Connect the chat, open the preview, publish.
+    </Card>
+    <Card title="CLI" href="/docs/cms/cli">
+        Create the tables, check the content, and move it between environments.
+    </Card>
+    <Card title="Payload CMS" href="/docs/cms/comparison/payload">
+        Where the two differ, for a team choosing.
+    </Card>
+</Cards>

@@ -142,7 +142,7 @@ export function CmsRelationships() {
 
     return (
         <Section
-            aside={<DocsLink href="/docs/cms/content#relationships" />}
+            aside={<DocsLink href="/docs/cms/content/relationships" />}
             title="Your data, right where it is"
             description="Products, prices and events stay where they live. Editors pick them, and the page fetches what it shows.">
             <article className={panel.panel}>
@@ -216,7 +216,7 @@ export function CmsRelationships() {
                 </div>
 
                 <div className={panel.body}>
-                    <Link href="/docs/cms/content#collection-or-your-own-table" className={panel.title}>
+                    <Link href="/docs/cms/content/collections#collection-or-your-own-table" className={panel.title}>
                         Content, or a record of yours
                         <ArrowRight className={panel.arrow} aria-hidden />
                     </Link>

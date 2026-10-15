@@ -1,0 +1,25 @@
+---
+title: Globals
+description: Content every page shows, like the footer or the contact details, kept as one copy.
+---
+
+Content every page shows, like a footer or the contact details, is a global. One copy serves the whole site:
+
+```ts title="src/cms/content.ts"
+import { z } from 'zod';
+import { defineGlobal } from '@kizunajs/cms';
+
+export const Site = defineGlobal({
+    name: 'site',
+    fields: [
+        {
+            name: 'footerText',
+            schema: z.string().min(1).max(160),
+        },
+        {
+            name: 'contactEmail',
+            schema: z.email(),
+        },
+    ],
+});
+```

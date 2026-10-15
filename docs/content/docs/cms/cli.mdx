@@ -62,7 +62,7 @@ kizuna cms rename-site default uk
 
 ## `kizuna cms export`
 
-Writes every published item of one collection as JSON, each with its id, to stdout or the file `--out` names. Use it to [move a collection into a table](/docs/cms/content#moving-between-them).
+Writes every published item of one collection as JSON, each with its id, to stdout or the file `--out` names. Use it to [move a collection into a table](/docs/cms/content/collections#moving-between-them).
 
 ```sh
 kizuna cms export employees --out employees.json
@@ -106,7 +106,7 @@ Copies one page's draft from `local`, or `--from`, into the target as a new draf
 kizuna cms push frontPage --to staging
 ```
 
-Every id a page holds through a [relationship](/docs/cms/content#relationships) is checked against the target's own picker list, and missing ids are listed rather than kept silently. The command exits `2` when any are missing.
+Every id a page holds through a [relationship](/docs/cms/content/relationships) is checked against the target's own picker list, and missing ids are listed rather than kept silently. The command exits `2` when any are missing.
 
 ```json
 {

@@ -1,0 +1,15 @@
+---
+title: AI search
+description: What gets a page cited by ChatGPT, Perplexity, Claude and Google's AI results, what the evidence says does not, and what the CMS does about it.
+---
+
+ChatGPT, Perplexity, Claude and Google's AI results cite pages the way search engines rank them: the page is indexed, it answers a question plainly, and it says who wrote it and when. Nothing on this list needs a file or a tag of its own, and Google says so of its own AI results. What the CMS does is make the ordinary signals true on every page:
+
+- **Visible dates and a named author.** An article shows `datePublished` and `dateModified` on the page and in its structured data, and the author is a person with a page of their own.
+- **Plain facts in typed fields.** An office's address, hours and phone number are fields, so the page states them rather than burying them in a paragraph.
+- **The crawlers that cite are let in.** The site's `robots.txt` names the answer engines' search crawlers, `OAI-SearchBot`, `Claude-SearchBot` and `PerplexityBot`, and `robots.ts` from the CMS writes the groups. Whether the training crawlers, `GPTBot` and `ClaudeBot`, may read the site is a site setting, off by default.
+- **Each publish tells the engines that read pings.** Bing, DuckDuckGo and the engines built on them learn of a change through [IndexNow](https://www.indexnow.org) the moment a page publishes or an address changes. Google does not take pings, and reads the sitemap.
+
+Two things sound like they should matter and the evidence says they do not. Structured data on a page does not make it cited more often, in a matched study of nearly two thousand pages. A `llms.txt` file is fetched on three percent of the sites that have one, and Google does not read it. The CMS writes neither for that reason, and what moves citations most, by the same studies, is the site being mentioned elsewhere, which is marketing's work rather than the CMS's.
+
+Search Console reports AI results under "Web", and Bing Webmaster Tools has a report of its own for Copilot citations.

@@ -9,6 +9,7 @@ import type * as PageTree from 'fumadocs-core/page-tree';
 import GithubIcon from '@/icons/Github.svg';
 import { Badge } from '@/components/shared/badge';
 import { githubUrl, version } from '@/lib/site';
+import { DocsSwitcher, tabsOf } from './docs-switcher';
 import styles from './docs-sidebar.module.css';
 
 function containsPath(folder: PageTree.Folder, pathname: string): boolean {
@@ -94,12 +95,24 @@ function Nodes({ nodes, pathname }: { nodes: PageTree.Node[]; pathname: string }
 
 export function DocsSidebar({ tree, className }: { tree: PageTree.Root; className?: string }) {
     const pathname = usePathname();
+    const { active } = tabsOf(tree, pathname);
 
     return (
         <nav className={clsx(styles.sidebar, className)} aria-label="Docs">
-            <Nodes nodes={tree.children} pathname={pathname} />
+            <Nodes nodes={active.nodes} pathname={pathname} />
         </nav>
     );
+}
+
+/**
+ * The switch between the core docs and each folder that is a docs of its own,
+ * such as the CMS.
+ */
+function Switcher({ tree }: { tree: PageTree.Root }) {
+    const pathname = usePathname();
+    const { tabs, active } = tabsOf(tree, pathname);
+    if (tabs.length < 2) return null;
+    return <DocsSwitcher tabs={tabs} active={active} />;
 }
 
 /**
@@ -114,6 +127,7 @@ export function DocsSidebarPanel({ tree, className }: { tree: PageTree.Root; cla
                 <Badge stage="beta" />
                 <ArrowUpRight className={styles.versionIcon} aria-hidden />
             </a>
+            <Switcher tree={tree} />
             <div className={styles.scroll}>
                 <DocsSidebar tree={tree} />
             </div>

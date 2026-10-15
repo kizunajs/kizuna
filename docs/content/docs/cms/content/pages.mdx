@@ -1,0 +1,45 @@
+---
+title: Pages
+description: A content.ts beside each route lists what that page needs, and a dynamic route shows one item of a collection.
+---
+
+```ts title="src/app/(front-page)/content.ts"
+export default definePage({
+    name: 'frontPage',
+    fields: [
+        {
+            name: 'heading',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'intro',
+            label: 'Introduction',
+            schema: z.string().max(400),
+        },
+    ],
+});
+```
+
+`name` is how the page is read, `kizuna.content.pages.frontPage`, and how tools address it. Write it in camelCase with a `Page` suffix, unique across the site, and as a literal so discovery can read it.
+
+Content is stored under the page's name, so moving the route's folder keeps it. A new name starts the page afresh, and the old content waits, listed by [`kizuna cms orphans`](/docs/cms/cli#kizuna-cms-orphans), until you move it:
+
+```sh
+kizuna cms rename-page pricingPage plansPage
+```
+
+## Pages that show a collection
+
+A blog post lives in a collection, and its route decides where each one is shown. A `content.ts` at a dynamic route names the collection instead of fields:
+
+```ts title="src/app/blog/[slug]/content.ts"
+import { definePage } from '@kizunajs/cms';
+import { Articles } from '../../../cms/content';
+
+export default definePage({
+    name: 'articlePage',
+    collection: Articles,
+});
+```
+
+Each route param reads the item field it names, so `[slug]` reads `slug`. That field is text, indexed and unique, since it is the address. Editors create articles as items of the collection, and the preview opens each one at its address.

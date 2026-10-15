@@ -1,0 +1,14 @@
+---
+title: Moving from another platform
+description: Keeping every old address answering, the blog's dates intact and lead capture running while a site moves off HubSpot or WordPress.
+---
+
+A move keeps its search standing when every old address answers. Export the old platform's redirect table and crawl the live site, including blog posts, PDFs and uploaded files, and import the map:
+
+```sh
+kizuna cms import-redirects old-site.csv
+```
+
+Each old address answers with a `301` straight to its new page, never to the front page, and never through another redirect. Imported articles keep their original `datePublished`. Keep the old domain pointing at the new site for a year, since links to it are still out there.
+
+HubSpot keeps its forms inside HubSpot, and they embed on the new site as they are, so lead capture carries on while the site moves. Its uploaded files, under `/hubfs/`, cannot be redirected from HubSpot's side, so copy them into the media library and map their addresses with the rest.

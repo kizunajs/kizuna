@@ -1,4 +1,30 @@
 {
     "title": "CMS",
-    "pages": ["index", "content", "editing", "reviews", "localization", "sites", "seo", "next", "api", "setup", "cli", "comparison"]
+    "description": "Content, editors and sites",
+    "root": true,
+    "pages": [
+        "---Getting started---",
+        "index",
+        "quickstart",
+        "---Content---",
+        "content",
+        "---Editing---",
+        "editing",
+        "reviews",
+        "localization",
+        "---Sites---",
+        "sites",
+        "setup",
+        "---Search---",
+        "seo",
+        "ai-search",
+        "migrating",
+        "---Reading---",
+        "next",
+        "api",
+        "---Tooling---",
+        "cli",
+        "---Comparisons---",
+        "comparison"
+    ]
 }

@@ -1,0 +1,163 @@
+---
+title: Quickstart
+description: A page editors can change in six steps, inside your Next.js app, with content in your own Postgres database.
+---
+
+<InstallTabs packageName="@kizunajs/cms drizzle-orm" />
+
+<Steps>
+
+<Step>
+
+## Create the tables
+
+```sh
+kizuna cms migrate --out drizzle
+```
+
+This writes the three `cms_` tables into your migrations folder. Run it with the rest.
+
+</Step>
+
+<Step>
+
+## Declare a page
+
+A `content.ts` beside the route lists what editors may change. Every field is plain Zod:
+
+```ts title="src/app/(front-page)/content.ts"
+import { z } from 'zod';
+import { definePage } from '@kizunajs/cms';
+
+export default definePage({
+    name: 'frontPage',
+    fields: [
+        {
+            name: 'heading',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'intro',
+            schema: z.string().max(400),
+        },
+    ],
+});
+```
+
+</Step>
+
+<Step>
+
+## Let Next find the pages
+
+```ts title="next.config.ts"
+import { withKizunaCms } from '@kizunajs/cms/next/config';
+
+export default withKizunaCms({});
+```
+
+It collects every `content.ts` into `src/cms.pages.ts` whenever Next starts or builds. Commit that file.
+
+</Step>
+
+<Step>
+
+## Add the CMS to your config
+
+```ts title="kizuna.config.ts"
+import { defineConfig } from 'kizunajs';
+import { nextAdapter } from '@kizunajs/next';
+import { cms } from '@kizunajs/cms';
+import { mcpPlugin } from '@kizunajs/mcp';
+import { editor } from './src/identities';
+import { pages } from './src/cms.pages';
+import { db } from './src/db';
+
+export default defineConfig({
+    adapter: nextAdapter(),
+    auth: {
+        identities: {
+            editor,
+        },
+    },
+    content: cms({
+        db,
+        pages,
+        auth: {
+            identity: 'editor',
+        },
+        signInPath: '/login',
+        preview: {
+            url: 'https://example.com',
+        },
+    }),
+    plugins: [mcpPlugin()],
+});
+```
+
+`editor` is the [identity](/docs/authentication) your editors sign in as, checked by your own sign-in. `mcpPlugin()` serves the [MCP](/docs/mcp) endpoint editors connect their chat to, and `preview.url` is where the site is, so the editor can show its draft. Mount the config once, and it serves everything the CMS needs, from the content to the images to draft mode:
+
+```ts title="src/app/api/[...kizuna]/route.ts"
+import kizuna from '@kizuna-config';
+
+export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount({
+    basePath: '/api',
+});
+```
+
+`@kizuna-config` points at the config from anywhere, through `tsconfig.json`:
+
+```json title="tsconfig.json"
+{
+    "compilerOptions": {
+        "paths": {
+            "@kizuna-config": ["./kizuna.config.ts"]
+        }
+    }
+}
+```
+
+</Step>
+
+<Step>
+
+## Read it in the page
+
+```tsx title="src/app/(front-page)/page.tsx"
+import kizuna from '@kizuna-config';
+
+export default async function FrontPage() {
+    const content = await kizuna.content.pages.frontPage.get();
+
+    return (
+        <main>
+            <h1>{content.heading}</h1>
+            <p>{content.intro}</p>
+        </main>
+    );
+}
+```
+
+`content` is typed from the page's fields. Until someone publishes the page, it answers 404.
+
+</Step>
+
+<Step>
+
+## Add the preview
+
+```tsx title="src/app/layout.tsx"
+import { KizunaPreview } from '@kizunajs/cms/next';
+import kizuna from '@kizuna-config';
+
+<body>
+    {children}
+    <KizunaPreview content={kizuna.content} />
+</body>;
+```
+
+The preview shows drafts in the editor, which runs in your chat. Add the MCP endpoint to Claude or another host that supports MCP Apps, signed in as an editor, and ask it to change the front page. See [Editing](/docs/cms/editing#the-editor).
+
+</Step>
+
+</Steps>

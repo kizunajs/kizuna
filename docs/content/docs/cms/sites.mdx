@@ -301,7 +301,7 @@ sites: {
 
 It hears every publish of content on `cms()`, like the sites in this repository. Its own CMS refreshes the pages that hold the id, from its own index.
 
-It reads the content through a [published client](/docs/cms/api#publishing-a-client), and its CMS holds the records through a [relationship](/docs/cms/content#from-another-kizuna-api). Where the UK extends the offices, a site in another repository keeps a collection of its own keyed by `OfficeId`, and its page reads both.
+It reads the content through a [published client](/docs/cms/api#publishing-a-client), and its CMS holds the records through a [relationship](/docs/cms/content/relationships#from-another-kizuna-api). Where the UK extends the offices, a site in another repository keeps a collection of its own keyed by `OfficeId`, and its page reads both.
 
 ## Starting with one site
 
@@ -317,11 +317,11 @@ Nothing needs to be split later, since content on `cms()` and a site's own were 
 
 A site holds the records it shows by id wherever they live:
 
-| The data lives in              | The site holds it through                                                         |
-| ------------------------------ | --------------------------------------------------------------------------------- |
-| This CMS                       | A collection on `cms()`, as above                                                 |
-| Another Kizuna API or CMS      | A [relationship](/docs/cms/content#from-another-kizuna-api) fed by its client     |
-| A service like Stripe or a CRM | A [relationship](/docs/cms/content#from-another-service) fed by the service's SDK |
+| The data lives in              | The site holds it through                                                                       |
+| ------------------------------ | ----------------------------------------------------------------------------------------------- |
+| This CMS                       | A collection on `cms()`, as above                                                               |
+| Another Kizuna API or CMS      | A [relationship](/docs/cms/content/relationships#from-another-kizuna-api) fed by its client     |
+| A service like Stripe or a CRM | A [relationship](/docs/cms/content/relationships#from-another-service) fed by the service's SDK |
 
 ## Reading from outside
 
