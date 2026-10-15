@@ -3,7 +3,7 @@ title: SEO
 description: 'What search engines and answer engines read from a page, written from the typed fields.'
 ---
 
-Every page gets a search result. Four steps set it up, and editors take it from there.
+Every page gets a search result. Three steps set it up, and editors take it from there.
 
 <Steps>
 
@@ -23,7 +23,7 @@ content: cms({
 }),
 ```
 
-`site` is the `Site` global, so editors rename the site without a deploy.
+`site` is the `Site` global, so editors rename the site without a deploy. A title that already ends in the site's name, like the front page's "Acme Blog", gets nothing added.
 
 </Step>
 
@@ -74,40 +74,23 @@ Every article now has a search result: its title, its teaser and its cover. An e
 
 </Step>
 
-<Step>
-
-## Leave the site's name off where it repeats
-
-The front page's title is the site's name, so it would read "Acme Blog | Acme Blog". Turn the site's name off for that page:
-
-```ts title="src/app/(front-page)/content.ts"
-export default definePage({
-    name: 'frontPage',
-    metadata: {
-        suffix: false,
-    },
-});
-```
-
-</Step>
-
 </Steps>
 
 ## What editors change
 
 Each article starts with what the code gave it. An editor changes it for one article:
 
-|             | Starts as                                | The editor can      |
-| ----------- | ---------------------------------------- | ------------------- |
-| Title       | The article's title, then "\| Acme Blog" | Write another       |
-| Description | The article's teaser                     | Write another       |
-| Image       | The article's cover                      | Pick another        |
-| Site name   | On, and off on the front page            | Switch it           |
-| Index       | Yes                                      | Switch it off       |
-| Follow      | Yes                                      | Switch it off       |
-| Canonical   | The page's own address                   | Point it at another |
+|             | Starts as                                     | The editor can      |
+| ----------- | --------------------------------------------- | ------------------- |
+| Title       | The article's title, then "\| Acme Blog"      | Write another       |
+| Description | The article's teaser                          | Write another       |
+| Image       | The article's cover                           | Pick another        |
+| Site name   | After the title, unless it ends in it already | Switch it off       |
+| Index       | Yes                                           | Switch it off       |
+| Follow      | Yes                                           | Switch it off       |
+| Canonical   | The page's own address                        | Point it at another |
 
-What it starts as shows as the placeholder, and clearing a field goes back to it. A page with Index off is left out of the sitemap too. Try it, open Tags to see what the page renders, then open Front Page, which starts without the site's name:
+What it starts as shows as the placeholder, and clearing a field goes back to it. A page with Index off is left out of the sitemap too. Try it, open Tags to see what the page renders, then open Front Page, whose title is the site's name:
 
 <SeoDemo />
 

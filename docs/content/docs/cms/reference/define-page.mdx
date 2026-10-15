@@ -7,18 +7,17 @@ description: 'Declare a page beside its route: its fields, or the collection it 
 definePage(definition: PageDefinition): Page
 ```
 
-| Option          | Type                                     | Description                                                                  |
-| --------------- | ---------------------------------------- | ---------------------------------------------------------------------------- |
-| `name`          | `string`                                 | How the page is read and addressed, camelCase with a `Page` suffix           |
-| `label`         | `string`                                 | What editors see it called                                                   |
-| `fields`        | `Field[]`                                | What editors may change, in order                                            |
-| `collection`    | `Collection`                             | For a dynamic route: the collection one item of which this page shows        |
-| `paths`         | `Record<Locale, string>`                 | The page's address per language, with the route's `[params]`                 |
-| `sites`         | `string[]`                               | The sites this page exists on. Elsewhere it is not found                     |
-| `metadata`      | `{ suffix: false }`                      | The page's search title starts without the site name. Editors can turn it on |
-| `requireReview` | `boolean`                                | Publishing waits for an approval                                             |
-| `migrate`       | `Record<number, (document) => document>` | Steps that bring stored content up to the current fields                     |
-| `on`            | `{ published, unpublished, deleted }`    | Functions that run after the fact, with `plugins` and `jobs`                 |
+| Option          | Type                                     | Description                                                           |
+| --------------- | ---------------------------------------- | --------------------------------------------------------------------- |
+| `name`          | `string`                                 | How the page is read and addressed, camelCase with a `Page` suffix    |
+| `label`         | `string`                                 | What editors see it called                                            |
+| `fields`        | `Field[]`                                | What editors may change, in order                                     |
+| `collection`    | `Collection`                             | For a dynamic route: the collection one item of which this page shows |
+| `paths`         | `Record<Locale, string>`                 | The page's address per language, with the route's `[params]`          |
+| `sites`         | `string[]`                               | The sites this page exists on. Elsewhere it is not found              |
+| `requireReview` | `boolean`                                | Publishing waits for an approval                                      |
+| `migrate`       | `Record<number, (document) => document>` | Steps that bring stored content up to the current fields              |
+| `on`            | `{ published, unpublished, deleted }`    | Functions that run after the fact, with `plugins` and `jobs`          |
 
 ## Example
 

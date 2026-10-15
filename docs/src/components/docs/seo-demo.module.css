@@ -55,12 +55,6 @@
     flex: 0 1 auto;
 }
 
-.suffix {
-    flex-shrink: 0;
-    white-space: nowrap;
-    color: var(--k-muted);
-}
-
 .counter {
     position: absolute;
     right: 10px;
@@ -72,13 +66,6 @@
 .over {
     color: var(--k-ink);
     font-weight: 600;
-}
-
-.switchRow {
-    display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
-    align-items: center;
-    gap: 10px;
 }
 
 .switch {
@@ -239,14 +226,6 @@
     outline-offset: 2px;
 }
 
-.sectionTitle {
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--k-muted);
-}
-
 .tags {
     display: flex;
     flex-direction: column;
@@ -263,11 +242,29 @@
     color: var(--k-ink);
 }
 
-@container (max-width: 520px) {
-    .switchRow {
-        grid-template-columns: minmax(0, 1fr) auto;
-    }
+.suffix {
+    flex-shrink: 0;
+    white-space: nowrap;
+    color: var(--k-muted);
+}
 
+.switches {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    min-height: 32px;
+}
+
+.switchItem {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--k-ink);
+}
+
+@container (max-width: 520px) {
     .card {
         grid-template-columns: minmax(0, 1fr);
     }

@@ -19,10 +19,10 @@ interface Page {
     address: string;
     url: string;
     image: string;
-    suffix: boolean;
 }
 
-const SUFFIX = ' | Acme Blog';
+const SITE_NAME = 'Acme Blog';
+const SUFFIX = ` | ${SITE_NAME}`;
 
 const pages: Record<PageName, Page> = {
     article: {
@@ -33,7 +33,6 @@ const pages: Record<PageName, Page> = {
         address: 'example.com › blog › new-office',
         url: 'https://example.com/blog/new-office',
         image: '/cms/office-corridor.jpg',
-        suffix: true,
     },
     front: {
         tab: 'Front Page',
@@ -43,7 +42,6 @@ const pages: Record<PageName, Page> = {
         address: 'example.com',
         url: 'https://example.com/',
         image: '/cms/team-at-laptops.jpg',
-        suffix: false,
     },
 };
 
@@ -61,11 +59,11 @@ interface Written {
     canonical: string;
 }
 
-const startOf = (page: Page): Written => ({
+const startOf = (): Written => ({
     image: '',
     title: '',
     description: '',
-    siteName: page.suffix,
+    siteName: true,
     indexed: true,
     follow: true,
     canonical: '',
@@ -88,8 +86,7 @@ const shownTabs: Array<{ value: Shown; label: string }> = [
 
 function Switch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
     return (
-        <label className={styles.switchRow}>
-            <span className={demo.label}>{label}</span>
+        <span className={styles.switchItem}>
             <button
                 type="button"
                 role="switch"
@@ -99,7 +96,8 @@ function Switch({ label, checked, onChange }: { label: string; checked: boolean;
                 onClick={() => onChange(!checked)}>
                 <span className={styles.knob} />
             </button>
-        </label>
+            {label}
+        </span>
     );
 }
 
@@ -111,14 +109,16 @@ export function SeoDemo() {
     const [pageName, setPageName] = useState<PageName>('article');
     const [shown, setShown] = useState<Shown>('search');
     const [written, setWritten] = useState<Record<PageName, Written>>({
-        article: startOf(pages.article),
-        front: startOf(pages.front),
+        article: startOf(),
+        front: startOf(),
     });
 
     const page = pages[pageName];
     const values = written[pageName];
-    const suffix = values.siteName ? SUFFIX : '';
-    const title = `${values.title || page.generatedTitle}${suffix}`;
+    const ownTitle = values.title || page.generatedTitle;
+    const repeats = ownTitle.endsWith(SITE_NAME);
+    const suffix = values.siteName && !repeats ? SUFFIX : '';
+    const title = `${ownTitle}${suffix}`;
     const description = values.description || page.generatedDescription;
     const image = values.image || page.image;
     const canonical = values.canonical || page.url;
@@ -182,15 +182,6 @@ export function SeoDemo() {
                             <span className={clsx(styles.counter, title.length > 60 && styles.over)}>{title.length}/60</span>
                         </span>
                     </label>
-                    <Switch
-                        label="Site name"
-                        checked={values.siteName}
-                        onChange={(checked) =>
-                            write({
-                                siteName: checked,
-                            })
-                        }
-                    />
                     <label className={demo.row}>
                         <span className={demo.label}>Description</span>
                         <span className={styles.field}>
@@ -235,28 +226,38 @@ export function SeoDemo() {
                             )}
                         </span>
                     </div>
-                </div>
-
-                <div className={demo.fields}>
-                    <span className={styles.sectionTitle}>Search engines</span>
-                    <Switch
-                        label="Index"
-                        checked={values.indexed}
-                        onChange={(checked) =>
-                            write({
-                                indexed: checked,
-                            })
-                        }
-                    />
-                    <Switch
-                        label="Follow"
-                        checked={values.follow}
-                        onChange={(checked) =>
-                            write({
-                                follow: checked,
-                            })
-                        }
-                    />
+                    <div className={demo.row}>
+                        <span />
+                        <span className={styles.switches}>
+                            <Switch
+                                label="Site name"
+                                checked={values.siteName}
+                                onChange={(checked) =>
+                                    write({
+                                        siteName: checked,
+                                    })
+                                }
+                            />
+                            <Switch
+                                label="Index"
+                                checked={values.indexed}
+                                onChange={(checked) =>
+                                    write({
+                                        indexed: checked,
+                                    })
+                                }
+                            />
+                            <Switch
+                                label="Follow"
+                                checked={values.follow}
+                                onChange={(checked) =>
+                                    write({
+                                        follow: checked,
+                                    })
+                                }
+                            />
+                        </span>
+                    </div>
                     <label className={demo.row}>
                         <span className={demo.label}>Canonical</span>
                         <span className={styles.field}>
