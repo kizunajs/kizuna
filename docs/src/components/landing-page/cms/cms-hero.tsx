@@ -12,19 +12,18 @@ export function CmsHero({ className }: { className?: string }) {
         <section className={clsx(hero.hero, className)}>
             <HeroBackdrop className={hero.backdrop} />
 
-            <h1 className={hero.headline}>Let editors change your site by asking</h1>
+            <h1 className={hero.headline}>The content system for your whole business</h1>
             <p className={hero.tagline}>
-                Editors change the words and images in a chat, or by clicking the page. Built on Kizuna, so you decide in code what they may
-                change.
+                Your sites, their content and the API behind them in one config. Editors change it in their chat or on the page.
             </p>
 
             <div className={hero.actions}>
-                <ButtonLink href="/docs/cms">
+                <ButtonLink href="/docs/cms/quickstart">
                     Get started
                     <ArrowRight aria-hidden />
                 </ButtonLink>
-                <ButtonLink href="/docs/cms/editing" variant="secondary">
-                    How editing works
+                <ButtonLink href="/docs/cms" variant="secondary">
+                    What is Kizuna CMS?
                 </ButtonLink>
             </div>
         </section>

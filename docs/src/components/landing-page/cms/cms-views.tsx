@@ -129,7 +129,7 @@ function NewsletterView() {
                                 <div className={styles.launch}>
                                     <Logo className={styles.launchLogo} aria-hidden />
                                     <span className={styles.launchTitle}>Kizuna CMS</span>
-                                    <span className={styles.launchText}>Editors change your site by asking. Now in alpha.</span>
+                                    <span className={styles.launchText}>Your content, edited in your chat. Now in alpha.</span>
                                     <span className={styles.launchButton}>Try it</span>
                                 </div>
                                 <h3>Upgrade in three steps</h3>

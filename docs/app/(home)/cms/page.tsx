@@ -13,15 +13,16 @@ import { CmsOnPage } from '@/components/landing-page/cms/cms-on-page';
 import { CmsRelationships } from '@/components/landing-page/cms/cms-relationships';
 import { CmsReviews } from '@/components/landing-page/cms/cms-reviews';
 import { CmsRichText } from '@/components/landing-page/cms/cms-rich-text';
+import { CmsSearch } from '@/components/landing-page/cms/cms-search';
 import { CmsSetup } from '@/components/landing-page/cms/cms-setup';
+import { CmsSites } from '@/components/landing-page/cms/cms-sites';
 import { CmsViews } from '@/components/landing-page/cms/cms-views';
 import { cmsFeatures } from '@/lib/cms-features';
 import styles from '../page.module.css';
 
 export const metadata: Metadata = {
     title: 'Kizuna CMS',
-    description:
-        'Let editors change your Next.js site by asking a model, or by clicking the page. You decide in code what they may change.',
+    description: 'Your sites, their content and the API behind them in one config. Editors change it in their chat or on the page.',
 };
 
 export default function CmsPage() {
@@ -54,6 +55,10 @@ export default function CmsPage() {
 
                 <CmsLocalization />
 
+                <CmsSites />
+
+                <CmsSearch />
+
                 <CmsViews />
 
                 <CmsBoundaries />
@@ -63,7 +68,7 @@ export default function CmsPage() {
                 <ClosingCta
                     title="Hand the words to your editors"
                     text="Declare the fields, connect the chat, and let the people who write the site change it."
-                    href="/docs/cms"
+                    href="/docs/cms/quickstart"
                 />
             </div>
         </div>

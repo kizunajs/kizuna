@@ -1,4 +1,17 @@
-import { ArrowLeftRight, Blocks, FileText, Globe, ImageIcon, Library, Link2, Pilcrow, UserCheck } from 'lucide-react';
+import {
+    ArrowLeftRight,
+    Blocks,
+    FileText,
+    Globe,
+    ImageIcon,
+    Languages,
+    Library,
+    Link2,
+    Network,
+    Pilcrow,
+    Search,
+    UserCheck,
+} from 'lucide-react';
 import type { Feature } from './features';
 
 export const cmsFeatures: Feature[] = [
@@ -49,6 +62,24 @@ export const cmsFeatures: Feature[] = [
         title: 'Reviews',
         href: '/docs/cms/reviews',
         description: 'Ask a colleague to look before a page goes live, and name who owns each page.',
+    },
+    {
+        icons: [Languages],
+        title: 'Localization',
+        href: '/docs/cms/localization',
+        description: 'Every page in every language the site serves, published one language at a time.',
+    },
+    {
+        icons: [Network],
+        title: 'Sites',
+        href: '/docs/cms/sites',
+        description: 'Content every site reads, written once, and each site’s own content beside it.',
+    },
+    {
+        icons: [Search],
+        title: 'SEO',
+        href: '/docs/cms/seo',
+        description: 'Titles joined in one place, structured data from the fields, and addresses that last.',
     },
     {
         icons: [ArrowLeftRight],
