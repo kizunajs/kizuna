@@ -13,9 +13,7 @@ export function CmsHero({ className }: { className?: string }) {
             <HeroBackdrop className={hero.backdrop} />
 
             <h1 className={hero.headline}>The content system for your whole business</h1>
-            <p className={hero.tagline}>
-                Your sites, their content and the API behind them in one config. Editors change it in their chat or on the page.
-            </p>
+            <p className={hero.tagline}>Content declared beside the code that shows it. One config, one database, every site you run.</p>
 
             <div className={hero.actions}>
                 <ButtonLink href="/docs/cms/quickstart">
