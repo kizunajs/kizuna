@@ -59,7 +59,7 @@ const result = await cmsClient.content.pages.frontPage();
 
 - **Identities.** `editor` lives on the CMS config, so an app route that names it fails to compile. When a [relationship's](/docs/cms/content#relationships) `options` calls a route that is not public, the editor also needs an identity on the app API, since `options` runs as them.
 - **MCP.** An editor's agent connects to `/cms-api/mcp` and sees content tools alone.
-- **Clients and OpenAPI.** Each API generates its own. A mobile app gets the app client, and the site uses both.
+- **Clients and OpenAPI.** Each API generates its own. A mobile app gets the app client, and the site uses both. A mobile app that shows content reads it through [a route on the app API](#content-in-the-app-api).
 - **Shared ids.** Ids both sides use, like `ProductId`, live in a module both configs import.
 
 ## Talking to the app
@@ -82,6 +82,61 @@ When the app changes a product, it calls `invalidate` through the CMS client, an
     };
 }),
 ```
+
+## Content in the app API
+
+A mobile app talks to the app API, and its news feed comes from the CMS. A route on the app API reads the CMS in process and answers in its own shape, so the Swift and Kotlin clients get the articles from the same client as the rest of the app.
+
+The app imports the CMS config's reader:
+
+```ts title="src/lib/content.ts"
+import kizunaCms from '../../kizuna.cms.config';
+
+export const content = kizunaCms.content;
+```
+
+A route lists the published articles and answers with what the app needs of them:
+
+```ts title="src/routes/news.ts"
+listNews: k
+    .route({
+        method: 'GET',
+        path: '/news',
+        auth: false,
+        summary: 'List the latest news',
+        responses: {
+            200: z.object({
+                articles: z.array(
+                    z.object({
+                        id: ArticleId,
+                        title: z.string(),
+                        imageUrl: z.url(),
+                    })
+                ),
+            }),
+        },
+    })
+    .handler(async () => {
+        const { items } = await content.collections.articles.list({
+            limit: 20,
+        });
+
+        return {
+            status: 200,
+            body: {
+                articles: items.map((article) => ({
+                    id: article.id,
+                    title: article.title,
+                    imageUrl: new URL(article.image.url, process.env.SITE_URL).href,
+                })),
+            },
+        };
+    }),
+```
+
+The reader returns published content alone, since the route has no draft mode. An image's `url` is a path on the CMS API, so the route makes it a full URL for the phone. `ArticleId` is the collection's own id type, so a later route that takes one, like `getNewsArticle`, accepts the ids this one returned.
+
+With [several sites](/docs/cms/sites), the route reads the site the app belongs to, `content.sites.norway.collections.articles.list()`.
 
 ## Images
 
