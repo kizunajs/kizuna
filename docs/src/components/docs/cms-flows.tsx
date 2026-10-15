@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import { Check, Clock, FileText, Globe, Library, Lock, Search } from 'lucide-react';
+import { Check, Clock, FileText, Globe, Library, List, Lock, Pin, Search } from 'lucide-react';
 import { Button, Editor, Footer, FormSection, Help, Row, Shell, TextInput } from '@/components/landing-page/cms/cms-editor-mock';
 import editor from '@/components/landing-page/cms/cms-editor.module.css';
 import styles from './cms-flows.module.css';
@@ -202,19 +202,18 @@ export function SharedReview() {
                 {[
                     {
                         site: 'Group',
-                        pages: ['Contact', 'About Us'],
+                        holds: [],
+                        lists: ['Contact'],
                     },
                     {
                         site: 'United Kingdom',
-                        pages: ['Contact', 'Front Page', 'Events'],
+                        holds: ['Open House, 12 March'],
+                        lists: ['Contact'],
                     },
                     {
                         site: 'Norway',
-                        pages: ['Contact', 'Kontor'],
-                    },
-                    {
-                        site: 'Denmark',
-                        pages: ['Kontakt', 'Forside'],
+                        holds: [],
+                        lists: ['Kontakt'],
                     },
                 ].map((entry) => (
                     <div key={entry.site} className={styles.reachRow}>
@@ -223,15 +222,31 @@ export function SharedReview() {
                             {entry.site}
                         </span>
                         <span className={styles.reachPages}>
-                            {entry.pages.map((pageName) => (
+                            {entry.holds.map((pageName) => (
+                                <span key={pageName} className={clsx(styles.chip, styles.chipYou)}>
+                                    <Pin aria-hidden />
+                                    {pageName}
+                                </span>
+                            ))}
+                            {entry.lists.map((pageName) => (
                                 <span key={pageName} className={styles.chip}>
-                                    <FileText aria-hidden />
+                                    <List aria-hidden />
                                     {pageName}
                                 </span>
                             ))}
                         </span>
                     </div>
                 ))}
+                <span className={styles.legend}>
+                    <span>
+                        <Pin aria-hidden />
+                        Holds this office
+                    </span>
+                    <span>
+                        <List aria-hidden />
+                        Lists offices
+                    </span>
+                </span>
             </div>
             <Footer>
                 <Button variant="secondary">Request changes</Button>
@@ -252,10 +267,6 @@ const refreshed = [
     },
     {
         site: 'Norway',
-        ok: true,
-    },
-    {
-        site: 'Denmark',
         ok: false,
     },
 ];
