@@ -2,7 +2,6 @@
 
 import clsx from 'clsx';
 import { useState } from 'react';
-import { Link2 } from 'lucide-react';
 import Logo from '@/icons/Logo.svg';
 import editor from '@/components/landing-page/cms/cms-editor.module.css';
 import panel from '@/components/landing-page/panel.module.css';
@@ -197,11 +196,14 @@ export function LocalizationDemo() {
 
                 <div className={demo.fields}>
                     {fields.map((field) => {
-                        const shared = !field.localized && !isSource;
                         const fieldBehind = behind.some((candidate) => candidate.name === field.name);
+                        const shared = !field.localized && !isSource;
                         return (
                             <div key={field.name} className={demo.row}>
-                                <span className={demo.label}>{field.label}</span>
+                                <span className={clsx(demo.label, styles.label)}>
+                                    {field.label}
+                                    {field.localized ? <span className={styles.marker}>{locale.toUpperCase()}</span> : null}
+                                </span>
                                 <div className={styles.stack}>
                                     {isSource || shared ? null : (
                                         <span className={clsx(styles.source, fieldBehind && styles.sourceChanged)}>
@@ -215,26 +217,17 @@ export function LocalizationDemo() {
                                             )}
                                         </span>
                                     )}
-                                    {shared ? (
-                                        <span className={styles.shared}>
-                                            <span className={demo.input}>{source.published?.code}</span>
-                                            <span className={demo.muted}>
-                                                <Link2 aria-hidden />
-                                                The same in every language
-                                            </span>
-                                        </span>
-                                    ) : (
-                                        <input
-                                            className={clsx(
-                                                demo.input,
-                                                copy.values[field.name] !== (copy.published?.[field.name] ?? '') && demo.inputChanged
-                                            )}
-                                            aria-label={`${field.label}, ${label}`}
-                                            placeholder="Not translated yet"
-                                            value={copy.values[field.name]}
-                                            onChange={(event) => edit(field.name, event.target.value)}
-                                        />
-                                    )}
+                                    <input
+                                        className={clsx(
+                                            demo.input,
+                                            !shared && copy.values[field.name] !== (copy.published?.[field.name] ?? '') && demo.inputChanged
+                                        )}
+                                        aria-label={`${field.label}, ${label}`}
+                                        placeholder="Not translated yet"
+                                        readOnly={shared}
+                                        value={shared ? (source.published?.[field.name] ?? '') : copy.values[field.name]}
+                                        onChange={(event) => edit(field.name, event.target.value)}
+                                    />
                                 </div>
                             </div>
                         );
@@ -242,13 +235,7 @@ export function LocalizationDemo() {
                 </div>
 
                 <div className={demo.footer}>
-                    <span className={demo.muted}>
-                        {behind.length > 0
-                            ? 'English changed since this was translated.'
-                            : isSource
-                              ? 'The source. Other languages translate it.'
-                              : ''}
-                    </span>
+                    <span />
                     <button type="button" className={clsx(demo.button, demo.primary)} disabled={!canPublish} onClick={publish}>
                         Publish {label}
                     </button>

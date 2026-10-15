@@ -77,31 +77,6 @@
     color: var(--k-ink);
 }
 
-.shared {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-}
-
-.shared > :first-child {
-    display: inline-flex;
-    align-items: center;
-    color: var(--k-muted);
-}
-
-.shared > :last-child {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-}
-
-.shared svg {
-    width: 12px;
-    height: 12px;
-}
-
 .visitor {
     display: flex;
     flex-direction: column;
@@ -141,4 +116,22 @@
         padding: 6px 4px;
         font-size: 11px;
     }
+}
+
+.label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.marker {
+    flex-shrink: 0;
+    border-radius: 4px;
+    background: var(--k-control);
+    box-shadow: var(--k-control-elevation);
+    padding: 1px 4px;
+    font-family: var(--kizuna-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--k-ink);
 }
