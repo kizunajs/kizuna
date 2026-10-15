@@ -11,27 +11,16 @@ One repository, one Next.js app, one CMS config. The app is deployed once per co
 
 ## Declare what a site is
 
-A site has a label, a slug, domains and locales. What else it has, you declare with fields, like a global:
+A site has a label, a slug, domains and locales. Extend its schema with what yours has:
 
 ```ts title="src/cms/site.ts"
 import { z } from 'zod';
-import { defineSite } from '@kizunajs/cms';
+import { SiteSchema } from '@kizunajs/cms';
 
-export const Site = defineSite({
-    fields: [
-        {
-            name: 'companyName',
-            schema: z.string().max(60),
-        },
-        {
-            name: 'currency',
-            schema: z.enum(['NOK', 'DKK', 'SEK']),
-        },
-        {
-            name: 'shopUrl',
-            schema: z.url().optional(),
-        },
-    ],
+export const Site = SiteSchema.extend({
+    companyName: z.string().max(60),
+    currency: z.enum(['NOK', 'DKK', 'SEK']),
+    shopUrl: z.url().optional(),
 });
 ```
 
@@ -43,32 +32,28 @@ content: cms({
     pages,
     globals: [PrivacyPolicy],
     collections: [Treatments, Centers],
-    sites: Site.declared({
+    sites: declareSites(Site, {
         norway: {
             label: 'Example Norge',
             url: 'https://example.no/api',
             locales: ['nb'],
-            data: {
-                companyName: 'Example Norge AS',
-                currency: 'NOK',
-                shopUrl: 'https://shop.example.no',
-            },
+            companyName: 'Example Norge AS',
+            currency: 'NOK',
+            shopUrl: 'https://shop.example.no',
         },
         denmark: {
             label: 'Example Danmark',
             url: 'https://example.dk/api',
             locales: ['da'],
-            data: {
-                companyName: 'Example Danmark ApS',
-                currency: 'DKK',
-            },
+            companyName: 'Example Danmark ApS',
+            currency: 'DKK',
         },
     }),
     site: () => process.env.KIZUNA_SITE,
 }),
 ```
 
-`pages` are the app's, shared by every site. `data` is typed by the site's fields, so a site missing `currency` fails to compile.
+`pages` are the app's, shared by every site. Each site is checked against `Site`, so one missing `currency` fails to compile.
 
 </Step>
 
@@ -83,9 +68,9 @@ const content = await kizuna.content.pages.frontPage.get();
 ```tsx title="src/components/header.tsx"
 const site = await kizuna.content.site.get();
 
-<span>{site.data.companyName}</span>;
+<span>{site.companyName}</span>;
 {
-    site.data.shopUrl !== undefined && <a href={site.data.shopUrl}>Shop</a>;
+    site.shopUrl !== undefined && <a href={site.shopUrl}>Shop</a>;
 }
 ```
 

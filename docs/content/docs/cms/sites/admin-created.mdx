@@ -11,7 +11,7 @@ A developer never hears about a new site.
 
 ## Declare what a site is
 
-The same `defineSite` as everywhere, and the fields are what an admin fills in for each site:
+An admin fills the site in through the editor, so its fields are declared like a global's, with labels:
 
 ```ts title="src/cms/site.ts"
 export const Site = defineSite({
@@ -51,7 +51,7 @@ The request's host picks the site, from the domains the admin entered:
 ```tsx title="src/app/layout.tsx"
 const site = await kizuna.content.site.get();
 
-<body data-theme={site.data.theme}>
+<body data-theme={site.theme}>
 ```
 
 ```tsx title="src/app/page.tsx"
