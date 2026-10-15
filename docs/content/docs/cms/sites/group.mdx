@@ -1,19 +1,18 @@
 ---
-title: Setting up several sites
-description: One repository for the content package, the shared UI and one Next.js app per site, deployed on its own domain and sharing one database.
+title: A group app and a countries app
+description: 'A main site with an app of its own, and country sites sharing a countries app, in one repository.'
 ---
-
-One repository: a content package with the CMS config, a UI package every site renders, and one Next.js app per site. This is the second of the [three shapes](/docs/cms/sites). The first, one app deployed per country, needs none of the workspace below: one Next.js app, `sites` with no `app`, and `KIZUNA_SITE` per deployment.
 
 ```text
 packages/
   content/      kizuna.cms.config.ts, the collections every site reads, shared blocks and fields
-  ui/           components every site renders
+  ui/           components every app renders
 apps/
-  web/          example.com
-  uk/           example.co.uk
-  norway/       example.no
+  group/        example.com
+  countries/    example.co.uk, example.no, deployed once per country
 ```
+
+One repository: a content package with the CMS config, a UI package every site renders, and one Next.js app per site. Sites that share an app need fewer of the steps below; see [Apps](/docs/cms/sites/one-app).
 
 <Steps>
 

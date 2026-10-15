@@ -1,0 +1,81 @@
+---
+title: Sites created by admins
+description: 'Forty dealer sites from one app and one deployment. An admin creates a site in the editor, gives it a domain and adds its people.'
+---
+
+A developer never hears about a new site.
+
+<Steps>
+
+<Step>
+
+## Declare what a site is
+
+The same `defineSite` as everywhere, and the fields are what an admin fills in for each site:
+
+```ts title="src/cms/site.ts"
+export const Site = defineSite({
+    fields: [
+        {
+            name: 'theme',
+            schema: z.enum(['classic', 'bold']),
+        },
+        {
+            name: 'phone',
+            schema: z.string().max(30),
+        },
+    ],
+});
+```
+
+```ts title="kizuna.config.ts"
+content: cms({
+    db,
+    pages,
+    globals: [PrivacyPolicy],
+    collections: [Services],
+    sites: Site,
+}),
+```
+
+`sites: Site` with no list means admins create them. A site has a label, a slug, its domains, its locales, a status, and the fields. A domain serves the site once its DNS is verified, and a suspended site answers with a holding page and keeps its content.
+
+</Step>
+
+<Step>
+
+## Read the site
+
+The request's host picks the site, from the domains the admin entered:
+
+```tsx title="src/app/layout.tsx"
+const site = await kizuna.content.site.get();
+
+<body data-theme={site.data.theme}>
+```
+
+```tsx title="src/app/page.tsx"
+const content = await kizuna.content.pages.frontPage.get();
+```
+
+A page a site has not published is not found on that site.
+
+</Step>
+
+<Step>
+
+## Editors
+
+An admin adds a site's editors in the editor, and they see that site alone. The chain's own staff hold `admin` on `cms()` and see every site.
+
+</Step>
+
+<Step>
+
+## Deploy
+
+One deployment answers every domain. Each domain points at it, and a new site needs no redeploy. Draft mode and the MCP endpoint are per domain, so an editor's chat connects to their own site's.
+
+</Step>
+
+</Steps>

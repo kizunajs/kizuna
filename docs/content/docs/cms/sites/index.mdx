@@ -1,21 +1,21 @@
 ---
 title: Sites
-description: 'One CMS, one database, several sites. Shared content is listed once, and each site adds its own.'
+description: 'Several sites in one CMS, and which setup is yours.'
 ---
 
-A site is a tenant with its own editors. Pick the shape that matches the business:
+Three ideas:
 
-| The business                                             | Shape                                                                         |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| One company, one site, several languages                 | No `sites`. [Localization](/docs/cms/localization)                            |
-| The same site in several countries, each its own company | [One app, many deployments](/docs/cms/sites/one-app)                          |
-| Country sites that differ, sharing a UI                  | [One app per site](/docs/cms/sites/one-app-per-site)                          |
-| A site run by someone else that shows your content       | [Another repository](/docs/cms/sites/publishing#a-site-in-another-repository) |
+- **A site** has its own content and its own editors. Content on `cms()` is shared by every site.
+- **An app** is a Next.js app that renders one site or several.
+- **Sites are declared** in the config by you, or created in the editor by an admin.
 
-In every shape, globals and collections on `cms()` are read by every site, and a site [adds its own](/docs/cms/sites/shared-content). [Editors](/docs/cms/sites/editors) belong to sites, and [publishing](/docs/cms/sites/publishing) reaches every site that shows the change.
+## Choose your setup
 
-A project that started with one site adds `sites` later without moving anything:
+| Example                                                 | Setup                                                                   |
+| ------------------------------------------------------- | ----------------------------------------------------------------------- |
+| A brand in four countries, each country its own company | [One app for every site](/docs/cms/sites/one-app)                       |
+| A group with a main site and country sites              | [A group app and a countries app](/docs/cms/sites/group)                |
+| A chain of forty dealers, each with a site and a domain | [Sites created by admins](/docs/cms/sites/admin-created)                |
+| A partner's site that shows your offices                | [Another repository](/docs/cms/sites/shared-content#another-repository) |
 
-```sh
-kizuna cms rename-site default uk
-```
+Every setup [shares content](/docs/cms/sites/shared-content) the same way.

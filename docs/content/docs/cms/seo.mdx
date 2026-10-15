@@ -107,14 +107,10 @@ A `redirects` collection, served by `nextAdapter()` at request time. Nothing red
 | `to`        | A path, a URL, or a page or item that follows renames |
 | `permanent` | `308`, or `307` for a campaign address                |
 
-<Flow
-    steps={[
-        'An article publishes with a new slug',
-        'The old address redirects to it',
-        'Earlier redirects to the article follow',
-        'A redirect from the new address is removed',
-    ]}
-/>
+1. An article publishes with a new slug.
+2. The old address redirects to it.
+3. Earlier redirects to the article follow.
+4. A redirect from the new address is removed.
 
 Rename-made redirects are read-only. `/offices` and `/offices/` are two addresses, as [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986) says. `GET /content/redirects` lists them for anything that is not Next.
 

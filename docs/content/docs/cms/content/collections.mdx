@@ -117,15 +117,9 @@ Would you keep the record if the website did not exist?
 
 Both use the same `EmployeeId`, so pages keep working.
 
-<Flow
-    steps={[
-        <code>kizuna cms export employees --out employees.json</code>,
-        'Insert them into your table, ids included, and serve a route',
-        'Replace the collection with a relationship of the same name and id',
-        <>
-            <code>kizuna cms orphans</code> lists the stored items to remove
-        </>,
-    ]}
-/>
+1. `kizuna cms export employees --out employees.json`
+2. Insert them into your table, ids included, and serve a route.
+3. Replace the collection with a relationship of the same name and id.
+4. `kizuna cms orphans` lists the stored items to remove.
 
 The other way, `kizuna cms import employees employees.json` creates drafts for an editor to publish.

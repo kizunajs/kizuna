@@ -89,21 +89,6 @@ export function Comparison({ first, other, children }: { first?: ReactNode; othe
 }
 
 /**
- * A sequence, one step after another.
- */
-export function Flow({ steps }: { steps: ReactNode[] }) {
-    return (
-        <ol className={styles.flow}>
-            {steps.map((step, index) => (
-                <li key={index} className={styles.step}>
-                    <span className={styles.stepText}>{step}</span>
-                </li>
-            ))}
-        </ol>
-    );
-}
-
-/**
  * Two code blocks beside each other, the same thing written both ways.
  */
 export function SideBySide({ children }: { children: ReactNode }) {

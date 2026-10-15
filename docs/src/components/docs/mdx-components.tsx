@@ -6,7 +6,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { AdapterTabs } from './adapter-tabs';
 import { CodeBlock } from './code-block';
 import { Card, Cards } from './cards';
-import { Comparison, Flow, Row, SideBySide } from './comparison';
+import { Comparison, Row, SideBySide } from './comparison';
 import { EditorFigure } from './cms-figures';
 import { AccessStyle, AccessStyleSwitch } from './access-style';
 import { ConfigExplorer } from '@/components/code/config-explorer';
@@ -31,7 +31,6 @@ export function getMDXComponents(components: MDXComponents): MDXComponents {
         Card,
         Cards,
         Comparison,
-        Flow,
         EditorFigure,
         Row,
         SideBySide,

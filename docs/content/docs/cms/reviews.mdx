@@ -44,8 +44,8 @@ The reviewer sees it in the editor, in their chat, and wherever you send it:
 
 ```ts title="kizuna.cms.config.ts"
 reviews: {
-    onReviewRequested: async ({ documents, reviewers, requestedBy, note }) => {
-        await sendEmail({
+    onReviewRequested: async ({ documents, reviewers, requestedBy, note }, { plugins }) => {
+        await plugins.resend.sendEmail({
             to: reviewers.map((reviewer) => reviewer.email),
             subject: `${requestedBy.name} asked you to review ${documents.length} pages`,
             text: note ?? '',
@@ -53,6 +53,8 @@ reviews: {
     },
 },
 ```
+
+Every function the CMS calls gets `plugins` and `jobs`, like a route handler, so [Resend](/docs/resend) sends it.
 
 They approve or ask for changes:
 

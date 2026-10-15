@@ -75,3 +75,25 @@ export default definePage({
     ],
 });
 ```
+
+## Publishing reaches every site
+
+1. An office publishes.
+2. A job per site calls its `invalidate` with `{ brand, id }`.
+3. Each site refreshes the pages that hold the id.
+4. The editor shows the result: "Refreshed 3 of 4 sites. The UK did not answer, retrying."
+
+## Another repository
+
+A site in another repository lists `url` and `headers` and no pages. It hears every publish, reads through a [published client](/docs/cms/api#publishing-a-client), and holds shared records through a [relationship](/docs/cms/content/relationships#from-another-kizuna-api).
+
+```ts title="packages/content/kizuna.cms.config.ts"
+sites: {
+    parkSite: {
+        url: 'https://park.example.com/api',
+        headers: {
+            authorization: `Bearer ${process.env.PARK_SITE_KEY}`,
+        },
+    },
+},
+```

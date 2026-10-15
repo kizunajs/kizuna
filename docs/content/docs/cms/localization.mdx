@@ -58,6 +58,36 @@ const content = await kizuna.content.pages.frontPage.get({
 
 Shared fields live on the source and publish with it. Change the price once, and every language shows it.
 
+## Addresses per language
+
+A route's folder is its address in code. A page names its address in each language, and visitors never see the folder:
+
+```ts title="src/app/products/[slug]/content.ts"
+export default definePage({
+    name: 'productPage',
+    collection: Products,
+    paths: {
+        nb: '/produkter/[slug]',
+        en: '/products/[slug]',
+    },
+});
+```
+
+Two things follow from it, and you write neither:
+
+- **The rewrite.** `proxy.ts` sends `/produkter/oak-desk` to the route, and answers the folder's own address, `/products/oak-desk` on the Norwegian site, with `404`.
+- **Links.** `href` builds the address for the current language, from the page's name and its params, so a link never carries a path:
+
+```ts title="src/proxy.ts"
+export { proxy, config } from '@kizunajs/cms/next/proxy';
+```
+
+```tsx
+<Link href={href('productPage', { slug: product.slug })}>{product.name}</Link>
+```
+
+The [sitemap and the language alternates](/docs/cms/seo#languages) come from the same declarations.
+
 ## Translating
 
 The editor shows one language at a time, with the source beside each field. Ask the model for the rest:
