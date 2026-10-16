@@ -109,6 +109,8 @@ export const resolveCoercionPlans = (route: RouteDefinition): void => {
 export const isFormBody = (route: RouteDefinition): boolean =>
     route.contentType === 'multipart/form-data' || route.contentType === 'application/x-www-form-urlencoded';
 
+const DECIMAL_INTEGER = /^-?[0-9]+$/;
+
 const coerceValue = (value: unknown, type: string): unknown => {
     if (typeof value !== 'string') return value;
     if (type === 'number' || type === 'int') {
@@ -120,14 +122,7 @@ const coerceValue = (value: unknown, type: string): unknown => {
         if (value === 'false') return false;
         return value;
     }
-    if (type === 'bigint') {
-        try {
-            return BigInt(value);
-        } catch {
-            // Invalid bigint; leave it for Zod to reject.
-            return value;
-        }
-    }
+    if (type === 'bigint') return DECIMAL_INTEGER.test(value) ? BigInt(value) : value;
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date;
 };

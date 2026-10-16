@@ -166,6 +166,36 @@ describe('applyCoercion', () => {
         });
     });
 
+    it('reads a bigint from decimal digits only', () => {
+        const plan = coercionPlanFor(
+            z.object({
+                cursor: z.bigint(),
+            })
+        );
+        expect(
+            applyCoercion(
+                {
+                    cursor: '-42',
+                },
+                plan
+            )
+        ).toEqual({
+            cursor: -42n,
+        });
+        for (const cursor of ['', ' 42', '0x1f', '1e3', '+42']) {
+            expect(
+                applyCoercion(
+                    {
+                        cursor,
+                    },
+                    plan
+                )
+            ).toEqual({
+                cursor,
+            });
+        }
+    });
+
     it('coerces array elements', () => {
         const plan = coercionPlanFor(
             z.object({
