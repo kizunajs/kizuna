@@ -172,6 +172,23 @@ let user = try await client.users.getUser(
 Text(user.body.id.rawValue)
 ```
 
+## Optional and null fields
+
+An `.optional()` field is a `String?` that defaults to `nil` and is left out of the request. A `.nullable()` field is a `String?` with no default, sent as `null` when you pass `nil`. A `.nullish()` field is a `Nullish<String>`, so you can leave it out with `.absent` or send `.null` to clear it:
+
+```swift
+try await client.users.updatePreferences(
+    .params(id: userID),
+    .body(
+        timezone: nil,
+        signature: .null,
+        mutedChannels: []
+    )
+)
+```
+
+See [Optional and null fields](/docs/zod#optional-and-null-fields) for which to declare.
+
 ## Property naming
 
 By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type.

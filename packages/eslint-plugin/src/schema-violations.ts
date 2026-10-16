@@ -9,9 +9,15 @@ export type SchemaResolver = (identifier: ts.Identifier) => ts.Expression | unde
 /**
  * The ways a kizuna schema can be illegal: `coerce` (uses `z.coerce`),
  * `collection` (`z.set` or `z.map`), `union` (a union of objects with no
- * discriminator), and `transform` (a transform on a response body).
+ * discriminator), `transform` (a transform on a response body), and `nullable`
+ * (a required `.nullable()` field where the wire has no null).
  */
-export type SchemaIssue = 'coerce' | 'collection' | 'union' | 'transform';
+export type SchemaIssue = 'coerce' | 'collection' | 'union' | 'transform' | 'nullable';
+
+/**
+ * What carries the schema. A query, path, header or form field is text, which has no null.
+ */
+export type SchemaWire = 'json' | 'text';
 
 /**
  * Which way a schema travels, since a transform is only unreadable on the way out.
@@ -82,7 +88,34 @@ const resolvesToObject = (node: ts.Node, resolve: SchemaResolver, depth = 0): bo
     return false;
 };
 
-export const collectSchemaIssues = (root: ts.Node, resolve: SchemaResolver, position: SchemaPosition = 'request'): SchemaViolation[] => {
+const LEAVE_OUT_METHODS = new Set(['optional', 'nullish', 'default', 'prefault', 'catch']);
+
+/**
+ * Whether a `.nullable()` call is later wrapped so its key may be left out, as in
+ * `.nullable().optional()` or `z.optional(z.string().nullable())`.
+ */
+const mayBeLeftOut = (call: ts.CallExpression): boolean => {
+    let current: ts.Node = call;
+    while (true) {
+        const parent = current.parent;
+        if (ts.isPropertyAccessExpression(parent) && parent.expression === current && ts.isCallExpression(parent.parent)) {
+            if (LEAVE_OUT_METHODS.has(parent.name.text)) return true;
+            current = parent.parent;
+            continue;
+        }
+        if (ts.isCallExpression(parent) && parent.arguments.includes(current as ts.Expression)) {
+            return zodCall(parent, 'optional') !== undefined || zodCall(parent, 'nullish') !== undefined;
+        }
+        return false;
+    }
+};
+
+export const collectSchemaIssues = (
+    root: ts.Node,
+    resolve: SchemaResolver,
+    position: SchemaPosition = 'request',
+    wire: SchemaWire = 'json'
+): SchemaViolation[] => {
     const violations: SchemaViolation[] = [];
     const reported = new Set<string>();
     const visited = new Set<ts.Node>();
@@ -103,6 +136,12 @@ export const collectSchemaIssues = (root: ts.Node, resolve: SchemaResolver, posi
         // A predicate's return type is unknowable, so no generator can name what a response sends.
         if (position === 'response' && ts.isPropertyAccessExpression(node) && node.name.text === 'transform') {
             add('transform', node, viaReference);
+        }
+
+        if (wire === 'text' && ts.isCallExpression(node) && !mayBeLeftOut(node)) {
+            const callee = node.expression;
+            if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'nullable') add('nullable', callee, viaReference);
+            else if (zodCall(node, 'nullable')) add('nullable', callee, viaReference);
         }
 
         const union = zodCall(node, 'union');

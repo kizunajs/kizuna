@@ -70,6 +70,11 @@ export namespace API {
         code?: "unauthenticated" | "expired_token" | "forbidden" | "not_found";
     };
 
+    export type MutedChannel = {
+        channel: string;
+        until: string | null;
+    };
+
     export type NotificationEvent = EmailEvent | SmsEvent;
 
     /**
@@ -154,6 +159,13 @@ export namespace API {
      * A branded `string`. Responses hand one back, and `toUserId` makes one from a plain value.
      */
     export type UserId = string & KizunaBrand<"UserId">;
+
+    export type UserPreferences = {
+        timezone: string | null;
+        locale?: string;
+        signature?: string | null;
+        mutedChannels: Array<MutedChannel>;
+    };
 
     export type UserSessionEvent = {
         kind: "login";
@@ -294,6 +306,18 @@ export namespace API {
         export type Result =
             | { status: 201; body: User; headers: Record<string, string> }
             | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace UsersUpdatePreferences {
+        export type Params = {
+            id: UserId;
+        };
+
+        export type Body = UserPreferences;
+
+        export type Result =
+            | { status: 200; body: UserPreferences; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace UsersDeleteUser {
@@ -928,6 +952,28 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.UsersCreateUser.Result>;
         /**
+         * Replace a user's preferences, exercises required nullable fields round-tripping through the clients
+         *
+         * @example
+         * const result = await client.users.updatePreferences({
+         *     params: {
+         *         id: '1',
+         *     },
+         *     body: {
+         *         timezone: 'string',
+         *         mutedChannels: [
+         *             {},
+         *         ],
+         *     },
+         * });
+         */
+        updatePreferences: ClientMethod<'PUT', false, {
+            params: API.UsersUpdatePreferences.Params;
+            body: API.UsersUpdatePreferences.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.UsersUpdatePreferences.Result>;
+        /**
          * Delete a user
          *
          * @deprecated use `archiveUser` instead
@@ -1423,6 +1469,14 @@ const routes: GeneratedRoutes = {
             path: '/users',
             responses: {
                 201: {},
+                400: {},
+            },
+        },
+        updatePreferences: {
+            method: 'PUT',
+            path: '/users/:id/preferences',
+            responses: {
+                200: {},
                 400: {},
             },
         },
