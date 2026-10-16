@@ -1,6 +1,6 @@
 {
   "name": "@kizunajs/fetch",
-  "version": "2.0.0-beta.16",
+  "version": "2.0.0-beta.17",
   "description": "Fetch client generation for Kizuna.js APIs",
   "keywords": [
     "kizunajs",
