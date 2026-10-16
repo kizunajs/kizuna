@@ -1844,7 +1844,7 @@ export const entriesToObject = (source: URLSearchParams | FormData): Record<stri
  * whose text core already read.
  */
 export const parseBodyText = (text: string, route: RouteDefinition): unknown => {
-    if (route.contentType === 'application/x-www-form-urlencoded') return Object.fromEntries(new URLSearchParams(text));
+    if (route.contentType === 'application/x-www-form-urlencoded') return entriesToObject(new URLSearchParams(text));
     return text.length > 0 ? JSON.parse(text) : undefined;
 };
 
@@ -1859,7 +1859,7 @@ export const parseFetchBody = async (request: Request, route: RouteDefinition): 
         case 'multipart/form-data':
             return entriesToObject(await request.formData());
         case 'application/x-www-form-urlencoded':
-            return Object.fromEntries(new URLSearchParams(await request.text()));
+            return entriesToObject(new URLSearchParams(await request.text()));
         default: {
             const text = await request.text();
             return text.length > 0 ? JSON.parse(text) : undefined;

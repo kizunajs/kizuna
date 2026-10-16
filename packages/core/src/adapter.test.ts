@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ProblemDetailsSchema } from './schemas.js';
-import { defineAdapter, renderJsonResult, ResponseValidationError, type AdapterRequest, type AdapterResult } from './adapter.js';
+import {
+    defineAdapter,
+    parseBodyText,
+    parseFetchBody,
+    renderJsonResult,
+    ResponseValidationError,
+    type AdapterRequest,
+    type AdapterResult,
+} from './adapter.js';
+import type { RouteDefinition } from './types.js';
 import { Kizuna } from './kizuna.js';
 
 interface Config {
@@ -389,5 +398,32 @@ describe('renderJsonResult: non-JSON and binary bodies', () => {
                 headers: {},
             })
         ).toThrow(/must be a string or Uint8Array/);
+    });
+});
+
+describe('urlencoded bodies', () => {
+    const formRoute = {
+        contentType: 'application/x-www-form-urlencoded',
+    } as RouteDefinition;
+
+    it('collects a repeated key into a list when parsing text', () => {
+        expect(parseBodyText('tags=work&tags=urgent&title=Plan', formRoute)).toEqual({
+            tags: ['work', 'urgent'],
+            title: 'Plan',
+        });
+    });
+
+    it('collects a repeated key into a list when parsing a request', async () => {
+        const request = new Request('http://localhost/notes', {
+            method: 'POST',
+            body: 'tags=work&tags=urgent&title=Plan',
+            headers: {
+                'content-type': 'application/x-www-form-urlencoded',
+            },
+        });
+        expect(await parseFetchBody(request, formRoute)).toEqual({
+            tags: ['work', 'urgent'],
+            title: 'Plan',
+        });
     });
 });
