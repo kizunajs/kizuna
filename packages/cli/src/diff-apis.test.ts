@@ -189,6 +189,27 @@ describe('schemas, compared field by field', () => {
 
         expect(summaries(diffApis(before, after))).toContain('GET /users query.sort is enum instead of string');
     });
+
+    it('reports a response field that can now be null as breaking', () => {
+        const after = contractOf({
+            createUser: {
+                method: 'POST',
+                path: '/users',
+                body: z.object({
+                    name: z.string(),
+                }),
+                responses: {
+                    201: z.object({
+                        id: z.string(),
+                        nickname: z.string().nullable(),
+                    }),
+                },
+            },
+        });
+
+        expect(summaries(diffApis(withBody, after))).toContain('POST /users 201.nickname can now be null');
+        expect(hasBreakingChange(diffApis(withBody, after))).toBe(true);
+    });
 });
 
 describe('what a document cannot carry', () => {

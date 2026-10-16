@@ -64,11 +64,36 @@ export const diffSchemas = (
         return [{ breaking: direction === 'response', path, summary: `${path || 'the body'} is gone` }];
     }
 
+    if (before.kind !== after.kind) {
+        return [
+            {
+                breaking: true,
+                path,
+                summary: `${path || 'the body'} is ${describeKind(after)} instead of ${describeKind(before)}`,
+            },
+        ];
+    }
+
     const changes: SchemaChange[] = [];
+
+    // A caller decodes a response it never expected to hold `null`, and a
+    // server rejects the `null` a caller was allowed to send.
+    const wasNullable = before.nullable === true;
+    const isNullable = after.nullable === true;
+    if (wasNullable !== isNullable) {
+        changes.push({
+            breaking: direction === (isNullable ? 'response' : 'request'),
+            path,
+            summary: isNullable ? `${path || 'the body'} can now be null` : `${path || 'the body'} can no longer be null`,
+        });
+    }
 
     const beforeElement = elementOf(before);
     const afterElement = elementOf(after);
-    if (beforeElement && afterElement) return diffSchemas(beforeElement, afterElement, direction, `${path}[]`);
+    if (beforeElement && afterElement) {
+        changes.push(...diffSchemas(beforeElement, afterElement, direction, `${path}[]`));
+        return changes;
+    }
 
     const beforeFields = fieldsOf(before);
     const afterFields = fieldsOf(after);
@@ -92,6 +117,13 @@ export const diffSchemas = (
             if (existing.optional && !field.optional) {
                 changes.push({ breaking: direction === 'request', path: here, summary: `${here} is no longer optional` });
             }
+            if (!existing.optional && field.optional) {
+                changes.push({
+                    breaking: direction === 'response',
+                    path: here,
+                    summary: direction === 'response' ? `${here} may now be left out` : `${here} is now optional`,
+                });
+            }
 
             changes.push(...diffSchemas(existing.schema, field.schema, direction, here));
         }
@@ -103,16 +135,6 @@ export const diffSchemas = (
         }
 
         return changes;
-    }
-
-    if (before.kind !== after.kind) {
-        return [
-            {
-                breaking: true,
-                path,
-                summary: `${path || 'the body'} is ${describeKind(after)} instead of ${describeKind(before)}`,
-            },
-        ];
     }
 
     const was = valuesOf(before);

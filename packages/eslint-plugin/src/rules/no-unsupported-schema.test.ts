@@ -66,4 +66,8 @@ describe.each([
     it('flags a transform on the way out but not on the way in', async () => {
         expect(await messageIdsFor('contract-transform.ts', parserOptions)).toEqual(['transform']);
     });
+
+    it('flags a required nullable query, header or form field, and leaves JSON bodies and responses alone', async () => {
+        expect(await messageIdsFor('contract-nullable.ts', parserOptions)).toEqual(['nullable', 'nullable', 'nullable']);
+    });
 });

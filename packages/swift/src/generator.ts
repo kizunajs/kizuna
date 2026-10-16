@@ -33,6 +33,7 @@ import {
     TypeRegistry,
     mapType,
     collectObjectFields,
+    hasDefault,
     objectFieldCount,
     objectShapeKeys,
     type SwiftBrand,
@@ -213,7 +214,7 @@ const buildRouteMethod = (
                 } else {
                     // Object body of any field count: exposed as a labeled tuple, rebuilt into the
                     // Codable Input internally. Tuples handle any arity, so there is no flatten cap.
-                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint);
+                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, true);
                     bodyDescriptor = {
                         kind: 'json-flat',
                         structName,
@@ -471,6 +472,69 @@ const sanitizeEnumCaseName = (value: string): string => {
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };
 
+const NULLISH_TYPE = /^Nullish<(.+)>$/;
+
+const emitNullish = (writer: SwiftWriter): void => {
+    writer.blank();
+    writer.docComment('A `.nullish()` field: left out, sent as `null`, or sent with a value.');
+    writer.block('public enum Nullish<Wrapped>', () => {
+        writer.line('case absent');
+        writer.line('case null');
+        writer.line('case some(Wrapped)');
+        writer.blank();
+        writer.block('public var value: Wrapped?', () => {
+            writer.line('if case .some(let value) = self { return value }');
+            writer.line('return nil');
+        });
+    });
+    writer.blank();
+    writer.line('extension Nullish: Sendable where Wrapped: Sendable {}');
+    writer.line('extension Nullish: Equatable where Wrapped: Equatable {}');
+    writer.line('extension Nullish: Hashable where Wrapped: Hashable {}');
+    writer.blank();
+    writer.block('extension Nullish: Encodable where Wrapped: Encodable', () => {
+        writer.block('public func encode(to encoder: Encoder) throws', () => {
+            writer.line('var container = encoder.singleValueContainer()');
+            writer.line('switch self {');
+            writer.line('case .absent, .null: try container.encodeNil()');
+            writer.line('case .some(let value): try container.encode(value)');
+            writer.line('}');
+        });
+    });
+    writer.blank();
+    writer.block('extension Nullish: Decodable where Wrapped: Decodable', () => {
+        writer.block('public init(from decoder: Decoder) throws', () => {
+            writer.line('let container = try decoder.singleValueContainer()');
+            writer.line('self = container.decodeNil() ? .null : .some(try container.decode(Wrapped.self))');
+        });
+    });
+    writer.blank();
+    writer.block('extension KeyedEncodingContainer', () => {
+        writer.block('public mutating func encode<Wrapped: Encodable>(_ value: Nullish<Wrapped>, forKey key: Key) throws', () => {
+            writer.line('switch value {');
+            writer.line('case .absent: return');
+            writer.line('case .null: try encodeNil(forKey: key)');
+            writer.line('case .some(let wrapped): try encode(wrapped, forKey: key)');
+            writer.line('}');
+        });
+    });
+    writer.blank();
+    writer.block('extension KeyedDecodingContainer', () => {
+        writer.block(
+            'public func decode<Wrapped: Decodable>(_ type: Nullish<Wrapped>.Type, forKey key: Key) throws -> Nullish<Wrapped>',
+            () => {
+                writer.line('guard contains(key) else { return .absent }');
+                writer.line('return try decodeNil(forKey: key) ? .null : .some(try decode(Wrapped.self, forKey: key))');
+            }
+        );
+    });
+};
+
+const defaultArgument = (field: SwiftField): string => {
+    if (!hasDefault(field)) return '';
+    return field.nullish ? ' = .absent' : ' = nil';
+};
+
 const optionalize = (type: string, optional: boolean): string => {
     if (!optional) return type;
     return type.endsWith('?') ? type : `${type}?`;
@@ -494,7 +558,7 @@ const emitNamedFactory = (
     }
     const params = fields.map((field) => {
         const typeExpression = optionalize(field.type, field.optional);
-        const defaultPart = field.optional ? ' = nil' : '';
+        const defaultPart = defaultArgument(field);
         return `${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
     });
     const args = fields.map((field) => `${field.name}: ${escapeKeyword(field.name)}`).join(', ');
@@ -524,7 +588,7 @@ const emitMemberwiseInit = (
     }
     const params = fields.map((field) => {
         const typeExpression = optionalize(field.type, field.optional);
-        const defaultPart = field.optional ? ' = nil' : '';
+        const defaultPart = defaultArgument(field);
         return `${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
     });
     if (params.length === 1) {
@@ -713,6 +777,8 @@ const emitStruct = (
     const conformances = hasFile ? 'Sendable, Equatable' : 'Codable, Sendable, Equatable';
 
     const resolveOwnedType = (raw: string): string => {
+        const nullish = NULLISH_TYPE.exec(raw);
+        if (nullish) return `Nullish<${resolveOwnedType(nullish[1]!)}>`;
         const optional = raw.endsWith('?');
         const stripped = optional ? raw.slice(0, -1) : raw;
         const isArray = stripped.startsWith('[') && stripped.endsWith(']');
@@ -732,9 +798,13 @@ const emitStruct = (
         type: resolveOwnedType(field.type),
     }));
 
+    const needsEncode = !hasFile && type.fields.some((field) => field.requiredNullable === true);
     const needsCodingKeys =
-        !hasFile &&
-        type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name) || field.deprecated === true);
+        needsEncode ||
+        (!hasFile &&
+            type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name) || field.deprecated === true));
+    const storageName = (field: SwiftField): string =>
+        field.deprecated ? deprecatedStorageName(field, type.fields) : escapeKeyword(field.name);
     writer.block(`public struct ${type.name}: ${conformances}`, () => {
         emitOwnedTypes(writer, lookupName, context, ownedTypeMap, ownedTypeLookup);
         for (const field of type.fields) {
@@ -763,10 +833,18 @@ const emitStruct = (
                 }
             });
         }
+        if (needsEncode) {
+            writer.blank();
+            writer.block('public func encode(to encoder: Encoder) throws', () => {
+                writer.line('var container = encoder.container(keyedBy: CodingKeys.self)');
+                for (const field of type.fields) {
+                    const encodeCall = field.optional && field.requiredNullable !== true ? 'encodeIfPresent' : 'encode';
+                    writer.line(`try container.${encodeCall}(${storageName(field)}, forKey: .${storageName(field)})`);
+                }
+            });
+        }
         writer.blank();
-        emitMemberwiseInit(writer, adjustedFields, (field) =>
-            field.deprecated ? deprecatedStorageName(field, type.fields) : escapeKeyword(field.name)
-        );
+        emitMemberwiseInit(writer, adjustedFields, storageName);
     });
 };
 
@@ -823,7 +901,7 @@ const emitDiscriminatedEnum = (
             const valueFields = payloadStruct.fields.filter((field) => !isDiscriminator(field));
             const factoryParams = valueFields
                 .map((field) => {
-                    const defaultPart = field.optional ? ' = nil' : '';
+                    const defaultPart = defaultArgument(field);
                     const relative = ownedTypeMap && relativeOwnedPath(field.type, ownedTypeMap, lookupName);
                     const fieldType = relative ?? resolveType(field.type, undefined, context);
                     return `${escapeKeyword(field.name)}: ${optionalize(fieldType, field.optional)}${defaultPart}`;
@@ -949,6 +1027,8 @@ const resolveType = (
     scope: 'operation-enum' | 'actor' = 'actor'
 ): string => {
     const { operationTypeMap, namespaceName, clientName, fileLevelTypeNames } = context;
+    const nullish = NULLISH_TYPE.exec(typeName);
+    if (nullish) return `Nullish<${resolveType(nullish[1]!, currentOperation, context, scope)}>`;
     const optional = typeName.endsWith('?');
     const base = optional ? typeName.slice(0, -1) : typeName;
 
@@ -1698,7 +1778,7 @@ const methodGroups = (method: RouteMethod, context: EmitContext): MethodGroup[] 
             varName: 'query',
             type: groupTypeRef(operationName, 'Query', context),
             factory: 'query',
-            required: method.query.some((field) => !field.optional),
+            required: method.query.some((field) => !hasDefault(field)),
         });
     }
     if (method.headers.length > 0) {
@@ -1706,7 +1786,7 @@ const methodGroups = (method: RouteMethod, context: EmitContext): MethodGroup[] 
             varName: 'headers',
             type: groupTypeRef(operationName, 'Headers', context),
             factory: 'headers',
-            required: method.headers.some((field) => !field.optional),
+            required: method.headers.some((field) => !hasDefault(field)),
         });
     }
 
@@ -2038,11 +2118,20 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
         writer.line('var multipart = Kizuna.MultipartBuilder()');
         for (const field of body.multipartFields) {
             const flattenedField = body.flattened.find((candidate) => candidate.name === field.name);
-            const accessor = `body.${escapeKeyword(field.name)}`;
-            if (field.isFile || flattenedField?.isFile === true) {
-                writer.line(`multipart.appendFile(name: ${stringLiteral(field.wireName)}, file: ${accessor})`);
+            const isFile = field.isFile || flattenedField?.isFile === true;
+            const append = (accessor: string): void => {
+                if (isFile) {
+                    writer.line(`multipart.appendFile(name: ${stringLiteral(field.wireName)}, file: ${accessor})`);
+                } else {
+                    writer.line(`multipart.appendField(name: ${stringLiteral(field.wireName)}, value: String(describing: ${accessor}))`);
+                }
+            };
+            if (flattenedField?.optional === true) {
+                writer.block(`if let value = body.${escapeKeyword(field.name)}`, () => {
+                    append('value');
+                });
             } else {
-                writer.line(`multipart.appendField(name: ${stringLiteral(field.wireName)}, value: String(describing: ${accessor}))`);
+                append(`body.${escapeKeyword(field.name)}`);
             }
         }
         writer.line('request.httpBody = multipart.finalize()');
@@ -2073,7 +2162,7 @@ const emitClient = (
     const usesMultipart = allMethods.some((method) => method.body?.kind === 'multipart');
 
     const contextFields = context.requestContextFields;
-    const contextRequired = contextFields.some((field) => !field.optional);
+    const contextRequired = contextFields.some((field) => !hasDefault(field));
 
     writer.blank();
     writer.block(`public final class ${clientName}: Sendable`, () => {
@@ -2086,7 +2175,7 @@ const emitClient = (
                 }
                 writer.blank();
                 const initParams = contextFields
-                    .map((field) => `${escapeKeyword(field.name)}: ${field.type}${field.optional ? ' = nil' : ''}`)
+                    .map((field) => `${escapeKeyword(field.name)}: ${field.type}${defaultArgument(field)}`)
                     .join(', ');
                 writer.block(`public init(${initParams})`, () => {
                     for (const field of contextFields) {
@@ -2354,6 +2443,8 @@ const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, regis
     for (const group of partition.groups) {
         emitSubClientStruct(writer, group, clientName, context);
     }
+
+    if (registry.usesNullish) emitNullish(writer);
 
     emitKizunaFailureProtocols(writer);
 

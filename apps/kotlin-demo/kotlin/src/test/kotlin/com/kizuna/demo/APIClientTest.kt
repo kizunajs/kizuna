@@ -2,6 +2,8 @@ package com.kizuna.demo
 
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.test.*
 
 class APIClientTest {
@@ -469,5 +471,63 @@ class APIClientTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun testRequiredNullableFieldsAreSentAsNull() = runTest {
+        val updated = client.users.updatePreferences {
+            params(
+                id = API.UserId("1"),
+            ).body(
+                timezone = null,
+                mutedChannels = listOf(
+                    API.MutedChannel(
+                        channel = "email",
+                        until = null,
+                    ),
+                ),
+            )
+        }
+        assertNull(updated.body.timezone)
+        assertNull(updated.body.mutedChannels[0].until)
+
+        val encoded = Json.encodeToString(updated.body)
+        assertTrue(""""timezone":null""" in encoded, "a nullable field is sent as null")
+        assertTrue(""""until":null""" in encoded, "a nested nullable field is sent as null")
+        assertFalse(""""locale"""" in encoded, "an optional field is left out")
+    }
+
+    @Test
+    fun testNullishFieldKeepsAllThreeStates() = runTest {
+        for (state in listOf<Nullish<String>>(Nullish.Absent, Nullish.Null, Nullish.Some("Ada"))) {
+            val updated = client.users.updatePreferences {
+                params(
+                    id = API.UserId("1"),
+                ).body(
+                    timezone = "Europe/Oslo",
+                    signature = state,
+                    mutedChannels = emptyList(),
+                )
+            }
+            assertEquals(state, updated.body.signature)
+        }
+
+        val absent = Json.encodeToString(
+            API.UserPreferences(
+                timezone = null,
+                signature = Nullish.Absent,
+                mutedChannels = emptyList(),
+            )
+        )
+        assertFalse(""""signature"""" in absent, "an absent nullish field is left out")
+
+        val sentNull = Json.encodeToString(
+            API.UserPreferences(
+                timezone = null,
+                signature = Nullish.Null,
+                mutedChannels = emptyList(),
+            )
+        )
+        assertTrue(""""signature":null""" in sentNull, "a null nullish field is sent as null")
     }
 }
