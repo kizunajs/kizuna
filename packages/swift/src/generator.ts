@@ -1336,7 +1336,7 @@ const emitKizunaStreaming = (writer: SwiftWriter): void => {
     });
     writer.blank();
     writer.block(
-        'static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse)',
+        'static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse)',
         () => {
             writer.line('if let requestMiddleware {');
             writer.line('    do { try await requestMiddleware(&request) }');
@@ -1350,6 +1350,8 @@ const emitKizunaStreaming = (writer: SwiftWriter): void => {
             writer.line('catch is CancellationError { throw Failure.cancelled }');
             writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
             writer.line('catch { throw Failure.requestFailed(error) }');
+            // A stream's body is read as it arrives, so the middleware sees the response with an empty body.
+            writer.line('if let responseMiddleware { await responseMiddleware(request, Foundation.Data(), response) }');
             writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
             writer.line('return (bytes, httpResponse.statusCode, httpResponse)');
         }
@@ -1942,7 +1944,7 @@ const emitStreamMethodTail = (
     const hasHeaders = method.resultHeaderFields.length > 0;
     const collect = `let data = try await Kizuna.collect(bytes, failure: ${failure}.self)`;
     writer.line(
-        `let (bytes, statusCode, ${responseBinding}) = try await Kizuna.open(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, failure: ${failure}.self)`
+        `let (bytes, statusCode, ${responseBinding}) = try await Kizuna.open(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
     );
     writer.line('switch statusCode {');
     writer.line(`case ${stream.status}:`);
