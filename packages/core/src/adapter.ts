@@ -1821,9 +1821,12 @@ const renderResult = (
     }
 };
 
-const formDataToObject = (form: FormData): Record<string, unknown> => {
+/**
+ * A query string or form as an object. A repeated key collects every value into a list.
+ */
+export const entriesToObject = (source: URLSearchParams | FormData): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
-    for (const [key, value] of form.entries()) {
+    for (const [key, value] of source.entries()) {
         const existing = result[key];
         if (existing === undefined) {
             result[key] = value;
@@ -1854,7 +1857,7 @@ export const parseBodyText = (text: string, route: RouteDefinition): unknown => 
 export const parseFetchBody = async (request: Request, route: RouteDefinition): Promise<unknown> => {
     switch (route.contentType) {
         case 'multipart/form-data':
-            return formDataToObject(await request.formData());
+            return entriesToObject(await request.formData());
         case 'application/x-www-form-urlencoded':
             return Object.fromEntries(new URLSearchParams(await request.text()));
         default: {

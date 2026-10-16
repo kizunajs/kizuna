@@ -398,6 +398,36 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'query.repeatedKeys': async () => {
+            await createAda();
+            await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Grace',
+                    email: 'grace@example.com',
+                },
+            });
+            const response = await api.request({
+                method: 'GET',
+                path: '/users?ids=1&ids=2',
+            });
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                users: [
+                    {
+                        id: '1',
+                        name: 'Ada',
+                    },
+                    {
+                        id: '2',
+                        name: 'Grace',
+                    },
+                ],
+                total: 2,
+            });
+        },
+
         'body.json': async () => {
             const response = await createAda();
             expect(response.status).toBe(201);

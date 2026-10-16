@@ -42,6 +42,9 @@ export const ADAPTER_FEATURES = {
     'query.singleValueArray': {
         summary: 'A single value for a list query param arrives as a one-item list.',
     },
+    'query.repeatedKeys': {
+        summary: 'A repeated query key arrives as a list of every value.',
+    },
     'body.json': {
         summary: 'A JSON body validates and reaches the handler typed.',
     },
