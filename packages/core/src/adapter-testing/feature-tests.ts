@@ -372,6 +372,32 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'query.singleValueArray': async () => {
+            await createAda();
+            await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Grace',
+                    email: 'grace@example.com',
+                },
+            });
+            const response = await api.request({
+                method: 'GET',
+                path: '/users?ids=2',
+            });
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                users: [
+                    {
+                        id: '2',
+                        name: 'Grace',
+                    },
+                ],
+                total: 1,
+            });
+        },
+
         'body.json': async () => {
             const response = await createAda();
             expect(response.status).toBe(201);

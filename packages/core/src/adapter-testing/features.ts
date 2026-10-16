@@ -39,6 +39,9 @@ export const ADAPTER_FEATURES = {
     'query.coercion': {
         summary: 'Query strings coerce to the declared types before validation.',
     },
+    'query.singleValueArray': {
+        summary: 'A single value for a list query param arrives as a one-item list.',
+    },
     'body.json': {
         summary: 'A JSON body validates and reaches the handler typed.',
     },
