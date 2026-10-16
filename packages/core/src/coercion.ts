@@ -1,6 +1,13 @@
 import type { z } from 'zod';
 import type { RouteDefinition } from './types.js';
-import { readDef, readObjectShape, resolveBaseType, WRAPPER_TYPES } from './zod-internals.js';
+import {
+    readDef,
+    readDiscriminatedUnion,
+    readDiscriminatorLiteral,
+    readObjectShape,
+    resolveBaseType,
+    WRAPPER_TYPES,
+} from './zod-internals.js';
 
 /**
  * The schema kinds a path/query/header string is coerced into. A field of any
@@ -90,7 +97,10 @@ export const resolveCoercionPlans = (route: RouteDefinition): void => {
     if (route.pathParams) coercionPlanFor(route.pathParams);
     if (route.query) coercionPlanFor(route.query);
     if (route.headers) coercionPlanFor(route.headers);
-    if (route.body && isFormBody(route)) coercionPlanFor(route.body);
+    if (route.body) {
+        if (isFormBody(route)) coercionPlanFor(route.body);
+        else jsonConverterFor(route.body);
+    }
 };
 
 /**
@@ -155,4 +165,114 @@ export const applyCoercion = (input: unknown, plan: CoercionPlan): unknown => {
         result[field.key] = coerced;
     }
     return result ?? input;
+};
+
+/**
+ * Converts the strings a JSON body carries for its dates and bigints, or `null`
+ * when the schema has neither.
+ */
+type JsonConverter = ((value: unknown) => unknown) | null;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const convertEntries = (record: Record<string, unknown>, converterFor: (key: string) => JsonConverter): Record<string, unknown> => {
+    let result: Record<string, unknown> | undefined;
+    for (const [key, value] of Object.entries(record)) {
+        const convert = converterFor(key);
+        if (!convert || value === undefined) continue;
+        const converted = convert(value);
+        if (converted === value) continue;
+        result ??= { ...record };
+        result[key] = converted;
+    }
+    return result ?? record;
+};
+
+const convertItems = (items: unknown[], converterAt: (index: number) => JsonConverter): unknown[] => {
+    let changed = false;
+    const converted = items.map((item, index) => {
+        const next = converterAt(index)?.(item) ?? item;
+        if (next !== item) changed = true;
+        return next;
+    });
+    return changed ? converted : items;
+};
+
+const jsonConverters = new WeakMap<z.core.$ZodType, JsonConverter>();
+
+const buildJsonConverter = (schema: z.core.$ZodType): JsonConverter => {
+    const def = readDef(schema);
+    if (def.type && WRAPPER_TYPES.has(def.type) && def.innerType) return jsonConverterFor(def.innerType);
+    if (def.type === 'pipe' && def.in) return jsonConverterFor(def.in);
+    if (def.type === 'date' || def.type === 'bigint') {
+        const type = def.type;
+        return (value) => coerceValue(value, type);
+    }
+    if (def.shape) {
+        const fields = new Map<string, NonNullable<JsonConverter>>();
+        for (const [key, field] of Object.entries(def.shape)) {
+            const convert = jsonConverterFor(field);
+            if (convert) fields.set(key, convert);
+        }
+        if (fields.size === 0) return null;
+        return (value) => (isRecord(value) ? convertEntries(value, (key) => fields.get(key) ?? null) : value);
+    }
+    if (def.type === 'array' && def.element) {
+        const convert = jsonConverterFor(def.element);
+        if (!convert) return null;
+        return (value) => (Array.isArray(value) ? convertItems(value, () => convert) : value);
+    }
+    if (def.type === 'tuple' && def.items) {
+        const converters = def.items.map(jsonConverterFor);
+        const rest = def.rest ? jsonConverterFor(def.rest) : null;
+        if (!rest && converters.every((convert) => convert === null)) return null;
+        return (value) => (Array.isArray(value) ? convertItems(value, (index) => converters[index] ?? rest) : value);
+    }
+    if (def.type === 'record' && def.valueType) {
+        const convert = jsonConverterFor(def.valueType);
+        if (!convert) return null;
+        return (value) => (isRecord(value) ? convertEntries(value, () => convert) : value);
+    }
+    const union = readDiscriminatedUnion(schema);
+    if (union) {
+        const variants = new Map<unknown, NonNullable<JsonConverter>>();
+        for (const option of union.options) {
+            const convert = jsonConverterFor(option);
+            const literal = readDiscriminatorLiteral(option, union.discriminator);
+            if (convert && literal !== undefined) variants.set(literal, convert);
+        }
+        if (variants.size === 0) return null;
+        return (value) => {
+            if (!isRecord(value)) return value;
+            const convert = variants.get(value[union.discriminator]);
+            return convert ? convert(value) : value;
+        };
+    }
+    return null;
+};
+
+/**
+ * The converter for a JSON body schema, built on first sight and cached
+ * afterwards.
+ */
+export const jsonConverterFor = (schema: z.core.$ZodType): JsonConverter => {
+    const cached = jsonConverters.get(schema);
+    if (cached !== undefined) return cached;
+    // A recursive schema reaches itself while building, so it finds a stand-in that forwards to the finished converter.
+    let built: JsonConverter = null;
+    jsonConverters.set(schema, (value) => (built ? built(value) : value));
+    built = buildJsonConverter(schema);
+    jsonConverters.set(schema, built);
+    return built;
+};
+
+/**
+ * Coerces a request body: a form's fields from their strings, a JSON body's dates
+ * and bigints from theirs.
+ */
+export const coerceBody = (route: RouteDefinition, body: unknown): unknown => {
+    if (!route.body) return body;
+    if (isFormBody(route)) return applyCoercion(body, coercionPlanFor(route.body));
+    const convert = jsonConverterFor(route.body);
+    return convert ? convert(body) : body;
 };

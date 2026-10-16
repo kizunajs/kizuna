@@ -17,7 +17,7 @@ import type { StreamBodyOf } from './stream.js';
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { GuardHoldings, IdentityRole } from './identity.js';
-import { applyCoercion, coercionPlanFor, isFormBody } from './coercion.js';
+import { applyCoercion, coerceBody, coercionPlanFor } from './coercion.js';
 import type { ProblemDetails, StripProblemEnvelope } from './problem-details.js';
 import type { StreamTools } from './tool-runner.js';
 
@@ -371,30 +371,26 @@ export const validateRequest = (
     route: RouteDefinition,
     raw: RawInputs
 ): { ok: true; parsed: RawInputs } | { ok: false; error: ValidationFailure } => {
-    const order: ReadonlyArray<{ stage: ValidationStage; schema: z.ZodType | undefined; input: unknown; coerced: boolean }> = [
+    const order: ReadonlyArray<{ stage: ValidationStage; schema: z.ZodType | undefined; input: unknown }> = [
         {
             stage: 'params',
             schema: route.pathParams,
             input: raw.params,
-            coerced: true,
         },
         {
             stage: 'query',
             schema: route.query,
             input: raw.query,
-            coerced: true,
         },
         {
             stage: 'headers',
             schema: route.headers,
             input: raw.headers,
-            coerced: true,
         },
         {
             stage: 'body',
             schema: route.body,
             input: raw.body,
-            coerced: isFormBody(route),
         },
     ];
 
@@ -407,7 +403,7 @@ export const validateRequest = (
 
     for (const step of order) {
         if (!step.schema) continue;
-        const input = step.coerced ? applyCoercion(step.input, coercionPlanFor(step.schema)) : step.input;
+        const input = step.stage === 'body' ? coerceBody(route, step.input) : applyCoercion(step.input, coercionPlanFor(step.schema));
         const result = step.schema.safeParse(input);
         if (!result.success) {
             return {

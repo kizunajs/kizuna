@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { applyCoercion, coercionPlanFor, resolveCoercionPlans } from './coercion.js';
+import { applyCoercion, coercionPlanFor, jsonConverterFor, resolveCoercionPlans } from './coercion.js';
 import { groupRoutes } from './routes.js';
 import { readDef } from './zod-internals.js';
 import type { RouteDefinition } from './types.js';
@@ -272,5 +272,47 @@ describe('startup resolution', () => {
                 array: false,
             },
         ]);
+    });
+});
+
+describe('JSON body converters', () => {
+    it('is null when the schema holds no date or bigint', () => {
+        expect(
+            jsonConverterFor(
+                z.object({
+                    title: z.string(),
+                    count: z.number(),
+                })
+            )
+        ).toBeNull();
+    });
+
+    it('converts every level of a recursive schema', () => {
+        const CategorySchema = z.object({
+            createdAt: z.date(),
+            get children() {
+                return z.array(CategorySchema);
+            },
+        });
+        const convert = jsonConverterFor(CategorySchema);
+        expect(
+            convert?.({
+                createdAt: '2026-10-16T09:00:00.000Z',
+                children: [
+                    {
+                        createdAt: '2026-10-15T09:00:00.000Z',
+                        children: [],
+                    },
+                ],
+            })
+        ).toEqual({
+            createdAt: new Date('2026-10-16T09:00:00.000Z'),
+            children: [
+                {
+                    createdAt: new Date('2026-10-15T09:00:00.000Z'),
+                    children: [],
+                },
+            ],
+        });
     });
 });

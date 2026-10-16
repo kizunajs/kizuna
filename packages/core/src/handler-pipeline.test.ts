@@ -467,8 +467,8 @@ describe('headers coercion', () => {
     });
 });
 
-describe('body is not coerced', () => {
-    it('does not coerce body values', () => {
+describe('JSON body coercion', () => {
+    it('leaves JSON numbers as they are', () => {
         const route = makeRoute({
             method: 'POST',
             body: z.object({
@@ -496,7 +496,7 @@ describe('body is not coerced', () => {
         }
     });
 
-    it('fails when body has string where number is expected', () => {
+    it('does not read a JSON string as a number', () => {
         const route = makeRoute({
             method: 'POST',
             body: z.object({
@@ -517,6 +517,90 @@ describe('body is not coerced', () => {
             headers: {},
         });
         expect(result.ok).toBe(false);
+    });
+    it('reads dates and bigints from their strings, nested in objects and lists', () => {
+        const route = makeRoute({
+            method: 'POST',
+            body: z.object({
+                startsAt: z.date(),
+                attendees: z.array(
+                    z.object({
+                        joinedAt: z.date().optional(),
+                    })
+                ),
+                bytesUsed: z.bigint(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                startsAt: '2026-10-16T09:00:00.000Z',
+                attendees: [
+                    {
+                        joinedAt: '2026-10-15T08:00:00.000Z',
+                    },
+                    {},
+                ],
+                bytesUsed: '9007199254740993',
+            },
+            headers: {},
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.parsed.body).toEqual({
+                startsAt: new Date('2026-10-16T09:00:00.000Z'),
+                attendees: [
+                    {
+                        joinedAt: new Date('2026-10-15T08:00:00.000Z'),
+                    },
+                    {},
+                ],
+                bytesUsed: 9007199254740993n,
+            });
+        }
+    });
+
+    it('reads a date in the variant a discriminated union picks', () => {
+        const route = makeRoute({
+            method: 'POST',
+            body: z.discriminatedUnion('kind', [
+                z.object({
+                    kind: z.literal('meeting'),
+                    startsAt: z.date(),
+                }),
+                z.object({
+                    kind: z.literal('note'),
+                    startsAt: z.string(),
+                }),
+            ]),
+        });
+        const meeting = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                kind: 'meeting',
+                startsAt: '2026-10-16T09:00:00.000Z',
+            },
+            headers: {},
+        });
+        const note = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                kind: 'note',
+                startsAt: 'tomorrow',
+            },
+            headers: {},
+        });
+        expect(meeting.ok && meeting.parsed.body).toEqual({
+            kind: 'meeting',
+            startsAt: new Date('2026-10-16T09:00:00.000Z'),
+        });
+        expect(note.ok && note.parsed.body).toEqual({
+            kind: 'note',
+            startsAt: 'tomorrow',
+        });
     });
 });
 
