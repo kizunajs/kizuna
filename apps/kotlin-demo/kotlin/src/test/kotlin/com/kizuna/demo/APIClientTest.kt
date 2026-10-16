@@ -498,36 +498,26 @@ class APIClientTest {
     }
 
     @Test
-    fun testNullishFieldKeepsAllThreeStates() = runTest {
-        for (state in listOf<Nullish<String>>(Nullish.Absent, Nullish.Null, Nullish.Some("Ada"))) {
+    fun testNullishFieldIsAnOptional() = runTest {
+        for (signature in listOf(null, "Ada")) {
             val updated = client.users.updatePreferences {
                 params(
                     id = API.UserId("1"),
                 ).body(
                     timezone = "Europe/Oslo",
-                    signature = state,
+                    signature = signature,
                     mutedChannels = emptyList(),
                 )
             }
-            assertEquals(state, updated.body.signature)
+            assertEquals(signature, updated.body.signature)
         }
 
-        val absent = Json.encodeToString(
+        val encoded = Json.encodeToString(
             API.UserPreferences(
                 timezone = null,
-                signature = Nullish.Absent,
                 mutedChannels = emptyList(),
             )
         )
-        assertFalse(""""signature"""" in absent, "an absent nullish field is left out")
-
-        val sentNull = Json.encodeToString(
-            API.UserPreferences(
-                timezone = null,
-                signature = Nullish.Null,
-                mutedChannels = emptyList(),
-            )
-        )
-        assertTrue(""""signature":null""" in sentNull, "a null nullish field is sent as null")
+        assertFalse(""""signature"""" in encoded, "a null nullish field is left out")
     }
 }

@@ -214,7 +214,7 @@ const buildRouteMethod = (
                 } else {
                     // Object body of any field count: exposed as a labeled tuple, rebuilt into the
                     // Codable Input internally. Tuples handle any arity, so there is no flatten cap.
-                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, true);
+                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint);
                     bodyDescriptor = {
                         kind: 'json-flat',
                         structName,
@@ -472,67 +472,9 @@ const sanitizeEnumCaseName = (value: string): string => {
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };
 
-const NULLISH_TYPE = /^Nullish<(.+)>$/;
-
-const emitNullish = (writer: SwiftWriter): void => {
-    writer.blank();
-    writer.docComment('A `.nullish()` field: left out, sent as `null`, or sent with a value.');
-    writer.block('public enum Nullish<Wrapped>', () => {
-        writer.line('case absent');
-        writer.line('case null');
-        writer.line('case some(Wrapped)');
-        writer.blank();
-        writer.block('public var value: Wrapped?', () => {
-            writer.line('if case .some(let value) = self { return value }');
-            writer.line('return nil');
-        });
-    });
-    writer.blank();
-    writer.line('extension Nullish: Sendable where Wrapped: Sendable {}');
-    writer.line('extension Nullish: Equatable where Wrapped: Equatable {}');
-    writer.line('extension Nullish: Hashable where Wrapped: Hashable {}');
-    writer.blank();
-    writer.block('extension Nullish: Encodable where Wrapped: Encodable', () => {
-        writer.block('public func encode(to encoder: Encoder) throws', () => {
-            writer.line('var container = encoder.singleValueContainer()');
-            writer.line('switch self {');
-            writer.line('case .absent, .null: try container.encodeNil()');
-            writer.line('case .some(let value): try container.encode(value)');
-            writer.line('}');
-        });
-    });
-    writer.blank();
-    writer.block('extension Nullish: Decodable where Wrapped: Decodable', () => {
-        writer.block('public init(from decoder: Decoder) throws', () => {
-            writer.line('let container = try decoder.singleValueContainer()');
-            writer.line('self = container.decodeNil() ? .null : .some(try container.decode(Wrapped.self))');
-        });
-    });
-    writer.blank();
-    writer.block('extension KeyedEncodingContainer', () => {
-        writer.block('public mutating func encode<Wrapped: Encodable>(_ value: Nullish<Wrapped>, forKey key: Key) throws', () => {
-            writer.line('switch value {');
-            writer.line('case .absent: return');
-            writer.line('case .null: try encodeNil(forKey: key)');
-            writer.line('case .some(let wrapped): try encode(wrapped, forKey: key)');
-            writer.line('}');
-        });
-    });
-    writer.blank();
-    writer.block('extension KeyedDecodingContainer', () => {
-        writer.block(
-            'public func decode<Wrapped: Decodable>(_ type: Nullish<Wrapped>.Type, forKey key: Key) throws -> Nullish<Wrapped>',
-            () => {
-                writer.line('guard contains(key) else { return .absent }');
-                writer.line('return try decodeNil(forKey: key) ? .null : .some(try decode(Wrapped.self, forKey: key))');
-            }
-        );
-    });
-};
-
 const defaultArgument = (field: SwiftField): string => {
     if (!hasDefault(field)) return '';
-    return field.nullish ? ' = .absent' : ' = nil';
+    return ' = nil';
 };
 
 const optionalize = (type: string, optional: boolean): string => {
@@ -777,8 +719,6 @@ const emitStruct = (
     const conformances = hasFile ? 'Sendable, Equatable' : 'Codable, Sendable, Equatable';
 
     const resolveOwnedType = (raw: string): string => {
-        const nullish = NULLISH_TYPE.exec(raw);
-        if (nullish) return `Nullish<${resolveOwnedType(nullish[1]!)}>`;
         const optional = raw.endsWith('?');
         const stripped = optional ? raw.slice(0, -1) : raw;
         const isArray = stripped.startsWith('[') && stripped.endsWith(']');
@@ -1027,8 +967,6 @@ const resolveType = (
     scope: 'operation-enum' | 'actor' = 'actor'
 ): string => {
     const { operationTypeMap, namespaceName, clientName, fileLevelTypeNames } = context;
-    const nullish = NULLISH_TYPE.exec(typeName);
-    if (nullish) return `Nullish<${resolveType(nullish[1]!, currentOperation, context, scope)}>`;
     const optional = typeName.endsWith('?');
     const base = optional ? typeName.slice(0, -1) : typeName;
 
@@ -2443,8 +2381,6 @@ const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, regis
     for (const group of partition.groups) {
         emitSubClientStruct(writer, group, clientName, context);
     }
-
-    if (registry.usesNullish) emitNullish(writer);
 
     emitKizunaFailureProtocols(writer);
 

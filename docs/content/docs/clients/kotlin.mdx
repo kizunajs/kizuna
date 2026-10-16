@@ -196,7 +196,7 @@ Text(user.body.id.value)
 
 ## Optional and null fields
 
-An `.optional()` field is a `String?` that defaults to `null` and is left out of the request. A `.nullable()` field is a `String?` with no default, sent as `null` when you pass `null`. A `.nullish()` field is a `Nullish<String>`, so you can leave it out with `Nullish.Absent` or send `Nullish.Null` to clear it:
+An `.optional()` or `.nullish()` field is a `String?` that defaults to `null` and is left out of the request. A `.nullable()` field is a `String?` with no default, sent as `null` when you pass `null`:
 
 ```kotlin
 client.users.updatePreferences {
@@ -204,7 +204,6 @@ client.users.updatePreferences {
         id = userId,
     ).body(
         timezone = null,
-        signature = Nullish.Null,
         mutedChannels = emptyList(),
     )
 }

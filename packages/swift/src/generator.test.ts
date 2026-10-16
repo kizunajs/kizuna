@@ -1106,13 +1106,11 @@ describe('Swift generator: nullable', () => {
         expect(output).not.toContain('appVersion: String? = nil');
     });
 
-    it('maps a nullish field to Nullish, defaulting to absent', () => {
+    it('maps a nullish field to an optional that defaults to nil and is left out', () => {
         const output = generateSwiftClient(contract, baseConfig);
-        expect(output).toContain('public let releaseNotes: Nullish<String>');
-        expect(output).toContain('releaseNotes: Nullish<String> = .absent');
-        expect(output).toContain('public enum Nullish<Wrapped>');
-        expect(output).toContain('case .absent: return');
-        expect(output).toContain('guard contains(key) else { return .absent }');
+        expect(output).toContain('public let releaseNotes: String?');
+        expect(output).toContain('releaseNotes: String? = nil');
+        expect(output).not.toContain('Nullish');
     });
 
     it('sends a nullable field that holds nil as null', () => {
@@ -1120,7 +1118,7 @@ describe('Swift generator: nullable', () => {
         expect(output).toContain('public func encode(to encoder: Encoder) throws');
         expect(output).toContain('try container.encode(id, forKey: .id)');
         expect(output).toContain('try container.encode(appVersion, forKey: .appVersion)');
-        expect(output).toContain('try container.encode(releaseNotes, forKey: .releaseNotes)');
+        expect(output).toContain('try container.encodeIfPresent(releaseNotes, forKey: .releaseNotes)');
     });
 
     it('maps a nullish query field to an optional, since a query string has no null', () => {

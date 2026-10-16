@@ -19,46 +19,9 @@ interface KizunaQueryValue {
     val wireValue: String
 }
 
-/** A `.nullish()` field: left out, sent as `null`, or sent with a value. */
-@Serializable(with = NullishSerializer::class)
-sealed interface Nullish<out T> {
-    val value: T?
-
-    data object Absent : Nullish<Nothing> {
-        override val value: Nothing? get() = null
-    }
-
-    data object Null : Nullish<Nothing> {
-        override val value: Nothing? get() = null
-    }
-
-    data class Some<out T>(override val value: T) : Nullish<T>
-}
-
-class NullishSerializer<T>(private val valueSerializer: KSerializer<T>) : KSerializer<Nullish<T>> {
-    override val descriptor: SerialDescriptor = valueSerializer.descriptor.nullable
-
-    @OptIn(ExperimentalSerializationApi::class)
-    override fun serialize(encoder: Encoder, value: Nullish<T>) {
-        when (value) {
-            is Nullish.Some -> encoder.encodeSerializableValue(valueSerializer, value.value)
-            Nullish.Null -> encoder.encodeNull()
-            Nullish.Absent -> throw SerializationException("An absent field has no value to write, so its key is left out")
-        }
-    }
-
-    @OptIn(ExperimentalSerializationApi::class)
-    override fun deserialize(decoder: Decoder): Nullish<T> {
-        if (decoder.decodeNotNullMark()) return Nullish.Some(decoder.decodeSerializableValue(valueSerializer))
-        decoder.decodeNull()
-        return Nullish.Null
-    }
-}
-
 object OpenEnumAPI {
 
     /** A user in the system */
-    @OptIn(ExperimentalSerializationApi::class)
     @Serializable
     data class User(
         val id: UserId,
@@ -66,7 +29,7 @@ object OpenEnumAPI {
         @Deprecated("use `email_address` instead.") val email: String,
         val email_address: String? = null,
         val last_name: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) val avatar: Nullish<Avatar> = Nullish.Absent,
+        val avatar: Avatar? = null,
         val avatars: List<AvatarsItem>? = null,
         val metadata: Map<String, String>? = null,
         val tags: List<String?>? = null
@@ -149,12 +112,11 @@ object OpenEnumAPI {
         val phone: String? = null
     )
 
-    @OptIn(ExperimentalSerializationApi::class)
     @Serializable
     data class UserPreferences(
         val timezone: String?,
         val locale: String? = null,
-        @EncodeDefault(EncodeDefault.Mode.NEVER) val signature: Nullish<String> = Nullish.Absent,
+        val signature: String? = null,
         val mutedChannels: List<MutedChannel>
     )
 
@@ -561,7 +523,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Body(
             val timezone: String?,
             val locale: String? = null,
-            val signature: Nullish<String> = Nullish.Absent,
+            val signature: String? = null,
             val mutedChannels: List<OpenEnumAPI.MutedChannel>
         )
 
@@ -575,7 +537,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
 
         class AfterParams internal constructor(internal val params: Params) {
-            fun body(timezone: String?, locale: String? = null, signature: Nullish<String> = Nullish.Absent, mutedChannels: List<OpenEnumAPI.MutedChannel>): AfterBody = AfterBody(params = params, body = Body(timezone = timezone, locale = locale, signature = signature, mutedChannels = mutedChannels))
+            fun body(timezone: String?, locale: String? = null, signature: String? = null, mutedChannels: List<OpenEnumAPI.MutedChannel>): AfterBody = AfterBody(params = params, body = Body(timezone = timezone, locale = locale, signature = signature, mutedChannels = mutedChannels))
         }
 
         class AfterBody internal constructor(override val params: Params, override val body: Body) : Args

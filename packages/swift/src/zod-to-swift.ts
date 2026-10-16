@@ -25,7 +25,6 @@ export interface SwiftField {
     type: string;
     optional: boolean;
     requiredNullable?: boolean;
-    nullish?: boolean;
     description?: string;
     isFile?: boolean;
     deprecated?: boolean;
@@ -74,7 +73,6 @@ export interface MapResult {
     expression: string;
     optional: boolean;
     requiredNullable?: boolean;
-    nullish?: boolean;
     isFile?: boolean;
 }
 
@@ -85,7 +83,6 @@ export class TypeRegistry {
     private readonly unionVariantOwners = new Map<string, string>();
     private readonly brands = new Map<string, SwiftBrand>();
     public usesAnyCodable = false;
-    public usesNullish = false;
 
     constructor(
         public readonly camelCaseProperties = false,
@@ -175,7 +172,6 @@ const objectFields = (
     schema: z.core.$ZodType,
     registry: TypeRegistry,
     hint: string,
-    nullishTriState = true,
     shape: Record<string, z.core.$ZodType> = readObjectShape(schema) ?? {}
 ): SwiftField[] => {
     const fields: SwiftField[] = [];
@@ -183,8 +179,6 @@ const objectFields = (
     for (const [key, value] of Object.entries(shape)) {
         const childHint = `${hint}${toPascalCase(key)}`;
         const result = mapType(value, registry, childHint);
-        const nullish = nullishTriState && result.nullish === true;
-        if (nullish) registry.usesNullish = true;
         const deprecation = readDeprecation(value);
         const swiftName = propertyName(key, registry.camelCaseProperties);
         const previousWireName = seen.get(swiftName);
@@ -197,10 +191,9 @@ const objectFields = (
         fields.push({
             name: swiftName,
             wireName: key,
-            type: nullish ? `Nullish<${result.expression.replace(/\?$/, '')}>` : result.expression,
-            optional: result.optional && !nullish,
+            type: result.expression,
+            optional: result.optional,
             requiredNullable: result.requiredNullable,
-            nullish,
             description: readMetaDescription(value),
             isFile: result.isFile,
             deprecated: deprecation !== undefined,
@@ -324,7 +317,6 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
             expression: innerResult.expression.endsWith('?') ? innerResult.expression : `${innerResult.expression}?`,
             optional: true,
             requiredNullable: nullable && !optional,
-            nullish: nullable && optional,
             isFile: innerResult.isFile,
         };
     }
@@ -539,14 +531,11 @@ const sanitizeCaseName = (literal: string): string => {
     return cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
 };
 
-/**
- * A JSON body keeps `.nullish()` as `Nullish`. A query, path, header or form field has no null, so it takes an optional.
- */
-export const collectObjectFields = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string, json = false): SwiftField[] => {
-    return objectFields(schema, registry, hint, json);
+export const collectObjectFields = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): SwiftField[] => {
+    return objectFields(schema, registry, hint);
 };
 
-export const hasDefault = (field: SwiftField): boolean => (field.optional && field.requiredNullable !== true) || field.nullish === true;
+export const hasDefault = (field: SwiftField): boolean => field.optional && field.requiredNullable !== true;
 
 export const objectFieldCount = (schema: z.core.$ZodType): number => {
     return Object.keys(readObjectShape(schema) ?? {}).length;

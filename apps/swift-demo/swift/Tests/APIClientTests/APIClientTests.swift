@@ -596,26 +596,20 @@ final class APIClientTests: XCTestCase {
         XCTAssertNil(encoded?["locale"], "an optional field is left out")
     }
 
-    func testNullishFieldKeepsAllThreeStates() async throws {
-        let states: [Nullish<String>] = [.absent, .null, .some("Ada")]
-        for state in states {
-            let preferences = API.UserPreferences(timezone: "Europe/Oslo", signature: state, mutedChannels: [])
+    func testNullishFieldIsAnOptional() async throws {
+        for signature in [nil, "Ada"] {
+            let preferences = API.UserPreferences(timezone: "Europe/Oslo", signature: signature, mutedChannels: [])
             let updated = try await client.users.updatePreferences(
                 .params(id: API.UserId("1")),
                 .init(payload: preferences)
             )
-            XCTAssertEqual(updated.body.signature, state)
+            XCTAssertEqual(updated.body.signature, signature)
         }
 
-        let absent = try JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(API.UserPreferences(timezone: nil, signature: .absent, mutedChannels: []))
+        let encoded = try JSONSerialization.jsonObject(
+            with: JSONEncoder().encode(API.UserPreferences(timezone: nil, mutedChannels: []))
         ) as? [String: Any]
-        XCTAssertNil(absent?["signature"], "an absent nullish field is left out")
-
-        let null = try JSONSerialization.jsonObject(
-            with: JSONEncoder().encode(API.UserPreferences(timezone: nil, signature: .null, mutedChannels: []))
-        ) as? [String: Any]
-        XCTAssertTrue(null?["signature"] is NSNull, "a null nullish field is sent as null")
+        XCTAssertNil(encoded?["signature"], "a nil nullish field is left out")
     }
 }
 
