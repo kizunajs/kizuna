@@ -1,6 +1,6 @@
 {
   "name": "@kizunajs/hono",
-  "version": "2.0.0-beta.18",
+  "version": "2.0.0-beta.19",
   "description": "Hono adapter for Kizuna.js",
   "keywords": [
     "kizunajs",
