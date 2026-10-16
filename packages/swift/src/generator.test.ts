@@ -2151,6 +2151,18 @@ describe('Swift generator: streamed responses', () => {
         expect(output).toContain('static func serverSentEvents(_ bytes: URLSession.AsyncBytes)');
     });
 
+    it('runs the response middleware on a streamed response too', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [contractRoutes],
+            }).api,
+            baseConfig
+        );
+        expect(output).toMatch(/Kizuna\.open\(&request, session: \S+, requestMiddleware: \S+, responseMiddleware: \S*responseMiddleware,/);
+        expect(output).toContain('if let responseMiddleware { await responseMiddleware(request, Foundation.Data(), response) }');
+    });
+
     it('reads a text stream line by line', () => {
         const output = generateSwiftClient(
             defineConfig({

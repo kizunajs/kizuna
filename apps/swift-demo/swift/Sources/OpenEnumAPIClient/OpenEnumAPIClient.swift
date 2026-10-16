@@ -4596,7 +4596,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.AssistantReply.Failure.self)
-        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, failure: OpenEnumAPIClient.AssistantReply.Failure.self)
+        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantReply.Failure.self)
         switch statusCode {
         case 200:
             let body = Kizuna.events(bytes, using: client.decoder) { event, decoder -> OpenEnumAPIClient.AssistantReply.Event? in
@@ -4631,7 +4631,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.AssistantChat.Failure.self)
-        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, failure: OpenEnumAPIClient.AssistantChat.Failure.self)
+        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantChat.Failure.self)
         switch statusCode {
         case 200:
             let body = Kizuna.events(bytes, using: client.decoder) { event, decoder -> OpenEnumAPIClient.AssistantChat.Event? in
@@ -4998,7 +4998,7 @@ private enum Kizuna {
         let retry: Int?
     }
 
-    static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse) {
+    static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse) {
         if let requestMiddleware {
             do { try await requestMiddleware(&request) }
             catch is CancellationError { throw Failure.cancelled }
@@ -5011,6 +5011,7 @@ private enum Kizuna {
         catch is CancellationError { throw Failure.cancelled }
         catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
         catch { throw Failure.requestFailed(error) }
+        if let responseMiddleware { await responseMiddleware(request, Foundation.Data(), response) }
         guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }
         return (bytes, httpResponse.statusCode, httpResponse)
     }
