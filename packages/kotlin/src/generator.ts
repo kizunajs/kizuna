@@ -213,7 +213,7 @@ const buildRouteMethod = (
                         multipartFields: [],
                     };
                 } else {
-                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint, true);
+                    const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint);
                     bodyDescriptor = {
                         kind: 'json-flat',
                         structName,
@@ -416,52 +416,9 @@ const escapeKeyword = (name: string): string => {
     return KOTLIN_KEYWORDS.has(name) ? `\`${name}\`` : name;
 };
 
-const NULLISH_TYPE = /^Nullish<(.+)>$/;
-
-const emitNullish = (writer: KotlinWriter): void => {
-    writer.line('/** A `.nullish()` field: left out, sent as `null`, or sent with a value. */');
-    writer.line('@Serializable(with = NullishSerializer::class)');
-    writer.block('sealed interface Nullish<out T>', () => {
-        writer.line('val value: T?');
-        writer.blank();
-        writer.block('data object Absent : Nullish<Nothing>', () => {
-            writer.line('override val value: Nothing? get() = null');
-        });
-        writer.blank();
-        writer.block('data object Null : Nullish<Nothing>', () => {
-            writer.line('override val value: Nothing? get() = null');
-        });
-        writer.blank();
-        writer.line('data class Some<out T>(override val value: T) : Nullish<T>');
-    });
-    writer.blank();
-    writer.block('class NullishSerializer<T>(private val valueSerializer: KSerializer<T>) : KSerializer<Nullish<T>>', () => {
-        writer.line('override val descriptor: SerialDescriptor = valueSerializer.descriptor.nullable');
-        writer.blank();
-        writer.line('@OptIn(ExperimentalSerializationApi::class)');
-        writer.block('override fun serialize(encoder: Encoder, value: Nullish<T>)', () => {
-            writer.line('when (value) {');
-            writer.line('    is Nullish.Some -> encoder.encodeSerializableValue(valueSerializer, value.value)');
-            writer.line('    Nullish.Null -> encoder.encodeNull()');
-            writer.line(
-                '    Nullish.Absent -> throw SerializationException("An absent field has no value to write, so its key is left out")'
-            );
-            writer.line('}');
-        });
-        writer.blank();
-        writer.line('@OptIn(ExperimentalSerializationApi::class)');
-        writer.block('override fun deserialize(decoder: Decoder): Nullish<T>', () => {
-            writer.line('if (decoder.decodeNotNullMark()) return Nullish.Some(decoder.decodeSerializableValue(valueSerializer))');
-            writer.line('decoder.decodeNull()');
-            writer.line('return Nullish.Null');
-        });
-    });
-    writer.blank();
-};
-
 const defaultArgument = (field: KotlinField): string => {
     if (!hasDefault(field)) return '';
-    return field.nullish ? ' = Nullish.Absent' : ' = null';
+    return ' = null';
 };
 
 const optionalize = (type: string, optional: boolean): string => {
@@ -484,8 +441,6 @@ const resolveType = (
     scope: 'operation-object' | 'client' = 'client'
 ): string => {
     const { operationTypeMap, namespaceName, clientName, fileLevelTypeNames } = context;
-    const nullish = NULLISH_TYPE.exec(typeName);
-    if (nullish) return `Nullish<${resolveType(nullish[1]!, currentOperation, context, scope)}>`;
     const optional = typeName.endsWith('?');
     const base = optional ? typeName.slice(0, -1) : typeName;
 
@@ -655,8 +610,6 @@ const emitDataClass = (
     const hasFile = baseFields.some((field) => field.isFile);
 
     const resolveOwnedType = (raw: string): string => {
-        const nullish = NULLISH_TYPE.exec(raw);
-        if (nullish) return `Nullish<${resolveOwnedType(nullish[1]!)}>`;
         const optional = raw.endsWith('?');
         const stripped = optional ? raw.slice(0, -1) : raw;
         const isList = stripped.startsWith('List<') && stripped.endsWith('>');
@@ -678,7 +631,6 @@ const emitDataClass = (
         writer.line(`@SerialName(${stringLiteral(type.serialName)})`);
     }
     if (!hasFile) {
-        if (adjustedFields.some((field) => field.nullish)) writer.line('@OptIn(ExperimentalSerializationApi::class)');
         writer.line('@Serializable');
     }
 
@@ -690,8 +642,7 @@ const emitDataClass = (
                 ? `@SerialName(${stringLiteral(field.wireName)}) `
                 : '';
         const deprecatedPart = field.deprecated ? `${deprecatedAnnotation(field.deprecationMessage)} ` : '';
-        const absentPart = field.nullish ? '@EncodeDefault(EncodeDefault.Mode.NEVER) ' : '';
-        return `${deprecatedPart}${serialNameAnnotation}${absentPart}val ${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
+        return `${deprecatedPart}${serialNameAnnotation}val ${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
     });
 
     const hasOwnedTypes = Array.from(ownedTypeMap.entries()).some(([, owner]) => owner === lookupName);
@@ -754,8 +705,6 @@ const relativeOwnedPath = (
 };
 
 const ownedTypePath = (typeName: string, ownedTypeMap: Map<string, string>, registry?: TypeRegistry): string => {
-    const nullish = NULLISH_TYPE.exec(typeName);
-    if (nullish) return `Nullish<${ownedTypePath(nullish[1]!, ownedTypeMap, registry)}>`;
     const sealedPath = registry?.sealedVariantPath(typeName);
     if (sealedPath !== undefined) return sealedPath;
     const owningClass = ownedTypeMap.get(typeName);
@@ -1954,7 +1903,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     writer.line('import kotlinx.serialization.*');
     writer.line('import kotlinx.serialization.json.*');
     const hasTolerantEnums = registry.all().some((type) => type.kind === 'enum-class' && type.unknownCase);
-    if (hasTolerantEnums || registry.usesNullish) {
+    if (hasTolerantEnums) {
         writer.line('import kotlinx.serialization.descriptors.*');
         writer.line('import kotlinx.serialization.encoding.*');
     }
@@ -1976,8 +1925,6 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
         });
         writer.blank();
     }
-
-    if (registry.usesNullish) emitNullish(writer);
 
     const sharedTypes: KotlinType[] = [];
     const typesByOperation = new Map<string, KotlinType[]>();

@@ -66,18 +66,10 @@ describe('Kotlin generator: nullable', () => {
         expect(output).not.toContain('val appVersion: String? = null');
     });
 
-    it('maps a nullish field to Nullish, defaulting to absent', () => {
+    it('maps a nullish field to an optional that defaults to null and is left out', () => {
         const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('val releaseNotes: Nullish<String> = Nullish.Absent');
-        expect(output).toContain('@Serializable(with = NullishSerializer::class)');
-        expect(output).toContain('sealed interface Nullish<out T>');
-        expect(output).toContain('import kotlinx.serialization.encoding.*');
-    });
-
-    it('leaves an absent field out even when the Json encodes defaults', () => {
-        const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('@EncodeDefault(EncodeDefault.Mode.NEVER) val releaseNotes: Nullish<String> = Nullish.Absent');
-        expect(output).toContain('Nullish.Absent -> throw SerializationException(');
+        expect(output).toContain('val releaseNotes: String? = null');
+        expect(output).not.toContain('Nullish');
     });
 
     it('maps a nullish query field to an optional, since a query string has no null', () => {

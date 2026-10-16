@@ -46,7 +46,7 @@ public enum API {
         /// Family name on the wire as `last_name`, exercises snake_case fidelity through the generators.
         public let last_name: String?
         /// Sibling anonymous objects (`avatar` / `avatars`) exercise inline-object naming where one field name is a prefix of another.
-        public let avatar: Nullish<Avatar>
+        public let avatar: Avatar?
         public let avatars: [AvatarsItem]?
         /// Free-form string map, exercises a record through the generators.
         public let metadata: [String: String]?
@@ -71,7 +71,7 @@ public enum API {
             email: String,
             email_address: String? = nil,
             last_name: String? = nil,
-            avatar: Nullish<Avatar> = .absent,
+            avatar: Avatar? = nil,
             avatars: [AvatarsItem]? = nil,
             metadata: [String: String]? = nil,
             tags: [String?]? = nil
@@ -225,7 +225,7 @@ public enum API {
     public struct UserPreferences: Codable, Sendable, Equatable {
         public let timezone: String?
         public let locale: String?
-        public let signature: Nullish<String>
+        public let signature: String?
         public let mutedChannels: [MutedChannel]
 
         private enum CodingKeys: String, CodingKey {
@@ -239,14 +239,14 @@ public enum API {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(timezone, forKey: .timezone)
             try container.encodeIfPresent(locale, forKey: .locale)
-            try container.encode(signature, forKey: .signature)
+            try container.encodeIfPresent(signature, forKey: .signature)
             try container.encode(mutedChannels, forKey: .mutedChannels)
         }
 
         public init(
             timezone: String?,
             locale: String? = nil,
-            signature: Nullish<String> = .absent,
+            signature: String? = nil,
             mutedChannels: [MutedChannel]
         ) {
             self.timezone = timezone
@@ -1048,7 +1048,7 @@ public final class APIClient: Sendable {
             public static func body(
                 timezone: String?,
                 locale: String? = nil,
-                signature: Nullish<String> = .absent,
+                signature: String? = nil,
                 mutedChannels: [API.MutedChannel]
             ) -> Self {
                 .init(payload: API.UserPreferences(timezone: timezone, locale: locale, signature: signature, mutedChannels: mutedChannels))
@@ -4581,56 +4581,6 @@ public struct APINewsletterClient: Sendable {
         default:
             throw APIClient.NewsletterSubscribe.Failure.unexpectedStatus(statusCode, data)
         }
-    }
-}
-
-/// A `.nullish()` field: left out, sent as `null`, or sent with a value.
-public enum Nullish<Wrapped> {
-    case absent
-    case null
-    case some(Wrapped)
-
-    public var value: Wrapped? {
-        if case .some(let value) = self { return value }
-        return nil
-    }
-}
-
-extension Nullish: Sendable where Wrapped: Sendable {}
-extension Nullish: Equatable where Wrapped: Equatable {}
-extension Nullish: Hashable where Wrapped: Hashable {}
-
-extension Nullish: Encodable where Wrapped: Encodable {
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .absent, .null: try container.encodeNil()
-        case .some(let value): try container.encode(value)
-        }
-    }
-}
-
-extension Nullish: Decodable where Wrapped: Decodable {
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        self = container.decodeNil() ? .null : .some(try container.decode(Wrapped.self))
-    }
-}
-
-extension KeyedEncodingContainer {
-    public mutating func encode<Wrapped: Encodable>(_ value: Nullish<Wrapped>, forKey key: Key) throws {
-        switch value {
-        case .absent: return
-        case .null: try encodeNil(forKey: key)
-        case .some(let wrapped): try encode(wrapped, forKey: key)
-        }
-    }
-}
-
-extension KeyedDecodingContainer {
-    public func decode<Wrapped: Decodable>(_ type: Nullish<Wrapped>.Type, forKey key: Key) throws -> Nullish<Wrapped> {
-        guard contains(key) else { return .absent }
-        return try decodeNil(forKey: key) ? .null : .some(try decode(Wrapped.self, forKey: key))
     }
 }
 
