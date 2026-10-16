@@ -17,7 +17,7 @@ import type { StreamBodyOf } from './stream.js';
 import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { GuardHoldings, IdentityRole } from './identity.js';
-import { applyCoercion, coercionPlanFor } from './coercion.js';
+import { applyCoercion, coercionPlanFor, isFormBody } from './coercion.js';
 import type { ProblemDetails, StripProblemEnvelope } from './problem-details.js';
 import type { StreamTools } from './tool-runner.js';
 
@@ -394,7 +394,7 @@ export const validateRequest = (
             stage: 'body',
             schema: route.body,
             input: raw.body,
-            coerced: false,
+            coerced: isFormBody(route),
         },
     ];
 

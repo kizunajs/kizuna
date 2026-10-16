@@ -358,9 +358,9 @@ This `400` is reflected in the [fetch client](/docs/clients/fetch#validation-err
 
 If you declare your own `400` response, the client sees a union of both your type and Kizuna's `ValidationError`. Use [`isValidationError`](/docs/clients/fetch#isvalidationerror) on the client to distinguish them.
 
-## Query, path, and header coercion
+## Coercion
 
-Values in the URL and in headers always arrive as strings. Kizuna coerces them to the types you declare, so both the client and the server see the parsed value:
+Values in the URL, in headers, and in form bodies always arrive as strings. Kizuna coerces them to the types you declare, so both the client and the server see the parsed value:
 
 | Declare                  | Accepts on the wire  | You get             |
 | ------------------------ | -------------------- | ------------------- |

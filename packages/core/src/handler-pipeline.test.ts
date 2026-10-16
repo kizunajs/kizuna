@@ -519,3 +519,65 @@ describe('body is not coerced', () => {
         expect(result.ok).toBe(false);
     });
 });
+
+describe('form body coercion', () => {
+    it('coerces the fields of a urlencoded body', () => {
+        const route = makeRoute({
+            method: 'POST',
+            contentType: 'application/x-www-form-urlencoded',
+            body: z.object({
+                rating: z.number(),
+                subscribe: z.boolean(),
+                tags: z.array(z.string()),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                rating: '5',
+                subscribe: 'true',
+                tags: 'fast',
+            },
+            headers: {},
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.parsed.body).toEqual({
+                rating: 5,
+                subscribe: true,
+                tags: ['fast'],
+            });
+        }
+    });
+
+    it('coerces the text fields of a multipart body and leaves its files alone', () => {
+        const avatar = new File(['avatar'], 'avatar.png', {
+            type: 'image/png',
+        });
+        const route = makeRoute({
+            method: 'POST',
+            contentType: 'multipart/form-data',
+            body: z.object({
+                file: z.instanceof(File),
+                takenAt: z.date(),
+            }),
+        });
+        const result = validateRequest(route, {
+            params: {},
+            query: {},
+            body: {
+                file: avatar,
+                takenAt: '2026-10-16T09:00:00.000Z',
+            },
+            headers: {},
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+            expect(result.parsed.body).toEqual({
+                file: avatar,
+                takenAt: new Date('2026-10-16T09:00:00.000Z'),
+            });
+        }
+    });
+});

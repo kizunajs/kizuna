@@ -90,7 +90,14 @@ export const resolveCoercionPlans = (route: RouteDefinition): void => {
     if (route.pathParams) coercionPlanFor(route.pathParams);
     if (route.query) coercionPlanFor(route.query);
     if (route.headers) coercionPlanFor(route.headers);
+    if (route.body && isFormBody(route)) coercionPlanFor(route.body);
 };
+
+/**
+ * Whether a route's body is a form, whose fields arrive as strings the way a query's do.
+ */
+export const isFormBody = (route: RouteDefinition): boolean =>
+    route.contentType === 'multipart/form-data' || route.contentType === 'application/x-www-form-urlencoded';
 
 const coerceValue = (value: unknown, type: string): unknown => {
     if (typeof value !== 'string') return value;

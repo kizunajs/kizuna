@@ -51,7 +51,7 @@ Flags anything no generated client can produce a type for: `body`, `query`, `pat
 
 ### `z.coerce`
 
-Kizuna already coerces query, path, and header params to their declared types ([see Coercion](/docs/routes#query-path-and-header-coercion)), so `z.coerce` is redundant, and `k.routes` throws on it. Use the plain schema:
+Kizuna already coerces query, path, header, and form fields to their declared types ([see Coercion](/docs/routes#coercion)), so `z.coerce` is redundant, and `k.routes` throws on it. Use the plain schema:
 
 ```ts
 // flagged

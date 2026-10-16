@@ -180,7 +180,7 @@ A URL, a header and a form field have no `null`, so every client leaves a `nil` 
 
 ## Coercion
 
-Path parameters, query parameters, and headers arrive as strings, and Kizuna coerces them to the declared schema, so `z.number()` in a query means the handler receives a number. Declare plain schemas; `k.routes` throws on `z.coerce`, since coercion is already built in. See [coercion](/docs/routes#query-path-and-header-coercion).
+Path parameters, query parameters, headers, and form fields arrive as strings, and Kizuna coerces them to the declared schema, so `z.number()` in a query means the handler receives a number. Declare plain schemas; `k.routes` throws on `z.coerce`, since coercion is already built in. See [coercion](/docs/routes#coercion).
 
 ## Custom issue codes
 
