@@ -2086,7 +2086,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<String>(data.decodeToString())
+                        val payload = data.decodeToString()
                         return@use OpenEnumAPIClient.UsersExportUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw OpenEnumAPIClient.UsersExportUsers.Failure.Decoding(error, statusCode, data) }

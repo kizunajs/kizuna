@@ -1856,7 +1856,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<String>(data.decodeToString())
+                        val payload = data.decodeToString()
                         return@use APIClient.UsersExportUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersExportUsers.Failure.Decoding(error, statusCode, data) }

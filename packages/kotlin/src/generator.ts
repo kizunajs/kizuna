@@ -4,7 +4,10 @@ import {
     type GeneratorWalk,
     parsePath,
     resolveResponseBody,
+    resolveResponseContentType,
     resolveResponseHeaders,
+    isBinarySchema,
+    isJsonMediaType,
     isObjectSchema,
     isDiscriminatedUnionSchema,
     readMetaId,
@@ -95,6 +98,7 @@ interface RouteMethod {
         status: number;
         type: string;
         responseHeaders: KotlinField[];
+        isText: boolean;
     }>;
     successReturnType: string;
     successSumClassName?: string;
@@ -263,10 +267,14 @@ const buildRouteMethod = (
                 responseHeaders: headersSchema
                     ? collectObjectFields(headersSchema as z.ZodType, registry, `${baseHint}ResponseHeaders`)
                     : [],
+                isText: false,
             });
             continue;
         }
         const bodySchema = resolveResponseBody(responseValue)!;
+        const responseContentType = resolveResponseContentType(responseValue);
+        const isText =
+            !isBinarySchema(bodySchema as z.core.$ZodType) && responseContentType !== undefined && !isJsonMediaType(responseContentType);
         const result = mapType(bodySchema as z.ZodType, registry, responseHint);
         const typeExpression = result.expression;
         if (isSuccessStatus(status)) {
@@ -278,6 +286,7 @@ const buildRouteMethod = (
                 status,
                 type: typeExpression,
                 responseHeaders: perStatusHeaderFields,
+                isText,
             });
         } else {
             errorCases.push({
@@ -435,9 +444,12 @@ const decodeJson = (resolved: string, source: string): string =>
 const KOTLIN_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Long', 'Boolean', 'Instant', 'Unit', 'ByteArray']);
 
 /**
- * How a response body is read. Raw bytes are the body already.
+ * How a response body is read. Raw bytes are the body already, and text is its decoded bytes.
  */
-const decodeBody = (resolved: string): string => (resolved === 'ByteArray' ? 'data' : decodeJson(resolved, 'data.decodeToString()'));
+const decodeBody = (resolved: string, isText = false): string => {
+    if (resolved === 'ByteArray') return 'data';
+    return isText ? 'data.decodeToString()' : decodeJson(resolved, 'data.decodeToString()');
+};
 
 const resolveType = (
     typeName: string,
@@ -1459,7 +1471,7 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
                 writer.indent(() => {
                     const resolved = resolveType(successResponse.type, method.operationName, context);
                     writer.block('try', () => {
-                        writer.line(`val payload = ${decodeBody(resolved)}`);
+                        writer.line(`val payload = ${decodeBody(resolved, successResponse.isText)}`);
                         const bodyExpr = isMultiSuccess ? `${operationRef}.Success.Status${successResponse.status}(payload)` : 'payload';
                         if (hasHeaders) {
                             for (const field of successResponse.responseHeaders) {
