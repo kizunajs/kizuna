@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ROUTES_GROUP, type Routes } from './types.js';
 import { Kizuna } from './kizuna.js';
+import { BinarySchema, FileSchema } from './binary.js';
 
 interface Config {
     groups: typeof kGroups;
@@ -393,6 +394,40 @@ describe('k.routes pathParams/path agreement', () => {
                 }),
             })
         ).not.toThrow();
+    });
+});
+
+describe('k.routes form fields', () => {
+    const uploadWith = (contentType: 'multipart/form-data' | 'application/x-www-form-urlencoded', file: z.ZodType) => () =>
+        k.routes.users({
+            uploadAvatar: k.route({
+                method: 'POST',
+                path: '/avatar',
+                contentType,
+                body: z.object({
+                    userId: z.string(),
+                    file,
+                }),
+                responses: {
+                    200: z.object({
+                        size: z.number(),
+                    }),
+                },
+            }),
+        });
+
+    it('throws for a bytes field in a form, pointing at FileSchema', () => {
+        expect(uploadWith('multipart/form-data', BinarySchema)).toThrowError(
+            'Route "uploadAvatar" declares form field "file" as BinarySchema, but a form sends a file part as a File. Declare it with FileSchema.'
+        );
+        expect(uploadWith('multipart/form-data', BinarySchema.optional())).toThrowError('form field "file"');
+        expect(uploadWith('multipart/form-data', z.array(BinarySchema))).toThrowError('form field "file"');
+        expect(uploadWith('application/x-www-form-urlencoded', BinarySchema)).toThrowError('form field "file"');
+    });
+
+    it('accepts a file field', () => {
+        expect(uploadWith('multipart/form-data', FileSchema)).not.toThrow();
+        expect(uploadWith('multipart/form-data', z.array(FileSchema))).not.toThrow();
     });
 });
 

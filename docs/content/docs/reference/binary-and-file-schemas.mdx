@@ -81,3 +81,5 @@ uploadAvatar: k
     })
     .handler(/* ... */),
 ```
+
+A form sends every file part as a `File`, so a form field declared with `BinarySchema` could never validate. `k.routes` throws on one and points you to `FileSchema`.

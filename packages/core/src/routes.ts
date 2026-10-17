@@ -1,8 +1,15 @@
 import type { z } from 'zod';
 import { ROUTES_GROUP, type Routes, type RouteDefinition, type ResponseDefinition } from './types.js';
 import { isRouteDefinition } from './handler-pipeline.js';
-import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from './zod-internals.js';
-import { resolveCoercionPlans } from './coercion.js';
+import {
+    findCoercedSchemaPath,
+    isBinarySchema,
+    readDef,
+    readObjectShape,
+    resolveBaseType,
+    unwrapOptionalWrappers,
+} from './zod-internals.js';
+import { isFormBody, resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
 import { isStreamResponse, isZodSchema } from './generator-utils.js';
 import { assertValidStreams, streamSchemas } from './stream.js';
@@ -90,6 +97,28 @@ const assertPathParamsAreScalar = (route: RouteDefinition, routeKey: string): vo
     }
 };
 
+const holdsBytes = (schema: z.core.$ZodType): boolean => {
+    const { inner } = unwrapOptionalWrappers(schema);
+    const element = readDef(inner).type === 'array' ? readDef(inner).element : undefined;
+    return isBinarySchema(inner) || (element !== undefined && isBinarySchema(unwrapOptionalWrappers(element).inner));
+};
+
+/**
+ * A form sends a file part as a `File` (RFC 7578), so a field declared as bytes could never validate.
+ */
+const assertFormFieldsTakeFiles = (route: RouteDefinition, routeKey: string): void => {
+    if (!isFormBody(route)) return;
+    const shape = route.body ? readObjectShape(route.body) : undefined;
+    if (!shape) return;
+    for (const [name, fieldSchema] of Object.entries(shape)) {
+        if (!holdsBytes(fieldSchema)) continue;
+        throw new Error(
+            `Route "${routeKey}" declares form field "${name}" as BinarySchema, but a form sends a file part as a File. ` +
+                'Declare it with FileSchema.'
+        );
+    }
+};
+
 /**
  * A tool's description is the one thing a model reads before choosing it, so a
  * route that publishes as one has to carry it.
@@ -114,6 +143,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             expandStreamTools(value, fullKey);
             assertPathParamsMatchPath(value, fullKey);
             assertPathParamsAreScalar(value, fullKey);
+            assertFormFieldsTakeFiles(value, fullKey);
             assertNoCoercion(value, fullKey);
             assertValidStreams(value, fullKey);
             assertToolDescribed(value, fullKey);
