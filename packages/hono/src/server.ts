@@ -24,6 +24,7 @@ import {
     jobRunnerFrom,
     type Adapter,
     renderJsonResult,
+    stringifyJson,
     parseFetchBody,
     entriesToObject,
     headersToObject,
@@ -93,7 +94,7 @@ const pipeline = defineAdapter<
             // Strings and binary (Uint8Array/ArrayBuffer) bodies are sent as-is, never JSON-serialized.
             return c.body(rendered.body as ArrayBuffer | string, rendered.status as ContentfulStatusCode, rendered.headers);
         }
-        return c.json(rendered.body as object, rendered.status as ContentfulStatusCode, rendered.headers);
+        return c.body(stringifyJson(rendered.body), rendered.status as ContentfulStatusCode, rendered.headers);
     },
 });
 

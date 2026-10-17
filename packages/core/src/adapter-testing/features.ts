@@ -99,6 +99,9 @@ export const ADAPTER_FEATURES = {
     'responses.binary': {
         summary: 'A binary body is sent as bytes under `application/octet-stream`.',
     },
+    'responses.bigintAsString': {
+        summary: 'A bigint in a JSON body is sent as a string of its digits.',
+    },
     'responses.void': {
         summary: 'A void response sends no body and no content type.',
     },

@@ -77,6 +77,18 @@ class APIClientTest {
     }
 
     @Test
+    fun testSetStorageLimitKeepsALongPastDoublePrecision() = runTest {
+        val response = client.users.setStorageLimit {
+            params(
+                id = API.UserId("1"),
+            ).body(
+                bytesLimit = 9_007_199_254_740_993L,
+            )
+        }
+        assertEquals(9_007_199_254_740_993L, response.body.bytesLimit)
+    }
+
+    @Test
     fun testGetUserNotFoundThrowsTypedError() = runTest {
         val failure = assertFailsWith<APIClient.UsersGetUser.Failure.NotFound> {
             client.users.getUser {

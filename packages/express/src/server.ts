@@ -22,6 +22,7 @@ import {
     pluginRouterOf,
     defineAdapter,
     renderJsonResult,
+    stringifyJson,
     type RenderedResult,
     jobRoutes,
     jobRouter,
@@ -224,7 +225,7 @@ const adapter = defineAdapter<Request, void, ExpressHandlerContext, ExpressRespo
             // Strings go out as-is; binary (Uint8Array/Buffer) is sent as bytes, never JSON-serialized.
             res.status(rendered.status).send(typeof body === 'string' || Buffer.isBuffer(body) ? body : Buffer.from(body as Uint8Array));
         } else {
-            res.status(rendered.status).json(rendered.body);
+            res.status(rendered.status).send(stringifyJson(rendered.body));
         }
     },
 });

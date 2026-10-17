@@ -558,6 +558,22 @@ export const responseShapeRoutes = k.routes({
             status: 200,
             body: badgeBytes,
         })),
+    getQuota: k
+        .route({
+            method: 'GET',
+            path: '/quota',
+            responses: {
+                200: z.object({
+                    bytesUsed: z.bigint(),
+                }),
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                bytesUsed: 9007199254740993n,
+            },
+        })),
     deleteItem: k
         .route({
             method: 'DELETE',

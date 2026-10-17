@@ -82,6 +82,33 @@ describe('KizunaClient', () => {
         expect(options.headers.get('Content-Type')).toBe('application/json');
     });
 
+    it('sends a bigint in a JSON body as a string of its digits', async () => {
+        const fetchMock = stubFetch(200, {
+            ok: true,
+            bytesUsed: '9007199254740993',
+        });
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        await client.payloads.nestedTyped({
+            body: {
+                filters: {
+                    price: 99,
+                    createdAt: '2026-01-01T00:00:00.000Z',
+                    tags: [],
+                },
+                scores: [],
+                pair: [1, 'two'],
+                quota: 9007199254740993n,
+            },
+        });
+
+        const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { body: string }];
+        expect(options.body).toContain('"quota":"9007199254740993"');
+    });
+
     it('appends query parameters', async () => {
         const fetchMock = stubFetch(200, {
             users: [],

@@ -155,6 +155,7 @@ const JSON_ENCODING: Record<string, Record<string, unknown>> = {
     },
     bigint: {
         type: 'string',
+        pattern: '^-?[0-9]+$',
     },
 };
 

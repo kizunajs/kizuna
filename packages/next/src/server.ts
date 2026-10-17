@@ -13,6 +13,7 @@ import {
     parseFetchBody,
     entriesToObject,
     renderJsonResult,
+    stringifyJson,
     type Jobs,
     type JobRunner,
     ROUTER_META,
@@ -89,7 +90,7 @@ export interface NextHandlerOptions {
 
 const jsonResponse = (status: number, body: unknown, headers: Record<string, string>, raw = false): NextResponse =>
     // Raw bodies (strings or binary Uint8Array) are passed through as `BodyInit`; only JSON is stringified.
-    new NextResponse(body === null || body === undefined ? null : raw ? (body as BodyInit) : JSON.stringify(body), {
+    new NextResponse(body === null || body === undefined ? null : raw ? (body as BodyInit) : stringifyJson(body), {
         status,
         headers,
     });

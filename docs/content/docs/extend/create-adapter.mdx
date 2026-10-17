@@ -24,7 +24,15 @@ An adapter translates between a native HTTP runtime (Bun, Cloudflare Workers, De
 ## `defineAdapter`
 
 ```ts title="adapter.ts"
-import { defineAdapter, renderJsonResult, parseFetchBody, entriesToObject, headersToObject, type AdapterRequest } from 'kizunajs/adapter';
+import {
+    defineAdapter,
+    renderJsonResult,
+    stringifyJson,
+    parseFetchBody,
+    entriesToObject,
+    headersToObject,
+    type AdapterRequest,
+} from 'kizunajs/adapter';
 ```
 
 ## Minimal example (fetch-based runtime)
@@ -33,6 +41,7 @@ import { defineAdapter, renderJsonResult, parseFetchBody, entriesToObject, heade
 import {
     defineAdapter,
     renderJsonResult,
+    stringifyJson,
     parseFetchBody,
     entriesToObject,
     headersToObject,
@@ -59,7 +68,7 @@ const adapter = defineAdapter<Request, Response, HandlerContext>({
                 headers: rendered.headers,
             });
         }
-        return new Response(rendered.body === null || rendered.body === undefined ? null : JSON.stringify(rendered.body), {
+        return new Response(rendered.body === null || rendered.body === undefined ? null : stringifyJson(rendered.body), {
             status: rendered.status,
             headers: rendered.headers,
         });
@@ -162,6 +171,17 @@ const rendered = renderJsonResult(result, formatError, request, request.method);
 ```
 
 A `success` result on a status declared with [`stream`](/docs/streaming) renders with `body` undefined and a `stream` function in its place. Check `stream` before `body`, hand it the signal that fires when the client goes away, and write the `ReadableStream` it returns. `encodeStreamBody(result, { signal })` does the same for an adapter that renders results itself.
+
+### `stringifyJson`
+
+Writes a JSON body the way kizuna sends one, with a bigint as a string of its digits. Use it in place of `JSON.stringify` for a body that is not `raw`.
+
+```ts
+new Response(stringifyJson(rendered.body), {
+    status: rendered.status,
+    headers: rendered.headers,
+});
+```
 
 ### `parseFetchBody`
 

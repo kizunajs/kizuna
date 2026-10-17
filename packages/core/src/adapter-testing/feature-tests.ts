@@ -755,6 +755,17 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'responses.bigintAsString': async () => {
+            await usingShapes(async (shapes) => {
+                const response = await shapes.request({
+                    method: 'GET',
+                    path: '/quota',
+                });
+                expect(response.status).toBe(200);
+                expect(response.text).toBe('{"bytesUsed":"9007199254740993"}');
+            });
+        },
+
         'responses.void': async () => {
             await usingShapes(async (shapes) => {
                 const response = await shapes.request({

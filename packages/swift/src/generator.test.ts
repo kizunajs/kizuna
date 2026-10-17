@@ -1076,6 +1076,62 @@ describe('Swift generator: owned type nesting', () => {
     });
 });
 
+describe('Swift generator: bigint', () => {
+    const quotaContract = (schema: z.ZodType) =>
+        defineConfig({
+            ...config,
+            routes: [
+                k.routes({
+                    getQuota: k.route({
+                        method: 'GET',
+                        path: '/quota',
+                        responses: {
+                            200: Kizuna.model({
+                                title: 'Quota',
+                                schema,
+                            }),
+                        },
+                    }),
+                }),
+            ],
+        }).api;
+
+    it('reads and writes an Int64 as a string of digits', () => {
+        const output = generateSwiftClient(
+            quotaContract(
+                z.object({
+                    bytesUsed: z.int64(),
+                    bytesLimit: z.int64().optional(),
+                    history: z.array(z.int64()),
+                    name: z.string(),
+                })
+            ),
+            baseConfig
+        );
+        expect(output).toContain('public let bytesUsed: Int64');
+        expect(output).toContain('bytesUsed = try container.decode(Kizuna.DecimalInt64.self, forKey: .bytesUsed).value');
+        expect(output).toContain('bytesLimit = try container.decodeIfPresent(Kizuna.DecimalInt64.self, forKey: .bytesLimit)?.value');
+        expect(output).toContain('history = try container.decode([Kizuna.DecimalInt64].self, forKey: .history).map(\\.value)');
+        expect(output).toContain('name = try container.decode(String.self, forKey: .name)');
+        expect(output).toContain('try container.encode(Kizuna.DecimalInt64(bytesUsed), forKey: .bytesUsed)');
+        expect(output).toContain('try container.encodeIfPresent(bytesLimit.map(Kizuna.DecimalInt64.init), forKey: .bytesLimit)');
+        expect(output).toContain('try container.encode(history.map(Kizuna.DecimalInt64.init), forKey: .history)');
+    });
+
+    it('fails generation for an Int64 nested deeper than a list or a record', () => {
+        expect(() =>
+            generateSwiftClient(
+                quotaContract(
+                    z.object({
+                        grid: z.array(z.array(z.int64())),
+                    })
+                ),
+                baseConfig
+            )
+        ).toThrow(/Quota\.grid is \[\[Int64\]\]/);
+    });
+});
+
 describe('Swift generator: nullable', () => {
     const contract = defineConfig({
         ...config,

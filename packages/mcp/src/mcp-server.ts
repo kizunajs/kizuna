@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { problemDetails } from 'kizunajs';
 import { McpServer, acceptedContent, inputRequired, type CallToolResult, type InputRequiredResult } from '@modelcontextprotocol/server';
-import { flattenRoutes, validateRequest } from 'kizunajs/adapter';
+import { flattenRoutes, stringifyJson, validateRequest } from 'kizunajs/adapter';
 import {
     ResponseError,
     type AdapterRequest,
@@ -264,18 +264,19 @@ const toolEnvelope = (status: number, body: unknown): ToolCallResult => {
         body,
     };
     const isError = status >= 400;
+    const text = stringifyJson(envelope, 2);
 
     return {
         content: [
             {
                 type: 'text' as const,
-                text: JSON.stringify(envelope, null, 2),
+                text,
             },
         ],
         ...(isError
             ? {}
             : {
-                  structuredContent: envelope,
+                  structuredContent: JSON.parse(text) as Record<string, unknown>,
               }),
         isError,
     };

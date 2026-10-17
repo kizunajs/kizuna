@@ -738,7 +738,9 @@ const emitStruct = (
         type: resolveOwnedType(field.type),
     }));
 
-    const needsEncode = !hasFile && type.fields.some((field) => field.requiredNullable === true);
+    const int64Shapes = new Map(hasFile ? [] : type.fields.map((field) => [field, int64Shape(type.name, field)] as const));
+    const hasInt64 = [...int64Shapes.values()].some((shape) => shape !== undefined);
+    const needsEncode = !hasFile && (hasInt64 || type.fields.some((field) => field.requiredNullable === true));
     const needsCodingKeys =
         needsEncode ||
         (!hasFile &&
@@ -773,19 +775,70 @@ const emitStruct = (
                 }
             });
         }
+        if (hasInt64) {
+            writer.blank();
+            writer.block('public init(from decoder: Decoder) throws', () => {
+                writer.line('let container = try decoder.container(keyedBy: CodingKeys.self)');
+                for (const field of type.fields) {
+                    const fieldType = resolveFieldType(field.type, field.optional);
+                    writer.line(`${storageName(field)} = ${decodeField(fieldType, int64Shapes.get(field), storageName(field))}`);
+                }
+            });
+        }
         if (needsEncode) {
             writer.blank();
             writer.block('public func encode(to encoder: Encoder) throws', () => {
                 writer.line('var container = encoder.container(keyedBy: CodingKeys.self)');
                 for (const field of type.fields) {
                     const encodeCall = field.optional && field.requiredNullable !== true ? 'encodeIfPresent' : 'encode';
-                    writer.line(`try container.${encodeCall}(${storageName(field)}, forKey: .${storageName(field)})`);
+                    const fieldType = resolveFieldType(field.type, field.optional);
+                    const value = encodedValue(storageName(field), fieldType.endsWith('?'), int64Shapes.get(field));
+                    writer.line(`try container.${encodeCall}(${value}, forKey: .${storageName(field)})`);
                 }
             });
         }
         writer.blank();
         emitMemberwiseInit(writer, adjustedFields, storageName);
     });
+};
+
+type Int64Shape = 'scalar' | 'array' | 'dictionary';
+
+const INT64_SHAPES: Record<string, Int64Shape> = {
+    Int64: 'scalar',
+    '[Int64]': 'array',
+    '[String: Int64]': 'dictionary',
+};
+
+/**
+ * How a field holds an `Int64`, which travels as a decimal string. Deeper nesting has no coder, so it fails generation.
+ */
+const int64Shape = (structName: string, field: SwiftField): Int64Shape | undefined => {
+    const bare = field.type.endsWith('?') ? field.type.slice(0, -1) : field.type;
+    const shape = INT64_SHAPES[bare];
+    if (shape === undefined && /\bInt64\b/.test(bare)) {
+        throw new Error(
+            `${structName}.${field.name} is ${bare}, which the Swift client cannot send as decimal strings. Use a bigint, a list of bigints, or a record of bigints.`
+        );
+    }
+    return shape;
+};
+
+const decodeField = (fieldType: string, shape: Int64Shape | undefined, key: string): string => {
+    const optional = fieldType.endsWith('?');
+    const call = optional ? 'decodeIfPresent' : 'decode';
+    const chain = optional ? '?' : '';
+    if (shape === undefined) return `try container.${call}(${optional ? fieldType.slice(0, -1) : fieldType}.self, forKey: .${key})`;
+    if (shape === 'scalar') return `try container.${call}(Kizuna.DecimalInt64.self, forKey: .${key})${chain}.value`;
+    if (shape === 'array') return `try container.${call}([Kizuna.DecimalInt64].self, forKey: .${key})${chain}.map(\\.value)`;
+    return `try container.${call}([String: Kizuna.DecimalInt64].self, forKey: .${key})${chain}.mapValues(\\.value)`;
+};
+
+const encodedValue = (name: string, optional: boolean, shape: Int64Shape | undefined): string => {
+    if (shape === undefined) return name;
+    if (shape === 'scalar') return optional ? `${name}.map(Kizuna.DecimalInt64.init)` : `Kizuna.DecimalInt64(${name})`;
+    const chain = optional ? '?' : '';
+    return shape === 'array' ? `${name}${chain}.map(Kizuna.DecimalInt64.init)` : `${name}${chain}.mapValues(Kizuna.DecimalInt64.init)`;
 };
 
 /**
@@ -803,13 +856,18 @@ const emitBrand = (writer: SwiftWriter, brand: SwiftBrand): void => {
             writer.line('self.rawValue = rawValue');
         });
         writer.blank();
+        const decimal = brand.rawType === 'Int64';
         writer.block('public init(from decoder: Decoder) throws', () => {
-            writer.line(`rawValue = try decoder.singleValueContainer().decode(${brand.rawType}.self)`);
+            writer.line(
+                decimal
+                    ? 'rawValue = try decoder.singleValueContainer().decode(Kizuna.DecimalInt64.self).value'
+                    : `rawValue = try decoder.singleValueContainer().decode(${brand.rawType}.self)`
+            );
         });
         writer.blank();
         writer.block('public func encode(to encoder: Encoder) throws', () => {
             writer.line('var container = encoder.singleValueContainer()');
-            writer.line('try container.encode(rawValue)');
+            writer.line(decimal ? 'try container.encode(Kizuna.DecimalInt64(rawValue))' : 'try container.encode(rawValue)');
         });
     });
 };
@@ -941,7 +999,7 @@ const buildOperationTypeMap = (allMethods: RouteMethod[], registry: TypeRegistry
     return operationTypeMap;
 };
 
-const SWIFT_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Bool', 'Date', 'Void', 'Foundation.Data']);
+const SWIFT_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Int64', 'Double', 'Bool', 'Date', 'Void', 'Foundation.Data']);
 
 /**
  * Where a dictionary's key ends and its value begins, or -1 for an array.
@@ -1509,6 +1567,28 @@ const emitKizunaNamespace = (
             writer.line('date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))');
         });
         writer.blank();
+        writer.block('struct DecimalInt64: Codable', () => {
+            writer.line('let value: Int64');
+            writer.blank();
+            writer.block('init(_ value: Int64)', () => {
+                writer.line('self.value = value');
+            });
+            writer.blank();
+            writer.block('init(from decoder: Decoder) throws', () => {
+                writer.line('let container = try decoder.singleValueContainer()');
+                writer.line('let raw = try container.decode(String.self)');
+                writer.line(
+                    'guard let value = Int64(raw) else { throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid Int64: \\(raw)") }'
+                );
+                writer.line('self.value = value');
+            });
+            writer.blank();
+            writer.block('func encode(to encoder: Encoder) throws', () => {
+                writer.line('var container = encoder.singleValueContainer()');
+                writer.line('try container.encode(String(value))');
+            });
+        });
+        writer.blank();
         writer.block('static func makeJSONEncoder() -> JSONEncoder', () => {
             writer.line('let encoder = JSONEncoder()');
             writer.line('encoder.dateEncodingStrategy = .custom { date, encoder in');
@@ -1760,6 +1840,9 @@ const decodeBodyStatement = (
 ): string => {
     if (response.isBinary) return `    let ${name} = data`;
     if (response.isRaw) return `    let ${name} = String(decoding: data, as: UTF8.self)`;
+    if (resolvedType === 'Int64') {
+        return `    let ${name} = try Kizuna.decode(Kizuna.DecimalInt64.self, from: data, using: ${receiver}decoder, statusCode: statusCode, failure: ${failure}.self).value`;
+    }
     return `    let ${name} = try Kizuna.decode(${resolvedType}.self, from: data, using: ${receiver}decoder, statusCode: statusCode, failure: ${failure}.self)`;
 };
 

@@ -178,7 +178,7 @@ export namespace API {
         export type Query = {
             page?: number;
             from: string;
-            cursor: string;
+            cursor: bigint | string;
             search: string;
             transformed: string;
         };
@@ -202,11 +202,13 @@ export namespace API {
             };
             scores: Array<number>;
             pair: [number, string];
+            quota: bigint | string;
         };
 
         export type Result =
             | { status: 200; body: {
                 ok: boolean;
+                bytesUsed: string;
             }; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
@@ -556,6 +558,7 @@ export interface Client {
          *             1,
          *         ],
          *         pair: [1, 'string'],
+         *         quota: '1',
          *     },
          * });
          */
@@ -1180,7 +1183,7 @@ const encodeBody = (route: GeneratedRoute, body: unknown, headers: Headers): Bod
             return buildSearchParams(body as Record<string, unknown>);
         default:
             if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-            return JSON.stringify(body);
+            return JSON.stringify(body, (_key, value: unknown) => (typeof value === 'bigint' ? value.toString() : value));
     }
 };
 

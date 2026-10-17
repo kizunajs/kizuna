@@ -426,13 +426,18 @@ const optionalize = (type: string, optional: boolean): string => {
     return type.endsWith('?') ? type : `${type}?`;
 };
 
+/**
+ * Decodes JSON text as a type. A bare `Long` reads from a string, since `@file:UseSerializers` only reaches class properties.
+ */
+const decodeJson = (resolved: string, source: string): string =>
+    resolved === 'Long' ? `json.decodeFromString(LongAsStringSerializer, ${source})` : `json.decodeFromString<${resolved}>(${source})`;
+
 const KOTLIN_PRIMITIVE_TYPES = new Set(['String', 'Int', 'Double', 'Long', 'Boolean', 'Instant', 'Unit', 'ByteArray']);
 
 /**
  * How a response body is read. Raw bytes are the body already.
  */
-const decodeBody = (resolved: string): string =>
-    resolved === 'ByteArray' ? 'data' : `json.decodeFromString<${resolved}>(data.decodeToString())`;
+const decodeBody = (resolved: string): string => (resolved === 'ByteArray' ? 'data' : decodeJson(resolved, 'data.decodeToString()'));
 
 const resolveType = (
     typeName: string,
@@ -1554,7 +1559,7 @@ const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context
                     for (const event of events) {
                         const payloadType = resolveType(event.type, method.operationName, context);
                         writer.line(
-                            `${stringLiteral(event.name)} -> ${elementType}.${event.caseName}(json.decodeFromString<${payloadType}>(event.data))`
+                            `${stringLiteral(event.name)} -> ${elementType}.${event.caseName}(${decodeJson(payloadType, 'event.data')})`
                         );
                     }
                     writer.line('else -> null');
@@ -1562,9 +1567,7 @@ const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context
             });
         } else {
             const elementType = streamElementType(method, context, 'client');
-            writer.line(
-                `val body = Kizuna.events<${elementType}>(httpResponse) { event -> json.decodeFromString<${elementType}>(event.data) }`
-            );
+            writer.line(`val body = Kizuna.events<${elementType}>(httpResponse) { event -> ${decodeJson(elementType, 'event.data')} }`);
         }
         if (hasHeaders) {
             for (const field of successResponse.responseHeaders) {
@@ -1895,12 +1898,14 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
         'RedundantUnitReturnType',
     ];
     writer.line(`@file:Suppress(${suppressions.map((name) => `"${name}"`).join(', ')})`);
+    writer.line('@file:UseSerializers(LongAsStringSerializer::class)');
     writer.blank();
     if (packageName) {
         writer.line(`package ${packageName}`);
         writer.blank();
     }
     writer.line('import kotlinx.serialization.*');
+    writer.line('import kotlinx.serialization.builtins.LongAsStringSerializer');
     writer.line('import kotlinx.serialization.json.*');
     const hasTolerantEnums = registry.all().some((type) => type.kind === 'enum-class' && type.unknownCase);
     if (hasTolerantEnums) {

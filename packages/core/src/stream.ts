@@ -3,6 +3,7 @@ import type { RouteDefinition, StreamDefinition, StreamResponseDefinition } from
 import { isBinarySchema, resolveBaseType } from './zod-internals.js';
 import type { StreamWithTools } from './tool-events.js';
 import { isJsonMediaType, isStreamResponse, isSuccessStatus, isZodSchema } from './generator-utils.js';
+import { stringifyJson } from './json.js';
 
 export interface StreamContext {
     signal: AbortSignal;
@@ -188,7 +189,7 @@ export const formatEvent = (item: EventItem | StreamComment, named: boolean): st
     }
     let text = '';
     if (named) text += `event: ${item.event}\n`;
-    text += formatField('data', JSON.stringify(item.data) ?? 'null');
+    text += formatField('data', stringifyJson(item.data) ?? 'null');
     if (item.id !== undefined) {
         if (/[\r\n\0]/.test(item.id)) {
             throw new Error(`A server-sent event id cannot contain a line break or NUL: ${JSON.stringify(item.id)}.`);

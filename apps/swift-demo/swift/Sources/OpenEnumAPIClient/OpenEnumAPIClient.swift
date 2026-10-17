@@ -799,6 +799,108 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
+    public enum UsersSetStorageLimit {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let bytesLimit: Int64
+
+            private enum CodingKeys: String, CodingKey {
+                case bytesLimit
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                bytesLimit = try container.decode(Kizuna.DecimalInt64.self, forKey: .bytesLimit).value
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(Kizuna.DecimalInt64(bytesLimit), forKey: .bytesLimit)
+            }
+
+            public init(bytesLimit: Int64) {
+                self.bytesLimit = bytesLimit
+            }
+        }
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let userId: String
+            public let bytesLimit: Int64
+
+            private enum CodingKeys: String, CodingKey {
+                case userId
+                case bytesLimit
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                userId = try container.decode(String.self, forKey: .userId)
+                bytesLimit = try container.decode(Kizuna.DecimalInt64.self, forKey: .bytesLimit).value
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(userId, forKey: .userId)
+                try container.encode(Kizuna.DecimalInt64(bytesLimit), forKey: .bytesLimit)
+            }
+
+            public init(
+                userId: String,
+                bytesLimit: Int64
+            ) {
+                self.userId = userId
+                self.bytesLimit = bytesLimit
+            }
+        }
+
+        public struct Params: Sendable {
+            public let id: OpenEnumAPI.UserId
+
+            public init(id: OpenEnumAPI.UserId) {
+                self.id = id
+            }
+
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: Input
+
+            public init(payload: Input) {
+                self.payload = payload
+            }
+
+            public static func body(bytesLimit: Int64) -> Self {
+                .init(payload: Input(bytesLimit: bytesLimit))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(OpenEnumAPIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
     public enum UsersLastSessionEvent {
 
         public struct Params: Sendable {
@@ -3892,6 +3994,29 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
+    /// Set a user's storage limit, exercises a bigint sent and returned as a string of digits
+    public func setStorageLimit(_ params: OpenEnumAPIClient.UsersSetStorageLimit.Params, _ body: OpenEnumAPIClient.UsersSetStorageLimit.Body) async throws(OpenEnumAPIClient.UsersSetStorageLimit.Failure) -> OpenEnumAPIClient.UsersSetStorageLimit.Result {
+        var path = "/users/:id/storage-limit"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersSetStorageLimit.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "PUT"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.UsersSetStorageLimit.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersSetStorageLimit.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPIClient.UsersSetStorageLimit.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersSetStorageLimit.Failure.self)
+            return OpenEnumAPIClient.UsersSetStorageLimit.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersSetStorageLimit.Failure.self)
+            throw OpenEnumAPIClient.UsersSetStorageLimit.Failure.badRequest(payload)
+        default:
+            throw OpenEnumAPIClient.UsersSetStorageLimit.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
     /// A user's most recent login or logout, inline union variants nest under the User model in native clients
     public func lastSessionEvent(_ params: OpenEnumAPIClient.UsersLastSessionEvent.Params) async throws(OpenEnumAPIClient.UsersLastSessionEvent.Failure) -> OpenEnumAPIClient.UsersLastSessionEvent.Result {
         var path = "/users/:id/last-session-event"
@@ -4890,6 +5015,26 @@ private enum Kizuna {
 
     static func encodeDate(_ date: Date) -> String {
         date.formatted(Date.ISO8601FormatStyle(includingFractionalSeconds: true))
+    }
+
+    struct DecimalInt64: Codable {
+        let value: Int64
+
+        init(_ value: Int64) {
+            self.value = value
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+            guard let value = Int64(raw) else { throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid Int64: \(raw)") }
+            self.value = value
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.singleValueContainer()
+            try container.encode(String(value))
+        }
     }
 
     static func makeJSONEncoder() -> JSONEncoder {

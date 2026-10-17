@@ -11,6 +11,48 @@ const baseConfig = {
     namespaceName: 'TestAPI',
 };
 
+describe('Kotlin generator: bigint', () => {
+    const contract = defineConfig({
+        routes: [
+            {
+                getQuota: {
+                    method: 'GET',
+                    path: '/quota',
+                    responses: {
+                        200: Kizuna.model({
+                            title: 'Quota',
+                            schema: z.object({
+                                bytesUsed: z.int64(),
+                                history: z.array(z.int64()),
+                            }),
+                        }),
+                    },
+                },
+                getBytesUsed: {
+                    method: 'GET',
+                    path: '/quota/bytes-used',
+                    responses: {
+                        200: z.int64(),
+                    },
+                },
+            },
+        ],
+    }).api;
+
+    it('reads and writes every Long property as a string of digits', () => {
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('@file:UseSerializers(LongAsStringSerializer::class)');
+        expect(output).toContain('import kotlinx.serialization.builtins.LongAsStringSerializer');
+        expect(output).toContain('val bytesUsed: Long');
+        expect(output).toContain('val history: List<Long>');
+    });
+
+    it('reads a bare Long body from a string of digits', () => {
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('json.decodeFromString(LongAsStringSerializer, data.decodeToString())');
+    });
+});
+
 describe('Kotlin generator: z.void()', () => {
     it('emits no body param and Response return for z.void() body and response', () => {
         const contract = defineConfig({

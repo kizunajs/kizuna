@@ -181,7 +181,7 @@ const encodeBody = (route: GeneratedRoute, body: unknown, headers: Headers): Bod
             return buildSearchParams(body as Record<string, unknown>);
         default:
             if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-            return JSON.stringify(body);
+            return JSON.stringify(body, (_key, value: unknown) => (typeof value === 'bigint' ? value.toString() : value));
     }
 };
 

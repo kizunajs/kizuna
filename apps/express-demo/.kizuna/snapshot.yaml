@@ -129,6 +129,31 @@ routes:
             optional: false
             schema:
               kind: string
+  users.setStorageLimit:
+    method: PUT
+    path: /users/:id/storage-limit
+    statuses:
+      - 200
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        bytesLimit:
+          optional: false
+          schema:
+            kind: bigint
+    responses:
+      "200":
+        kind: object
+        fields:
+          userId:
+            optional: false
+            schema:
+              kind: string
+          bytesLimit:
+            optional: false
+            schema:
+              kind: bigint
   users.lastSessionEvent:
     method: GET
     path: /users/:id/last-session-event

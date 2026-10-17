@@ -373,7 +373,7 @@ const structuralType = (schema: z.core.$ZodType, collector: TypeCollector, hint:
         case 'int':
             return 'number';
         case 'bigint':
-            return 'string';
+            return collector.readsInput() ? 'bigint | string' : 'string';
         case 'boolean':
             return 'boolean';
         case 'date':

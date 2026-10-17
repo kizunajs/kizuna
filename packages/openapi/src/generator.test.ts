@@ -2564,9 +2564,10 @@ describe('types JSON Schema has no keyword for', () => {
         });
     });
 
-    it('documents a bigint as a string, which is how JSON carries it', () => {
+    it('documents a bigint as a string of decimal digits, which is how JSON carries it', () => {
         expect(parameter('bigId')).toEqual({
             type: 'string',
+            pattern: '^-?[0-9]+$',
         });
     });
 

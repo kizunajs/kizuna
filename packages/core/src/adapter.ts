@@ -643,6 +643,7 @@ export {
     AUTO_GUARD_BRAND,
     type AutoResponsesBrand,
 } from './types.js';
+import { stringifyJson } from './json.js';
 export { authenticationChallenge, resolveSecurityRequirements } from './security-scheme.js';
 export { groupRoutes } from './routes.js';
 export { isGroupSet } from './groups.js';
@@ -1107,7 +1108,7 @@ const responseBytes = (body: unknown, response: ResponseDefinition | undefined):
     const bodySchema = response !== undefined ? resolveResponseBody(response) : undefined;
     const isBinary = bodySchema !== undefined && isBinarySchema(bodySchema);
     const contentType = resolveResponseContentType(response) ?? (isBinary ? 'application/octet-stream' : 'application/json');
-    return isJsonMediaType(contentType) ? JSON.stringify(body) : undefined;
+    return isJsonMediaType(contentType) ? stringifyJson(body) : undefined;
 };
 
 /**
@@ -1644,7 +1645,7 @@ const contentEncoder = new TextEncoder();
 const contentByteLength = (body: unknown, raw: boolean | undefined): number => {
     if (body instanceof Uint8Array) return body.byteLength;
     if (raw && typeof body === 'string') return contentEncoder.encode(body).length;
-    return contentEncoder.encode(JSON.stringify(body)).length;
+    return contentEncoder.encode(stringifyJson(body)).length;
 };
 
 /**
@@ -1820,6 +1821,8 @@ const renderResult = (
             return renderError(500, 'Internal Server Error', undefined, result.headers);
     }
 };
+
+export { stringifyJson } from './json.js';
 
 /**
  * A query string or form as an object. A repeated key collects every value into a list.

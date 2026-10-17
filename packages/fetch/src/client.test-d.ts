@@ -170,7 +170,7 @@ test('query fields surface as the JSON wire types the server coerces from', asyn
     type Query = API.PayloadsTypedQuery.Query;
     expectTypeOf<Query['page']>().toEqualTypeOf<number | undefined>();
     expectTypeOf<Query['from']>().toEqualTypeOf<string>();
-    expectTypeOf<Query['cursor']>().toEqualTypeOf<string>();
+    expectTypeOf<Query['cursor']>().toEqualTypeOf<bigint | string>();
     expectTypeOf<Query['search']>().toEqualTypeOf<string>();
     expectTypeOf<Query['transformed']>().toEqualTypeOf<string>();
 });
@@ -190,6 +190,7 @@ test('nested object, array, and date fields surface as their JSON wire types', a
             },
             scores: [1, 2, 3],
             pair: [1, 'two'],
+            quota: 9007199254740993n,
         },
     });
     type Body = API.PayloadsNestedTyped.Body;
@@ -199,6 +200,12 @@ test('nested object, array, and date fields surface as their JSON wire types', a
     expectTypeOf<Body['filters']['tags'][number]['name']>().toEqualTypeOf<string>();
     expectTypeOf<Body['scores']>().toEqualTypeOf<number[]>();
     expectTypeOf<Body['pair']>().toEqualTypeOf<[number, string]>();
+});
+
+test('a bigint is sent as a bigint or its digits, and arrives as its digits', () => {
+    expectTypeOf<API.PayloadsNestedTyped.Body['quota']>().toEqualTypeOf<bigint | string>();
+    type Ok = Extract<API.PayloadsNestedTyped.Result, { status: 200 }>;
+    expectTypeOf<Ok['body']['bytesUsed']>().toEqualTypeOf<string>();
 });
 
 test('nested number field rejects wrong-typed values', () => {
@@ -212,6 +219,7 @@ test('nested number field rejects wrong-typed values', () => {
             },
             scores: [],
             pair: [1, 'x'],
+            quota: '0',
         },
     });
 });

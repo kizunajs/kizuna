@@ -219,6 +219,30 @@ export const usersRoutes = k.routes.users({
                 body: Buffer.from(`BADGE:${user.id}:${user.name}`, 'utf-8'),
             };
         }),
+    setStorageLimit: k
+        .route({
+            method: 'PUT',
+            path: '/users/:id/storage-limit',
+            auth: false,
+            pathParams: UserPathParams,
+            body: z.object({
+                bytesLimit: z.int64(),
+            }),
+            responses: {
+                200: z.object({
+                    userId: z.string(),
+                    bytesLimit: z.int64(),
+                }),
+            },
+            summary: "Set a user's storage limit, exercises a bigint sent and returned as a string of digits",
+        })
+        .handler(({ params, body }) => ({
+            status: 200,
+            body: {
+                userId: params.id,
+                bytesLimit: body.bytesLimit,
+            },
+        })),
     lastSessionEvent: k
         .route({
             method: 'GET',

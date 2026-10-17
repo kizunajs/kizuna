@@ -373,6 +373,8 @@ Arrays of these coerce too (`z.array(z.number())`). A list repeats its key, `?id
 
 A JSON body keeps its numbers and booleans, since JSON has them. JSON has no date or bigint, so those travel as strings, and Kizuna reads `z.date()` and `z.bigint()` fields back from them wherever they sit in the body.
 
+A response sends a bigint the same way, as a string of its digits, because a JSON number past 2^53 loses precision in JavaScript ([RFC 7493 §2.2](https://www.rfc-editor.org/rfc/rfc7493#section-2.2)). The fetch client types it as `string` and accepts a `bigint` or a `string` when sending. The Swift client keeps it as `Int64` and the Kotlin client as `Long`.
+
 Because coercion is built in, **`z.coerce` is not supported**, and `k.routes` throws if any schema uses it. Declare the plain schema (`z.number()`, `z.date()`, `z.bigint()`). To receive a different type than you send, use `z.string().transform(...)`.
 
 ### Response schemas

@@ -5,6 +5,7 @@ import { buildToolDefinitions, toolOptionsOf, type ToolDefinition } from './tool
 import type { ToolCall, ToolError, ToolResult } from './tool-events.js';
 import type { RouteDefinition, Routes } from './types.js';
 import { isVoidSchema } from './zod-internals.js';
+import { stringifyJson } from './json.js';
 
 /**
  * A call as the model sent it. `name` is the tool name or its dotted key.
@@ -160,7 +161,7 @@ export const createStreamTools = <R extends Routes>(tools: R, pipeline: ToolPipe
     const namesByKey = new Map(definitions.map((definition) => [definition.key, definition.name]));
 
     const answered = (call: ModelToolCall, status: number, body: unknown): ToolRunResult => {
-        const content = JSON.stringify({
+        const content = stringifyJson({
             status,
             body,
         });

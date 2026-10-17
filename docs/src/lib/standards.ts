@@ -54,6 +54,13 @@ export const standards: Standard[] = [
     },
     {
         group: 'http',
+        cite: 'RFC 7493',
+        title: 'I-JSON',
+        href: 'https://www.rfc-editor.org/rfc/rfc7493',
+        covers: 'A bigint sent as a string of its digits, since a JSON number past 2^53 loses precision',
+    },
+    {
+        group: 'http',
         cite: 'RFC 3986',
         title: 'URI Syntax',
         href: 'https://www.rfc-editor.org/rfc/rfc3986',

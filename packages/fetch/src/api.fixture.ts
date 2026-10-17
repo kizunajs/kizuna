@@ -285,10 +285,12 @@ const routes = k.routes({
                 }),
                 scores: z.array(z.number()),
                 pair: z.tuple([z.number(), z.string()]),
+                quota: z.bigint(),
             }),
             responses: {
                 200: z.object({
                     ok: z.boolean(),
+                    bytesUsed: z.bigint(),
                 }),
             },
         }),

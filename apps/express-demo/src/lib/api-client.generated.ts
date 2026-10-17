@@ -234,6 +234,23 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
+    export namespace UsersSetStorageLimit {
+        export type Params = {
+            id: UserId;
+        };
+
+        export type Body = {
+            bytesLimit: bigint | string;
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                userId: string;
+                bytesLimit: string;
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace UsersLastSessionEvent {
         export type Params = {
             id: UserId;
@@ -876,6 +893,25 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.UsersUserBadge.Result>;
         /**
+         * Set a user's storage limit, exercises a bigint sent and returned as a string of digits
+         *
+         * @example
+         * const result = await client.users.setStorageLimit({
+         *     params: {
+         *         id: '1',
+         *     },
+         *     body: {
+         *         bytesLimit: '1',
+         *     },
+         * });
+         */
+        setStorageLimit: ClientMethod<'PUT', false, {
+            params: API.UsersSetStorageLimit.Params;
+            body: API.UsersSetStorageLimit.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.UsersSetStorageLimit.Result>;
+        /**
          * A user's most recent login or logout, inline union variants nest under the User model in native clients
          *
          * @example
@@ -1480,6 +1516,14 @@ const routes: GeneratedRoutes = {
                 404: {},
             },
         },
+        setStorageLimit: {
+            method: 'PUT',
+            path: '/users/:id/storage-limit',
+            responses: {
+                200: {},
+                400: {},
+            },
+        },
         lastSessionEvent: {
             method: 'GET',
             path: '/users/:id/last-session-event',
@@ -1985,7 +2029,7 @@ const encodeBody = (route: GeneratedRoute, body: unknown, headers: Headers): Bod
             return buildSearchParams(body as Record<string, unknown>);
         default:
             if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-            return JSON.stringify(body);
+            return JSON.stringify(body, (_key, value: unknown) => (typeof value === 'bigint' ? value.toString() : value));
     }
 };
 

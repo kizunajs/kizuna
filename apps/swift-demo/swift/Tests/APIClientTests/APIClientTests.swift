@@ -412,6 +412,14 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(text, "BADGE:1:Ada Lovelace")
     }
 
+    func testSetStorageLimitKeepsAnInt64PastDoublePrecision() async throws {
+        let result = try await client.users.setStorageLimit(
+            .params(id: API.UserId("1")),
+            .body(bytesLimit: 9_007_199_254_740_993)
+        )
+        XCTAssertEqual(result.body.bytesLimit, 9_007_199_254_740_993)
+    }
+
     func testLastSessionEventNestedUnionPayloads() async throws {
         // UserSessionEvent's inline variants nest under the union as UserSessionEvent.Login /
         // .Logout, matching the Kotlin client. Switching over both arms proves the enum references
