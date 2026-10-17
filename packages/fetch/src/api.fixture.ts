@@ -555,6 +555,22 @@ const routes = k.routes({
                 status: 200,
                 body: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
             })),
+        count: k
+            .route({
+                method: 'GET',
+                path: '/count',
+                auth: false,
+                responses: {
+                    200: {
+                        body: z.string(),
+                        contentType: 'text/plain',
+                    },
+                },
+            })
+            .handler(() => ({
+                status: 200,
+                body: '42',
+            })),
     },
     account: {
         whoAmI: k.route({

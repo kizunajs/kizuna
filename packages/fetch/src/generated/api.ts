@@ -387,6 +387,11 @@ export namespace API {
             | { status: 200; body: Uint8Array; headers: Record<string, string> };
     }
 
+    export namespace DownloadsCount {
+        export type Result =
+            | { status: 200; body: string; headers: Record<string, string> };
+    }
+
     export namespace AccountWhoAmI {
         export type Result =
             | { status: 200; body: {
@@ -763,6 +768,14 @@ export interface Client {
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.DownloadsBadge.Result>;
+        /**
+         * @example
+         * const result = await client.downloads.count();
+         */
+        count: ClientMethod<'GET', false, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.DownloadsCount.Result>;
     };
     account: {
         /**
@@ -1017,6 +1030,13 @@ const routes: GeneratedRoutes = {
                 200: { read: 'bytes' },
             },
         },
+        count: {
+            method: 'GET',
+            path: '/count',
+            responses: {
+                200: { read: 'text' },
+            },
+        },
     },
     account: {
         whoAmI: {
@@ -1094,7 +1114,7 @@ export const createClient = (config: ClientConfig & { requestContext?: RequestCo
 export type GeneratedResponse =
     | Record<string, never>
     | {
-          read: 'bytes';
+          read: 'bytes' | 'text';
       }
     | {
           stream: true;
@@ -1403,7 +1423,7 @@ const buildMethod = (route: GeneratedRoute, config: ClientConfig) => {
         if (declared !== undefined && 'read' in declared) {
             return {
                 status: response.status,
-                body: new Uint8Array(await response.arrayBuffer()),
+                body: declared.read === 'bytes' ? new Uint8Array(await response.arrayBuffer()) : await response.text(),
                 headers: responseHeaders,
             };
         }

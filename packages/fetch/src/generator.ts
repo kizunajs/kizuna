@@ -3,10 +3,12 @@ import type { ApiDefinition, ResponseDefinition, RouteDefinition, Routes } from 
 import { ValidationErrorSchema } from 'kizunajs/schemas';
 import {
     isBinarySchema,
+    isJsonMediaType,
     isStreamResponse,
     isVoidSchema,
     readObjectShape,
     resolveResponseBody,
+    resolveResponseContentType,
     resolveResponseHeaders,
     streamContentType,
     streamMode,
@@ -234,11 +236,14 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
 };
 
 /**
- * How the client reads a body that does not stream: as bytes for a binary schema, as JSON otherwise.
+ * How the client reads a body that does not stream: as bytes for a binary schema, as text for any other media type than
+ * JSON, as JSON otherwise.
  */
 const readEntry = (response: ResponseDefinition): string => {
     const schema = resolveResponseBody(response);
-    return schema && isBinarySchema(schema) ? `{ read: 'bytes' }` : '{}';
+    if (schema && isBinarySchema(schema)) return `{ read: 'bytes' }`;
+    const contentType = resolveResponseContentType(response);
+    return contentType !== undefined && !isJsonMediaType(contentType) ? `{ read: 'text' }` : '{}';
 };
 
 const isRoute = (value: unknown): value is RouteDefinition =>

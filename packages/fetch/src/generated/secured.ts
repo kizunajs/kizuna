@@ -68,7 +68,7 @@ export const createClient = (config: ClientConfig): Client => buildClient(routes
 export type GeneratedResponse =
     | Record<string, never>
     | {
-          read: 'bytes';
+          read: 'bytes' | 'text';
       }
     | {
           stream: true;
@@ -377,7 +377,7 @@ const buildMethod = (route: GeneratedRoute, config: ClientConfig) => {
         if (declared !== undefined && 'read' in declared) {
             return {
                 status: response.status,
-                body: new Uint8Array(await response.arrayBuffer()),
+                body: declared.read === 'bytes' ? new Uint8Array(await response.arrayBuffer()) : await response.text(),
                 headers: responseHeaders,
             };
         }
