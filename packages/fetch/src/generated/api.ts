@@ -382,6 +382,11 @@ export namespace API {
             | { status: 200; body: AsyncIterable<Uint8Array>; headers: Record<string, string> };
     }
 
+    export namespace DownloadsBadge {
+        export type Result =
+            | { status: 200; body: Uint8Array; headers: Record<string, string> };
+    }
+
     export namespace AccountWhoAmI {
         export type Result =
             | { status: 200; body: {
@@ -749,6 +754,16 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.StreamsBytes.Result>;
     };
+    downloads: {
+        /**
+         * @example
+         * const result = await client.downloads.badge();
+         */
+        badge: ClientMethod<'GET', false, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.DownloadsBadge.Result>;
+    };
     account: {
         /**
          * @example
@@ -994,6 +1009,15 @@ const routes: GeneratedRoutes = {
             },
         },
     },
+    downloads: {
+        badge: {
+            method: 'GET',
+            path: '/badge',
+            responses: {
+                200: { read: 'bytes' },
+            },
+        },
+    },
     account: {
         whoAmI: {
             method: 'GET',
@@ -1065,10 +1089,13 @@ export const createClient = (config: ClientConfig & { requestContext?: RequestCo
 
 /**
  * What the client knows about one response: nothing for a body it reads as
- * JSON, the media type for one that streams.
+ * JSON, how to read one that is not, the media type for one that streams.
  */
 export type GeneratedResponse =
     | Record<string, never>
+    | {
+          read: 'bytes';
+      }
     | {
           stream: true;
           contentType: string;
@@ -1370,6 +1397,13 @@ const buildMethod = (route: GeneratedRoute, config: ClientConfig) => {
             return {
                 status: response.status,
                 body: readStream(response.body, declared.contentType),
+                headers: responseHeaders,
+            };
+        }
+        if (declared !== undefined && 'read' in declared) {
+            return {
+                status: response.status,
+                body: new Uint8Array(await response.arrayBuffer()),
                 headers: responseHeaders,
             };
         }

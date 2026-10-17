@@ -1,7 +1,8 @@
 import type { z } from 'zod';
-import type { ApiDefinition, RouteDefinition, Routes } from 'kizunajs';
+import type { ApiDefinition, ResponseDefinition, RouteDefinition, Routes } from 'kizunajs';
 import { ValidationErrorSchema } from 'kizunajs/schemas';
 import {
+    isBinarySchema,
     isStreamResponse,
     isVoidSchema,
     readObjectShape,
@@ -214,7 +215,9 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
     const tableEntries = [`method: '${route.method}'`, `path: '${route.path}'`];
     if (route.contentType) tableEntries.push(`contentType: '${route.contentType}'`);
     const responses = Object.entries(route.responses).map(([status, response]) =>
-        isStreamResponse(response) ? `${status}: { stream: true, contentType: '${streamContentType(response)}' }` : `${status}: {}`
+        isStreamResponse(response)
+            ? `${status}: { stream: true, contentType: '${streamContentType(response)}' }`
+            : `${status}: ${readEntry(response)}`
     );
     // The runtime and its wrappers read the table alone, so it lists the 400 the types add.
     if (validationBody && !declaredBadRequest) responses.push('400: {}');
@@ -228,6 +231,14 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
         declaration: `export namespace ${namespace} {\n${indent(members.join('\n\n'))}\n}`,
         table: `${key}: {\n${indent(tableEntries.map((entry) => `${entry},`).join('\n'))}\n},`,
     };
+};
+
+/**
+ * How the client reads a body that does not stream: as bytes for a binary schema, as JSON otherwise.
+ */
+const readEntry = (response: ResponseDefinition): string => {
+    const schema = resolveResponseBody(response);
+    return schema && isBinarySchema(schema) ? `{ read: 'bytes' }` : '{}';
 };
 
 const isRoute = (value: unknown): value is RouteDefinition =>

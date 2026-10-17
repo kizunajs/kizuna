@@ -57,6 +57,11 @@ describe('end-to-end: typed client → Express server', () => {
         }
     });
 
+    it('downloads a binary body as its bytes', async () => {
+        const result = await client.downloads.badge();
+        expect(result.body).toEqual(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]));
+    });
+
     it('returns typed 404 for a missing user', async () => {
         const result = await client.users.getUser({
             params: {

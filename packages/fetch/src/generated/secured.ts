@@ -63,10 +63,13 @@ export const createClient = (config: ClientConfig): Client => buildClient(routes
 
 /**
  * What the client knows about one response: nothing for a body it reads as
- * JSON, the media type for one that streams.
+ * JSON, how to read one that is not, the media type for one that streams.
  */
 export type GeneratedResponse =
     | Record<string, never>
+    | {
+          read: 'bytes';
+      }
     | {
           stream: true;
           contentType: string;
@@ -368,6 +371,13 @@ const buildMethod = (route: GeneratedRoute, config: ClientConfig) => {
             return {
                 status: response.status,
                 body: readStream(response.body, declared.contentType),
+                headers: responseHeaders,
+            };
+        }
+        if (declared !== undefined && 'read' in declared) {
+            return {
+                status: response.status,
+                body: new Uint8Array(await response.arrayBuffer()),
                 headers: responseHeaders,
             };
         }
