@@ -8,6 +8,7 @@ import {
     csvBody,
     cachedInput,
     deprecatedInput,
+    formInput,
     issueInput,
     methodInput,
     ownerToken,
@@ -127,6 +128,14 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 input: cachedInput,
+            },
+            use
+        );
+
+    const usingForms = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                input: formInput,
             },
             use
         );
@@ -425,6 +434,59 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     },
                 ],
                 total: 2,
+            });
+        },
+
+        'body.urlencoded': async () => {
+            await usingForms(async (forms) => {
+                const response = await forms.request({
+                    method: 'POST',
+                    path: '/feedback',
+                    body: 'rating=5&tags=fast&tags=clear',
+                    headers: {
+                        'content-type': 'application/x-www-form-urlencoded',
+                    },
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    rating: 5,
+                    tags: ['fast', 'clear'],
+                });
+            });
+        },
+
+        'body.multipart': async () => {
+            await usingForms(async (forms) => {
+                const response = await forms.request({
+                    method: 'POST',
+                    path: '/avatar',
+                    body: [
+                        '--avatar',
+                        'Content-Disposition: form-data; name="width"',
+                        '',
+                        '128',
+                        '--avatar',
+                        'Content-Disposition: form-data; name="file"; filename="avatar.png"',
+                        'Content-Type: image/png',
+                        '',
+                        'PNG',
+                        '--avatar--',
+                        '',
+                    ].join('\r\n'),
+                    headers: {
+                        'content-type': 'multipart/form-data; boundary=avatar',
+                    },
+                });
+                if (!behaviour.parsesMultipart) {
+                    expect(response.status).toBe(400);
+                    return;
+                }
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    filename: 'avatar.png',
+                    size: 3,
+                    width: 128,
+                });
             });
         },
 

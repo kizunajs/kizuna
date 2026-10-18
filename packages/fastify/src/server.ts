@@ -23,6 +23,7 @@ import {
     pluginRouterOf,
     defineAdapter,
     renderJsonResult,
+    parseFetchBody,
     stringifyJson,
     type RenderedResult,
     jobRoutes,
@@ -104,6 +105,27 @@ const keepRawBody = async (
     const replay = Readable.from([buffer]) as Readable & { receivedEncodedLength?: number };
     replay.receivedEncodedLength = buffer.length;
     return replay;
+};
+
+const FORM_CONTENT_TYPES: ReadonlySet<string> = new Set(['application/x-www-form-urlencoded', 'multipart/form-data']);
+
+/**
+ * A form body arrives as the bytes kizuna's own parser left, and is read the way Hono and Next read one. A parser the
+ * app registered has already made it an object.
+ */
+const readFormOrBody = (request: FastifyRequest, route: RouteDefinition): unknown => {
+    if (!Buffer.isBuffer(request.body) || route.contentType === undefined || !FORM_CONTENT_TYPES.has(route.contentType))
+        return request.body;
+    return parseFetchBody(
+        new Request('http://localhost/', {
+            method: 'POST',
+            headers: {
+                'content-type': request.headers['content-type'] ?? route.contentType,
+            },
+            body: new Uint8Array(request.body),
+        }),
+        route
+    );
 };
 
 const writeStream = (open: NonNullable<RenderedResult['stream']>, res: ServerResponse, validate: boolean | undefined): void => {
@@ -204,6 +226,13 @@ export const fastifyKizuna = fastifyPlugin(
             resolvedRouter: CoreRouter<Routes, FastifyHandlerContext>,
             method: Method = route.method
         ): void => {
+            if (
+                route.contentType !== undefined &&
+                FORM_CONTENT_TYPES.has(route.contentType) &&
+                !app.hasContentTypeParser(route.contentType)
+            ) {
+                app.addContentTypeParser(route.contentType, { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
+            }
             app.route({
                 method,
                 url: route.path,
@@ -229,7 +258,7 @@ export const fastifyKizuna = fastifyPlugin(
                         },
                         query: (request.query ?? {}) as Record<string, string>,
                         headers: request.headers,
-                        readBody: () => request.body,
+                        readBody: (routeDefinition) => readFormOrBody(request, routeDefinition),
                         readRawBody: () => request.kizunaRawBody ?? '',
                     };
 

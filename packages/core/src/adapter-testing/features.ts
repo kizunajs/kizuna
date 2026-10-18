@@ -45,6 +45,12 @@ export const ADAPTER_FEATURES = {
     'query.repeatedKeys': {
         summary: 'A repeated query key arrives as a list of every value.',
     },
+    'body.urlencoded': {
+        summary: 'A urlencoded body is parsed, with a repeated key as a list and fields coerced to their types.',
+    },
+    'body.multipart': {
+        summary: 'A multipart body is parsed, with a file part as a File and text fields coerced to their types.',
+    },
     'body.json': {
         summary: 'A JSON body validates and reaches the handler typed.',
     },
@@ -200,6 +206,10 @@ export interface AdapterBehaviour {
      * kizuna sees the request.
      */
     methodMismatchStatus: 404 | 405;
+    /**
+     * Express reads a multipart body through the app's own middleware, like multer. The others parse it themselves.
+     */
+    parsesMultipart: boolean;
 }
 
 /**
@@ -208,15 +218,19 @@ export interface AdapterBehaviour {
 export const ADAPTER_BEHAVIOUR: Record<AdapterName, AdapterBehaviour> = {
     express: {
         methodMismatchStatus: 404,
+        parsesMultipart: false,
     },
     fastify: {
         methodMismatchStatus: 404,
+        parsesMultipart: true,
     },
     hono: {
         methodMismatchStatus: 404,
+        parsesMultipart: true,
     },
     next: {
         methodMismatchStatus: 405,
+        parsesMultipart: true,
     },
 };
 

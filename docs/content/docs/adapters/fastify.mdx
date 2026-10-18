@@ -206,6 +206,12 @@ Both middleware and handlers are then typed:
 
 The adapter also sets `request.kizunaRoute` on every matched request, holding the route that matched.
 
+## Form bodies
+
+Routes with `contentType: 'multipart/form-data'` or `'application/x-www-form-urlencoded'` work without a plugin. The adapter reads a form the way Hono and Next do, so a file part arrives as a `File`. If your app already registers a parser for a form type, like `@fastify/formbody`, the adapter leaves it in place and reads what it produced.
+
+Fastify's `bodyLimit` (1 MiB by default) caps the size of an upload. Raise it on the Fastify instance for larger files.
+
 ## Streams
 
 A [stream](/docs/streaming) response hijacks the reply and is piped to `reply.raw` after its headers are flushed. The generator's `signal` fires when the raw response closes before the stream has finished.

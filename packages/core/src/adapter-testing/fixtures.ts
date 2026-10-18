@@ -181,6 +181,59 @@ export const userRoutes = k.routes({
         }),
 });
 
+export const formRoutes = k.routes({
+    submitFeedback: k
+        .route({
+            method: 'POST',
+            path: '/feedback',
+            contentType: 'application/x-www-form-urlencoded',
+            body: z.object({
+                rating: z.number(),
+                tags: z.array(z.string()),
+            }),
+            responses: {
+                200: z.object({
+                    rating: z.number(),
+                    tags: z.array(z.string()),
+                }),
+            },
+        })
+        .handler(({ body }) => ({
+            status: 200,
+            body,
+        })),
+    uploadAvatar: k
+        .route({
+            method: 'POST',
+            path: '/avatar',
+            contentType: 'multipart/form-data',
+            body: z.object({
+                file: z.instanceof(File),
+                width: z.number(),
+            }),
+            responses: {
+                200: z.object({
+                    filename: z.string(),
+                    size: z.number(),
+                    width: z.number(),
+                }),
+            },
+        })
+        .handler(({ body }) => ({
+            status: 200,
+            body: {
+                filename: body.file.name,
+                size: body.file.size,
+                width: body.width,
+            },
+        })),
+});
+
+export const formInput = {
+    ...config,
+    routes: [formRoutes],
+};
+
 export type UserRoutes = typeof userRoutes;
 
 export const userInput = {
