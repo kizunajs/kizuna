@@ -131,6 +131,8 @@ interface CallArgs {
  */
 const serializeValue = (value: unknown): string => (value instanceof Date ? value.toISOString() : String(value));
 
+const isPlainObject = (value: unknown): boolean => typeof value === 'object' && !(value instanceof Date);
+
 const buildPath = (path: string, params: Record<string, unknown> = {}): string =>
     path.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (_, name: string) => {
         const value = params[name];
@@ -155,7 +157,7 @@ const buildFormData = (fields: Record<string, unknown>): FormData => {
     for (const [key, value] of Object.entries(fields)) {
         for (const item of Array.isArray(value) ? value : [value]) {
             if (item instanceof Blob) formData.append(key, item);
-            else if (item !== undefined && item !== null) formData.append(key, typeof item === 'string' ? item : JSON.stringify(item));
+            else if (item !== undefined && item !== null) formData.append(key, isPlainObject(item) ? JSON.stringify(item) : serializeValue(item));
         }
     }
     return formData;

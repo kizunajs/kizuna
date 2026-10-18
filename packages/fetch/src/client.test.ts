@@ -239,6 +239,27 @@ describe('KizunaClient', () => {
         expect(options.headers.get('content-type')).toBeNull();
     });
 
+    it('sends a bigint form field as its digits', async () => {
+        const fetchMock = stubFetch(200, {
+            ok: true,
+        });
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        await client.forms.uploadAvatar({
+            body: {
+                file: new File(['avatar'], 'avatar.png'),
+                userId: '1',
+                bytesLimit: 9007199254740993n,
+            },
+        });
+
+        const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { body: FormData }];
+        expect(options.body.get('bytesLimit')).toBe('9007199254740993');
+    });
+
     it('serializes application/x-www-form-urlencoded body as URLSearchParams', async () => {
         const fetchMock = stubFetch(200, {
             ok: true,

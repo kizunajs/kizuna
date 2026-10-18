@@ -172,6 +172,7 @@ const routes = k.routes({
             body: z.object({
                 file: z.instanceof(File),
                 userId: z.string(),
+                bytesLimit: z.bigint().optional(),
             }),
             responses: {
                 200: z.object({
