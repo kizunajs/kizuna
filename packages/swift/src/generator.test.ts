@@ -1076,6 +1076,34 @@ describe('Swift generator: owned type nesting', () => {
     });
 });
 
+describe('Swift generator: retry', () => {
+    it('takes a RetryPolicy and hands it to every request', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        getUser: k.route({
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: z.object({
+                                    id: z.string(),
+                                }),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public struct RetryPolicy: Sendable');
+        expect(output).toContain('timeout: TimeInterval = 30, retry: RetryPolicy? = nil');
+        expect(output).toContain('Kizuna.send(&request, session: session, retry: retry,');
+        expect(output).toContain('let idempotent = ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"].contains(request.httpMethod ?? "GET")');
+    });
+});
+
 describe('Swift generator: nullable', () => {
     const contract = defineConfig({
         ...config,
@@ -2159,7 +2187,9 @@ describe('Swift generator: streamed responses', () => {
             }).api,
             baseConfig
         );
-        expect(output).toMatch(/Kizuna\.open\(&request, session: \S+, requestMiddleware: \S+, responseMiddleware: \S*responseMiddleware,/);
+        expect(output).toMatch(
+            /Kizuna\.open\(&request, session: \S+, retry: \S+, requestMiddleware: \S+, responseMiddleware: \S*responseMiddleware,/
+        );
         expect(output).toContain('if let responseMiddleware { await responseMiddleware(request, Foundation.Data(), response) }');
     });
 

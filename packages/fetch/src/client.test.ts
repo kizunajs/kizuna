@@ -800,3 +800,129 @@ describe('headers', () => {
         expect(options.headers.get('content-type')).toBe('application/vnd.call+json');
     });
 });
+
+describe('retry', () => {
+    const unavailable = (retryAfter?: string) =>
+        new Response(null, {
+            status: 503,
+            headers:
+                retryAfter === undefined
+                    ? {}
+                    : {
+                          'retry-after': retryAfter,
+                      },
+        });
+
+    const user = () =>
+        new Response(
+            JSON.stringify({
+                id: '1',
+                name: 'Alice',
+            }),
+            {
+                status: 200,
+                headers: {
+                    'content-type': 'application/json',
+                },
+            }
+        );
+
+    const clientWith = (fetchMock: typeof fetch, retry?: Parameters<typeof createClient>[0]['retry']) =>
+        createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+            retry,
+        });
+
+    const getUser = (client: ReturnType<typeof createClient>) =>
+        client.users.getUser({
+            params: {
+                id: '1',
+            },
+        });
+
+    it('sends once when retry is not configured', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(unavailable('0'));
+        const result = await getUser(clientWith(fetchMock));
+        expect(result.status).toBe(503);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits what Retry-After asks and sends again', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(unavailable('0')).mockResolvedValueOnce(user());
+        const result = await getUser(clientWith(fetchMock, {}));
+        expect(result.status).toBe(200);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('reads Retry-After as an HTTP-date', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(unavailable(new Date(Date.now() - 1000).toUTCString()))
+            .mockResolvedValueOnce(user());
+        const result = await getUser(clientWith(fetchMock, {}));
+        expect(result.status).toBe(200);
+    });
+
+    it('hands the response back when Retry-After asks for longer than the maximum delay', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(unavailable('120')).mockResolvedValueOnce(user());
+        const result = await getUser(
+            clientWith(fetchMock, {
+                maximumDelay: 1000,
+            })
+        );
+        expect(result.status).toBe(503);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops after the maximum attempts', async () => {
+        const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(unavailable()));
+        const result = await getUser(
+            clientWith(fetchMock, {
+                maximumAttempts: 3,
+                initialDelay: 0,
+            })
+        );
+        expect(result.status).toBe(503);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('retries a network error', async () => {
+        const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce(user());
+        const result = await getUser(
+            clientWith(fetchMock, {
+                initialDelay: 0,
+            })
+        );
+        expect(result.status).toBe(200);
+    });
+
+    it('never retries a cancelled request', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        const fetchMock = vi.fn().mockRejectedValue(new DOMException('The operation was aborted.', 'AbortError'));
+        await expect(
+            clientWith(fetchMock, {}).users.getUser({
+                params: {
+                    id: '1',
+                },
+                fetchOptions: {
+                    signal: controller.signal,
+                },
+            })
+        ).rejects.toThrow('aborted');
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('never retries a POST', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(unavailable('0'));
+        const result = await clientWith(fetchMock, {}).users.createUser({
+            body: {
+                name: 'Alice',
+                email: 'alice@example.com',
+            },
+        });
+        expect(result.status).toBe(503);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+});

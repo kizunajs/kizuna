@@ -11,6 +11,33 @@ const baseConfig = {
     namespaceName: 'TestAPI',
 };
 
+describe('Kotlin generator: retry', () => {
+    it('takes a RetryPolicy and hands it to every request', () => {
+        const output = generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        getUser: {
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: z.object({
+                                    id: z.string(),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('data class RetryPolicy(');
+        expect(output).toContain('private val retry: RetryPolicy? = null)');
+        expect(output).toContain('val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)');
+        expect(output).toContain('val idempotent = request.method in setOf("GET", "HEAD", "OPTIONS", "PUT", "DELETE")');
+    });
+});
+
 describe('Kotlin generator: z.void()', () => {
     it('emits no body param and Response return for z.void() body and response', () => {
         const contract = defineConfig({

@@ -54,6 +54,13 @@ export const standards: Standard[] = [
     },
     {
         group: 'http',
+        cite: 'RFC 6585',
+        title: 'Additional HTTP Status Codes',
+        href: 'https://www.rfc-editor.org/rfc/rfc6585',
+        covers: 'The `429 Too Many Requests` a client with retries turned on waits out',
+    },
+    {
+        group: 'http',
         cite: 'RFC 3986',
         title: 'URI Syntax',
         href: 'https://www.rfc-editor.org/rfc/rfc3986',

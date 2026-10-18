@@ -253,6 +253,19 @@ public func deleteUser(_ params: APIClient.DeleteUser.Params) async throws(APICl
 }
 ```
 
+## Retries
+
+A busy server answers `503` or `429` and says in `Retry-After` when to come back. Pass a `RetryPolicy` and the client waits that long and sends the request again:
+
+```swift title="API.swift"
+let api = APIClient(
+    baseURL: URL(string: "https://api.example.com")!,
+    retry: APIClient.RetryPolicy(maximumAttempts: 3)
+)
+```
+
+Only `GET`, `HEAD`, `OPTIONS`, `PUT` and `DELETE` are retried, so a `POST` that fails is handed back rather than sent twice. A network error is retried too, and a cancelled task never is. Without a `Retry-After` the client backs off from `initialDelay` (0.5 s), and a `Retry-After` longer than `maximumDelay` (30 s) hands the response back.
+
 ## Streams
 
 A route whose response [streams](/docs/streaming) returns its `body` as an `AsyncThrowingStream`. Named events become an `Event` enum with one case per event, each carrying its decoded payload:

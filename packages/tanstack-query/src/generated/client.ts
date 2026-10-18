@@ -379,6 +379,26 @@ export interface ClientConfig {
     credentials?: RequestCredentials;
     fetch?: typeof fetch;
     onRequest?: (request: OutgoingRequest) => void | Promise<void>;
+    retry?: RetryOptions;
+}
+
+/**
+ * Retries a GET, HEAD, OPTIONS, PUT or DELETE that failed on the network or
+ * was answered 429 or 503, waiting what Retry-After asks or backing off.
+ */
+export interface RetryOptions {
+    /**
+     * Attempts in all, the first included.
+     */
+    maximumAttempts?: number;
+    /**
+     * Milliseconds the first backoff waits at most.
+     */
+    initialDelay?: number;
+    /**
+     * Milliseconds any wait may take.
+     */
+    maximumDelay?: number;
 }
 
 /**
@@ -603,6 +623,61 @@ const readStream = (body: ReadableStream<Uint8Array>, contentType: string): Asyn
     return readBytes(body);
 };
 
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
+
+const RETRY_STATUSES = new Set([429, 503]);
+
+const retryAfter = (header: string | null): number | undefined => {
+    if (header === null) return undefined;
+    if (/^\d+$/.test(header.trim())) return Number(header.trim()) * 1000;
+    const date = Date.parse(header);
+    return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
+};
+
+const wait = (milliseconds: number, signal: AbortSignal | null | undefined): Promise<void> =>
+    new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(signal.reason);
+            return;
+        }
+        const onAbort = () => {
+            clearTimeout(timer);
+            reject(signal?.reason);
+        };
+        const timer = setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+        }, milliseconds);
+        signal?.addEventListener('abort', onAbort, {
+            once: true,
+        });
+    });
+
+const send = async (url: string, init: RequestInit, route: GeneratedRoute, config: ClientConfig): Promise<Response> => {
+    const fetcher = config.fetch ?? fetch;
+    const retry = config.retry;
+    if (retry === undefined || !IDEMPOTENT_METHODS.has(route.method)) return fetcher(url, init);
+    const maximumAttempts = retry.maximumAttempts ?? 3;
+    const initialDelay = retry.initialDelay ?? 500;
+    const maximumDelay = retry.maximumDelay ?? 30_000;
+    for (let attempt = 1; ; attempt += 1) {
+        const backoff = Math.random() * Math.min(maximumDelay, initialDelay * 2 ** (attempt - 1));
+        let response: Response;
+        try {
+            response = await fetcher(url, init);
+        } catch (error) {
+            if (attempt >= maximumAttempts || init.signal?.aborted || !(error instanceof TypeError)) throw error;
+            await wait(backoff, init.signal);
+            continue;
+        }
+        if (attempt >= maximumAttempts || !RETRY_STATUSES.has(response.status)) return response;
+        const asked = retryAfter(response.headers.get('retry-after'));
+        if (asked !== undefined && asked > maximumDelay) return response;
+        await response.body?.cancel();
+        await wait(asked ?? backoff, init.signal);
+    }
+};
+
 const buildMethod = (route: GeneratedRoute, config: ClientConfig) => {
     const call = async (args: CallArgs = {}) => {
         const query = args.query === undefined ? '' : buildSearchParams(args.query).toString();
@@ -624,10 +699,15 @@ const buildMethod = (route: GeneratedRoute, config: ClientConfig) => {
             route,
         });
 
-        const response = await (config.fetch ?? fetch)(url, {
-            ...init,
-            ...args.fetchOptions,
-        });
+        const response = await send(
+            url,
+            {
+                ...init,
+                ...args.fetchOptions,
+            },
+            route,
+            config
+        );
         const responseHeaders: Record<string, string> = {};
         response.headers.forEach((value, name) => {
             responseHeaders[name] = value;

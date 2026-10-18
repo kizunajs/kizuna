@@ -333,6 +333,19 @@ suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.Us
 }
 ```
 
+## Retries
+
+A busy server answers `503` or `429` and says in `Retry-After` when to come back. Pass a `RetryPolicy` and the client waits that long and sends the request again:
+
+```kotlin title="Api.kt"
+val api = APIClient(
+    baseUrl = "https://api.example.com",
+    retry = APIClient.RetryPolicy(maximumAttempts = 3),
+)
+```
+
+Only `GET`, `HEAD`, `OPTIONS`, `PUT` and `DELETE` are retried, so a `POST` that fails is handed back rather than sent twice. A network error is retried too, and a cancelled coroutine never is. Without a `Retry-After` the client backs off from `initialDelay` (500 ms), and a `Retry-After` longer than `maximumDelay` (30 s) hands the response back.
+
 ## Streams
 
 A route whose response [streams](/docs/streaming) returns its `body` as a `Flow`. Named events become a sealed `Event` interface with one class per event, each carrying its decoded payload as `data`:

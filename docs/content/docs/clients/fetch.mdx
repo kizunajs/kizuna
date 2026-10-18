@@ -160,6 +160,7 @@ export interface ClientConfig {
     credentials?: RequestCredentials;
     fetch?: typeof fetch;
     onRequest?: (request: OutgoingRequest) => void | Promise<void>;
+    retry?: RetryOptions;
 }
 ```
 
@@ -170,6 +171,7 @@ export interface ClientConfig {
 | `credentials` | Passed as `credentials` to every `fetch` call                                     |
 | `fetch`       | Custom fetch implementation (e.g. for testing or a polyfill)                      |
 | `onRequest`   | Callback before each request, receiving the `OutgoingRequest` it is about to send |
+| `retry`       | Retry a request the server could not take yet, see [Retries](#retries)            |
 
 Setting a header on the `headers` of an `OutgoingRequest` sets it on the request that goes out, which is how a credential that lives in storage is read per request rather than fixed at construction. See [React Native](#reading-a-token-from-storage).
 
@@ -229,6 +231,25 @@ const { body } = await apiClient.users.listUsers({
     },
 });
 ```
+
+## Retries
+
+A busy server answers `503 Service Unavailable` or `429 Too Many Requests` and says in `Retry-After` when to come back. Turn retries on and the client waits that long and sends the request again:
+
+```ts title="src/lib/api-client.ts"
+export const apiClient = createClient({
+    baseUrl: import.meta.env.VITE_API_URL,
+    retry: {
+        maximumAttempts: 3,
+    },
+});
+```
+
+Only `GET`, `HEAD`, `OPTIONS`, `PUT` and `DELETE` are retried, the methods [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110#section-9.2.2) lets a client send twice without asking. A `POST` that fails is handed back, so a payment never goes through twice. A network error is retried too, and a cancelled request never is.
+
+Without a `Retry-After`, the client backs off, waiting at most `initialDelay` (500 ms) the first time and doubling from there. A `Retry-After` longer than `maximumDelay` (30 s) hands the response back instead of waiting.
+
+TanStack Query retries failed queries on its own. Use one or the other.
 
 ## Response type
 

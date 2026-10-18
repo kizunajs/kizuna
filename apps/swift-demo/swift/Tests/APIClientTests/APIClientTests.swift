@@ -412,6 +412,12 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(text, "BADGE:1:Ada Lovelace")
     }
 
+    func testRetryWaitsOutAWarmingUpServer() async throws {
+        let retrying = APIClient(baseURL: client.baseURL, session: client.session, retry: APIClient.RetryPolicy(initialDelay: 0))
+        let result = try await retrying.health.ready()
+        XCTAssertTrue(result.body.ready)
+    }
+
     func testLastSessionEventNestedUnionPayloads() async throws {
         // UserSessionEvent's inline variants nest under the union as UserSessionEvent.Login /
         // .Logout, matching the Kotlin client. Switching over both arms proves the enum references
