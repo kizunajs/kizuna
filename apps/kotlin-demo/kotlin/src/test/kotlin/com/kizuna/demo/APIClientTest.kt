@@ -84,6 +84,24 @@ class APIClientTest {
     }
 
     @Test
+    fun testUploadAvatarSendsAFileFromDisk() = runTest {
+        val avatar = java.io.File.createTempFile("avatar", ".png")
+        try {
+            avatar.writeBytes(ByteArray(20_000))
+            val response = client.users.uploadAvatar {
+                body(
+                    file = APIClient.MultipartFile(file = avatar),
+                    userId = "1",
+                )
+            }
+            assertEquals(20_000, response.body.size.toInt())
+            assertEquals("1", response.body.userId)
+        } finally {
+            avatar.delete()
+        }
+    }
+
+    @Test
     fun testSubmitFeedbackSendsAUrlencodedForm() = runTest {
         val response = client.users.submitFeedback {
             body(

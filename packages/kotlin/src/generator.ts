@@ -1328,7 +1328,7 @@ const emitBodyEncoding = (writer: KotlinWriter, method: RouteMethod, context: Em
             const append = (accessor: string): void => {
                 if (isFile) {
                     writer.line(
-                        `multipartBuilder.addFormDataPart(${stringLiteral(field.wireName)}, ${accessor}.filename, ${accessor}.data.toRequestBody(${accessor}.mimeType.toMediaType()))`
+                        `multipartBuilder.addFormDataPart(${stringLiteral(field.wireName)}, ${accessor}.filename, ${accessor}.requestBody())`
                     );
                 } else {
                     writer.line(
@@ -1851,17 +1851,43 @@ const emitClient = (
             if (usesMultipart) {
                 writer.blank();
                 emitConstructorClass(writer, 'data class MultipartFile', [
-                    'val data: ByteArray',
+                    'val source: Source',
                     'val filename: String',
                     'val mimeType: String = "application/octet-stream"',
                 ]);
                 writer.appendToLastLine(' {');
                 writer.indent(() => {
-                    emitByteArrayEquality(writer, 'MultipartFile', [
-                        { name: 'data', isByteArray: true },
-                        { name: 'filename', isByteArray: false },
-                        { name: 'mimeType', isByteArray: false },
-                    ]);
+                    writer.line(
+                        'constructor(data: ByteArray, filename: String, mimeType: String = "application/octet-stream") : this(Source.Bytes(data), filename, mimeType)'
+                    );
+                    writer.blank();
+                    writer.line('/**');
+                    writer.line(' * A file on disk, sent from there rather than read into memory first.');
+                    writer.line(' */');
+                    writer.line(
+                        'constructor(file: java.io.File, filename: String = file.name, mimeType: String = java.net.URLConnection.guessContentTypeFromName(file.name) ?: "application/octet-stream") : this(Source.FromFile(file), filename, mimeType)'
+                    );
+                    writer.blank();
+                    writer.block('sealed interface Source', () => {
+                        emitConstructorClass(writer, 'class Bytes', ['val data: ByteArray']);
+                        writer.appendToLastLine(' : Source {');
+                        writer.indent(() => {
+                            writer.line('override fun equals(other: Any?): Boolean = other is Bytes && data.contentEquals(other.data)');
+                            writer.blank();
+                            writer.line('override fun hashCode(): Int = data.contentHashCode()');
+                        });
+                        writer.line('}');
+                        writer.blank();
+                        writer.line('data class FromFile(val file: java.io.File) : Source');
+                    });
+                    writer.blank();
+                    writer.block('internal fun requestBody(): RequestBody', () => {
+                        writer.line('val mediaType = mimeType.toMediaType()');
+                        writer.line('return when (source) {');
+                        writer.line('    is Source.Bytes -> source.data.toRequestBody(mediaType)');
+                        writer.line('    is Source.FromFile -> source.file.asRequestBody(mediaType)');
+                        writer.line('}');
+                    });
                 });
                 writer.line('}');
             }
@@ -1956,6 +1982,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     writer.line('import okhttp3.*');
     writer.line('import okhttp3.MediaType.Companion.toMediaType');
     writer.line('import okhttp3.RequestBody.Companion.toRequestBody');
+    writer.line('import okhttp3.RequestBody.Companion.asRequestBody');
     writer.line('import okhttp3.HttpUrl.Companion.toHttpUrl');
     writer.blank();
 

@@ -333,6 +333,21 @@ suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.Us
 }
 ```
 
+## Uploading a file
+
+A `FileSchema` field takes a `MultipartFile`. Build it from a `java.io.File` and OkHttp streams it from disk, so a large video never has to fit in memory. The filename and MIME type come from the file's name:
+
+```kotlin title="AvatarUpload.kt"
+val response = api.users.uploadAvatar {
+    body(
+        file = APIClient.MultipartFile(file = photo),
+        userId = userId,
+    )
+}
+```
+
+For bytes you already hold, use `MultipartFile(data, filename, mimeType)`.
+
 ## Streams
 
 A route whose response [streams](/docs/streaming) returns its `body` as a `Flow`. Named events become a sealed `Event` interface with one class per event, each carrying its decoded payload as `data`:

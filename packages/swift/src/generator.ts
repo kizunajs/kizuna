@@ -1724,38 +1724,68 @@ const emitKizunaNamespace = (
         if (options.multipart) {
             writer.blank();
             writer.block('struct MultipartBuilder', () => {
+                writer.block('enum Piece', () => {
+                    writer.line('case data(Foundation.Data)');
+                    writer.line('case file(URL)');
+                });
+                writer.blank();
                 writer.line('let boundary: String');
-                writer.line('private var data = Foundation.Data()');
+                writer.line('private var pieces: [Piece] = []');
                 writer.blank();
                 writer.block('init(boundary: String = "kizuna-\\(UUID().uuidString)")', () => {
                     writer.line('self.boundary = boundary');
                 });
                 writer.blank();
                 writer.block('mutating func appendField(name: String, value: String)', () => {
-                    writer.line('data.append("--\\(boundary)\\r\\n".data(using: .utf8)!)');
-                    writer.line('data.append("Content-Disposition: form-data; name=\\"\\(name)\\"\\r\\n\\r\\n".data(using: .utf8)!)');
-                    writer.line('data.append(value.data(using: .utf8)!)');
-                    writer.line('data.append("\\r\\n".data(using: .utf8)!)');
+                    writer.line(
+                        'pieces.append(.data(Data("--\\(boundary)\\r\\nContent-Disposition: form-data; name=\\"\\(name)\\"\\r\\n\\r\\n\\(value)\\r\\n".utf8)))'
+                    );
                 });
                 writer.blank();
                 writer.block(`mutating func appendFile(name: String, file: ${options.clientName}.MultipartFile)`, () => {
-                    writer.line('data.append("--\\(boundary)\\r\\n".data(using: .utf8)!)');
                     writer.line(
-                        'data.append("Content-Disposition: form-data; name=\\"\\(name)\\"; filename=\\"\\(file.filename)\\"\\r\\n".data(using: .utf8)!)'
+                        'pieces.append(.data(Data("--\\(boundary)\\r\\nContent-Disposition: form-data; name=\\"\\(name)\\"; filename=\\"\\(file.filename)\\"\\r\\nContent-Type: \\(file.mimeType)\\r\\n\\r\\n".utf8)))'
                     );
-                    writer.line('data.append("Content-Type: \\(file.mimeType)\\r\\n\\r\\n".data(using: .utf8)!)');
-                    writer.line('data.append(file.data)');
-                    writer.line('data.append("\\r\\n".data(using: .utf8)!)');
+                    writer.line('switch file.source {');
+                    writer.line('case .data(let data): pieces.append(.data(data))');
+                    writer.line('case .file(let url): pieces.append(.file(url))');
+                    writer.line('}');
+                    writer.line('pieces.append(.data(Data("\\r\\n".utf8)))');
                 });
                 writer.blank();
-                writer.block('func finalize() -> Foundation.Data', () => {
-                    writer.line('var result = data');
-                    writer.line('result.append("--\\(boundary)--\\r\\n".data(using: .utf8)!)');
-                    writer.line('return result');
-                });
-                writer.blank();
-                writer.block('var contentType: String', () => {
-                    writer.line('"multipart/form-data; boundary=\\(boundary)"');
+                writer.docComment(
+                    'Sets the body on the request. A body with a file on disk is written to a temporary file and streamed from it, which the caller removes once the response is in.'
+                );
+                writer.block('func write(to request: inout URLRequest) throws -> URL?', () => {
+                    writer.line('request.setValue("multipart/form-data; boundary=\\(boundary)", forHTTPHeaderField: "Content-Type")');
+                    writer.line('let closing = Data("--\\(boundary)--\\r\\n".utf8)');
+                    writer.line('let streamsFromDisk = pieces.contains { if case .file = $0 { true } else { false } }');
+                    writer.block('guard streamsFromDisk else', () => {
+                        writer.line(
+                            'request.httpBody = pieces.reduce(into: Data()) { body, piece in if case .data(let data) = piece { body.append(data) } } + closing'
+                        );
+                        writer.line('return nil');
+                    });
+                    writer.line('let body = FileManager.default.temporaryDirectory.appending(path: "kizuna-\\(UUID().uuidString)")');
+                    writer.line('FileManager.default.createFile(atPath: body.path, contents: nil)');
+                    writer.line('let output = try FileHandle(forWritingTo: body)');
+                    writer.line('defer { try? output.close() }');
+                    writer.block('for piece in pieces', () => {
+                        writer.line('switch piece {');
+                        writer.line('case .data(let data):');
+                        writer.line('    try output.write(contentsOf: data)');
+                        writer.line('case .file(let source):');
+                        writer.line('    let input = try FileHandle(forReadingFrom: source)');
+                        writer.line('    defer { try? input.close() }');
+                        writer.line(
+                            '    while let chunk = try input.read(upToCount: 65_536), !chunk.isEmpty { try output.write(contentsOf: chunk) }'
+                        );
+                        writer.line('}');
+                    });
+                    writer.line('try output.write(contentsOf: closing)');
+                    writer.line('request.httpBodyStream = InputStream(url: body)');
+                    writer.line('request.setValue(String(try output.offset()), forHTTPHeaderField: "Content-Length")');
+                    writer.line('return body');
                 });
             });
         }
@@ -2171,8 +2201,9 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
                 append(`body.${escapeKeyword(field.name)}`);
             }
         }
-        writer.line('request.httpBody = multipart.finalize()');
-        writer.line('request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")');
+        writer.line('let uploadBody: URL?');
+        writer.line(`do { uploadBody = try multipart.write(to: &request) } catch { throw ${failure}.requestFailed(error) }`);
+        writer.line('defer { if let uploadBody { try? FileManager.default.removeItem(at: uploadBody) } }');
         return;
     }
 
@@ -2260,14 +2291,32 @@ const emitClient = (
         if (usesMultipart) {
             writer.blank();
             writer.block('public struct MultipartFile: Sendable, Equatable', () => {
-                writer.line('public let data: Foundation.Data');
+                writer.block('public enum Source: Sendable, Equatable', () => {
+                    writer.line('case data(Foundation.Data)');
+                    writer.line('case file(URL)');
+                });
+                writer.blank();
+                writer.line('public let source: Source');
                 writer.line('public let filename: String');
                 writer.line('public let mimeType: String');
                 writer.blank();
                 writer.block('public init(data: Data, filename: String, mimeType: String = "application/octet-stream")', () => {
-                    writer.line('self.data = data');
+                    writer.line('self.source = .data(data)');
                     writer.line('self.filename = filename');
                     writer.line('self.mimeType = mimeType');
+                });
+                writer.blank();
+                writer.docComment('A file on disk, sent from there rather than read into memory first.');
+                writer.block('public init(fileURL: URL, filename: String? = nil, mimeType: String? = nil)', () => {
+                    writer.line('self.source = .file(fileURL)');
+                    writer.line('self.filename = filename ?? fileURL.lastPathComponent');
+                    writer.line('#if canImport(UniformTypeIdentifiers)');
+                    writer.line(
+                        'self.mimeType = mimeType ?? UTType(filenameExtension: fileURL.pathExtension)?.preferredMIMEType ?? "application/octet-stream"'
+                    );
+                    writer.line('#else');
+                    writer.line('self.mimeType = mimeType ?? "application/octet-stream"');
+                    writer.line('#endif');
                 });
             });
         }
@@ -2418,6 +2467,8 @@ const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, regis
     const operationTypeMap = buildOperationTypeMap(allMethods, registry);
     const clientName = `${namespaceName}Client`;
 
+    const usesMultipart = allMethods.some((method) => method.body?.kind === 'multipart');
+
     const writer = new SwiftWriter();
     writer.line('// Generated by @kizunajs/swift. Do not edit by hand.');
     writer.blank();
@@ -2425,9 +2476,13 @@ const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, regis
     writer.line('#if canImport(FoundationNetworking)');
     writer.line('import FoundationNetworking');
     writer.line('#endif');
+    if (usesMultipart) {
+        writer.line('#if canImport(UniformTypeIdentifiers)');
+        writer.line('import UniformTypeIdentifiers');
+        writer.line('#endif');
+    }
     writer.blank();
 
-    const usesMultipart = allMethods.some((method) => method.body?.kind === 'multipart');
     const usesMultiError = allMethods.some(hasMultiErrorGroup);
 
     // Split registry types:

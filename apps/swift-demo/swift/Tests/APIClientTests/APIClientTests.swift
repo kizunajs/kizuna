@@ -464,6 +464,20 @@ final class APIClientTests: XCTestCase {
         XCTAssertTrue(result.body.received)
     }
 
+    func testUploadAvatarSendsAFileFromDisk() async throws {
+        let fileURL = FileManager.default.temporaryDirectory.appending(path: "avatar-\(UUID().uuidString).png")
+        try Data(repeating: 0xAB, count: 20_000).write(to: fileURL)
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+        let result = try await client.users.uploadAvatar(
+            .body(
+                file: APIClient.MultipartFile(fileURL: fileURL),
+                userId: "1"
+            )
+        )
+        XCTAssertEqual(result.body.size, 20_000)
+        XCTAssertEqual(result.body.userId, "1")
+    }
+
     func testUploadAvatarSendsTheFileAsAFilePart() async throws {
         let bytes = Data(repeating: 0xAB, count: 16)
         let file = APIClient.MultipartFile(data: bytes, filename: "avatar.bin", mimeType: "application/octet-stream")

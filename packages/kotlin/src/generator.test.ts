@@ -1996,12 +1996,32 @@ describe('Kotlin generator: ByteArray structural equality', () => {
         }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('data class MultipartFile(');
-        expect(output).toContain(
-            'override fun equals(other: Any?) = other is MultipartFile && data.contentEquals(other.data) && filename == other.filename && mimeType == other.mimeType'
-        );
-        expect(output).toContain(
-            'override fun hashCode() = 31 * (31 * data.contentHashCode() + filename.hashCode()) + mimeType.hashCode()'
-        );
+        expect(output).toContain('override fun equals(other: Any?): Boolean = other is Bytes && data.contentEquals(other.data)');
+        expect(output).toContain('override fun hashCode(): Int = data.contentHashCode()');
+    });
+
+    it('streams a MultipartFile built from a file on disk', () => {
+        const contract = defineConfig({
+            routes: [
+                {
+                    upload: {
+                        method: 'POST',
+                        path: '/upload',
+                        contentType: 'multipart/form-data',
+                        body: z.object({
+                            file: z.instanceof(File),
+                        }),
+                        responses: {
+                            204: z.void(),
+                        },
+                    },
+                },
+            ],
+        }).api;
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('constructor(file: java.io.File, filename: String = file.name');
+        expect(output).toContain('is Source.FromFile -> source.file.asRequestBody(mediaType)');
+        expect(output).toContain('multipartBuilder.addFormDataPart("file", body.file.filename, body.file.requestBody())');
     });
 });
 

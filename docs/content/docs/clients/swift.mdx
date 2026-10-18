@@ -253,6 +253,21 @@ public func deleteUser(_ params: APIClient.DeleteUser.Params) async throws(APICl
 }
 ```
 
+## Uploading a file
+
+A `FileSchema` field takes a `MultipartFile`. Build it from a file on disk and the client streams it from there, so a large video never has to fit in memory. The filename and MIME type come from the URL:
+
+```swift title="AvatarUpload.swift"
+let result = try await api.users.uploadAvatar(
+    .body(
+        file: APIClient.MultipartFile(fileURL: photoURL),
+        userId: userId
+    )
+)
+```
+
+For bytes you already hold, use `MultipartFile(data:filename:mimeType:)`.
+
 ## Streams
 
 A route whose response [streams](/docs/streaming) returns its `body` as an `AsyncThrowingStream`. Named events become an `Event` enum with one case per event, each carrying its decoded payload:

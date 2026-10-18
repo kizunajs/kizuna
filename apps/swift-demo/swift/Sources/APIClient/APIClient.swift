@@ -4,6 +4,9 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+#if canImport(UniformTypeIdentifiers)
+import UniformTypeIdentifiers
+#endif
 
 public enum API {
 
@@ -455,14 +458,30 @@ public final class APIClient: Sendable {
     }
 
     public struct MultipartFile: Sendable, Equatable {
-        public let data: Foundation.Data
+        public enum Source: Sendable, Equatable {
+            case data(Foundation.Data)
+            case file(URL)
+        }
+
+        public let source: Source
         public let filename: String
         public let mimeType: String
 
         public init(data: Data, filename: String, mimeType: String = "application/octet-stream") {
-            self.data = data
+            self.source = .data(data)
             self.filename = filename
             self.mimeType = mimeType
+        }
+
+        /// A file on disk, sent from there rather than read into memory first.
+        public init(fileURL: URL, filename: String? = nil, mimeType: String? = nil) {
+            self.source = .file(fileURL)
+            self.filename = filename ?? fileURL.lastPathComponent
+            #if canImport(UniformTypeIdentifiers)
+            self.mimeType = mimeType ?? UTType(filenameExtension: fileURL.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+            #else
+            self.mimeType = mimeType ?? "application/octet-stream"
+            #endif
         }
     }
 
@@ -4064,8 +4083,9 @@ public struct APIUsersClient: Sendable {
         for text in Kizuna.stringifyQueryValue(body.userId) {
             multipart.appendField(name: "userId", value: text)
         }
-        request.httpBody = multipart.finalize()
-        request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")
+        let uploadBody: URL?
+        do { uploadBody = try multipart.write(to: &request) } catch { throw APIClient.UsersUploadAvatar.Failure.requestFailed(error) }
+        defer { if let uploadBody { try? FileManager.default.removeItem(at: uploadBody) } }
         let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersUploadAvatar.Failure.self)
         switch statusCode {
         case 200:
@@ -5122,36 +5142,58 @@ private enum Kizuna {
     }
 
     struct MultipartBuilder {
+        enum Piece {
+            case data(Foundation.Data)
+            case file(URL)
+        }
+
         let boundary: String
-        private var data = Foundation.Data()
+        private var pieces: [Piece] = []
 
         init(boundary: String = "kizuna-\(UUID().uuidString)") {
             self.boundary = boundary
         }
 
         mutating func appendField(name: String, value: String) {
-            data.append("--\(boundary)\r\n".data(using: .utf8)!)
-            data.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
-            data.append(value.data(using: .utf8)!)
-            data.append("\r\n".data(using: .utf8)!)
+            pieces.append(.data(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"\r\n\r\n\(value)\r\n".utf8)))
         }
 
         mutating func appendFile(name: String, file: APIClient.MultipartFile) {
-            data.append("--\(boundary)\r\n".data(using: .utf8)!)
-            data.append("Content-Disposition: form-data; name=\"\(name)\"; filename=\"\(file.filename)\"\r\n".data(using: .utf8)!)
-            data.append("Content-Type: \(file.mimeType)\r\n\r\n".data(using: .utf8)!)
-            data.append(file.data)
-            data.append("\r\n".data(using: .utf8)!)
+            pieces.append(.data(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(name)\"; filename=\"\(file.filename)\"\r\nContent-Type: \(file.mimeType)\r\n\r\n".utf8)))
+            switch file.source {
+            case .data(let data): pieces.append(.data(data))
+            case .file(let url): pieces.append(.file(url))
+            }
+            pieces.append(.data(Data("\r\n".utf8)))
         }
 
-        func finalize() -> Foundation.Data {
-            var result = data
-            result.append("--\(boundary)--\r\n".data(using: .utf8)!)
-            return result
-        }
-
-        var contentType: String {
-            "multipart/form-data; boundary=\(boundary)"
+        /// Sets the body on the request. A body with a file on disk is written to a temporary file and streamed from it, which the caller removes once the response is in.
+        func write(to request: inout URLRequest) throws -> URL? {
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            let closing = Data("--\(boundary)--\r\n".utf8)
+            let streamsFromDisk = pieces.contains { if case .file = $0 { true } else { false } }
+            guard streamsFromDisk else {
+                request.httpBody = pieces.reduce(into: Data()) { body, piece in if case .data(let data) = piece { body.append(data) } } + closing
+                return nil
+            }
+            let body = FileManager.default.temporaryDirectory.appending(path: "kizuna-\(UUID().uuidString)")
+            FileManager.default.createFile(atPath: body.path, contents: nil)
+            let output = try FileHandle(forWritingTo: body)
+            defer { try? output.close() }
+            for piece in pieces {
+                switch piece {
+                case .data(let data):
+                    try output.write(contentsOf: data)
+                case .file(let source):
+                    let input = try FileHandle(forReadingFrom: source)
+                    defer { try? input.close() }
+                    while let chunk = try input.read(upToCount: 65_536), !chunk.isEmpty { try output.write(contentsOf: chunk) }
+                }
+            }
+            try output.write(contentsOf: closing)
+            request.httpBodyStream = InputStream(url: body)
+            request.setValue(String(try output.offset()), forHTTPHeaderField: "Content-Length")
+            return body
         }
     }
 }

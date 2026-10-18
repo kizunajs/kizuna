@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
 interface KizunaQueryValue {
@@ -252,12 +253,34 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
     }
 
     data class MultipartFile(
-        val data: ByteArray,
+        val source: Source,
         val filename: String,
         val mimeType: String = "application/octet-stream"
     ) {
-        override fun equals(other: Any?) = other is MultipartFile && data.contentEquals(other.data) && filename == other.filename && mimeType == other.mimeType
-        override fun hashCode() = 31 * (31 * data.contentHashCode() + filename.hashCode()) + mimeType.hashCode()
+        constructor(data: ByteArray, filename: String, mimeType: String = "application/octet-stream") : this(Source.Bytes(data), filename, mimeType)
+
+        /**
+         * A file on disk, sent from there rather than read into memory first.
+         */
+        constructor(file: java.io.File, filename: String = file.name, mimeType: String = java.net.URLConnection.guessContentTypeFromName(file.name) ?: "application/octet-stream") : this(Source.FromFile(file), filename, mimeType)
+
+        sealed interface Source {
+            class Bytes(val data: ByteArray) : Source {
+                override fun equals(other: Any?): Boolean = other is Bytes && data.contentEquals(other.data)
+
+                override fun hashCode(): Int = data.contentHashCode()
+            }
+
+            data class FromFile(val file: java.io.File) : Source
+        }
+
+        internal fun requestBody(): RequestBody {
+            val mediaType = mimeType.toMediaType()
+            return when (source) {
+                is Source.Bytes -> source.data.toRequestBody(mediaType)
+                is Source.FromFile -> source.file.asRequestBody(mediaType)
+            }
+        }
     }
 
     @Serializable
@@ -2614,7 +2637,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
         val multipartBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)
-        multipartBuilder.addFormDataPart("file", body.file.filename, body.file.data.toRequestBody(body.file.mimeType.toMediaType()))
+        multipartBuilder.addFormDataPart("file", body.file.filename, body.file.requestBody())
         Kizuna.stringifyQueryValue(body.userId).forEach { text -> multipartBuilder.addFormDataPart("userId", text) }
         requestBody = multipartBuilder.build()
         var requestBuilder = Request.Builder()
