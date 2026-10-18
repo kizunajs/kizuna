@@ -7,6 +7,7 @@ Kizuna is an HTTP and OpenAPI spec-driven library. It follows the relevant RFCs 
 - **RFC 9110** (HTTP Semantics, June 2022): methods, status codes, headers, content negotiation
 - **RFC 5789** (PATCH Method, April 2010): PATCH semantics
 - **RFC 9457** (Problem Details for HTTP APIs, July 2023): error response bodies
+- **RFC 6585** (Additional HTTP Status Codes, April 2012): the `429 Too Many Requests` a client with retries turned on waits out, alongside RFC 9110's `Retry-After` and idempotent methods
 - **RFC 7493** (The I-JSON Message Format, March 2015): a bigint travels as a string of its digits, since a JSON number past 2^53 loses precision
 - **RFC 3986** (URI Syntax, January 2005): paths match exactly, so `/users/1` and `/users/1/` differ
 - **RFC 8594** (Sunset HTTP Header, May 2019): the `Sunset` response header and the `sunset` link relation on routes with a `sunset` date
