@@ -814,6 +814,88 @@ public final class APIClient: Sendable {
         }
     }
 
+    public enum UsersSubmitFeedback {
+
+        public struct Input: Codable, Sendable, Equatable {
+            public let rating: Int
+            public let tags: [String]
+            public let comment: String?
+
+            public init(
+                rating: Int,
+                tags: [String],
+                comment: String? = nil
+            ) {
+                self.rating = rating
+                self.tags = tags
+                self.comment = comment
+            }
+        }
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let rating: Int
+            public let tags: [String]
+            public let comment: String?
+
+            public init(
+                rating: Int,
+                tags: [String],
+                comment: String? = nil
+            ) {
+                self.rating = rating
+                self.tags = tags
+                self.comment = comment
+            }
+        }
+
+        public struct Body: Sendable {
+            public let rating: Int
+            public let tags: [String]
+            public let comment: String?
+
+            public init(
+                rating: Int,
+                tags: [String],
+                comment: String? = nil
+            ) {
+                self.rating = rating
+                self.tags = tags
+                self.comment = comment
+            }
+
+            public static func body(
+                rating: Int,
+                tags: [String],
+                comment: String? = nil
+            ) -> Self {
+                .init(rating: rating, tags: tags, comment: comment)
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
     public enum UsersLastSessionEvent {
 
         public struct Params: Sendable {
@@ -3735,6 +3817,40 @@ public struct APIUsersClient: Sendable {
         }
     }
 
+    /// Submit feedback, exercises a urlencoded body with a list and a number
+    public func submitFeedback(_ body: APIClient.UsersSubmitFeedback.Body) async throws(APIClient.UsersSubmitFeedback.Failure) -> APIClient.UsersSubmitFeedback.Result {
+        let path = "/feedback"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersSubmitFeedback.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "POST"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        var form: [(String, String)] = []
+        for text in Kizuna.stringifyQueryValue(body.rating) {
+            form.append(("rating", text))
+        }
+        for text in Kizuna.stringifyQueryValue(body.tags) {
+            form.append(("tags", text))
+        }
+        if let value = body.comment {
+            for text in Kizuna.stringifyQueryValue(value) {
+                form.append(("comment", text))
+            }
+        }
+        request.httpBody = Kizuna.formEncode(form)
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.UsersSubmitFeedback.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(APIClient.UsersSubmitFeedback.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersSubmitFeedback.Failure.self)
+            return APIClient.UsersSubmitFeedback.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(APIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: APIClient.UsersSubmitFeedback.Failure.self)
+            throw APIClient.UsersSubmitFeedback.Failure.badRequest(payload)
+        default:
+            throw APIClient.UsersSubmitFeedback.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
     /// A user's most recent login or logout, inline union variants nest under the User model in native clients
     public func lastSessionEvent(_ params: APIClient.UsersLastSessionEvent.Params) async throws(APIClient.UsersLastSessionEvent.Failure) -> APIClient.UsersLastSessionEvent.Result {
         var path = "/users/:id/last-session-event"
@@ -4785,6 +4901,13 @@ private enum Kizuna {
 
     static func appendPath(_ base: URL, _ path: String) -> URL {
         base.appending(path: path, directoryHint: .notDirectory)
+    }
+
+    private static let formAllowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*-._ ")
+
+    static func formEncode(_ fields: [(String, String)]) -> Data {
+        let encode = { (text: String) in (text.addingPercentEncoding(withAllowedCharacters: formAllowed) ?? text).replacingOccurrences(of: " ", with: "+") }
+        return Data(fields.map { "\(encode($0.0))=\(encode($0.1))" }.joined(separator: "&").utf8)
     }
 
     static func stringifyQueryValue(_ value: Any) -> [String] {

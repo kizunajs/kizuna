@@ -251,6 +251,22 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace UsersSubmitFeedback {
+        export type Body = {
+            rating: number;
+            tags: Array<string>;
+            comment?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                rating: number;
+                tags: Array<string>;
+                comment?: string;
+            }; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace UsersLastSessionEvent {
         export type Params = {
             id: UserId;
@@ -912,6 +928,24 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.UsersSetStorageLimit.Result>;
         /**
+         * Submit feedback, exercises a urlencoded body with a list and a number
+         *
+         * @example
+         * const result = await client.users.submitFeedback({
+         *     body: {
+         *         rating: 1,
+         *         tags: [
+         *             'string',
+         *         ],
+         *     },
+         * });
+         */
+        submitFeedback: ClientMethod<'POST', false, {
+            body: API.UsersSubmitFeedback.Body;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.UsersSubmitFeedback.Result>;
+        /**
          * A user's most recent login or logout, inline union variants nest under the User model in native clients
          *
          * @example
@@ -1519,6 +1553,15 @@ const routes: GeneratedRoutes = {
         setStorageLimit: {
             method: 'PUT',
             path: '/users/:id/storage-limit',
+            responses: {
+                200: {},
+                400: {},
+            },
+        },
+        submitFeedback: {
+            method: 'POST',
+            path: '/feedback',
+            contentType: 'application/x-www-form-urlencoded',
             responses: {
                 200: {},
                 400: {},

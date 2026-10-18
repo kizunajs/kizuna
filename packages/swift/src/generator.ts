@@ -63,10 +63,10 @@ export interface SwiftConfig {
 }
 
 interface BodyDescriptor {
-    kind: 'json-flat' | 'json-struct' | 'multipart' | 'union' | 'json-empty';
+    kind: 'json-flat' | 'json-struct' | 'multipart' | 'form' | 'union' | 'json-empty';
     structName?: string;
     flattened: SwiftField[];
-    multipartFields: Array<{ name: string; wireName: string; isFile: boolean }>;
+    formFields: Array<{ name: string; wireName: string; isFile: boolean }>;
 }
 
 interface RouteMethod {
@@ -168,6 +168,7 @@ const buildRouteMethod = (
     if (route.body && !isVoidSchema(route.body)) {
         const bodyHint = readMetaId(route.body as never) ?? `${baseHint}Input`;
         const isMultipart = route.contentType === 'multipart/form-data';
+        const isForm = route.contentType === 'application/x-www-form-urlencoded';
         const isUnion = isDiscriminatedUnionSchema(route.body as z.ZodType);
 
         if (isUnion) {
@@ -176,17 +177,17 @@ const buildRouteMethod = (
                 kind: 'union',
                 structName: result.expression,
                 flattened: [],
-                multipartFields: [],
+                formFields: [],
             };
-        } else if (isMultipart) {
+        } else if (isMultipart || isForm) {
             // Always emit the struct for type clarity, but call sites use flat params (file fields → MultipartFile)
             mapType(route.body as z.ZodType, registry, bodyHint);
             const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint);
-            const multipartFields = objectShapeKeys(route.body as z.ZodType, registry.camelCaseProperties);
+            const formFields = objectShapeKeys(route.body as z.ZodType, registry.camelCaseProperties);
             bodyDescriptor = {
-                kind: 'multipart',
+                kind: isMultipart ? 'multipart' : 'form',
                 flattened,
-                multipartFields,
+                formFields,
             };
         } else {
             const isObject = isObjectSchema(route.body as z.ZodType);
@@ -196,7 +197,7 @@ const buildRouteMethod = (
                 bodyDescriptor = {
                     kind: 'json-empty',
                     flattened: [],
-                    multipartFields: [],
+                    formFields: [],
                 };
             } else {
                 const result = mapType(route.body as z.ZodType, registry, bodyHint);
@@ -209,7 +210,7 @@ const buildRouteMethod = (
                         kind: 'json-struct',
                         structName,
                         flattened: [],
-                        multipartFields: [],
+                        formFields: [],
                     };
                 } else {
                     // Object body of any field count: exposed as a labeled tuple, rebuilt into the
@@ -219,7 +220,7 @@ const buildRouteMethod = (
                         kind: 'json-flat',
                         structName,
                         flattened,
-                        multipartFields: [],
+                        formFields: [],
                     };
                 }
             }
@@ -1268,7 +1269,7 @@ const emitBodyType = (writer: SwiftWriter, method: RouteMethod, context: EmitCon
     const operationName = method.operationName;
     writer.blank();
 
-    if (body.kind === 'multipart') {
+    if (body.kind === 'multipart' || body.kind === 'form') {
         const resolved = body.flattened.map((field) => ({
             ...field,
             type: resolveType(field.type, operationName, context, 'operation-enum'),
@@ -1617,6 +1618,17 @@ const emitKizunaNamespace = (
         writer.blank();
         writer.block('static func appendPath(_ base: URL, _ path: String) -> URL', () => {
             writer.line('base.appending(path: path, directoryHint: .notDirectory)');
+        });
+        writer.blank();
+        writer.line(
+            'private static let formAllowed = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*-._ ")'
+        );
+        writer.blank();
+        writer.block('static func formEncode(_ fields: [(String, String)]) -> Data', () => {
+            writer.line(
+                'let encode = { (text: String) in (text.addingPercentEncoding(withAllowedCharacters: formAllowed) ?? text).replacingOccurrences(of: " ", with: "+") }'
+            );
+            writer.line('return Data(fields.map { "\\(encode($0.0))=\\(encode($0.1))" }.joined(separator: "&").utf8)');
         });
         writer.blank();
         writer.block('static func stringifyQueryValue(_ value: Any) -> [String]', () => {
@@ -2139,7 +2151,7 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
 
     if (body.kind === 'multipart') {
         writer.line('var multipart = Kizuna.MultipartBuilder()');
-        for (const field of body.multipartFields) {
+        for (const field of body.formFields) {
             const flattenedField = body.flattened.find((candidate) => candidate.name === field.name);
             const isFile = field.isFile || flattenedField?.isFile === true;
             const append = (accessor: string): void => {
@@ -2161,6 +2173,28 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
         }
         writer.line('request.httpBody = multipart.finalize()');
         writer.line('request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")');
+        return;
+    }
+
+    if (body.kind === 'form') {
+        writer.line('var form: [(String, String)] = []');
+        for (const field of body.formFields) {
+            const flattenedField = body.flattened.find((candidate) => candidate.name === field.name);
+            const append = (accessor: string): void => {
+                writer.block(`for text in Kizuna.stringifyQueryValue(${accessor})`, () => {
+                    writer.line(`form.append((${stringLiteral(field.wireName)}, text))`);
+                });
+            };
+            if (flattenedField?.optional === true) {
+                writer.block(`if let value = body.${escapeKeyword(field.name)}`, () => {
+                    append('value');
+                });
+            } else {
+                append(`body.${escapeKeyword(field.name)}`);
+            }
+        }
+        writer.line('request.httpBody = Kizuna.formEncode(form)');
+        writer.line('request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")');
         return;
     }
 

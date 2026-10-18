@@ -243,6 +243,30 @@ export const usersRoutes = k.routes.users({
                 bytesLimit: body.bytesLimit,
             },
         })),
+    submitFeedback: k
+        .route({
+            method: 'POST',
+            path: '/feedback',
+            auth: false,
+            contentType: 'application/x-www-form-urlencoded',
+            body: z.object({
+                rating: z.int(),
+                tags: z.array(z.string()),
+                comment: z.string().optional(),
+            }),
+            responses: {
+                200: z.object({
+                    rating: z.int(),
+                    tags: z.array(z.string()),
+                    comment: z.string().optional(),
+                }),
+            },
+            summary: 'Submit feedback, exercises a urlencoded body with a list and a number',
+        })
+        .handler(({ body }) => ({
+            status: 200,
+            body,
+        })),
     lastSessionEvent: k
         .route({
             method: 'GET',

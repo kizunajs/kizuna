@@ -84,6 +84,20 @@ class APIClientTest {
     }
 
     @Test
+    fun testSubmitFeedbackSendsAUrlencodedForm() = runTest {
+        val response = client.users.submitFeedback {
+            body(
+                rating = 5,
+                tags = listOf("shipping", "support"),
+                comment = "Arrived in two days & works great",
+            )
+        }
+        assertEquals(5, response.body.rating)
+        assertEquals(listOf("shipping", "support"), response.body.tags)
+        assertEquals("Arrived in two days & works great", response.body.comment)
+    }
+
+    @Test
     fun testSetStorageLimitKeepsALongPastDoublePrecision() = runTest {
         val response = client.users.setStorageLimit {
             params(

@@ -154,6 +154,47 @@ routes:
             optional: false
             schema:
               kind: bigint
+  users.submitFeedback:
+    method: POST
+    path: /feedback
+    statuses:
+      - 200
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        rating:
+          optional: false
+          schema:
+            kind: number
+        tags:
+          optional: false
+          schema:
+            kind: array
+            element:
+              kind: string
+        comment:
+          optional: true
+          schema:
+            kind: string
+    responses:
+      "200":
+        kind: object
+        fields:
+          rating:
+            optional: false
+            schema:
+              kind: number
+          tags:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: string
+          comment:
+            optional: true
+            schema:
+              kind: string
   users.lastSessionEvent:
     method: GET
     path: /users/:id/last-session-event

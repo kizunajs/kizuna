@@ -412,6 +412,19 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(text, "BADGE:1:Ada Lovelace")
     }
 
+    func testSubmitFeedbackSendsAUrlencodedForm() async throws {
+        let result = try await client.users.submitFeedback(
+            .body(
+                rating: 5,
+                tags: ["shipping", "support"],
+                comment: "Arrived in two days & works great"
+            )
+        )
+        XCTAssertEqual(result.body.rating, 5)
+        XCTAssertEqual(result.body.tags, ["shipping", "support"])
+        XCTAssertEqual(result.body.comment, "Arrived in two days & works great")
+    }
+
     func testSetStorageLimitKeepsAnInt64PastDoublePrecision() async throws {
         let result = try await client.users.setStorageLimit(
             .params(id: API.UserId("1")),

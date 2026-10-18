@@ -11,6 +11,35 @@ const baseConfig = {
     namespaceName: 'TestAPI',
 };
 
+describe('Kotlin generator: urlencoded bodies', () => {
+    it('sends a urlencoded body as a form, one pair per list item', () => {
+        const output = generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        submitFeedback: {
+                            method: 'POST',
+                            path: '/feedback',
+                            contentType: 'application/x-www-form-urlencoded',
+                            body: z.object({
+                                rating: z.int(),
+                                tags: z.array(z.string()),
+                            }),
+                            responses: {
+                                204: z.void(),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('val formBuilder = FormBody.Builder()');
+        expect(output).toContain('Kizuna.stringifyQueryValue(body.tags).forEach { text -> formBuilder.add("tags", text) }');
+        expect(output).toContain('requestBody = formBuilder.build()');
+    });
+});
+
 describe('Kotlin generator: bigint', () => {
     const contract = defineConfig({
         routes: [

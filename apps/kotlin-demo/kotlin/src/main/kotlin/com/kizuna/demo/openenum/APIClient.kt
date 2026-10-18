@@ -380,6 +380,47 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
+    object UsersSubmitFeedback {
+
+        @Serializable
+        data class Input(
+            val rating: Int,
+            val tags: List<String>,
+            val comment: String? = null
+        )
+
+        @Serializable
+        data class Response(
+            val rating: Int,
+            val tags: List<String>,
+            val comment: String? = null
+        )
+
+        data class Body(
+            val rating: Int,
+            val tags: List<String>,
+            val comment: String? = null
+        )
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(rating: Int, tags: List<String>, comment: String? = null): AfterBody = AfterBody(body = Body(rating = rating, tags = tags, comment = comment))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object UsersLastSessionEvent {
 
         data class Params(val id: OpenEnumAPI.UserId)
@@ -2168,6 +2209,49 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
                     throw OpenEnumAPIClient.UsersSetStorageLimit.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.UsersSetStorageLimit.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Submit feedback, exercises a urlencoded body with a list and a number */
+    @Throws(OpenEnumAPIClient.UsersSubmitFeedback.Failure::class)
+    suspend fun submitFeedback(build: OpenEnumAPIClient.UsersSubmitFeedback.Scope.() -> OpenEnumAPIClient.UsersSubmitFeedback.Args): OpenEnumAPIClient.UsersSubmitFeedback.Result {
+        val args = OpenEnumAPIClient.UsersSubmitFeedback.Scope.build()
+        val body = args.body
+        val path = "/feedback"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val formBuilder = FormBody.Builder()
+        Kizuna.stringifyQueryValue(body.rating).forEach { text -> formBuilder.add("rating", text) }
+        Kizuna.stringifyQueryValue(body.tags).forEach { text -> formBuilder.add("tags", text) }
+        if (body.comment != null) {
+            Kizuna.stringifyQueryValue(body.comment).forEach { text -> formBuilder.add("comment", text) }
+        }
+        requestBody = formBuilder.build()
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.UsersSubmitFeedback.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.UsersSubmitFeedback.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.UsersSubmitFeedback.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersSubmitFeedback.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersSubmitFeedback.Failure.BadRequest(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.UsersSubmitFeedback.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

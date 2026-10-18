@@ -72,10 +72,10 @@ const BODY_FLATTEN_MAX_FIELDS = 6;
 const METHODS_REQUIRING_BODY = new Set(['POST', 'PUT', 'PATCH']);
 
 interface BodyDescriptor {
-    kind: 'json-flat' | 'json-struct' | 'multipart' | 'union' | 'json-empty';
+    kind: 'json-flat' | 'json-struct' | 'multipart' | 'form' | 'union' | 'json-empty';
     structName?: string;
     flattened: KotlinField[];
-    multipartFields: Array<{ name: string; wireName: string; isFile: boolean }>;
+    formFields: Array<{ name: string; wireName: string; isFile: boolean }>;
 }
 
 interface RouteMethod {
@@ -175,6 +175,7 @@ const buildRouteMethod = (
     if (route.body && bodyDefType !== 'void') {
         const bodyHint = readMetaId(route.body as never) ?? `${baseHint}Input`;
         const isMultipart = route.contentType === 'multipart/form-data';
+        const isForm = route.contentType === 'application/x-www-form-urlencoded';
         const isUnion = isDiscriminatedUnionSchema(route.body as z.ZodType);
 
         if (isUnion) {
@@ -183,16 +184,16 @@ const buildRouteMethod = (
                 kind: 'union',
                 structName: result.expression,
                 flattened: [],
-                multipartFields: [],
+                formFields: [],
             };
-        } else if (isMultipart) {
+        } else if (isMultipart || isForm) {
             mapType(route.body as z.ZodType, registry, bodyHint);
             const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint);
-            const multipartFields = objectShapeKeys(route.body as z.ZodType, registry.camelCaseProperties);
+            const formFields = objectShapeKeys(route.body as z.ZodType, registry.camelCaseProperties);
             bodyDescriptor = {
-                kind: 'multipart',
+                kind: isMultipart ? 'multipart' : 'form',
                 flattened,
-                multipartFields,
+                formFields,
             };
         } else {
             const isObject = isObjectSchema(route.body as z.ZodType);
@@ -202,7 +203,7 @@ const buildRouteMethod = (
                 bodyDescriptor = {
                     kind: 'json-empty',
                     flattened: [],
-                    multipartFields: [],
+                    formFields: [],
                 };
             } else {
                 const useStruct = !isObject || fieldCount > BODY_FLATTEN_MAX_FIELDS;
@@ -214,7 +215,7 @@ const buildRouteMethod = (
                         kind: 'json-struct',
                         structName,
                         flattened: [],
-                        multipartFields: [],
+                        formFields: [],
                     };
                 } else {
                     const flattened = collectObjectFields(route.body as z.ZodType, registry, bodyHint);
@@ -222,7 +223,7 @@ const buildRouteMethod = (
                         kind: 'json-flat',
                         structName,
                         flattened,
-                        multipartFields: [],
+                        formFields: [],
                     };
                 }
             }
@@ -1321,7 +1322,7 @@ const emitBodyEncoding = (writer: KotlinWriter, method: RouteMethod, context: Em
 
     if (body.kind === 'multipart') {
         writer.line('val multipartBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)');
-        for (const field of body.multipartFields) {
+        for (const field of body.formFields) {
             const flattenedField = body.flattened.find((flatField) => flatField.name === field.name);
             const isFile = field.isFile || flattenedField?.isFile === true;
             const append = (accessor: string): void => {
@@ -1344,6 +1345,27 @@ const emitBodyEncoding = (writer: KotlinWriter, method: RouteMethod, context: Em
             }
         }
         writer.line('requestBody = multipartBuilder.build()');
+        return;
+    }
+
+    if (body.kind === 'form') {
+        writer.line('val formBuilder = FormBody.Builder()');
+        for (const field of body.formFields) {
+            const flattenedField = body.flattened.find((flatField) => flatField.name === field.name);
+            const append = (accessor: string): void => {
+                writer.line(
+                    `Kizuna.stringifyQueryValue(${accessor}).forEach { text -> formBuilder.add(${stringLiteral(field.wireName)}, text) }`
+                );
+            };
+            if (flattenedField?.optional === true) {
+                writer.block(`if (${groupMemberAccessor('body', field)} != null)`, () => {
+                    append(groupMemberAccessor('body', field));
+                });
+            } else {
+                append(groupMemberAccessor('body', field));
+            }
+        }
+        writer.line('requestBody = formBuilder.build()');
         return;
     }
 

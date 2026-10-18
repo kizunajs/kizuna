@@ -306,6 +306,47 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
+    object UsersSubmitFeedback {
+
+        @Serializable
+        data class Input(
+            val rating: Int,
+            val tags: List<String>,
+            val comment: String? = null
+        )
+
+        @Serializable
+        data class Response(
+            val rating: Int,
+            val tags: List<String>,
+            val comment: String? = null
+        )
+
+        data class Body(
+            val rating: Int,
+            val tags: List<String>,
+            val comment: String? = null
+        )
+
+        sealed interface Args {
+            val body: Body
+        }
+
+        object Scope {
+            fun body(rating: Int, tags: List<String>, comment: String? = null): AfterBody = AfterBody(body = Body(rating = rating, tags = tags, comment = comment))
+        }
+
+        class AfterBody internal constructor(override val body: Body) : Args
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object UsersLastSessionEvent {
 
         data class Params(val id: API.UserId)
@@ -1938,6 +1979,49 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                     throw APIClient.UsersSetStorageLimit.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersSetStorageLimit.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Submit feedback, exercises a urlencoded body with a list and a number */
+    @Throws(APIClient.UsersSubmitFeedback.Failure::class)
+    suspend fun submitFeedback(build: APIClient.UsersSubmitFeedback.Scope.() -> APIClient.UsersSubmitFeedback.Args): APIClient.UsersSubmitFeedback.Result {
+        val args = APIClient.UsersSubmitFeedback.Scope.build()
+        val body = args.body
+        val path = "/feedback"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val formBuilder = FormBody.Builder()
+        Kizuna.stringifyQueryValue(body.rating).forEach { text -> formBuilder.add("rating", text) }
+        Kizuna.stringifyQueryValue(body.tags).forEach { text -> formBuilder.add("tags", text) }
+        if (body.comment != null) {
+            Kizuna.stringifyQueryValue(body.comment).forEach { text -> formBuilder.add("comment", text) }
+        }
+        requestBody = formBuilder.build()
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("POST", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.UsersSubmitFeedback.Response>(data.decodeToString())
+                        return@use APIClient.UsersSubmitFeedback.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.UsersSubmitFeedback.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.UsersSubmitFeedback.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.UsersSubmitFeedback.Failure.BadRequest(body = payload)
+                }
+                else -> throw APIClient.UsersSubmitFeedback.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }

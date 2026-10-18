@@ -1076,6 +1076,38 @@ describe('Swift generator: owned type nesting', () => {
     });
 });
 
+describe('Swift generator: urlencoded bodies', () => {
+    it('sends a urlencoded body as a form, one pair per list item', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        submitFeedback: k.route({
+                            method: 'POST',
+                            path: '/feedback',
+                            contentType: 'application/x-www-form-urlencoded',
+                            body: z.object({
+                                rating: z.int(),
+                                tags: z.array(z.string()),
+                            }),
+                            responses: {
+                                204: z.void(),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('for text in Kizuna.stringifyQueryValue(body.tags) {');
+        expect(output).toContain('form.append(("tags", text))');
+        expect(output).toContain('request.httpBody = Kizuna.formEncode(form)');
+        expect(output).toContain('request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")');
+        expect(output).not.toContain('Kizuna.encodeBody(&request');
+    });
+});
+
 describe('Swift generator: bigint', () => {
     const quotaContract = (schema: z.ZodType) =>
         defineConfig({
