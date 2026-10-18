@@ -2531,7 +2531,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         val requestBody: RequestBody
         val multipartBuilder = MultipartBody.Builder().setType(MultipartBody.FORM)
         multipartBuilder.addFormDataPart("file", body.file.filename, body.file.data.toRequestBody(body.file.mimeType.toMediaType()))
-        multipartBuilder.addFormDataPart("userId", body.userId.toString())
+        Kizuna.stringifyQueryValue(body.userId).forEach { text -> multipartBuilder.addFormDataPart("userId", text) }
         requestBody = multipartBuilder.build()
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())

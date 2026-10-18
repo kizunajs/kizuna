@@ -176,6 +176,8 @@ describe('Kotlin generator: nullable', () => {
                             body: z.object({
                                 file: z.instanceof(File),
                                 caption: z.string().optional(),
+                                visibility: z.enum(['public', 'private']),
+                                tags: z.array(z.string()),
                             }),
                             responses: {
                                 204: z.void(),
@@ -187,7 +189,16 @@ describe('Kotlin generator: nullable', () => {
             baseConfig
         );
         expect(output).toContain('if (body.caption != null) {');
-        expect(output).toContain('multipartBuilder.addFormDataPart("caption", body.caption.toString())');
+        expect(output).toContain(
+            'Kizuna.stringifyQueryValue(body.caption).forEach { text -> multipartBuilder.addFormDataPart("caption", text) }'
+        );
+        expect(output).toContain(
+            'Kizuna.stringifyQueryValue(body.visibility).forEach { text -> multipartBuilder.addFormDataPart("visibility", text) }'
+        );
+        expect(output).toContain(
+            'Kizuna.stringifyQueryValue(body.tags).forEach { text -> multipartBuilder.addFormDataPart("tags", text) }'
+        );
+        expect(output).not.toContain('body.visibility.toString()');
     });
 });
 

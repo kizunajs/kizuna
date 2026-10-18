@@ -2146,7 +2146,9 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
                 if (isFile) {
                     writer.line(`multipart.appendFile(name: ${stringLiteral(field.wireName)}, file: ${accessor})`);
                 } else {
-                    writer.line(`multipart.appendField(name: ${stringLiteral(field.wireName)}, value: String(describing: ${accessor}))`);
+                    writer.block(`for text in Kizuna.stringifyQueryValue(${accessor})`, () => {
+                        writer.line(`multipart.appendField(name: ${stringLiteral(field.wireName)}, value: text)`);
+                    });
                 }
             };
             if (flattenedField?.optional === true) {

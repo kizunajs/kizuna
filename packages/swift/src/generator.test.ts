@@ -1242,6 +1242,8 @@ describe('Swift generator: nullable', () => {
                             body: z.object({
                                 file: z.instanceof(File),
                                 caption: z.string().optional(),
+                                visibility: z.enum(['public', 'private']),
+                                tags: z.array(z.string()),
                             }),
                             responses: {
                                 204: z.void(),
@@ -1254,7 +1256,11 @@ describe('Swift generator: nullable', () => {
         );
         expect(output).toContain('multipart.appendFile(name: "file", file: body.file)');
         expect(output).toContain('if let value = body.caption {');
-        expect(output).toContain('multipart.appendField(name: "caption", value: String(describing: value))');
+        expect(output).toContain('for text in Kizuna.stringifyQueryValue(value) {');
+        expect(output).toContain('for text in Kizuna.stringifyQueryValue(body.visibility) {');
+        expect(output).toContain('for text in Kizuna.stringifyQueryValue(body.tags) {');
+        expect(output).toContain('multipart.appendField(name: "tags", value: text)');
+        expect(output).not.toContain('String(describing: body.');
     });
 });
 

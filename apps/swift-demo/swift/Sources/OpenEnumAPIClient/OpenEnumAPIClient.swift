@@ -4227,7 +4227,9 @@ public struct OpenEnumAPIUsersClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         var multipart = Kizuna.MultipartBuilder()
         multipart.appendFile(name: "file", file: body.file)
-        multipart.appendField(name: "userId", value: String(describing: body.userId))
+        for text in Kizuna.stringifyQueryValue(body.userId) {
+            multipart.appendField(name: "userId", value: text)
+        }
         request.httpBody = multipart.finalize()
         request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")
         let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUploadAvatar.Failure.self)

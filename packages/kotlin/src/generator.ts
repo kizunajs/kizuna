@@ -1330,7 +1330,9 @@ const emitBodyEncoding = (writer: KotlinWriter, method: RouteMethod, context: Em
                         `multipartBuilder.addFormDataPart(${stringLiteral(field.wireName)}, ${accessor}.filename, ${accessor}.data.toRequestBody(${accessor}.mimeType.toMediaType()))`
                     );
                 } else {
-                    writer.line(`multipartBuilder.addFormDataPart(${stringLiteral(field.wireName)}, ${accessor}.toString())`);
+                    writer.line(
+                        `Kizuna.stringifyQueryValue(${accessor}).forEach { text -> multipartBuilder.addFormDataPart(${stringLiteral(field.wireName)}, text) }`
+                    );
                 }
             };
             if (flattenedField?.optional === true) {
