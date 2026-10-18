@@ -206,10 +206,6 @@ export interface AdapterBehaviour {
      * kizuna sees the request.
      */
     methodMismatchStatus: 404 | 405;
-    /**
-     * Express reads a multipart body through the app's own middleware, like multer. The others parse it themselves.
-     */
-    parsesMultipart: boolean;
 }
 
 /**
@@ -218,19 +214,15 @@ export interface AdapterBehaviour {
 export const ADAPTER_BEHAVIOUR: Record<AdapterName, AdapterBehaviour> = {
     express: {
         methodMismatchStatus: 404,
-        parsesMultipart: false,
     },
     fastify: {
         methodMismatchStatus: 404,
-        parsesMultipart: true,
     },
     hono: {
         methodMismatchStatus: 404,
-        parsesMultipart: true,
     },
     next: {
         methodMismatchStatus: 405,
-        parsesMultipart: true,
     },
 };
 

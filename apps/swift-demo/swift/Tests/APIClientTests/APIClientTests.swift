@@ -451,30 +451,17 @@ final class APIClientTests: XCTestCase {
         XCTAssertTrue(result.body.received)
     }
 
-    func testUploadAvatarMultipartEncoding() async throws {
-        // The express demo ships a stub for multipart (see CLAUDE.md). The contract validator
-        // rejects with 400 because parsed form fields don't satisfy `z.instanceof(File)`. We
-        // verify the client serialized and sent the request, not the server-side round-trip.
+    func testUploadAvatarSendsTheFileAsAFilePart() async throws {
         let bytes = Data(repeating: 0xAB, count: 16)
         let file = APIClient.MultipartFile(data: bytes, filename: "avatar.bin", mimeType: "application/octet-stream")
-        do {
-            _ = try await client.users.uploadAvatar(
-                .body(
-                    file: file,
-                    userId: "1"
-                )
+        let result = try await client.users.uploadAvatar(
+            .body(
+                file: file,
+                userId: "1"
             )
-            XCTFail("expected .unexpectedStatus to be thrown")
-        } catch let failure {
-            switch failure {
-            case .badRequest:
-                break
-            case .requestFailed(let underlying):
-                XCTFail("multipart request should reach the server, got request failure: \(underlying)")
-            default:
-                XCTFail("expected .badRequest, got \(failure)")
-            }
-        }
+        )
+        XCTAssertEqual(result.body.size, 16)
+        XCTAssertEqual(result.body.userId, "1")
     }
 
     func testAssistantReplyStreamsEvents() async throws {

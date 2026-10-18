@@ -477,10 +477,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                         'content-type': 'multipart/form-data; boundary=avatar',
                     },
                 });
-                if (!behaviour.parsesMultipart) {
-                    expect(response.status).toBe(400);
-                    return;
-                }
                 expect(response.status).toBe(200);
                 expect(response.body).toEqual({
                     filename: 'avatar.png',

@@ -561,17 +561,13 @@ export const usersRoutes = k.routes.users({
             },
             summary: 'Upload an avatar image',
         })
-        .handler(() => {
-            // Multipart is out of scope for the Express adapter today (see CLAUDE.md).
-            // Real consumers wire multer (or similar) before this handler runs.
-            return {
-                status: 200,
-                body: {
-                    size: 0,
-                    userId: 'unsupported',
-                },
-            };
-        }),
+        .handler(({ body }) => ({
+            status: 200,
+            body: {
+                size: body.file.size,
+                userId: body.userId,
+            },
+        })),
     pingUser: k
         .route({
             method: 'POST',

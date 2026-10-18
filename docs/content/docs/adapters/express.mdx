@@ -153,7 +153,7 @@ export const user = k.identity
 
 ## Middleware
 
-For request-scoped values handlers need, use [request context](/docs/request-context). Rate limiting, multipart parsing and the rest go in Express's own `app.use`. Authentication belongs in [guards](#guards).
+For request-scoped values handlers need, use [request context](/docs/request-context). Rate limiting and the rest go in Express's own `app.use`. Authentication belongs in [guards](#guards).
 
 ## Options
 
@@ -166,11 +166,11 @@ kizuna.api.mount(app, {
 });
 ```
 
-| Option               | Default            | Description                                                                                                                                                                               |
-| -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `responseValidation` | `false`            | Validate handler return values against response schemas, surfacing as 500 on mismatch. Enable in development.                                                                             |
-| `json`               | Express's defaults | The options for `express.json()`, like `limit` and `strict`, used for Kizuna's own routes. Leave it out if the app runs its own `express.json()`.                                         |
-| `formatError`        | none               | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
+| Option               | Default            | Description                                                                                                                                                                                 |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `responseValidation` | `false`            | Validate handler return values against response schemas, surfacing as 500 on mismatch. Enable in development.                                                                               |
+| `json`               | Express's defaults | The options for `express.json()`, like `limit` and `strict`, used for Kizuna's own routes. Its `limit` also caps a multipart upload. Leave it out if the app runs its own `express.json()`. |
+| `formatError`        | none               | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api).   |
 
 ## Type-safe request properties
 
@@ -240,20 +240,14 @@ Without either, a `rawBody` route answers `500`, and the log names the route and
 
 ## Multipart / file uploads
 
-For routes with `contentType: 'multipart/form-data'`, add a multipart middleware such as `multer` or `busboy` before the Kizuna handler. The adapter reads `req.body` as-is.
+Routes with `contentType: 'multipart/form-data'` work without middleware. The adapter reads a form the way Hono and Next do, so a file part arrives as a `File`. The `json` option's `limit` caps the size of an upload:
 
 ```ts title="src/index.ts"
-import multer from 'multer';
-
-const upload = multer({
-    storage: multer.memoryStorage(),
+kizuna.api.mount(app, {
+    json: {
+        limit: '10mb',
+    },
 });
-
-app.post('/avatar', upload.single('file'), (req, res, next) => {
-    next();
-});
-
-kizuna.api.mount(app);
 ```
 
 ## Streams

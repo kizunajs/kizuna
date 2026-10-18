@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction, RequestHandler, Router as ExpressRouter } from 'express';
-import { Router as createExpressRouter, json, urlencoded } from 'express';
+import { Router as createExpressRouter, json, raw, urlencoded } from 'express';
 import { Readable, pipeline } from 'node:stream';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
@@ -22,6 +22,7 @@ import {
     pluginRouterOf,
     defineAdapter,
     renderJsonResult,
+    parseFetchBody,
     stringifyJson,
     type RenderedResult,
     jobRoutes,
@@ -88,18 +89,22 @@ type JsonOptions = NonNullable<Parameters<typeof json>[0]>;
  * Parse a kizuna route's body, unless the app already parsed it. The parser
  * keeps the text as well, for routes with `rawBody: true`.
  */
-const bodyParserFor = (route: RouteDefinition, jsonOptions: JsonOptions | undefined): RequestHandler | undefined => {
-    if (route.contentType === 'multipart/form-data') return undefined;
+const bodyParserFor = (route: RouteDefinition, jsonOptions: JsonOptions | undefined): RequestHandler => {
     const parse: RequestHandler =
-        route.contentType === 'application/x-www-form-urlencoded'
-            ? urlencoded({
-                  extended: false,
-                  verify: keepRawBody,
+        route.contentType === 'multipart/form-data'
+            ? raw({
+                  type: () => true,
+                  limit: jsonOptions?.limit,
               })
-            : json({
-                  ...jsonOptions,
-                  verify: keepRawBody,
-              });
+            : route.contentType === 'application/x-www-form-urlencoded'
+              ? urlencoded({
+                    extended: false,
+                    verify: keepRawBody,
+                })
+              : json({
+                    ...jsonOptions,
+                    verify: keepRawBody,
+                });
     return (req, res, next) => {
         if (req.body !== undefined) {
             next();
@@ -108,6 +113,24 @@ const bodyParserFor = (route: RouteDefinition, jsonOptions: JsonOptions | undefi
         req.kizunaParsedBody = true;
         parse(req, res, next);
     };
+};
+
+/**
+ * A multipart body arrives as the bytes kizuna read, and is read the way Hono and Next read one. A parser the app ran
+ * first has already made it an object.
+ */
+const readBody = (req: Request, route: RouteDefinition): unknown => {
+    if (route.contentType !== 'multipart/form-data' || !Buffer.isBuffer(req.body)) return req.body;
+    return parseFetchBody(
+        new Request('http://localhost/', {
+            method: 'POST',
+            headers: {
+                'content-type': req.headers['content-type'] ?? route.contentType,
+            },
+            body: new Uint8Array(req.body),
+        }),
+        route
+    );
 };
 
 /**
@@ -135,8 +158,9 @@ export interface ExpressOptions {
     formatError?: ErrorFormatter<Request>;
     /**
      * The options for `express.json()`, like `limit` and `strict`, used to parse
-     * the bodies of kizuna's own routes. An `express.json()` your app runs
-     * first takes precedence, and kizuna uses the body it parsed.
+     * the bodies of kizuna's own routes. Its `limit` also caps a multipart body.
+     * An `express.json()` your app runs first takes precedence, and kizuna uses
+     * the body it parsed.
      *
      * @example
      * json: {
@@ -260,7 +284,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                 req.kizunaRoute = route;
                 next();
             },
-            ...(parseBody === undefined ? [] : [parseBody]),
+            parseBody,
             async (req: Request, res: Response, next: NextFunction) => {
                 const adapterRequest: AdapterRequest<Request> = {
                     request: req,
@@ -273,7 +297,7 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
                     },
                     query: req.query,
                     headers: req.headers,
-                    readBody: () => req.body,
+                    readBody: () => readBody(req, route),
                     readRawBody: () => rawBodyOf(req),
                 };
                 await adapter.handle({
