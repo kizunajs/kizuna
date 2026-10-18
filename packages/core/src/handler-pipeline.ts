@@ -97,8 +97,32 @@ type RawBodyArg<R> = R extends { rawBody: true }
       }
     : unknown;
 
+type EventStreamStatuses<R extends Pick<RouteDefinition, 'responses'>> = {
+    [Status in keyof R['responses']]: R['responses'][Status] extends { stream: unknown }
+        ? R['responses'][Status] extends { contentType: infer ContentType extends string }
+            ? 'text/event-stream' extends ContentType
+                ? Status
+                : never
+            : Status
+        : never;
+}[keyof R['responses']];
+
+/**
+ * Where a client that lost an event stream asks it to resume, for a route that streams events.
+ */
+type LastEventIdArg<R extends RouteDefinition> = [EventStreamStatuses<R>] extends [never]
+    ? unknown
+    : {
+          /**
+           * The `id` of the last event the client received before it reconnected, from its `Last-Event-ID`
+           * header. Send what follows it.
+           */
+          lastEventId: string | undefined;
+      };
+
 export type HandlerArgs<R extends RouteDefinition> = ToolsArg<R> &
-    RawBodyArg<R> & {
+    RawBodyArg<R> &
+    LastEventIdArg<R> & {
         params: R extends { pathParams: z.ZodType } ? z.output<R['pathParams']> : ExtractPathParams<R['path']>;
         query: R extends { query: z.ZodType } ? z.output<R['query']> : undefined;
         body: R extends { body: z.ZodType } ? z.output<R['body']> : undefined;

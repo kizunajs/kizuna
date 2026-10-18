@@ -418,6 +418,22 @@ final class APIClientTests: XCTestCase {
         XCTAssertTrue(result.body.ready)
     }
 
+    func testWatchNotificationsResumesAfterADroppedConnection() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DroppingStreamURLProtocol.self]
+        let resuming = APIClient(
+            baseURL: client.baseURL,
+            session: URLSession(configuration: configuration),
+            reconnect: APIClient.ReconnectPolicy(reconnectionTime: 0)
+        )
+        let result = try await resuming.notifications.watchNotifications()
+        var titles: [String] = []
+        for try await notification in result.body {
+            titles.append(notification.title)
+        }
+        XCTAssertEqual(titles, ["Invoice paid", "New comment", "Report ready"])
+    }
+
     func testLastSessionEventNestedUnionPayloads() async throws {
         // UserSessionEvent's inline variants nest under the union as UserSessionEvent.Login /
         // .Logout, matching the Kotlin client. Switching over both arms proves the enum references
@@ -617,6 +633,33 @@ final class APIClientTests: XCTestCase {
         ) as? [String: Any]
         XCTAssertNil(encoded?["signature"], "a nil nullish field is left out")
     }
+}
+
+/// Streams notifications the way a lost mobile connection does: two events and a dropped connection, then the rest once
+/// the client resumes from Last-Event-ID, then 204 when it reconnects with nothing newer. URLSession reports a stream the
+/// server cuts off as a clean end, so only a stub can drop it on the client's side.
+private final class DroppingStreamURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        if request.value(forHTTPHeaderField: "Last-Event-ID") == "3" {
+            client?.urlProtocol(self, didReceive: HTTPURLResponse(url: request.url!, statusCode: 204, httpVersion: "HTTP/1.1", headerFields: [:])!, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "text/event-stream"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        if request.value(forHTTPHeaderField: "Last-Event-ID") == "2" {
+            client?.urlProtocol(self, didLoad: Data("id: 3\ndata: {\"title\":\"Report ready\"}\n\n".utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        } else {
+            client?.urlProtocol(self, didLoad: Data("id: 1\ndata: {\"title\":\"Invoice paid\"}\n\nid: 2\ndata: {\"title\":\"New comment\"}\n\n".utf8))
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) { [self] in
+                client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
+            }
+        }
+    }
+    override func stopLoading() {}
 }
 
 /// Accepts a request and never answers it, so a test can cancel a request that is really in flight.

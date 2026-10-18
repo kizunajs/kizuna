@@ -246,26 +246,35 @@ The client hands `id` and `retry` back on each message and drops comments.
 
 ### Resuming
 
-A client that reconnects sends the last `id` it saw as `Last-Event-ID`. Declare the header and the handler reads it like any other:
+A client that reconnects sends the last `id` it saw as `Last-Event-ID`. A handler of an event stream receives it as `lastEventId`, and sends what follows:
 
 ```ts title="src/routes/notifications.ts"
-watchEvents: k
+watchNotifications: k
     .route({
         method: 'GET',
-        path: '/events/watch',
-        headers: z.object({
-            'last-event-id': z.string().optional(),
-        }),
+        path: '/notifications/stream',
         responses: {
             200: {
-                stream: EventRecord,
+                stream: NotificationSchema,
             },
         },
     })
-    .handler(/* ... */),
+    .handler(({ lastEventId }) => ({
+        status: 200,
+        body: async function* () {
+            for (const notification of await notificationsAfter(lastEventId)) {
+                yield {
+                    id: notification.id,
+                    data: notification,
+                };
+            }
+        },
+    })),
 ```
 
-The fetch client reads one connection and leaves reconnecting to you. The browser's `EventSource` reconnects on its own and can open a `GET` route like this one directly, with the limits it has always had: `GET` only, no request body, and no headers of your own, so it reaches the `POST` assistant route above through the fetch client alone.
+The clients reconnect when you turn it on, with `reconnect` in the fetch client and a `ReconnectPolicy` in the Swift and Kotlin clients. As the [event stream specification](https://html.spec.whatwg.org/multipage/server-sent-events.html) has it, they reconnect whenever the connection closes, whether the network dropped it or the server ended the stream, so a proxy closing an idle stream doesn't end it for good. They wait the last `retry` the server sent, longer after reconnections in a row that fail, then send `Last-Event-ID` and carry on yielding to the same loop. `onRequest`, `requestMiddleware` and `requestInterceptor` run again before each reconnection, so a refreshed token goes with it.
+
+To end a stream for good, answer the reconnection with `204 No Content`. Any other status than the stream's own, or a body that isn't `text/event-stream`, fails the stream. Only a `GET`, `HEAD`, `OPTIONS`, `PUT` or `DELETE` stream reconnects, since a `POST` like the assistant route above would run its handler again.
 
 ## Raw chunks
 

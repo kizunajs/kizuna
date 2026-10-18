@@ -1177,6 +1177,21 @@ const createStreamGate = () => {
 
 export const streamGate = createStreamGate();
 
+const notifications = [
+    {
+        id: '1',
+        title: 'Invoice paid',
+    },
+    {
+        id: '2',
+        title: 'New comment',
+    },
+    {
+        id: '3',
+        title: 'Report ready',
+    },
+];
+
 export const streamRoutes = k.routes({
     watchEvents: k
         .route({
@@ -1246,6 +1261,32 @@ export const streamRoutes = k.routes({
                 },
             };
         }),
+    watchNotifications: k
+        .route({
+            method: 'GET',
+            path: '/notifications',
+            responses: {
+                200: {
+                    stream: z.object({
+                        title: z.string(),
+                    }),
+                },
+            },
+        })
+        .handler(({ lastEventId }) => ({
+            status: 200,
+            body: async function* () {
+                const after = lastEventId === undefined ? 0 : Number(lastEventId);
+                for (const notification of notifications.filter((candidate) => Number(candidate.id) > after)) {
+                    yield {
+                        id: notification.id,
+                        data: {
+                            title: notification.title,
+                        },
+                    };
+                }
+            },
+        })),
     watchTicks: k
         .route({
             method: 'GET',

@@ -470,6 +470,22 @@ public final class APIClient: Sendable {
         }
     }
 
+    /// Reconnects an event stream on a GET, HEAD, OPTIONS, PUT or DELETE when its connection drops, sending the id of the last event as Last-Event-ID.
+    public struct ReconnectPolicy: Sendable {
+        /// Reconnections in a row before the stream fails. An event received resets the count.
+        public var maximumAttempts: Int
+        /// Seconds to wait before reconnecting, until the server sends a retry field.
+        public var reconnectionTime: TimeInterval
+        /// Seconds the wait may grow to after reconnections in a row that fail.
+        public var maximumDelay: TimeInterval
+
+        public init(maximumAttempts: Int = 5, reconnectionTime: TimeInterval = 3, maximumDelay: TimeInterval = 30) {
+            self.maximumAttempts = maximumAttempts
+            self.reconnectionTime = reconnectionTime
+            self.maximumDelay = maximumDelay
+        }
+    }
+
     public struct MultipartFile: Sendable, Equatable {
         public let data: Foundation.Data
         public let filename: String
@@ -561,14 +577,16 @@ public final class APIClient: Sendable {
     public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?
     public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?
     public let retry: RetryPolicy?
+    public let reconnect: ReconnectPolicy?
     let encoder: JSONEncoder
     let decoder: JSONDecoder
 
-    public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, retry: RetryPolicy? = nil, requestContext: RequestContext = RequestContext(), requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil) {
+    public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, retry: RetryPolicy? = nil, reconnect: ReconnectPolicy? = nil, requestContext: RequestContext = RequestContext(), requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil) {
         self.baseURL = baseURL
         self.session = session
         self.timeout = timeout
         self.retry = retry
+        self.reconnect = reconnect
         self.requestContextHeaders = requestContext.headerFields
         self.requestMiddleware = requestMiddleware
         self.responseMiddleware = responseMiddleware
@@ -1610,6 +1628,39 @@ public final class APIClient: Sendable {
             case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(APIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum NotificationsWatchNotifications {
+
+        public struct Message: Codable, Sendable, Equatable {
+            public let title: String
+
+            public init(title: String) {
+                self.title = title
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: AsyncThrowingStream<Message, Swift.Error>
+
+            public init(body: AsyncThrowingStream<Message, Swift.Error>) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -4073,6 +4124,40 @@ public struct APINotificationsClient: Sendable {
         }
     }
 
+    /// Watch notifications, drops a fresh connection after two to exercise resuming from Last-Event-ID
+    public func watchNotifications() async throws(APIClient.NotificationsWatchNotifications.Failure) -> APIClient.NotificationsWatchNotifications.Result {
+        let path = "/notifications/stream"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.NotificationsWatchNotifications.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: APIClient.NotificationsWatchNotifications.Failure.self)
+        switch statusCode {
+        case 200:
+            let reopen: @Sendable (String) async throws -> URLSession.AsyncBytes? = { [request, session = client.session, retry = client.retry, requestMiddleware = client.requestMiddleware, responseMiddleware = client.responseMiddleware] lastEventId in
+                var again = request
+                if !lastEventId.isEmpty { again.setValue(lastEventId, forHTTPHeaderField: "Last-Event-ID") }
+                let reopened: (URLSession.AsyncBytes, Int, HTTPURLResponse)
+                do { reopened = try await Kizuna.open(&again, session: session, retry: retry, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: APIClient.NotificationsWatchNotifications.Failure.self) }
+                catch let failure as APIClient.NotificationsWatchNotifications.Failure {
+                    if case .requestFailed(let underlying) = failure { throw underlying }
+                    throw failure
+                }
+                if reopened.1 == 204 { return nil }
+                guard reopened.1 == 200 else { throw APIClient.NotificationsWatchNotifications.Failure.unexpectedStatus(reopened.1, Foundation.Data()) }
+                guard reopened.2.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("text/event-stream") == true else { throw APIClient.NotificationsWatchNotifications.Failure.invalidResponse }
+                return reopened.0
+            }
+            let body = Kizuna.events(bytes, using: client.decoder, reconnect: client.reconnect.map { Kizuna.Reconnection(policy: $0, reopen: reopen) }) { event, decoder -> APIClient.NotificationsWatchNotifications.Message? in
+                try decoder.decode(APIClient.NotificationsWatchNotifications.Message.self, from: Foundation.Data(event.data.utf8))
+            }
+            return APIClient.NotificationsWatchNotifications.Result(body: body)
+        default:
+            let data = try await Kizuna.collect(bytes, failure: APIClient.NotificationsWatchNotifications.Failure.self)
+            throw APIClient.NotificationsWatchNotifications.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
     /// List events, exercises Date / enum / array query params
     public func listEvents(_ query: APIClient.NotificationsListEvents.Query = .query()) async throws(APIClient.NotificationsListEvents.Failure) -> APIClient.NotificationsListEvents.Result {
         let path = "/events"
@@ -4834,6 +4919,11 @@ private enum Kizuna {
         let retry: Int?
     }
 
+    struct Reconnection: Sendable {
+        let policy: APIClient.ReconnectPolicy
+        let reopen: @Sendable (String) async throws -> URLSession.AsyncBytes?
+    }
+
     static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, retry: APIClient.RetryPolicy?, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse) {
         if let requestMiddleware {
             do { try await requestMiddleware(&request) }
@@ -4926,56 +5016,97 @@ private enum Kizuna {
         }
     }
 
-    static func serverSentEvents(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<ServerSentEvent, Swift.Error> {
+    static func serverSentEvents(_ first: URLSession.AsyncBytes, reconnect: Reconnection?) -> AsyncThrowingStream<ServerSentEvent, Swift.Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
-                var eventType = ""
-                var dataLines: [String] = []
                 var lastEventId = ""
-                var retry: Int? = nil
-                do {
-                    for try await line in lines(bytes) {
-                        if line.isEmpty {
-                            if !dataLines.isEmpty {
-                                continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))
-                                dataLines = []
-                                retry = nil
+                var reconnectionTime = reconnect?.policy.reconnectionTime ?? 3
+                var bytes: URLSession.AsyncBytes? = first
+                var attempts = 0
+                var failure: Swift.Error? = nil
+                while true {
+                    if let current = bytes {
+                        var eventType = ""
+                        var dataLines: [String] = []
+                        var pendingId = lastEventId
+                        var retry: Int? = nil
+                        var firstLine = true
+                        do {
+                            for try await received in lines(current) {
+                                let line = firstLine && received.hasPrefix("\u{FEFF}") ? String(received.dropFirst()) : received
+                                firstLine = false
+                                if line.isEmpty {
+                                    lastEventId = pendingId
+                                    if !dataLines.isEmpty {
+                                        continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))
+                                        attempts = 0
+                                        failure = nil
+                                        dataLines = []
+                                        retry = nil
+                                    }
+                                    eventType = ""
+                                    continue
+                                }
+                                if line.hasPrefix(":") { continue }
+                                let field: Substring
+                                var value: Substring
+                                if let separator = line.firstIndex(of: ":") {
+                                    field = line[..<separator]
+                                    value = line[line.index(after: separator)...]
+                                    if value.hasPrefix(" ") { value = value.dropFirst() }
+                                } else {
+                                    field = Substring(line)
+                                    value = ""
+                                }
+                                switch field {
+                                case "event": eventType = String(value)
+                                case "data": dataLines.append(String(value))
+                                case "id": if !value.contains("\0") { pendingId = String(value) }
+                                case "retry": if !value.isEmpty, value.allSatisfy({ $0.isASCII && $0.isNumber }), let milliseconds = Int(value) { retry = milliseconds; reconnectionTime = min(TimeInterval(milliseconds) / 1000, 3600) }
+                                default: break
+                                }
                             }
-                            eventType = ""
-                            continue
                         }
-                        if line.hasPrefix(":") { continue }
-                        let field: Substring
-                        var value: Substring
-                        if let separator = line.firstIndex(of: ":") {
-                            field = line[..<separator]
-                            value = line[line.index(after: separator)...]
-                            if value.hasPrefix(" ") { value = value.dropFirst() }
-                        } else {
-                            field = Substring(line)
-                            value = ""
-                        }
-                        switch field {
-                        case "event": eventType = String(value)
-                        case "data": dataLines.append(String(value))
-                        case "id": if !value.contains("\0") { lastEventId = String(value) }
-                        case "retry": if !value.isEmpty, value.allSatisfy(\.isNumber), let milliseconds = Int(value) { retry = milliseconds }
-                        default: break
-                        }
+                        catch { failure = error }
                     }
-                    continuation.finish()
+                    guard let reconnect, !Task.isCancelled, attempts < reconnect.policy.maximumAttempts else {
+                        continuation.finish(throwing: failure)
+                        return
+                    }
+                    attempts += 1
+                    let ceiling = min(reconnect.policy.maximumDelay, reconnectionTime * pow(2, Double(attempts - 1)))
+                    let delay = max(0, reconnectionTime) + Double.random(in: 0...max(0, ceiling - reconnectionTime))
+                    do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
+                    catch {
+                        continuation.finish(throwing: failure)
+                        return
+                    }
+                    do {
+                        guard let reopened = try await reconnect.reopen(lastEventId) else {
+                            continuation.finish()
+                            return
+                        }
+                        bytes = reopened
+                    }
+                    catch let error as URLError {
+                        failure = error
+                        bytes = nil
+                    }
+                    catch {
+                        continuation.finish(throwing: error)
+                        return
+                    }
                 }
-                catch { continuation.finish(throwing: error) }
             }
             continuation.onTermination = { _ in task.cancel() }
         }
     }
 
-    static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error> {
+    static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, reconnect: Reconnection? = nil, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    for try await event in serverSentEvents(bytes) {
+                    for try await event in serverSentEvents(bytes, reconnect: reconnect) {
                         if let decoded = try decode(event, decoder) { continuation.yield(decoded) }
                     }
                     continuation.finish()

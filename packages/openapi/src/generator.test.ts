@@ -2433,6 +2433,21 @@ describe('streams', () => {
         },
     });
 
+    it('documents the Last-Event-ID a reconnecting client sends on an event stream, and on no other stream', () => {
+        expect(spec.paths['/ticks']!.get!.parameters).toEqual([
+            {
+                name: 'Last-Event-ID',
+                in: 'header',
+                required: false,
+                description: 'The id of the last event received, to resume a dropped stream after it',
+                schema: {
+                    type: 'string',
+                },
+            },
+        ]);
+        expect(spec.paths['/lines']!.get!.parameters).toBeUndefined();
+    });
+
     it('documents named events under text/event-stream as a oneOf of messages', () => {
         const response = spec.paths['/reply']!.post!.responses['200'] as { content: Record<string, { schema: Record<string, unknown> }> };
         const schema = response.content['text/event-stream']!.schema;

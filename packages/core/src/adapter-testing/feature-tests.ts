@@ -944,6 +944,23 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.text).toBe(streamedEventsText);
             });
         },
+        'streams.lastEventId': async () => {
+            await usingStreams(async (streams) => {
+                const resumed = await streams.request({
+                    method: 'GET',
+                    path: '/notifications',
+                    headers: {
+                        'last-event-id': '1',
+                    },
+                });
+                expect(resumed.text).toBe('data: {"title":"New comment"}\nid: 2\n\ndata: {"title":"Report ready"}\nid: 3\n\n');
+                const fresh = await streams.request({
+                    method: 'GET',
+                    path: '/notifications',
+                });
+                expect(fresh.text).toContain('id: 1\n');
+            });
+        },
         'streams.unnamedData': async () => {
             await usingStreams(async (streams) => {
                 const response = await streams.request({

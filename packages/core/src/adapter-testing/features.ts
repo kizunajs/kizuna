@@ -150,6 +150,9 @@ export const ADAPTER_FEATURES = {
     'streams.sseFraming': {
         summary: 'A streamed status writes each yield as a server-sent event under `text/event-stream` with `Cache-Control: no-store`.',
     },
+    'streams.lastEventId': {
+        summary: 'An event stream handler reads the `Last-Event-ID` a reconnecting client sends.',
+    },
     'streams.unnamedData': {
         summary: 'A stream of one schema writes `data` lines alone.',
     },

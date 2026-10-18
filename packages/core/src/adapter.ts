@@ -268,6 +268,7 @@ export const HANDLER_ARG_KEYS = [
     'plugins',
     'tools',
     'rawBody',
+    'lastEventId',
 ] as const;
 
 /**
@@ -803,6 +804,11 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
  * header, `undefined` when absent. For guards and request context resolvers on
  * adapters that expose raw header records.
  */
+const streamsEvents = (route: RouteDefinition): boolean =>
+    Object.values(route.responses).some(
+        (response) => isStreamResponse(response) && streamContentType(response) === EVENT_STREAM_MEDIA_TYPE
+    );
+
 export const getHeaderValue = (value: unknown): string | undefined => {
     if (typeof value === 'string') return value;
     if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
@@ -1484,6 +1490,11 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
             ...(route.rawBody === true
                 ? {
                       rawBody: invocation.rawBody,
+                  }
+                : {}),
+            ...(streamsEvents(route)
+                ? {
+                      lastEventId: getHeaderValue((invocation.request.headers as Record<string, unknown>)['last-event-id']),
                   }
                 : {}),
             throwError,
