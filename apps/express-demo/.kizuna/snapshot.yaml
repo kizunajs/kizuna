@@ -1013,6 +1013,14 @@ routes:
             optional: false
             schema:
               kind: boolean
+  notifications.watchNotifications:
+    method: GET
+    path: /notifications/stream
+    statuses:
+      - 200
+    deprecated: false
+    responses:
+      "200": null
   notifications.listEvents:
     method: GET
     path: /events

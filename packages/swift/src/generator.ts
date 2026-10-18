@@ -1394,6 +1394,11 @@ const emitKizunaStreaming = (writer: SwiftWriter, clientName: string): void => {
         writer.line('let retry: Int?');
     });
     writer.blank();
+    writer.block('struct Reconnection: Sendable', () => {
+        writer.line(`let policy: ${clientName}.ReconnectPolicy`);
+        writer.line('let reopen: @Sendable (String) async throws -> URLSession.AsyncBytes?');
+    });
+    writer.blank();
     writer.block(
         `static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, retry: ${clientName}.RetryPolicy?, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse)`,
         () => {
@@ -1495,51 +1500,84 @@ const emitKizunaStreaming = (writer: SwiftWriter, clientName: string): void => {
     });
     writer.blank();
     writer.block(
-        'static func serverSentEvents(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<ServerSentEvent, Swift.Error>',
+        'static func serverSentEvents(_ first: URLSession.AsyncBytes, reconnect: Reconnection?) -> AsyncThrowingStream<ServerSentEvent, Swift.Error>',
         () => {
             closure(writer, 'AsyncThrowingStream { continuation in', () => {
                 writer.block('let task = Task', () => {
-                    writer.line('var eventType = ""');
-                    writer.line('var dataLines: [String] = []');
                     writer.line('var lastEventId = ""');
-                    writer.line('var retry: Int? = nil');
-                    writer.block('do', () => {
-                        writer.block('for try await line in lines(bytes)', () => {
-                            writer.line('if line.isEmpty {');
-                            writer.line('    if !dataLines.isEmpty {');
-                            writer.line(
-                                '        continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))'
-                            );
-                            writer.line('        dataLines = []');
-                            writer.line('        retry = nil');
-                            writer.line('    }');
-                            writer.line('    eventType = ""');
-                            writer.line('    continue');
-                            writer.line('}');
-                            writer.line('if line.hasPrefix(":") { continue }');
-                            writer.line('let field: Substring');
-                            writer.line('var value: Substring');
-                            writer.line('if let separator = line.firstIndex(of: ":") {');
-                            writer.line('    field = line[..<separator]');
-                            writer.line('    value = line[line.index(after: separator)...]');
-                            writer.line('    if value.hasPrefix(" ") { value = value.dropFirst() }');
-                            writer.line('} else {');
-                            writer.line('    field = Substring(line)');
-                            writer.line('    value = ""');
-                            writer.line('}');
-                            writer.line('switch field {');
-                            writer.line('case "event": eventType = String(value)');
-                            writer.line('case "data": dataLines.append(String(value))');
-                            writer.line('case "id": if !value.contains("\\0") { lastEventId = String(value) }');
-                            writer.line(
-                                'case "retry": if !value.isEmpty, value.allSatisfy(\\.isNumber), let milliseconds = Int(value) { retry = milliseconds }'
-                            );
-                            writer.line('default: break');
-                            writer.line('}');
+                    writer.line('var reconnectionTime = reconnect?.policy.reconnectionTime ?? 3');
+                    writer.line('var bytes: URLSession.AsyncBytes? = first');
+                    writer.line('var attempts = 0');
+                    writer.line('var failure: Swift.Error = CancellationError()');
+                    writer.block('while true', () => {
+                        writer.block('if let current = bytes', () => {
+                            writer.line('var eventType = ""');
+                            writer.line('var dataLines: [String] = []');
+                            writer.line('var pendingId = lastEventId');
+                            writer.line('var retry: Int? = nil');
+                            writer.block('do', () => {
+                                writer.block('for try await line in lines(current)', () => {
+                                    writer.line('if line.isEmpty {');
+                                    writer.line('    lastEventId = pendingId');
+                                    writer.line('    if !dataLines.isEmpty {');
+                                    writer.line(
+                                        '        continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))'
+                                    );
+                                    writer.line('        attempts = 0');
+                                    writer.line('        dataLines = []');
+                                    writer.line('        retry = nil');
+                                    writer.line('    }');
+                                    writer.line('    eventType = ""');
+                                    writer.line('    continue');
+                                    writer.line('}');
+                                    writer.line('if line.hasPrefix(":") { continue }');
+                                    writer.line('let field: Substring');
+                                    writer.line('var value: Substring');
+                                    writer.line('if let separator = line.firstIndex(of: ":") {');
+                                    writer.line('    field = line[..<separator]');
+                                    writer.line('    value = line[line.index(after: separator)...]');
+                                    writer.line('    if value.hasPrefix(" ") { value = value.dropFirst() }');
+                                    writer.line('} else {');
+                                    writer.line('    field = Substring(line)');
+                                    writer.line('    value = ""');
+                                    writer.line('}');
+                                    writer.line('switch field {');
+                                    writer.line('case "event": eventType = String(value)');
+                                    writer.line('case "data": dataLines.append(String(value))');
+                                    writer.line('case "id": if !value.contains("\\0") { pendingId = String(value) }');
+                                    writer.line(
+                                        'case "retry": if !value.isEmpty, value.allSatisfy(\\.isNumber), let milliseconds = Int(value) { retry = milliseconds; reconnectionTime = TimeInterval(milliseconds) / 1000 }'
+                                    );
+                                    writer.line('default: break');
+                                    writer.line('}');
+                                });
+                                writer.line('continuation.finish()');
+                                writer.line('return');
+                            });
+                            writer.line('catch { failure = error }');
                         });
-                        writer.line('continuation.finish()');
+                        writer.line('guard let reconnect, !Task.isCancelled, attempts < reconnect.policy.maximumAttempts else {');
+                        writer.line('    continuation.finish(throwing: failure)');
+                        writer.line('    return');
+                        writer.line('}');
+                        writer.line('attempts += 1');
+                        writer.line('do { try await Task.sleep(nanoseconds: UInt64(reconnectionTime * 1_000_000_000)) }');
+                        writer.line('catch {');
+                        writer.line('    continuation.finish(throwing: failure)');
+                        writer.line('    return');
+                        writer.line('}');
+                        writer.block('do', () => {
+                            writer.line('guard let reopened = try await reconnect.reopen(lastEventId) else {');
+                            writer.line('    continuation.finish()');
+                            writer.line('    return');
+                            writer.line('}');
+                            writer.line('bytes = reopened');
+                        });
+                        writer.block('catch', () => {
+                            writer.line('failure = error');
+                            writer.line('bytes = nil');
+                        });
                     });
-                    writer.line('catch { continuation.finish(throwing: error) }');
                 });
                 writer.line('continuation.onTermination = { _ in task.cancel() }');
             });
@@ -1547,12 +1585,12 @@ const emitKizunaStreaming = (writer: SwiftWriter, clientName: string): void => {
     );
     writer.blank();
     writer.block(
-        'static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error>',
+        'static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, reconnect: Reconnection? = nil, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error>',
         () => {
             closure(writer, 'AsyncThrowingStream { continuation in', () => {
                 writer.block('let task = Task', () => {
                     writer.block('do', () => {
-                        writer.block('for try await event in serverSentEvents(bytes)', () => {
+                        writer.block('for try await event in serverSentEvents(bytes, reconnect: reconnect)', () => {
                             writer.line('if let decoded = try decode(event, decoder) { continuation.yield(decoded) }');
                         });
                         writer.line('continuation.finish()');
@@ -2129,6 +2167,31 @@ const emitErrorCases = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     }
 };
 
+const IDEMPOTENT_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
+
+/**
+ * Writes the closure that reopens an event stream and returns the argument handing it to `Kizuna.events`, or nothing
+ * for a method a client may not resend.
+ */
+const emitReopen = (writer: SwiftWriter, method: RouteMethod, receiver: string, failure: string, status: number): string => {
+    if (!IDEMPOTENT_METHODS.has(method.method)) return '';
+    closure(
+        writer,
+        `let reopen: @Sendable (String) async throws -> URLSession.AsyncBytes? = { [request, session = ${receiver}session, retry = ${receiver}retry, responseMiddleware = ${receiver}responseMiddleware] lastEventId in`,
+        () => {
+            writer.line('var again = request');
+            writer.line('if !lastEventId.isEmpty { again.setValue(lastEventId, forHTTPHeaderField: "Last-Event-ID") }');
+            writer.line(
+                `let (reopened, statusCode, _) = try await Kizuna.open(&again, session: session, retry: retry, requestMiddleware: nil, responseMiddleware: responseMiddleware, failure: ${failure}.self)`
+            );
+            writer.line('if statusCode == 204 { return nil }');
+            writer.line(`guard statusCode == ${status} else { throw ${failure}.unexpectedStatus(statusCode, Foundation.Data()) }`);
+            writer.line('return reopened');
+        }
+    );
+    return `, reconnect: ${receiver}reconnect.map { Kizuna.Reconnection(policy: $0, reopen: reopen) }`;
+};
+
 const emitStreamMethodTail = (
     writer: SwiftWriter,
     method: RouteMethod,
@@ -2155,22 +2218,32 @@ const emitStreamMethodTail = (
         } else if (stream.events) {
             const events = stream.events;
             const elementType = streamElementType(method, context, 'actor');
-            closure(writer, `let body = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
-                writer.line('switch event.event {');
-                for (const event of events) {
-                    const payloadType = resolveType(event.type, method.operationName, context);
-                    writer.line(
-                        `case ${stringLiteral(event.name)}: return .${escapeKeyword(event.caseName)}(try decoder.decode(${payloadType}.self, from: Foundation.Data(event.data.utf8)))`
-                    );
+            const reconnect = emitReopen(writer, method, receiver, failure, stream.status);
+            closure(
+                writer,
+                `let body = Kizuna.events(bytes, using: ${receiver}decoder${reconnect}) { event, decoder -> ${elementType}? in`,
+                () => {
+                    writer.line('switch event.event {');
+                    for (const event of events) {
+                        const payloadType = resolveType(event.type, method.operationName, context);
+                        writer.line(
+                            `case ${stringLiteral(event.name)}: return .${escapeKeyword(event.caseName)}(try decoder.decode(${payloadType}.self, from: Foundation.Data(event.data.utf8)))`
+                        );
+                    }
+                    writer.line('default: return nil');
+                    writer.line('}');
                 }
-                writer.line('default: return nil');
-                writer.line('}');
-            });
+            );
         } else {
             const elementType = streamElementType(method, context, 'actor');
-            closure(writer, `let body = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
-                writer.line(`try decoder.decode(${elementType}.self, from: Foundation.Data(event.data.utf8))`);
-            });
+            const reconnect = emitReopen(writer, method, receiver, failure, stream.status);
+            closure(
+                writer,
+                `let body = Kizuna.events(bytes, using: ${receiver}decoder${reconnect}) { event, decoder -> ${elementType}? in`,
+                () => {
+                    writer.line(`try decoder.decode(${elementType}.self, from: Foundation.Data(event.data.utf8))`);
+                }
+            );
         }
         for (const field of successResponse.responseHeaders) {
             writer.line(`let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`);
@@ -2380,6 +2453,21 @@ const emitClient = (
                 writer.line('self.maximumDelay = maximumDelay');
             });
         });
+        writer.blank();
+        writer.docComment(
+            'Reconnects an event stream on a GET, HEAD, OPTIONS, PUT or DELETE when its connection drops, sending the id of the last event as Last-Event-ID.'
+        );
+        writer.block('public struct ReconnectPolicy: Sendable', () => {
+            writer.docComment('Reconnections in a row before the stream fails. An event received resets the count.');
+            writer.line('public var maximumAttempts: Int');
+            writer.docComment('Seconds to wait before reconnecting, until the server sends a retry field.');
+            writer.line('public var reconnectionTime: TimeInterval');
+            writer.blank();
+            writer.block('public init(maximumAttempts: Int = 5, reconnectionTime: TimeInterval = 3)', () => {
+                writer.line('self.maximumAttempts = maximumAttempts');
+                writer.line('self.reconnectionTime = reconnectionTime');
+            });
+        });
         if (usesMultipart) {
             writer.blank();
             writer.block('public struct MultipartFile: Sendable, Equatable', () => {
@@ -2499,18 +2587,20 @@ const emitClient = (
         writer.line('public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?');
         writer.line('public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?');
         writer.line('public let retry: RetryPolicy?');
+        writer.line('public let reconnect: ReconnectPolicy?');
         writer.line('let encoder: JSONEncoder');
         writer.line('let decoder: JSONDecoder');
         writer.blank();
         const contextInitParam =
             contextFields.length > 0 ? `, requestContext: RequestContext${contextRequired ? '' : ' = RequestContext()'}` : '';
         writer.block(
-            `public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, retry: RetryPolicy? = nil${contextInitParam}, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)`,
+            `public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, retry: RetryPolicy? = nil, reconnect: ReconnectPolicy? = nil${contextInitParam}, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)`,
             () => {
                 writer.line('self.baseURL = baseURL');
                 writer.line('self.session = session');
                 writer.line('self.timeout = timeout');
                 writer.line('self.retry = retry');
+                writer.line('self.reconnect = reconnect');
                 if (contextFields.length > 0) {
                     writer.line('self.requestContextHeaders = requestContext.headerFields');
                 }

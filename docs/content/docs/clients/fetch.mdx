@@ -161,6 +161,7 @@ export interface ClientConfig {
     fetch?: typeof fetch;
     onRequest?: (request: OutgoingRequest) => void | Promise<void>;
     retry?: RetryOptions;
+    reconnect?: ReconnectOptions;
 }
 ```
 
@@ -172,6 +173,7 @@ export interface ClientConfig {
 | `fetch`       | Custom fetch implementation (e.g. for testing or a polyfill)                      |
 | `onRequest`   | Callback before each request, receiving the `OutgoingRequest` it is about to send |
 | `retry`       | Retry a request the server could not take yet, see [Retries](#retries)            |
+| `reconnect`   | Reconnect a dropped event stream, see [Resuming](/docs/streaming#resuming)        |
 
 Setting a header on the `headers` of an `OutgoingRequest` sets it on the request that goes out, which is how a credential that lives in storage is read per request rather than fixed at construction. See [React Native](#reading-a-token-from-storage).
 

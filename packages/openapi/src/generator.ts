@@ -334,6 +334,24 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                 }
             }
 
+            const streamsEvents = Object.values(route.responses).some(
+                (response) => isStreamResponse(response) && streamContentType(response) === 'text/event-stream'
+            );
+            const declaresLastEventId = parameters.some(
+                (parameter) => parameter.in === 'header' && parameter.name.toLowerCase() === 'last-event-id'
+            );
+            if (streamsEvents && !declaresLastEventId) {
+                parameters.push({
+                    name: 'Last-Event-ID',
+                    in: 'header',
+                    required: false,
+                    description: 'The id of the last event received, to resume a dropped stream after it',
+                    schema: {
+                        type: 'string',
+                    },
+                });
+            }
+
             if (parameters.length > 0) operation.parameters = parameters;
 
             if (route.body && !isVoidSchema(route.body)) {

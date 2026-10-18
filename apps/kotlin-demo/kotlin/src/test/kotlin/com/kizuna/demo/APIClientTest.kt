@@ -1,5 +1,6 @@
 package com.kizuna.demo
 
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
 import kotlinx.serialization.encodeToString
@@ -81,6 +82,14 @@ class APIClientTest {
         val response = client.users.exportUsers()
         assertTrue(response.body.startsWith("id,name,email"))
         assertTrue(response.body.contains("Ada Lovelace"))
+    }
+
+    @Test
+    fun testWatchNotificationsResumesAfterADroppedConnection() = runTest {
+        val baseUrl = System.getenv("API_BASE_URL") ?: "http://localhost:8765"
+        val resuming = APIClient(baseUrl = baseUrl, reconnect = APIClient.ReconnectPolicy(reconnectionTime = kotlin.time.Duration.ZERO))
+        val response = resuming.notifications.watchNotifications()
+        assertEquals(listOf("Invoice paid", "New comment", "Report ready"), response.body.toList().map { it.title })
     }
 
     @Test

@@ -3,6 +3,21 @@ import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { z } from 'zod';
 import { k } from '../k';
 
+const recentNotifications = [
+    {
+        id: '1',
+        title: 'Invoice paid',
+    },
+    {
+        id: '2',
+        title: 'New comment',
+    },
+    {
+        id: '3',
+        title: 'Report ready',
+    },
+];
+
 export const EmailEvent = Kizuna.model({
     title: 'EmailEvent',
     schema: z.object({
@@ -81,6 +96,35 @@ export const notificationsRoutes = k.routes.notifications({
                 },
             };
         }),
+    watchNotifications: k
+        .route({
+            method: 'GET',
+            path: '/notifications/stream',
+            auth: false,
+            responses: {
+                200: {
+                    stream: z.object({
+                        title: z.string(),
+                    }),
+                },
+            },
+            summary: 'Watch notifications, drops a fresh connection after two to exercise resuming from Last-Event-ID',
+        })
+        .handler(({ lastEventId }) => ({
+            status: 200,
+            body: async function* () {
+                const after = lastEventId === undefined ? 0 : Number(lastEventId);
+                for (const notification of recentNotifications.filter((candidate) => Number(candidate.id) > after)) {
+                    yield {
+                        id: notification.id,
+                        data: {
+                            title: notification.title,
+                        },
+                    };
+                    if (lastEventId === undefined && notification.id === '2') throw new Error('Connection dropped');
+                }
+            },
+        })),
     listEvents: k
         .route({
             method: 'GET',

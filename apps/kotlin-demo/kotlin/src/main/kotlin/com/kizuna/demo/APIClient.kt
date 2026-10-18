@@ -167,7 +167,7 @@ object API {
     }
 }
 
-class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null, private val retry: RetryPolicy? = null) {
+class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null, private val retry: RetryPolicy? = null, private val reconnect: ReconnectPolicy? = null) {
 
     /** Values sent as headers on every request, from the api's request context. */
     data class RequestContext(
@@ -188,6 +188,18 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
      * @property initialDelay What the first backoff waits at most.
      * @property maximumDelay What any wait may take.
      */
+    /**
+     * Reconnects an event stream on a GET, HEAD, OPTIONS, PUT or DELETE when its connection drops,
+     * sending the id of the last event as Last-Event-ID.
+     *
+     * @property maximumAttempts Reconnections in a row before the stream fails. An event received resets the count.
+     * @property reconnectionTime What to wait before reconnecting, until the server sends a retry field.
+     */
+    data class ReconnectPolicy(
+        val maximumAttempts: Int = 5,
+        val reconnectionTime: kotlin.time.Duration = 3.seconds
+    )
+
     data class RetryPolicy(
         val maximumAttempts: Int = 3,
         val initialDelay: kotlin.time.Duration = 500.milliseconds,
@@ -864,6 +876,19 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
 
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: APIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object NotificationsWatchNotifications {
+
+        @Serializable
+        data class Message(val title: String)
+
+        data class Result(val body: Flow<Message>)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -1869,24 +1894,24 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
+    val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
+    val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val notifications = APINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
+    val notifications = APINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
+    val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val assistant = APIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
+    val assistant = APIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
+    val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val contact = APIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
+    val contact = APIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val newsletter = APINewsletterClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
+    val newsletter = APINewsletterClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 }
 
-class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
+class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** List users with pagination */
     @Throws(APIClient.UsersListUsers.Failure::class)
@@ -2590,7 +2615,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     }
 }
 
-class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
+class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Health check, exercises nested sub-client routing */
     @Throws(APIClient.HealthCheck.Failure::class)
@@ -2707,7 +2732,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
     }
 }
 
-class APINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
+class APINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Send a notification (discriminated by channel) */
     @Throws(APIClient.NotificationsSendNotification.Failure::class)
@@ -2742,6 +2767,42 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
                     throw APIClient.NotificationsSendNotification.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.NotificationsSendNotification.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Watch notifications, drops a fresh connection after two to exercise resuming from Last-Event-ID */
+    @Throws(APIClient.NotificationsWatchNotifications.Failure::class)
+    suspend fun watchNotifications(): APIClient.NotificationsWatchNotifications.Result {
+        val path = "/notifications/stream"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+        if (httpResponse.code == 200) {
+            val reconnection = reconnect?.let { policy ->
+                Kizuna.Reconnection(policy) { lastEventId ->
+                    val again = requestBuilder.build().newBuilder()
+                    if (lastEventId.isNotEmpty()) again.header("Last-Event-ID", lastEventId)
+                    val reopened = Kizuna.send(client, again.build(), retry)
+                    when (reopened.code) {
+                        204 -> { reopened.close(); null }
+                        200 -> reopened
+                        else -> { reopened.close(); throw APIClient.NotificationsWatchNotifications.Failure.Unexpected(statusCode = reopened.code, data = ByteArray(0)) }
+                    }
+                }
+            }
+            val body = Kizuna.events<APIClient.NotificationsWatchNotifications.Message>(httpResponse, reconnection) { event -> json.decodeFromString<APIClient.NotificationsWatchNotifications.Message>(event.data) }
+            return APIClient.NotificationsWatchNotifications.Result(body = body)
+        }
+        return httpResponse.use {
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                else -> throw APIClient.NotificationsWatchNotifications.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
@@ -2890,7 +2951,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
     }
 }
 
-class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
+class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Get workspace info */
     @Throws(APIClient.WorkspaceGetWorkspace.Failure::class)
@@ -3270,7 +3331,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
     }
 }
 
-class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
+class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Stream an assistant reply, exercises a server-sent events response */
     @Throws(APIClient.AssistantReply.Failure::class)
@@ -3589,7 +3650,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
     }
 }
 
-class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
+class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Report the caller as Express sees it */
     @Throws(APIClient.DiagnosticsWhoAmI.Failure::class)
@@ -3619,7 +3680,7 @@ class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl
     }
 }
 
-class APIContactClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
+class APIContactClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Send a message to the team */
     @Throws(APIClient.ContactSendMessage.Failure::class)
@@ -3654,7 +3715,7 @@ class APIContactClient(private val client: OkHttpClient, private val baseUrl: St
     }
 }
 
-class APINewsletterClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
+class APINewsletterClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Subscribe to the weekly newsletter */
     @Throws(APIClient.NewsletterSubscribe.Failure::class)
@@ -3693,6 +3754,8 @@ private object Kizuna {
 
     data class ServerSentEvent(val event: String?, val data: String, val id: String?, val retry: Int?)
 
+    class Reconnection(val policy: APIClient.ReconnectPolicy, val reopen: suspend (String) -> Response?)
+
     private suspend fun readLine(source: okio.BufferedSource): String? {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { source.readUtf8Line() }
     }
@@ -3719,39 +3782,59 @@ private object Kizuna {
         }
     }
 
-    fun serverSentEvents(response: Response): Flow<ServerSentEvent> = flow {
-        response.use { open ->
-            val source = open.body?.source() ?: return@use
-            var eventType = ""
-            val dataLines = mutableListOf<String>()
-            var lastEventId = ""
-            var retry: Int? = null
-            while (true) {
-                val line = readLine(source) ?: break
-                if (line.isEmpty()) {
-                    if (dataLines.isNotEmpty()) {
-                        emit(ServerSentEvent(eventType.ifEmpty { null }, dataLines.joinToString("\n"), lastEventId.ifEmpty { null }, retry))
-                        dataLines.clear()
-                        retry = null
+    fun serverSentEvents(response: Response, reconnect: Reconnection?): Flow<ServerSentEvent> = flow {
+        var lastEventId = ""
+        var reconnectionTime = reconnect?.policy?.reconnectionTime ?: 3.seconds
+        var current: Response? = response
+        var attempts = 0
+        var failure: Throwable = java.io.IOException("The event stream dropped")
+        while (true) {
+            val open = current
+            if (open != null) {
+                try {
+                    open.use {
+                        val source = it.body?.source() ?: return@flow
+                        var eventType = ""
+                        val dataLines = mutableListOf<String>()
+                        var pendingId = lastEventId
+                        var retry: Int? = null
+                        while (true) {
+                            val line = readLine(source) ?: break
+                            if (line.isEmpty()) {
+                                lastEventId = pendingId
+                                if (dataLines.isNotEmpty()) {
+                                    emit(ServerSentEvent(eventType.ifEmpty { null }, dataLines.joinToString("\n"), lastEventId.ifEmpty { null }, retry))
+                                    attempts = 0
+                                    dataLines.clear()
+                                    retry = null
+                                }
+                                eventType = ""
+                                continue
+                            }
+                            if (line.startsWith(":")) continue
+                            val separator = line.indexOf(':')
+                            val field = if (separator == -1) line else line.substring(0, separator)
+                            val value = (if (separator == -1) "" else line.substring(separator + 1)).removePrefix(" ")
+                            when (field) {
+                                "event" -> eventType = value
+                                "data" -> dataLines.add(value)
+                                "id" -> if (!value.contains('\u0000')) pendingId = value
+                                "retry" -> if (value.isNotEmpty() && value.all { character -> character.isDigit() }) value.toIntOrNull()?.let { milliseconds -> retry = milliseconds; reconnectionTime = milliseconds.milliseconds }
+                            }
+                        }
                     }
-                    eventType = ""
-                    continue
+                    return@flow
                 }
-                if (line.startsWith(":")) continue
-                val separator = line.indexOf(':')
-                val field = if (separator == -1) line else line.substring(0, separator)
-                val value = (if (separator == -1) "" else line.substring(separator + 1)).removePrefix(" ")
-                when (field) {
-                    "event" -> eventType = value
-                    "data" -> dataLines.add(value)
-                    "id" -> if (!value.contains('\u0000')) lastEventId = value
-                    "retry" -> if (value.isNotEmpty() && value.all { it.isDigit() }) retry = value.toIntOrNull()
-                }
+                catch (error: java.io.IOException) { failure = error }
             }
+            if (reconnect == null || attempts >= reconnect.policy.maximumAttempts) throw failure
+            attempts += 1
+            kotlinx.coroutines.delay(reconnectionTime)
+            current = try { reconnect.reopen(lastEventId) ?: return@flow } catch (error: java.io.IOException) { failure = error; null }
         }
     }
 
-    fun <Event : Any> events(response: Response, decode: (ServerSentEvent) -> Event?): Flow<Event> = serverSentEvents(response).mapNotNull(decode)
+    fun <Event : Any> events(response: Response, reconnect: Reconnection? = null, decode: (ServerSentEvent) -> Event?): Flow<Event> = serverSentEvents(response, reconnect).mapNotNull(decode)
     fun resolveUrl(baseUrl: String, path: String): HttpUrl.Builder {
         val base = baseUrl.toHttpUrl()
         val trimmedPath = path.trimStart('/')

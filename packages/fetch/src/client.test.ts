@@ -1034,3 +1034,123 @@ describe('retry', () => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('reconnect', () => {
+    const encoder = new TextEncoder();
+
+    const droppedAfter = (chunks: string[]): ReadableStream<Uint8Array> => {
+        const pending = [...chunks];
+        return new ReadableStream({
+            pull(controller) {
+                const chunk = pending.shift();
+                if (chunk === undefined) controller.error(new TypeError('network connection was lost'));
+                else controller.enqueue(encoder.encode(chunk));
+            },
+        });
+    };
+
+    const endingAfter = (chunks: string[]): ReadableStream<Uint8Array> =>
+        new ReadableStream({
+            start(controller) {
+                for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+                controller.close();
+            },
+        });
+
+    const events = (body: ReadableStream<Uint8Array>, status = 200) =>
+        new Response(status === 204 ? null : body, {
+            status,
+            headers: {
+                'content-type': 'text/event-stream',
+            },
+        });
+
+    const collect = async <T>(iterable: AsyncIterable<T>): Promise<T[]> => {
+        const items: T[] = [];
+        for await (const item of iterable) items.push(item);
+        return items;
+    };
+
+    const ticksOf = async (fetchMock: typeof fetch, reconnect: Parameters<typeof createClient>[0]['reconnect']) => {
+        const result = await createClient({
+            baseUrl: 'http://api',
+            fetch: fetchMock,
+            reconnect,
+        }).streams.ticks();
+        if (result.status !== 200) throw new Error('expected a stream');
+        return collect(result.body);
+    };
+
+    it('resumes a dropped stream from the last event it received', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(events(droppedAfter(['data: {"tick":1}\nid: 1\n\ndata: {"tick":2}\nid: 2\n\n'])))
+            .mockResolvedValueOnce(events(endingAfter(['data: {"tick":3}\nid: 3\n\n'])));
+        const ticks = await ticksOf(fetchMock, {
+            reconnectionTime: 0,
+        });
+        expect(ticks.map((message) => message.data.tick)).toEqual([1, 2, 3]);
+        const [, reopened] = fetchMock.mock.calls[1]! as [string, RequestInit & { headers: Headers }];
+        expect(reopened.headers.get('Last-Event-ID')).toBe('2');
+    });
+
+    it('waits the reconnection time a retry field sets', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(events(droppedAfter(['retry: 0\ndata: {"tick":1}\n\n'])))
+            .mockResolvedValueOnce(events(endingAfter([])));
+        const ticks = await ticksOf(fetchMock, {
+            reconnectionTime: 60_000,
+        });
+        expect(ticks).toHaveLength(1);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('ends when the server answers 204 to a reconnection', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(events(droppedAfter(['data: {"tick":1}\n\n'])))
+            .mockResolvedValueOnce(events(endingAfter([]), 204));
+        const ticks = await ticksOf(fetchMock, {
+            reconnectionTime: 0,
+        });
+        expect(ticks).toHaveLength(1);
+    });
+
+    it('does not reconnect a stream the server ended', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(events(endingAfter(['data: {"tick":1}\n\n'])));
+        await ticksOf(fetchMock, {
+            reconnectionTime: 0,
+        });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('fails once the reconnections run out', async () => {
+        const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(events(droppedAfter([]))));
+        await expect(
+            ticksOf(fetchMock, {
+                reconnectionTime: 0,
+                maximumAttempts: 2,
+            })
+        ).rejects.toThrow('network connection was lost');
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('never reconnects a POST', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(events(droppedAfter(['event: delta\ndata: {"text":"a"}\n\n'])));
+        const result = await createClient({
+            baseUrl: 'http://api',
+            fetch: fetchMock,
+            reconnect: {
+                reconnectionTime: 0,
+            },
+        }).streams.reply({
+            body: {
+                prompt: 'hi',
+            },
+        });
+        if (result.status !== 200) throw new Error('expected a stream');
+        await expect(collect(result.body)).rejects.toThrow('network connection was lost');
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+});

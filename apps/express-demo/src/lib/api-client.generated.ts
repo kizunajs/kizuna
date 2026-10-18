@@ -475,6 +475,13 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace NotificationsWatchNotifications {
+        export type Result =
+            | { status: 200; body: AsyncIterable<{ event?: string; data: {
+                title: string;
+            }; id?: string; retry?: number }>; headers: Record<string, string> };
+    }
+
     export namespace NotificationsListEvents {
         export type Query = {
             /**
@@ -1234,6 +1241,16 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.NotificationsSendNotification.Result>;
         /**
+         * Watch notifications, drops a fresh connection after two to exercise resuming from Last-Event-ID
+         *
+         * @example
+         * const result = await client.notifications.watchNotifications();
+         */
+        watchNotifications: ClientMethod<'GET', true, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.NotificationsWatchNotifications.Result>;
+        /**
          * List events, exercises Date / enum / array query params
          *
          * @example
@@ -1740,6 +1757,13 @@ const routes: GeneratedRoutes = {
                 400: {},
             },
         },
+        watchNotifications: {
+            method: 'GET',
+            path: '/notifications/stream',
+            responses: {
+                200: { stream: true, contentType: 'text/event-stream' },
+            },
+        },
         listEvents: {
             method: 'GET',
             path: '/events',
@@ -2033,6 +2057,22 @@ export interface ClientConfig {
     fetch?: typeof fetch;
     onRequest?: (request: OutgoingRequest) => void | Promise<void>;
     retry?: RetryOptions;
+    reconnect?: ReconnectOptions;
+}
+
+/**
+ * Reconnects an event stream on a GET, HEAD, OPTIONS, PUT or DELETE when its
+ * connection drops, sending the id of the last event as Last-Event-ID.
+ */
+export interface ReconnectOptions {
+    /**
+     * Reconnections in a row before the stream fails. An event received resets the count.
+     */
+    maximumAttempts?: number;
+    /**
+     * Milliseconds to wait before reconnecting, until the server sends a retry field.
+     */
+    reconnectionTime?: number;
 }
 
 /**
@@ -2165,17 +2205,29 @@ const findLineEnd = (buffer: string, final: boolean): { index: number; length: n
 /**
  * Reads text/event-stream as the WHATWG HTML specification parses it.
  */
-async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<ServerSentEvent> {
+interface EventStreamState {
+    lastEventId: string;
+    reconnectionTime: number;
+}
+
+async function* readEvents(
+    body: ReadableStream<Uint8Array>,
+    state: EventStreamState = {
+        lastEventId: '',
+        reconnectionTime: 3000,
+    }
+): AsyncGenerator<ServerSentEvent> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
     let first = true;
     let dataLines: string[] = [];
     let eventType = '';
-    let lastEventId = '';
+    let lastEventId = state.lastEventId;
     let retry: number | undefined;
 
     const dispatch = (): ServerSentEvent | undefined => {
+        state.lastEventId = lastEventId;
         if (dataLines.length === 0) {
             eventType = '';
             return undefined;
@@ -2210,7 +2262,10 @@ async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<Ser
                 if (!value.includes('\0')) lastEventId = value;
                 break;
             case 'retry':
-                if (/^\d+$/.test(value)) retry = Number(value);
+                if (/^\d+$/.test(value)) {
+                    retry = Number(value);
+                    state.reconnectionTime = retry;
+                }
                 break;
         }
         return undefined;
@@ -2237,6 +2292,50 @@ async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<Ser
         }
     } finally {
         void reader.cancel().catch(() => undefined);
+    }
+}
+
+async function* reconnectingEvents(
+    first: Response,
+    reopen: (lastEventId: string) => Promise<Response>,
+    options: ReconnectOptions,
+    signal: AbortSignal | null | undefined
+): AsyncGenerator<ServerSentEvent> {
+    const maximumAttempts = options.maximumAttempts ?? 5;
+    const state: EventStreamState = {
+        lastEventId: '',
+        reconnectionTime: options.reconnectionTime ?? 3000,
+    };
+    let response: Response | undefined = first;
+    let attempts = 0;
+    for (;;) {
+        let failure: unknown;
+        if (response?.body) {
+            try {
+                for await (const message of readEvents(response.body, state)) {
+                    attempts = 0;
+                    yield message;
+                }
+                return;
+            } catch (error) {
+                failure = error;
+            }
+        }
+        if (signal?.aborted || attempts >= maximumAttempts) throw failure;
+        attempts += 1;
+        await wait(state.reconnectionTime, signal);
+        try {
+            response = await reopen(state.lastEventId);
+        } catch (error) {
+            if (signal?.aborted) throw error;
+            response = undefined;
+            continue;
+        }
+        if (response.status === 204) return;
+        const contentType = response.headers.get('content-type') ?? '';
+        if (!response.ok || !contentType.toLowerCase().startsWith('text/event-stream')) {
+            throw new Error('Reconnecting to the event stream failed with status ' + response.status);
+        }
     }
 }
 
@@ -2370,9 +2469,27 @@ const buildMethod = (route: GeneratedRoute, config: ClientConfig) => {
         });
         const declared = route.responses[response.status];
         if (declared !== undefined && 'stream' in declared && response.body !== null) {
+            const essence = (declared.contentType.split(';')[0] ?? '').trim().toLowerCase();
+            const reconnect = essence === 'text/event-stream' && IDEMPOTENT_METHODS.has(route.method) ? config.reconnect : undefined;
+            const reopen = (lastEventId: string) => {
+                const reopenHeaders = new Headers(headers);
+                if (lastEventId !== '') reopenHeaders.set('Last-Event-ID', lastEventId);
+                return send(
+                    url,
+                    {
+                        ...init,
+                        ...args.fetchOptions,
+                        headers: reopenHeaders,
+                    },
+                    route,
+                    config
+                );
+            };
             return {
                 status: response.status,
-                body: readStream(response.body, declared.contentType),
+                body: reconnect
+                    ? reconnectingEvents(response, reopen, reconnect, args.fetchOptions?.signal)
+                    : readStream(response.body, declared.contentType),
                 headers: responseHeaders,
             };
         }

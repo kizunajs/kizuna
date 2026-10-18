@@ -2270,7 +2270,7 @@ describe('Swift generator: streamed responses', () => {
             'case "delta": return .delta(try decoder.decode(TestAPIClient.Reply.Delta.self, from: Foundation.Data(event.data.utf8)))'
         );
         expect(output).toContain('let data = try await Kizuna.collect(bytes, failure: TestAPIClient.Reply.Failure.self)');
-        expect(output).toContain('static func serverSentEvents(_ bytes: URLSession.AsyncBytes)');
+        expect(output).toContain('static func serverSentEvents(_ first: URLSession.AsyncBytes, reconnect: Reconnection?)');
     });
 
     it('runs the response middleware on a streamed response too', () => {

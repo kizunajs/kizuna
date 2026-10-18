@@ -32,7 +32,7 @@ describe('Kotlin generator: retry', () => {
             baseConfig
         );
         expect(output).toContain('data class RetryPolicy(');
-        expect(output).toContain('private val retry: RetryPolicy? = null)');
+        expect(output).toContain('private val retry: RetryPolicy? = null,');
         expect(output).toContain('val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)');
         expect(output).toContain('val idempotent = request.method in setOf("GET", "HEAD", "OPTIONS", "PUT", "DELETE")');
     });
@@ -2319,7 +2319,7 @@ describe('Kotlin generator: streamed responses', () => {
         expect(output).toContain(
             '"delta" -> TestAPIClient.Reply.Event.Delta(json.decodeFromString<TestAPIClient.Reply.Delta>(event.data))'
         );
-        expect(output).toContain('fun serverSentEvents(response: Response): Flow<ServerSentEvent>');
+        expect(output).toContain('fun serverSentEvents(response: Response, reconnect: Reconnection?): Flow<ServerSentEvent>');
         expect(output).toContain('import kotlinx.coroutines.flow.*');
     });
 
