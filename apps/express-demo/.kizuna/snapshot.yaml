@@ -943,6 +943,40 @@ routes:
             optional: false
             schema:
               kind: string
+  health.ready:
+    method: GET
+    path: /health/ready
+    statuses:
+      - 200
+      - 503
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          ready:
+            optional: false
+            schema:
+              kind: boolean
+      "503":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   health.history:
     method: GET
     path: /health/history

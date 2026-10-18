@@ -302,14 +302,10 @@ const readStream = (body: ReadableStream<Uint8Array>, contentType: string): Asyn
     return readBytes(body);
 };
 
-// RFC 9110 §9.2.2: a client may resend these on its own, since a second one changes nothing the first did not.
 const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
 
 const RETRY_STATUSES = new Set([429, 503]);
 
-/**
- * The milliseconds a Retry-After header asks for, as delta-seconds or an HTTP-date (RFC 9110 §10.2.3).
- */
 const retryAfter = (header: string | null): number | undefined => {
     if (header === null) return undefined;
     if (/^\d+$/.test(header.trim())) return Number(header.trim()) * 1000;
@@ -355,7 +351,6 @@ const send = async (url: string, init: RequestInit, route: GeneratedRoute, confi
         }
         if (attempt >= maximumAttempts || !RETRY_STATUSES.has(response.status)) return response;
         const asked = retryAfter(response.headers.get('retry-after'));
-        // Retrying sooner than the server asked would be wrong, so a longer wait than allowed hands the response back.
         if (asked !== undefined && asked > maximumDelay) return response;
         await response.body?.cancel();
         await wait(asked ?? backoff, init.signal);

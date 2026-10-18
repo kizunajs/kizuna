@@ -1385,7 +1385,7 @@ const closure = (writer: SwiftWriter, opener: string, body: () => void): void =>
     writer.line('}');
 };
 
-const emitKizunaStreaming = (writer: SwiftWriter): void => {
+const emitKizunaStreaming = (writer: SwiftWriter, clientName: string): void => {
     writer.blank();
     writer.block('struct ServerSentEvent: Sendable', () => {
         writer.line('let event: String?');
@@ -1395,7 +1395,7 @@ const emitKizunaStreaming = (writer: SwiftWriter): void => {
     });
     writer.blank();
     writer.block(
-        'static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse)',
+        `static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, retry: ${clientName}.RetryPolicy?, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse)`,
         () => {
             writer.line('if let requestMiddleware {');
             writer.line('    do { try await requestMiddleware(&request) }');
@@ -1403,16 +1403,33 @@ const emitKizunaStreaming = (writer: SwiftWriter): void => {
             writer.line('    catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
             writer.line('    catch { throw Failure.requestFailed(error) }');
             writer.line('}');
-            writer.line('let bytes: URLSession.AsyncBytes');
-            writer.line('let response: URLResponse');
-            writer.line('do { (bytes, response) = try await session.bytes(for: request) }');
-            writer.line('catch is CancellationError { throw Failure.cancelled }');
-            writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
-            writer.line('catch { throw Failure.requestFailed(error) }');
-            // A stream's body is read as it arrives, so the middleware sees the response with an empty body.
-            writer.line('if let responseMiddleware { await responseMiddleware(request, Foundation.Data(), response) }');
-            writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
-            writer.line('return (bytes, httpResponse.statusCode, httpResponse)');
+            writer.line('let policy = retryPolicy(for: request, retry)');
+            writer.line('var attempt = 1');
+            writer.block('while true', () => {
+                writer.line('let bytes: URLSession.AsyncBytes');
+                writer.line('let response: URLResponse');
+                writer.line('do { (bytes, response) = try await session.bytes(for: request) }');
+                writer.line('catch is CancellationError { throw Failure.cancelled }');
+                writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
+                writer.line('catch {');
+                writer.line('    if let policy, let delay = retryDelay(policy, attempt: attempt, response: nil) {');
+                writer.line('        try await pause(delay, failure: Failure.self)');
+                writer.line('        attempt += 1');
+                writer.line('        continue');
+                writer.line('    }');
+                writer.line('    throw Failure.requestFailed(error)');
+                writer.line('}');
+                // A stream's body is read as it arrives, so the middleware sees the response with an empty body.
+                writer.line('if let responseMiddleware { await responseMiddleware(request, Foundation.Data(), response) }');
+                writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
+                writer.line('if let policy, let delay = retryDelay(policy, attempt: attempt, response: httpResponse) {');
+                writer.line('    bytes.task.cancel()');
+                writer.line('    try await pause(delay, failure: Failure.self)');
+                writer.line('    attempt += 1');
+                writer.line('    continue');
+                writer.line('}');
+                writer.line('return (bytes, httpResponse.statusCode, httpResponse)');
+            });
         }
     );
     writer.blank();
@@ -1677,7 +1694,7 @@ const emitKizunaNamespace = (
         );
         writer.blank();
         writer.block(
-            'static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse)',
+            `static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, retry: ${options.clientName}.RetryPolicy?, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse)`,
             () => {
                 writer.line('if let requestMiddleware {');
                 writer.line('    do { try await requestMiddleware(&request) }');
@@ -1685,15 +1702,72 @@ const emitKizunaNamespace = (
                 writer.line('    catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
                 writer.line('    catch { throw Failure.requestFailed(error) }');
                 writer.line('}');
-                writer.line('let data: Foundation.Data');
-                writer.line('let response: URLResponse');
-                writer.line('do { (data, response) = try await session.data(for: request) }');
-                writer.line('catch is CancellationError { throw Failure.cancelled }');
-                writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
-                writer.line('catch { throw Failure.requestFailed(error) }');
-                writer.line('if let responseMiddleware { await responseMiddleware(request, data, response) }');
-                writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
-                writer.line('return (data, httpResponse.statusCode, httpResponse)');
+                writer.line('let policy = retryPolicy(for: request, retry)');
+                writer.line('var attempt = 1');
+                writer.block('while true', () => {
+                    writer.line('let data: Foundation.Data');
+                    writer.line('let response: URLResponse');
+                    writer.line('do { (data, response) = try await session.data(for: request) }');
+                    writer.line('catch is CancellationError { throw Failure.cancelled }');
+                    writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
+                    writer.line('catch {');
+                    writer.line('    if let policy, let delay = retryDelay(policy, attempt: attempt, response: nil) {');
+                    writer.line('        try await pause(delay, failure: Failure.self)');
+                    writer.line('        attempt += 1');
+                    writer.line('        continue');
+                    writer.line('    }');
+                    writer.line('    throw Failure.requestFailed(error)');
+                    writer.line('}');
+                    writer.line('if let responseMiddleware { await responseMiddleware(request, data, response) }');
+                    writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
+                    writer.line('if let policy, let delay = retryDelay(policy, attempt: attempt, response: httpResponse) {');
+                    writer.line('    try await pause(delay, failure: Failure.self)');
+                    writer.line('    attempt += 1');
+                    writer.line('    continue');
+                    writer.line('}');
+                    writer.line('return (data, httpResponse.statusCode, httpResponse)');
+                });
+            }
+        );
+        writer.blank();
+        writer.block(
+            `static func retryPolicy(for request: URLRequest, _ retry: ${options.clientName}.RetryPolicy?) -> ${options.clientName}.RetryPolicy?`,
+            () => {
+                writer.line('let idempotent = ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"].contains(request.httpMethod ?? "GET")');
+                writer.line('return idempotent && request.httpBodyStream == nil ? retry : nil');
+            }
+        );
+        writer.blank();
+        writer.block(
+            `static func retryDelay(_ policy: ${options.clientName}.RetryPolicy, attempt: Int, response: HTTPURLResponse?) -> TimeInterval?`,
+            () => {
+                writer.line('guard attempt < policy.maximumAttempts else { return nil }');
+                writer.line(
+                    'let backoff = Double.random(in: 0...min(policy.maximumDelay, policy.initialDelay * pow(2, Double(attempt - 1))))'
+                );
+                writer.line('guard let response else { return backoff }');
+                writer.line('guard [429, 503].contains(response.statusCode) else { return nil }');
+                writer.line('guard let asked = retryAfter(response.value(forHTTPHeaderField: "Retry-After")) else { return backoff }');
+                writer.line('return asked <= policy.maximumDelay ? asked : nil');
+            }
+        );
+        writer.blank();
+        writer.block('static func retryAfter(_ header: String?) -> TimeInterval?', () => {
+            writer.line('guard let value = header?.trimmingCharacters(in: .whitespaces) else { return nil }');
+            writer.line('if let seconds = Int(value), seconds >= 0 { return TimeInterval(seconds) }');
+            writer.line('let formatter = DateFormatter()');
+            writer.line('formatter.locale = Locale(identifier: "en_US_POSIX")');
+            writer.line('formatter.timeZone = TimeZone(identifier: "GMT")');
+            writer.line('formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"');
+            writer.line('guard let date = formatter.date(from: value) else { return nil }');
+            writer.line('return max(0, date.timeIntervalSinceNow)');
+        });
+        writer.blank();
+        writer.block(
+            'static func pause<Failure: KizunaFailure>(_ seconds: TimeInterval, failure: Failure.Type) async throws(Failure)',
+            () => {
+                writer.line('do { try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000)) }');
+                writer.line('catch { throw Failure.cancelled }');
             }
         );
         writer.blank();
@@ -1720,7 +1794,7 @@ const emitKizunaNamespace = (
                 }
             );
         }
-        if (options.streaming) emitKizunaStreaming(writer);
+        if (options.streaming) emitKizunaStreaming(writer, options.clientName);
         if (options.multipart) {
             writer.blank();
             writer.block('struct MultipartBuilder', () => {
@@ -1944,7 +2018,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
         return;
     }
     writer.line(
-        `let (data, statusCode, ${responseBinding}) = try await Kizuna.send(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
+        `let (data, statusCode, ${responseBinding}) = try await Kizuna.send(&request, session: ${receiver}session, retry: ${receiver}retry, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
     );
 
     writer.line('switch statusCode {');
@@ -2069,7 +2143,7 @@ const emitStreamMethodTail = (
     const hasHeaders = method.resultHeaderFields.length > 0;
     const collect = `let data = try await Kizuna.collect(bytes, failure: ${failure}.self)`;
     writer.line(
-        `let (bytes, statusCode, ${responseBinding}) = try await Kizuna.open(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
+        `let (bytes, statusCode, ${responseBinding}) = try await Kizuna.open(&request, session: ${receiver}session, retry: ${receiver}retry, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
     );
     writer.line('switch statusCode {');
     writer.line(`case ${stream.status}:`);
@@ -2288,6 +2362,24 @@ const emitClient = (
                 });
             });
         }
+        writer.blank();
+        writer.docComment(
+            'Retries a GET, HEAD, OPTIONS, PUT or DELETE that failed on the network or was answered 429 or 503, waiting what Retry-After asks or backing off.'
+        );
+        writer.block('public struct RetryPolicy: Sendable', () => {
+            writer.docComment('Attempts in all, the first included.');
+            writer.line('public var maximumAttempts: Int');
+            writer.docComment('Seconds the first backoff waits at most.');
+            writer.line('public var initialDelay: TimeInterval');
+            writer.docComment('Seconds any wait may take.');
+            writer.line('public var maximumDelay: TimeInterval');
+            writer.blank();
+            writer.block('public init(maximumAttempts: Int = 3, initialDelay: TimeInterval = 0.5, maximumDelay: TimeInterval = 30)', () => {
+                writer.line('self.maximumAttempts = maximumAttempts');
+                writer.line('self.initialDelay = initialDelay');
+                writer.line('self.maximumDelay = maximumDelay');
+            });
+        });
         if (usesMultipart) {
             writer.blank();
             writer.block('public struct MultipartFile: Sendable, Equatable', () => {
@@ -2406,17 +2498,19 @@ const emitClient = (
         }
         writer.line('public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?');
         writer.line('public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?');
+        writer.line('public let retry: RetryPolicy?');
         writer.line('let encoder: JSONEncoder');
         writer.line('let decoder: JSONDecoder');
         writer.blank();
         const contextInitParam =
             contextFields.length > 0 ? `, requestContext: RequestContext${contextRequired ? '' : ' = RequestContext()'}` : '';
         writer.block(
-            `public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30${contextInitParam}, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)`,
+            `public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, retry: RetryPolicy? = nil${contextInitParam}, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)`,
             () => {
                 writer.line('self.baseURL = baseURL');
                 writer.line('self.session = session');
                 writer.line('self.timeout = timeout');
+                writer.line('self.retry = retry');
                 if (contextFields.length > 0) {
                     writer.line('self.requestContextHeaders = requestContext.headerFields');
                 }

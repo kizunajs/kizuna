@@ -14,6 +14,8 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
 interface KizunaQueryValue {
@@ -165,7 +167,7 @@ object API {
     }
 }
 
-class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
+class APIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null, private val retry: RetryPolicy? = null) {
 
     /** Values sent as headers on every request, from the api's request context. */
     data class RequestContext(
@@ -177,6 +179,20 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         if (requestContext.xPosthogSessionId != null) put("x-posthog-session-id", requestContext.xPosthogSessionId!!)
         if (requestContext.xPosthogDistinctId != null) put("x-posthog-distinct-id", requestContext.xPosthogDistinctId!!)
     }
+
+    /**
+     * Retries a GET, HEAD, OPTIONS, PUT or DELETE that failed on the network or was answered 429 or 503,
+     * waiting what Retry-After asks or backing off.
+     *
+     * @property maximumAttempts Attempts in all, the first included.
+     * @property initialDelay What the first backoff waits at most.
+     * @property maximumDelay What any wait may take.
+     */
+    data class RetryPolicy(
+        val maximumAttempts: Int = 3,
+        val initialDelay: kotlin.time.Duration = 500.milliseconds,
+        val maximumDelay: kotlin.time.Duration = 30.seconds
+    )
 
     data class MultipartFile(
         val source: Source,
@@ -792,6 +808,20 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         data class Result(val body: Response)
 
         sealed class Failure(message: String? = null) : Exception(message) {
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object HealthReady {
+
+        @Serializable
+        data class Response(val ready: Boolean)
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class ServiceUnavailable(val body: API.ProblemDetails) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -1839,24 +1869,24 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
 
-    val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
 
-    val notifications = APINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val notifications = APINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
 
-    val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
 
-    val assistant = APIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val assistant = APIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
 
-    val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
 
-    val contact = APIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val contact = APIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
 
-    val newsletter = APINewsletterClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val newsletter = APINewsletterClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry)
 }
 
-class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
 
     /** List users with pagination */
     @Throws(APIClient.UsersListUsers.Failure::class)
@@ -1880,7 +1910,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -1913,7 +1943,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -1943,7 +1973,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -1983,7 +2013,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("PUT", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2026,7 +2056,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2062,7 +2092,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2106,7 +2136,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2144,7 +2174,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestBuilder = requestBuilder.header("x-request-id", Kizuna.stringifyQueryValue(headers.xRequestId).joinToString(", "))
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2182,7 +2212,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2218,7 +2248,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2256,7 +2286,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2301,7 +2331,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("PUT", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2338,7 +2368,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("DELETE", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2374,7 +2404,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("POST", ByteArray(0).toRequestBody(null))
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2415,7 +2445,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2451,7 +2481,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("POST", ByteArray(0).toRequestBody(null))
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2478,7 +2508,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2515,7 +2545,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("HEAD", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2542,7 +2572,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("OPTIONS", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2560,7 +2590,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     }
 }
 
-class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
 
     /** Health check, exercises nested sub-client routing */
     @Throws(APIClient.HealthCheck.Failure::class)
@@ -2572,7 +2602,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2599,7 +2629,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2616,6 +2646,39 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
         }
     }
 
+    /** Readiness, answers 503 with Retry-After once while the server warms up, exercises client retries */
+    @Throws(APIClient.HealthReady.Failure::class)
+    suspend fun ready(): APIClient.HealthReady.Result {
+        val path = "/health/ready"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<APIClient.HealthReady.Response>(data.decodeToString())
+                        return@use APIClient.HealthReady.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw APIClient.HealthReady.Failure.Decoding(error, statusCode, data) }
+                }
+                503 -> {
+                    val payload = try {
+                        json.decodeFromString<API.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw APIClient.HealthReady.Failure.Decoding(error, statusCode, data) }
+                    throw APIClient.HealthReady.Failure.ServiceUnavailable(body = payload)
+                }
+                else -> throw APIClient.HealthReady.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
     /** Health history, exercises array return type qualification */
     @Throws(APIClient.HealthHistory.Failure::class)
     suspend fun history(): APIClient.HealthHistory.Result {
@@ -2626,7 +2689,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2644,7 +2707,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
     }
 }
 
-class APINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
 
     /** Send a notification (discriminated by channel) */
     @Throws(APIClient.NotificationsSendNotification.Failure::class)
@@ -2660,7 +2723,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2720,7 +2783,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2758,7 +2821,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2803,7 +2866,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2827,7 +2890,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
     }
 }
 
-class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
 
     /** Get workspace info */
     @Throws(APIClient.WorkspaceGetWorkspace.Failure::class)
@@ -2839,7 +2902,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2878,7 +2941,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("DELETE", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2922,7 +2985,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2967,7 +3030,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3011,7 +3074,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3065,7 +3128,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("DELETE", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3113,7 +3176,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3165,7 +3228,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3207,7 +3270,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
     }
 }
 
-class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
 
     /** Stream an assistant reply, exercises a server-sent events response */
     @Throws(APIClient.AssistantReply.Failure::class)
@@ -3224,7 +3287,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
         if (httpResponse.code == 200) {
             val body = Kizuna.events<APIClient.AssistantReply.Event>(httpResponse) { event ->
@@ -3273,7 +3336,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
         if (httpResponse.code == 200) {
             val body = Kizuna.events<APIClient.AssistantChat.Event>(httpResponse) { event ->
@@ -3337,7 +3400,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3375,7 +3438,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3413,7 +3476,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3446,7 +3509,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3490,7 +3553,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3526,7 +3589,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
     }
 }
 
-class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
 
     /** Report the caller as Express sees it */
     @Throws(APIClient.DiagnosticsWhoAmI.Failure::class)
@@ -3538,7 +3601,7 @@ class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3556,7 +3619,7 @@ class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl
     }
 }
 
-class APIContactClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APIContactClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
 
     /** Send a message to the team */
     @Throws(APIClient.ContactSendMessage.Failure::class)
@@ -3573,7 +3636,7 @@ class APIContactClient(private val client: OkHttpClient, private val baseUrl: St
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3591,7 +3654,7 @@ class APIContactClient(private val client: OkHttpClient, private val baseUrl: St
     }
 }
 
-class APINewsletterClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class APINewsletterClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?) {
 
     /** Subscribe to the weekly newsletter */
     @Throws(APIClient.NewsletterSubscribe.Failure::class)
@@ -3608,7 +3671,7 @@ class APINewsletterClient(private val client: OkHttpClient, private val baseUrl:
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3710,6 +3773,47 @@ private object Kizuna {
             is Enum<*> -> listOf(value.name)
             else -> listOf(value.toString())
         }
+    }
+
+    suspend fun send(client: OkHttpClient, request: Request, retry: APIClient.RetryPolicy?): Response {
+        val idempotent = request.method in setOf("GET", "HEAD", "OPTIONS", "PUT", "DELETE")
+        val policy = retry?.takeIf { idempotent && request.body?.isOneShot() != true }
+        var attempt = 1
+        while (true) {
+            val response = try {
+                execute(client, request)
+            } catch (error: java.io.IOException) {
+                val delay = policy?.let { retryDelay(it, attempt, null) } ?: throw error
+                kotlinx.coroutines.delay(delay)
+                attempt += 1
+                continue
+            }
+            val delay = policy?.let { retryDelay(it, attempt, response) } ?: return response
+            response.close()
+            kotlinx.coroutines.delay(delay)
+            attempt += 1
+        }
+    }
+
+    fun retryDelay(policy: APIClient.RetryPolicy, attempt: Int, response: Response?): Long? {
+        if (attempt >= policy.maximumAttempts) return null
+        val ceiling = minOf(policy.maximumDelay.inWholeMilliseconds, policy.initialDelay.inWholeMilliseconds shl (attempt - 1))
+        val backoff = (Math.random() * ceiling).toLong()
+        if (response == null) return backoff
+        if (response.code != 429 && response.code != 503) return null
+        val asked = retryAfter(response.header("Retry-After")) ?: return backoff
+        return if (asked <= policy.maximumDelay.inWholeMilliseconds) asked else null
+    }
+
+    fun retryAfter(header: String?): Long? {
+        val value = header?.trim() ?: return null
+        value.toLongOrNull()?.let { return if (it >= 0) it * 1000 else null }
+        val date = try {
+            java.time.ZonedDateTime.parse(value, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+        } catch (_: java.time.format.DateTimeParseException) {
+            return null
+        }
+        return maxOf(0L, date.toInstant().toEpochMilli() - System.currentTimeMillis())
     }
 
     suspend fun execute(client: OkHttpClient, request: Request): Response {

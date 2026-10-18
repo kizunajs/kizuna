@@ -84,6 +84,14 @@ class APIClientTest {
     }
 
     @Test
+    fun testRetryWaitsOutAWarmingUpServer() = runTest {
+        val baseUrl = System.getenv("API_BASE_URL") ?: "http://localhost:8765"
+        val retrying = APIClient(baseUrl = baseUrl, retry = APIClient.RetryPolicy(initialDelay = kotlin.time.Duration.ZERO))
+        val response = retrying.health.ready()
+        assertTrue(response.body.ready)
+    }
+
+    @Test
     fun testUploadAvatarSendsAFileFromDisk() = runTest {
         val avatar = java.io.File.createTempFile("avatar", ".png")
         try {
