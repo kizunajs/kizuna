@@ -239,6 +239,47 @@ describe('KizunaClient', () => {
         expect(options.headers.get('content-type')).toBeNull();
     });
 
+    it('sends a file given as bytes as a file part', async () => {
+        const fetchMock = stubFetch(200, {
+            ok: true,
+        });
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        await client.forms.uploadAvatar({
+            body: {
+                file: new Uint8Array([137, 80, 78, 71]),
+                userId: '1',
+            },
+        });
+
+        const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { body: FormData }];
+        const file = options.body.get('file');
+        expect(file).toBeInstanceOf(Blob);
+        expect(new Uint8Array(await (file as Blob).arrayBuffer())).toEqual(new Uint8Array([137, 80, 78, 71]));
+    });
+
+    it('sends a FormData body as it is', async () => {
+        const fetchMock = stubFetch(200, {
+            ok: true,
+        });
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+        const formData = new FormData();
+        formData.append('userId', '1');
+
+        await client.forms.uploadAvatar({
+            body: formData,
+        });
+
+        const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { body: FormData }];
+        expect(options.body).toBe(formData);
+    });
+
     it('sends a bigint form field as its digits', async () => {
         const fetchMock = stubFetch(200, {
             ok: true,

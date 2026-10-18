@@ -330,7 +330,7 @@ export const typeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: 
 };
 
 const unbrandedTypeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: string): string => {
-    if (isFileSchema(schema)) return 'File | Blob';
+    if (isFileSchema(schema)) return collector.readsInput() ? 'File | Blob | Uint8Array' : 'File | Blob';
     if (isBinarySchema(schema)) return 'Uint8Array';
 
     const def = readDef(schema);

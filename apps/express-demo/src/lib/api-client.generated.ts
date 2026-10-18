@@ -383,7 +383,7 @@ export namespace API {
 
     export namespace UsersUploadAvatar {
         export type Body = {
-            file: File | Blob;
+            file: File | Blob | Uint8Array;
             userId: string;
         };
 
@@ -1108,7 +1108,7 @@ export interface Client {
          * });
          */
         uploadAvatar: ClientMethod<'POST', false, {
-            body: API.UsersUploadAvatar.Body;
+            body: API.UsersUploadAvatar.Body | FormData;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.UsersUploadAvatar.Result>;
@@ -2059,6 +2059,7 @@ const buildFormData = (fields: Record<string, unknown>): FormData => {
     for (const [key, value] of Object.entries(fields)) {
         for (const item of Array.isArray(value) ? value : [value]) {
             if (item instanceof Blob) formData.append(key, item);
+            else if (item instanceof Uint8Array) formData.append(key, new Blob([new Uint8Array(item)]));
             else if (item !== undefined && item !== null) formData.append(key, isPlainObject(item) ? JSON.stringify(item) : serializeValue(item));
         }
     }

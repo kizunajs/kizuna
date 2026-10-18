@@ -555,3 +555,19 @@ test('a refusal carries the body the contract declared under guardSchema', async
         expectTypeOf(response.body.code).toEqualTypeOf<'expired_token' | 'forbidden' | undefined>();
     }
 });
+
+test('a multipart route takes its fields or a FormData', () => {
+    void client.forms.uploadAvatar({
+        body: new FormData(),
+    });
+    void client.forms.uploadAvatar({
+        body: {
+            file: new Uint8Array(),
+            userId: '1',
+        },
+    });
+    void client.users.createUser({
+        // @ts-expect-error only a multipart route takes a FormData
+        body: new FormData(),
+    });
+});

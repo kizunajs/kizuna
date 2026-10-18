@@ -363,11 +363,9 @@ formData.append('userId', userId);
 formData.append('file', new File(photo.uri));
 
 const { status } = await apiClient.users.uploadAvatar({
-    body: formData as never,
+    body: formData,
 });
 ```
-
-The cast is there because the route types the field as the `File` the server receives once the multipart request lands.
 
 Bare React Native has no `File` it can build from a path. Append a `{ uri, name, type }` descriptor in its place and leave `fetch` out of the client config, since that form is the one the global `fetch` understands.
 

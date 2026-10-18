@@ -174,7 +174,7 @@ const emitRoute = (routeKey: string, key: string, route: RouteDefinition, collec
 
     if (body && !isVoidSchema(body)) {
         members.push(`export type Body = ${collector.readingInput(() => typeOf(body, collector, `${namespace}Body`))};`);
-        args.push(`body: ${namespaceName}.${namespace}.Body`);
+        args.push(`body: ${namespaceName}.${namespace}.Body${route.contentType === 'multipart/form-data' ? ' | FormData' : ''}`);
     }
 
     if (headers) {
