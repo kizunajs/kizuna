@@ -8,11 +8,17 @@ import { readDef, readObjectShape, resolveBaseType, WRAPPER_TYPES } from './zod-
  */
 const COERCIBLE_TYPES: ReadonlySet<string> = new Set(['number', 'int', 'boolean', 'bigint', 'date']);
 
-interface CoercionField {
-    key: string;
-    type: string;
-    array: boolean;
-}
+type CoercionField =
+    | {
+          key: string;
+          type: string;
+          array: false;
+      }
+    | {
+          key: string;
+          type: string | undefined;
+          array: true;
+      };
 
 /**
  * The fields of one request schema that need coercion, or `null` when none do.
@@ -43,13 +49,11 @@ const buildCoercionPlan = (schema: z.ZodType): CoercionPlan => {
         if (baseType === 'array') {
             const element = resolveArrayElement(fieldSchema);
             const elementType = element ? resolveBaseType(element) : undefined;
-            if (elementType !== undefined && COERCIBLE_TYPES.has(elementType)) {
-                fields.push({
-                    key,
-                    type: elementType,
-                    array: true,
-                });
-            }
+            fields.push({
+                key,
+                type: elementType !== undefined && COERCIBLE_TYPES.has(elementType) ? elementType : undefined,
+                array: true,
+            });
             continue;
         }
         if (COERCIBLE_TYPES.has(baseType)) {
@@ -111,10 +115,15 @@ const coerceValue = (value: unknown, type: string): unknown => {
     return Number.isNaN(date.getTime()) ? value : date;
 };
 
-const coerceArray = (value: unknown, type: string): unknown => {
-    if (!Array.isArray(value)) return value;
-    let changed = false;
-    const coerced = value.map((item) => {
+/**
+ * A lone value is a one-item list, the way OpenAPI's default `form` style
+ * sends `?tag=work`.
+ */
+const coerceArray = (value: unknown, type: string | undefined): unknown => {
+    const items = Array.isArray(value) ? value : [value];
+    if (type === undefined) return items;
+    let changed = items !== value;
+    const coerced = items.map((item) => {
         const next = coerceValue(item, type);
         if (next !== item) changed = true;
         return next;
