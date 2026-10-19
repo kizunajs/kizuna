@@ -19,6 +19,9 @@ export const ADAPTER_TYPE_FEATURES = {
     'handler.rawBody': {
         summary: 'A route with `rawBody: true` gives its handler `rawBody` as a string, and a route without one gives none.',
     },
+    'handler.lastEventId': {
+        summary: 'A route that streams events gives its handler `lastEventId`, and a route without one gives none.',
+    },
     'handler.context': {
         summary: 'Handler args carry the adapter’s own handler context.',
     },

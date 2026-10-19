@@ -1535,6 +1535,33 @@ const emitErrorBranches = (writer: KotlinWriter, method: RouteMethod, context: E
     writer.line(`else -> throw ${failureRef}.Unexpected(statusCode = statusCode, data = data)`);
 };
 
+const IDEMPOTENT_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
+
+/**
+ * Writes the reconnection an event stream reopens through and returns the argument handing it to `Kizuna.events`, or
+ * nothing for a method a client may not resend.
+ */
+const emitReopen = (writer: KotlinWriter, method: RouteMethod, operationRef: string, status: number): string => {
+    if (!IDEMPOTENT_METHODS.has(method.method)) return '';
+    closure(writer, 'val reconnection = reconnect?.let { policy ->', () => {
+        closure(writer, 'Kizuna.Reconnection(policy) { lastEventId ->', () => {
+            writer.line('val again = requestBuilder.build().newBuilder()');
+            writer.line('if (lastEventId.isNotEmpty()) again.header("Last-Event-ID", lastEventId)');
+            writer.line('requestInterceptor?.invoke(again)');
+            writer.line('val reopened = Kizuna.send(client, again.build(), retry)');
+            writer.line('val eventStream = reopened.header("Content-Type")?.lowercase()?.startsWith("text/event-stream") == true');
+            writer.block('when', () => {
+                writer.line('reopened.code == 204 -> { reopened.close(); null }');
+                writer.line(`reopened.code == ${status} && eventStream -> reopened`);
+                writer.line(
+                    `else -> { reopened.close(); throw ${operationRef}.Failure.Unexpected(statusCode = reopened.code, data = ByteArray(0)) }`
+                );
+            });
+        });
+    });
+    return ', reconnection';
+};
+
 const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context: EmitContext): void => {
     const operationRef = `${context.clientName}.${method.operationName}`;
     const stream = method.stream!;
@@ -1549,7 +1576,8 @@ const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context
         } else if (stream.events) {
             const events = stream.events;
             const elementType = streamElementType(method, context, 'client');
-            closure(writer, `val body = Kizuna.events<${elementType}>(httpResponse) { event ->`, () => {
+            const reconnection = emitReopen(writer, method, operationRef, stream.status);
+            closure(writer, `val body = Kizuna.events<${elementType}>(httpResponse${reconnection}) { event ->`, () => {
                 writer.block('when (event.event)', () => {
                     for (const event of events) {
                         const payloadType = resolveType(event.type, method.operationName, context);
@@ -1562,8 +1590,9 @@ const emitStreamMethodTail = (writer: KotlinWriter, method: RouteMethod, context
             });
         } else {
             const elementType = streamElementType(method, context, 'client');
+            const reconnection = emitReopen(writer, method, operationRef, stream.status);
             writer.line(
-                `val body = Kizuna.events<${elementType}>(httpResponse) { event -> json.decodeFromString<${elementType}>(event.data) }`
+                `val body = Kizuna.events<${elementType}>(httpResponse${reconnection}) { event -> json.decodeFromString<${elementType}>(event.data) }`
             );
         }
         if (hasHeaders) {
@@ -1629,7 +1658,7 @@ const emitSubClientMethod = (writer: KotlinWriter, method: RouteMethod, context:
 const emitSubClientClass = (writer: KotlinWriter, group: RouteGroup, clientName: string, context: EmitContext): void => {
     writer.blank();
     writer.block(
-        `class ${group.className}(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: ${clientName}.RetryPolicy?)`,
+        `class ${group.className}(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: ${clientName}.RetryPolicy?, private val reconnect: ${clientName}.ReconnectPolicy?)`,
         () => {
             for (const method of group.methods) {
                 writer.blank();
@@ -1646,9 +1675,11 @@ const closure = (writer: KotlinWriter, opener: string, body: () => void): void =
     writer.line('}');
 };
 
-const emitKizunaStreaming = (writer: KotlinWriter): void => {
+const emitKizunaStreaming = (writer: KotlinWriter, clientName: string): void => {
     writer.blank();
     writer.line('data class ServerSentEvent(val event: String?, val data: String, val id: String?, val retry: Int?)');
+    writer.blank();
+    writer.line(`class Reconnection(val policy: ${clientName}.ReconnectPolicy, val reopen: suspend (String) -> Response?)`);
     writer.blank();
     writer.block('private suspend fun readLine(source: okio.BufferedSource): String?', () => {
         writer.line('return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { source.readUtf8Line() }');
@@ -1676,49 +1707,94 @@ const emitKizunaStreaming = (writer: KotlinWriter): void => {
         });
     });
     writer.blank();
-    writer.block('fun serverSentEvents(response: Response): Flow<ServerSentEvent> = flow', () => {
-        closure(writer, 'response.use { open ->', () => {
-            writer.line('val source = open.body?.source() ?: return@use');
-            writer.line('var eventType = ""');
-            writer.line('val dataLines = mutableListOf<String>()');
-            writer.line('var lastEventId = ""');
-            writer.line('var retry: Int? = null');
-            writer.block('while (true)', () => {
-                writer.line('val line = readLine(source) ?: break');
-                writer.block('if (line.isEmpty())', () => {
-                    writer.block('if (dataLines.isNotEmpty())', () => {
-                        writer.line(
-                            'emit(ServerSentEvent(eventType.ifEmpty { null }, dataLines.joinToString("\\n"), lastEventId.ifEmpty { null }, retry))'
-                        );
-                        writer.line('dataLines.clear()');
-                        writer.line('retry = null');
-                    });
-                    writer.line('eventType = ""');
-                    writer.line('continue');
-                });
-                writer.line('if (line.startsWith(":")) continue');
-                writer.line("val separator = line.indexOf(':')");
-                writer.line('val field = if (separator == -1) line else line.substring(0, separator)');
-                writer.line('val value = (if (separator == -1) "" else line.substring(separator + 1)).removePrefix(" ")');
-                writer.block('when (field)', () => {
-                    writer.line('"event" -> eventType = value');
-                    writer.line('"data" -> dataLines.add(value)');
-                    writer.line('"id" -> if (!value.contains(\'\\u0000\')) lastEventId = value');
-                    writer.line('"retry" -> if (value.isNotEmpty() && value.all { it.isDigit() }) retry = value.toIntOrNull()');
-                });
+    writer.line("private val LINE_ENDINGS = okio.ByteString.of('\\r'.code.toByte(), '\\n'.code.toByte())");
+    writer.blank();
+    writer.block('private suspend fun readEventLine(source: okio.BufferedSource): String?', () => {
+        closure(writer, 'return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {', () => {
+            writer.line('val end = source.indexOfElement(LINE_ENDINGS)');
+            writer.block('if (end == -1L)', () => {
+                writer.line('if (source.exhausted()) null else source.readUtf8()');
+            });
+            writer.block('else', () => {
+                writer.line('val line = source.readUtf8(end)');
+                writer.line("val carriageReturn = source.readByte() == '\\r'.code.toByte()");
+                writer.line("if (carriageReturn && source.request(1) && source.buffer[0] == '\\n'.code.toByte()) source.skip(1)");
+                writer.line('line');
             });
         });
     });
     writer.blank();
+    writer.block('fun serverSentEvents(response: Response, reconnect: Reconnection?): Flow<ServerSentEvent> = flow', () => {
+        writer.line('var lastEventId = ""');
+        writer.line('var reconnectionTime = reconnect?.policy?.reconnectionTime ?: 3.seconds');
+        writer.line('var current: Response? = response');
+        writer.line('var attempts = 0');
+        writer.line('var failure: Throwable? = null');
+        writer.block('while (true)', () => {
+            closure(writer, 'current?.use { open ->', () => {
+                writer.line('val source = open.body?.source() ?: return@use');
+                writer.line('var eventType = ""');
+                writer.line('val dataLines = mutableListOf<String>()');
+                writer.line('var pendingId = lastEventId');
+                writer.line('var retry: Int? = null');
+                writer.line('var firstLine = true');
+                writer.block('while (true)', () => {
+                    writer.line(
+                        'val received = try { readEventLine(source) } catch (error: java.io.IOException) { failure = error; null } ?: break'
+                    );
+                    writer.line('val line = if (firstLine) received.removePrefix("\\uFEFF") else received');
+                    writer.line('firstLine = false');
+                    writer.block('if (line.isEmpty())', () => {
+                        writer.line('lastEventId = pendingId');
+                        writer.block('if (dataLines.isNotEmpty())', () => {
+                            writer.line(
+                                'emit(ServerSentEvent(eventType.ifEmpty { null }, dataLines.joinToString("\\n"), lastEventId.ifEmpty { null }, retry))'
+                            );
+                            writer.line('attempts = 0');
+                            writer.line('failure = null');
+                            writer.line('dataLines.clear()');
+                            writer.line('retry = null');
+                        });
+                        writer.line('eventType = ""');
+                        writer.line('continue');
+                    });
+                    writer.line('if (line.startsWith(":")) continue');
+                    writer.line("val separator = line.indexOf(':')");
+                    writer.line('val field = if (separator == -1) line else line.substring(0, separator)');
+                    writer.line('val value = (if (separator == -1) "" else line.substring(separator + 1)).removePrefix(" ")');
+                    writer.block('when (field)', () => {
+                        writer.line('"event" -> eventType = value');
+                        writer.line('"data" -> dataLines.add(value)');
+                        writer.line('"id" -> if (!value.contains(\'\\u0000\')) pendingId = value');
+                        writer.line(
+                            "\"retry\" -> if (value.isNotEmpty() && value.all { character -> character in '0'..'9' }) value.toIntOrNull()?.let { milliseconds -> retry = milliseconds; reconnectionTime = minOf(milliseconds.milliseconds, 3_600_000.milliseconds) }"
+                        );
+                    });
+                });
+            });
+            writer.block('if (reconnect == null || attempts >= reconnect.policy.maximumAttempts)', () => {
+                writer.line('failure?.let { throw it }');
+                writer.line('return@flow');
+            });
+            writer.line('attempts += 1');
+            writer.line('val ceiling = minOf(reconnect.policy.maximumDelay, reconnectionTime * Math.pow(2.0, (attempts - 1).toDouble()))');
+            writer.line('val extra = (ceiling - reconnectionTime).coerceAtLeast(kotlin.time.Duration.ZERO)');
+            writer.line('kotlinx.coroutines.delay(reconnectionTime + extra * Math.random())');
+            writer.line(
+                'current = try { reconnect.reopen(lastEventId) ?: return@flow } catch (error: java.io.IOException) { failure = error; null }'
+            );
+        });
+    });
+    writer.blank();
     writer.line(
-        'fun <Event : Any> events(response: Response, decode: (ServerSentEvent) -> Event?): Flow<Event> = serverSentEvents(response).mapNotNull(decode)'
+        'fun <Event : Any> events(response: Response, reconnect: Reconnection? = null, decode: (ServerSentEvent) -> Event?): Flow<Event> = serverSentEvents(response, reconnect).mapNotNull(decode)'
     );
 };
 
 const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; clientName: string }): void => {
     writer.blank();
     writer.block('private object Kizuna', () => {
-        if (options.streaming) emitKizunaStreaming(writer);
+        if (options.streaming) emitKizunaStreaming(writer, options.clientName);
         writer.block('fun resolveUrl(baseUrl: String, path: String): HttpUrl.Builder', () => {
             writer.line('val base = baseUrl.toHttpUrl()');
             writer.line("val trimmedPath = path.trimStart('/')");
@@ -1832,7 +1908,7 @@ const emitClient = (
 
     writer.blank();
     writer.block(
-        `class ${clientName}(private val baseUrl: String, ${contextParam}private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null, private val retry: RetryPolicy? = null)`,
+        `class ${clientName}(private val baseUrl: String, ${contextParam}private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null, private val retry: RetryPolicy? = null, private val reconnect: ReconnectPolicy? = null)`,
         () => {
             if (contextFields.length > 0) {
                 writer.blank();
@@ -1867,6 +1943,20 @@ const emitClient = (
             emitConstructorClass(writer, 'data class RetryPolicy', [
                 'val maximumAttempts: Int = 3',
                 'val initialDelay: kotlin.time.Duration = 500.milliseconds',
+                'val maximumDelay: kotlin.time.Duration = 30.seconds',
+            ]);
+            writer.blank();
+            writer.line('/**');
+            writer.line(' * Reconnects an event stream on a GET, HEAD, OPTIONS, PUT or DELETE when its connection drops,');
+            writer.line(' * sending the id of the last event as Last-Event-ID.');
+            writer.line(' *');
+            writer.line(' * @property maximumAttempts Reconnections in a row before the stream fails. An event received resets the count.');
+            writer.line(' * @property reconnectionTime What to wait before reconnecting, until the server sends a retry field.');
+            writer.line(' * @property maximumDelay What the wait may grow to after reconnections in a row that fail.');
+            writer.line(' */');
+            emitConstructorClass(writer, 'data class ReconnectPolicy', [
+                'val maximumAttempts: Int = 5',
+                'val reconnectionTime: kotlin.time.Duration = 3.seconds',
                 'val maximumDelay: kotlin.time.Duration = 30.seconds',
             ]);
             if (usesMultipart) {
@@ -1922,7 +2012,7 @@ const emitClient = (
                 for (const group of groups) {
                     writer.blank();
                     writer.line(
-                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, baseUrl, json, ${contextFields.length > 0 ? 'requestContextHeaders' : 'emptyMap()'}, requestInterceptor, responseInterceptor, retry)`
+                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, baseUrl, json, ${contextFields.length > 0 ? 'requestContextHeaders' : 'emptyMap()'}, requestInterceptor, responseInterceptor, retry, reconnect)`
                     );
                 }
             }
