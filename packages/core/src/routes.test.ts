@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ROUTES_GROUP, type Routes } from './types.js';
 import { Kizuna } from './kizuna.js';
+import { BinarySchema, FileSchema } from './binary.js';
 
 interface Config {
     groups: typeof kGroups;
@@ -387,6 +388,152 @@ describe('k.routes pathParams/path agreement', () => {
                     pathParams: z.record(z.string(), z.string()),
                     responses: {
                         200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                }),
+            })
+        ).not.toThrow();
+    });
+});
+
+describe('k.routes fields a request cannot carry', () => {
+    const listNotesWith = (field: z.ZodType) => () =>
+        k.routes.users({
+            listNotes: k.route({
+                method: 'GET',
+                path: '/notes',
+                query: z.object({
+                    filter: field,
+                }),
+                responses: {
+                    200: z.object({
+                        total: z.number(),
+                    }),
+                },
+            }),
+        });
+
+    const getNoteWith = (header: z.ZodType) => () =>
+        k.routes.users({
+            getNote: k.route({
+                method: 'GET',
+                path: '/note',
+                headers: z.object({
+                    'x-workspace': header,
+                }),
+                responses: {
+                    200: z.object({
+                        id: z.string(),
+                    }),
+                },
+            }),
+        });
+
+    const uploadAvatarWith = (contentType: 'multipart/form-data' | 'application/x-www-form-urlencoded', field: z.ZodType) => () =>
+        k.routes.users({
+            uploadAvatar: k.route({
+                method: 'POST',
+                path: '/avatar',
+                contentType,
+                body: z.object({
+                    userId: z.string(),
+                    file: field,
+                }),
+                responses: {
+                    200: z.object({
+                        size: z.number(),
+                    }),
+                },
+            }),
+        });
+
+    it('throws for a query field that is not a value or a list of values', () => {
+        expect(
+            listNotesWith(
+                z.object({
+                    status: z.string(),
+                })
+            )
+        ).toThrowError(
+            'Route "listNotes" declares query field "filter" as object. A query string carries values and lists of values, so this cannot be sent.'
+        );
+        expect(listNotesWith(z.record(z.string(), z.string()))).toThrowError('as record');
+        expect(
+            listNotesWith(
+                z
+                    .array(
+                        z.object({
+                            status: z.string(),
+                        })
+                    )
+                    .optional()
+            )
+        ).toThrowError('as array of object');
+        expect(listNotesWith(z.array(z.array(z.string())))).toThrowError('as array of array');
+    });
+
+    it('accepts a value, a list of values and a transform in a query', () => {
+        expect(listNotesWith(z.string().optional())).not.toThrow();
+        expect(listNotesWith(z.array(z.enum(['open', 'closed'])).optional())).not.toThrow();
+        expect(listNotesWith(z.date())).not.toThrow();
+        expect(listNotesWith(z.string().transform((value) => value.split(',')))).not.toThrow();
+    });
+
+    it('throws for a header that is not a single value', () => {
+        expect(getNoteWith(z.array(z.string()))).toThrowError(
+            'Route "getNote" declares header "x-workspace" as array of string. A header carries one value, so this cannot be sent.'
+        );
+        expect(
+            getNoteWith(
+                z.object({
+                    id: z.string(),
+                })
+            )
+        ).toThrowError('as object');
+        expect(getNoteWith(z.string().optional())).not.toThrow();
+    });
+
+    it('throws for a form field that is not a value, a list of values or a file', () => {
+        expect(
+            uploadAvatarWith(
+                'multipart/form-data',
+                z.object({
+                    name: z.string(),
+                })
+            )
+        ).toThrowError(
+            'Route "uploadAvatar" declares form field "file" as object. A form carries values, lists of values and files, so this cannot be sent.'
+        );
+        expect(uploadAvatarWith('multipart/form-data', BinarySchema)).toThrowError(
+            'Route "uploadAvatar" declares form field "file" as BinarySchema, but a form sends a file part as a File. Declare it with FileSchema.'
+        );
+        expect(uploadAvatarWith('multipart/form-data', z.array(BinarySchema))).toThrowError('as BinarySchema');
+        expect(uploadAvatarWith('application/x-www-form-urlencoded', FileSchema)).toThrowError(
+            'Route "uploadAvatar" declares form field "file" as a file, which a urlencoded body cannot carry.'
+        );
+    });
+
+    it('accepts values, lists and files in a multipart form, and values in a urlencoded one', () => {
+        expect(uploadAvatarWith('multipart/form-data', FileSchema)).not.toThrow();
+        expect(uploadAvatarWith('multipart/form-data', z.array(FileSchema))).not.toThrow();
+        expect(uploadAvatarWith('multipart/form-data', z.array(z.string()).optional())).not.toThrow();
+        expect(uploadAvatarWith('application/x-www-form-urlencoded', z.number())).not.toThrow();
+    });
+
+    it('leaves a JSON body to carry any shape', () => {
+        expect(() =>
+            k.routes.users({
+                createNote: k.route({
+                    method: 'POST',
+                    path: '/notes',
+                    body: z.object({
+                        filter: z.object({
+                            status: z.string(),
+                        }),
+                    }),
+                    responses: {
+                        201: z.object({
                             id: z.string(),
                         }),
                     },

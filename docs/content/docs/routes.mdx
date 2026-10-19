@@ -142,13 +142,28 @@ Its keys are checked against the path, so a name the path does not carry is a co
 pathParams declares "userId", which is not a parameter in path "/users/:id"
 ```
 
-Each value must be a scalar, since a path segment arrives as one string. Structured values belong in `query`. To parse one into something richer, use `z.string().transform(...)`:
+Each value must be a scalar, since a path segment arrives as one string. Lists belong in `query`. To parse one into something richer, use `z.string().transform(...)`:
 
 ```ts
 pathParams: z.object({
     tags: z.string().transform((value) => value.split(',')),
 }),
 ```
+
+### What each part can carry
+
+A route can only declare what its part of the request can send, and `k.routes` throws on anything else when the config loads:
+
+| Part                                        | Carries                                                       |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| `pathParams`                                | a value: a string, number, boolean, enum, date or bigint      |
+| `query`                                     | a value, or a list of values                                  |
+| `headers`                                   | a value                                                       |
+| a `multipart/form-data` body                | values, lists of values, and files declared with `FileSchema` |
+| an `application/x-www-form-urlencoded` body | values and lists of values                                    |
+| a JSON body                                 | anything JSON can hold                                        |
+
+An object in a query or a form can't be sent. Split it into fields of their own, or move it to a JSON body.
 
 ## Handler arguments
 
