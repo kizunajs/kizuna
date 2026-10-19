@@ -82,6 +82,25 @@ describe('KizunaClient', () => {
         expect(options.headers.get('Content-Type')).toBe('application/json');
     });
 
+    it('reads a binary body as the bytes the server sent', async () => {
+        const badge = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: () =>
+                Promise.resolve(
+                    new Response(badge, {
+                        headers: {
+                            'content-type': 'application/octet-stream',
+                        },
+                    })
+                ),
+        });
+
+        const result = await client.downloads.badge();
+
+        expect(result.body).toEqual(badge);
+    });
+
     it('appends query parameters', async () => {
         const fetchMock = stubFetch(200, {
             users: [],

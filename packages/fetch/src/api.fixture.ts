@@ -536,6 +536,40 @@ const routes = k.routes({
             },
         }),
     },
+    downloads: {
+        badge: k
+            .route({
+                method: 'GET',
+                path: '/badge',
+                auth: false,
+                responses: {
+                    200: {
+                        body: z.instanceof(Uint8Array),
+                        contentType: 'application/octet-stream',
+                    },
+                },
+            })
+            .handler(() => ({
+                status: 200,
+                body: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+            })),
+        count: k
+            .route({
+                method: 'GET',
+                path: '/count',
+                auth: false,
+                responses: {
+                    200: {
+                        body: z.string(),
+                        contentType: 'text/plain',
+                    },
+                },
+            })
+            .handler(() => ({
+                status: 200,
+                body: '42',
+            })),
+    },
     account: {
         whoAmI: k.route({
             method: 'GET',

@@ -95,6 +95,13 @@ class APIClientTest {
     }
 
     @Test
+    fun testExportUsersReturnsTheCsvAsText() = runTest {
+        val response = client.users.exportUsers()
+        assertTrue(response.body.startsWith("id,name,email"))
+        assertTrue(response.body.contains("Ada Lovelace"))
+    }
+
+    @Test
     fun testGetUserNotFoundThrowsTypedError() = runTest {
         val failure = assertFailsWith<APIClient.UsersGetUser.Failure.NotFound> {
             client.users.getUser {

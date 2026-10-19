@@ -38,6 +38,30 @@ describe('Kotlin generator: retry', () => {
     });
 });
 
+describe('Kotlin generator: text bodies', () => {
+    it('reads a text body as its text, never as JSON', () => {
+        const contract = defineConfig({
+            routes: [
+                {
+                    exportUsers: {
+                        method: 'GET',
+                        path: '/users/export',
+                        responses: {
+                            200: {
+                                body: z.string(),
+                                contentType: 'text/csv',
+                            },
+                        },
+                    },
+                },
+            ],
+        }).api;
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val payload = data.decodeToString()');
+        expect(output).not.toContain('json.decodeFromString<String>(data.decodeToString())');
+    });
+});
+
 describe('Kotlin generator: z.void()', () => {
     it('emits no body param and Response return for z.void() body and response', () => {
         const contract = defineConfig({
