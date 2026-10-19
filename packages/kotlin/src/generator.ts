@@ -1432,7 +1432,7 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
 
     writer.line('requestInterceptor?.invoke(requestBuilder)');
 
-    writer.line('val httpResponse = Kizuna.execute(client, requestBuilder.build())');
+    writer.line('val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)');
     if (method.stream) {
         emitStreamMethodTail(writer, method, context);
         return;
@@ -1629,7 +1629,7 @@ const emitSubClientMethod = (writer: KotlinWriter, method: RouteMethod, context:
 const emitSubClientClass = (writer: KotlinWriter, group: RouteGroup, clientName: string, context: EmitContext): void => {
     writer.blank();
     writer.block(
-        `class ${group.className}(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?)`,
+        `class ${group.className}(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: ${clientName}.RetryPolicy?)`,
         () => {
             for (const method of group.methods) {
                 writer.blank();
@@ -1715,7 +1715,7 @@ const emitKizunaStreaming = (writer: KotlinWriter): void => {
     );
 };
 
-const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean }): void => {
+const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; clientName: string }): void => {
     writer.blank();
     writer.block('private object Kizuna', () => {
         if (options.streaming) emitKizunaStreaming(writer);
@@ -1742,6 +1742,52 @@ const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean })
                 writer.line('else -> listOf(value.toString())');
             });
             writer.line('}');
+        });
+        writer.blank();
+        writer.block(
+            `suspend fun send(client: OkHttpClient, request: Request, retry: ${options.clientName}.RetryPolicy?): Response`,
+            () => {
+                writer.line('val idempotent = request.method in setOf("GET", "HEAD", "OPTIONS", "PUT", "DELETE")');
+                writer.line('val policy = retry?.takeIf { idempotent && request.body?.isOneShot() != true }');
+                writer.line('var attempt = 1');
+                writer.block('while (true)', () => {
+                    writer.line('val response = try {');
+                    writer.line('    execute(client, request)');
+                    writer.line('} catch (error: java.io.IOException) {');
+                    writer.line('    val delay = policy?.let { retryDelay(it, attempt, null) } ?: throw error');
+                    writer.line('    kotlinx.coroutines.delay(delay)');
+                    writer.line('    attempt += 1');
+                    writer.line('    continue');
+                    writer.line('}');
+                    writer.line('val delay = policy?.let { retryDelay(it, attempt, response) } ?: return response');
+                    writer.line('response.close()');
+                    writer.line('kotlinx.coroutines.delay(delay)');
+                    writer.line('attempt += 1');
+                });
+            }
+        );
+        writer.blank();
+        writer.block(`fun retryDelay(policy: ${options.clientName}.RetryPolicy, attempt: Int, response: Response?): Long?`, () => {
+            writer.line('if (attempt >= policy.maximumAttempts) return null');
+            writer.line(
+                'val ceiling = minOf(policy.maximumDelay.inWholeMilliseconds, policy.initialDelay.inWholeMilliseconds shl (attempt - 1))'
+            );
+            writer.line('val backoff = (Math.random() * ceiling).toLong()');
+            writer.line('if (response == null) return backoff');
+            writer.line('if (response.code != 429 && response.code != 503) return null');
+            writer.line('val asked = retryAfter(response.header("Retry-After")) ?: return backoff');
+            writer.line('return if (asked <= policy.maximumDelay.inWholeMilliseconds) asked else null');
+        });
+        writer.blank();
+        writer.block('fun retryAfter(header: String?): Long?', () => {
+            writer.line('val value = header?.trim() ?: return null');
+            writer.line('value.toLongOrNull()?.let { return if (it >= 0) it * 1000 else null }');
+            writer.line('val date = try {');
+            writer.line('    java.time.ZonedDateTime.parse(value, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)');
+            writer.line('} catch (_: java.time.format.DateTimeParseException) {');
+            writer.line('    return null');
+            writer.line('}');
+            writer.line('return maxOf(0L, date.toInstant().toEpochMilli() - System.currentTimeMillis())');
         });
         writer.blank();
         writer.block('suspend fun execute(client: OkHttpClient, request: Request): Response', () => {
@@ -1786,7 +1832,7 @@ const emitClient = (
 
     writer.blank();
     writer.block(
-        `class ${clientName}(private val baseUrl: String, ${contextParam}private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null)`,
+        `class ${clientName}(private val baseUrl: String, ${contextParam}private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null, private val retry: RetryPolicy? = null)`,
         () => {
             if (contextFields.length > 0) {
                 writer.blank();
@@ -1809,6 +1855,20 @@ const emitClient = (
                     }
                 });
             }
+            writer.blank();
+            writer.line('/**');
+            writer.line(' * Retries a GET, HEAD, OPTIONS, PUT or DELETE that failed on the network or was answered 429 or 503,');
+            writer.line(' * waiting what Retry-After asks or backing off.');
+            writer.line(' *');
+            writer.line(' * @property maximumAttempts Attempts in all, the first included.');
+            writer.line(' * @property initialDelay What the first backoff waits at most.');
+            writer.line(' * @property maximumDelay What any wait may take.');
+            writer.line(' */');
+            emitConstructorClass(writer, 'data class RetryPolicy', [
+                'val maximumAttempts: Int = 3',
+                'val initialDelay: kotlin.time.Duration = 500.milliseconds',
+                'val maximumDelay: kotlin.time.Duration = 30.seconds',
+            ]);
             if (usesMultipart) {
                 writer.blank();
                 emitConstructorClass(writer, 'data class MultipartFile', [
@@ -1862,7 +1922,7 @@ const emitClient = (
                 for (const group of groups) {
                     writer.blank();
                     writer.line(
-                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, baseUrl, json, ${contextFields.length > 0 ? 'requestContextHeaders' : 'emptyMap()'}, requestInterceptor, responseInterceptor)`
+                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, baseUrl, json, ${contextFields.length > 0 ? 'requestContextHeaders' : 'emptyMap()'}, requestInterceptor, responseInterceptor, retry)`
                     );
                 }
             }
@@ -1915,6 +1975,8 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     writer.line('import okhttp3.*');
     writer.line('import okhttp3.MediaType.Companion.toMediaType');
     writer.line('import okhttp3.RequestBody.Companion.toRequestBody');
+    writer.line('import kotlin.time.Duration.Companion.milliseconds');
+    writer.line('import kotlin.time.Duration.Companion.seconds');
     writer.line('import okhttp3.HttpUrl.Companion.toHttpUrl');
     writer.blank();
 
@@ -1989,6 +2051,7 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
 
     emitKizunaObject(writer, {
         streaming: usesStreaming,
+        clientName,
     });
 
     for (const warning of registry.warnings()) {
