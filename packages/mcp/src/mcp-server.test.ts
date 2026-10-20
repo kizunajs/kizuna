@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
@@ -942,13 +942,15 @@ describe('MCP server e2e', () => {
         await close();
     });
 
-    it('returns isError when handler throws', async () => {
+    it('answers a thrown error the way HTTP does, keeping its message in the log', async () => {
+        const failure = new Error('database connection failed');
         const throwingRouter = {
             ...router,
             health: () => {
-                throw new Error('database connection failed');
+                throw failure;
             },
         };
+        const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const { client, close } = await connectMcpClient(buildApi(throwingRouter));
 
@@ -961,8 +963,10 @@ describe('MCP server e2e', () => {
         const content = result.content as Array<{ type: string; text: string }>;
         const parsed = JSON.parse(content[0]!.text);
         expect(parsed.status).toBe(500);
-        expect(parsed.body.detail).toBe('database connection failed');
+        expect(parsed.body.detail).toBe('Internal Server Error');
+        expect(logged).toHaveBeenCalledWith('[kizuna] tool "health" threw:', failure);
 
+        logged.mockRestore();
         await close();
     });
 
@@ -1274,6 +1278,308 @@ describe('MCP server: guards', () => {
         expect(result.isError).toBe(true);
         expect(parsed.status).toBe(500);
         expect(parsed.body.detail).toContain('No guard registered');
+        await close();
+    });
+});
+
+describe('MCP server: a call runs the way an HTTP request does', () => {
+    const workspaceRoutes = k.routes({
+        deleteWorkspace: k.route({
+            method: 'DELETE',
+            path: '/workspace',
+            summary: 'Delete the workspace',
+            tool: {
+                needsApproval: true,
+            },
+            responses: {
+                200: z.object({
+                    ok: z.boolean(),
+                }),
+            },
+        }),
+        addNote: k.route({
+            method: 'POST',
+            path: '/notes',
+            summary: 'Add a note',
+            tool: true,
+            body: z.object({
+                text: z.string().min(1),
+            }),
+            responses: {
+                201: z.object({
+                    length: z.number(),
+                }),
+            },
+        }),
+        countWords: k.route({
+            method: 'POST',
+            path: '/notes/count',
+            summary: 'Count the words in a note',
+            tool: true,
+            body: z.object({
+                text: z.string().transform((text) => text.split(' ').length),
+            }),
+            responses: {
+                200: z.object({
+                    words: z.number(),
+                }),
+            },
+        }),
+        getLocale: k.route({
+            method: 'GET',
+            path: '/locale',
+            summary: 'Read the language the caller asked for',
+            tool: true,
+            headers: z.object({
+                'accept-language': z.string(),
+            }),
+            responses: {
+                200: z.object({
+                    locale: z.string(),
+                }),
+            },
+        }),
+        listReminders: k.route({
+            method: 'GET',
+            path: '/reminders',
+            summary: 'List the reminders due before a time',
+            tool: true,
+            query: z.object({
+                before: z.date(),
+            }),
+            responses: {
+                200: z.object({
+                    before: z.date(),
+                }),
+            },
+        }),
+    });
+
+    const deleted: boolean[] = [];
+    const workspaceApi = assembleApi(
+        defineConfig({
+            ...config,
+            routes: [workspaceRoutes],
+        }).api,
+        {
+            router: {
+                deleteWorkspace: () => {
+                    deleted.push(true);
+                    return {
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    };
+                },
+                addNote: ({ body }: { body: { text: string } }) => ({
+                    status: 201,
+                    body: {
+                        length: body.text.length,
+                    },
+                }),
+                countWords: ({ body }: { body: { text: number } }) => ({
+                    status: 200,
+                    body: {
+                        words: body.text,
+                    },
+                }),
+                getLocale: ({ headers }: { headers: { 'accept-language': string } }) => ({
+                    status: 200,
+                    body: {
+                        locale: headers['accept-language'],
+                    },
+                }),
+                listReminders: ({ query }: { query: { before: Date } }) => ({
+                    status: 200,
+                    body: {
+                        before: query.before,
+                    },
+                }),
+            },
+        }
+    );
+
+    const parseText = (result: Awaited<ReturnType<Client['callTool']>>) =>
+        JSON.parse((result.content as Array<{ type: string; text: string }>)[0]!.text);
+
+    it('asks before running a tool that takes no input', async () => {
+        const server = createMcpServer(workspaceApi, baseOptions);
+        const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+        const client = new Client(
+            {
+                name: 'test-client',
+                version: '1.0.0',
+            },
+            {
+                capabilities: {
+                    elicitation: {
+                        form: {},
+                    },
+                },
+            }
+        );
+        const asked: string[] = [];
+        client.setRequestHandler('elicitation/create', async (request) => {
+            asked.push(request.params.message);
+            return {
+                action: 'accept',
+                content: {
+                    approved: true,
+                },
+            };
+        });
+        await server.connect(serverTransport);
+        await client.connect(clientTransport);
+
+        const result = await client.callTool({
+            name: 'delete_workspace',
+            arguments: {},
+        });
+
+        expect(asked).toEqual(['Allow "Delete the workspace"?']);
+        expect(deleted).toEqual([true]);
+        expect(result.structuredContent).toEqual({
+            status: 200,
+            body: {
+                ok: true,
+            },
+        });
+
+        await client.close();
+        await server.close();
+    });
+
+    it('publishes MCP’s recommended schema for a tool that takes no input', async () => {
+        const { client, close } = await connectMcpClient(workspaceApi);
+
+        const { tools } = await client.listTools();
+        const deleteWorkspace = tools.find((tool) => tool.name === 'delete_workspace');
+
+        expect(deleteWorkspace?.inputSchema).toEqual({
+            type: 'object',
+            additionalProperties: false,
+        });
+
+        await close();
+    });
+
+    it('answers invalid input with the 400 HTTP sends', async () => {
+        const { client, close } = await connectMcpClient(workspaceApi);
+
+        const result = await client.callTool({
+            name: 'add_note',
+            arguments: {
+                body: {
+                    text: '',
+                },
+            },
+        });
+
+        expect(result.isError).toBe(true);
+        expect(parseText(result)).toEqual({
+            status: 400,
+            body: {
+                type: 'about:blank',
+                title: 'Bad Request',
+                status: 400,
+                detail: 'Invalid request body',
+                errors: [
+                    {
+                        code: 'too_small',
+                        path: ['text'],
+                        message: 'Too small: expected string to have >=1 characters',
+                    },
+                ],
+            },
+        });
+
+        await close();
+    });
+
+    it('parses input once, so a transform runs once', async () => {
+        const { client, close } = await connectMcpClient(workspaceApi);
+
+        const result = await client.callTool({
+            name: 'count_words',
+            arguments: {
+                body: {
+                    text: 'call the venue tomorrow',
+                },
+            },
+        });
+
+        expect(result.structuredContent).toEqual({
+            status: 200,
+            body: {
+                words: 4,
+            },
+        });
+
+        await close();
+    });
+
+    it('reads a route’s headers from the MCP request', async () => {
+        const { client, close } = await connectMcpClient(workspaceApi, {
+            credentialHeaders: {
+                'accept-language': 'nb',
+            },
+        });
+
+        const result = await client.callTool({
+            name: 'get_locale',
+            arguments: {},
+        });
+
+        expect(result.structuredContent).toEqual({
+            status: 200,
+            body: {
+                locale: 'nb',
+            },
+        });
+
+        await close();
+    });
+
+    it('publishes a date as the ISO string the wire carries', async () => {
+        const { client, close } = await connectMcpClient(workspaceApi);
+
+        const { tools } = await client.listTools();
+        const listReminders = tools.find((tool) => tool.name === 'list_reminders');
+
+        expect(listReminders?.inputSchema.properties).toMatchObject({
+            query: {
+                properties: {
+                    before: {
+                        type: 'string',
+                        format: 'date-time',
+                    },
+                },
+            },
+        });
+
+        await close();
+    });
+
+    it('takes a date as an ISO string and hands the handler a Date', async () => {
+        const { client, close } = await connectMcpClient(workspaceApi);
+
+        const result = await client.callTool({
+            name: 'list_reminders',
+            arguments: {
+                query: {
+                    before: '2026-10-20T09:00:00.000Z',
+                },
+            },
+        });
+
+        expect(parseText(result)).toEqual({
+            status: 200,
+            body: {
+                before: '2026-10-20T09:00:00.000Z',
+            },
+        });
+
         await close();
     });
 });

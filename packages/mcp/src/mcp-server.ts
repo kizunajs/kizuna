@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { problemDetails } from 'kizunajs';
-import { McpServer, acceptedContent, inputRequired, type CallToolResult, type InputRequiredResult } from '@modelcontextprotocol/server';
-import { flattenRoutes, validateRequest } from 'kizunajs/adapter';
+import {
+    McpServer,
+    acceptedContent,
+    inputRequired,
+    type CallToolResult,
+    type InputRequiredResult,
+    type StandardSchemaWithJSON,
+} from '@modelcontextprotocol/server';
+import { flattenRoutes, formatValidationError, validateRequest } from 'kizunajs/adapter';
 import {
     ResponseError,
     type AdapterRequest,
@@ -24,7 +31,7 @@ import {
 import { contractOf } from 'kizunajs/adapter';
 import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from 'kizunajs';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
-import { deriveToolNames } from 'kizunajs/generator';
+import { deriveToolNames, encodeForWire } from 'kizunajs/generator';
 import { buildToolOutputSchema } from './schema.js';
 import { buildToolInputSchema, describeTool, selectToolRoutes, toolOptionsOf, type ToolInputSchema } from 'kizunajs/adapter';
 
@@ -152,6 +159,43 @@ const approval = (route: RouteDefinition, context: McpToolContext): CallToolResu
         ],
         isError: true,
     };
+};
+
+/**
+ * A schema as JSON Schema, with a `z.date()` as the ISO string the wire
+ * carries. Zod alone throws on a date, which would empty the whole tool list.
+ */
+const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output'): Record<string, unknown> =>
+    z.toJSONSchema(schema, {
+        target: 'draft-2020-12',
+        io,
+        unrepresentable: 'any',
+        override: encodeForWire,
+    }) as Record<string, unknown>;
+
+/**
+ * What the SDK publishes for a tool. Input passes through unchecked, so the
+ * call is validated once, by `validateRequest`, as an HTTP request is. Output
+ * keeps the route's own check.
+ */
+const publishedSchema = (jsonSchema: Record<string, unknown>, check?: z.ZodType): StandardSchemaWithJSON<Record<string, unknown>> => ({
+    '~standard': {
+        version: 1,
+        vendor: 'kizuna',
+        validate: check === undefined ? (value) => ({ value: value as Record<string, unknown> }) : (check['~standard'].validate as never),
+        jsonSchema: {
+            input: () => jsonSchema,
+            output: () => jsonSchema,
+        },
+    },
+});
+
+/**
+ * MCP's recommended schema for a tool that takes nothing.
+ */
+const NO_INPUT = {
+    type: 'object',
+    additionalProperties: false,
 };
 
 /**
@@ -430,29 +474,21 @@ const executeToolCall = async (
         params,
         query,
         body,
-        headers: {},
+        headers: credentialHeaders ?? {},
     });
 
     if (!validation.ok) {
-        return {
-            content: [
-                {
-                    type: 'text' as const,
-                    text: JSON.stringify(
-                        {
-                            status: 400,
-                            body: {
-                                detail: `Validation failed: ${validation.error.stage}`,
-                                errors: validation.error.issues,
-                            },
-                        },
-                        null,
-                        2
-                    ),
-                },
-            ],
-            isError: true,
-        };
+        const formatted = formatValidationError(validation.error);
+        return toolEnvelope(
+            400,
+            problemDetails(400, formatted.detail, {
+                errors: formatted.issues.map((issue) => ({
+                    code: issue.code ?? 'custom',
+                    path: issue.path,
+                    message: issue.message,
+                })),
+            })
+        );
     }
 
     const handler = resolveHandler(router, routeKey);
@@ -519,24 +555,8 @@ const executeToolCall = async (
             return toolEnvelope(error.status, error.body);
         }
 
-        return {
-            content: [
-                {
-                    type: 'text' as const,
-                    text: JSON.stringify(
-                        {
-                            status: 500,
-                            body: {
-                                detail: error instanceof Error ? error.message : 'Internal Server Error',
-                            },
-                        },
-                        null,
-                        2
-                    ),
-                },
-            ],
-            isError: true,
-        };
+        console.error(`[kizuna] tool "${routeKey}" threw:`, error);
+        return toolEnvelope(500, problemDetails(500, 'Internal Server Error'));
     }
 };
 
@@ -584,8 +604,10 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                           title: definition.title,
                       }),
                 description: definition.description,
-                inputSchema: definition.inputSchema.shape === undefined ? undefined : z.object(definition.inputSchema.shape),
-                outputSchema: definition.outputSchema,
+                inputSchema: publishedSchema(
+                    definition.inputSchema.shape === undefined ? NO_INPUT : toJsonSchema(z.object(definition.inputSchema.shape), 'input')
+                ),
+                outputSchema: publishedSchema(toJsonSchema(definition.outputSchema, 'output'), definition.outputSchema),
                 annotations: buildToolAnnotations(definition.route),
             },
             async (args: Record<string, unknown>, context: McpToolContext) => {
