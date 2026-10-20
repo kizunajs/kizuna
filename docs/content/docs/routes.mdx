@@ -369,7 +369,7 @@ Values in the URL and in headers always arrive as strings. Kizuna coerces them t
 | `z.bigint()`             | `"9007199254740993"` | `9007199254740993n` |
 | `z.date()`               | an ISO 8601 string   | `Date`              |
 
-Arrays of these coerce too (`z.array(z.number())`). The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
+Arrays of these coerce too (`z.array(z.number())`). A list repeats its key, `?ids=1&ids=2`, and a single `?ids=1` arrives as a one-item list. The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
 
 Because coercion is built in, **`z.coerce` is not supported**, and `k.routes` throws if any schema uses it. Declare the plain schema (`z.number()`, `z.date()`, `z.bigint()`). To receive a different type than you send, use `z.string().transform(...)`.
 
