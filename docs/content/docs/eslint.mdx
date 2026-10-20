@@ -143,6 +143,26 @@ query: z.object({
 
 JSON bodies and responses can carry `null`, so `.nullable()` there is untouched. See [Optional and null fields](/docs/zod#optional-and-null-fields).
 
+### A field its part of the request cannot carry
+
+A path parameter and a header carry one value, a query carries values and lists of values, and a form carries those plus files. An object anywhere in those, a list in a header, or `BinarySchema` in a form can't be sent:
+
+```ts
+// flagged
+query: z.object({
+    filter: z.object({
+        status: z.string(),
+    }),
+});
+
+// good, a field of its own
+query: z.object({
+    status: z.string(),
+});
+```
+
+`k.routes` throws on the same fields when the config loads, so the rule shows it in the editor first. See [What each part can carry](/docs/routes#what-each-part-can-carry).
+
 ### Across files
 
 A schema defined elsewhere, such as a shared `PaginationQuery` in its own `zod`-only module, is still caught, and the error lands on the reference:
