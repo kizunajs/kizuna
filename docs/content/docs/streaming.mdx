@@ -276,6 +276,131 @@ The clients reconnect when you turn it on, with `reconnect` in the fetch client 
 
 To end a stream for good, answer the reconnection with `204 No Content`. Any other status than the stream's own, or a body that isn't `text/event-stream`, fails the stream. Only a `GET`, `HEAD`, `OPTIONS`, `PUT` or `DELETE` stream reconnects, since a `POST` like the assistant route above would run its handler again.
 
+## Answers that outlive the connection
+
+A streamed reply runs inside its request, so it stops when the client goes away, as it does when a phone app goes to the background. To let an answer finish and be read later, start it with one route, write it in a job, and read it with a stream of its own.
+
+Kizuna keeps no stored state, so saving the messages is your app's part. Every other step is Kizuna's:
+
+| Step | Kizuna does | Your app does |
+| --- | --- | --- |
+| [Start](#start-the-answer) | Queues the job and answers `202` | Saves the prompt |
+| [Write](#write-it-in-a-job) | Runs the job, after the request has ended | Calls the model and saves each message |
+| [Read](#read-it-back) | Streams, reconnects from the last id, and checks each message with `streamMessageSchema` | Reads the saved messages back |
+| [Stop](#stop-it) | | Marks the answer stopped, and aborts the model call |
+
+### Start the answer
+
+The route saves the prompt, queues the work, and answers `202 Accepted` with the answer's id:
+
+```ts title="src/routes/answers.ts"
+startAnswer: k
+    .route({
+        method: 'POST',
+        path: '/answers',
+        body: z.object({
+            prompt: z.string().min(1),
+        }),
+        responses: {
+            202: z.object({
+                id: z.string(),
+            }),
+        },
+    })
+    .handler(async ({ body, jobs }) => {
+        const answer = await db.answers.create({
+            prompt: body.prompt,
+        });
+
+        await jobs.writeAnswer.queue({
+            input: {
+                answerId: answer.id,
+            },
+        });
+
+        return {
+            status: 202,
+            body: {
+                id: answer.id,
+            },
+        };
+    }),
+```
+
+On a serverless host, give the jobs a [transport](/docs/jobs#setting-it-up). Without one, `queue` runs the job in the same process, which the host can stop once the response is sent.
+
+### Write it in a job
+
+The job calls the model and saves each message with an id. It runs whether or not anyone is reading:
+
+```ts title="src/jobs.ts"
+writeAnswer: k
+    .job({
+        input: z.object({
+            answerId: z.string(),
+        }),
+    })
+    .handler(async ({ input }) => {
+        const answer = await db.answers.find(input.answerId);
+
+        for await (const text of replyTo(answer.prompt)) {
+            await db.answerMessages.add(input.answerId, {
+                event: 'delta',
+                data: {
+                    text,
+                },
+            });
+        }
+
+        await db.answers.finish(input.answerId);
+    }),
+```
+
+A model sends many small pieces of text. Join them before saving, so a long answer is a few rows rather than thousands.
+
+### Read it back
+
+The client reads the answer from a `GET` stream. Saved rows come back from the database untyped, so the handler checks each one against `streamMessageSchema`, the schema of one message the route sends:
+
+```ts title="src/routes/answers.ts"
+import { streamMessageSchema } from 'kizunajs';
+
+export const answerRoutes = k.routes({
+    answerEvents: k
+        .route({
+            method: 'GET',
+            path: '/answers/:id/events',
+            responses: {
+                200: {
+                    stream: {
+                        delta: z.object({
+                            text: z.string(),
+                        }),
+                    },
+                },
+            },
+        })
+        .handler(({ params, lastEventId }) => ({
+            status: 200,
+            body: async function* () {
+                for await (const saved of db.answerMessages.follow(params.id, lastEventId)) {
+                    yield AnswerMessageSchema.parse(saved);
+                }
+            },
+        })),
+});
+
+const AnswerMessageSchema = streamMessageSchema(answerRoutes.answerEvents);
+```
+
+`follow` is the app's own: it reads what was saved after `lastEventId`, then waits for new rows until the answer is finished. The schema has an arm for every event the route declares, each with its `id` and `retry`, and one for each tool event its `tools` add, so checked messages go straight to [`readToolCalls`](/docs/tools#reading-the-calls).
+
+The clients reconnect a `GET` stream on their own and send the last id they saw, so a dropped connection picks up where it left off. Once the answer is finished and sent, answer the reconnection with `204`, as in [Resuming](#resuming).
+
+### Stop it
+
+A stop route marks the answer stopped, and the job checks the mark and aborts the model call with an `AbortController`. The stream's own `signal` can't stop it, since the work runs in the job, and the signal only reaches the server that holds the connection.
+
 ## Raw chunks
 
 A `z.string()` schema with a `text/*` content type, or `BinarySchema` with any other, writes each yield as it is, with no framing around it:

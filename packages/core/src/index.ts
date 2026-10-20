@@ -141,6 +141,7 @@ export {
     type ToolAt,
 } from './tool-events.js';
 export { readToolCalls, type ToolCallRecord, type ToolCallState, type ToolCallMessage } from './tool-records.js';
+export { streamMessageSchema } from './stream-message-schema.js';
 export type { ModelToolCall, StreamTools, ToolAnswer, ToolEventYield, ToolRunCall, ToolRunOptions, ToolRunResult } from './tool-runner.js';
 export type { ToolDefinition } from './tool-definitions.js';
 export {
