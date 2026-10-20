@@ -836,6 +836,74 @@ describe('Swift generator: owned type nesting', () => {
         expect(output).toContain('public let baseUnit: BaseUnit');
     });
 
+    it('types a described model field as the model, with its own description', () => {
+        const ArticleStatusSchema = Kizuna.model({
+            title: 'ArticleStatus',
+            schema: z.enum(['draft', 'published']),
+        });
+        const contractRoutes = k.routes({
+            getArticle: k.route({
+                method: 'GET',
+                path: '/articles/:id',
+                responses: {
+                    200: Kizuna.model({
+                        title: 'Article',
+                        schema: z.object({
+                            status: ArticleStatusSchema.describe('Set by the editor'),
+                            previousStatus: ArticleStatusSchema.meta({
+                                deprecated: true,
+                            }),
+                            scheduledStatus: ArticleStatusSchema.describe('Applied at the scheduled time').optional(),
+                        }),
+                    }),
+                },
+            }),
+        });
+
+        const contract = defineConfig({
+            ...config,
+            routes: [contractRoutes],
+        }).api;
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output.match(/enum \w*Status\b/g)).toEqual(['enum ArticleStatus']);
+        expect(output).toContain('/// Set by the editor\n        public let status: ArticleStatus');
+        expect(output).toContain('public var previousStatus: ArticleStatus');
+        expect(output).toContain('public let scheduledStatus: ArticleStatus?');
+    });
+
+    it('declares a model reached only through a described copy with its own description', () => {
+        const AuthorSchema = Kizuna.model({
+            title: 'Author',
+            description: 'The person who wrote an article',
+            schema: z.object({
+                name: z.string(),
+            }),
+        });
+        const contractRoutes = k.routes({
+            getArticle: k.route({
+                method: 'GET',
+                path: '/articles/:id',
+                responses: {
+                    200: Kizuna.model({
+                        title: 'Article',
+                        schema: z.object({
+                            writer: AuthorSchema.describe('Shown in the byline'),
+                        }),
+                    }),
+                },
+            }),
+        });
+
+        const contract = defineConfig({
+            ...config,
+            routes: [contractRoutes],
+        }).api;
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('/// The person who wrote an article\n    public struct Author: Codable');
+        expect(output).toContain('/// Shown in the byline\n        public let writer: Author');
+        expect(output).not.toContain('struct Writer');
+    });
+
     it('keeps a named enum model at top level when its title starts with the parent struct name', () => {
         const FoodSourceSchema = Kizuna.model({
             title: 'FoodSource',

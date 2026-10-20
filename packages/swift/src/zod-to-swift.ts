@@ -11,6 +11,7 @@ import {
     readMetaBrand,
     readMetaDescription,
     readMetaId,
+    readModelSchema,
     readObjectShape,
     unwrapOptionalWrappers,
     toPascalCase,
@@ -237,6 +238,9 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
             optional: false,
         };
     }
+
+    const model = readModelSchema(schema);
+    if (model !== undefined && model !== schema) return mapUnbrandedType(model, registry, hint);
 
     const id = readMetaId(schema);
     const def = readDef(schema);

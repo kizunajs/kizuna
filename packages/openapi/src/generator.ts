@@ -12,6 +12,7 @@ import {
     readDiscriminatorLiteral,
     readMeta,
     readMetaId,
+    readModelSchema,
     readObjectShape,
     globalRegistrySchemas,
     resolveResponseBody,
@@ -182,7 +183,7 @@ const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; 
 };
 
 const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Record<string, unknown> => {
-    const id = readMetaId(schema);
+    const id = readModelSchema(schema) === schema ? readMetaId(schema) : undefined;
     if (id) {
         return {
             $ref: COMPONENT_REF_BASE + id,

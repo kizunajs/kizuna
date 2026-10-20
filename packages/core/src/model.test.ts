@@ -79,4 +79,29 @@ describe('Kizuna.model', () => {
         });
         expect(result.success).toBe(true);
     });
+
+    it('keeps the id through describe and meta', () => {
+        const ArticleStatus = Kizuna.model({
+            title: 'ArticleStatus',
+            schema: z.enum(['draft', 'published']),
+        });
+        expect(readMetaId(ArticleStatus.describe('Set by the editor'))).toBe('ArticleStatus');
+        expect(
+            readMetaId(
+                ArticleStatus.meta({
+                    deprecated: true,
+                })
+            )
+        ).toBe('ArticleStatus');
+    });
+
+    it('drops the id when a copy changes validation', () => {
+        const Article = Kizuna.model({
+            title: 'Article',
+            schema: z.object({
+                title: z.string(),
+            }),
+        });
+        expect(readMetaId(Article.refine((article) => article.title.length > 0))).toBeUndefined();
+    });
 });

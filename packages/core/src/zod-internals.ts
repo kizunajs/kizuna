@@ -249,11 +249,26 @@ export const markModelSchema = (schema: z.core.$ZodType): void => {
 };
 
 /**
+ * Returns the `Kizuna.model` a schema is, or was copied from by `.describe()` or `.meta()`.
+ */
+export const readModelSchema = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
+    let current: z.core.$ZodType | undefined = schema;
+    while (current !== undefined) {
+        if (modelSchemas.has(current)) return current;
+        const parent: z.core.$ZodType | undefined = current._zod.parent;
+        if (parent === undefined || parent._zod.def !== current._zod.def) return undefined;
+        current = parent;
+    }
+    return undefined;
+};
+
+/**
  * Returns a `Kizuna.model` schema's `id` metadata, or undefined.
  */
 export const readMetaId = (schema: z.core.$ZodType): string | undefined => {
-    if (!modelSchemas.has(schema)) return undefined;
-    const id = readMeta(schema)?.id;
+    const model = readModelSchema(schema);
+    if (model === undefined) return undefined;
+    const id = readMeta(model)?.id;
     return typeof id === 'string' ? id : undefined;
 };
 
