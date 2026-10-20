@@ -301,6 +301,44 @@ describe('Zod meta() in OpenAPI output', () => {
             $ref: '#/components/schemas/RawTagged',
         });
     });
+
+    it('keeps a described model field as a $ref with its own description', () => {
+        const ArticleStatusSchema = Kizuna.model({
+            title: 'ArticleStatus',
+            schema: z.enum(['draft', 'published']),
+        });
+        const articleRoutes = k.routes({
+            updateArticle: k.route({
+                method: 'PATCH',
+                path: '/articles/:id',
+                body: z.object({
+                    status: ArticleStatusSchema.describe('Set by the editor'),
+                }),
+                responses: {
+                    200: ArticleStatusSchema.describe('The status after the update'),
+                },
+            }),
+        });
+        const spec = generateJson(
+            defineConfig({
+                ...config,
+                routes: [articleRoutes],
+            }).api,
+            baseConfig
+        );
+        const operation = spec.paths['/articles/{id}']?.patch;
+        const bodySchema = operation?.requestBody?.content?.['application/json']?.schema as
+            | { properties: Record<string, unknown> }
+            | undefined;
+        expect(bodySchema?.properties['status']).toEqual({
+            description: 'Set by the editor',
+            $ref: '#/components/schemas/ArticleStatus',
+        });
+        expect(operation?.responses['200']?.content?.['application/json']?.schema).toEqual({
+            description: 'The status after the update',
+            $ref: '#/components/schemas/ArticleStatus',
+        });
+    });
 });
 
 describe('operation metadata passthrough', () => {

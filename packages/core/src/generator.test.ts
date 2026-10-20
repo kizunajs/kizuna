@@ -118,6 +118,38 @@ describe('walkApi', () => {
 
         expect(visited).toEqual(['Address', 'User', 'users.getUser']);
     });
+
+    it('finds a model reached only through a described copy', () => {
+        const AuthorSchema = Kizuna.model({
+            title: 'Author',
+            description: 'The person who wrote an article',
+            schema: z.object({
+                name: z.string(),
+            }),
+        });
+        const { api: articlesApi } = defineConfig({
+            routes: [
+                {
+                    getArticle: k.route({
+                        method: 'GET',
+                        path: '/articles/:id',
+                        responses: {
+                            200: z.object({
+                                writer: AuthorSchema.describe('Shown in the byline'),
+                            }),
+                        },
+                    }),
+                },
+            ],
+        });
+        const visited: string[] = [];
+        walkApi(articlesApi, {
+            processModel: ({ name, description }) => visited.push(`${name}: ${description}`),
+            finalize: () => undefined,
+        });
+
+        expect(visited).toEqual(['Author: The person who wrote an article']);
+    });
 });
 
 const routeListClient = defineClient({

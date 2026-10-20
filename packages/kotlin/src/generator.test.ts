@@ -1323,6 +1323,71 @@ describe('Kotlin generator: discriminated union', () => {
         expect(output).toContain('val baseUnit: BaseUnit');
     });
 
+    it('types a described model field as the model', () => {
+        const ArticleStatusSchema = Kizuna.model({
+            title: 'ArticleStatus',
+            schema: z.enum(['draft', 'published']),
+        });
+        const contract = defineConfig({
+            routes: [
+                {
+                    getArticle: {
+                        method: 'GET',
+                        path: '/articles/:id',
+                        responses: {
+                            200: Kizuna.model({
+                                title: 'Article',
+                                schema: z.object({
+                                    status: ArticleStatusSchema.describe('Set by the editor'),
+                                    previousStatus: ArticleStatusSchema.meta({
+                                        deprecated: true,
+                                    }),
+                                    scheduledStatus: ArticleStatusSchema.describe('Applied at the scheduled time').optional(),
+                                }),
+                            }),
+                        },
+                    },
+                },
+            ],
+        }).api;
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output.match(/enum class \w*Status\b/g)).toEqual(['enum class ArticleStatus']);
+        expect(output).toContain('val status: ArticleStatus');
+        expect(output).toContain('val previousStatus: ArticleStatus');
+        expect(output).toContain('val scheduledStatus: ArticleStatus? = null');
+    });
+
+    it('declares a model reached only through a described copy', () => {
+        const AuthorSchema = Kizuna.model({
+            title: 'Author',
+            schema: z.object({
+                name: z.string(),
+            }),
+        });
+        const contract = defineConfig({
+            routes: [
+                {
+                    getArticle: {
+                        method: 'GET',
+                        path: '/articles/:id',
+                        responses: {
+                            200: Kizuna.model({
+                                title: 'Article',
+                                schema: z.object({
+                                    writer: AuthorSchema.describe('Shown in the byline'),
+                                }),
+                            }),
+                        },
+                    },
+                },
+            ],
+        }).api;
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val writer: Author');
+        expect(output).toContain('data class Author(');
+        expect(output).not.toContain('class Writer');
+    });
+
     it('keeps a named enum model at top level when its title starts with the parent class name', () => {
         const FoodSourceSchema = Kizuna.model({
             title: 'FoodSource',

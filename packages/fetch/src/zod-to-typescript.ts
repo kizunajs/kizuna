@@ -9,6 +9,7 @@ import {
     readMetaDescription,
     readMetaExamples,
     readMetaId,
+    readModelSchema,
     readObjectShape,
     sanitizeIdentifier,
     toPascalCase,
@@ -344,6 +345,9 @@ const unbrandedTypeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint
         const side = collector.readsInput() ? def.in : (def.out ?? def.in);
         return side ? typeOf(side, collector, hint) : 'unknown';
     }
+
+    const model = readModelSchema(schema);
+    if (model !== undefined && model !== schema) return unbrandedTypeOf(model, collector, hint);
 
     const modelName = readMetaId(schema);
     if (modelName !== undefined) {

@@ -233,6 +233,50 @@ describe('a model on something other than an object', () => {
     });
 });
 
+describe('a described model field', () => {
+    const ArticleStatus = Kizuna.model({
+        title: 'ArticleStatus',
+        schema: z.enum(['draft', 'published']),
+    });
+
+    const Author = Kizuna.model({
+        title: 'Author',
+        description: 'The person who wrote an article',
+        schema: z.object({
+            name: z.string(),
+        }),
+    });
+
+    const articleRoutes = k.routes({
+        getArticle: k.route({
+            method: 'GET',
+            path: '/articles/:id',
+            responses: {
+                200: z.object({
+                    status: ArticleStatus.describe('Set by the editor'),
+                    writer: Author.describe('Shown in the byline'),
+                }),
+            },
+        }),
+    });
+
+    const output = generateFetchClient(
+        defineConfig({
+            routes: [articleRoutes],
+        }).api
+    );
+
+    it('types the field as the model', () => {
+        expect(output).toContain('status: ArticleStatus;');
+        expect(output).toContain('export type ArticleStatus = "draft" | "published";');
+    });
+
+    it('declares a model reached only through the copy with its own description', () => {
+        expect(output).toContain('writer: Author;');
+        expect(output).toMatch(/\* The person who wrote an article\n\s*\*\/\n\s*export type Author = \{/);
+    });
+});
+
 describe('a literal that is not a string', () => {
     const envelopeRoutes = k.routes({
         read: k.route({
