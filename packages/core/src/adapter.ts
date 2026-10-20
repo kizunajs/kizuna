@@ -630,6 +630,8 @@ export {
     buildToolInputSchema,
     describeTool,
     selectToolRoutes,
+    toolInputJsonSchema,
+    toolJsonSchema,
     toolOptionsOf,
     toolRefusal,
     type ToolDefinition,
