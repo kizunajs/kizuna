@@ -6,6 +6,7 @@ import { resolveSecurityRequirements } from './security-scheme.js';
 import { routeStreams } from './stream.js';
 import { deriveToolNames } from './tool-name.js';
 import { isVoidSchema, readObjectShape } from './zod-internals.js';
+import { encodeForWire } from './json-encoding.js';
 
 /**
  * What a route says about publishing itself, or `undefined` when it says
@@ -138,8 +139,9 @@ const toJsonSchema = (route: RouteDefinition): Record<string, unknown> => {
     const { $schema: _, ...schema } = z.toJSONSchema(z.object(shape ?? {}), {
         io: 'input',
         unrepresentable: 'any',
-        override: ({ jsonSchema }) => {
-            delete jsonSchema.brand;
+        override: (context) => {
+            encodeForWire(context);
+            delete context.jsonSchema.brand;
         },
     }) as Record<string, unknown>;
     return schema;

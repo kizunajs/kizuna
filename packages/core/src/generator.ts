@@ -42,6 +42,7 @@ export {
 } from './zod-internals.js';
 
 export { deprecationHeaders } from './deprecation.js';
+export { encodeForWire } from './json-encoding.js';
 export { toToolName, deriveToolNames, type ToolOrigin, type ToolNameEntry } from './tool-name.js';
 export {
     streamMode,

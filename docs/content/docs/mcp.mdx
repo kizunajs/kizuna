@@ -315,6 +315,8 @@ The same body is attached as `structuredContent`, matching the output schema the
 
 Responses with status >= 400 set `isError: true` on the MCP result so the AI knows the call failed.
 
+A route that declares `headers` reads them from the MCP request, the same headers that carry the credential.
+
 ## Standalone server
 
 If you want to drive the transport yourself, for stdio or SSE, [`createMcpServer`](/docs/reference/create-mcp-server) returns a raw `McpServer`:
