@@ -262,6 +262,13 @@ describe('Zod meta() in OpenAPI output', () => {
         });
     });
 
+    it('names a component by its key, with no id keyword', () => {
+        const spec = generateJson(taggedContract, baseConfig);
+        const userSchema = spec.components?.schemas?.TaggedUser as Record<string, unknown> | undefined;
+        expect(userSchema).not.toHaveProperty('id');
+        expect(userSchema?.properties).toHaveProperty('id');
+    });
+
     it('preserves description and emits example as examples on properties', () => {
         const spec = generateJson(taggedContract, baseConfig);
         const userSchema = spec.components?.schemas?.TaggedUser as Record<string, unknown> | undefined;

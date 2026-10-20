@@ -163,7 +163,8 @@ const JSON_ENCODING: Record<string, Record<string, unknown>> = {
  * kizuna's metadata widens JSON Schema: `deprecated` may carry a message,
  * `example` holds one value or several, and `brand` has no keyword. Emit
  * `deprecated: true`, an `examples` array and `x-kizuna-brand`; the message
- * stays in outputs with a place for it, like Swift's `@available`.
+ * stays in outputs with a place for it, like Swift's `@available`. `id` names
+ * the component, so it is dropped.
  */
 const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; jsonSchema: Record<string, unknown> }): void => {
     const encoding = JSON_ENCODING[readDef(zodSchema).type ?? ''];
@@ -180,6 +181,7 @@ const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; 
         jsonSchema['x-kizuna-brand'] = jsonSchema.brand;
         delete jsonSchema.brand;
     }
+    delete jsonSchema.id;
 };
 
 const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Record<string, unknown> => {
