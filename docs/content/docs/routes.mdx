@@ -533,6 +533,8 @@ responses: {
 },
 ```
 
+Every client reads that body as the text the server sent, never as JSON.
+
 For binary responses, use [`BinarySchema`](/docs/reference/binary-and-file-schemas) for a body of raw bytes (`Uint8Array`/`Buffer`), such as a PDF download:
 
 ```ts title="src/routes/reports.ts"

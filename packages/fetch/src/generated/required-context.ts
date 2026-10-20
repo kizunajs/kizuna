@@ -52,10 +52,13 @@ export const createClient = (config: ClientConfig & { requestContext: RequestCon
 
 /**
  * What the client knows about one response: nothing for a body it reads as
- * JSON, the media type for one that streams.
+ * JSON, how to read one that is not, the media type for one that streams.
  */
 export type GeneratedResponse =
     | Record<string, never>
+    | {
+          read: 'bytes' | 'text';
+      }
     | {
           stream: true;
           contentType: string;
@@ -527,6 +530,13 @@ const buildMethod = (route: GeneratedRoute, config: ClientConfig) => {
                 body: reconnect
                     ? reconnectingEvents(response, reopen, reconnect, args.fetchOptions?.signal)
                     : readStream(response.body, declared.contentType),
+                headers: responseHeaders,
+            };
+        }
+        if (declared !== undefined && 'read' in declared) {
+            return {
+                status: response.status,
+                body: declared.read === 'bytes' ? new Uint8Array(await response.arrayBuffer()) : await response.text(),
                 headers: responseHeaders,
             };
         }
