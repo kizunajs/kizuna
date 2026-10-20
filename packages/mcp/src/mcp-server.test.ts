@@ -1584,6 +1584,109 @@ describe('MCP server: a call runs the way an HTTP request does', () => {
     });
 });
 
+describe('MCP server: what a model reads', () => {
+    it('sends the result text as compact JSON, the same as the structured content', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const result = await client.callTool({
+            name: 'users_list_users',
+            arguments: {},
+        });
+
+        const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
+        expect(text).toBe(JSON.stringify(result.structuredContent));
+
+        await close();
+    });
+
+    it('keeps a route’s own integer bounds and drops the ones z.int() adds', async () => {
+        const noteRoutes = k.routes({
+            listNotes: k.route({
+                method: 'GET',
+                path: '/notes',
+                summary: 'List notes',
+                tool: true,
+                query: z.object({
+                    limit: z.int().min(1).max(100).default(10),
+                    offset: z.int().default(0),
+                }),
+                responses: {
+                    200: z.object({
+                        total: z.int(),
+                    }),
+                },
+            }),
+        });
+        const noteApi = assembleApi(
+            defineConfig({
+                ...config,
+                routes: [noteRoutes],
+            }).api,
+            {
+                router: {
+                    listNotes: () => ({
+                        status: 200,
+                        body: {
+                            total: 0,
+                        },
+                    }),
+                },
+            }
+        );
+        const { client, close } = await connectMcpClient(noteApi);
+
+        const { tools } = await client.listTools();
+        const [listNotes] = tools;
+
+        expect(listNotes?.inputSchema.properties).toEqual({
+            query: {
+                type: 'object',
+                properties: {
+                    limit: {
+                        type: 'integer',
+                        minimum: 1,
+                        maximum: 100,
+                        default: 10,
+                    },
+                    offset: {
+                        type: 'integer',
+                        default: 0,
+                    },
+                },
+            },
+        });
+        expect(JSON.stringify(tools)).not.toContain('9007199254740991');
+        expect(JSON.stringify(tools)).not.toContain('$schema');
+
+        await close();
+    });
+
+    it('records how many bytes each tool definition costs', async () => {
+        const { client, close } = await connectMcpClient();
+
+        const { tools } = await client.listTools();
+        const sizes = Object.fromEntries(tools.map((tool) => [tool.name, JSON.stringify(tool).length]));
+
+        expect({
+            ...sizes,
+            total: JSON.stringify(tools).length,
+        }).toMatchInlineSnapshot(`
+          {
+            "delete_user": 645,
+            "health": 520,
+            "ping_user": 470,
+            "total": 4470,
+            "update_user": 732,
+            "users_create_user": 672,
+            "users_get_user": 651,
+            "users_list_users": 772,
+          }
+        `);
+
+        await close();
+    });
+});
+
 describe('streamed routes', () => {
     it('are never tools, since a tool result is one value', () => {
         const streamRoutes = k.routes({

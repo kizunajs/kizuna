@@ -134,17 +134,38 @@ export interface ToolDefinition {
     inputSchema: Record<string, unknown>;
 }
 
-const toJsonSchema = (route: RouteDefinition): Record<string, unknown> => {
-    const { shape } = buildToolInputSchema(route);
-    const { $schema: _, ...schema } = z.toJSONSchema(z.object(shape ?? {}), {
-        io: 'input',
+/**
+ * A schema as a model reads it: a date as the ISO string the wire carries, and
+ * nothing that tells a model nothing, like `$schema`, kizuna's `brand`, or the
+ * safe-integer bounds `z.int()` adds.
+ */
+export const toolJsonSchema = (schema: z.ZodType, io: 'input' | 'output'): Record<string, unknown> => {
+    const { $schema: _, ...jsonSchema } = z.toJSONSchema(schema, {
+        io,
         unrepresentable: 'any',
         override: (context) => {
             encodeForWire(context);
             delete context.jsonSchema.brand;
+            if (context.jsonSchema.minimum === Number.MIN_SAFE_INTEGER) delete context.jsonSchema.minimum;
+            if (context.jsonSchema.maximum === Number.MAX_SAFE_INTEGER) delete context.jsonSchema.maximum;
         },
     }) as Record<string, unknown>;
-    return schema;
+    return jsonSchema;
+};
+
+/**
+ * The `{ params, query, body }` a model sends, as JSON Schema. A route that
+ * takes nothing gets MCP's recommended schema for no input.
+ */
+export const toolInputJsonSchema = (route: RouteDefinition): Record<string, unknown> => {
+    const { shape } = buildToolInputSchema(route);
+    if (shape === undefined) {
+        return {
+            type: 'object',
+            additionalProperties: false,
+        };
+    }
+    return toolJsonSchema(z.object(shape), 'input');
 };
 
 /**
@@ -163,6 +184,6 @@ export const buildToolDefinitions = (routes: Routes): ToolDefinition[] => {
         name: names.get(routeKey)!,
         key: routeKey,
         description: describeTool(route),
-        inputSchema: toJsonSchema(route),
+        inputSchema: toolInputJsonSchema(route),
     }));
 };

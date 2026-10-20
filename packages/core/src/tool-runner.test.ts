@@ -589,8 +589,6 @@ describe('tools.definitions', () => {
                                 limit: {
                                     type: 'integer',
                                     default: 10,
-                                    minimum: -9007199254740991,
-                                    maximum: 9007199254740991,
                                 },
                             },
                             required: ['term'],
@@ -614,8 +612,6 @@ describe('tools.definitions', () => {
                                 },
                                 minutes: {
                                     type: 'integer',
-                                    minimum: -9007199254740991,
-                                    maximum: 9007199254740991,
                                 },
                             },
                             required: ['text', 'minutes'],

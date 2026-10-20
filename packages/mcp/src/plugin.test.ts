@@ -124,6 +124,33 @@ describe('mcpPlugin', () => {
         });
     });
 
+    it('lets the client keep the tool list for five minutes', async () => {
+        const started = await start();
+        running = started.server;
+        const connected = new Client(
+            {
+                name: 'test-client',
+                version: '1.0.0',
+            },
+            {
+                versionNegotiation: {
+                    mode: {
+                        pin: '2026-07-28',
+                    },
+                },
+            }
+        );
+        await connected.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${started.port}/mcp`)));
+        client = connected;
+
+        const listed = await connected.listTools();
+
+        expect(listed).toMatchObject({
+            ttlMs: 300000,
+            cacheScope: 'private',
+        });
+    });
+
     it('leaves the endpoint out of the contract, so clients never see it', () => {
         expect(Object.keys(contract.routes)).toEqual(['getUser']);
     });
