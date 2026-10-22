@@ -110,7 +110,7 @@ export interface OutgoingRequest {
 export interface ClientConfig {
     baseUrl: string;
     baseHeaders?: Record<string, string>;
-    credentials?: RequestCredentials;
+    credentials?: RequestInit['credentials'];
     fetch?: typeof fetch;
     onRequest?: (request: OutgoingRequest) => void | Promise<void>;
     retry?: RetryOptions;
@@ -215,7 +215,7 @@ const buildFormData = (fields: Record<string, unknown>): FormData => {
 /**
  * A multipart body leaves Content-Type to fetch, which adds the boundary.
  */
-const encodeBody = (route: GeneratedRoute, body: unknown, headers: Headers): BodyInit => {
+const encodeBody = (route: GeneratedRoute, body: unknown, headers: Headers): NonNullable<RequestInit['body']> => {
     switch (route.contentType) {
         case 'multipart/form-data':
             return body instanceof FormData ? body : buildFormData(body as Record<string, unknown>);

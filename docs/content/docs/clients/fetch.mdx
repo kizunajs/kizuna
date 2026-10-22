@@ -5,7 +5,7 @@ description: A fully typed HTTP client for consuming Kizuna routes in the browse
 
 `@kizunajs/fetch` writes a typed client for your routes, a wrapper around the native `fetch` API. The client runs anywhere `fetch` does, [React Native](#react-native) included.
 
-The generated file carries named types, a table of methods and paths, and the code that sends the requests. It imports nothing, so the app that calls your API installs nothing. `@kizunajs/fetch` goes beside `kizuna.config.ts`:
+The generated file carries named types, a table of methods and paths, and the code that sends the requests. It imports nothing, so the app that calls your API installs nothing. Its types come from the global `fetch`, so the DOM lib, `@types/node` or React Native's types are all it needs. `@kizunajs/fetch` goes beside `kizuna.config.ts`:
 
 <InstallTabs packageName="@kizunajs/fetch" />
 
@@ -157,7 +157,7 @@ const { body } = await apiClient.users.getUser({
 export interface ClientConfig {
     baseUrl: string;
     baseHeaders?: Record<string, string>;
-    credentials?: RequestCredentials;
+    credentials?: RequestInit['credentials'];
     fetch?: typeof fetch;
     onRequest?: (request: OutgoingRequest) => void | Promise<void>;
     retry?: RetryOptions;
