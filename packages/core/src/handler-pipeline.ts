@@ -46,11 +46,25 @@ type HandlerBody<S, Status> = S extends z.ZodType
         ? ApplyErrorEnvelope<z.input<S['body']>, Status>
         : never;
 
-type ResponseReturn<R extends Pick<RouteDefinition, 'responses'>, Status extends keyof R['responses']> = {
-    status: Status extends number ? Status : never;
-    body: HandlerBody<R['responses'][Status], Status>;
-    headers?: ResponseHeaders;
-};
+/**
+ * A response that carries no body, like a `204: z.void()`, may leave `body` out. A body
+ * that resolves to `never` stays required, so a status that cannot be returned still
+ * fails to compile.
+ */
+type ResponseReturn<R extends Pick<RouteDefinition, 'responses'>, Status extends keyof R['responses']> =
+    IsBodiless<HandlerBody<R['responses'][Status], Status>> extends true
+        ? {
+              status: Status extends number ? Status : never;
+              body?: HandlerBody<R['responses'][Status], Status>;
+              headers?: ResponseHeaders;
+          }
+        : {
+              status: Status extends number ? Status : never;
+              body: HandlerBody<R['responses'][Status], Status>;
+              headers?: ResponseHeaders;
+          };
+
+type IsBodiless<Body> = [Body] extends [never] ? false : [Body] extends [undefined | void] ? true : false;
 
 /**
  * Constrained to `responses` alone so a job, which has no method or path, reuses it.

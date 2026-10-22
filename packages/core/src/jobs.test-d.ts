@@ -281,7 +281,6 @@ test('a handler may be async or sync', () => {
             }
             return {
                 status: 204,
-                body: undefined,
             };
         },
     };

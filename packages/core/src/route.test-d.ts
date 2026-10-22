@@ -120,6 +120,26 @@ test('the handler cannot return a body the response schema rejects', () => {
     }));
 });
 
+test('the handler answers a response with no body with the status alone', () => {
+    k.route({
+        method: 'DELETE',
+        path: '/users/:id',
+        responses: {
+            204: z.void(),
+            404: ProblemDetailsSchema,
+        },
+    }).handler(({ params, throwError }) => {
+        if (params.id === 'archived') {
+            throwError({
+                status: 204,
+            });
+        }
+        return {
+            status: 204,
+        };
+    });
+});
+
 test('the handler cannot read a path parameter the path does not carry', () => {
     k.route({
         method: 'GET',

@@ -408,6 +408,14 @@ responses: {
 },
 ```
 
+The handler answers it with the status alone:
+
+```ts
+return {
+    status: 204,
+};
+```
+
 To type response headers, give the status a `{ body, headers }` object:
 
 ```ts

@@ -98,6 +98,5 @@ export const webhookRoute = (resend: Resend, webhookSecret: string, on: ResendEv
 
         return {
             status: 204,
-            body: undefined,
         };
     });
