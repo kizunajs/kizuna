@@ -211,9 +211,12 @@ export const createStreamTools = <R extends Routes>(tools: R, pipeline: ToolPipe
             }) as ToolEventYield<R>;
 
         const input = isRecord(call.input) ? call.input : {};
-        // Guards read params as strings, as from a URL.
+        const sent = isRecord(input['params']) ? input['params'] : {};
+        // Only the params the path names, as strings, the way a URL carries them.
         const params = Object.fromEntries(
-            Object.entries(isRecord(input['params']) ? input['params'] : {}).map(([name, value]) => [name, String(value)])
+            parsePath(entry.route.path)
+                .paramNames.filter((name) => Object.hasOwn(sent, name))
+                .map((name) => [name, String(sent[name])])
         );
         const validation = validateRequest(entry.route, {
             params,

@@ -15,6 +15,7 @@ import {
     securedInput,
     sessionAuthorization,
     signedBodyText,
+    staffToken,
     subUserInput,
     userInput,
     pluginInput,
@@ -731,6 +732,53 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'guards.identityParams': async () => {
+            await usingSecured(async (secured) => {
+                const accepted = await secured.request({
+                    method: 'GET',
+                    path: '/invites/7',
+                });
+                expect(accepted.status).toBe(200);
+                expect(accepted.body).toEqual({
+                    inviteCode: 7,
+                });
+
+                const refused = await secured.request({
+                    method: 'GET',
+                    path: '/invites/seven',
+                });
+                expect(refused.status).toBe(400);
+                expect(refused.body).toMatchObject({
+                    detail: 'Invalid path parameters',
+                });
+            });
+        },
+
+        'guards.denyWithoutReturn': async () => {
+            await usingSecured(async (secured) => {
+                const refused = await secured.request({
+                    method: 'GET',
+                    path: '/staff',
+                });
+                expect(refused.status).toBe(401);
+                expect(refused.body).toMatchObject({
+                    detail: 'Staff only',
+                });
+
+                const allowed = await secured.request({
+                    method: 'GET',
+                    path: '/staff',
+                    headers: {
+                        authorization: `Bearer ${staffToken}`,
+                    },
+                });
+                expect(allowed.status).toBe(200);
+                expect(allowed.body).toEqual({
+                    staffId: '1',
+                });
+            });
+        },
+
         'responses.declaredContentType': async () => {
             await usingShapes(async (shapes) => {
                 const response = await shapes.request({
@@ -1137,6 +1185,33 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     'event: tool_call\ndata: {"id":"call_1","name":"readProfile"}\n\n' +
                         'event: tool_error\ndata: {"id":"call_1","name":"readProfile","message":"Unauthorized"}\n\n' +
                         'event: done\ndata: {"ok":false}\n\n'
+                );
+            });
+        },
+        'streams.unlistedToolsGuarded': async () => {
+            await usingSecured(async (secured) => {
+                const anonymous = await secured.request({
+                    method: 'GET',
+                    path: '/drafts-reply',
+                });
+                expect(anonymous.status).toBe(200);
+                expect(anonymous.text).toBe(
+                    'event: tool_call\ndata: {"id":"call_1","name":"readDrafts"}\n\n' +
+                        'event: tool_error\ndata: {"id":"call_1","name":"readDrafts","message":"Unauthorized"}\n\n' +
+                        'event: done\ndata: {"ok":false}\n\n'
+                );
+
+                const signedIn = await secured.request({
+                    method: 'GET',
+                    path: '/drafts-reply',
+                    headers: {
+                        authorization: sessionAuthorization,
+                    },
+                });
+                expect(signedIn.text).toBe(
+                    'event: tool_call\ndata: {"id":"call_1","name":"readDrafts"}\n\n' +
+                        'event: tool_result\ndata: {"id":"call_1","name":"readDrafts","output":{"drafts":2}}\n\n' +
+                        'event: done\ndata: {"ok":true}\n\n'
                 );
             });
         },

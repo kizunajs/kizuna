@@ -248,6 +248,8 @@ A guard returns the identity's `context`, field for field. Whether that caller m
 
 `deny({ status, body, headers })` answers with [Problem Details](/docs/reference/problem-details-schema), the same shape `throwError` takes in a handler. A `401` carries the `WWW-Authenticate` challenge RFC 9110 requires, named after the identity that denied it. A cookie or API key has no challenge to send, so those answer `403`.
 
+Calling `deny` refuses the request, so a guard that forgets to `return` it still turns the caller away.
+
 ### What a refusal says
 
 A refusal carries `detail` alone until `guardSchema` widens it:
@@ -287,7 +289,7 @@ Every field you add must be optional or carry a `.default()`, since Kizuna sends
 
 ## What else a guard gets
 
-The route's path `params`, the adapter's native request objects, and any [request context](/docs/request-context) your config declares. A request-scoped value that gates nothing, such as a logger, is a [request context](/docs/request-context) rather than an identity.
+The route's path `params`, the adapter's native request objects, and any [request context](/docs/request-context) your config declares. A `custom` identity's `params` schema parses the path params first, coercing them the way a route's own are, and a value it refuses answers `400` before the guard runs. A request-scoped value that gates nothing, such as a logger, is a [request context](/docs/request-context) rather than an identity.
 
 ## What it drives
 

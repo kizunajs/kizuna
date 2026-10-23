@@ -87,7 +87,7 @@ export const member = k.identity
 
 ## The guard
 
-`guard` is what runs before the handler of every route whose `auth` names this identity. It receives the credential the method extracted, the path params the identity declares, your framework's own request, and `deny`. Return the identity's `context`, or call `deny({ status, body })` to refuse.
+`guard` is what runs before the handler of every route whose `auth` names this identity. It receives the credential the method extracted, the path params the identity declares, your framework's own request, and `deny`. Return the identity's `context`, or call `deny({ status, body })` to refuse. A `deny` call refuses the request even when the guard does not return it.
 
 It sits on the identity because that is the one place it belongs to. An identity with no guard cannot authenticate anyone, and [`defineConfig`](/docs/reference/define-config) refuses to assemble an API whose routes name one.
 
@@ -154,7 +154,7 @@ export const inviteToken = k.identity
     });
 ```
 
-The guard receives the usual `{ params, deny }` (plus your framework's handler context) with no credential key, since there is nothing for the runtime to pre-extract. Everything else is ordinary typed auth: the identity is named under `identities`, a route's `auth` references it, handlers read `auth.inviteToken.inviteId`, and `roles` work as usual.
+The guard receives the usual `{ params, deny }` (plus your framework's handler context) with no credential key, since there is nothing for the runtime to pre-extract. `params` is what the identity's `params` schema produced, coerced the way a route's path params are, and a value the schema refuses answers `400` before the guard runs. Everything else is ordinary typed auth: the identity is named under `identities`, a route's `auth` references it, handlers read `auth.inviteToken.inviteId`, and `roles` work as usual.
 
 Because it emits no `security`, a custom-guarded route would otherwise look public in the spec. To keep the distinction honest, [`generateOpenApi`](/docs/reference/generate-openapi) marks the operation with an `x-kizuna-guarded` extension listing the custom identities, so a genuinely public route (no `security`, no extension) stays distinguishable from one protected out-of-band.
 

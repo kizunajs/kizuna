@@ -3,13 +3,14 @@ import { expressAdapter } from '@kizunajs/express';
 import { z } from 'zod';
 import express from 'express';
 import type { Server } from 'node:http';
-import { Kizuna } from 'kizunajs';
+import { Kizuna, getHeaderValue } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { pluginRoutesOf } from 'kizunajs/adapter';
 import { mcpPlugin } from './plugin.js';
 import { assertCanonicalResource, protectedResourceMetadataPath, protectedResourceMetadataUrl } from './oauth.js';
+import { enforceOAuth } from './oauth-enforcement.js';
 
 interface Config {
     groups: typeof kGroups;
@@ -149,7 +150,7 @@ const kAnalytics = k
         }),
     })
     .handler(({ headers }) => ({
-        sessionId: headers['x-session-id'] ?? null,
+        sessionId: getHeaderValue(headers['x-session-id']) ?? null,
     }));
 const config = {
     groups: kGroups,
@@ -570,5 +571,47 @@ describe('mcpPlugin: oauth declaration', () => {
                 ],
             })
         ).toThrow('not an absolute URI');
+    });
+});
+
+describe('enforceOAuth', () => {
+    it('refuses a token whose guard called `deny` without returning it', async () => {
+        const outcome = await enforceOAuth({
+            scheme: 'user',
+            guard: ({ deny }) => {
+                deny({
+                    status: 401,
+                    body: {
+                        detail: 'Invalid or expired token',
+                    },
+                });
+                return {
+                    userId: 'u-reader',
+                    role: 'employee',
+                };
+            },
+            schemeDefinition: user,
+            metadataUrl: 'https://api.example.com/.well-known/oauth-protected-resource/mcp',
+            scopesSupported: undefined,
+            scopes: [],
+            roles: undefined,
+            requires: undefined,
+            params: {},
+            headers: {
+                authorization: 'Bearer forged',
+            },
+            handlerContext: {},
+            requestContext: undefined,
+        });
+
+        expect(outcome).toMatchObject({
+            ok: false,
+            denial: {
+                status: 401,
+                body: {
+                    detail: 'Invalid or expired token',
+                },
+            },
+        });
     });
 });

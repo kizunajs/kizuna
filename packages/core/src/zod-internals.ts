@@ -13,6 +13,7 @@ export interface ZodDef {
     in?: z.core.$ZodType;
     out?: z.core.$ZodType;
     shape?: Record<string, z.core.$ZodType>;
+    catchall?: z.core.$ZodType;
     entries?: Record<string, string>;
     values?: unknown[];
     options?: z.core.$ZodType[];

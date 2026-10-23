@@ -14,6 +14,8 @@ interface SecuredKConfig {
         identities: {
             user: typeof userIdentity;
             member: typeof memberIdentity;
+            invite: typeof inviteIdentity;
+            staff: typeof staffIdentity;
         };
     };
 }
@@ -286,11 +288,54 @@ const memberships = new Map<string, { workspaceUserId: string; role: 'owner' | '
     [adminToken, { workspaceUserId: '2', role: 'admin' }],
 ]);
 
+/**
+ * A capability link whose code travels in the path, read by the guard as the number its `params` declare.
+ */
+export const inviteIdentity = k.identity
+    .custom({
+        params: z.object({
+            code: z.int().positive(),
+        }),
+        context: z.object({
+            inviteCode: z.int(),
+        }),
+    })
+    .guard(({ params }) => ({
+        inviteCode: params.code,
+    }));
+
+export const staffToken = 'tok_staff';
+
+/**
+ * A guard that calls `deny` without returning it.
+ */
+export const staffIdentity = k.identity
+    .bearer({
+        context: z.object({
+            staffId: z.string(),
+        }),
+    })
+    .guard(({ bearer, deny }) => {
+        if (bearer?.token !== staffToken) {
+            deny({
+                status: 401,
+                body: {
+                    detail: 'Staff only',
+                },
+            });
+        }
+        return {
+            staffId: '1',
+        };
+    });
+
 const securedKConfig = {
     auth: {
         identities: {
             user: userIdentity,
             member: memberIdentity,
+            invite: inviteIdentity,
+            staff: staffIdentity,
         },
     },
 };
@@ -317,8 +362,98 @@ export const securedTools = securedK.routes({
         })),
 });
 
+/**
+ * Tools a stream names that `routes` does not list.
+ */
+export const draftTools = securedK.routes({
+    readDrafts: securedK
+        .route({
+            method: 'GET',
+            path: '/drafts',
+            auth: 'user',
+            responses: {
+                200: z.object({
+                    drafts: z.int(),
+                }),
+            },
+            summary: 'Count the signed-in user drafts',
+            tool: true,
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                drafts: 2,
+            },
+        })),
+});
+
 export const securedRoutes = securedK.routes({
     tools: securedTools,
+    draftsReply: securedK
+        .route({
+            method: 'GET',
+            path: '/drafts-reply',
+            auth: false,
+            responses: {
+                200: {
+                    stream: {
+                        done: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                    tools: draftTools,
+                },
+            },
+        })
+        .handler(({ tools }) => ({
+            status: 200,
+            body: async function* () {
+                const result = yield* tools.run({
+                    id: 'call_1',
+                    name: 'read_drafts',
+                });
+                yield {
+                    event: 'done',
+                    data: {
+                        ok: result.state === 'done',
+                    },
+                };
+            },
+        })),
+    acceptInvite: securedK
+        .route({
+            method: 'GET',
+            path: '/invites/:code',
+            auth: 'invite',
+            responses: {
+                200: z.object({
+                    inviteCode: z.int(),
+                }),
+            },
+        })
+        .handler(({ auth }) => ({
+            status: 200,
+            body: {
+                inviteCode: auth.invite.inviteCode,
+            },
+        })),
+    staffOnly: securedK
+        .route({
+            method: 'GET',
+            path: '/staff',
+            auth: 'staff',
+            responses: {
+                200: z.object({
+                    staffId: z.string(),
+                }),
+            },
+        })
+        .handler(({ auth }) => ({
+            status: 200,
+            body: {
+                staffId: auth.staff.staffId,
+            },
+        })),
     profileReply: securedK
         .route({
             method: 'GET',

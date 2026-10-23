@@ -10,6 +10,7 @@ import {
     type RouteHandler,
     type Router,
     type RawInputs,
+    type ValidationFailure,
     type ValidationStage,
     allowedMethodsForPath,
     flattenRoutes,
@@ -24,8 +25,8 @@ import { cacheHeaders } from './cache.js';
 import { computeEtag, etagMatches } from './etag.js';
 import { ResponseError } from './response-error.js';
 import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
-import { isVoidSchema, isBinarySchema } from './zod-internals.js';
-import { resolveCoercionPlans } from './coercion.js';
+import { isVoidSchema, isBinarySchema, readDef, readDefType, readObjectShape } from './zod-internals.js';
+import { applyCoercion, coercionPlanFor, resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ResolvedPlugin } from './plugin.js';
 import {
@@ -219,7 +220,8 @@ export const isGuardDenial = (value: unknown): value is GuardDenial => typeof va
  * context resolved for this request, absent
  * when the api declares none. It returns the context the scheme provides
  * (nested under `auth`, keyed by the identity's name in the handler args) or
- * `deny(...)` to reject.
+ * `deny(...)` to reject. Calling `deny` rejects even when the guard does not
+ * return it.
  */
 export type GuardRun<HandlerContext = unknown> = (
     args: HandlerContext &
@@ -229,6 +231,99 @@ export type GuardRun<HandlerContext = unknown> = (
             requestContext?: Record<string, unknown>;
         }
 ) => Promise<Record<string, unknown> | GuardDenial | void> | Record<string, unknown> | GuardDenial | void;
+
+/**
+ * How one guard call went: passed, with the context it returned, denied, or
+ * refused before it ran because the path params failed the identity's `params`.
+ */
+export type GuardOutcome =
+    | {
+          kind: 'passed';
+          context: Record<string, unknown> | undefined;
+      }
+    | {
+          kind: 'denied';
+          denial: GuardDenial;
+      }
+    | {
+          kind: 'invalid-params';
+          failure: ValidationFailure;
+      };
+
+/**
+ * Run one identity's guard, the way every call path runs it. The path params
+ * the identity's `params` schema declares pass through it first, so the guard
+ * reads what the schema produced. A denial the guard returns answers the
+ * request, and a `deny` it called without returning refuses it all the same.
+ */
+export const callGuard = async <HandlerContext>(
+    guard: GuardRun<HandlerContext>,
+    call: {
+        scheme: SecurityScheme | undefined;
+        params: Record<string, unknown>;
+        /**
+         * Everything else the guard receives: the handler context, the
+         * credential, and the request context.
+         */
+        args: Record<string, unknown>;
+    }
+): Promise<GuardOutcome> => {
+    let params = call.params;
+    const paramsSchema = (call.scheme as { params?: z.ZodType } | undefined)?.params;
+    if (paramsSchema !== undefined) {
+        // The route may carry params of its own beside the identity's, which a strict schema would refuse.
+        // A schema that takes undeclared keys, like `z.looseObject`, asked for all of them.
+        const shape = readObjectShape(paramsSchema);
+        const catchall = readDef(paramsSchema).catchall;
+        const takesUndeclared = catchall !== undefined && readDefType(catchall) !== 'never';
+        const declared =
+            shape === undefined || takesUndeclared
+                ? call.params
+                : Object.fromEntries(Object.entries(call.params).filter(([name]) => Object.hasOwn(shape, name)));
+        const parsed = paramsSchema.safeParse(applyCoercion(declared, coercionPlanFor(paramsSchema)));
+        if (!parsed.success) {
+            return {
+                kind: 'invalid-params',
+                failure: {
+                    stage: 'params',
+                    issues: parsed.error.issues,
+                },
+            };
+        }
+        params = parsed.data as Record<string, unknown>;
+    }
+
+    const build = guardDenyFor(call.scheme);
+    let recorded: GuardDenial | undefined;
+    const deny: GuardDeny<GuardDenialBody> = (denial) => {
+        const built = build(denial);
+        recorded ??= built;
+        return built;
+    };
+    const result = await guard({
+        ...call.args,
+        params,
+        deny,
+    } as Parameters<typeof guard>[0]);
+
+    if (isGuardDenial(result)) {
+        return {
+            kind: 'denied',
+            denial: result,
+        };
+    }
+    // A guard that called `deny` without returning it.
+    if (recorded !== undefined) {
+        return {
+            kind: 'denied',
+            denial: recorded,
+        };
+    }
+    return {
+        kind: 'passed',
+        context: result !== null && typeof result === 'object' ? result : undefined,
+    };
+};
 
 /**
  * Guards keyed by the security scheme name they satisfy. A route's resolved
@@ -485,7 +580,7 @@ export const DISPATCH_ROUTE_KEY = 'kizuna:dispatch';
  * The endpoint a scheduler ticks to run whichever jobs are due.
  */
 export const dispatchRoute = (meta: JobsMeta): RouteDefinition => {
-    // Every job in a group shares one identity.
+    // `defineConfig` refuses jobs served over HTTP under more than one identity.
     const identity = flattenJobs(meta.jobs).find(({ job }) => job.identity !== undefined)?.job.identity;
     return {
         method: meta.config?.method ?? 'POST',
@@ -1427,24 +1522,40 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
             }
             const schemeDefinition = schemes?.[scheme];
             const credential = schemeDefinition ? extractCredential(schemeDefinition, request as AdapterRequest<unknown>) : {};
-            const guardResult = await guard({
-                ...(handlerContext as Record<string, unknown>),
-                ...credential,
+            const outcome = await callGuard(guard, {
+                scheme: schemeDefinition,
                 params,
-                deny: guardDenyFor(schemeDefinition),
-                ...(hasRequestContext ? { requestContext } : {}),
-            } as Parameters<typeof guard>[0]);
-            if (isGuardDenial(guardResult)) {
-                if (responseValidation) assertDeclaredBody(route, routeKey, guardResult.status, guardResult.body);
+                args: {
+                    ...(handlerContext as Record<string, unknown>),
+                    ...credential,
+                    ...(hasRequestContext
+                        ? {
+                              requestContext,
+                          }
+                        : {}),
+                },
+            });
+            if (outcome.kind === 'invalid-params') {
+                const formatted = formatValidationError(outcome.failure);
                 return {
-                    kind: 'guard-denied',
-                    status: guardResult.status,
-                    body: guardResult.body,
-                    headers: guardResult.headers,
+                    kind: 'validation-failed',
+                    stage: outcome.failure.stage,
+                    detail: formatted.detail,
+                    issues: formatted.issues,
                 };
             }
-            if (guardResult && typeof guardResult === 'object') {
-                securityContext[scheme] = withPermissions(scheme, schemeDefinition, guardResult);
+            if (outcome.kind === 'denied') {
+                const { denial } = outcome;
+                if (responseValidation) assertDeclaredBody(route, routeKey, denial.status, denial.body);
+                return {
+                    kind: 'guard-denied',
+                    status: denial.status,
+                    body: denial.body,
+                    headers: denial.headers,
+                };
+            }
+            if (outcome.context !== undefined) {
+                securityContext[scheme] = withPermissions(scheme, schemeDefinition, outcome.context);
             }
         }
         const accessCheck = {

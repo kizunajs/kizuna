@@ -13,6 +13,7 @@ import type { AssembledRoutes } from './group-routes.js';
 import { assembleRoutes } from './routes.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
+import { streamToolsOf } from './tool-events.js';
 import type { Routes, RouteDefinition, RouteAuth, SecurityRequirement, RequiredPermissions } from './types.js';
 import type { SecurityScheme } from './security-scheme.js';
 import type { RequestContextSchema } from './request-context.js';
@@ -102,6 +103,11 @@ const resolveRouteAuth = (
     route.security = [requirementFor(names, undefined, identities) as SecurityRequirement];
 
     const accepted = rule.roles === undefined ? [] : typeof rule.roles === 'string' ? [rule.roles] : [...rule.roles];
+    if (rule.roles !== undefined && accepted.length === 0) {
+        throw new Error(
+            `Route '${routePath}' accepts no role under \`roles: []\`, so no caller could reach it. Name the roles it accepts, or remove \`roles\` to accept every caller its identity lets in.`
+        );
+    }
     if (accepted.length > 0) {
         const declared = names.map((name) => identities?.[name]?.roles).filter((roles) => roles !== undefined);
         if (declared.length === 0) {
@@ -145,6 +151,38 @@ const handlersOf = (declarations: Record<string, unknown> | undefined, key: stri
         if (handler !== undefined) handlers[name] = handler;
     }
     return handlers;
+};
+
+interface StreamTool {
+    toolKey: string;
+    streamKey: string;
+    route: RouteDefinition;
+}
+
+/**
+ * The routes a streamed response names under `tools` that the tree itself does
+ * not list. A tool runs as a request of its own, so each still needs its `auth`
+ * resolved and its guard responses.
+ */
+const unlistedStreamTools = (routes: Routes): StreamTool[] => {
+    const flattened = flattenRoutes(routes);
+    const listed = new Set(flattened.map(({ route }) => route));
+    const collected = new Map<RouteDefinition, StreamTool>();
+    for (const { route, routeKey } of flattened) {
+        for (const response of Object.values(route.responses)) {
+            const tools = streamToolsOf(response);
+            if (tools === undefined) continue;
+            for (const { route: tool, routeKey: toolKey } of flattenRoutes(tools)) {
+                if (listed.has(tool) || collected.has(tool)) continue;
+                collected.set(tool, {
+                    toolKey,
+                    streamKey: routeKey,
+                    route: tool,
+                });
+            }
+        }
+    }
+    return [...collected.values()];
 };
 
 /**
@@ -425,9 +463,23 @@ export const defineConfig = <
         }
         resolveRouteAuth(route, route.auth, identities, routeKey);
     }
+    const streamTools: Record<string, RouteDefinition> = {};
+    for (const { toolKey, streamKey, route } of [...unlistedStreamTools(routes), ...unlistedStreamTools(pluginRoutes)]) {
+        const where = `Tool '${toolKey}', which route '${streamKey}' streams,`;
+        if (route.auth === undefined) {
+            if (declaresIdentities) {
+                throw new Error(`${where} declares no \`auth\`. Name the identity it requires, or \`false\` for a public tool.`);
+            }
+            route.security = [];
+        } else {
+            resolveRouteAuth(route, route.auth, identities, toolKey);
+        }
+        streamTools[`${streamKey}:${toolKey}`] = route;
+    }
     // After every route's `auth` resolves, so both of these can read `security`.
     injectGuardResponses(routes, identities, guardSchema);
     injectGuardResponses(pluginRoutes, identities, guardSchema);
+    injectGuardResponses(streamTools, identities, guardSchema);
     assertValidCache(routes);
     assertValidCache(pluginRoutes);
 

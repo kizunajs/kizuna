@@ -11,6 +11,7 @@ interface Config {
     auth: {
         identities: {
             scheduler: typeof scheduler;
+            operator: typeof operator;
         };
     };
 }
@@ -19,6 +20,11 @@ const k = new Kizuna<Config>();
 
 const scheduler = k.identity.bearer({
     description: 'The platform scheduler',
+});
+
+const operator = k.identity.apiKey({
+    name: 'x-operator-key',
+    in: 'header',
 });
 
 const config = {
@@ -467,6 +473,75 @@ describe('how jobs run', () => {
                     },
                 }).api
         ).toThrow('would let anyone trigger them');
+    });
+
+    it('rejects jobs served over HTTP under two identities', () => {
+        expect(
+            () =>
+                defineConfig({
+                    auth: {
+                        identities: {
+                            scheduler,
+                            operator,
+                        },
+                    },
+                    routes: [],
+                    jobs: {
+                        digests: scheduled,
+                        maintenance: k.jobs('operator', {
+                            purgeClosedAccounts: k.job({
+                                summary: 'Delete accounts closed over a year ago',
+                            }),
+                        }),
+                    },
+                    jobRunner: {
+                        mode: 'http',
+                    },
+                }).api
+        ).toThrow("The jobs declare the identities 'scheduler' and 'operator'");
+    });
+
+    it('accepts jobs served over HTTP under one identity beside jobs with none', () => {
+        expect(
+            () =>
+                defineConfig({
+                    ...config,
+                    routes: [],
+                    jobs: {
+                        digests: scheduled,
+                        cleanup: unguarded,
+                    },
+                    jobRunner: {
+                        mode: 'http',
+                    },
+                }).api
+        ).not.toThrow();
+    });
+
+    it('accepts jobs under two identities in process', () => {
+        expect(
+            () =>
+                defineConfig({
+                    auth: {
+                        identities: {
+                            scheduler,
+                            operator,
+                        },
+                    },
+                    routes: [],
+                    jobs: {
+                        digests: scheduled,
+                        maintenance: k.jobs('operator', {
+                            purgeClosedAccounts: k.job({
+                                summary: 'Delete accounts closed over a year ago',
+                            }),
+                        }),
+                    },
+                    jobRunner: {
+                        mode: 'in-process',
+                    },
+                }).api
+        ).not.toThrow();
     });
 
     it('accepts jobs with no identity in process', () => {

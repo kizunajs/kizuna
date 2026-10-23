@@ -36,7 +36,7 @@ export const jobs = k.jobs('scheduler', {
 
 Jobs nest to any depth. Because a job carries its own identity, it declares no `auth` of its own.
 
-Omit the identity argument only for jobs that run in process, with `jobRunner: { mode: 'in-process' }`. Otherwise `/jobs/run` would let anyone trigger them, so `defineConfig` throws.
+With `mode: 'http'`, one identity guards both job endpoints, so every `k.jobs` that names an identity names the same one, and `defineConfig` throws when two name different identities. A group that omits the identity argument runs behind that same identity. When no group names one, `/jobs/run` would let anyone trigger them, so `defineConfig` throws unless the jobs run in process, with `jobRunner: { mode: 'in-process' }`. A group without an identity leaves out the first argument:
 
 ```ts title="jobs.ts"
 export const jobs = k.jobs({

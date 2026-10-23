@@ -19,7 +19,8 @@ export interface RequestContextSchema<
      * Schema for the request headers the value derives from. Clients type
      * against it: the generated fetch client takes the values once under
      * `requestContext`, and the Swift and Kotlin clients take them in their
-     * initializers. Routes and the OpenAPI document are untouched.
+     * initializers. Routes and the OpenAPI document are untouched, and the
+     * resolver reads the header values as the request carried them.
      */
     readonly headers?: HeadersSchema;
 }
@@ -78,13 +79,8 @@ export type RequestContextHeaderInputs<Declaration> = Declaration extends { head
     : {};
 
 /**
- * The header values a resolver reads for a declaration: the `z.output` of its
- * `headers` schema, or the adapter's raw header record when it has none.
+ * The header values a resolver reads: the adapter's raw header record. A
+ * declaration's `headers` schema documents what clients send, and the resolver
+ * reads each value as the request carried it.
  */
-export type RequestContextHeaderValues<Declaration> = Declaration extends { headers?: infer HeadersSchema }
-    ? [NonNullable<HeadersSchema>] extends [never]
-        ? Record<string, string | string[] | undefined>
-        : NonNullable<HeadersSchema> extends z.ZodType
-          ? z.output<NonNullable<HeadersSchema>>
-          : Record<string, string | string[] | undefined>
-    : Record<string, string | string[] | undefined>;
+export type RequestContextHeaderValues<_Declaration = unknown> = Record<string, string | string[] | undefined>;

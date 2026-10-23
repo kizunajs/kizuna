@@ -257,7 +257,7 @@ export interface K<Spec extends KizunaSpec = KizunaSpec> {
      *         }),
      *     })
      *     .handler(({ headers }) => ({
-     *         sessionId: headers['x-posthog-session-id'] ?? null,
+     *         sessionId: getHeaderValue(headers['x-posthog-session-id']) ?? null,
      *     }));
      */
     requestContext<const ContextSchema extends z.ZodType, const HeadersSchema extends z.ZodType | undefined = undefined>(
