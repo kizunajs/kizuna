@@ -100,6 +100,35 @@ describe('renderDocsHtml', () => {
             expect(html).not.toContain('<script>alert(1)</script>');
         });
 
+        it('keeps a quote in the cdn url inside the script src', () => {
+            const html = renderDocsHtml({
+                specUrl: '/openapi.json',
+                cdnUrl: '/assets/scalar.js" onload="alert(1)',
+            });
+
+            expect(html).toContain('<script src="/assets/scalar.js&quot; onload=&quot;alert(1)"></script>');
+        });
+
+        it('keeps a quote in the cdn url inside the swagger stylesheet href and script src', () => {
+            const html = renderDocsHtml({
+                specUrl: '/openapi.json',
+                provider: 'swagger',
+                cdnUrl: '/assets" onerror="alert(1)',
+            });
+
+            expect(html).toContain('<link rel="stylesheet" href="/assets&quot; onerror=&quot;alert(1)/swagger-ui.css" />');
+            expect(html).toContain('<script src="/assets&quot; onerror=&quot;alert(1)/swagger-ui-bundle.js"></script>');
+        });
+
+        it('leaves a cdn url with a query string loading the same address', () => {
+            const html = renderDocsHtml({
+                specUrl: '/openapi.json',
+                cdnUrl: 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.0?v=1&min=true',
+            });
+
+            expect(html).toContain('<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.0?v=1&amp;min=true"></script>');
+        });
+
         it('keeps a closing script tag inside configuration from breaking out', () => {
             const html = renderDocsHtml({
                 specUrl: '/openapi.json',

@@ -53,9 +53,12 @@ const OpenApiPluginOptionsSchema = GenerateOpenApiOptionsSchema.extend({
     provider: z.enum(['scalar', 'swagger']).optional(),
 
     /**
-     * Where to load the UI's assets from, for a self-hosted copy. The script
-     * URL for `'scalar'`; the directory holding `swagger-ui.css` and
-     * `swagger-ui-bundle.js` for `'swagger'`.
+     * Where to load the UI's assets from. The default is the latest release of
+     * one major version on jsDelivr. Point this at an exact version to pin it,
+     * or at a self-hosted copy for air-gapped deployments or a strict CSP.
+     *
+     * For `'scalar'` this is the script URL. For `'swagger'` it is the
+     * directory holding `swagger-ui.css` and `swagger-ui-bundle.js`.
      */
     cdnUrl: z.string().optional(),
 

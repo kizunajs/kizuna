@@ -144,7 +144,36 @@ openApiPlugin({
 });
 ```
 
-Point `cdnUrl` at a self-hosted copy for air-gapped deployments or a strict CSP.
+### Where the UI loads from
+
+The docs page loads the UI from jsDelivr, at the latest release of one major version: `@scalar/api-reference@1` for Scalar and `swagger-ui-dist@5` for Swagger. A fix the UI ships within that major reaches your page without a kizuna release.
+
+To pin an exact version, point `cdnUrl` at it:
+
+```ts
+openApiPlugin({
+    info: {
+        title: 'My API',
+        version: '1.0.0',
+    },
+    docsPath: '/docs',
+    cdnUrl: 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.0',
+});
+```
+
+For an air-gapped deployment or a strict CSP, serve the assets yourself and point `cdnUrl` at your copy. For Scalar it is the script URL. For Swagger it is the directory holding `swagger-ui.css` and `swagger-ui-bundle.js`:
+
+```ts
+openApiPlugin({
+    info: {
+        title: 'My API',
+        version: '1.0.0',
+    },
+    docsPath: '/docs',
+    provider: 'swagger',
+    cdnUrl: '/assets/swagger-ui',
+});
+```
 
 ## `generateOpenApi`
 

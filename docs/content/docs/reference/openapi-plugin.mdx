@@ -110,7 +110,7 @@ Nothing guards these routes. Gate them with your framework's own middleware if y
 
 ## Air-gapped and strict CSP
 
-`cdnUrl` points the page at a self-hosted copy of the UI's assets. For `'scalar'` it is the script URL; for `'swagger'` it is the directory holding `swagger-ui.css` and `swagger-ui-bundle.js`.
+By default the page loads the UI from jsDelivr, at the latest release of `@scalar/api-reference@1` or `swagger-ui-dist@5`. `cdnUrl` points it at an exact version or a self-hosted copy instead. For `'scalar'` it is the script URL. For `'swagger'` it is the directory holding `swagger-ui.css` and `swagger-ui-bundle.js`. See [Where the UI loads from](/docs/openapi#where-the-ui-loads-from).
 
 ## Serving it yourself
 

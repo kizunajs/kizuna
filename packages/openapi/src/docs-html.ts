@@ -33,8 +33,9 @@ export interface DocsHtmlOptions {
     pageTitle?: string;
 
     /**
-     * Where to load the UI's assets from. Point this at a self-hosted copy for
-     * air-gapped deployments or a strict CSP.
+     * Where to load the UI's assets from. The default is the latest release of
+     * one major version on jsDelivr. Point this at an exact version to pin it,
+     * or at a self-hosted copy for air-gapped deployments or a strict CSP.
      *
      * For `'scalar'` this is the script URL. For `'swagger'` it is the
      * directory holding `swagger-ui.css` and `swagger-ui-bundle.js`.
@@ -50,7 +51,11 @@ export interface DocsHtmlOptions {
     configuration?: Record<string, unknown>;
 }
 
-const escapeHtml = (value: string): string => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/**
+ * Escapes text for an element body or a double-quoted attribute value.
+ */
+const escapeHtml = (value: string): string =>
+    value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /**
  * JSON for embedding in an inline `<script>`. Escaping `<` keeps a `</script>`
