@@ -15,6 +15,7 @@
         "k-issue",
         "define-config",
         "create-client",
+        "create-test-client",
         "kizuna-tanstack-query",
         "problem-details-schema",
         "binary-and-file-schemas",
