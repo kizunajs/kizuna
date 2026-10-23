@@ -165,10 +165,11 @@ const propertyKey = (key: string): string => (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(
 
 /**
  * A doc comment over the lines it is given, or nothing when there are none.
- * Always multi-line, the way the rest of this repository writes them.
+ * Always multi-line, the way the rest of this repository writes them. A `*\/`
+ * in the text would end the comment early, so it is escaped.
  */
 export const docComment = (lines: readonly string[]): string => {
-    const body = lines.flatMap((line) => line.split('\n'));
+    const body = lines.flatMap((line) => line.replace(/\*\//g, '*\\/').split('\n'));
     if (body.length === 0) return '';
     return `/**\n${body.map((line) => ` * ${line}`.trimEnd()).join('\n')}\n */\n`;
 };

@@ -451,12 +451,23 @@ interface CallArgs {
  */
 const serializeValue = (value: unknown): string => (value instanceof Date ? value.toISOString() : String(value));
 
-const buildPath = (path: string, params: Record<string, unknown> = {}): string =>
-    path.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (_, name: string) => {
+/**
+ * A URL resolves a "." or ".." segment away, and an empty param leaves its
+ * segment empty, so either would send the request to another route.
+ */
+const buildPath = (template: string, params: Record<string, unknown> = {}): string => {
+    const path = template.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (_, name: string) => {
         const value = params[name];
         if (value === undefined) throw new Error('Missing path parameter: ' + name);
-        return encodeURIComponent(serializeValue(value));
+        const encoded = encodeURIComponent(serializeValue(value));
+        if (encoded === '') throw new Error('Path parameter ' + name + ' cannot be empty');
+        return encoded;
     });
+    if (path.split('/').some((segment) => segment === '.' || segment === '..')) {
+        throw new Error('Path parameters cannot make a "." or ".." segment: ' + path);
+    }
+    return path;
+};
 
 /**
  * An array repeats its key, and an undefined or null field is left out.

@@ -1129,6 +1129,21 @@ const pathParamFields = (method: RouteMethod): KotlinField[] =>
         return declared ? { ...declared, optional: false } : { name, wireName: name, type: 'String', optional: false };
     });
 
+/**
+ * The path template's literals joined with each param encoded in its own place,
+ * so filling `:id` never touches `:idx` or a value that holds a placeholder.
+ */
+const pathExpression = (method: RouteMethod): string => {
+    const fields = pathParamFields(method);
+    const parts = parsePath(method.pathTemplate).segments.map((segment) => {
+        if (segment.kind === 'literal') return stringLiteral(segment.value);
+        const field = fields.find((candidate) => candidate.wireName === segment.value);
+        if (field === undefined) throw new Error(`Path parameter ${segment.value} has no field`);
+        return `Kizuna.encodePathSegment(${groupMemberAccessor('params', field)})`;
+    });
+    return parts.length > 0 ? parts.join(' + ') : '""';
+};
+
 // Whether the method carries a call-site body group. `json-empty` bodies send `{}` with no group.
 const hasBodyGroup = (method: RouteMethod): boolean => method.body !== undefined && method.body.kind !== 'json-empty';
 
@@ -1378,11 +1393,7 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
         }
     }
 
-    writer.line(`${method.pathParams.length > 0 ? 'var' : 'val'} path = ${stringLiteral(method.pathTemplate)}`);
-    for (const field of pathParamFields(method)) {
-        const accessor = groupMemberAccessor('params', field);
-        writer.line(`path = path.replace(${stringLiteral(`:${field.name}`)}, Kizuna.encodePathSegment(${accessor}))`);
-    }
+    writer.line(`val path = ${pathExpression(method)}`);
 
     writer.line('val urlBuilder = Kizuna.resolveUrl(baseUrl, path)');
 
@@ -1443,7 +1454,9 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
 
     writer.line('requestInterceptor?.invoke(requestBuilder)');
 
-    writer.line('val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)');
+    // OkHttp resends a request whose reused connection drops, which a POST or PATCH must never be.
+    const sender = IDEMPOTENT_METHODS.has(method.method) ? 'client' : 'clientWithoutRetry.value';
+    writer.line(`val httpResponse = Kizuna.send(${sender}, requestBuilder.build(), retry)`);
     if (method.stream) {
         emitStreamMethodTail(writer, method, context);
         return;
@@ -1482,6 +1495,7 @@ const emitMethodBody = (writer: KotlinWriter, method: RouteMethod, context: Emit
                         }
                     });
                     writer.line(`catch (error: Exception) { throw ${failureRef}.Decoding(error, statusCode, data) }`);
+                    writer.line(`catch (error: StackOverflowError) { throw ${failureRef}.Decoding(error, statusCode, data) }`);
                 });
                 writer.line('}');
             }
@@ -1520,7 +1534,9 @@ const emitErrorBranches = (writer: KotlinWriter, method: RouteMethod, context: E
                     writer.indent(() => {
                         writer.line(decodeBody(resolved));
                     });
-                    writer.line(`} catch (error: Exception) { throw ${failureRef}.Decoding(error, statusCode, data) }`);
+                    writer.line(
+                        `} catch (error: Exception) { throw ${failureRef}.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw ${failureRef}.Decoding(error, statusCode, data) }`
+                    );
                     writer.line(`throw ${failureRef}.${caseName}(body = payload)`);
                 }
             } else {
@@ -1534,7 +1550,9 @@ const emitErrorBranches = (writer: KotlinWriter, method: RouteMethod, context: E
                         writer.indent(() => {
                             writer.line(decodeBody(resolved));
                         });
-                        writer.line('} catch (_: Exception) { null }');
+                        writer.line(
+                            `} catch (_: Exception) { null } catch (error: StackOverflowError) { throw ${failureRef}.Decoding(error, statusCode, data) }`
+                        );
                         writer.line(`if (${errorCase.caseName} != null) throw ${failureRef}.${caseName}(body = ${errorCase.caseName})`);
                     }
                 }
@@ -1669,7 +1687,7 @@ const emitSubClientMethod = (writer: KotlinWriter, method: RouteMethod, context:
 const emitSubClientClass = (writer: KotlinWriter, group: RouteGroup, clientName: string, context: EmitContext): void => {
     writer.blank();
     writer.block(
-        `class ${group.className}(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: ${clientName}.RetryPolicy?, private val reconnect: ${clientName}.ReconnectPolicy?)`,
+        `class ${group.className}(private val client: OkHttpClient, private val clientWithoutRetry: Lazy<OkHttpClient>, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: ${clientName}.RetryPolicy?, private val reconnect: ${clientName}.ReconnectPolicy?)`,
         () => {
             for (const method of group.methods) {
                 writer.blank();
@@ -1810,12 +1828,16 @@ const emitKizunaObject = (writer: KotlinWriter, options: { streaming: boolean; c
             writer.line('val base = baseUrl.toHttpUrl()');
             writer.line("val trimmedPath = path.trimStart('/')");
             writer.line("val basePath = base.encodedPath.trimEnd('/')");
+            writer.line(
+                'require(path.split(\'/\').none { it == "." || it == ".." }) { "Path parameters cannot make a \\".\\" or \\"..\\" segment: $path" }'
+            );
             writer.line('val fullPath = if (basePath.isEmpty()) "/$trimmedPath" else "$basePath/$trimmedPath"');
             writer.line('return base.newBuilder().encodedPath(fullPath)');
         });
         writer.blank();
         writer.block('fun encodePathSegment(value: Any): String', () => {
             writer.line('val text = stringifyQueryValue(value).firstOrNull() ?: ""');
+            writer.line('require(text.isNotEmpty()) { "Path parameters cannot be empty" }');
             writer.line('return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")');
         });
         writer.blank();
@@ -2019,11 +2041,18 @@ const emitClient = (
                 });
             }
 
+            writer.blank();
+            writer.line('/**');
+            writer.line(' * The app client with connection retries turned off, for a POST or PATCH. It shares the');
+            writer.line(" * app client's connection pool, dispatcher and interceptors.");
+            writer.line(' */');
+            writer.line('private val clientWithoutRetry = lazy { client.newBuilder().retryOnConnectionFailure(false).build() }');
+
             if (groups.length > 0) {
                 for (const group of groups) {
                     writer.blank();
                     writer.line(
-                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, baseUrl, json, ${contextFields.length > 0 ? 'requestContextHeaders' : 'emptyMap()'}, requestInterceptor, responseInterceptor, retry, reconnect)`
+                        `val ${escapeKeyword(group.propertyName)} = ${group.className}(client, clientWithoutRetry, baseUrl, json, ${contextFields.length > 0 ? 'requestContextHeaders' : 'emptyMap()'}, requestInterceptor, responseInterceptor, retry, reconnect)`
                     );
                 }
             }
@@ -2081,13 +2110,11 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     writer.line('import okhttp3.HttpUrl.Companion.toHttpUrl');
     writer.blank();
 
-    const hasEnums = registry.all().some((type) => type.kind === 'enum-class');
-    if (hasEnums) {
-        writer.block('interface KizunaQueryValue', () => {
-            writer.line('val wireValue: String');
-        });
-        writer.blank();
-    }
+    // stringifyQueryValue reads it, so it is declared whether or not the contract has an enum.
+    writer.block('interface KizunaQueryValue', () => {
+        writer.line('val wireValue: String');
+    });
+    writer.blank();
 
     const sharedTypes: KotlinType[] = [];
     const typesByOperation = new Map<string, KotlinType[]>();

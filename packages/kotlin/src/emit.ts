@@ -26,7 +26,7 @@ export class KotlinWriter {
 
     docComment(text: string | undefined): void {
         if (!text) return;
-        const segments = text.split('\n');
+        const segments = escapeComment(text).split('\n');
         if (segments.length === 1) {
             this.line(`/** ${segments[0]} */`);
             return;
@@ -55,6 +55,18 @@ export class KotlinWriter {
     }
 }
 
+/**
+ * Kotlin block comments nest, so a `/*` in the text opens a comment of its own
+ * and the doc comment never closes. Both `/*` and `*\/` are broken up with a
+ * backslash, `/*` first, so the second replacement cannot form a new one.
+ */
+const escapeComment = (text: string): string => text.replace(/\/\*/g, '/\\*').replace(/\*\//g, '*\\/');
+
+/**
+ * A `$` would start a string template, so it is escaped along with the
+ * characters a one-line string cannot hold.
+ */
 export const stringLiteral = (value: string): string => {
-    return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+    const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+    return '"' + escaped + '"';
 };

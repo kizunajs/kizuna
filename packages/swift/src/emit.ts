@@ -24,9 +24,13 @@ export class SwiftWriter {
         this.depth -= 1;
     }
 
+    /**
+     * Swift ends a `///` line at a carriage return as well as a newline, so the
+     * text is split on both and every line keeps its `///`.
+     */
     docComment(text: string | undefined): void {
         if (!text) return;
-        for (const segment of text.split('\n')) {
+        for (const segment of text.split(/\r\n|\r|\n/)) {
             this.line(`/// ${segment}`);
         }
     }
@@ -42,6 +46,13 @@ export class SwiftWriter {
     }
 }
 
+/**
+ * What goes between the quotes of a one-line string literal. Escaping the
+ * backslash also means nothing in the text can start an interpolation.
+ */
+export const stringContent = (value: string): string =>
+    value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+
 export const stringLiteral = (value: string): string => {
-    return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+    return '"' + stringContent(value) + '"';
 };

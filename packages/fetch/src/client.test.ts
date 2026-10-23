@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createClient } from './generated/api.js';
+import { createClient, toCenterId, toUserId } from './generated/api.js';
 
 const stubFetch = (status: number, body: unknown, headers: Record<string, string> = {}) =>
     vi.fn().mockResolvedValue({
@@ -1103,5 +1103,62 @@ describe('reconnect', () => {
         if (result.status !== 200) throw new Error('expected a stream');
         await expect(collect(result.body)).rejects.toThrow('network connection was lost');
         expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('path params', () => {
+    it('refuses a param of "." or "..", which a URL resolves into another route', async () => {
+        const fetchMock = stubFetch(200, {});
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        for (const centerId of ['.', '..']) {
+            await expect(
+                client.centers.getCenter({
+                    params: {
+                        centerId: toCenterId(centerId),
+                    },
+                })
+            ).rejects.toThrow('Path parameters cannot make a "." or ".." segment: /centers/' + centerId);
+        }
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses an empty param, which would leave its segment empty', async () => {
+        const fetchMock = stubFetch(200, {});
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        await expect(
+            client.events.getUserEvents({
+                params: {
+                    userId: toUserId(''),
+                    eventId: '1',
+                },
+            })
+        ).rejects.toThrow('Path parameter userId cannot be empty');
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('sends a param holding dots beside other characters as it is', async () => {
+        const fetchMock = stubFetch(200, {});
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+        });
+
+        await client.events.getUserEvents({
+            params: {
+                userId: toUserId('...'),
+                eventId: '../admin',
+            },
+        });
+
+        const [url] = fetchMock.mock.calls[0]! as [string];
+        expect(url).toBe('http://localhost:3000/users/.../events/..%2Fadmin');
     });
 });

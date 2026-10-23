@@ -92,6 +92,8 @@ try await client.sendNotification(
 )
 ```
 
+Each path param is percent-encoded into its place in the path. An empty value, or one that makes a `.` or `..` segment, throws `invalidRequest` before anything is sent, since either would point the request at a different path.
+
 </Step>
 
 <Step>

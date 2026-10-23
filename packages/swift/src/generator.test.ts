@@ -1292,7 +1292,9 @@ describe('Swift generator: nullable', () => {
             }).api,
             baseConfig
         );
-        expect(output).toContain('multipart.appendFile(name: "file", file: body.file)');
+        expect(output).toContain(
+            'try multipart.appendFile(name: "file", file: body.file, failure: TestAPIClient.UploadAvatar.Failure.self)'
+        );
         expect(output).toContain('if let value = body.caption {');
         expect(output).toContain('multipart.appendField(name: "caption", value: String(describing: value))');
     });
@@ -2550,5 +2552,160 @@ describe('Swift generator: brands', () => {
                 baseConfig
             )
         ).toThrow('brand "CenterId" wraps both String and Int');
+    });
+});
+
+describe('Swift generator: path params', () => {
+    const generate = (path: `/${string}`) =>
+        generateSwiftClient(
+            defineConfig({
+                routes: [
+                    {
+                        getPair: {
+                            method: 'GET',
+                            path,
+                            responses: {
+                                204: z.void(),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+
+    it('fills each param into its own place, so :id never rewrites :idx', () => {
+        const output = generate('/a/:id/:idx');
+        expect(output).toContain(
+            'let path = "/a/\\(try Kizuna.encodePathSegment(params.id, failure: TestAPIClient.GetPair.Failure.self))/\\(try Kizuna.encodePathSegment(params.idx, failure: TestAPIClient.GetPair.Failure.self))"'
+        );
+        expect(output).not.toContain('replacingOccurrences(of: ":');
+    });
+
+    it('writes a path with no params as one literal', () => {
+        expect(generate('/health')).toContain('let path = "/health"');
+    });
+
+    it('keeps a colon that names no param in the literal', () => {
+        expect(generate('/times/12:30/:id')).toContain(
+            'let path = "/times/12:30/\\(try Kizuna.encodePathSegment(params.id, failure: TestAPIClient.GetPair.Failure.self))"'
+        );
+    });
+
+    it('refuses an empty param, which would leave its segment empty', () => {
+        expect(generate('/:workspace/invites')).toContain('guard !text.isEmpty else { throw Failure.invalidRequest }');
+    });
+
+    it('joins the encoded path to the base URL as it is, so a param is never encoded twice', () => {
+        const output = generate('/a/:id');
+        expect(output).toContain('components.percentEncodedPath = basePath + relative.percentEncodedPath');
+        expect(output).toContain('let relative = URLComponents(string: path),');
+        expect(output).not.toContain('appending(path:');
+    });
+
+    it('percent-encodes a semicolon, so ..; never reaches a server that reads it as ..', () => {
+        expect(generate('/a/:id')).toContain('allowed.remove(charactersIn: "/;")');
+    });
+
+    it('refuses a path whose params make a "." or ".." segment', () => {
+        expect(generate('/a/:id')).toContain(
+            'if path.split(separator: "/", omittingEmptySubsequences: false).contains(where: { $0 == "." || $0 == ".." }) {'
+        );
+    });
+});
+
+describe('Swift generator: escaping', () => {
+    const uploadClient = () =>
+        generateSwiftClient(
+            defineConfig({
+                routes: [
+                    {
+                        uploadAvatar: {
+                            method: 'POST',
+                            path: '/users/:id/avatar',
+                            contentType: 'multipart/form-data',
+                            body: z.object({
+                                file: z.instanceof(File),
+                            }),
+                            responses: {
+                                204: z.void(),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+
+    it('ends a doc comment line at a carriage return, so the text after it stays in the comment', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                routes: [
+                    {
+                        getUser: {
+                            method: 'GET',
+                            path: '/users/:id',
+                            summary: 'ok\rpublic let pwnedBySummary = 1',
+                            responses: {
+                                200: z.object({
+                                    id: z.string().describe('ok\r\npublic let pwnedByField = 1'),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('/// ok\n    /// public let pwnedBySummary = 1');
+        expect(output).toMatch(/\/\/\/ ok\n +\/\/\/ public let pwnedByField = 1/);
+        expect(output).not.toContain('\r');
+    });
+
+    it('escapes a newline and a carriage return in a string literal', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                routes: [
+                    {
+                        getEvent: {
+                            method: 'GET',
+                            path: '/events/:id',
+                            responses: {
+                                200: z.object({
+                                    kind: z.enum(['first\nsecond', 'third\rfourth']),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('"first\\nsecond"');
+        expect(output).toContain('"third\\rfourth"');
+    });
+
+    it('percent-encodes a quote, CR and LF in a multipart name and filename', () => {
+        const output = uploadClient();
+        expect(output).toContain(
+            'data.append("Content-Disposition: form-data; name=\\"\\(Self.escape(name))\\"; filename=\\"\\(Self.escape(file.filename))\\"\\r\\n".data(using: .utf8)!)'
+        );
+        expect(output).toContain(
+            'data.append("Content-Disposition: form-data; name=\\"\\(Self.escape(name))\\"\\r\\n\\r\\n".data(using: .utf8)!)'
+        );
+        expect(output).toContain('case "\\"": escaped += "%22"');
+        expect(output).toContain('case "\\r": escaped += "%0D"');
+        expect(output).toContain('case "\\n": escaped += "%0A"');
+    });
+
+    it('refuses a multipart mimeType holding a CR or LF, which would start a header of its own', () => {
+        const output = uploadClient();
+        expect(output).toContain(
+            'mutating func appendFile<Failure: KizunaFailure>(name: String, file: TestAPIClient.MultipartFile, failure: Failure.Type) throws(Failure) {'
+        );
+        expect(output).toContain('if file.mimeType.unicodeScalars.contains(where: { $0 == "\\r" || $0 == "\\n" }) {');
+        expect(output).toContain(
+            'try multipart.appendFile(name: "file", file: body.file, failure: TestAPIClient.UploadAvatar.Failure.self)'
+        );
     });
 });

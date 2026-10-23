@@ -116,6 +116,8 @@ val created = client.users.createUser {
 }
 ```
 
+Each path param is percent-encoded into its place in the path. An empty value, or one that makes a `.` or `..` segment, throws `IllegalArgumentException` before anything is sent, since either would point the request at a different path.
+
 </Step>
 
 <Step>
@@ -345,6 +347,10 @@ val api = APIClient(
 ```
 
 Only `GET`, `HEAD`, `OPTIONS`, `PUT` and `DELETE` are retried, so a `POST` that fails is handed back rather than sent twice. A network error is retried too, and a cancelled coroutine never is. Without a `Retry-After` the client backs off from `initialDelay` (500 ms), and a `Retry-After` longer than `maximumDelay` (30 s) hands the response back.
+
+OkHttp sends a request again on its own when its connection fails. A connection can drop after the request is sent and before the response arrives, and by then the server may have run the `POST`. So a `POST` or `PATCH` goes out through a copy of your `OkHttpClient` with `retryOnConnectionFailure` turned off. The copy shares your client's connection pool, dispatcher and interceptors, and the other methods keep your client's setting.
+
+With the retry off, a `POST` or `PATCH` also throws the `IOException` when an address is unreachable or an HTTP/2 server sends `GOAWAY`, where OkHttp would otherwise try another address or connection. A pooled connection the server has already closed fails the same way, so keep the connection pool's keep-alive shorter than the server's.
 
 ## Streams
 

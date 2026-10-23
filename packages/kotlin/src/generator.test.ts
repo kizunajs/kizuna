@@ -2037,7 +2037,7 @@ describe('Kotlin generator: emitted-syntax cleanups', () => {
         expect(output).not.toContain('val statusCode = httpResponse.code\n');
     });
 
-    it('declares path as val when the route has no path params, var when it does', () => {
+    it('declares path as a val, with or without path params', () => {
         const contract = defineConfig({
             routes: [
                 {
@@ -2064,7 +2064,8 @@ describe('Kotlin generator: emitted-syntax cleanups', () => {
         }).api;
         const output = generateKotlinClient(contract, baseConfig);
         expect(output).toContain('val path = "/users"');
-        expect(output).toContain('var path = "/users/:id"');
+        expect(output).toContain('val path = "/users/" + Kizuna.encodePathSegment(params.id)');
+        expect(output).not.toContain('var path');
     });
 
     it('emits an empty success branch for void-success routes', () => {
@@ -2540,5 +2541,241 @@ describe('Kotlin generator: brands', () => {
         expect(output).toContain('val centerId: TestAPI.CenterId');
         expect(output).toContain('val id: TestAPI.CenterId');
         expect(output).toContain('val parentId: TestAPI.CenterId?');
+    });
+});
+
+describe('Kotlin generator: path params', () => {
+    const generate = (path: `/${string}`, pathParams?: z.ZodObject, options = {}) =>
+        generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        getPair: {
+                            method: 'GET',
+                            path,
+                            ...(pathParams === undefined
+                                ? {}
+                                : {
+                                      pathParams,
+                                  }),
+                            responses: {
+                                204: z.void(),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            {
+                ...baseConfig,
+                ...options,
+            }
+        );
+
+    it('fills each param into its own place, so :id never rewrites :idx', () => {
+        const output = generate('/a/:id/:idx');
+        expect(output).toContain('val path = "/a/" + Kizuna.encodePathSegment(params.id) + "/" + Kizuna.encodePathSegment(params.idx)');
+        expect(output).not.toContain('path.replace(');
+    });
+
+    it('writes a path with no params as one literal', () => {
+        expect(generate('/health')).toContain('val path = "/health"');
+    });
+
+    it('keeps a colon that names no param in the literal', () => {
+        expect(generate('/times/12:30/:id')).toContain('val path = "/times/12:30/" + Kizuna.encodePathSegment(params.id)');
+    });
+
+    it('fills a param whose property name is camelCased from its wire name', () => {
+        const output = generate(
+            '/users/:user_id',
+            z.object({
+                user_id: z.string(),
+            }),
+            {
+                camelCaseProperties: true,
+            }
+        );
+        expect(output).toContain('val path = "/users/" + Kizuna.encodePathSegment(params.userId)');
+    });
+
+    it('refuses an empty param, which would leave its segment empty', () => {
+        expect(generate('/:workspace/invites')).toContain('require(text.isNotEmpty()) { "Path parameters cannot be empty" }');
+    });
+
+    it('refuses a path whose params make a "." or ".." segment', () => {
+        const output = generate('/a/:id');
+        expect(output).toContain(
+            'require(path.split(\'/\').none { it == "." || it == ".." }) { "Path parameters cannot make a \\".\\" or \\"..\\" segment: $path" }'
+        );
+    });
+});
+
+describe('Kotlin generator: escaping', () => {
+    const generate = (responses: Record<number, z.ZodType>, summary?: string) =>
+        generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        getEvent: {
+                            method: 'GET',
+                            path: '/events/:id',
+                            ...(summary === undefined
+                                ? {}
+                                : {
+                                      summary,
+                                  }),
+                            responses,
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+
+    it('escapes */ and /* in a doc comment, since Kotlin block comments nest', () => {
+        const output = generate(
+            {
+                200: Kizuna.model({
+                    title: 'Event',
+                    description: 'Accepts image/* uploads */ val pwned = 1 /*',
+                    schema: z.object({
+                        id: z.string(),
+                    }),
+                }),
+            },
+            'x */ val pwnedBySummary = 1 /*'
+        );
+        expect(output).toContain('/** Accepts image/\\* uploads *\\/ val pwned = 1 /\\* */');
+        expect(output).toContain('/** x *\\/ val pwnedBySummary = 1 /\\* */');
+        expect(output).not.toContain('image/* ');
+    });
+
+    it('escapes $ in a string literal, so a wire name is never a template', () => {
+        const output = generate({
+            200: z.object({
+                $type: z.string(),
+                role: z.enum(['${1+1}', 'plain']),
+            }),
+        });
+        expect(output).toContain('@SerialName("\\$type")');
+        expect(output).toContain('@SerialName("\\${1+1}")');
+        expect(output).toContain('("\\${1+1}")');
+    });
+
+    it('escapes a newline and a carriage return in a string literal', () => {
+        const output = generate({
+            200: z.object({
+                kind: z.enum(['first\nsecond', 'third\rfourth']),
+            }),
+        });
+        expect(output).toContain('@SerialName("first\\nsecond")');
+        expect(output).toContain('@SerialName("third\\rfourth")');
+    });
+});
+
+describe('Kotlin generator: decoding', () => {
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                {
+                    getEvent: {
+                        method: 'GET',
+                        path: '/events/:id',
+                        responses: {
+                            200: z.object({
+                                id: z.string(),
+                            }),
+                            404: z.object({
+                                detail: z.string(),
+                            }),
+                        },
+                    },
+                },
+            ],
+        }).api,
+        baseConfig
+    );
+
+    it('turns JSON nested too deep for the stack into a Decoding failure', () => {
+        expect(output).toContain(
+            'catch (error: StackOverflowError) { throw TestAPIClient.GetEvent.Failure.Decoding(error, statusCode, data) }'
+        );
+        expect(output).toContain(
+            '} catch (error: Exception) { throw TestAPIClient.GetEvent.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw TestAPIClient.GetEvent.Failure.Decoding(error, statusCode, data) }'
+        );
+    });
+
+    it('declares KizunaQueryValue in a contract with no enum, since stringifyQueryValue reads it', () => {
+        expect(output).toContain('interface KizunaQueryValue');
+        expect(output).toContain('is KizunaQueryValue -> listOf(value.wireValue)');
+    });
+});
+
+describe('Kotlin generator: connection retries', () => {
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [
+                {
+                    getOrder: {
+                        method: 'GET',
+                        path: '/orders/:id',
+                        responses: {
+                            204: z.void(),
+                        },
+                    },
+                    createOrder: {
+                        method: 'POST',
+                        path: '/orders',
+                        body: z.object({
+                            item: z.string(),
+                        }),
+                        responses: {
+                            204: z.void(),
+                        },
+                    },
+                    updateOrder: {
+                        method: 'PATCH',
+                        path: '/orders/:id',
+                        body: z.object({
+                            item: z.string(),
+                        }),
+                        responses: {
+                            204: z.void(),
+                        },
+                    },
+                    replaceOrder: {
+                        method: 'PUT',
+                        path: '/orders/:id',
+                        body: z.object({
+                            item: z.string(),
+                        }),
+                        responses: {
+                            204: z.void(),
+                        },
+                    },
+                },
+            ],
+        }).api,
+        baseConfig
+    );
+
+    const sendsOf = (operation: string): string => {
+        const start = output.indexOf(`suspend fun ${operation}(`);
+        const end = output.indexOf('Kizuna.send(', start);
+        return output.slice(end, output.indexOf('\n', end));
+    };
+
+    it('derives one client without connection retries from the app client', () => {
+        expect(output).toContain('private val clientWithoutRetry = lazy { client.newBuilder().retryOnConnectionFailure(false).build() }');
+    });
+
+    it('sends a POST and a PATCH through it, so OkHttp never resends one on a dropped connection', () => {
+        expect(sendsOf('createOrder')).toBe('Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)');
+        expect(sendsOf('updateOrder')).toBe('Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)');
+    });
+
+    it('sends a GET and a PUT through the app client', () => {
+        expect(sendsOf('getOrder')).toBe('Kizuna.send(client, requestBuilder.build(), retry)');
+        expect(sendsOf('replaceOrder')).toBe('Kizuna.send(client, requestBuilder.build(), retry)');
     });
 });

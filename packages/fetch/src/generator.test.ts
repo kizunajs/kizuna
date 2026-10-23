@@ -402,3 +402,103 @@ describe('a branded schema', () => {
         expect(source).not.toContain('KizunaBrand');
     });
 });
+
+describe('doc comments', () => {
+    const breakout = 'x */ export const pwned = 1; /*';
+
+    it('escapes a closing */ in a model description', () => {
+        const output = generateFetchClient(
+            defineConfig({
+                routes: [
+                    {
+                        getUser: {
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: Kizuna.model({
+                                    title: 'User',
+                                    description: breakout,
+                                    schema: z.object({
+                                        id: z.string(),
+                                    }),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api
+        );
+        expect(output).toContain('    /**\n     * x *\\/ export const pwned = 1; /*\n     */\n    export type User =');
+        expect(output).not.toContain('x */ export const pwned');
+    });
+
+    it('writes a model description over several lines as one comment', () => {
+        const output = generateFetchClient(
+            defineConfig({
+                routes: [
+                    {
+                        getUser: {
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: Kizuna.model({
+                                    title: 'User',
+                                    description: 'A user.\nSigned up with an email.',
+                                    schema: z.object({
+                                        id: z.string(),
+                                    }),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api
+        );
+        expect(output).toContain('    /**\n     * A user.\n     * Signed up with an email.\n     */\n    export type User =');
+    });
+
+    it('escapes a closing */ in a field description', () => {
+        const output = generateFetchClient(
+            defineConfig({
+                routes: [
+                    {
+                        getUser: {
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: z.object({
+                                    id: z.string().describe(breakout),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api
+        );
+        expect(output).toContain(' * x *\\/ export const pwned = 1; /*');
+        expect(output).not.toContain('x */ export const pwned');
+    });
+
+    it('escapes a closing */ in a route summary', () => {
+        const output = generateFetchClient(
+            defineConfig({
+                routes: [
+                    {
+                        getUser: {
+                            method: 'GET',
+                            path: '/users/:id',
+                            summary: breakout,
+                            responses: {
+                                200: z.object({
+                                    id: z.string(),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api
+        );
+        expect(output).toContain(' * x *\\/ export const pwned = 1; /*');
+        expect(output).not.toContain('x */ export const pwned');
+    });
+});

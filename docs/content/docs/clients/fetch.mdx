@@ -136,6 +136,8 @@ const { status, body } = await apiClient.users.getUser({
 
 `params` is required when the path contains `:param` placeholders, and rejected when it does not.
 
+Each value is percent-encoded into its place in the path, so a `/` in it stays part of the value. An empty value, or one that makes a `.` or `..` segment, throws before anything is sent, since either would point the request at a different path.
+
 When the route declares a `pathParams` schema, `params` is typed by that schema instead of the path template. A [branded ID](#branded-ids) reaches the caller:
 
 ```ts title="users.ts"
@@ -267,6 +269,8 @@ type ListUsersResponse = {
     headers: Record<string, string>;
 };
 ```
+
+A status the route does not declare resolves too, with its `status`, its `headers`, and its body parsed as JSON, or as text when it is not JSON. The types list the declared statuses only, so check `status` before reading `body`.
 
 Every route's types are in the namespace, so `API.UsersListUsers.Query` is what `listUsers` takes as `query`, and `API.UsersListUsers.Result` is what it resolves to. [Wrapping the client](/docs/extend/wrap-fetch-client) builds on them.
 

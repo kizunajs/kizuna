@@ -378,7 +378,7 @@ export const generateFetchClient = (contract: ApiDefinition, options: FetchClien
     const requestContext = emitRequestContext(contract, collector);
 
     const models = collector.all().map((model) => {
-        const doc = model.description ? `/**\n * ${model.description}\n */\n` : '';
+        const doc = model.description ? docComment([model.description]) : '';
         return `${doc}export type ${model.name} = ${model.body};`;
     });
 

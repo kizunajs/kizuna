@@ -28,7 +28,7 @@ import {
     soleStreamResponse,
 } from 'kizunajs/generator';
 import type { ApiDefinition } from 'kizunajs';
-import { SwiftWriter, stringLiteral } from './emit.js';
+import { SwiftWriter, stringContent, stringLiteral } from './emit.js';
 import {
     TypeRegistry,
     mapType,
@@ -1591,17 +1591,30 @@ const emitKizunaNamespace = (
         writer.blank();
         writer.line('private static let pathSegmentAllowed: CharacterSet = {');
         writer.line('    var allowed = CharacterSet.urlPathAllowed');
-        writer.line('    allowed.remove(charactersIn: "/")');
+        writer.line('    allowed.remove(charactersIn: "/;")');
         writer.line('    return allowed');
         writer.line('}()');
         writer.blank();
-        writer.block('static func encodePathSegment<Value>(_ value: Value) -> String', () => {
-            writer.line('let text = stringifyQueryValue(value).first ?? ""');
-            writer.line('return text.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? text');
-        });
+        writer.block(
+            'static func encodePathSegment<Value, Failure: KizunaFailure>(_ value: Value, failure: Failure.Type) throws(Failure) -> String',
+            () => {
+                writer.line('let text = stringifyQueryValue(value).first ?? ""');
+                writer.line('guard !text.isEmpty else { throw Failure.invalidRequest }');
+                writer.line('return text.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? text');
+            }
+        );
         writer.blank();
-        writer.block('static func appendPath(_ base: URL, _ path: String) -> URL', () => {
-            writer.line('base.appending(path: path, directoryHint: .notDirectory)');
+        writer.line("/// Joins the path, already percent-encoded, to the base URL's own path as it is. Appending it");
+        writer.line('/// through `URL.appending` would encode its `%` a second time.');
+        writer.block('static func appendPath(_ base: URL, _ path: String) -> URLComponents?', () => {
+            writer.line('guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false),');
+            writer.line('    let relative = URLComponents(string: path),');
+            writer.line('    relative.host == nil, relative.query == nil, relative.fragment == nil');
+            writer.line('else { return nil }');
+            writer.line('var basePath = components.percentEncodedPath');
+            writer.line('while basePath.hasSuffix("/") { basePath.removeLast() }');
+            writer.line('components.percentEncodedPath = basePath + relative.percentEncodedPath');
+            writer.line('return components');
         });
         writer.blank();
         writer.block('static func stringifyQueryValue(_ value: Any) -> [String]', () => {
@@ -1632,7 +1645,12 @@ const emitKizunaNamespace = (
         writer.block(
             'static func makeURL<Failure: KizunaFailure>(baseURL: URL, path: String, queryItems: [URLQueryItem], failure: Failure.Type) throws(Failure) -> URL',
             () => {
-                writer.line('guard var components = URLComponents(url: appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {');
+                writer.line(
+                    'if path.split(separator: "/", omittingEmptySubsequences: false).contains(where: { $0 == "." || $0 == ".." }) {'
+                );
+                writer.line('    throw Failure.invalidRequest');
+                writer.line('}');
+                writer.line('guard var components = appendPath(baseURL, path) else {');
                 writer.line('    throw Failure.invalidRequest');
                 writer.line('}');
                 writer.line('if !queryItems.isEmpty { components.queryItems = queryItems }');
@@ -1763,19 +1781,43 @@ const emitKizunaNamespace = (
                 writer.blank();
                 writer.block('mutating func appendField(name: String, value: String)', () => {
                     writer.line('data.append("--\\(boundary)\\r\\n".data(using: .utf8)!)');
-                    writer.line('data.append("Content-Disposition: form-data; name=\\"\\(name)\\"\\r\\n\\r\\n".data(using: .utf8)!)');
+                    writer.line(
+                        'data.append("Content-Disposition: form-data; name=\\"\\(Self.escape(name))\\"\\r\\n\\r\\n".data(using: .utf8)!)'
+                    );
                     writer.line('data.append(value.data(using: .utf8)!)');
                     writer.line('data.append("\\r\\n".data(using: .utf8)!)');
                 });
                 writer.blank();
-                writer.block(`mutating func appendFile(name: String, file: ${options.clientName}.MultipartFile)`, () => {
-                    writer.line('data.append("--\\(boundary)\\r\\n".data(using: .utf8)!)');
-                    writer.line(
-                        'data.append("Content-Disposition: form-data; name=\\"\\(name)\\"; filename=\\"\\(file.filename)\\"\\r\\n".data(using: .utf8)!)'
-                    );
-                    writer.line('data.append("Content-Type: \\(file.mimeType)\\r\\n\\r\\n".data(using: .utf8)!)');
-                    writer.line('data.append(file.data)');
-                    writer.line('data.append("\\r\\n".data(using: .utf8)!)');
+                writer.line('/// A CR or LF in the MIME type would start a header of its own, so it is refused.');
+                writer.block(
+                    `mutating func appendFile<Failure: KizunaFailure>(name: String, file: ${options.clientName}.MultipartFile, failure: Failure.Type) throws(Failure)`,
+                    () => {
+                        writer.line('if file.mimeType.unicodeScalars.contains(where: { $0 == "\\r" || $0 == "\\n" }) {');
+                        writer.line('    throw Failure.invalidRequest');
+                        writer.line('}');
+                        writer.line('data.append("--\\(boundary)\\r\\n".data(using: .utf8)!)');
+                        writer.line(
+                            'data.append("Content-Disposition: form-data; name=\\"\\(Self.escape(name))\\"; filename=\\"\\(Self.escape(file.filename))\\"\\r\\n".data(using: .utf8)!)'
+                        );
+                        writer.line('data.append("Content-Type: \\(file.mimeType)\\r\\n\\r\\n".data(using: .utf8)!)');
+                        writer.line('data.append(file.data)');
+                        writer.line('data.append("\\r\\n".data(using: .utf8)!)');
+                    }
+                );
+                writer.blank();
+                writer.line('/// A quote, CR or LF would end the quoted name or filename, so each is percent-encoded the way');
+                writer.line('/// HTML encodes multipart/form-data.');
+                writer.block('private static func escape(_ value: String) -> String', () => {
+                    writer.line('var escaped = ""');
+                    writer.block('for scalar in value.unicodeScalars', () => {
+                        writer.line('switch scalar {');
+                        writer.line('case "\\"": escaped += "%22"');
+                        writer.line('case "\\r": escaped += "%0D"');
+                        writer.line('case "\\n": escaped += "%0A"');
+                        writer.line('default: escaped.unicodeScalars.append(scalar)');
+                        writer.line('}');
+                    });
+                    writer.line('return escaped');
                 });
                 writer.blank();
                 writer.block('func finalize() -> Foundation.Data', () => {
@@ -1802,6 +1844,21 @@ const pathParamFields = (method: RouteMethod): SwiftField[] =>
         const declared = method.declaredPathParams.find((field) => field.wireName === name);
         return declared ? { ...declared, optional: false } : { name, wireName: name, type: 'String', optional: false };
     });
+
+/**
+ * The path template as one string literal, with each param interpolated in its
+ * own place, so filling `:id` never touches `:idx` or a value that holds a placeholder.
+ */
+const pathExpression = (method: RouteMethod, context: EmitContext): string => {
+    const fields = pathParamFields(method);
+    const parts = parsePath(method.pathTemplate).segments.map((segment) => {
+        if (segment.kind === 'literal') return stringContent(segment.value);
+        const field = fields.find((candidate) => candidate.wireName === segment.value);
+        if (field === undefined) throw new Error(`Path parameter ${segment.value} has no field`);
+        return `\\(try Kizuna.encodePathSegment(${groupMemberAccessor('params', field)}, failure: ${failureRef(method, context)}.self))`;
+    });
+    return `"${parts.join('')}"`;
+};
 
 const registryStruct = (typeName: string, context: EmitContext): Extract<SwiftType, { kind: 'struct' }> | undefined => {
     const found = context.registry.get(typeName);
@@ -1898,14 +1955,7 @@ const hasMultiErrorGroup = (method: RouteMethod): boolean => {
 // client itself, `client.` inside a sub-client struct that forwards to its parent client.
 const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitContext, receiver = ''): void => {
     const failure = failureRef(method, context);
-    const pathDecl = method.pathParams.length > 0 ? 'var' : 'let';
-    writer.line(`${pathDecl} path = ${stringLiteral(method.pathTemplate)}`);
-    for (const field of pathParamFields(method)) {
-        const accessor = groupMemberAccessor('params', field);
-        writer.line(
-            `path = path.replacingOccurrences(of: ${stringLiteral(`:${field.name}`)}, with: Kizuna.encodePathSegment(${accessor}))`
-        );
-    }
+    writer.line(`let path = ${pathExpression(method, context)}`);
 
     let queryItemsExpression = '[]';
     if (method.query.length > 0) {
@@ -2226,7 +2276,9 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
             const isFile = field.isFile || flattenedField?.isFile === true;
             const append = (accessor: string): void => {
                 if (isFile) {
-                    writer.line(`multipart.appendFile(name: ${stringLiteral(field.wireName)}, file: ${accessor})`);
+                    writer.line(
+                        `try multipart.appendFile(name: ${stringLiteral(field.wireName)}, file: ${accessor}, failure: ${failure}.self)`
+                    );
                 } else {
                     writer.line(`multipart.appendField(name: ${stringLiteral(field.wireName)}, value: String(describing: ${accessor}))`);
                 }

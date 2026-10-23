@@ -1791,24 +1791,30 @@ class APIClient(private val baseUrl: String, requestContext: RequestContext = Re
         }
     }
 
-    val users = APIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
+    /**
+     * The app client with connection retries turned off, for a POST or PATCH. It shares the
+     * app client's connection pool, dispatcher and interceptors.
+     */
+    private val clientWithoutRetry = lazy { client.newBuilder().retryOnConnectionFailure(false).build() }
 
-    val health = APIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
+    val users = APIUsersClient(client, clientWithoutRetry, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val notifications = APINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
+    val health = APIHealthClient(client, clientWithoutRetry, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val workspace = APIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
+    val notifications = APINotificationsClient(client, clientWithoutRetry, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val assistant = APIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
+    val workspace = APIWorkspaceClient(client, clientWithoutRetry, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val diagnostics = APIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
+    val assistant = APIAssistantClient(client, clientWithoutRetry, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val contact = APIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
+    val diagnostics = APIDiagnosticsClient(client, clientWithoutRetry, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val newsletter = APINewsletterClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
+    val contact = APIContactClient(client, clientWithoutRetry, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
+
+    val newsletter = APINewsletterClient(client, clientWithoutRetry, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 }
 
-class APIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
+class APIUsersClient(private val client: OkHttpClient, private val clientWithoutRetry: Lazy<OkHttpClient>, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** List users with pagination */
     @Throws(APIClient.UsersListUsers.Failure::class)
@@ -1843,11 +1849,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersListUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersListUsers.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersListUsers.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersListUsers.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersListUsers.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersListUsers.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersListUsers.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersListUsers.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -1876,6 +1883,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersExportUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersExportUsers.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersExportUsers.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.UsersExportUsers.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -1887,8 +1895,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     suspend fun userBadge(build: APIClient.UsersUserBadge.Scope.() -> APIClient.UsersUserBadge.Args): APIClient.UsersUserBadge.Result {
         val args = APIClient.UsersUserBadge.Scope.build()
         val params = args.params
-        var path = "/users/:id/badge"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id) + "/badge"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -1906,11 +1913,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersUserBadge.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersUserBadge.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUserBadge.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersUserBadge.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -1923,8 +1931,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     suspend fun lastSessionEvent(build: APIClient.UsersLastSessionEvent.Scope.() -> APIClient.UsersLastSessionEvent.Args): APIClient.UsersLastSessionEvent.Result {
         val args = APIClient.UsersLastSessionEvent.Scope.build()
         val params = args.params
-        var path = "/users/:id/last-session-event"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id) + "/last-session-event"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -1942,11 +1949,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersLastSessionEvent.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersLastSessionEvent.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersLastSessionEvent.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersLastSessionEvent.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -1986,11 +1994,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersSearchUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersSearchUsers.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersSearchUsers.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersSearchUsers.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersSearchUsers.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersSearchUsers.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersSearchUsers.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersSearchUsers.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2004,8 +2013,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         val args = APIClient.UsersGetUser.Scope.build()
         val params = args.params
         val headers = args.headers
-        var path = "/users/:id"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id)
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -2025,11 +2033,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersGetUser.Result(body = payload, headers = APIClient.UsersGetUser.Result.Headers(xRequestId = xRequestId))
                     }
                     catch (error: Exception) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersGetUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersGetUser.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersGetUser.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2042,9 +2051,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     suspend fun userActivity(build: APIClient.UsersUserActivity.Scope.() -> APIClient.UsersUserActivity.Args): APIClient.UsersUserActivity.Result {
         val args = APIClient.UsersUserActivity.Scope.build()
         val params = args.params
-        var path = "/users/:id/activity/:year"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
-        path = path.replace(":year", Kizuna.encodePathSegment(params.year))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id) + "/activity/" + Kizuna.encodePathSegment(params.year)
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -2062,11 +2069,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersUserActivity.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersUserActivity.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUserActivity.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersUserActivity.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2079,8 +2087,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     suspend fun userProfile(build: APIClient.UsersUserProfile.Scope.() -> APIClient.UsersUserProfile.Args): APIClient.UsersUserProfile.Result {
         val args = APIClient.UsersUserProfile.Scope.build()
         val params = args.params
-        var path = "/users/:id/profile"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id) + "/profile"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -2098,11 +2105,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersUserProfile.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersUserProfile.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUserProfile.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersUserProfile.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2125,7 +2133,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2136,15 +2144,16 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersCreateUser.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersCreateUser.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersCreateUser.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val badRequest = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (_: Exception) { null }
+                    } catch (_: Exception) { null } catch (error: StackOverflowError) { throw APIClient.UsersCreateUser.Failure.Decoding(error, statusCode, data) }
                     if (badRequest != null) throw APIClient.UsersCreateUser.Failure.BadRequest(body = badRequest)
                     val validationError = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (_: Exception) { null }
+                    } catch (_: Exception) { null } catch (error: StackOverflowError) { throw APIClient.UsersCreateUser.Failure.Decoding(error, statusCode, data) }
                     if (validationError != null) throw APIClient.UsersCreateUser.Failure.ValidationError(body = validationError)
                     throw APIClient.UsersCreateUser.Failure.Unexpected(statusCode = statusCode, data = data)
                 }
@@ -2159,8 +2168,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
         val args = APIClient.UsersUpdatePreferences.Scope.build()
         val params = args.params
         val body = args.body
-        var path = "/users/:id/preferences"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id) + "/preferences"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
         val payload = API.UserPreferences(timezone = body.timezone, locale = body.locale, signature = body.signature, mutedChannels = body.mutedChannels)
@@ -2181,11 +2189,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersUpdatePreferences.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersUpdatePreferences.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersUpdatePreferences.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersUpdatePreferences.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersUpdatePreferences.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersUpdatePreferences.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUpdatePreferences.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersUpdatePreferences.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2199,8 +2208,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.UsersDeleteUser.Args): APIClient.UsersDeleteUser.Result {
         val args = APIClient.UsersDeleteUser.Scope.build()
         val params = args.params
-        var path = "/users/:id"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id)
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -2218,11 +2226,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersDeleteUser.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersDeleteUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersDeleteUser.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersDeleteUser.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2235,15 +2244,14 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     suspend fun archiveUser(build: APIClient.UsersArchiveUser.Scope.() -> APIClient.UsersArchiveUser.Args): APIClient.UsersArchiveUser.Result {
         val args = APIClient.UsersArchiveUser.Scope.build()
         val params = args.params
-        var path = "/users/:id/archive"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id) + "/archive"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", ByteArray(0).toRequestBody(null))
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2254,6 +2262,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersArchiveUser.Result(body = APIClient.UsersArchiveUser.Success.Status200(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
                 }
                 201 -> {
                     try {
@@ -2261,6 +2270,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersArchiveUser.Result(body = APIClient.UsersArchiveUser.Success.Status201(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersArchiveUser.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.UsersArchiveUser.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2284,7 +2294,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2295,11 +2305,12 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersUploadAvatar.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersUploadAvatar.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersUploadAvatar.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersUploadAvatar.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersUploadAvatar.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersUploadAvatar.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersUploadAvatar.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersUploadAvatar.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2312,15 +2323,14 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     suspend fun pingUser(build: APIClient.UsersPingUser.Scope.() -> APIClient.UsersPingUser.Args) {
         val args = APIClient.UsersPingUser.Scope.build()
         val params = args.params
-        var path = "/users/:id/ping"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id) + "/ping"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
             .method("POST", ByteArray(0).toRequestBody(null))
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2329,7 +2339,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersPingUser.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersPingUser.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersPingUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersPingUser.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.UsersPingUser.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2358,6 +2368,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersGetMyWork.Result(body = APIClient.UsersGetMyWork.Success.Status200(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersGetMyWork.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersGetMyWork.Failure.Decoding(error, statusCode, data) }
                 }
                 204 -> {
                     try {
@@ -2365,6 +2376,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersGetMyWork.Result(body = APIClient.UsersGetMyWork.Success.Status204(payload))
                     }
                     catch (error: Exception) { throw APIClient.UsersGetMyWork.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersGetMyWork.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.UsersGetMyWork.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2376,8 +2388,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     suspend fun checkUser(build: APIClient.UsersCheckUser.Scope.() -> APIClient.UsersCheckUser.Args) {
         val args = APIClient.UsersCheckUser.Scope.build()
         val params = args.params
-        var path = "/users/:id/check"
-        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val path = "/users/" + Kizuna.encodePathSegment(params.id) + "/check"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -2393,7 +2404,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.UsersCheckUser.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.UsersCheckUser.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.UsersCheckUser.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2422,6 +2433,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
                         return@use APIClient.UsersDescribeUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.UsersDescribeUsers.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.UsersDescribeUsers.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.UsersDescribeUsers.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2429,7 +2441,7 @@ class APIUsersClient(private val client: OkHttpClient, private val baseUrl: Stri
     }
 }
 
-class APIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
+class APIHealthClient(private val client: OkHttpClient, private val clientWithoutRetry: Lazy<OkHttpClient>, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Health check, exercises nested sub-client routing */
     @Throws(APIClient.HealthCheck.Failure::class)
@@ -2452,6 +2464,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
                         return@use APIClient.HealthCheck.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.HealthCheck.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.HealthCheck.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.HealthCheck.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2479,6 +2492,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
                         return@use APIClient.HealthVersion.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.HealthVersion.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.HealthVersion.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.HealthVersion.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2506,11 +2520,12 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
                         return@use APIClient.HealthReady.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.HealthReady.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.HealthReady.Failure.Decoding(error, statusCode, data) }
                 }
                 503 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.HealthReady.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.HealthReady.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.HealthReady.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.HealthReady.Failure.ServiceUnavailable(body = payload)
                 }
                 else -> throw APIClient.HealthReady.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2539,6 +2554,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
                         return@use APIClient.HealthHistory.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.HealthHistory.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.HealthHistory.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.HealthHistory.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -2546,7 +2562,7 @@ class APIHealthClient(private val client: OkHttpClient, private val baseUrl: Str
     }
 }
 
-class APINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
+class APINotificationsClient(private val client: OkHttpClient, private val clientWithoutRetry: Lazy<OkHttpClient>, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Send a notification (discriminated by channel) */
     @Throws(APIClient.NotificationsSendNotification.Failure::class)
@@ -2562,7 +2578,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2573,11 +2589,12 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
                         return@use APIClient.NotificationsSendNotification.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.NotificationsSendNotification.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.NotificationsSendNotification.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.NotificationsSendNotification.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.NotificationsSendNotification.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.NotificationsSendNotification.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.NotificationsSendNotification.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.NotificationsSendNotification.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2671,11 +2688,12 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
                         return@use APIClient.NotificationsListEvents.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.NotificationsListEvents.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.NotificationsListEvents.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.NotificationsListEvents.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.NotificationsListEvents.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.NotificationsListEvents.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.NotificationsListEvents.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.NotificationsListEvents.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2698,7 +2716,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2709,15 +2727,16 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
                         return@use APIClient.NotificationsValidateConfig.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.NotificationsValidateConfig.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.NotificationsValidateConfig.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val badRequest = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (_: Exception) { null }
+                    } catch (_: Exception) { null } catch (error: StackOverflowError) { throw APIClient.NotificationsValidateConfig.Failure.Decoding(error, statusCode, data) }
                     if (badRequest != null) throw APIClient.NotificationsValidateConfig.Failure.BadRequest(body = badRequest)
                     val validationError = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (_: Exception) { null }
+                    } catch (_: Exception) { null } catch (error: StackOverflowError) { throw APIClient.NotificationsValidateConfig.Failure.Decoding(error, statusCode, data) }
                     if (validationError != null) throw APIClient.NotificationsValidateConfig.Failure.ValidationError(body = validationError)
                     throw APIClient.NotificationsValidateConfig.Failure.Unexpected(statusCode = statusCode, data = data)
                 }
@@ -2743,7 +2762,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2754,11 +2773,12 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
                         return@use APIClient.NotificationsWebhook.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.NotificationsWebhook.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.NotificationsWebhook.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.NotificationsWebhook.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.NotificationsWebhook.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.NotificationsWebhook.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.NotificationsWebhook.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.NotificationsWebhook.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2767,7 +2787,7 @@ class APINotificationsClient(private val client: OkHttpClient, private val baseU
     }
 }
 
-class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
+class APIWorkspaceClient(private val client: OkHttpClient, private val clientWithoutRetry: Lazy<OkHttpClient>, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Get workspace info */
     @Throws(APIClient.WorkspaceGetWorkspace.Failure::class)
@@ -2790,17 +2810,18 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.WorkspaceGetWorkspace.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceGetWorkspace.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceGetWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceGetWorkspace.Failure.Forbidden(body = payload)
                 }
                 else -> throw APIClient.WorkspaceGetWorkspace.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2829,17 +2850,18 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.WorkspaceDeleteWorkspace.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceDeleteWorkspace.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceDeleteWorkspace.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceDeleteWorkspace.Failure.Forbidden(body = payload)
                 }
                 else -> throw APIClient.WorkspaceDeleteWorkspace.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2862,7 +2884,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2873,23 +2895,24 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.WorkspaceTransfer.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceTransfer.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceTransfer.Failure.Forbidden(body = payload)
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceTransfer.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceTransfer.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.WorkspaceTransfer.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2918,17 +2941,18 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.WorkspaceMembersListMembers.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceMembersListMembers.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersListMembers.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceMembersListMembers.Failure.Forbidden(body = payload)
                 }
                 else -> throw APIClient.WorkspaceMembersListMembers.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2951,7 +2975,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2962,29 +2986,30 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.WorkspaceMembersInviteMember.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceMembersInviteMember.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceMembersInviteMember.Failure.Forbidden(body = payload)
                 }
                 409 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceMembersInviteMember.Failure.Conflict(body = payload)
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersInviteMember.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceMembersInviteMember.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.WorkspaceMembersInviteMember.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -2997,8 +3022,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
     suspend fun membersCancelInvite(build: APIClient.WorkspaceMembersCancelInvite.Scope.() -> APIClient.WorkspaceMembersCancelInvite.Args): APIClient.WorkspaceMembersCancelInvite.Result {
         val args = APIClient.WorkspaceMembersCancelInvite.Scope.build()
         val params = args.params
-        var path = "/workspace/invites/:inviteId"
-        path = path.replace(":inviteId", Kizuna.encodePathSegment(params.inviteId))
+        val path = "/workspace/invites/" + Kizuna.encodePathSegment(params.inviteId)
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -3016,23 +3040,24 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.WorkspaceMembersCancelInvite.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceMembersCancelInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceMembersCancelInvite.Failure.Forbidden(body = payload)
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceMembersCancelInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceMembersCancelInvite.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.WorkspaceMembersCancelInvite.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3045,8 +3070,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
     suspend fun invitesGetInvite(build: APIClient.WorkspaceInvitesGetInvite.Scope.() -> APIClient.WorkspaceInvitesGetInvite.Args): APIClient.WorkspaceInvitesGetInvite.Result {
         val args = APIClient.WorkspaceInvitesGetInvite.Scope.build()
         val params = args.params
-        var path = "/invites/:token"
-        path = path.replace(":token", Kizuna.encodePathSegment(params.token))
+        val path = "/invites/" + Kizuna.encodePathSegment(params.token)
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         var requestBuilder = Request.Builder()
             .url(urlBuilder.build())
@@ -3064,23 +3088,24 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.WorkspaceInvitesGetInvite.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceInvitesGetInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceInvitesGetInvite.Failure.Forbidden(body = payload)
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceInvitesGetInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceInvitesGetInvite.Failure.NotFound(body = payload)
                 }
                 else -> throw APIClient.WorkspaceInvitesGetInvite.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3094,8 +3119,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
         val args = APIClient.WorkspaceInvitesAcceptInvite.Scope.build()
         val params = args.params
         val body = args.body
-        var path = "/invites/:token/accept"
-        path = path.replace(":token", Kizuna.encodePathSegment(params.token))
+        val path = "/invites/" + Kizuna.encodePathSegment(params.token) + "/accept"
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         val requestBody: RequestBody
         val payload = APIClient.WorkspaceInvitesAcceptInvite.Input(name = body.name)
@@ -3105,7 +3129,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3116,29 +3140,30 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.WorkspaceInvitesAcceptInvite.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Forbidden(body = payload)
                 }
                 404 -> {
                     val payload = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceInvitesAcceptInvite.Failure.NotFound(body = payload)
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.WorkspaceInvitesAcceptInvite.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.WorkspaceInvitesAcceptInvite.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3147,7 +3172,7 @@ class APIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: 
     }
 }
 
-class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
+class APIAssistantClient(private val client: OkHttpClient, private val clientWithoutRetry: Lazy<OkHttpClient>, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Stream an assistant reply, exercises a server-sent events response */
     @Throws(APIClient.AssistantReply.Failure::class)
@@ -3164,7 +3189,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
         if (httpResponse.code == 200) {
             val body = Kizuna.events<APIClient.AssistantReply.Event>(httpResponse) { event ->
@@ -3185,11 +3210,11 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
                 400 -> {
                     val badRequest = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (_: Exception) { null }
+                    } catch (_: Exception) { null } catch (error: StackOverflowError) { throw APIClient.AssistantReply.Failure.Decoding(error, statusCode, data) }
                     if (badRequest != null) throw APIClient.AssistantReply.Failure.BadRequest(body = badRequest)
                     val validationError = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (_: Exception) { null }
+                    } catch (_: Exception) { null } catch (error: StackOverflowError) { throw APIClient.AssistantReply.Failure.Decoding(error, statusCode, data) }
                     if (validationError != null) throw APIClient.AssistantReply.Failure.ValidationError(body = validationError)
                     throw APIClient.AssistantReply.Failure.Unexpected(statusCode = statusCode, data = data)
                 }
@@ -3213,7 +3238,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
         if (httpResponse.code == 200) {
             val body = Kizuna.events<APIClient.AssistantChat.Event>(httpResponse) { event ->
@@ -3233,24 +3258,24 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
                 400 -> {
                     val badRequest = try {
                         json.decodeFromString<API.ProblemDetails>(data.decodeToString())
-                    } catch (_: Exception) { null }
+                    } catch (_: Exception) { null } catch (error: StackOverflowError) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
                     if (badRequest != null) throw APIClient.AssistantChat.Failure.BadRequest(body = badRequest)
                     val validationError = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (_: Exception) { null }
+                    } catch (_: Exception) { null } catch (error: StackOverflowError) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
                     if (validationError != null) throw APIClient.AssistantChat.Failure.ValidationError(body = validationError)
                     throw APIClient.AssistantChat.Failure.Unexpected(statusCode = statusCode, data = data)
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantChat.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantChat.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantChat.Failure.Forbidden(body = payload)
                 }
                 else -> throw APIClient.AssistantChat.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3264,8 +3289,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
         val args = APIClient.AssistantToolsGetForecast.Scope.build()
         val params = args.params
         val query = args.query ?: APIClient.AssistantToolsGetForecast.Query()
-        var path = "/forecast/:city"
-        path = path.replace(":city", Kizuna.encodePathSegment(params.city))
+        val path = "/forecast/" + Kizuna.encodePathSegment(params.city)
         val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
         if (query.unit != null) {
             for (stringValue in Kizuna.stringifyQueryValue(query.unit)) {
@@ -3288,11 +3312,12 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.AssistantToolsGetForecast.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.AssistantToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.AssistantToolsGetForecast.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantToolsGetForecast.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantToolsGetForecast.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantToolsGetForecast.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantToolsGetForecast.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.AssistantToolsGetForecast.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3326,11 +3351,12 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.AssistantToolsPlotSignups.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.AssistantToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.AssistantToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantToolsPlotSignups.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantToolsPlotSignups.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantToolsPlotSignups.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.AssistantToolsPlotSignups.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3353,7 +3379,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3364,11 +3390,12 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.AssistantToolsCountWords.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.AssistantToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.AssistantToolsCountWords.Failure.Decoding(error, statusCode, data) }
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantToolsCountWords.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantToolsCountWords.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantToolsCountWords.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantToolsCountWords.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.AssistantToolsCountWords.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3397,17 +3424,18 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.AssistantNotesList.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantNotesList.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantNotesList.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantNotesList.Failure.Forbidden(body = payload)
                 }
                 else -> throw APIClient.AssistantNotesList.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3430,7 +3458,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3441,23 +3469,24 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
                         return@use APIClient.AssistantNotesAdd.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
                 }
                 401 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantNotesAdd.Failure.Unauthorized(body = payload)
                 }
                 403 -> {
                     val payload = try {
                         json.decodeFromString<API.GuardDenial>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantNotesAdd.Failure.Forbidden(body = payload)
                 }
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.AssistantNotesAdd.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.AssistantNotesAdd.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.AssistantNotesAdd.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3466,7 +3495,7 @@ class APIAssistantClient(private val client: OkHttpClient, private val baseUrl: 
     }
 }
 
-class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
+class APIDiagnosticsClient(private val client: OkHttpClient, private val clientWithoutRetry: Lazy<OkHttpClient>, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Report the caller as Express sees it */
     @Throws(APIClient.DiagnosticsWhoAmI.Failure::class)
@@ -3489,6 +3518,7 @@ class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl
                         return@use APIClient.DiagnosticsWhoAmI.Result(body = payload)
                     }
                     catch (error: Exception) { throw APIClient.DiagnosticsWhoAmI.Failure.Decoding(error, statusCode, data) }
+                    catch (error: StackOverflowError) { throw APIClient.DiagnosticsWhoAmI.Failure.Decoding(error, statusCode, data) }
                 }
                 else -> throw APIClient.DiagnosticsWhoAmI.Failure.Unexpected(statusCode = statusCode, data = data)
             }
@@ -3496,7 +3526,7 @@ class APIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl
     }
 }
 
-class APIContactClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
+class APIContactClient(private val client: OkHttpClient, private val clientWithoutRetry: Lazy<OkHttpClient>, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Send a message to the team */
     @Throws(APIClient.ContactSendMessage.Failure::class)
@@ -3513,7 +3543,7 @@ class APIContactClient(private val client: OkHttpClient, private val baseUrl: St
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3522,7 +3552,7 @@ class APIContactClient(private val client: OkHttpClient, private val baseUrl: St
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.ContactSendMessage.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.ContactSendMessage.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.ContactSendMessage.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.ContactSendMessage.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.ContactSendMessage.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3531,7 +3561,7 @@ class APIContactClient(private val client: OkHttpClient, private val baseUrl: St
     }
 }
 
-class APINewsletterClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
+class APINewsletterClient(private val client: OkHttpClient, private val clientWithoutRetry: Lazy<OkHttpClient>, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: APIClient.RetryPolicy?, private val reconnect: APIClient.ReconnectPolicy?) {
 
     /** Subscribe to the weekly newsletter */
     @Throws(APIClient.NewsletterSubscribe.Failure::class)
@@ -3548,7 +3578,7 @@ class APINewsletterClient(private val client: OkHttpClient, private val baseUrl:
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        val httpResponse = Kizuna.send(clientWithoutRetry.value, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3557,7 +3587,7 @@ class APINewsletterClient(private val client: OkHttpClient, private val baseUrl:
                 400 -> {
                     val payload = try {
                         json.decodeFromString<APIClient.ValidationError>(data.decodeToString())
-                    } catch (error: Exception) { throw APIClient.NewsletterSubscribe.Failure.Decoding(error, statusCode, data) }
+                    } catch (error: Exception) { throw APIClient.NewsletterSubscribe.Failure.Decoding(error, statusCode, data) } catch (error: StackOverflowError) { throw APIClient.NewsletterSubscribe.Failure.Decoding(error, statusCode, data) }
                     throw APIClient.NewsletterSubscribe.Failure.BadRequest(body = payload)
                 }
                 else -> throw APIClient.NewsletterSubscribe.Failure.Unexpected(statusCode = statusCode, data = data)
@@ -3674,12 +3704,14 @@ private object Kizuna {
         val base = baseUrl.toHttpUrl()
         val trimmedPath = path.trimStart('/')
         val basePath = base.encodedPath.trimEnd('/')
+        require(path.split('/').none { it == "." || it == ".." }) { "Path parameters cannot make a \".\" or \"..\" segment: $path" }
         val fullPath = if (basePath.isEmpty()) "/$trimmedPath" else "$basePath/$trimmedPath"
         return base.newBuilder().encodedPath(fullPath)
     }
 
     fun encodePathSegment(value: Any): String {
         val text = stringifyQueryValue(value).firstOrNull() ?: ""
+        require(text.isNotEmpty()) { "Path parameters cannot be empty" }
         return java.net.URLEncoder.encode(text, "UTF-8").replace("+", "%20")
     }
 

@@ -3976,8 +3976,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
 
     /// Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag
     public func userBadge(_ params: OpenEnumAPIClient.UsersUserBadge.Params) async throws(OpenEnumAPIClient.UsersUserBadge.Failure) -> OpenEnumAPIClient.UsersUserBadge.Result {
-        var path = "/users/:id/badge"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersUserBadge.Failure.self))/badge"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersUserBadge.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -3997,8 +3996,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
 
     /// A user's most recent login or logout, inline union variants nest under the User model in native clients
     public func lastSessionEvent(_ params: OpenEnumAPIClient.UsersLastSessionEvent.Params) async throws(OpenEnumAPIClient.UsersLastSessionEvent.Failure) -> OpenEnumAPIClient.UsersLastSessionEvent.Result {
-        var path = "/users/:id/last-session-event"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersLastSessionEvent.Failure.self))/last-session-event"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersLastSessionEvent.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -4042,8 +4040,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
 
     /// Get a user by id
     public func getUser(_ params: OpenEnumAPIClient.UsersGetUser.Params, _ headers: OpenEnumAPIClient.UsersGetUser.Headers) async throws(OpenEnumAPIClient.UsersGetUser.Failure) -> OpenEnumAPIClient.UsersGetUser.Result {
-        var path = "/users/:id"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersGetUser.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersGetUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -4065,9 +4062,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
 
     /// Get a year of user activity, exercising two typed path params (a branded id and a coerced int year) and a cache policy on both a success and an error response
     public func userActivity(_ params: OpenEnumAPIClient.UsersUserActivity.Params) async throws(OpenEnumAPIClient.UsersUserActivity.Failure) -> OpenEnumAPIClient.UsersUserActivity.Result {
-        var path = "/users/:id/activity/:year"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
-        path = path.replacingOccurrences(of: ":year", with: Kizuna.encodePathSegment(params.year))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self))/activity/\(try Kizuna.encodePathSegment(params.year, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -4087,8 +4082,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
 
     /// Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with
     public func userProfile(_ params: OpenEnumAPIClient.UsersUserProfile.Params) async throws(OpenEnumAPIClient.UsersUserProfile.Failure) -> OpenEnumAPIClient.UsersUserProfile.Result {
-        var path = "/users/:id/profile"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersUserProfile.Failure.self))/profile"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -4132,8 +4126,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
 
     /// Replace a user's preferences, exercises required nullable fields round-tripping through the clients
     public func updatePreferences(_ params: OpenEnumAPIClient.UsersUpdatePreferences.Params, _ body: OpenEnumAPIClient.UsersUpdatePreferences.Body) async throws(OpenEnumAPIClient.UsersUpdatePreferences.Failure) -> OpenEnumAPIClient.UsersUpdatePreferences.Result {
-        var path = "/users/:id/preferences"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersUpdatePreferences.Failure.self))/preferences"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersUpdatePreferences.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "PUT"
@@ -4156,8 +4149,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
     /// Delete a user
     @available(*, deprecated, message: "use `archiveUser` instead")
     public func deleteUser(_ params: OpenEnumAPIClient.UsersDeleteUser.Params) async throws(OpenEnumAPIClient.UsersDeleteUser.Failure) -> OpenEnumAPIClient.UsersDeleteUser.Result {
-        var path = "/users/:id"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersDeleteUser.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersDeleteUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
@@ -4177,8 +4169,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
 
     /// Archive a user, first call returns 201, subsequent calls 200
     public func archiveUser(_ params: OpenEnumAPIClient.UsersArchiveUser.Params) async throws(OpenEnumAPIClient.UsersArchiveUser.Failure) -> OpenEnumAPIClient.UsersArchiveUser.Result {
-        var path = "/users/:id/archive"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersArchiveUser.Failure.self))/archive"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersArchiveUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
@@ -4204,7 +4195,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         request.httpMethod = "POST"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         var multipart = Kizuna.MultipartBuilder()
-        multipart.appendFile(name: "file", file: body.file)
+        try multipart.appendFile(name: "file", file: body.file, failure: OpenEnumAPIClient.UsersUploadAvatar.Failure.self)
         multipart.appendField(name: "userId", value: String(describing: body.userId))
         request.httpBody = multipart.finalize()
         request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")
@@ -4223,8 +4214,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
 
     /// Ping a user, exercises z.void() body and response
     public func pingUser(_ params: OpenEnumAPIClient.UsersPingUser.Params) async throws(OpenEnumAPIClient.UsersPingUser.Failure) {
-        var path = "/users/:id/ping"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersPingUser.Failure.self))/ping"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersPingUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
@@ -4262,8 +4252,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
 
     /// Check user existence, exercises HEAD body stripping
     public func checkUser(_ params: OpenEnumAPIClient.UsersCheckUser.Params) async throws(OpenEnumAPIClient.UsersCheckUser.Failure) {
-        var path = "/users/:id/check"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: OpenEnumAPIClient.UsersCheckUser.Failure.self))/check"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersCheckUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "HEAD"
@@ -4652,8 +4641,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
 
     /// Cancel an invite, an admin only their own
     public func membersCancelInvite(_ params: OpenEnumAPIClient.WorkspaceMembersCancelInvite.Params) async throws(OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure) -> OpenEnumAPIClient.WorkspaceMembersCancelInvite.Result {
-        var path = "/workspace/invites/:inviteId"
-        path = path.replacingOccurrences(of: ":inviteId", with: Kizuna.encodePathSegment(params.inviteId))
+        let path = "/workspace/invites/\(try Kizuna.encodePathSegment(params.inviteId, failure: OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
@@ -4679,8 +4667,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
 
     /// Resolve an invite by its capability-URL token, guarded by a custom path-token identity
     public func invitesGetInvite(_ params: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Params) async throws(OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure) -> OpenEnumAPIClient.WorkspaceInvitesGetInvite.Result {
-        var path = "/invites/:token"
-        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let path = "/invites/\(try Kizuna.encodePathSegment(params.token, failure: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -4706,8 +4693,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
 
     /// Accept an invite via the capability URL
     public func invitesAcceptInvite(_ params: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Params, _ body: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Body) async throws(OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure) -> OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Result {
-        var path = "/invites/:token/accept"
-        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let path = "/invites/\(try Kizuna.encodePathSegment(params.token, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self))/accept"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
@@ -4823,8 +4809,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
 
     /// Look up tomorrow forecast for one city
     public func toolsGetForecast(_ params: OpenEnumAPIClient.AssistantToolsGetForecast.Params, _ query: OpenEnumAPIClient.AssistantToolsGetForecast.Query = .query()) async throws(OpenEnumAPIClient.AssistantToolsGetForecast.Failure) -> OpenEnumAPIClient.AssistantToolsGetForecast.Result {
-        var path = "/forecast/:city"
-        path = path.replacingOccurrences(of: ":city", with: Kizuna.encodePathSegment(params.city))
+        let path = "/forecast/\(try Kizuna.encodePathSegment(params.city, failure: OpenEnumAPIClient.AssistantToolsGetForecast.Failure.self))"
         var queryItems: [URLQueryItem] = []
         queryItems += Kizuna.queryItems(name: "unit", value: query.unit)
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: OpenEnumAPIClient.AssistantToolsGetForecast.Failure.self)
@@ -5066,17 +5051,27 @@ private enum Kizuna {
 
     private static let pathSegmentAllowed: CharacterSet = {
         var allowed = CharacterSet.urlPathAllowed
-        allowed.remove(charactersIn: "/")
+        allowed.remove(charactersIn: "/;")
         return allowed
     }()
 
-    static func encodePathSegment<Value>(_ value: Value) -> String {
+    static func encodePathSegment<Value, Failure: KizunaFailure>(_ value: Value, failure: Failure.Type) throws(Failure) -> String {
         let text = stringifyQueryValue(value).first ?? ""
+        guard !text.isEmpty else { throw Failure.invalidRequest }
         return text.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? text
     }
 
-    static func appendPath(_ base: URL, _ path: String) -> URL {
-        base.appending(path: path, directoryHint: .notDirectory)
+    /// Joins the path, already percent-encoded, to the base URL's own path as it is. Appending it
+    /// through `URL.appending` would encode its `%` a second time.
+    static func appendPath(_ base: URL, _ path: String) -> URLComponents? {
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false),
+            let relative = URLComponents(string: path),
+            relative.host == nil, relative.query == nil, relative.fragment == nil
+        else { return nil }
+        var basePath = components.percentEncodedPath
+        while basePath.hasSuffix("/") { basePath.removeLast() }
+        components.percentEncodedPath = basePath + relative.percentEncodedPath
+        return components
     }
 
     static func stringifyQueryValue(_ value: Any) -> [String] {
@@ -5105,7 +5100,10 @@ private enum Kizuna {
     }
 
     static func makeURL<Failure: KizunaFailure>(baseURL: URL, path: String, queryItems: [URLQueryItem], failure: Failure.Type) throws(Failure) -> URL {
-        guard var components = URLComponents(url: appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
+        if path.split(separator: "/", omittingEmptySubsequences: false).contains(where: { $0 == "." || $0 == ".." }) {
+            throw Failure.invalidRequest
+        }
+        guard var components = appendPath(baseURL, path) else {
             throw Failure.invalidRequest
         }
         if !queryItems.isEmpty { components.queryItems = queryItems }
@@ -5409,17 +5407,36 @@ private enum Kizuna {
 
         mutating func appendField(name: String, value: String) {
             data.append("--\(boundary)\r\n".data(using: .utf8)!)
-            data.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
+            data.append("Content-Disposition: form-data; name=\"\(Self.escape(name))\"\r\n\r\n".data(using: .utf8)!)
             data.append(value.data(using: .utf8)!)
             data.append("\r\n".data(using: .utf8)!)
         }
 
-        mutating func appendFile(name: String, file: OpenEnumAPIClient.MultipartFile) {
+        /// A CR or LF in the MIME type would start a header of its own, so it is refused.
+        mutating func appendFile<Failure: KizunaFailure>(name: String, file: OpenEnumAPIClient.MultipartFile, failure: Failure.Type) throws(Failure) {
+            if file.mimeType.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\n" }) {
+                throw Failure.invalidRequest
+            }
             data.append("--\(boundary)\r\n".data(using: .utf8)!)
-            data.append("Content-Disposition: form-data; name=\"\(name)\"; filename=\"\(file.filename)\"\r\n".data(using: .utf8)!)
+            data.append("Content-Disposition: form-data; name=\"\(Self.escape(name))\"; filename=\"\(Self.escape(file.filename))\"\r\n".data(using: .utf8)!)
             data.append("Content-Type: \(file.mimeType)\r\n\r\n".data(using: .utf8)!)
             data.append(file.data)
             data.append("\r\n".data(using: .utf8)!)
+        }
+
+        /// A quote, CR or LF would end the quoted name or filename, so each is percent-encoded the way
+        /// HTML encodes multipart/form-data.
+        private static func escape(_ value: String) -> String {
+            var escaped = ""
+            for scalar in value.unicodeScalars {
+                switch scalar {
+                case "\"": escaped += "%22"
+                case "\r": escaped += "%0D"
+                case "\n": escaped += "%0A"
+                default: escaped.unicodeScalars.append(scalar)
+                }
+            }
+            return escaped
         }
 
         func finalize() -> Foundation.Data {

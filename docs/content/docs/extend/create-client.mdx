@@ -97,7 +97,9 @@ Called once, after the walk, and returns the file.
 
 The generated code is what app developers live with, so match what the first-party clients do:
 
-- **Every declared status is a typed result**, so a `404` the route declares comes back as data the app can switch on. Undeclared statuses are errors.
+- **Every declared status is a typed result**, so a `404` the route declares comes back as data the app can switch on. Give an undeclared status a defined outcome too: the fetch client resolves it with its `status` and body, the Swift client throws `unexpectedStatus`, and the Kotlin client throws `Unexpected`.
+- **Path params fill their place in the path**, percent-encoded, and an empty value or one that makes a `.` or `..` segment throws before anything is sent.
+- **Text from the contract is escaped** wherever it lands in the generated code, such as a description in a doc comment or a wire name in a string literal.
 - **Problem details decode** into a typed error body, including validation issues on a `400`.
 - **Request context headers** are set once on the client and sent on every call.
 - **Request and response middleware**, so an app can add auth headers and log responses, the way Swift's `requestMiddleware` and Kotlin's `requestInterceptor` do.

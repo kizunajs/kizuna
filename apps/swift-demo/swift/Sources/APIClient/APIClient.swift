@@ -3694,8 +3694,7 @@ public struct APIUsersClient: Sendable {
 
     /// Download a user badge, exercises a binary (BinarySchema) response body under a cache policy and an ETag
     public func userBadge(_ params: APIClient.UsersUserBadge.Params) async throws(APIClient.UsersUserBadge.Failure) -> APIClient.UsersUserBadge.Result {
-        var path = "/users/:id/badge"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersUserBadge.Failure.self))/badge"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersUserBadge.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -3715,8 +3714,7 @@ public struct APIUsersClient: Sendable {
 
     /// A user's most recent login or logout, inline union variants nest under the User model in native clients
     public func lastSessionEvent(_ params: APIClient.UsersLastSessionEvent.Params) async throws(APIClient.UsersLastSessionEvent.Failure) -> APIClient.UsersLastSessionEvent.Result {
-        var path = "/users/:id/last-session-event"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersLastSessionEvent.Failure.self))/last-session-event"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersLastSessionEvent.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -3760,8 +3758,7 @@ public struct APIUsersClient: Sendable {
 
     /// Get a user by id
     public func getUser(_ params: APIClient.UsersGetUser.Params, _ headers: APIClient.UsersGetUser.Headers) async throws(APIClient.UsersGetUser.Failure) -> APIClient.UsersGetUser.Result {
-        var path = "/users/:id"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersGetUser.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersGetUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -3783,9 +3780,7 @@ public struct APIUsersClient: Sendable {
 
     /// Get a year of user activity, exercising two typed path params (a branded id and a coerced int year) and a cache policy on both a success and an error response
     public func userActivity(_ params: APIClient.UsersUserActivity.Params) async throws(APIClient.UsersUserActivity.Failure) -> APIClient.UsersUserActivity.Result {
-        var path = "/users/:id/activity/:year"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
-        path = path.replacingOccurrences(of: ":year", with: Kizuna.encodePathSegment(params.year))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersUserActivity.Failure.self))/activity/\(try Kizuna.encodePathSegment(params.year, failure: APIClient.UsersUserActivity.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersUserActivity.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -3805,8 +3800,7 @@ public struct APIUsersClient: Sendable {
 
     /// Get a user profile, exercises an ETag and the 304 a matching If-None-Match answers with
     public func userProfile(_ params: APIClient.UsersUserProfile.Params) async throws(APIClient.UsersUserProfile.Failure) -> APIClient.UsersUserProfile.Result {
-        var path = "/users/:id/profile"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersUserProfile.Failure.self))/profile"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersUserProfile.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -3850,8 +3844,7 @@ public struct APIUsersClient: Sendable {
 
     /// Replace a user's preferences, exercises required nullable fields round-tripping through the clients
     public func updatePreferences(_ params: APIClient.UsersUpdatePreferences.Params, _ body: APIClient.UsersUpdatePreferences.Body) async throws(APIClient.UsersUpdatePreferences.Failure) -> APIClient.UsersUpdatePreferences.Result {
-        var path = "/users/:id/preferences"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersUpdatePreferences.Failure.self))/preferences"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersUpdatePreferences.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "PUT"
@@ -3874,8 +3867,7 @@ public struct APIUsersClient: Sendable {
     /// Delete a user
     @available(*, deprecated, message: "use `archiveUser` instead")
     public func deleteUser(_ params: APIClient.UsersDeleteUser.Params) async throws(APIClient.UsersDeleteUser.Failure) -> APIClient.UsersDeleteUser.Result {
-        var path = "/users/:id"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersDeleteUser.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersDeleteUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
@@ -3895,8 +3887,7 @@ public struct APIUsersClient: Sendable {
 
     /// Archive a user, first call returns 201, subsequent calls 200
     public func archiveUser(_ params: APIClient.UsersArchiveUser.Params) async throws(APIClient.UsersArchiveUser.Failure) -> APIClient.UsersArchiveUser.Result {
-        var path = "/users/:id/archive"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersArchiveUser.Failure.self))/archive"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersArchiveUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
@@ -3922,7 +3913,7 @@ public struct APIUsersClient: Sendable {
         request.httpMethod = "POST"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         var multipart = Kizuna.MultipartBuilder()
-        multipart.appendFile(name: "file", file: body.file)
+        try multipart.appendFile(name: "file", file: body.file, failure: APIClient.UsersUploadAvatar.Failure.self)
         multipart.appendField(name: "userId", value: String(describing: body.userId))
         request.httpBody = multipart.finalize()
         request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")
@@ -3941,8 +3932,7 @@ public struct APIUsersClient: Sendable {
 
     /// Ping a user, exercises z.void() body and response
     public func pingUser(_ params: APIClient.UsersPingUser.Params) async throws(APIClient.UsersPingUser.Failure) {
-        var path = "/users/:id/ping"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersPingUser.Failure.self))/ping"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersPingUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
@@ -3980,8 +3970,7 @@ public struct APIUsersClient: Sendable {
 
     /// Check user existence, exercises HEAD body stripping
     public func checkUser(_ params: APIClient.UsersCheckUser.Params) async throws(APIClient.UsersCheckUser.Failure) {
-        var path = "/users/:id/check"
-        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let path = "/users/\(try Kizuna.encodePathSegment(params.id, failure: APIClient.UsersCheckUser.Failure.self))/check"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.UsersCheckUser.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "HEAD"
@@ -4370,8 +4359,7 @@ public struct APIWorkspaceClient: Sendable {
 
     /// Cancel an invite, an admin only their own
     public func membersCancelInvite(_ params: APIClient.WorkspaceMembersCancelInvite.Params) async throws(APIClient.WorkspaceMembersCancelInvite.Failure) -> APIClient.WorkspaceMembersCancelInvite.Result {
-        var path = "/workspace/invites/:inviteId"
-        path = path.replacingOccurrences(of: ":inviteId", with: Kizuna.encodePathSegment(params.inviteId))
+        let path = "/workspace/invites/\(try Kizuna.encodePathSegment(params.inviteId, failure: APIClient.WorkspaceMembersCancelInvite.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceMembersCancelInvite.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
@@ -4397,8 +4385,7 @@ public struct APIWorkspaceClient: Sendable {
 
     /// Resolve an invite by its capability-URL token, guarded by a custom path-token identity
     public func invitesGetInvite(_ params: APIClient.WorkspaceInvitesGetInvite.Params) async throws(APIClient.WorkspaceInvitesGetInvite.Failure) -> APIClient.WorkspaceInvitesGetInvite.Result {
-        var path = "/invites/:token"
-        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let path = "/invites/\(try Kizuna.encodePathSegment(params.token, failure: APIClient.WorkspaceInvitesGetInvite.Failure.self))"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceInvitesGetInvite.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
@@ -4424,8 +4411,7 @@ public struct APIWorkspaceClient: Sendable {
 
     /// Accept an invite via the capability URL
     public func invitesAcceptInvite(_ params: APIClient.WorkspaceInvitesAcceptInvite.Params, _ body: APIClient.WorkspaceInvitesAcceptInvite.Body) async throws(APIClient.WorkspaceInvitesAcceptInvite.Failure) -> APIClient.WorkspaceInvitesAcceptInvite.Result {
-        var path = "/invites/:token/accept"
-        path = path.replacingOccurrences(of: ":token", with: Kizuna.encodePathSegment(params.token))
+        let path = "/invites/\(try Kizuna.encodePathSegment(params.token, failure: APIClient.WorkspaceInvitesAcceptInvite.Failure.self))/accept"
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: APIClient.WorkspaceInvitesAcceptInvite.Failure.self)
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
@@ -4541,8 +4527,7 @@ public struct APIAssistantClient: Sendable {
 
     /// Look up tomorrow forecast for one city
     public func toolsGetForecast(_ params: APIClient.AssistantToolsGetForecast.Params, _ query: APIClient.AssistantToolsGetForecast.Query = .query()) async throws(APIClient.AssistantToolsGetForecast.Failure) -> APIClient.AssistantToolsGetForecast.Result {
-        var path = "/forecast/:city"
-        path = path.replacingOccurrences(of: ":city", with: Kizuna.encodePathSegment(params.city))
+        let path = "/forecast/\(try Kizuna.encodePathSegment(params.city, failure: APIClient.AssistantToolsGetForecast.Failure.self))"
         var queryItems: [URLQueryItem] = []
         queryItems += Kizuna.queryItems(name: "unit", value: query.unit)
         let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: queryItems, failure: APIClient.AssistantToolsGetForecast.Failure.self)
@@ -4784,17 +4769,27 @@ private enum Kizuna {
 
     private static let pathSegmentAllowed: CharacterSet = {
         var allowed = CharacterSet.urlPathAllowed
-        allowed.remove(charactersIn: "/")
+        allowed.remove(charactersIn: "/;")
         return allowed
     }()
 
-    static func encodePathSegment<Value>(_ value: Value) -> String {
+    static func encodePathSegment<Value, Failure: KizunaFailure>(_ value: Value, failure: Failure.Type) throws(Failure) -> String {
         let text = stringifyQueryValue(value).first ?? ""
+        guard !text.isEmpty else { throw Failure.invalidRequest }
         return text.addingPercentEncoding(withAllowedCharacters: pathSegmentAllowed) ?? text
     }
 
-    static func appendPath(_ base: URL, _ path: String) -> URL {
-        base.appending(path: path, directoryHint: .notDirectory)
+    /// Joins the path, already percent-encoded, to the base URL's own path as it is. Appending it
+    /// through `URL.appending` would encode its `%` a second time.
+    static func appendPath(_ base: URL, _ path: String) -> URLComponents? {
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: false),
+            let relative = URLComponents(string: path),
+            relative.host == nil, relative.query == nil, relative.fragment == nil
+        else { return nil }
+        var basePath = components.percentEncodedPath
+        while basePath.hasSuffix("/") { basePath.removeLast() }
+        components.percentEncodedPath = basePath + relative.percentEncodedPath
+        return components
     }
 
     static func stringifyQueryValue(_ value: Any) -> [String] {
@@ -4823,7 +4818,10 @@ private enum Kizuna {
     }
 
     static func makeURL<Failure: KizunaFailure>(baseURL: URL, path: String, queryItems: [URLQueryItem], failure: Failure.Type) throws(Failure) -> URL {
-        guard var components = URLComponents(url: appendPath(baseURL, path), resolvingAgainstBaseURL: false) else {
+        if path.split(separator: "/", omittingEmptySubsequences: false).contains(where: { $0 == "." || $0 == ".." }) {
+            throw Failure.invalidRequest
+        }
+        guard var components = appendPath(baseURL, path) else {
             throw Failure.invalidRequest
         }
         if !queryItems.isEmpty { components.queryItems = queryItems }
@@ -5127,17 +5125,36 @@ private enum Kizuna {
 
         mutating func appendField(name: String, value: String) {
             data.append("--\(boundary)\r\n".data(using: .utf8)!)
-            data.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
+            data.append("Content-Disposition: form-data; name=\"\(Self.escape(name))\"\r\n\r\n".data(using: .utf8)!)
             data.append(value.data(using: .utf8)!)
             data.append("\r\n".data(using: .utf8)!)
         }
 
-        mutating func appendFile(name: String, file: APIClient.MultipartFile) {
+        /// A CR or LF in the MIME type would start a header of its own, so it is refused.
+        mutating func appendFile<Failure: KizunaFailure>(name: String, file: APIClient.MultipartFile, failure: Failure.Type) throws(Failure) {
+            if file.mimeType.unicodeScalars.contains(where: { $0 == "\r" || $0 == "\n" }) {
+                throw Failure.invalidRequest
+            }
             data.append("--\(boundary)\r\n".data(using: .utf8)!)
-            data.append("Content-Disposition: form-data; name=\"\(name)\"; filename=\"\(file.filename)\"\r\n".data(using: .utf8)!)
+            data.append("Content-Disposition: form-data; name=\"\(Self.escape(name))\"; filename=\"\(Self.escape(file.filename))\"\r\n".data(using: .utf8)!)
             data.append("Content-Type: \(file.mimeType)\r\n\r\n".data(using: .utf8)!)
             data.append(file.data)
             data.append("\r\n".data(using: .utf8)!)
+        }
+
+        /// A quote, CR or LF would end the quoted name or filename, so each is percent-encoded the way
+        /// HTML encodes multipart/form-data.
+        private static func escape(_ value: String) -> String {
+            var escaped = ""
+            for scalar in value.unicodeScalars {
+                switch scalar {
+                case "\"": escaped += "%22"
+                case "\r": escaped += "%0D"
+                case "\n": escaped += "%0A"
+                default: escaped.unicodeScalars.append(scalar)
+                }
+            }
+            return escaped
         }
 
         func finalize() -> Foundation.Data {
