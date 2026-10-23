@@ -1,5 +1,6 @@
 import { isCompiledJob, jobAt, toJobResponse, type CompiledJob, type JobHandlerReturn, type JobHandlers, type Jobs } from './jobs.js';
 import { ResponseError } from './response-error.js';
+import { waitUntil } from './wait-until.js';
 import type { JobMessage, JobTransport } from './job-transport.js';
 import type { z } from 'zod';
 
@@ -199,12 +200,12 @@ export const createJobRunner = <Jobs_ extends Jobs>(
                 console.error(`[kizuna] Queued job "${jobKey}" failed:`, error);
             });
         };
-        const delay = runAt ? runAt.getTime() - Date.now() : 0;
-        if (delay <= 0) {
+        const time = runAt?.getTime();
+        if (time === undefined || time <= Date.now()) {
             start();
             return;
         }
-        setTimeout(start, delay).unref?.();
+        waitUntil(time, start);
     };
 
     /**
