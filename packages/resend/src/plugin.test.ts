@@ -630,6 +630,33 @@ describe('the webhook route', () => {
         expect(response.status).toBe(204);
     });
 
+    it('acknowledges an event whose type names an inherited property, running nothing', async () => {
+        const ran: string[] = [];
+        const inherited = {
+            constructor: () => {
+                ran.push('constructor');
+            },
+            toString: () => {
+                ran.push('toString');
+                return '';
+            },
+        };
+        const app = express();
+        install(Object.create(inherited)).mount(app);
+
+        for (const type of ['constructor', 'toString', 'hasOwnProperty', '__proto__']) {
+            const payload = JSON.stringify({
+                type,
+                data: {},
+            });
+
+            const response = await post(app, payload, signedDelivery(payload));
+
+            expect(response.status, type).toBe(204);
+        }
+        expect(ran).toEqual([]);
+    });
+
     it('refuses a delivery whose signature does not match', async () => {
         const bounced: string[] = [];
         const app = express();

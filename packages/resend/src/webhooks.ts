@@ -87,7 +87,10 @@ export const webhookRoute = (resend: Resend, webhookSecret: string, on: ResendEv
             });
         }
 
-        const handle = on[event.type] as ((context: Record<string, unknown>) => Promise<void> | void) | undefined;
+        // Own keys only, so a signed event typed `constructor` or `toString` runs nothing.
+        const handle = (Object.hasOwn(on, event.type) ? on[event.type] : undefined) as
+            | ((context: Record<string, unknown>) => Promise<void> | void)
+            | undefined;
         const { jobs, plugins } = args as unknown as Record<string, unknown>;
         await handle?.({
             event,
