@@ -10,7 +10,7 @@ import { flattenRoutes, type RoutesWithHandlerContext } from './handler-pipeline
 import { assertJobRunner, jobClaims, type Jobs, type JobsArg, type JobRunnerConfig } from './jobs.js';
 import type { GroupOptions, GroupSet } from './groups.js';
 import type { AssembledRoutes } from './group-routes.js';
-import { assembleRoutes } from './routes.js';
+import { assembleRoutes, assertParamsSeparated } from './routes.js';
 import { problemDetails, type GuardBody, type GuardOutput, type GuardSchemaCheck } from './problem-details.js';
 import { readObjectShape } from './zod-internals.js';
 import { streamToolsOf } from './tool-events.js';
@@ -425,6 +425,7 @@ export const defineConfig = <
         if (route.tool !== undefined && route.tool !== false) {
             throw new Error(`Plugin route '${routeKey}' declares \`tool\`. Plugin routes are hidden, so they never publish.`);
         }
+        assertParamsSeparated(route, routeKey);
         // Plugin routes are for outside callers, so none reaches the clients, the OpenAPI document or MCP.
         (route as { hidden?: boolean }).hidden = true;
     }

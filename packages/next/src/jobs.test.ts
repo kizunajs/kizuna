@@ -167,6 +167,78 @@ describe('the dispatch endpoint', () => {
     });
 });
 
+describe('requestMiddleware on the job runner', () => {
+    const mountWith = (requestMiddleware: NonNullable<Parameters<typeof api.mount>[0]>['requestMiddleware']) =>
+        api.mount({
+            basePath: '/api',
+            requestMiddleware,
+        });
+
+    it('runs once for the dispatch endpoint, with its path and method', async () => {
+        const seen: Array<{ path: string; method: string }> = [];
+        const { POST: middlewarePOST } = mountWith([
+            (_request, route) => {
+                seen.push(route);
+            },
+        ]);
+        const response = await middlewarePOST(
+            new NextRequest('http://localhost:3000/api/jobs/dispatch', {
+                method: 'POST',
+                headers: secret,
+            })
+        );
+        expect(response.status).toBe(200);
+        expect(seen).toEqual([
+            {
+                path: '/jobs/dispatch',
+                method: 'POST',
+            },
+        ]);
+    });
+
+    it('stops a job run when it returns a Response', async () => {
+        const { POST: middlewarePOST } = mountWith([
+            () =>
+                new Response(null, {
+                    status: 403,
+                }),
+        ]);
+        const response = await middlewarePOST(
+            new NextRequest('http://localhost:3000/api/jobs/run', {
+                method: 'POST',
+                headers: {
+                    ...secret,
+                    'content-type': 'application/json',
+                },
+                body: JSON.stringify({
+                    job: 'reconcile',
+                    input: {
+                        since: '2026-01-01',
+                    },
+                }),
+            })
+        );
+        expect(response.status).toBe(403);
+    });
+
+    it('runs once for an API route', async () => {
+        const seen: Array<{ path: string; method: string }> = [];
+        const { GET: middlewareGET } = mountWith([
+            (_request, route) => {
+                seen.push(route);
+            },
+        ]);
+        const response = await middlewareGET(new NextRequest('http://localhost:3000/api/users'));
+        expect(response.status).toBe(200);
+        expect(seen).toEqual([
+            {
+                path: '/users',
+                method: 'GET',
+            },
+        ]);
+    });
+});
+
 describe('jobs that run in process', () => {
     const closed = defineConfig({
         ...config,

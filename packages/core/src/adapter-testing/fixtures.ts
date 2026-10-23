@@ -1180,6 +1180,8 @@ export const methodInput = {
 
 export const methodContract = defineConfig(methodInput).api;
 
+export const failingStreamFirstChunk = 'first chunk\n';
+
 const probePlugin = definePlugin({
     slug: 'probe',
     options: z.object({
@@ -1231,6 +1233,35 @@ const probePlugin = definePlugin({
                             'Content-Type': 'text/plain',
                         },
                     })
+                )
+            ),
+            failingStream: route({
+                method: 'GET',
+                path: '/probe/failing-stream',
+                responses: {
+                    200: z.object({
+                        never: z.boolean(),
+                    }),
+                },
+            }).handler(() =>
+                rawResponse(
+                    new Response(
+                        new ReadableStream<Uint8Array>({
+                            start(controller) {
+                                controller.enqueue(new TextEncoder().encode(failingStreamFirstChunk));
+                            },
+                            async pull(controller) {
+                                await new Promise((resolve) => setTimeout(resolve, 20));
+                                controller.error(new Error('The stream failed after its first chunk'));
+                            },
+                        }),
+                        {
+                            status: 200,
+                            headers: {
+                                'Content-Type': 'text/plain',
+                            },
+                        }
+                    )
                 )
             ),
         },

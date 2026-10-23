@@ -15,6 +15,9 @@ export const ADAPTER_FEATURES = {
     'routing.notFound': {
         summary: 'An undeclared path is refused.',
     },
+    'routing.exactPaths': {
+        summary: 'A path matches only as declared, so a change of case or a trailing slash is another path (RFC 3986).',
+    },
     'routing.subRouterComposition': {
         summary: 'Routes composed from a sub-router mount at their declared path.',
     },
@@ -80,6 +83,9 @@ export const ADAPTER_FEATURES = {
     },
     'errors.undeclaredExtensionsStripped': {
         summary: 'An error body keeps the extension members its schema declares and loses the rest.',
+    },
+    'errors.formatError': {
+        summary: 'A `formatError` passed at mount reshapes the error responses kizuna sends.',
     },
     'guards.publicRoute': {
         summary: 'A route the contract marks public runs without credentials.',
@@ -179,6 +185,9 @@ export const ADAPTER_FEATURES = {
     },
     'plugins.rawResponse': {
         summary: 'A plugin route answering with `rawResponse` sends its response untouched by validation or rendering.',
+    },
+    'plugins.rawResponseStreamError': {
+        summary: 'A `rawResponse` body that errors partway ends the connection, and the server goes on serving.',
     },
     'streams.sseFraming': {
         summary: 'A streamed status writes each yield as a server-sent event under `text/event-stream` with `Cache-Control: no-store`.',

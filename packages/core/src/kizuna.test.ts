@@ -991,4 +991,37 @@ describe('hidden routes', () => {
             })
         ).toThrow(/Plugin route 'status.check' declares `tool`/);
     });
+
+    it('throws when a plugin route puts one param directly after another', () => {
+        const ranges = definePlugin({
+            slug: 'ranges',
+            setup: () => ({
+                routes: {
+                    read: route({
+                        method: 'GET',
+                        path: '/ranges/:from:to',
+                        auth: false,
+                        responses: {
+                            200: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                    }).handler(() => ({
+                        status: 200,
+                        body: {
+                            ok: true,
+                        },
+                    })),
+                },
+            }),
+        });
+
+        expect(() =>
+            defineConfig({
+                groups: hiddenGroups,
+                routes: [],
+                plugins: [ranges()],
+            })
+        ).toThrow(/:to follows :from with no text between them/);
+    });
 });

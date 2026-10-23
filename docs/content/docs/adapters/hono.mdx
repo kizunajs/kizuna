@@ -186,6 +186,25 @@ kizuna.api.mount(app, {
 | `responseValidation` | `false` | Answer `500` when a handler's body fails its response schema. Off, that body is sent. Fields the schema leaves out are removed either way. Enable in development.                         |
 | `formatError`        | none    | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
 
+## Body size
+
+Hono reads a request body whole and sets no limit on its size. Put Hono's [`bodyLimit`](https://hono.dev/docs/middleware/builtin/body-limit) middleware in front of Kizuna to cap it:
+
+```ts title="src/index.ts"
+import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
+import kizuna from '../kizuna.config';
+
+const app = new Hono();
+
+app.use(
+    bodyLimit({
+        maxSize: 1024 * 1024,
+    })
+);
+kizuna.api.mount(app);
+```
+
 ## Streams
 
 A [stream](/docs/streaming) response is returned as a `ReadableStream` body. The generator's `signal` is `c.req.raw.signal`, which the Node server aborts when the client goes away.

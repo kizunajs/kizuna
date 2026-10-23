@@ -293,3 +293,111 @@ describe('matchRoute', () => {
         expect(matched(matchRoute('GET', '/users/42/things', collectionRoutes)).routeKey).toBe('getUserThings');
     });
 });
+
+describe('matchRoute with several params in one segment', () => {
+    const matched = (result: ReturnType<typeof matchRoute>) => {
+        if (result.kind !== 'matched') throw new Error(`expected match, got ${result.kind}`);
+        return result.match;
+    };
+
+    const segmentRoutes = k.routes({
+        getRange: k.route({
+            method: 'GET',
+            path: '/range/:from-:to',
+            responses: {
+                200: z.string(),
+            },
+        }),
+        getFile: k.route({
+            method: 'GET',
+            path: '/files/:name.:ext',
+            responses: {
+                200: z.string(),
+            },
+        }),
+        getTriple: k.route({
+            method: 'GET',
+            path: '/triple/:first-:second-:third',
+            responses: {
+                200: z.string(),
+            },
+        }),
+        getSpan: k.route({
+            method: 'GET',
+            path: '/span/:start-to-:end',
+            responses: {
+                200: z.string(),
+            },
+        }),
+    });
+
+    it('captures the way Express 5 does', () => {
+        expect(matched(matchRoute('GET', '/files/archive.tar.gz', segmentRoutes)).params).toEqual({
+            name: 'archive.tar',
+            ext: 'gz',
+        });
+        expect(matched(matchRoute('GET', '/range/a-b-c', segmentRoutes)).params).toEqual({
+            from: 'a-b',
+            to: 'c',
+        });
+        expect(matched(matchRoute('GET', '/range/---', segmentRoutes)).params).toEqual({
+            from: '-',
+            to: '-',
+        });
+        expect(matched(matchRoute('GET', '/triple/a-b-c-d', segmentRoutes)).params).toEqual({
+            first: 'a-b',
+            second: 'c',
+            third: 'd',
+        });
+        expect(matched(matchRoute('GET', '/span/a-to-b-to-c', segmentRoutes)).params).toEqual({
+            start: 'a-to-b',
+            end: 'c',
+        });
+    });
+
+    it('refuses what Express 5 refuses', () => {
+        expect(matchRoute('GET', '/range/a-b-', segmentRoutes).kind).toBe('not-found');
+        expect(matchRoute('GET', '/range/-a', segmentRoutes).kind).toBe('not-found');
+        expect(matchRoute('GET', '/files/archive.', segmentRoutes).kind).toBe('not-found');
+    });
+
+    it('fails a long near miss in linear time', () => {
+        for (const path of [
+            '/range/' + '-'.repeat(16_000) + '/x',
+            '/triple/' + '-'.repeat(16_000) + '/x',
+            '/files/' + '.'.repeat(16_000) + '/x',
+        ]) {
+            const started = performance.now();
+            expect(matchRoute('GET', path, segmentRoutes).kind).toBe('not-found');
+            expect(performance.now() - started).toBeLessThan(50);
+        }
+    });
+
+    it('matches a long path in linear time', () => {
+        const started = performance.now();
+        expect(matched(matchRoute('GET', '/range/' + 'a-'.repeat(8_000) + 'b', segmentRoutes)).params.to).toBe('b');
+        expect(performance.now() - started).toBeLessThan(50);
+    });
+});
+
+describe('matchRoute with unusual paths', () => {
+    it('reads `*` in a declared path as a literal', () => {
+        const starRoutes = k.routes({
+            listFiles: k.route({
+                method: 'GET',
+                path: '/files*',
+                responses: {
+                    200: z.string(),
+                },
+            }),
+        });
+        expect(matchRoute('GET', '/file', starRoutes).kind).toBe('not-found');
+        expect(matchRoute('GET', '/filesss', starRoutes).kind).toBe('not-found');
+        expect(matchRoute('GET', '/files*', starRoutes).kind).toBe('matched');
+    });
+
+    it('answers a malformed percent escape in a param as no match', () => {
+        expect(matchRoute('GET', '/users/%E0%A4%A', routes).kind).toBe('not-found');
+        expect(matchRoute('DELETE', '/users/%E0%A4%A', routes).kind).toBe('not-found');
+    });
+});

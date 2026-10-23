@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { ErrorFormatter } from '../adapter.js';
 import { ADAPTER_BEHAVIOUR, ADAPTER_FEATURES, featureGroups, featuresInGroup, type AdapterFeature, type AdapterName } from './features.js';
 import {
     adminToken,
@@ -28,6 +29,7 @@ import {
     streamedLinesText,
     strippedInput,
     visitorSession,
+    failingStreamFirstChunk,
 } from './fixtures.js';
 import { collectStreamText, readStreamUntil, toMountedApi, type MountedApi, type Transport, type TestResponse } from './transport.js';
 
@@ -45,7 +47,15 @@ export interface AdapterUnderTest<Api> {
      * createApi: (input) => defineConfig({ ...input, adapter: expressAdapter() }).api
      */
     createApi: (input: never) => Api;
-    mount: (api: Api, options: { responseValidation?: boolean }) => Transport | Promise<Transport>;
+    mount: (api: Api, options: AdapterMountOptions) => Transport | Promise<Transport>;
+}
+
+/**
+ * The mount options every adapter takes, passed through as they are.
+ */
+export interface AdapterMountOptions {
+    responseValidation?: boolean;
+    formatError?: ErrorFormatter;
 }
 
 interface MountOptions {
@@ -55,6 +65,7 @@ interface MountOptions {
      */
     input: unknown;
     responseValidation?: boolean;
+    formatError?: ErrorFormatter;
 }
 
 export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void => {
@@ -64,6 +75,7 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         const api = adapter.createApi(options.input as never);
         const transport = await adapter.mount(api, {
             responseValidation: options.responseValidation,
+            formatError: options.formatError,
         });
         return toMountedApi(transport);
     };
@@ -257,6 +269,22 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 path: '/not-a-declared-route',
             });
             expect(response.status).toBe(404);
+        },
+
+        'routing.exactPaths': async () => {
+            await createAda();
+            const declared = await api.request({
+                method: 'GET',
+                path: '/users/1',
+            });
+            expect(declared.status).toBe(200);
+            for (const path of ['/Users/1', '/USERS/1', '/users/1/', '/users//1']) {
+                const response = await api.request({
+                    method: 'GET',
+                    path,
+                });
+                expect(response.status, path).toBe(404);
+            }
         },
 
         'routing.subRouterComposition': async () => {
@@ -682,6 +710,32 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     openShifts: 2,
                 });
             });
+        },
+
+        'errors.formatError': async () => {
+            await using(
+                {
+                    input: userInput,
+                    formatError: (problem) => ({
+                        contentType: 'application/json',
+                        body: {
+                            message: problem.detail,
+                        },
+                    }),
+                },
+                async (formatted) => {
+                    const response = await formatted.request({
+                        method: 'GET',
+                        path: '/users/missing',
+                    });
+                    expect(response.status).toBe(404);
+                    expect(response.headers.get('content-type')).toContain('application/json');
+                    expect(response.headers.get('content-type')).not.toContain('problem+json');
+                    expect(response.body).toEqual({
+                        message: 'Not found',
+                    });
+                }
+            );
         },
 
         'guards.publicRoute': async () => {
@@ -1216,6 +1270,34 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.text).toBe('not json at all');
             });
         },
+        'plugins.rawResponseStreamError': async () => {
+            const uncaught: unknown[] = [];
+            const record = (error: unknown) => uncaught.push(error);
+            process.on('uncaughtException', record);
+            try {
+                await usingPlugins(async (mounted) => {
+                    const response = await mounted.stream({
+                        method: 'GET',
+                        path: '/probe/failing-stream',
+                    });
+                    expect(response.status).toBe(200);
+                    const { text, error } = await withTimeout(collectStreamText(response.body), 2000, 'the failed read');
+                    expect(text).toBe(failingStreamFirstChunk);
+                    expect(error).toBeDefined();
+                    await new Promise((resolve) => setTimeout(resolve, 100));
+
+                    const next = await mounted.request({
+                        method: 'GET',
+                        path: '/probe/ping',
+                    });
+                    expect(next.status).toBe(200);
+                });
+            } finally {
+                process.off('uncaughtException', record);
+            }
+            expect(uncaught).toEqual([]);
+        },
+
         'streams.sseFraming': async () => {
             await usingStreams(async (streams) => {
                 const response = await streams.request({

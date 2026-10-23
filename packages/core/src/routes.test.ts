@@ -256,6 +256,69 @@ describe('k.routes z.coerce ban', () => {
     });
 });
 
+describe('k.routes params in one segment', () => {
+    it('throws when a param directly follows another', () => {
+        expect(() =>
+            k.routes.users({
+                getRange: k.route({
+                    method: 'GET',
+                    path: '/ranges/:from:to',
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                }),
+            })
+        ).toThrowError(
+            'Route "getRange" has the path "/ranges/:from:to", where :to follows :from with no text between them. Put a literal between them, like "/ranges/:from-:to".'
+        );
+    });
+
+    it('names the first pair when several params run together', () => {
+        expect(() =>
+            k.routes.users({
+                getSpan: k.route({
+                    method: 'GET',
+                    path: '/spans/:start:middle:end',
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                }),
+            })
+        ).toThrowError(
+            'where :middle follows :start with no text between them. Put a literal between them, like "/spans/:start-:middle:end".'
+        );
+    });
+
+    it('accepts params separated by text', () => {
+        expect(() =>
+            k.routes.users({
+                getRange: k.route({
+                    method: 'GET',
+                    path: '/ranges/:from-:to',
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                }),
+                getFile: k.route({
+                    method: 'GET',
+                    path: '/files/:name.:ext',
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                }),
+            })
+        ).not.toThrow();
+    });
+});
+
 describe('k.routes pathParams/path agreement', () => {
     it('throws when pathParams declares a key the path does not have', () => {
         expect(() =>

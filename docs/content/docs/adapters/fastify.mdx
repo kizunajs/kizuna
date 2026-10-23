@@ -183,6 +183,42 @@ await app.register(fastifyKizuna, {
 });
 ```
 
+## Form bodies
+
+Fastify parses JSON and plain text bodies itself. Routes with `contentType: 'application/x-www-form-urlencoded'` need [`@fastify/formbody`](https://github.com/fastify/fastify-formbody), registered before Kizuna mounts. Without it, Fastify answers them `415`.
+
+```ts title="src/index.ts"
+import Fastify from 'fastify';
+import formbody from '@fastify/formbody';
+import kizuna from '../kizuna.config';
+
+const app = Fastify();
+
+await app.register(formbody);
+await kizuna.api.mount(app);
+```
+
+## Errors
+
+A handler that throws reaches Fastify's error handler. Fastify's default answers `500` with the error's `message` in the body, so set your own with `setErrorHandler` to decide what a client sees. It handles Fastify's own errors too, like a `413` for a body over `bodyLimit`, so keep their status:
+
+```ts title="src/index.ts"
+app.setErrorHandler((error, request, reply) => {
+    const status = error.statusCode ?? 500;
+    if (status >= 500) request.log.error(error);
+    return reply
+        .status(status)
+        .type('application/problem+json')
+        .send({
+            type: 'about:blank',
+            title: status >= 500 ? 'Internal Server Error' : error.message,
+            status,
+        });
+});
+
+await kizuna.api.mount(app);
+```
+
 ## Type-safe request properties
 
 Middleware that sets custom properties on `request`, such as a request id, needs Fastify's [declaration merging](https://fastify.dev/docs/latest/Reference/TypeScript/#creating-a-typescript-fastify-plugin) to extend the `FastifyRequest` interface. Authentication data does not: guards hand handlers typed context directly.
