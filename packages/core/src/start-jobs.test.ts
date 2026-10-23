@@ -125,6 +125,53 @@ describe('startJobs', () => {
         expect(sent.map((message) => message.dedupeKey)).toEqual(['cleanup@2026-08-05T03:00:00.000Z', 'cleanup@2026-08-06T03:00:00.000Z']);
     });
 
+    it('waits for a run further away than one timer can hold', async () => {
+        vi.setSystemTime(new Date('2026-08-02T00:00:00Z'));
+        const { sent, transport } = recording();
+        const monthly = {
+            [JOBS_META]: {
+                jobs: k.jobs({
+                    sendInvoices: k.job({
+                        schedule: '0 0 1 * *',
+                    }),
+                }),
+                handlers: {
+                    sendInvoices: () => {},
+                },
+                transport,
+            },
+        };
+        const scheduler = startJobs(monthly, { logger: silent });
+        await vi.advanceTimersByTimeAsync(29 * 24 * 60 * 60 * 1000);
+        expect(sent).toHaveLength(0);
+        await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+        scheduler.stop();
+        expect(sent.map((message) => message.dedupeKey)).toEqual(['sendInvoices@2026-09-01T00:00:00.000Z']);
+    });
+
+    it('stops a long wait once stopped', async () => {
+        vi.setSystemTime(new Date('2026-08-02T00:00:00Z'));
+        const { sent, transport } = recording();
+        const monthly = {
+            [JOBS_META]: {
+                jobs: k.jobs({
+                    sendInvoices: k.job({
+                        schedule: '0 0 1 * *',
+                    }),
+                }),
+                handlers: {
+                    sendInvoices: () => {},
+                },
+                transport,
+            },
+        };
+        const scheduler = startJobs(monthly, { logger: silent });
+        await vi.advanceTimersByTimeAsync(25 * 24 * 60 * 60 * 1000);
+        scheduler.stop();
+        await vi.advanceTimersByTimeAsync(10 * 24 * 60 * 60 * 1000);
+        expect(sent).toHaveLength(0);
+    });
+
     it('never ticks a job with no schedule', async () => {
         vi.setSystemTime(new Date('2026-08-05T02:59:00Z'));
         const { sent, transport } = recording();

@@ -45,7 +45,8 @@ export interface HttpJobsConfig {
     method?: 'POST' | 'GET';
     /**
      * How far back a tick looks for due jobs. Widen it when the scheduler
-     * delivers late.
+     * delivers late. A window wider than the time between ticks runs an
+     * occurrence on each tick that covers it.
      *
      * @default 60000
      */

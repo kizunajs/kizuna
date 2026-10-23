@@ -1,5 +1,6 @@
 import { nextRun, scheduleExpression, scheduleTimezone, type JobSchedule } from './schedule.js';
 import { flattenJobs, jobFnAt, jobRunnerFrom, JOBS_META, type JobsMeta, type ScheduledJob } from './adapter.js';
+import { waitUntil, type Wait } from './wait-until.js';
 
 export interface StartJobsOptions {
     /**
@@ -87,7 +88,7 @@ export const startJobs = (api: unknown, options?: StartJobsOptions): JobSchedule
     }
 
     const runner = jobRunnerFrom(meta);
-    const timers = new Map<string, ReturnType<typeof setTimeout>>();
+    const waits = new Map<string, Wait>();
     let stopped = false;
 
     const scheduleNext = (jobKey: string, schedule: JobSchedule, from: Date): void => {
@@ -97,34 +98,30 @@ export const startJobs = (api: unknown, options?: StartJobsOptions): JobSchedule
             logger.warn(`[kizuna] Job "${jobKey}" has a schedule that never fires: ${scheduleExpression(schedule)}`);
             return;
         }
-        const timer = setTimeout(
-            () => {
-                const jobFn = jobFnAt(runner, jobKey);
-                if (!jobFn) {
-                    logger.warn(`[kizuna] No handler was bound for job "${jobKey}", so its schedule does nothing.`);
-                    return;
-                }
-                void jobFn
-                    .queue({
-                        dedupeKey: occurrenceKey(jobKey, occurrence),
-                    })
-                    .then(() => {
-                        options?.onTick?.(jobKey, {
-                            queuedAt: occurrence,
-                        });
-                    })
-                    .catch((error: unknown) => {
-                        logger.error(`[kizuna] Queueing "${jobKey}" for ${occurrence.toISOString()} failed:`, error);
-                        options?.onTick?.(jobKey, { error });
-                    })
-                    .finally(() => {
-                        scheduleNext(jobKey, schedule, occurrence);
+        const wait = waitUntil(occurrence.getTime(), () => {
+            const jobFn = jobFnAt(runner, jobKey);
+            if (!jobFn) {
+                logger.warn(`[kizuna] No handler was bound for job "${jobKey}", so its schedule does nothing.`);
+                return;
+            }
+            void jobFn
+                .queue({
+                    dedupeKey: occurrenceKey(jobKey, occurrence),
+                })
+                .then(() => {
+                    options?.onTick?.(jobKey, {
+                        queuedAt: occurrence,
                     });
-            },
-            Math.max(occurrence.getTime() - Date.now(), 0)
-        );
-        timer.unref?.();
-        timers.set(jobKey, timer);
+                })
+                .catch((error: unknown) => {
+                    logger.error(`[kizuna] Queueing "${jobKey}" for ${occurrence.toISOString()} failed:`, error);
+                    options?.onTick?.(jobKey, { error });
+                })
+                .finally(() => {
+                    scheduleNext(jobKey, schedule, occurrence);
+                });
+        });
+        waits.set(jobKey, wait);
     };
 
     const now = new Date();
@@ -140,8 +137,8 @@ export const startJobs = (api: unknown, options?: StartJobsOptions): JobSchedule
     return {
         stop: () => {
             stopped = true;
-            for (const timer of timers.values()) clearTimeout(timer);
-            timers.clear();
+            for (const wait of waits.values()) wait.cancel();
+            waits.clear();
         },
     };
 };
