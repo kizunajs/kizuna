@@ -64,10 +64,11 @@ describe('Fastify: handler context', () => {
 testAdapterFeatures({
     name: 'fastify',
     createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: fastifyAdapter() }).api as unknown as FastifyApi,
-    mount: async (api, { responseValidation }) => {
+    mount: async (api, { responseValidation, formatError }) => {
         const app = Fastify();
         await api.mount(app, {
             responseValidation,
+            formatError,
         });
         await app.ready();
         let listening = false;

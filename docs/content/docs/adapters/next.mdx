@@ -168,6 +168,7 @@ export const { GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS } = kizuna.api.mount
 | `requestMiddleware`  | `[]`    | Middleware run after route matching, before the handler. See [`requestMiddleware`](#requestmiddleware)                         |
 | `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                |
 | `onError`            | none    | Map a thrown error into a response (inbound migration seam); return an `AdapterResult`/`Response` to override the default 500. |
+| `formatError`        | none    | Reshape error (`>= 400`) response bytes for migrating clients. See [Migrating an existing API](/docs/migration/existing-api).  |
 
 ## `onError`
 
@@ -201,7 +202,11 @@ export default defineConfig({
 
 ## `requestMiddleware`
 
-`requestMiddleware` applies a flat array of middleware to every matched route, after route matching and before the handler. Each middleware receives `(request, route)`, where `route` is the matched route's `path` and `method`, and may return a `Response` to short-circuit.
+`requestMiddleware` applies a flat array of middleware to every matched route, after route matching and before the handler. That includes plugin routes and the job runner's routes, `/jobs/dispatch` and `/jobs/run` by default. Each middleware receives `(request, route)`, where `route` is the matched route's `path` and `method`, and may return a `Response` to short-circuit.
+
+## Body size
+
+A route handler reads the request body whole, and Next.js sets no limit on its size there. Its `bodySizeLimit` covers Server Actions alone. Cap request bodies where the app is hosted: Vercel limits a function's request body itself, and on your own server the proxy in front sets it, like `client_max_body_size` in nginx.
 
 ## Type-safe request properties
 

@@ -59,10 +59,11 @@ describe('Hono: handler context', () => {
 testAdapterFeatures({
     name: 'hono',
     createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: honoAdapter() }).api as unknown as HonoApi,
-    mount: (api, { responseValidation }) => {
+    mount: (api, { responseValidation, formatError }) => {
         const app = new Hono();
         api.mount(app, {
             responseValidation,
+            formatError,
         });
         return {
             stream: async ({ method, path, body, headers }) => {

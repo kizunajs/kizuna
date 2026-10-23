@@ -7,6 +7,7 @@ import {
     type GuardMap,
     type RequestContextMap,
     type ApiWithRouter,
+    type RouteDefinition,
     defineAdapter,
     headersToObject,
     matchRoute,
@@ -72,8 +73,9 @@ export interface NextHandlerOptions {
      */
     formatError?: ErrorFormatter<NextRequest>;
     /**
-     * Middleware functions that run after route matching but before the handler.
-     * Each receives `(request, route)`; return a `Response` to short-circuit.
+     * Middleware functions that run after route matching but before the handler,
+     * on every matched route, plugin routes and the job runner's included. Each
+     * receives `(request, route)`; return a `Response` to short-circuit.
      * Authentication belongs in a guard.
      */
     requestMiddleware?: Array<NextMiddlewareHandler>;
@@ -143,9 +145,33 @@ export const handleNextRequest = async <T extends Routes>(
         },
     });
 
+    /**
+     * Run `requestMiddleware` for a matched route, and return the first
+     * `Response` one of them sends.
+     */
+    const runMiddleware = async (route: RouteDefinition): Promise<NextResponse | undefined> => {
+        const middlewareRoute: NextMiddlewareRoute = {
+            path: route.path,
+            method: route.method,
+        };
+        for (const handler of options?.requestMiddleware ?? []) {
+            const result = await handler(request, middlewareRoute);
+            if (result instanceof Response) {
+                return new NextResponse(result.body, {
+                    status: result.status,
+                    statusText: result.statusText,
+                    headers: result.headers,
+                });
+            }
+        }
+        return undefined;
+    };
+
     if (jobs) {
         const matchedJob = matchRoute(request.method, url.pathname, jobs.routes, options?.basePath);
         if (matchedJob.kind === 'matched') {
+            const stopped = await runMiddleware(matchedJob.match.route);
+            if (stopped) return stopped;
             const jobRequest: AdapterRequest<NextRequest> = {
                 request,
                 method: request.method,
@@ -181,21 +207,8 @@ export const handleNextRequest = async <T extends Routes>(
         const matched = matchRoute(request.method, url.pathname, routes, options?.basePath);
 
         if (matched.kind === 'matched') {
-            const middlewareRoute: NextMiddlewareRoute = {
-                path: matched.match.route.path,
-                method: matched.match.route.method,
-            };
-
-            for (const handler of globalMiddleware) {
-                const result = await handler(request, middlewareRoute);
-                if (result instanceof Response) {
-                    return new NextResponse(result.body, {
-                        status: result.status,
-                        statusText: result.statusText,
-                        headers: result.headers,
-                    });
-                }
-            }
+            const stopped = await runMiddleware(matched.match.route);
+            if (stopped) return stopped;
 
             const adapterRequest: AdapterRequest<NextRequest> = {
                 request,
@@ -220,6 +233,7 @@ export const handleNextRequest = async <T extends Routes>(
                 guards,
                 schemes,
                 requestContext,
+                pluginExports,
                 jobs: jobs?.runner,
                 responseValidation: options?.responseValidation,
             });
@@ -304,6 +318,7 @@ export function mountNext(api: NextApiWithRouter, options?: NextHandlerOptions):
     const handlerOptions = {
         basePath: options?.basePath,
         onError: options?.onError,
+        formatError: options?.formatError,
         requestMiddleware: options?.requestMiddleware,
         responseValidation: options?.responseValidation,
     };

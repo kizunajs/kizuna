@@ -77,6 +77,28 @@ const assertPathParamsMatchPath = (route: RouteDefinition, routeKey: string): vo
     throw new Error(`Route "${routeKey}" has pathParams that do not match its path "${route.path}": ${details.join('; ')}.`);
 };
 
+/**
+ * Throws when a param directly follows another, like `/x/:a:b`. Nothing marks
+ * where one ends and the next begins, and matching such a path backtracks over
+ * every split of the segment. Express refuses the same paths.
+ */
+export const assertParamsSeparated = (route: RouteDefinition, routeKey: string): void => {
+    const { segments } = parsePath(route.path);
+    for (const [index, segment] of segments.entries()) {
+        const previous = segments[index - 1];
+        if (segment.kind !== 'param' || previous?.kind !== 'param') continue;
+        const separated = segments
+            .map((candidate, position) =>
+                candidate.kind === 'param' ? `${position === index ? '-' : ''}:${candidate.value}` : candidate.value
+            )
+            .join('');
+        throw new Error(
+            `Route "${routeKey}" has the path "${route.path}", where :${segment.value} follows :${previous.value} with no text between them. ` +
+                `Put a literal between them, like "${separated}".`
+        );
+    }
+};
+
 const STRUCTURED_TYPES: ReadonlySet<string> = new Set(['object', 'array', 'record', 'tuple', 'map', 'set']);
 
 /**
@@ -205,6 +227,7 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
                 throw new Error(`Route "${fullKey}" has an empty body schema (z.object({})). Use z.void() or omit the body field.`);
             }
             expandStreamTools(value, fullKey);
+            assertParamsSeparated(value, fullKey);
             assertPathParamsMatchPath(value, fullKey);
             assertPathParamsAreScalar(value, fullKey);
             assertQuerySendable(value, fullKey);

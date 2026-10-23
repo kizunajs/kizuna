@@ -181,8 +181,24 @@ const writeWebResponse = async (response: unknown, res: Response): Promise<void>
         res.end();
         return;
     }
-    Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]).pipe(res);
+    // A body that errors partway destroys the socket, so the client sees a truncated response.
+    pipeline(Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]), res, () => undefined);
 };
+
+/**
+ * What a route threw, as Express's `next` should receive it. Express reads a
+ * falsy value, `'route'` and `'router'` as routing signals rather than errors,
+ * which would hand the request to whatever the app mounted next.
+ */
+const asExpressError = (thrown: unknown): unknown =>
+    !thrown || thrown === 'route' || thrown === 'router'
+        ? new Error(
+              `A route threw ${typeof thrown === 'string' ? `'${thrown}'` : String(thrown)}, which Express would read as a routing signal`,
+              {
+                  cause: thrown,
+              }
+          )
+        : thrown;
 
 const adapter = defineAdapter<Request, void, ExpressHandlerContext, ExpressResponseContext>({
     buildHandlerContext: (adapterRequest, { res }) => ({
@@ -191,7 +207,7 @@ const adapter = defineAdapter<Request, void, ExpressHandlerContext, ExpressRespo
     }),
     respond: (result, { res, next, formatError, responseValidation }) => {
         if (result.kind === 'handler-error') {
-            next(result.error);
+            next(asExpressError(result.error));
             return;
         }
         if (result.kind === 'raw-response') {
@@ -230,7 +246,8 @@ const adapter = defineAdapter<Request, void, ExpressHandlerContext, ExpressRespo
 });
 
 /**
- * Mount a Kizuna API onto an Express app.
+ * Mount a Kizuna API onto an Express app. Its router is case-sensitive and
+ * strict, so a path matches only as declared (RFC 3986).
  *
  * @example
  * api.mount(app);
@@ -243,7 +260,11 @@ export function mountExpress(api: ExpressApi, app: AppLike, options?: ExpressOpt
     const pluginExports = pluginExportsOf(api);
     const jobsMeta = api[JOBS_META] as JobsMeta | undefined;
     const jobRunner = jobRunnerFrom(jobsMeta);
-    const expressRouter = createExpressRouter();
+    // RFC 3986: paths match exactly as declared, case and trailing slash included.
+    const expressRouter = createExpressRouter({
+        caseSensitive: true,
+        strict: true,
+    });
 
     const mountRoute = (
         routeKey: string,

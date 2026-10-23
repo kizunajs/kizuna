@@ -4,7 +4,7 @@ import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import { nextAdapter, NextRequest, NextResponse, type NextApi } from './server.js';
-import { readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { pluginInput, readTestBody, streamedResponse, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 interface Config {
     adapter: ReturnType<typeof nextAdapter>;
@@ -400,15 +400,56 @@ describe('Next.js handler: requestMiddleware', () => {
         expect(response.status).toBe(404);
         expect(middlewareCalled).toBe(false);
     });
+
+    it('hands plugin exports to the handler of a route the middleware let through', async () => {
+        const { GET: middlewareGET } = defineConfig({
+            ...pluginInput,
+            adapter: nextAdapter(),
+        }).api.mount({
+            basePath: '/api',
+            requestMiddleware: [async () => undefined],
+        });
+
+        const response = await middlewareGET(makeRequest('GET', '/api/which-label'));
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({
+            label: 'probed',
+        });
+    });
+
+    it('runs once for a plugin route', async () => {
+        const seen: Array<{ path: string; method: string }> = [];
+        const { GET: middlewareGET } = defineConfig({
+            ...pluginInput,
+            adapter: nextAdapter(),
+        }).api.mount({
+            basePath: '/api',
+            requestMiddleware: [
+                async (_request, route) => {
+                    seen.push(route);
+                },
+            ],
+        });
+
+        const response = await middlewareGET(makeRequest('GET', '/api/probe/ping'));
+        expect(response.status).toBe(200);
+        expect(seen).toEqual([
+            {
+                path: '/probe/ping',
+                method: 'GET',
+            },
+        ]);
+    });
 });
 
 testAdapterFeatures({
     name: 'next',
     createApi: (input) => defineConfig({ ...(input as { routes: never }), adapter: nextAdapter() }).api as unknown as NextApi,
-    mount: (api, { responseValidation }) => {
+    mount: (api, { responseValidation, formatError }) => {
         const handlers = api.mount({
             basePath: '/api',
             responseValidation,
+            formatError,
         });
         return {
             stream: async ({ method, path, body, headers }) => {

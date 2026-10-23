@@ -195,9 +195,13 @@ Both middleware and handlers are then typed:
 });
 ```
 
+## Paths
+
+A path matches exactly as declared ([RFC 3986](https://www.rfc-editor.org/rfc/rfc3986)), so the router Kizuna mounts is case-sensitive and strict. `/users/:id` answers `/users/1`, and `/Users/1` and `/users/1/` are other paths, which go on to whatever the app mounts next. Under a prefix like `app.use('/admin', adminRouter)`, Express matches `/admin` itself: with or without a trailing slash, and ignoring case unless the app sets `case sensitive routing`.
+
 ## Method mismatches
 
-If a path is matched but the method is not declared, the adapter returns 405 with an `Allow` header listing the supported methods. This follows [RFC 9110 §15.5.6](https://www.rfc-editor.org/rfc/rfc9110#section-15.5.6).
+Express routes each method on its own, so a request to a declared path with a method the API does not declare goes on to whatever the app mounts next, and ends as Express's `404` when nothing answers it. A declared `OPTIONS` route lists every method on the path in its `Allow` header.
 
 ## Alongside your own Express routes
 
