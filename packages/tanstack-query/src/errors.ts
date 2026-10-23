@@ -5,6 +5,9 @@
 export class UndeclaredResponseError extends Error {
     readonly status: number;
     readonly body: unknown;
+    /**
+     * The response headers, without `set-cookie` or `set-cookie2`.
+     */
     readonly headers: Record<string, string>;
 
     constructor(routeKey: string, status: number, body: unknown, headers: Record<string, string>) {
@@ -28,6 +31,9 @@ export const isUndeclaredResponseError = (error: unknown): error is UndeclaredRe
 export class NonStreamResponseError extends Error {
     readonly status: number;
     readonly body: unknown;
+    /**
+     * The response headers, without `set-cookie` or `set-cookie2`.
+     */
     readonly headers: Record<string, string>;
 
     constructor(routeKey: string, status: number, body: unknown, headers: Record<string, string>) {

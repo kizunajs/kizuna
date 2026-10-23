@@ -264,11 +264,13 @@ export default async function Page() {
 
 Responses are plain JSON, so the default `dehydrate` and `hydrate` need no custom serializer.
 
+Query data, mutation data and errors leave out the `set-cookie` and `set-cookie2` headers. Dehydrated data is written into the page's HTML, where any script on the page could read a session cookie that `HttpOnly` keeps from it. Browsers already hide both headers from JavaScript, so a query sees the same headers on the server as in the browser. On the server, `call` and the fetch client still return `set-cookie`, for code that has to read a cookie the API sets.
+
 `serverApi` is built from a client whose `onRequest` forwards the incoming cookies. Client components use the browser one.
 
 ## Calling a route directly
 
-`call` runs a route through the client without touching the cache.
+`call` runs a route through the client without touching the cache. It returns what the fetch client returns, `set-cookie` included.
 
 ```ts title="users.ts"
 const result = await api.users.getUser.call({

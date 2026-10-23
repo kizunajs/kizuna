@@ -44,6 +44,18 @@ const withSignal = (args: unknown, signal: AbortSignal | undefined): unknown => 
     };
 };
 
+/**
+ * The Fetch standard's forbidden response-header names, which a browser already
+ * hides from JavaScript. Query data rendered on the server is written into the
+ * page, so a cookie kept there would reach scripts despite `HttpOnly`.
+ */
+const forbiddenResponseHeaders = new Set(['set-cookie', 'set-cookie2']);
+
+const withoutForbiddenHeaders = (result: ClientResult): ClientResult => ({
+    ...result,
+    headers: Object.fromEntries(Object.entries(result.headers).filter(([name]) => !forbiddenResponseHeaders.has(name.toLowerCase()))),
+});
+
 const runRoute = async (
     clientFn: ClientNode,
     route: ClientRoute,
@@ -51,7 +63,7 @@ const runRoute = async (
     args: unknown,
     signal: AbortSignal | undefined
 ): Promise<unknown> => {
-    const result = (await clientFn(withSignal(args, signal))) as ClientResult;
+    const result = withoutForbiddenHeaders((await clientFn(withSignal(args, signal))) as ClientResult);
 
     if (!declaresStatus(route, result.status)) {
         throw new UndeclaredResponseError(routeKey, result.status, result.body, result.headers);

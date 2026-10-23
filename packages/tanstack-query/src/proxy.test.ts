@@ -480,3 +480,147 @@ describe('streams', () => {
         expect(options.queryKey).toEqual([['assistant', 'reply'], { type: 'stream' }]);
     });
 });
+
+describe('set-cookie', () => {
+    const withCookies = (status: number, body: unknown) => ({
+        status,
+        body,
+        headers: {
+            'content-type': 'application/json',
+            'set-cookie': 'session=secret; HttpOnly',
+            'Set-Cookie2': 'legacy=secret',
+            'x-trace': 'abc',
+        },
+    });
+    const keptHeaders = {
+        'content-type': 'application/json',
+        'x-trace': 'abc',
+    };
+    const getUserInput = {
+        input: {
+            params: {
+                id: '1',
+            },
+        },
+    };
+
+    it('leaves set-cookie out of query data, keeping every other header', async () => {
+        const api = buildApi(buildClient(withCookies(200, ok.body)));
+        const queryClient = new QueryClient();
+
+        const data = await queryClient.fetchQuery(api.users.getUser.queryOptions(getUserInput));
+
+        expect(data.headers).toEqual(keptHeaders);
+    });
+
+    it('leaves set-cookie out of infinite query pages', async () => {
+        const api = buildApi(
+            buildClient(
+                withCookies(200, {
+                    users: [],
+                    nextCursor: null,
+                })
+            )
+        );
+
+        const page = (await runQueryFn(
+            api.users.searchUsers.infiniteOptions({
+                input: (cursor: number | undefined) => ({
+                    query: {
+                        term: 'ada',
+                        cursor,
+                    },
+                }),
+                initialPageParam: undefined,
+                getNextPageParam: () => null,
+            }),
+            {
+                pageParam: undefined,
+            }
+        )) as {
+            headers: Record<string, string>;
+        };
+
+        expect(page.headers).toEqual(keptHeaders);
+    });
+
+    it('leaves set-cookie out of mutation data', async () => {
+        const api = buildApi(
+            buildClient(
+                withCookies(201, {
+                    id: '1',
+                    name: 'Ada',
+                })
+            )
+        );
+        const options = api.users.createUser.mutationOptions();
+
+        const data = (await (options.mutationFn as (variables: unknown) => Promise<unknown>)({
+            body: {
+                name: 'Ada',
+            },
+        })) as {
+            headers: Record<string, string>;
+        };
+
+        expect(data.headers).toEqual(keptHeaders);
+    });
+
+    it('leaves set-cookie out of UndeclaredResponseError', async () => {
+        const api = buildApi(
+            buildClient(
+                withCookies(500, {
+                    message: 'boom',
+                })
+            )
+        );
+
+        const error = await runQueryFn(api.users.getUser.queryOptions(getUserInput)).catch((caught: unknown) => caught);
+
+        expect(isUndeclaredResponseError(error)).toBe(true);
+        expect((error as UndeclaredResponseError).headers).toEqual(keptHeaders);
+    });
+
+    it('leaves set-cookie out of NonStreamResponseError', async () => {
+        const api = new KizunaTanstackQuery<Pick<Client, 'assistant'>>({
+            assistant: {
+                reply: standIn(
+                    generated.assistant.reply,
+                    withCookies(404, {
+                        detail: 'gone',
+                    })
+                ),
+            },
+        });
+        const queryClient = new QueryClient();
+
+        const error = await queryClient
+            .fetchQuery(
+                api.assistant.reply.streamOptions({
+                    input: {
+                        body: {
+                            prompt: 'hi',
+                        },
+                    },
+                    retry: false,
+                })
+            )
+            .catch((caught: unknown) => caught);
+
+        expect(isNonStreamResponseError(error)).toBe(true);
+        expect((error as NonStreamResponseError).headers).toEqual(keptHeaders);
+    });
+
+    it('keeps set-cookie on call, which returns what the fetch client returns', async () => {
+        const result = withCookies(200, ok.body);
+        const api = buildApi(buildClient(result));
+
+        const called = await api.users.getUser.call({
+            params: {
+                id: '1',
+            },
+        });
+
+        expect(called.headers).toEqual(result.headers);
+    });
+});

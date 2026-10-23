@@ -23,11 +23,11 @@ isUndeclaredResponseError(error: unknown): error is UndeclaredResponseError
 
 ## `UndeclaredResponseError`
 
-| Property  | Type                     | Description                    |
-| --------- | ------------------------ | ------------------------------ |
-| `status`  | `number`                 | The status the server returned |
-| `body`    | `unknown`                | The parsed response body       |
-| `headers` | `Record<string, string>` | The response headers           |
+| Property  | Type                     | Description                                                 |
+| --------- | ------------------------ | ----------------------------------------------------------- |
+| `status`  | `number`                 | The status the server returned                              |
+| `body`    | `unknown`                | The parsed response body                                    |
+| `headers` | `Record<string, string>` | The response headers, without `set-cookie` or `set-cookie2` |
 
 It extends `Error`, so `retry`, `throwOnError`, and error boundaries treat it as one.
 

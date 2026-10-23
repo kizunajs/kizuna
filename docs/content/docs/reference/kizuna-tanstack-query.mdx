@@ -86,6 +86,8 @@ Segments are the route's path through your routes, so `api.users.key()` prefixes
 
 Declared statuses come back as data. Anything else throws [`UndeclaredResponseError`](/docs/reference/is-undeclared-response-error). A streamed route that answers a declared status other than its stream throws `NonStreamResponseError`, narrowed with `isNonStreamResponseError`.
 
+Data and both errors leave out the `set-cookie` and `set-cookie2` headers, so dehydrated query data carries no `Set-Cookie`. `call` returns them, as the fetch client does. See [Server rendering](/docs/clients/tanstack-query#server-rendering).
+
 ## Example
 
 ```ts
