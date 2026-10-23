@@ -7,10 +7,12 @@ import {
     resetUsers,
     csvBody,
     cachedInput,
+    cookieInput,
     deprecatedInput,
     issueInput,
     methodInput,
     ownerToken,
+    requestNameInput,
     responseShapeInput,
     securedInput,
     sessionAuthorization,
@@ -23,6 +25,8 @@ import {
     streamedEventsText,
     streamedTicksText,
     streamedLinesText,
+    strippedInput,
+    visitorSession,
 } from './fixtures.js';
 import { collectStreamText, readStreamUntil, toMountedApi, type MountedApi, type Transport, type TestResponse } from './transport.js';
 
@@ -127,6 +131,31 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
         using(
             {
                 input: cachedInput,
+            },
+            use
+        );
+
+    const usingStripped = <T>(use: (mounted: MountedApi) => Promise<T>, responseValidation?: boolean) =>
+        using(
+            {
+                input: strippedInput,
+                responseValidation,
+            },
+            use
+        );
+
+    const usingCookies = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                input: cookieInput,
+            },
+            use
+        );
+
+    const usingRequestNames = <T>(use: (mounted: MountedApi) => Promise<T>) =>
+        using(
+            {
+                input: requestNameInput,
             },
             use
         );
@@ -428,6 +457,44 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'query.prototypeKeys': async () => {
+            await usingRequestNames(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/search?__proto__=x&constructor=a&term=ada',
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    keys: ['term', 'constructor'],
+                    constructorValue: 'a',
+                    plainPrototype: true,
+                });
+            });
+        },
+
+        'headers.mixedCaseNames': async () => {
+            await usingRequestNames(async (mounted) => {
+                for (const name of ['X-Tenant-Id', 'x-tenant-id', 'X-TENANT-ID']) {
+                    const response = await mounted.request({
+                        method: 'GET',
+                        path: '/tenant',
+                        headers: {
+                            [name]: 'acme',
+                        },
+                    });
+                    expect(response.status, name).toBe(200);
+                    expect(response.body).toEqual({
+                        tenantId: 'acme',
+                    });
+                }
+                const missing = await mounted.request({
+                    method: 'GET',
+                    path: '/tenant',
+                });
+                expect(missing.status).toBe(400);
+            });
+        },
+
         'body.json': async () => {
             const response = await createAda();
             expect(response.status).toBe(201);
@@ -598,6 +665,24 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             }
         },
 
+        'errors.undeclaredExtensionsStripped': async () => {
+            await usingStripped(async (stripped) => {
+                const response = await stripped.request({
+                    method: 'DELETE',
+                    path: '/employees/1',
+                });
+                expect(response.status).toBe(409);
+                expect(response.headers.get('content-type')).toContain('application/problem+json');
+                expect(response.body).toEqual({
+                    type: 'about:blank',
+                    title: 'Conflict',
+                    status: 409,
+                    detail: 'Ada has open shifts',
+                    openShifts: 2,
+                });
+            });
+        },
+
         'guards.publicRoute': async () => {
             await usingSecured(async (secured) => {
                 const response = await secured.request({
@@ -731,6 +816,53 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
+        'guards.malformedCookie': async () => {
+            await usingCookies(async (cookies) => {
+                const response = await cookies.request({
+                    method: 'GET',
+                    path: '/visit',
+                    headers: {
+                        cookie: `_ga=%E0%A4%A; session=${visitorSession}`,
+                    },
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    visitorId: '1',
+                });
+
+                const malformedSession = await cookies.request({
+                    method: 'GET',
+                    path: '/visit',
+                    headers: {
+                        cookie: 'session=%E0%A4%A',
+                    },
+                });
+                expect(malformedSession.status).toBe(403);
+            });
+        },
+
+        'guards.repeatedCookie': async () => {
+            await usingCookies(async (cookies) => {
+                const first = await cookies.request({
+                    method: 'GET',
+                    path: '/visit',
+                    headers: {
+                        cookie: `session=${visitorSession}; session=sess_tossed`,
+                    },
+                });
+                expect(first.status).toBe(200);
+
+                const second = await cookies.request({
+                    method: 'GET',
+                    path: '/visit',
+                    headers: {
+                        cookie: `session=sess_tossed; session=${visitorSession}`,
+                    },
+                });
+                expect(second.status).toBe(403);
+            });
+        },
+
         'responses.declaredContentType': async () => {
             await usingShapes(async (shapes) => {
                 const response = await shapes.request({
@@ -781,6 +913,37 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                     expect(response.status).toBe(500);
                 }
             );
+        },
+
+        'responses.undeclaredFieldsStripped': async () => {
+            for (const responseValidation of [false, true]) {
+                await usingStripped(async (stripped) => {
+                    const single = await stripped.request({
+                        method: 'GET',
+                        path: '/employees/1',
+                    });
+                    expect(single.status).toBe(200);
+                    expect(single.text).toBe('{"id":"1","name":"Ada","profile":{"bio":"Writes the payroll engine"}}');
+
+                    const list = await stripped.request({
+                        method: 'GET',
+                        path: '/employees',
+                    });
+                    expect(list.status).toBe(200);
+                    expect(list.body).toEqual({
+                        employees: [
+                            {
+                                id: '1',
+                                name: 'Ada',
+                            },
+                            {
+                                id: '1',
+                                name: 'Ada',
+                            },
+                        ],
+                    });
+                }, responseValidation);
+            }
         },
         'deprecation.deprecationHeader': async () => {
             await usingDeprecated(async (mounted) => {
@@ -940,6 +1103,23 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.body).toEqual({
                     id: '1',
                 });
+            });
+        },
+
+        'cache.etagSafeMethodsOnly': async () => {
+            await usingCached(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'POST',
+                    path: '/tagged-users',
+                    headers: {
+                        'if-none-match': '*',
+                    },
+                });
+                expect(response.status).toBe(200);
+                expect(response.body).toEqual({
+                    id: '1',
+                });
+                expect(response.headers.get('etag')).toMatch(/^"[0-9a-f]{32}"$/);
             });
         },
         'plugins.routesServed': async () => {
@@ -1140,6 +1320,21 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 );
             });
         },
+
+        'streams.toolResultStripped': async () => {
+            await usingStripped(async (stripped) => {
+                const response = await stripped.request({
+                    method: 'GET',
+                    path: '/assistant',
+                });
+                expect(response.status).toBe(200);
+                expect(response.text).toBe(
+                    'event: tool_call\ndata: {"id":"call_1","name":"lookupEmployee"}\n\n' +
+                        'event: tool_result\ndata: {"id":"call_1","name":"lookupEmployee","output":{"id":"1","name":"Ada"}}\n\n' +
+                        'event: done\ndata: {"ok":true}\n\n'
+                );
+            });
+        },
         'streams.itemValidation': async () => {
             await usingStreams(async (streams) => {
                 const response = await streams.stream({
@@ -1152,6 +1347,19 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(text).not.toContain('42');
                 expect(error).toBeDefined();
             }, true);
+        },
+
+        'streams.undeclaredFieldsStripped': async () => {
+            for (const responseValidation of [false, true]) {
+                await usingStripped(async (stripped) => {
+                    const response = await stripped.request({
+                        method: 'GET',
+                        path: '/employees/1/events',
+                    });
+                    expect(response.status).toBe(200);
+                    expect(response.text).toBe('event: updated\ndata: {"id":"1","name":"Ada"}\n\n');
+                }, responseValidation);
+            }
         },
     };
 

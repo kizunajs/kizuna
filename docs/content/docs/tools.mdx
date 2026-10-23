@@ -276,7 +276,7 @@ reply: k
     })),
 ```
 
-`result.content` is the `{ status, body }` the route answered with, as JSON. When the route refuses, because the input fails its schema, a guard says no, or the handler answers `4xx`, `result.isError` is `true` and `content` carries the same Problem Details an HTTP caller would get, so the model reads why and can try again.
+`result.content` is the `{ status, body }` the route answered with, as JSON, holding the fields its schema declares and no others. When the route refuses, because the input fails its schema, a guard says no, or the handler answers `4xx`, `result.isError` is `true` and `content` carries the same Problem Details an HTTP caller would get, so the model reads why and can try again.
 
 ### Wait for approval
 

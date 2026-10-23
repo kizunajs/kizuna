@@ -45,6 +45,12 @@ export const ADAPTER_FEATURES = {
     'query.repeatedKeys': {
         summary: 'A repeated query key arrives as a list of every value.',
     },
+    'query.prototypeKeys': {
+        summary: 'Query keys named after `Object.prototype` members arrive as plain values and leave the query object plain.',
+    },
+    'headers.mixedCaseNames': {
+        summary: 'A request header the route declares in mixed case matches the header whatever case the caller sends.',
+    },
     'body.json': {
         summary: 'A JSON body validates and reaches the handler typed.',
     },
@@ -72,6 +78,9 @@ export const ADAPTER_FEATURES = {
     'errors.validationIssueCodes': {
         summary: 'Each issue crosses the wire as exactly `code`, `path` and `message`.',
     },
+    'errors.undeclaredExtensionsStripped': {
+        summary: 'An error body keeps the extension members its schema declares and loses the rest.',
+    },
     'guards.publicRoute': {
         summary: 'A route the contract marks public runs without credentials.',
     },
@@ -93,6 +102,12 @@ export const ADAPTER_FEATURES = {
     'guards.authFailureModes': {
         summary: 'An unresolved credential is 401 with a challenge; a resolved one missing a permission is 403 without.',
     },
+    'guards.malformedCookie': {
+        summary: 'A cookie that is not valid percent-encoding is read as sent, so a session beside it still passes.',
+    },
+    'guards.repeatedCookie': {
+        summary: 'Of two cookies with one name, the guard reads the first.',
+    },
     'responses.declaredContentType': {
         summary: 'A route declaring a non-JSON content type sends its body raw under it.',
     },
@@ -104,6 +119,9 @@ export const ADAPTER_FEATURES = {
     },
     'responses.validation': {
         summary: 'With `responseValidation` on, a body the contract disallows fails as a 500.',
+    },
+    'responses.undeclaredFieldsStripped': {
+        summary: 'Fields a handler returns beyond its response schema never reach the body, at any depth.',
     },
     'deprecation.deprecationHeader': {
         summary: 'A route with a deprecation date announces it in `Deprecation`, with its documentation link in `Link`.',
@@ -140,6 +158,9 @@ export const ADAPTER_FEATURES = {
     },
     'cache.etagMismatchSendsBody': {
         summary: 'A non-matching `If-None-Match` answers `200` with the body.',
+    },
+    'cache.etagSafeMethodsOnly': {
+        summary: 'A matching `If-None-Match` answers `304` only to GET and HEAD. Another method sends its response with the `ETag`.',
     },
     'plugins.routesServed': {
         summary: 'A plugin route is served by `api.mount`, in the same pipeline as the contract’s own.',
@@ -183,8 +204,14 @@ export const ADAPTER_FEATURES = {
     'streams.toolsRunAsCaller': {
         summary: 'A tool a stream runs passes its guard with the credentials of the request that is streaming.',
     },
+    'streams.toolResultStripped': {
+        summary: 'A tool result a stream sends keeps only the fields the tool route declares.',
+    },
     'streams.itemValidation': {
         summary: 'With `responseValidation` on, a message failing its schema ends the stream.',
+    },
+    'streams.undeclaredFieldsStripped': {
+        summary: 'A message keeps only the fields its event schema declares.',
     },
 } as const satisfies Record<string, AdapterFeatureMeta>;
 

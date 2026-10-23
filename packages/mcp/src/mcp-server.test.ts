@@ -1876,3 +1876,125 @@ describe('MCP server: request context in guards', () => {
         await close();
     });
 });
+
+describe('MCP server: undeclared response fields', () => {
+    const strippedApi = buildApi({
+        ...router,
+        users: {
+            ...router.users,
+            getUser: ({
+                params,
+                throwError,
+            }: {
+                params: { id: string };
+                throwError: (response: { status: number; body: unknown }) => never;
+            }) => {
+                if (params.id === '999') {
+                    throwError({
+                        status: 404,
+                        body: {
+                            message: 'User not found',
+                            internalQuery: 'SELECT * FROM users WHERE id = 999',
+                        },
+                    });
+                }
+                return {
+                    status: 200,
+                    body: {
+                        id: params.id,
+                        name: 'Alice',
+                        passwordHash: 'argon2id-hash',
+                    },
+                };
+            },
+        },
+    });
+
+    it('never reach the text content or the structured content', async () => {
+        const { client, close } = await connectMcpClient(strippedApi);
+
+        const result = await client.callTool({
+            name: 'users_get_user',
+            arguments: {
+                params: {
+                    id: '42',
+                },
+            },
+        });
+
+        expect(result.structuredContent).toEqual({
+            status: 200,
+            body: {
+                id: '42',
+                name: 'Alice',
+            },
+        });
+        expect(result.content).toEqual([
+            {
+                type: 'text',
+                text: '{"status":200,"body":{"id":"42","name":"Alice"}}',
+            },
+        ]);
+
+        await close();
+    });
+
+    it('never reach the model from an error body failing its schema', async () => {
+        const invalidApi = buildApi({
+            ...router,
+            users: {
+                ...router.users,
+                getUser: ({ throwError }: { throwError: (response: { status: number; body: unknown }) => never }) =>
+                    throwError({
+                        status: 404,
+                        body: {
+                            message: 404,
+                            internalQuery: 'SELECT * FROM users WHERE id = 999',
+                        },
+                    }),
+            },
+        });
+        const { client, close } = await connectMcpClient(invalidApi);
+
+        const result = await client.callTool({
+            name: 'users_get_user',
+            arguments: {
+                params: {
+                    id: '999',
+                },
+            },
+        });
+
+        expect(result.content).toEqual([
+            {
+                type: 'text',
+                text: '{"status":404,"body":{"message":404}}',
+            },
+        ]);
+
+        await close();
+    });
+
+    it('never reach a failed call, which keeps what its error schema declares', async () => {
+        const { client, close } = await connectMcpClient(strippedApi);
+
+        const result = await client.callTool({
+            name: 'users_get_user',
+            arguments: {
+                params: {
+                    id: '999',
+                },
+            },
+        });
+
+        expect(result.isError).toBe(true);
+        expect(result.content).toEqual([
+            {
+                type: 'text',
+                text: '{"status":404,"body":{"message":"User not found"}}',
+            },
+        ]);
+
+        await close();
+    });
+});

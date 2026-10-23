@@ -51,6 +51,18 @@ const declaresNothing = (cache: ObjectPolicy): boolean =>
     DELTA_SECONDS.every(([field]) => cache[field] === undefined);
 
 /**
+ * What lets a shared cache store a response to an authorized request (RFC 9111
+ * section 3.5): `s-maxage`, `must-revalidate`, or `public`. A cookie or API key
+ * credential carries no such rule, so a freshness lifetime counts too.
+ */
+const sharedCacheMayStore = (cache: ObjectPolicy): boolean =>
+    cache.sharedMaxAge !== undefined ||
+    (cache.maxAge !== undefined && cache.maxAge > 0) ||
+    cache.staleWhileRevalidate !== undefined ||
+    cache.staleIfError !== undefined ||
+    cache.mustRevalidate === true;
+
+/**
  * Rejects a cache policy that cannot mean what it says. Called by `defineConfig`,
  * so a bad policy fails when the api is assembled rather than on the first response.
  */
@@ -81,10 +93,17 @@ export const assertValidCache = (routes: Routes): void => {
                     `${where} an empty cache.vary ${onStatus}, which sends no Vary header. Name the request headers that change the response, or drop it.`
                 );
             }
-            if (cache.scope === 'public' && route.security !== undefined && route.security.length > 0) {
+            const guarded = route.security !== undefined && route.security.length > 0;
+            if (cache.scope === 'public' && guarded) {
                 throw new Error(
                     `${where} cache.scope 'public' ${onStatus}, but the route is behind authentication, ` +
                         `which lets a shared cache serve one caller's response to another. Use 'private'.`
+                );
+            }
+            if (cache.scope === undefined && guarded && sharedCacheMayStore(cache)) {
+                throw new Error(
+                    `${where} a cache policy a shared cache may store ${onStatus}, but the route is behind authentication, ` +
+                        `which lets a shared cache serve one caller's response to another. Set cache.scope to 'private'.`
                 );
             }
 

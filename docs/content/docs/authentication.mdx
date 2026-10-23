@@ -85,6 +85,8 @@ export const member = k.identity
     });
 ```
 
+A cookie value that is not valid percent-encoding reaches the guard as it was sent. Of two cookies with the same name, the guard gets the first, as the `cookie` package behind Express and Fastify reads them.
+
 <Callout type="warn" title="A cookie travels on its own">
     The browser attaches it to any request, including ones another site triggers. Set `SameSite` on the cookie and check the `Origin` header
     on unsafe methods.
@@ -284,6 +286,8 @@ return deny({
 ```
 
 Every field you add must be optional or carry a `.default()`, since Kizuna sends this body itself when [Access Control](/docs/access-control) refuses a caller. `defineConfig` throws when it cannot.
+
+A field that neither `guardSchema` nor the route's own `403` declares is left out of the response, so a guard can hand `deny` the record it looked up without sending all of it.
 
 ## What else a guard gets
 

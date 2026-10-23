@@ -142,6 +142,39 @@ describe('applyCoercion', () => {
         expect(applyCoercion({}, plan)).toEqual({});
     });
 
+    it.each([[''], [' '], ['\t']])('leaves a blank %j uncoerced for a number, an int and a bigint, so Zod rejects it', (blank) => {
+        const schema = z.object({
+            page: z.number(),
+            limit: z.int(),
+            cursor: z.bigint(),
+        });
+        const input = {
+            page: blank,
+            limit: blank,
+            cursor: blank,
+        };
+        expect(applyCoercion(input, coercionPlanFor(schema))).toBe(input);
+        expect(schema.safeParse(applyCoercion(input, coercionPlanFor(schema))).success).toBe(false);
+    });
+
+    it('leaves a blank item of a number list uncoerced', () => {
+        const plan = coercionPlanFor(
+            z.object({
+                pages: z.array(z.number()),
+            })
+        );
+        expect(
+            applyCoercion(
+                {
+                    pages: ['1', ''],
+                },
+                plan
+            )
+        ).toEqual({
+            pages: [1, ''],
+        });
+    });
+
     it('leaves values Zod should reject alone', () => {
         const plan = coercionPlanFor(
             z.object({

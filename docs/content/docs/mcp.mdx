@@ -94,7 +94,7 @@ Every published tool's name, description, and input schema sits in the model's c
 | **Title**       | `tool.title`                                                                                                       |
 | **Description** | `tool.description` or the route's `summary`, then its `description`, its method and path, and what it requires     |
 | **Input**       | `{ params, query, body }`, holding only the keys the route declares                                                |
-| **Output**      | The success response's schema, so an assistant knows the shape before it calls                                     |
+| **Output**      | The success response's schema, so an assistant knows the shape before it calls, and the fields it receives         |
 | **Annotations** | The method's HTTP semantics, per [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110), and anything `tool` overrides |
 
 The [specification](https://modelcontextprotocol.io/specification/latest/server/tools) allows the dot, but Claude Code and VS Code rewrite it before the name reaches the model, so publishing the rewritten form is what keeps your docs and the model's tool name the same. Names are capped at 128 characters. A key over that throws at startup, as do two keys that converge on one name.
@@ -111,6 +111,8 @@ The annotations tell a client how careful to be with a tool before calling it:
 An absent hint is not a neutral one. MCP defaults `destructiveHint` and `openWorldHint` to true and `readOnlyHint` to false, so a client already treats `POST` and `PATCH` as destructive calls against an open world. The hints worth setting are the ones that make a tool safer than that, which is why `GET` gets `readOnlyHint` and `POST` gets nothing. Set one on the route's `tool` to say what the method cannot.
 
 Handlers receive the same framework context they do over HTTP, passed through from the transport request, so one reading `req` or `c` keeps working as a tool.
+
+A result carries the fields the route's schema for that status declares, in both its text and its `structuredContent`, the way an [HTTP response](/docs/routes#return-type) does. A field the handler returned beyond them never reaches the model.
 
 ## What the model reads
 

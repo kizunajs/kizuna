@@ -17,6 +17,7 @@ import {
     type RequestContextMap,
     ROUTER_META,
     GUARDS_META,
+    declaredResponseBody,
     SCHEMES_META,
     GUARD_SCHEMA_META,
     REQUEST_CONTEXT_META,
@@ -410,7 +411,8 @@ const runGuards = async (
     credentialHeaders: Record<string, string | string[] | undefined> | undefined,
     requestContext: Record<string, unknown>,
     transportAuth: McpServerOptions['transportAuth'],
-    guardSchema: z.ZodType | undefined
+    guardSchema: z.ZodType | undefined,
+    declared: (status: number, body: GuardDenialBody) => GuardDenialBody
 ): Promise<{ ok: true; securityContext: Record<string, unknown> } | { ok: false; result: ToolCallResult }> => {
     const securityContext: Record<string, unknown> = {};
     const credentialRequest = {
@@ -446,7 +448,7 @@ const runGuards = async (
         if (isGuardDenial(guardResult)) {
             return {
                 ok: false,
-                result: toolError(guardResult.status, guardResult.body),
+                result: toolError(guardResult.status, declared(guardResult.status, guardResult.body)),
             };
         }
         if (guardResult && typeof guardResult === 'object') {
@@ -531,20 +533,27 @@ const executeToolCall = async (
 
     const requestContext = await resolveRequestContext(contextResolvers, params, credentialHeaders, handlerContext);
 
-    const guardOutcome = await runGuards(
-        resolveSecurityRequirements(route),
-        route.roles,
-        route.requires,
-        `route "${routeKey}"`,
-        params,
-        guards,
-        schemes,
-        handlerContext,
-        credentialHeaders,
-        requestContext,
-        transportAuth,
-        guardSchema
-    );
+    let guardOutcome: Awaited<ReturnType<typeof runGuards>>;
+    try {
+        guardOutcome = await runGuards(
+            resolveSecurityRequirements(route),
+            route.roles,
+            route.requires,
+            `route "${routeKey}"`,
+            params,
+            guards,
+            schemes,
+            handlerContext,
+            credentialHeaders,
+            requestContext,
+            transportAuth,
+            guardSchema,
+            (status, denial) => declaredResponseBody(route, routeKey, status, denial, false) as GuardDenialBody
+        );
+    } catch (error) {
+        console.error(`[kizuna] tool "${routeKey}" threw:`, error);
+        return toolEnvelope(500, problemDetails(500, 'Internal Server Error'));
+    }
     if (!guardOutcome.ok) {
         return guardOutcome.result;
     }
@@ -565,10 +574,15 @@ const executeToolCall = async (
             ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),
         });
 
-        return toolEnvelope(result.status, result.body);
+        return toolEnvelope(result.status, declaredResponseBody(route, routeKey, result.status, result.body, false));
     } catch (error) {
         if (error instanceof ResponseError) {
-            return toolEnvelope(error.status, error.body);
+            try {
+                return toolEnvelope(error.status, declaredResponseBody(route, routeKey, error.status, error.body, false));
+            } catch (stripError) {
+                console.error(`[kizuna] tool "${routeKey}" answered a body that cannot be sent:`, stripError);
+                return toolEnvelope(500, problemDetails(500, 'Internal Server Error'));
+            }
         }
 
         console.error(`[kizuna] tool "${routeKey}" threw:`, error);

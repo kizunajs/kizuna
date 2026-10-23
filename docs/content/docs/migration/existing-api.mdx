@@ -87,6 +87,8 @@ The body is now valid Problem Details **and** still has `errorCode` / `requestId
 
 A client reading `errorCode` keeps working untouched, and a new client reads the standard fields off the same body. When every client has moved to the standard fields, drop the extras.
 
+Declare every field you keep. A field the schema leaves out is removed before the body is sent, and `formatError` receives the body with those fields already removed.
+
 ## The content type
 
 Errors go out as `application/problem+json`; success stays `application/json`. That is still JSON, so a client calling `response.json()` parses it identically. Only a client that strictly asserts `Content-Type: application/json` notices.
