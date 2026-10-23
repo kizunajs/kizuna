@@ -270,6 +270,14 @@ return {
 };
 ```
 
+The caller receives the fields the schema declares and no others. Return the database row as it is, and a `passwordHash` that `UserSchema` leaves out never reaches the wire, whether it sits in the row, in a nested object or in an array item, as far down as the schema describes the body. `z.looseObject`, `.catchall()` and `z.record` declare the extra keys they accept, so those keys stay. `z.any()`, `z.unknown()`, `z.custom()`, `z.instanceof()` and `z.preprocess()` say nothing about keys, so a value under one of them goes out whole.
+
+A union sends the fields its matching option declares. A discriminated union's option is the one its discriminator names, which makes it the reliable form. Any other union picks its option from the shape of the value: an option whose literal field disagrees with the body is ruled out, and the one declaring the most of the body's keys, with the kinds the body holds, wins. On a tie, the first one wins. It never picks by who is asking, so when the fields a caller may see depend on the caller, return the shape that caller gets, or declare a discriminated union.
+
+The body goes out as you returned it, in the same order, without the undeclared fields. A body nested past about a thousand levels answers `500`, since it is too deep to walk.
+
+Undeclared fields are left out of a body that fails its schema too. The adapter's `responseValidation` decides what happens to the rest of it: off, it is sent, and on, the caller gets a `500` instead. Turn it on in development and in tests.
+
 For routes with typed response headers, include `headers` too:
 
 ```ts
@@ -328,6 +336,8 @@ In the handler, `throwError` returns a typed error response. It takes the same `
 
 TypeScript enforces the status and body the same way it does for a return value.
 
+An error body keeps the extension members its schema declares. Declare `409` as `ProblemDetailsSchema.extend({ conflictingId: z.string() })` and `conflictingId` reaches the caller, while a field the schema leaves out does not. `type`, `title`, `status` and `detail` are always sent, and so is the `instance` RFC 9457 defines, when you set it. A guard's `deny` body follows its [`guardSchema`](/docs/authentication#what-a-refusal-says) the same way.
+
 ## Validation errors
 
 When a request body or query fails schema validation, Kizuna returns a `400` before the handler runs:
@@ -384,9 +394,11 @@ Values in the URL and in headers always arrive as strings. Kizuna coerces them t
 | `z.bigint()`             | `"9007199254740993"` | `9007199254740993n` |
 | `z.date()`               | an ISO 8601 string   | `Date`              |
 
-Arrays of these coerce too (`z.array(z.number())`). A list repeats its key, `?ids=1&ids=2`, and a single `?ids=1` arrives as a one-item list. The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
+Arrays of these coerce too (`z.array(z.number())`). A list repeats its key, `?ids=1&ids=2`, and a single `?ids=1` arrives as a one-item list. A blank value such as `?page=` stays a string, so `z.number()` and `z.bigint()` answer `400` for a blank number. The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
 
 Because coercion is built in, **`z.coerce` is not supported**, and `k.routes` throws if any schema uses it. Declare the plain schema (`z.number()`, `z.date()`, `z.bigint()`). To receive a different type than you send, use `z.string().transform(...)`.
+
+Header names are case-insensitive under RFC 9110. Declare `X-Tenant-Id` and the handler reads `headers['X-Tenant-Id']`, whichever case the caller sent it in.
 
 ### Response schemas
 

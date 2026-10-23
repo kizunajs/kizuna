@@ -18,6 +18,7 @@ import type { ExtractPathParams } from './path-params.js';
 import type { ContextOf } from './security-scheme.js';
 import type { GuardHoldings, IdentityRole } from './identity.js';
 import { applyCoercion, coercionPlanFor } from './coercion.js';
+import { readObjectShape } from './zod-internals.js';
 import type { ProblemDetails, StripProblemEnvelope } from './problem-details.js';
 import type { StreamTools } from './tool-runner.js';
 
@@ -405,6 +406,29 @@ export const formatValidationError = (failure: ValidationFailure): { detail: str
     issues: failure.issues,
 });
 
+/**
+ * The request headers with each one the schema declares under the name it
+ * declares. Header names are case-insensitive (RFC 9110 section 5.1) and every
+ * adapter hands them over lowercased, so a declared `X-Tenant-Id` reads the
+ * `x-tenant-id` the adapter holds. The lowercased name wins over any other
+ * spelling, since it is the one guards read too.
+ */
+const underDeclaredNames = (schema: z.ZodType, headers: unknown): unknown => {
+    const shape = readObjectShape(schema);
+    if (!shape || !headers || typeof headers !== 'object' || Array.isArray(headers)) return headers;
+    const received = headers as Record<string, unknown>;
+    let renamed: Record<string, unknown> | undefined;
+    for (const name of Object.keys(shape)) {
+        const lowercase = name.toLowerCase();
+        if (lowercase === name || !Object.hasOwn(received, lowercase)) continue;
+        renamed ??= {
+            ...received,
+        };
+        renamed[name] = received[lowercase];
+    }
+    return renamed ?? headers;
+};
+
 export const validateRequest = (
     route: RouteDefinition,
     raw: RawInputs
@@ -425,7 +449,7 @@ export const validateRequest = (
         {
             stage: 'headers',
             schema: route.headers,
-            input: raw.headers,
+            input: route.headers ? underDeclaredNames(route.headers, raw.headers) : raw.headers,
             coerced: true,
         },
         {

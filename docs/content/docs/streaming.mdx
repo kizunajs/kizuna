@@ -244,6 +244,8 @@ yield {
 
 The client hands `id` and `retry` back on each message and drops comments.
 
+An `id` holds ASCII alone. The client sends it back as the `Last-Event-ID` header, and a header outside ASCII reads differently from one server to the next, so a yield with any other character ends the stream the way a throw does. Encode a non-ASCII value before it goes in.
+
 ### Resuming
 
 A client that reconnects sends the last `id` it saw as `Last-Event-ID`. A handler of an event stream receives it as `lastEventId`, and sends what follows:
@@ -366,7 +368,7 @@ Before the first message, everything works as on any route: validation answers `
 
 Once the handler has returned, the status and headers are on the wire. A throw inside the generator after that cannot become a `500`, so Kizuna ends the connection. The client's loop rejects instead of finishing quietly, and the adapter's error callback is told. Declare a terminal event like `done` when the reader must know the reply is whole, and an `error` event of your own when it must know why it stopped short.
 
-With `responseValidation` on, Kizuna validates each message against its schema before writing it, and a message that fails ends the stream the same way.
+Each message is written with the fields its schema declares and no others, as a [returned body](/docs/routes#return-type) is, even when the message is otherwise invalid. `responseValidation` decides what happens to an invalid one: on, it ends the stream the same way, and off, it is written.
 
 ## Headers
 
@@ -389,7 +391,7 @@ A streamed response can name the tools the model may call, adding `tool_call`, `
 },
 ```
 
-Each is discriminated on the tool's dotted key. The handler receives `tools`, whose `run` calls one of those routes as the person streaming and yields its events. See [tools](/docs/tools#running-the-calls).
+Each is discriminated on the tool's dotted key. The handler receives `tools`, whose `run` calls one of those routes as the person streaming and yields its events. A `tool_result` carries the fields the tool's route declares, and nothing else its handler returned. See [tools](/docs/tools#running-the-calls).
 
 ## Reference
 

@@ -47,9 +47,9 @@ export interface HonoHandlerContext<E extends Env = Env> {
 
 export interface HonoOptions {
     /**
-     * Validate handler return values against the routes' response schemas.
-     * Mismatches surface as 500 errors. Intended for development; disable in
-     * production.
+     * Answer 500 when a handler returns a body its response schema rejects.
+     * Off, that body is sent. Fields the schema leaves out are removed either
+     * way. Enable in development.
      *
      * @default false
      */

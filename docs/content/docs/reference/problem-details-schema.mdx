@@ -110,6 +110,8 @@ const users = k.routes.users({
 });
 ```
 
+The response carries the extension members the schema declares. One the handler sends without declaring it is left out of the response.
+
 To reuse the extended schema across routes, and give it a name in the generated OpenAPI spec, wrap it in [`Kizuna.model`](/docs/reference/kizuna-model):
 
 ```ts title="src/routes/users.ts"

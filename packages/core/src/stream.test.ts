@@ -98,6 +98,18 @@ describe('formatEvent', () => {
         ).toThrow(/line break or NUL/);
     });
 
+    it.each([['café'], ['evt-✓'], ['\u0080']])('refuses an id outside ASCII: %j', (id) => {
+        expect(() =>
+            formatEvent(
+                {
+                    data: 1,
+                    id,
+                },
+                false
+            )
+        ).toThrow(/outside ASCII/);
+    });
+
     it('refuses a retry that is not a whole number of milliseconds', () => {
         expect(() =>
             formatEvent(
@@ -299,6 +311,52 @@ describe('encodeStreamBody', () => {
             }
         );
         await expect(readAll(stream)).rejects.toThrow(/validation failed/);
+    });
+
+    it('writes only the fields a message declares', async () => {
+        const stream = encodeStreamBody(
+            {
+                routeKey: 'watch',
+                route: eventsRoute,
+                status: 200,
+                body: async function* () {
+                    yield {
+                        event: 'delta',
+                        data: {
+                            text: 'a',
+                            authorEmail: 'ada@example.com',
+                        },
+                    };
+                },
+            },
+            {
+                signal: new AbortController().signal,
+            }
+        );
+        expect(await readAll(stream)).toBe('event: delta\ndata: {"text":"a"}\n\n');
+    });
+
+    it('writes a message failing its schema without its undeclared fields when not validating', async () => {
+        const stream = encodeStreamBody(
+            {
+                routeKey: 'watch',
+                route: eventsRoute,
+                status: 200,
+                body: async function* () {
+                    yield {
+                        event: 'delta',
+                        data: {
+                            text: 42,
+                            authorEmail: 'ada@example.com',
+                        },
+                    };
+                },
+            },
+            {
+                signal: new AbortController().signal,
+            }
+        );
+        expect(await readAll(stream)).toBe('event: delta\ndata: {"text":42}\n\n');
     });
 
     it('writes text chunks as they are', async () => {

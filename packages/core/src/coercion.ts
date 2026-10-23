@@ -94,6 +94,8 @@ export const resolveCoercionPlans = (route: RouteDefinition): void => {
 
 const coerceValue = (value: unknown, type: string): unknown => {
     if (typeof value !== 'string') return value;
+    // `Number('')` and `BigInt(' ')` are both zero, which no caller sent.
+    if ((type === 'number' || type === 'int' || type === 'bigint') && value.trim() === '') return value;
     if (type === 'number' || type === 'int') {
         const coerced = Number(value);
         return Number.isNaN(coerced) ? value : coerced;

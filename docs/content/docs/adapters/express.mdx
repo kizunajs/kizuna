@@ -168,7 +168,7 @@ kizuna.api.mount(app, {
 
 | Option               | Default            | Description                                                                                                                                                                               |
 | -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `responseValidation` | `false`            | Validate handler return values against response schemas, surfacing as 500 on mismatch. Enable in development.                                                                             |
+| `responseValidation` | `false`            | Answer `500` when a handler's body fails its response schema. Off, that body is sent. Fields the schema leaves out are removed either way. Enable in development.                         |
 | `json`               | Express's defaults | The options for `express.json()`, like `limit` and `strict`, used for Kizuna's own routes. Leave it out if the app runs its own `express.json()`.                                         |
 | `formatError`        | none               | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
 

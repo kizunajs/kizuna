@@ -80,7 +80,10 @@ export type CachePolicy =
            * Which caches may store the response. `private` is the caller's own
            * browser; `public` is any cache in between, including a CDN or a
            * corporate proxy. A response on a route behind `security` wants
-           * `private`, and `defineConfig` throws on `public` there.
+           * `private`. `defineConfig` throws on `public` there, and on a
+           * policy with no scope that a shared cache may store: a `maxAge`
+           * above zero, `sharedMaxAge`, `staleWhileRevalidate`, `staleIfError`
+           * or `mustRevalidate`.
            */
           scope?: 'public' | 'private';
           /**
@@ -172,11 +175,14 @@ export type ResponseDefinition =
            */
           cache?: CachePolicy;
           /**
-           * Send an `ETag` for this response, and answer `304 Not Modified`
-           * when the caller's `If-None-Match` already holds it. The tag hashes
-           * the body, so the handler still runs; what it saves is sending the
-           * body again. Pairs with a `cache` policy that revalidates, such as
-           * `noCache` or `maxAge: 0` with `mustRevalidate`.
+           * Send an `ETag` for this response, and answer a GET or HEAD with
+           * `304 Not Modified` when the caller's `If-None-Match` already holds
+           * it. Any other method sends its response, and a `412` is the
+           * handler's to send. The tag hashes the body, so the handler still
+           * runs; what it saves is sending the body again. Pairs with a
+           * `cache` policy that revalidates, such as `noCache` or `maxAge: 0`
+           * with `mustRevalidate`, which a route behind `security` also gives
+           * `scope: 'private'`.
            *
            * Successful responses only, since `304` says the representation the
            * caller holds is still current.

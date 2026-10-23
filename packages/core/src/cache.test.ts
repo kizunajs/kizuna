@@ -294,6 +294,92 @@ describe('assertValidCache', () => {
                 }).api
         ).toThrow(/declares cache\.scope 'public' on its 200 response, but the route is behind authentication/);
     });
+
+    describe('a route behind authentication', () => {
+        const user = k.identity.bearer({});
+        const secured = new Kizuna<{
+            auth: {
+                identities: {
+                    user: typeof user;
+                };
+            };
+        }>();
+        const guardedWith = (cache: CachePolicy) =>
+            defineConfig({
+                auth: {
+                    identities: {
+                        user,
+                    },
+                },
+                routes: [
+                    secured.routes({
+                        getInvoice: secured.route({
+                            method: 'GET',
+                            path: '/invoices/:id',
+                            auth: 'user',
+                            responses: {
+                                200: {
+                                    body: z.object({
+                                        ok: z.boolean(),
+                                    }),
+                                    cache,
+                                },
+                            },
+                        }),
+                    }),
+                ],
+            }).api;
+
+        test.each([
+            {
+                sharedMaxAge: 60,
+            },
+            {
+                maxAge: 60,
+            },
+            {
+                maxAge: 60,
+                staleWhileRevalidate: 30,
+            },
+            {
+                maxAge: 60,
+                staleIfError: 300,
+            },
+            {
+                maxAge: 0,
+                mustRevalidate: true,
+            },
+        ] satisfies CachePolicy[])('rejects %j with no scope, since a shared cache could store it', (cache) => {
+            expect(() => guardedWith(cache)).toThrow(
+                /declares a cache policy a shared cache may store on its 200 response, but the route is behind authentication/
+            );
+        });
+
+        test.each([
+            {
+                scope: 'private',
+                maxAge: 60,
+            },
+            {
+                scope: 'private',
+                maxAge: 0,
+                mustRevalidate: true,
+            },
+            {
+                noCache: true,
+            },
+            {
+                noCache: true,
+                vary: ['authorization'],
+            },
+            {
+                maxAge: 0,
+            },
+            'no-store',
+        ] satisfies CachePolicy[])('accepts %j', (cache) => {
+            expect(() => guardedWith(cache)).not.toThrow();
+        });
+    });
 });
 
 describe('the policies the caching guide shows', () => {
