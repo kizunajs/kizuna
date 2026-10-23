@@ -5,6 +5,7 @@ import express from 'express';
 import type { Server } from 'node:http';
 import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
+import { definePlugin } from 'kizunajs/plugin';
 import { Client } from '@modelcontextprotocol/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { mcpPlugin } from './plugin.js';
@@ -289,5 +290,114 @@ describe('mcpPlugin: the routes that publish', () => {
                 routes: [routes],
             })
         ).toThrow(/\[kizuna\] Plugin 'mcp' has invalid options: path: must start with \//);
+    });
+});
+
+const auditPlugin = definePlugin({
+    slug: 'audit',
+    options: z.object({}),
+    setup: () => ({
+        exports: {
+            label: 'audit log',
+        },
+    }),
+});
+
+const pluginsSeen: unknown[] = [];
+
+const auditedContract = defineConfig({
+    adapter: expressAdapter(),
+    ...config,
+    routes: [
+        k.routes({
+            getUser: k
+                .route({
+                    method: 'GET',
+                    path: '/users/:id',
+                    tool: true,
+                    summary: 'Get a user by id',
+                    responses: {
+                        200: z.object({
+                            id: z.string(),
+                        }),
+                    },
+                })
+                .handler((args) => {
+                    pluginsSeen.push((args as Record<string, unknown>).plugins);
+                    return {
+                        status: 200,
+                        body: {
+                            id: args.params.id,
+                        },
+                    };
+                }),
+        }),
+    ],
+    plugins: [
+        mcpPlugin({
+            name: 'Audited API',
+        }),
+        auditPlugin({}),
+    ],
+}).api;
+
+describe('mcpPlugin: what a tool handler receives', () => {
+    let running: Server | undefined;
+    let client: Client | undefined;
+
+    afterEach(async () => {
+        await client?.close();
+        await new Promise<void>((resolve) => {
+            if (running) running.close(() => resolve());
+            else resolve();
+        });
+        running = undefined;
+        client = undefined;
+        pluginsSeen.length = 0;
+    });
+
+    it('hands a tool handler the plugin exports an HTTP handler gets', async () => {
+        const app = express();
+        app.use(express.json());
+        auditedContract.mount(app);
+        const started = await new Promise<{ port: number; server: Server }>((resolve) => {
+            const listening = app.listen(0, () => {
+                resolve({
+                    port: (listening.address() as { port: number }).port,
+                    server: listening,
+                });
+            });
+        });
+        running = started.server;
+
+        await fetch(`http://127.0.0.1:${started.port}/users/1`);
+
+        const connected = new Client({
+            name: 'test-client',
+            version: '1.0.0',
+        });
+        await connected.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${started.port}/mcp`)));
+        client = connected;
+        await connected.callTool({
+            name: 'get_user',
+            arguments: {
+                params: {
+                    id: '1',
+                },
+            },
+        });
+
+        expect(pluginsSeen).toEqual([
+            {
+                audit: {
+                    label: 'audit log',
+                },
+            },
+            {
+                audit: {
+                    label: 'audit log',
+                },
+            },
+        ]);
     });
 });

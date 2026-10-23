@@ -10,6 +10,7 @@ import {
     adapterContextOf,
     rawResponse,
     resolveSecurityRequirements,
+    validateToolInput,
     GUARDS_META,
     SCHEMES_META,
     type ApiWithRouter,
@@ -20,6 +21,7 @@ import { buildMcpTools, createMcpServer, type McpTool } from './mcp-server.js';
 import type { McpPluginProps } from './plugin.js';
 import { assertCanonicalResource, protectedResourceMetadataUrl, type McpOAuthProps } from './oauth.js';
 import { denialResponse, enforceOAuth } from './oauth-enforcement.js';
+import { allowsOrigin } from './origin.js';
 
 type HandlerArgs = {
     body: unknown;
@@ -75,45 +77,75 @@ const prepareOAuth = (oauth: McpOAuthProps, endpointPath: `/${string}`, api: Api
     };
 };
 
-/**
- * The oauth scheme's requirement for the tool a `tools/call` body names, so
- * the challenge speaks about the operation the client is attempting. The
- * route's `roles` and `requires` ride along when the oauth identity is the only one on
- * the route whose roles can satisfy it; otherwise the tool call checks it,
- * with every guard's role in hand.
- */
-const toolCallTarget = (
-    body: unknown,
-    enforcement: OAuthEnforcement
-): {
+interface ToolCallTarget {
     scopes: readonly string[];
     roles: readonly string[] | undefined;
     requires: RequiredPermissions | undefined;
     params: Record<string, string>;
-} => {
-    if (body !== null && typeof body === 'object' && (body as { method?: unknown }).method === 'tools/call') {
-        const callParams = (body as { params?: { name?: unknown; arguments?: { params?: unknown } } }).params;
-        const definition = typeof callParams?.name === 'string' ? enforcement.tools.get(callParams.name) : undefined;
-        if (definition !== undefined) {
-            const requirements = resolveSecurityRequirements(definition.route);
-            const requirement = requirements.find((candidate) => candidate.scheme === enforcement.oauth.scheme);
-            const roleBearing = requirements.filter((candidate) => enforcement.schemes?.[candidate.scheme]?.roles !== undefined);
-            const oauthDecidesRequires = roleBearing.every((candidate) => candidate.scheme === enforcement.oauth.scheme);
-            const routeParams = callParams?.arguments?.params;
-            return {
-                scopes: requirement?.scopes ?? [],
-                roles: requirement !== undefined && oauthDecidesRequires ? definition.route.roles : undefined,
-                requires: requirement !== undefined && oauthDecidesRequires ? definition.route.requires : undefined,
-                params: routeParams !== null && typeof routeParams === 'object' ? (routeParams as Record<string, string>) : {},
-            };
-        }
-    }
-    return {
-        scopes: [],
-        roles: undefined,
-        requires: undefined,
-        params: {},
+}
+
+const NO_TOOL_CALL: ToolCallTarget = {
+    scopes: [],
+    roles: undefined,
+    requires: undefined,
+    params: {},
+};
+
+interface ToolCallMessage {
+    method: 'tools/call';
+    params?: {
+        name?: unknown;
+        arguments?: unknown;
     };
+}
+
+const isToolCallMessage = (message: unknown): message is ToolCallMessage =>
+    message !== null && typeof message === 'object' && (message as { method?: unknown }).method === 'tools/call';
+
+/**
+ * The oauth scheme's requirement for the tool a `tools/call` message names, so
+ * the challenge speaks about the operation the client is attempting. The
+ * route's `roles` and `requires` ride along when the oauth identity is the only one on
+ * the route whose roles can satisfy it; otherwise the tool call checks it,
+ * with every guard's role in hand. The guard reads the call's params only once
+ * they validate, as HTTP runs no guard on a request that fails validation, and
+ * the call then answers its `400`.
+ */
+const toolCallTarget = (message: ToolCallMessage, enforcement: OAuthEnforcement, headers: HandlerArgs['headers']): ToolCallTarget => {
+    const name = message.params?.name;
+    const definition = typeof name === 'string' ? enforcement.tools.get(name) : undefined;
+    if (definition === undefined) return NO_TOOL_CALL;
+    const requirements = resolveSecurityRequirements(definition.route);
+    const requirement = requirements.find((candidate) => candidate.scheme === enforcement.oauth.scheme);
+    const roleBearing = requirements.filter((candidate) => enforcement.schemes?.[candidate.scheme]?.roles !== undefined);
+    const oauthDecidesRequires = roleBearing.every((candidate) => candidate.scheme === enforcement.oauth.scheme);
+    const validation = validateToolInput(definition.route, message.params?.arguments, headers);
+    return {
+        scopes: requirement?.scopes ?? [],
+        roles: requirement !== undefined && oauthDecidesRequires ? definition.route.roles : undefined,
+        requires: requirement !== undefined && oauthDecidesRequires ? definition.route.requires : undefined,
+        params: validation.ok ? validation.params : {},
+    };
+};
+
+const toolCallsIn = (body: unknown): ToolCallMessage[] => (Array.isArray(body) ? body : [body]).filter(isToolCallMessage);
+
+/**
+ * The guard's context reaches every call the request carries, so it can speak
+ * for one call only. MCP 2025-06-18 removed JSON-RPC batching.
+ */
+const MORE_THAN_ONE_TOOL_CALL = {
+    status: 400,
+    body: {
+        detail: 'Send one tools/call per request.',
+    },
+};
+
+const FOREIGN_ORIGIN = {
+    status: 403,
+    body: {
+        detail: 'Requests from this origin may not call the MCP endpoint.',
+    },
 };
 
 /**
@@ -131,15 +163,30 @@ export const mcpEndpoint = (props: McpPluginProps, api: unknown) => {
         return prepared;
     };
 
+    // Built on first use, once `enforcementOf` has checked the oauth resource.
+    let allowedOrigins: ReadonlySet<string> | undefined;
+    const allowedOriginsOf = (): ReadonlySet<string> => {
+        allowedOrigins ??= new Set([
+            ...(props.allowedOrigins ?? []),
+            ...(props.oauth === undefined ? [] : [new URL(props.oauth.resource).origin]),
+        ]);
+        return allowedOrigins;
+    };
+
     return {
         validate: (): void => {
             enforcementOf();
         },
         handle: async (args: HandlerArgs) => {
             const enforcement = enforcementOf();
+            if (!allowsOrigin(args.headers['origin'], allowedOriginsOf())) return denialResponse(FOREIGN_ORIGIN);
+
             let transportAuth: { scheme: string; context?: Record<string, unknown> } | undefined;
             if (enforcement !== undefined) {
-                const target = toolCallTarget(args.body, enforcement);
+                const [call, ...others] = toolCallsIn(args.body);
+                if (others.length > 0) return denialResponse(MORE_THAN_ONE_TOOL_CALL);
+                // A body with no tool call still needs a token.
+                const target = call === undefined ? NO_TOOL_CALL : toolCallTarget(call, enforcement, args.headers);
                 const outcome = await enforceOAuth({
                     scheme: enforcement.oauth.scheme,
                     guard: enforcement.guard,

@@ -572,3 +572,202 @@ describe('mcpPlugin: oauth declaration', () => {
         ).toThrow('not an absolute URI');
     });
 });
+
+describe('mcpPlugin: oauth and JSON-RPC batches', () => {
+    const ran: string[] = [];
+    const guardSaw: Array<Record<string, string>> = [];
+    const contextSaw: Array<string | undefined> = [];
+
+    const workspaceK = new Kizuna();
+    const owner = workspaceK.identity
+        .oauth2({
+            issuer: 'https://auth.example.com',
+            flows: {
+                authorizationCode: {
+                    authorizationUrl: 'https://auth.example.com/oauth2/authorize',
+                    tokenUrl: 'https://auth.example.com/oauth2/token',
+                    scopes: {
+                        'workspaces:read': 'Read workspaces',
+                    },
+                },
+            },
+            context: z.object({
+                userId: z.string(),
+                workspaceId: z.string().optional(),
+            }),
+        })
+        .guard(({ oauth2, params, deny }) => {
+            const routeParams = (params ?? {}) as Record<string, string>;
+            guardSaw.push(routeParams);
+            if (oauth2?.token !== 'reader')
+                return deny({
+                    status: 401,
+                    body: {
+                        detail: 'Invalid or expired token',
+                    },
+                });
+            if (routeParams.workspaceId !== undefined && !['mine', 'also-mine'].includes(routeParams.workspaceId))
+                return deny({
+                    status: 403,
+                    body: {
+                        detail: 'Not your workspace',
+                    },
+                });
+            return {
+                userId: 'u-reader',
+                workspaceId: routeParams.workspaceId,
+            };
+        });
+
+    const workspaceApi = defineConfig({
+        adapter: expressAdapter(),
+        auth: {
+            identities: {
+                owner,
+            },
+        },
+        routes: [
+            workspaceK.routes({
+                getWorkspace: workspaceK
+                    .route({
+                        method: 'GET',
+                        path: '/workspaces/:workspaceId',
+                        tool: true,
+                        auth: 'owner' as never,
+                        summary: 'Get a workspace',
+                        responses: {
+                            200: z.object({
+                                workspaceId: z.string(),
+                            }),
+                        },
+                    })
+                    .handler((args) => {
+                        const { params } = args;
+                        ran.push(params.workspaceId);
+                        contextSaw.push((args as unknown as { auth: { owner: { workspaceId?: string } } }).auth.owner.workspaceId);
+                        return {
+                            status: 200,
+                            body: {
+                                workspaceId: params.workspaceId,
+                            },
+                        };
+                    }),
+            }),
+        ],
+        plugins: [
+            mcpPlugin({
+                oauth: {
+                    resource: 'https://api.example.com/mcp',
+                    scheme: 'owner',
+                },
+            }),
+        ],
+    }).api;
+
+    let running: Server | undefined;
+
+    afterEach(async () => {
+        await new Promise<void>((resolve) => {
+            if (running) running.close(() => resolve());
+            else resolve();
+        });
+        running = undefined;
+        ran.length = 0;
+        guardSaw.length = 0;
+        contextSaw.length = 0;
+    });
+
+    const start = async (): Promise<number> => {
+        const app = express();
+        app.use(express.json());
+        workspaceApi.mount(app);
+        return new Promise((resolve) => {
+            const listening = app.listen(0, () => {
+                running = listening;
+                resolve((listening.address() as { port: number }).port);
+            });
+        });
+    };
+
+    const post = (port: number, body: unknown) =>
+        fetch(`http://127.0.0.1:${port}/mcp`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                accept: 'application/json, text/event-stream',
+                authorization: 'Bearer reader',
+            },
+            body: JSON.stringify(body),
+        });
+
+    const getWorkspace = (id: number, workspaceId: string) => ({
+        jsonrpc: '2.0',
+        id,
+        method: 'tools/call',
+        params: {
+            name: 'get_workspace',
+            arguments: {
+                params: {
+                    workspaceId,
+                },
+            },
+        },
+    });
+
+    const toolsList = {
+        jsonrpc: '2.0',
+        id: 9,
+        method: 'tools/list',
+    };
+
+    it('denies a single call the guard refuses', async () => {
+        const port = await start();
+        const response = await post(port, getWorkspace(1, 'theirs'));
+        expect(response.status).toBe(403);
+        expect(ran).toEqual([]);
+    });
+
+    it('hands the handler the context its own call verified', async () => {
+        const port = await start();
+        const response = await post(port, getWorkspace(1, 'also-mine'));
+        expect(response.status).toBe(200);
+        expect(contextSaw).toEqual(['also-mine']);
+    });
+
+    it('refuses a batch with more than one tool call, before anything runs', async () => {
+        const port = await start();
+        const response = await post(port, [getWorkspace(1, 'mine'), getWorkspace(2, 'also-mine')]);
+        expect(response.status).toBe(400);
+        expect(response.headers.get('content-type')).toContain('application/problem+json');
+        expect(((await response.json()) as { detail: string }).detail).toBe('Send one tools/call per request.');
+        expect(guardSaw).toEqual([]);
+        expect(ran).toEqual([]);
+    });
+
+    it('denies a batch whose refused call sits behind another method', async () => {
+        const port = await start();
+        const response = await post(port, [toolsList, getWorkspace(1, 'theirs')]);
+        expect(response.status).toBe(403);
+        expect(ran).toEqual([]);
+    });
+
+    it('runs a batch whose every call the guard allows', async () => {
+        const port = await start();
+        const response = await post(port, [getWorkspace(1, 'mine')]);
+        expect(response.status).toBe(200);
+        expect(ran).toEqual(['mine']);
+    });
+
+    it('still asks for a token on a batch with no tool call in it', async () => {
+        const port = await start();
+        const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                accept: 'application/json, text/event-stream',
+            },
+            body: JSON.stringify([toolsList]),
+        });
+        expect(response.status).toBe(401);
+    });
+});

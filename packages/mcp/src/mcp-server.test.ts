@@ -1876,3 +1876,272 @@ describe('MCP server: request context in guards', () => {
         await close();
     });
 });
+
+describe('MCP server: tool input shaped like an HTTP request', () => {
+    const member = k.identity.bearer({
+        context: z.object({
+            userId: z.string(),
+        }),
+    });
+
+    const inputK = new Kizuna<{
+        auth: {
+            identities: {
+                member: typeof member;
+            };
+        };
+    }>();
+
+    const inputRoutes = inputK.routes({
+        getWorkspace: inputK.route({
+            method: 'GET',
+            path: '/workspaces/:workspaceId',
+            tool: true,
+            summary: 'Get a workspace',
+            auth: 'member',
+            responses: {
+                200: z.object({
+                    workspaceId: z.string(),
+                }),
+            },
+        }),
+        getPage: inputK.route({
+            method: 'GET',
+            path: '/pages/:pageNumber',
+            tool: true,
+            summary: 'Get a page of the report',
+            auth: false,
+            pathParams: z.object({
+                pageNumber: z.number(),
+            }),
+            responses: {
+                200: z.object({
+                    pageNumber: z.number(),
+                }),
+            },
+        }),
+        archiveUser: inputK.route({
+            method: 'POST',
+            path: '/users/:id/archive',
+            tool: true,
+            summary: 'Archive a user',
+            auth: false,
+            responses: {
+                200: z.object({
+                    archived: z.boolean(),
+                }),
+            },
+        }),
+    });
+
+    const inputContract = defineConfig({
+        auth: {
+            identities: {
+                member,
+            },
+        },
+        routes: [inputRoutes],
+    }).api;
+
+    const connectInputs = async () => {
+        const guardSaw: unknown[] = [];
+        const handlerSaw: unknown[] = [];
+        const inputApi = assembleApi(inputContract, {
+            router: {
+                getWorkspace: ({ params }: { params: { workspaceId: string } }) => {
+                    handlerSaw.push(params);
+                    return {
+                        status: 200,
+                        body: {
+                            workspaceId: params.workspaceId,
+                        },
+                    };
+                },
+                getPage: ({ params }: { params: { pageNumber: number } }) => {
+                    handlerSaw.push(params);
+                    return {
+                        status: 200,
+                        body: {
+                            pageNumber: params.pageNumber,
+                        },
+                    };
+                },
+                archiveUser: ({ body }: { body: unknown }) => {
+                    handlerSaw.push(body);
+                    return {
+                        status: 200,
+                        body: {
+                            archived: true,
+                        },
+                    };
+                },
+            },
+            guards: {
+                member: ({ params }: { params: Record<string, unknown> }) => {
+                    guardSaw.push(params);
+                    return {
+                        userId: '1',
+                    };
+                },
+            },
+        }) as Parameters<typeof createMcpServer>[0];
+        const connected = await connectMcpClient(inputApi, {
+            credentialHeaders: {
+                authorization: 'Bearer tok_ada',
+            },
+        });
+        return {
+            ...connected,
+            guardSaw,
+            handlerSaw,
+        };
+    };
+
+    const parseText = (result: Awaited<ReturnType<Client['callTool']>>) =>
+        JSON.parse((result.content as Array<{ type: string; text: string }>)[0]!.text);
+
+    it('hands the guard and the handler only the route’s own path params', async () => {
+        const { client, close, guardSaw, handlerSaw } = await connectInputs();
+
+        const result = await client.callTool({
+            name: 'get_workspace',
+            arguments: {
+                params: {
+                    workspaceId: 'w1',
+                    ownerId: 'someone-else',
+                },
+            },
+        });
+
+        expect(parseText(result).status).toBe(200);
+        expect(guardSaw).toEqual([
+            {
+                workspaceId: 'w1',
+            },
+        ]);
+        expect(handlerSaw).toEqual([
+            {
+                workspaceId: 'w1',
+            },
+        ]);
+        await close();
+    });
+
+    it('answers a param sent as an object with the 400 HTTP sends, before any guard runs', async () => {
+        const { client, close, guardSaw, handlerSaw } = await connectInputs();
+
+        const result = await client.callTool({
+            name: 'get_workspace',
+            arguments: {
+                params: {
+                    workspaceId: {
+                        $ne: null,
+                    },
+                },
+            },
+        });
+
+        expect(result.isError).toBe(true);
+        const parsed = parseText(result);
+        expect(parsed.status).toBe(400);
+        expect(parsed.body.detail).toBe('Invalid path parameters');
+        expect(guardSaw).toEqual([]);
+        expect(handlerSaw).toEqual([]);
+        await close();
+    });
+
+    it('answers a missing param with 400', async () => {
+        const { client, close, guardSaw, handlerSaw } = await connectInputs();
+
+        const result = await client.callTool({
+            name: 'get_workspace',
+            arguments: {},
+        });
+
+        const parsed = parseText(result);
+        expect(parsed.status).toBe(400);
+        expect(parsed.body.detail).toBe('Invalid path parameters');
+        expect(parsed.body.errors[0].path).toEqual(['workspaceId']);
+        expect(guardSaw).toEqual([]);
+        expect(handlerSaw).toEqual([]);
+        await close();
+    });
+
+    it('turns a number into the string a URL carries', async () => {
+        const { client, close, guardSaw, handlerSaw } = await connectInputs();
+
+        await client.callTool({
+            name: 'get_workspace',
+            arguments: {
+                params: {
+                    workspaceId: 7,
+                },
+            },
+        });
+
+        expect(guardSaw).toEqual([
+            {
+                workspaceId: '7',
+            },
+        ]);
+        expect(handlerSaw).toEqual([
+            {
+                workspaceId: '7',
+            },
+        ]);
+        await close();
+    });
+
+    it('coerces a param the route declares as a number, from the number its input schema asks for', async () => {
+        const { client, close, handlerSaw } = await connectInputs();
+
+        const { tools } = await client.listTools();
+        const getPage = tools.find((tool) => tool.name === 'get_page');
+        expect(
+            (getPage?.inputSchema.properties as { params: { properties: { pageNumber: { type: string } } } }).params.properties.pageNumber
+                .type
+        ).toBe('number');
+
+        const result = await client.callTool({
+            name: 'get_page',
+            arguments: {
+                params: {
+                    pageNumber: 3,
+                },
+            },
+        });
+
+        expect(parseText(result)).toEqual({
+            status: 200,
+            body: {
+                pageNumber: 3,
+            },
+        });
+        expect(handlerSaw).toEqual([
+            {
+                pageNumber: 3,
+            },
+        ]);
+        await close();
+    });
+
+    it('drops a body on a route that declares none', async () => {
+        const { client, close, handlerSaw } = await connectInputs();
+
+        const result = await client.callTool({
+            name: 'archive_user',
+            arguments: {
+                params: {
+                    id: '1',
+                },
+                body: {
+                    role: 'admin',
+                },
+            },
+        });
+
+        expect(parseText(result).status).toBe(200);
+        expect(handlerSaw).toEqual([undefined]);
+        await close();
+    });
+});

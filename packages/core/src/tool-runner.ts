@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { flattenRoutes, validateRequest, type FlattenedRoute, type RawInputs, type ValidationFailure } from './handler-pipeline.js';
 import { parsePath } from './path-params.js';
 import { problemDetails } from './problem-details.js';
@@ -131,6 +132,57 @@ const isRecord = (value: unknown): value is Record<string, unknown> => value !==
 const detailOf = (status: number, body: unknown): string =>
     isRecord(body) && typeof body['detail'] === 'string' ? body['detail'] : `The route answered ${status}.`;
 
+/**
+ * A path segment as the URL carries it. JSON's numbers and booleans read as the
+ * text they would be in a URL. An empty string is no segment, since the router
+ * never matches one. Anything else stays as sent, so the check below refuses it.
+ */
+const asPathSegment = (value: unknown): unknown => {
+    if (value === '') return undefined;
+    return typeof value === 'number' || typeof value === 'boolean' ? String(value) : value;
+};
+
+/**
+ * Validate a tool call's input the way HTTP validates the request it stands for.
+ * Only the route's own path params get through, each a string as a URL gives
+ * it, and a body reaches only a route that declares one. `params` is what the
+ * guards read, before the route's schema parses it.
+ */
+export const validateToolInput = (
+    route: RouteDefinition,
+    input: unknown,
+    headers: unknown
+): { ok: true; params: Record<string, string>; parsed: RawInputs } | { ok: false; error: ValidationFailure } => {
+    const sent = isRecord(input) ? input : {};
+    const sentParams = isRecord(sent['params']) ? sent['params'] : {};
+    const paramNames = parsePath(route.path).paramNames;
+    const segments = Object.fromEntries(paramNames.map((name) => [name, asPathSegment(sentParams[name])]));
+    const checked = z.object(Object.fromEntries(paramNames.map((name) => [name, z.string()]))).safeParse(segments);
+    if (!checked.success) {
+        return {
+            ok: false,
+            error: {
+                stage: 'params',
+                issues: checked.error.issues,
+            },
+        };
+    }
+
+    const params = checked.data as Record<string, string>;
+    const validation = validateRequest(route, {
+        params,
+        query: sent['query'] ?? {},
+        body: route.body && !isVoidSchema(route.body) ? sent['body'] : undefined,
+        headers,
+    });
+    if (!validation.ok) return validation;
+    return {
+        ok: true,
+        params,
+        parsed: validation.parsed,
+    };
+};
+
 const callInput = (route: RouteDefinition, parsed: RawInputs): Record<string, unknown> | undefined => {
     const input: Record<string, unknown> = {};
     if (parsePath(route.path).paramNames.length > 0) input['params'] = parsed.params;
@@ -210,17 +262,7 @@ export const createStreamTools = <R extends Routes>(tools: R, pipeline: ToolPipe
                 },
             }) as ToolEventYield<R>;
 
-        const input = isRecord(call.input) ? call.input : {};
-        // Guards read params as strings, as from a URL.
-        const params = Object.fromEntries(
-            Object.entries(isRecord(input['params']) ? input['params'] : {}).map(([name, value]) => [name, String(value)])
-        );
-        const validation = validateRequest(entry.route, {
-            params,
-            query: input['query'] ?? {},
-            body: input['body'],
-            headers: pipeline.headers,
-        });
+        const validation = validateToolInput(entry.route, call.input, pipeline.headers);
         if (!validation.ok) {
             const rendered = pipeline.render(validation.error);
             yield failed(rendered.status, rendered.body);
@@ -271,7 +313,7 @@ export const createStreamTools = <R extends Routes>(tools: R, pipeline: ToolPipe
             };
         }
 
-        const { status, body } = await pipeline.invoke(entry, validation.parsed, params);
+        const { status, body } = await pipeline.invoke(entry, validation.parsed, validation.params);
         if (status >= 400) {
             yield failed(status, body);
         } else {

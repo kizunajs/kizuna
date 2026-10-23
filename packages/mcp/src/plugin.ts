@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { definePlugin, route, RoutePathSchema, type PluginRoutes } from 'kizunajs/plugin';
 import { ProtectedResourceMetadataSchema } from 'kizunajs/schemas';
 import { McpOAuthSchema, protectedResourceMetadataPath } from './oauth.js';
+import { isOrigin } from './origin.js';
 import { mcpEndpoint } from './server.js';
 
 /**
@@ -42,6 +43,31 @@ const McpPluginOptionsSchema = z.object({
      * and HTTP `401`/`403` challenges built from the named identity.
      */
     oauth: McpOAuthSchema.optional(),
+
+    /**
+     * Browser origins allowed to call the endpoint, besides localhost on any
+     * port and, with `oauth`, the origin of its `resource`. A request whose
+     * `Origin` is none of these answers `403`, as the MCP Streamable HTTP
+     * transport requires. Clients that run outside a browser, such as Claude
+     * Code, send no `Origin` and always pass.
+     *
+     * Each entry is one exact origin, `https://app.example.com`, with no path,
+     * no trailing slash and no wildcard.
+     *
+     * @example
+     * ```ts
+     * mcpPlugin({
+     *     allowedOrigins: ['https://app.example.com'],
+     * });
+     * ```
+     */
+    allowedOrigins: z
+        .array(
+            z.string().refine(isOrigin, {
+                error: 'must be an origin exactly as a browser sends it, such as https://app.example.com, with a lowercase punycode host and no default port (such as :443), path, trailing slash or wildcard',
+            })
+        )
+        .optional(),
 });
 
 /**

@@ -637,6 +637,7 @@ export {
     type ToolDefinition,
     type ToolInputSchema,
 } from './tool-definitions.js';
+export { validateToolInput } from './tool-runner.js';
 export { sortFlattenedRoutes } from './route-matcher.js';
 export {
     ROUTES_GROUP,

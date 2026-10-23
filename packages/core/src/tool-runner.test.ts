@@ -4,7 +4,7 @@ import { defineAdapter, routerFromRoutes, type AdapterRequest, type AdapterResul
 import { Kizuna } from './kizuna.js';
 import { defineConfig } from './define-config.js';
 import { readToolCalls } from './tool-records.js';
-import type { ToolRunCall, ToolRunOptions, ToolRunResult } from './tool-runner.js';
+import { validateToolInput, type ToolRunCall, type ToolRunOptions, type ToolRunResult } from './tool-runner.js';
 
 interface Config {
     auth: {
@@ -621,5 +621,80 @@ describe('tools.definitions', () => {
                 },
             },
         ]);
+    });
+});
+
+describe('validateToolInput', () => {
+    const archiveUser = k.route({
+        method: 'POST',
+        path: '/users/:id/archive',
+        auth: false,
+        summary: 'Archive a user',
+        tool: true,
+        responses: {
+            200: z.object({
+                archived: z.boolean(),
+            }),
+        },
+    });
+
+    it('keeps only the route’s own path params, as the strings a URL carries', () => {
+        const validation = validateToolInput(
+            archiveUser,
+            {
+                params: {
+                    id: 7,
+                    workspaceId: 'someone-elses',
+                },
+            },
+            {}
+        );
+        expect(validation.ok && validation.params).toEqual({
+            id: '7',
+        });
+    });
+
+    it('refuses a param no URL could carry, and a missing or empty one', () => {
+        for (const params of [
+            {
+                id: {
+                    $ne: null,
+                },
+            },
+            {
+                id: '',
+            },
+            {
+                id: ['1'],
+            },
+            {},
+            undefined,
+        ]) {
+            const validation = validateToolInput(
+                archiveUser,
+                {
+                    params,
+                },
+                {}
+            );
+            expect(validation.ok).toBe(false);
+            expect(!validation.ok && validation.error.stage).toBe('params');
+        }
+    });
+
+    it('drops a body the route does not declare', () => {
+        const validation = validateToolInput(
+            archiveUser,
+            {
+                params: {
+                    id: '1',
+                },
+                body: {
+                    role: 'admin',
+                },
+            },
+            {}
+        );
+        expect(validation.ok && validation.parsed.body).toBeUndefined();
     });
 });

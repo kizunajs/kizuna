@@ -665,7 +665,7 @@ Nothing here is a new transport. Every piece reduces to something Kizuna already
 
 **The dotted key is the discriminator, not the published name.** `weather.getForecast` on the wire, `weather_get_forecast` over MCP. Deriving the snake-case name at the type level would need a string algorithm that has to agree exactly with the runtime one, and disagreeing silently would be worse than reading the name off a definition.
 
-**Execution is the route's own pipeline.** A tool call runs the route handler through the same validation, guards and Problem Details an HTTP request does, so there is one place a route runs whoever asked. On a stream, `tools.run` enters that pipeline after routing, with the stream request's headers and the adapter's handler context, and the tool's input in place of the URL and body.
+**Execution is the route's own pipeline.** A tool call runs the route handler through the same validation, guards and Problem Details an HTTP request does, so there is one place a route runs whoever asked. On a stream, `tools.run` enters that pipeline after routing, with the stream request's headers and the adapter's handler context, and the tool's input in place of the URL and body. That input is shaped the way the URL and body would be: only the route's own path params, each a string, and a body only for a route that declares one.
 
 ## What Kizuna.js leaves out
 

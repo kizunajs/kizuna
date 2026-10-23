@@ -8,7 +8,7 @@ import {
     type InputRequiredResult,
     type StandardSchemaWithJSON,
 } from '@modelcontextprotocol/server';
-import { flattenRoutes, formatValidationError, validateRequest } from 'kizunajs/adapter';
+import { flattenRoutes, formatValidationError, pluginExportsOf, validateToolInput } from 'kizunajs/adapter';
 import {
     ResponseError,
     type AdapterRequest,
@@ -181,7 +181,7 @@ const approval = (route: RouteDefinition, context: McpToolContext): CallToolResu
 
 /**
  * What the SDK publishes for a tool. Input passes through unchecked, so the
- * call is validated once, by `validateRequest`, as an HTTP request is. Output
+ * call is validated once, by `validateToolInput`, as an HTTP request is. Output
  * keeps the route's own check.
  */
 const publishedSchema = (jsonSchema: Record<string, unknown>, check?: z.ZodType): StandardSchemaWithJSON<Record<string, unknown>> => ({
@@ -484,18 +484,10 @@ const executeToolCall = async (
     credentialHeaders?: Record<string, string | string[] | undefined>,
     contextResolvers?: RequestContextMap,
     transportAuth?: McpServerOptions['transportAuth'],
-    guardSchema?: z.ZodType
+    guardSchema?: z.ZodType,
+    pluginExports?: Record<string, unknown>
 ): Promise<ToolCallResult> => {
-    const params = (args.params ?? {}) as Record<string, string>;
-    const query = (args.query ?? {}) as Record<string, unknown>;
-    const body = args.body;
-
-    const validation = validateRequest(route, {
-        params,
-        query,
-        body,
-        headers: credentialHeaders ?? {},
-    });
+    const validation = validateToolInput(route, args, credentialHeaders ?? {});
 
     if (!validation.ok) {
         const formatted = formatValidationError(validation.error);
@@ -529,6 +521,7 @@ const executeToolCall = async (
         };
     }
 
+    const { params } = validation;
     const requestContext = await resolveRequestContext(contextResolvers, params, credentialHeaders, handlerContext);
 
     const guardOutcome = await runGuards(
@@ -563,6 +556,7 @@ const executeToolCall = async (
             ...handlerContext,
             ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
             ...(Object.keys(guardOutcome.securityContext).length > 0 ? { auth: guardOutcome.securityContext } : {}),
+            ...(pluginExports && Object.keys(pluginExports).length > 0 ? { plugins: pluginExports } : {}),
         });
 
         return toolEnvelope(result.status, result.body);
@@ -582,6 +576,10 @@ const executeToolCall = async (
  * Each route in the routes becomes an MCP tool. When an AI assistant calls
  * a tool, the corresponding handler is invoked directly.
  *
+ * The server never sees an HTTP request, so serving it over HTTP yourself
+ * means checking `Origin` in front of it, as `mcpPlugin` does. The SDK's
+ * `originValidationResponse` does that for a web `Request`.
+ *
  * ```ts
  * import { createMcpServer } from '@kizunajs/mcp';
  * import { api } from './api';
@@ -595,6 +593,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
     const schemes = (api as unknown as Record<typeof SCHEMES_META, Record<string, SecurityScheme> | undefined>)[SCHEMES_META];
     const guardSchema = (api as unknown as Record<typeof GUARD_SCHEMA_META, z.ZodType | undefined>)[GUARD_SCHEMA_META];
     const contextResolvers = (api as unknown as Record<typeof REQUEST_CONTEXT_META, RequestContextMap | undefined>)[REQUEST_CONTEXT_META];
+    const pluginExports = pluginExportsOf(api);
 
     const contract = contractOf<ApiDefinition | undefined>(api);
 
@@ -645,7 +644,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                     options?.credentialHeaders,
                     contextResolvers,
                     options?.transportAuth,
-                    guardSchema
+                    guardSchema,
+                    pluginExports
                 );
             }
         );

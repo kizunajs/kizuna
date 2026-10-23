@@ -29,14 +29,15 @@ mcpPlugin(props?: McpPluginProps): PluginDeclaration
 
 ## Props
 
-| Option         | Default                | Description                                                                   |
-| -------------- | ---------------------- | ----------------------------------------------------------------------------- |
-| `slug`         | `'mcp'`                | What handlers reach this plugin under                                         |
-| `path`         | `'/mcp'`               | Path the endpoint is served from                                              |
-| `name`         | `'MCP Server'`         | Human-readable name shown to AI assistants                                    |
-| `version`      | `'1.0.0'`              | Semantic version string                                                       |
-| `instructions` | built from your groups | Appended to the generated overview                                            |
-| `oauth`        | off                    | Serve the endpoint as an OAuth 2.1 resource server ([guide](/docs/mcp#oauth)) |
+| Option           | Default                                      | Description                                                                       |
+| ---------------- | -------------------------------------------- | --------------------------------------------------------------------------------- |
+| `slug`           | `'mcp'`                                      | What handlers reach this plugin under                                             |
+| `path`           | `'/mcp'`                                     | Path the endpoint is served from                                                  |
+| `name`           | `'MCP Server'`                               | Human-readable name shown to AI assistants                                        |
+| `version`        | `'1.0.0'`                                    | Semantic version string                                                           |
+| `instructions`   | built from your groups                       | Appended to the generated overview                                                |
+| `oauth`          | off                                          | Serve the endpoint as an OAuth 2.1 resource server ([guide](/docs/mcp#oauth))     |
+| `allowedOrigins` | localhost, and the `oauth` resource's origin | Browser origins allowed to call the endpoint ([guide](/docs/mcp#browser-origins)) |
 
 ## Which routes it publishes
 
@@ -98,6 +99,18 @@ With the default `path`, the endpoint is at `/api/mcp`.
 ## Secured routes
 
 Each tool call runs the same [guard](/docs/reference/k-identity) pipeline as an HTTP request, reading credentials from the MCP transport request's headers. A `deny(...)` becomes a tool error result; with [`oauth`](/docs/mcp#oauth) configured, denials from that identity answer at the HTTP level instead. See the [MCP guide](/docs/mcp) for configuring clients to send credentials.
+
+## Origin
+
+Every request's `Origin` is checked before a guard or a tool runs. A request with none passes, as clients outside a browser send none. One that carries an origin passes when it is localhost on any port, the origin of the `oauth` `resource`, or listed under `allowedOrigins`, and answers `403` otherwise:
+
+```ts title="kizuna.config.ts"
+mcpPlugin({
+    allowedOrigins: ['https://app.example.com'],
+}),
+```
+
+Each entry is one exact origin, with no path, trailing slash or wildcard.
 
 ## Plugin route
 

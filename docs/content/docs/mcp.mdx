@@ -110,7 +110,7 @@ The annotations tell a client how careful to be with a tool before calling it:
 
 An absent hint is not a neutral one. MCP defaults `destructiveHint` and `openWorldHint` to true and `readOnlyHint` to false, so a client already treats `POST` and `PATCH` as destructive calls against an open world. The hints worth setting are the ones that make a tool safer than that, which is why `GET` gets `readOnlyHint` and `POST` gets nothing. Set one on the route's `tool` to say what the method cannot.
 
-Handlers receive the same framework context they do over HTTP, passed through from the transport request, so one reading `req` or `c` keeps working as a tool.
+Handlers receive the same framework context and `plugins` they do over HTTP, passed through from the transport request, so one reading `req` or `c` keeps working as a tool.
 
 ## What the model reads
 
@@ -204,6 +204,24 @@ When a guard denies the call, or the caller's role is not one the route accepts,
 
 Routes with `auth: false` run without guards, credentials or not.
 
+## Browser origins
+
+The endpoint checks the `Origin` header on every request, as the [MCP transport specification](https://modelcontextprotocol.io/specification/latest/basic/transports#security-warning) requires, so a web page you visit cannot reach a server running on your machine through DNS rebinding. Clients that run outside a browser, such as Claude Code, send no `Origin` and always pass. A request that carries one passes when it is:
+
+- a loopback origin over http or https, on any port: `localhost`, `127.0.0.1` or `[::1]`, such as `http://localhost:5173`
+- the origin of the [`oauth`](#oauth) `resource`, when one is set
+- listed under `allowedOrigins`
+
+Any other origin answers `403` with a Problem Details body, before a guard or a tool runs. List the browser apps that call the endpoint themselves:
+
+```ts title="kizuna.config.ts"
+mcpPlugin({
+    allowedOrigins: ['https://app.example.com'],
+}),
+```
+
+Each entry is one origin exactly as a browser sends it: the scheme, the host, and the port when it is not the default, with no path, trailing slash or wildcard. An entry that is not one fails when the config assembles.
+
 ## Asking before it runs
 
 A route with [`needsApproval`](/docs/tools#say-how-it-behaves) asks the person before the handler is reached, over MCP's elicitation:
@@ -231,23 +249,35 @@ mcpPlugin({
 
 `resource` is the canonical URI of the endpoint as clients reach it, and the audience your guard checks tokens against. `scheme` names the identity whose guard verifies the token on every request. The identity's `issuer` and flow scopes become the RFC 9728 metadata document, served at `/.well-known/oauth-protected-resource/mcp`.
 
+So the guard checks `https://api.example.com/mcp` as the audience. When the same identity also guards your REST routes, whose resource is `https://api.example.com`, it accepts both:
+
+```ts title="src/identities.ts"
+({ payload: claims } = await jwtVerify(oauth2.token, jwks, {
+    issuer: 'https://auth.example.com',
+    audience: ['https://api.example.com', 'https://api.example.com/mcp'],
+}));
+```
+
+A token issued for either then works at both. To keep them apart, give MCP an identity of its own and name it as `scheme`.
+
 With `oauth` configured, denials from that identity move to the HTTP level, where the specification puts them:
 
 - No token, or a bad one, answers `401` with `WWW-Authenticate: Bearer resource_metadata="..."`.
 - A token that lacks a permission its role holds answers `403` with `error="insufficient_scope"` and the permissions it is missing.
 - A role that lacks a permission the route requires answers a plain `403`.
 
-The guard runs once per request, its context reaches handlers under `auth.<scheme>` as always, and every other identity keeps the in-band tool errors above.
+The guard runs once per request, with the params of the tool call the request carries, so send one `tools/call` per request. A JSON-RPC batch holding more than one answers `400` before anything runs, since MCP 2025-06-18 removed batching. The guard's context reaches handlers under `auth.<scheme>` as always, and every other identity keeps the in-band tool errors above.
 
 ## Options
 
-| Option         | Default                | Description                                                          |
-| -------------- | ---------------------- | -------------------------------------------------------------------- |
-| `path`         | `'/mcp'`               | Path the endpoint is served from                                     |
-| `name`         | `'MCP Server'`         | Human-readable name shown to AI assistants                           |
-| `version`      | `'1.0.0'`              | Semantic version string                                              |
-| `instructions` | built from your groups | Appended to the generated overview                                   |
-| `oauth`        | off                    | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth)) |
+| Option           | Default                                      | Description                                                                        |
+| ---------------- | -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `path`           | `'/mcp'`                                     | Path the endpoint is served from                                                   |
+| `name`           | `'MCP Server'`                               | Human-readable name shown to AI assistants                                         |
+| `version`        | `'1.0.0'`                                    | Semantic version string                                                            |
+| `instructions`   | built from your groups                       | Appended to the generated overview                                                 |
+| `oauth`          | off                                          | Serve the endpoint as an OAuth 2.1 resource server ([OAuth](#oauth))               |
+| `allowedOrigins` | localhost, and the `oauth` resource's origin | Browser origins allowed to call the endpoint ([Browser origins](#browser-origins)) |
 
 ## Connecting clients
 
@@ -297,6 +327,8 @@ Tool inputs use structured keys that mirror the Kizuna handler args:
 
 Only the keys the route declares are present.
 
+A call is validated the way the HTTP request it stands for is, and a guard never reads params that failed. Only the route's own path params reach the guard and the handler, each as the string a URL carries, so `7` arrives as `"7"` and a route that declares a number param parses it back. A missing param, or one no URL could carry, such as an object, answers the `400` any invalid input does. A `body` sent to a route that declares none is dropped.
+
 ## Tool responses
 
 Every tool returns a JSON text block with the HTTP status and parsed response body:
@@ -323,7 +355,7 @@ If you want to drive the transport yourself, for stdio or SSE, [`createMcpServer
 
 ```ts title="src/mcp.ts"
 import { createMcpServer } from '@kizunajs/mcp';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import kizuna from '../kizuna.config';
 
 const server = createMcpServer(kizuna.api, {

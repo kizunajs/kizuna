@@ -59,15 +59,26 @@ const server = createMcpServer(kizuna.api, {
 });
 ```
 
+## Origin
+
+The server never sees an HTTP request, so it checks no `Origin`. When you serve it over HTTP yourself, check it in front of the server, as the MCP transport specification requires and [`mcpPlugin`](/docs/mcp#browser-origins) does. The SDK's `originValidationResponse` does it for a web `Request`:
+
+```ts title="src/mcp.ts"
+import { localhostAllowedOrigins, originValidationResponse } from '@modelcontextprotocol/server';
+
+const refused = originValidationResponse(request, localhostAllowedOrigins());
+if (refused) return refused;
+```
+
 ## Returns
 
-An `McpServer` instance from `@modelcontextprotocol/sdk`. Connect it to any transport.
+An `McpServer` instance from `@modelcontextprotocol/server`. Connect it to any transport.
 
 ## Example
 
 ```ts title="src/mcp.ts"
 import { createMcpServer } from '@kizunajs/mcp';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import kizuna from '../kizuna.config';
 
 const server = createMcpServer(kizuna.api, {
