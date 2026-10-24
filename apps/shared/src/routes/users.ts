@@ -562,7 +562,6 @@ export const usersRoutes = k.routes.users({
         })
         .handler(() => ({
             status: 204,
-            body: undefined,
         })),
     getMyWork: k
         .route({

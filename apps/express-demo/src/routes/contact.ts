@@ -25,7 +25,6 @@ export const contact = k.routes.contact({
 
             return {
                 status: 204,
-                body: undefined,
             };
         }),
 });
