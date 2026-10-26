@@ -10,6 +10,9 @@ import styles from '../subpage.module.css';
 export const metadata: Metadata = {
     title: 'About',
     description: 'The idea behind Kizuna.js.',
+    alternates: {
+        canonical: '/about',
+    },
     robots: {
         index: false,
         follow: false,

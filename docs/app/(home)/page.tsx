@@ -18,6 +18,9 @@ export const metadata: Metadata = {
     },
     description:
         'Write one config. Get a fully typed server, typed auth, scheduled jobs, an OpenAPI spec, Swift and Kotlin clients, an MCP endpoint, and more.',
+    alternates: {
+        canonical: '/',
+    },
 };
 
 export default function HomePage() {
