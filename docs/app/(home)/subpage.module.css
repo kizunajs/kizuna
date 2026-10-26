@@ -16,7 +16,7 @@
 
 .backdrop {
     position: absolute;
-    top: calc(-1 * (var(--kizuna-header-height) + var(--kizuna-page-offset)));
+    top: calc(-1 * (var(--kizuna-sticky-height) + var(--kizuna-page-offset)));
     bottom: -120px;
     left: 50%;
     z-index: -1;
@@ -76,7 +76,7 @@
 
     .splitHead {
         position: sticky;
-        top: calc(var(--kizuna-header-height) + 24px);
+        top: calc(var(--kizuna-sticky-height) + 24px);
         align-self: start;
     }
 }

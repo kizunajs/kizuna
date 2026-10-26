@@ -9,7 +9,7 @@
     position: absolute;
     inset: 0 0 auto;
     z-index: -1;
-    height: calc(var(--kizuna-header-height) + 24px);
+    height: calc(var(--kizuna-sticky-height) + 24px);
     background: linear-gradient(to bottom, var(--kizuna-canvas) 30%, transparent);
     opacity: 0;
     transition: opacity 0.25s ease;
@@ -192,7 +192,7 @@
     top: 100%;
     right: 0;
     left: 0;
-    height: calc(100dvh - var(--kizuna-header-height));
+    height: calc(100dvh - var(--kizuna-sticky-height));
     padding: 4px var(--kizuna-gutter) 16px;
     visibility: hidden;
     transition: visibility 0s linear 0.2s;
@@ -205,7 +205,7 @@
 
 .scrim {
     position: absolute;
-    inset: calc(-1 * var(--kizuna-header-height)) 0 0;
+    inset: calc(-1 * var(--kizuna-sticky-height)) 0 0;
     background-color: color-mix(in srgb, var(--kizuna-canvas) 80%, transparent);
     opacity: 0;
     transition: opacity 0.2s ease;

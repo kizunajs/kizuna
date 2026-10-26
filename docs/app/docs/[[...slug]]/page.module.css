@@ -95,7 +95,7 @@
 }
 
 .body :is(h2, h3, h4, h5, h6) {
-    scroll-margin-top: calc(var(--kizuna-header-height) + 24px);
+    scroll-margin-top: calc(var(--kizuna-sticky-height) + 24px);
 }
 
 .body > h2,
@@ -200,10 +200,10 @@
 
     .toc {
         position: sticky;
-        top: calc(var(--kizuna-header-height) + var(--kizuna-docs-offset));
+        top: calc(var(--kizuna-sticky-height) + var(--kizuna-docs-offset));
         display: block;
         align-self: start;
-        max-height: calc(100dvh - var(--kizuna-header-height) - var(--kizuna-docs-offset) - var(--kizuna-docs-bottom));
+        max-height: calc(100dvh - var(--kizuna-sticky-height) - var(--kizuna-docs-offset) - var(--kizuna-docs-bottom));
         overflow-y: auto;
         border-radius: var(--kizuna-radius-card);
         background-color: var(--kizuna-surface);

@@ -36,10 +36,10 @@
 
     .sidebar {
         position: sticky;
-        top: calc(var(--kizuna-header-height) + var(--kizuna-docs-offset));
+        top: calc(var(--kizuna-sticky-height) + var(--kizuna-docs-offset));
         display: block;
         align-self: start;
-        height: calc(100dvh - var(--kizuna-header-height) - var(--kizuna-docs-offset) - var(--kizuna-docs-bottom));
+        height: calc(100dvh - var(--kizuna-sticky-height) - var(--kizuna-docs-offset) - var(--kizuna-docs-bottom));
         margin-block: var(--kizuna-docs-offset) var(--kizuna-docs-bottom);
         overflow: hidden;
         border-radius: var(--kizuna-radius-card);

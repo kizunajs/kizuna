@@ -1,0 +1,50 @@
+.banner {
+    position: relative;
+    border-bottom: var(--kizuna-hairline) solid var(--kizuna-line);
+    background-color: var(--kizuna-surface);
+}
+
+.link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: calc(var(--kizuna-banner-height) - var(--kizuna-hairline));
+    padding-inline: var(--kizuna-gutter);
+    font-size: 0.875rem;
+    color: color-mix(in srgb, var(--kizuna-ink) 68%, var(--kizuna-canvas));
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.link:focus-visible {
+    outline: 2px solid var(--kizuna-ink);
+    outline-offset: -2px;
+}
+
+.action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: var(--font-weight-600);
+    color: var(--kizuna-ink);
+}
+
+.icon {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2.25;
+    transition: transform 0.15s ease;
+}
+
+@media (hover: hover) {
+    .link:hover .icon {
+        transform: translateX(2px);
+    }
+}
+
+@media (max-width: 767px) {
+    .bodyLong {
+        display: none;
+    }
+}

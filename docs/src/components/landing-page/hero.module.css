@@ -9,7 +9,7 @@
 
 .backdrop {
     position: absolute;
-    top: calc(-1 * var(--kizuna-header-height));
+    top: calc(-1 * var(--kizuna-sticky-height));
     bottom: -330px;
     left: 50%;
     z-index: -1;

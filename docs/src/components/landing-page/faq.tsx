@@ -117,8 +117,8 @@ export const questions: Question[] = [
                 Kizuna is inspired by{' '}
                 <a className={styles.link} href="https://ts-rest.com" target="_blank" rel="noreferrer">
                     ts-rest
-                </a>{' '}
-                and keeps the public API familiar. The{' '}
+                </a>
+                , which is no longer maintained, and keeps the public API familiar. The{' '}
                 <Link className={styles.link} href="/docs/migration/from-ts-rest">
                     migration guide
                 </Link>{' '}

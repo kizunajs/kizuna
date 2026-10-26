@@ -1,6 +1,6 @@
 .bar {
     position: sticky;
-    top: var(--kizuna-header-height);
+    top: var(--kizuna-sticky-height);
     z-index: 30;
     padding: 4px var(--kizuna-gutter) 12px;
 }
@@ -8,7 +8,7 @@
 .bar::before {
     content: '';
     position: absolute;
-    inset: calc(-1 * var(--kizuna-header-height)) 0 -16px;
+    inset: calc(-1 * var(--kizuna-sticky-height)) 0 -16px;
     z-index: -1;
     background: linear-gradient(to top, transparent, var(--kizuna-canvas) 16px);
     pointer-events: none;
@@ -80,7 +80,7 @@
     top: 100%;
     right: 0;
     left: 0;
-    height: calc(100dvh - var(--kizuna-header-height) - 58px);
+    height: calc(100dvh - var(--kizuna-sticky-height) - 58px);
     padding: 0 var(--kizuna-gutter) 16px;
     visibility: hidden;
     transition: visibility 0s linear 0.2s;

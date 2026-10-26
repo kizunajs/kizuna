@@ -1,9 +1,16 @@
 ---
 title: Migrating from ts-rest
-description: Side-by-side comparison of ts-rest and Kizuna, for anyone weighing a ts-rest alternative, with notes on deliberate differences.
+description: Side-by-side comparison of ts-rest and Kizuna, for anyone moving off ts-rest now that it is no longer maintained, with notes on deliberate differences.
 ---
 
-Kizuna is inspired by [ts-rest](https://ts-rest.com) and the ideas it pioneered. ts-rest showed that routes-first TypeScript APIs work, and a lot of people built real things with it, ourselves included. Kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood. This page maps every changed API to its Kizuna equivalent.
+Kizuna is an alternative to [ts-rest](https://ts-rest.com), inspired by the ideas it pioneered. ts-rest showed that routes-first TypeScript APIs work, and a lot of people built real things with it, ourselves included. Kizuna borrows several of its core concepts and keeps the public API deliberately familiar, but takes a different approach under the hood.
+
+ts-rest [is no longer maintained](https://github.com/ts-rest/ts-rest/pull/878), and its repository was archived on October 26, 2026. The last stable release is 3.52.1, V4 will not be released, and no further bug fixes or security updates are planned. This page maps every changed API to its Kizuna equivalent, so a ts-rest project can move over route by route.
+
+<Callout title="Thank you, ts-rest">
+    A big thank you to everyone who built and contributed to ts-rest. It proved that a typed, routes-first API could stay plain HTTP, and
+    years of production use, ours included, rest on that work. Kizuna would not exist without it.
+</Callout>
 
 ## Package mapping
 
@@ -282,9 +289,9 @@ Handlers of a route with `auth: 'user'` then read `auth.user.userId`, typed, and
 
 ## Zod version
 
-Kizuna targets **Zod 4 only**. ts-rest supports Zod 3 and 4.
+Kizuna targets **Zod 4 only**. ts-rest's Standard Schema support only shipped in 3.53.0-rc.1, a prerelease that was never promoted to stable and has known compatibility issues with stable Zod 4, so most ts-rest projects are on Zod 3.
 
-If you are upgrading from ts-rest and Zod 3, migrate to Zod 4 alongside this change:
+Migrate to Zod 4 alongside this change:
 
 | Zod 3 / ts-rest           | Zod 4 / Kizuna                     |
 | ------------------------- | ---------------------------------- |

@@ -55,6 +55,8 @@
     --kizuna-gap-actions: 12px;
 
     --kizuna-header-height: 80px;
+    --kizuna-banner-height: 44px;
+    --kizuna-sticky-height: calc(var(--kizuna-banner-height) + var(--kizuna-header-height));
     --kizuna-header-shadow: 0 16px 40px -12px rgb(0 0 0 / 0.9);
 
     --kizuna-hero-offset: 76px;
