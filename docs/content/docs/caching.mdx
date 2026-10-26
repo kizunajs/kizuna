@@ -93,7 +93,7 @@ Without that, the image lives at one URL forever and every cache holding it is b
 },
 ```
 
-Declaring `public` on a route behind `security` throws when the config is assembled, so the version of this that leaks data cannot ship.
+Declaring `public` on a route behind `security` throws when the config is assembled, so the version of this that leaks data cannot ship. So does a policy a shared cache may store without `scope: 'private'`: a `maxAge` above zero, a `sharedMaxAge`, `staleWhileRevalidate`, `staleIfError` or `mustRevalidate`. RFC 9111 lets a shared cache store a response to a request carrying `Authorization` once it sees `s-maxage` or `must-revalidate`, and a request that signs in with a cookie or an API key has no such protection, so a plain `maxAge` is enough. `noCache` on its own, and `'no-store'`, need no scope.
 
 ## When it does nothing
 
@@ -205,5 +205,7 @@ The saving is the body, not the work: your handler still runs, because the tag c
 `noCache` means the caller waits for that check on every request. If you would rather it did not, give the response a short `maxAge` instead and let the tag serve the requests that come after the lifetime runs out.
 
 `etag` applies to successful responses, since `304` says the representation the caller holds is still current.
+
+Only a GET or HEAD turns into a `304`. Any other method still sends its response, with the `ETag`, because by the time the tag is known the handler has made its change. RFC 9110 answers a failed condition on those methods with `412 Precondition Failed`, so a `PUT` that should only create, or only replace a version the caller has seen, reads `If-None-Match` or `If-Match` in the handler and answers `412` itself.
 
 `Last-Modified` and `If-Modified-Since` are not here. `etag` is the stronger validator and covers the same ground.

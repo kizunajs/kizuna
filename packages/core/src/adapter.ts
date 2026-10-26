@@ -28,6 +28,7 @@ import { problemDetails, problemFromBody, type ProblemDetails } from './problem-
 import { isVoidSchema, isBinarySchema, readDef, readDefType, readObjectShape } from './zod-internals.js';
 import { applyCoercion, coercionPlanFor, resolveCoercionPlans } from './coercion.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
+import { stripUndeclared } from './strip-undeclared.js';
 import { pluginRouteTree, PLUGIN_ROUTES_META_KEY, PLUGIN_SERVERS_META_KEY, type ResolvedPlugin } from './plugin.js';
 import {
     resolveResponseBody,
@@ -912,29 +913,76 @@ export const getHeaderValue = (value: unknown): string | undefined => {
     return undefined;
 };
 
-const parseCookies = (cookieHeader: string | undefined): Record<string, string> => {
-    const cookies: Record<string, string> = {};
-    if (!cookieHeader) return cookies;
+/**
+ * A value that is not valid percent-encoding is kept as sent, and of two cookies
+ * with one name the first wins, the way the `cookie` package reads them.
+ */
+const readCookie = (cookieHeader: string | undefined, name: string): string | undefined => {
+    if (!cookieHeader) return undefined;
     for (const part of cookieHeader.split(';')) {
         const separator = part.indexOf('=');
-        if (separator === -1) continue;
-        const name = part.slice(0, separator).trim();
-        if (name) cookies[name] = decodeURIComponent(part.slice(separator + 1).trim());
+        if (separator === -1 || part.slice(0, separator).trim() !== name) continue;
+        const value = part.slice(separator + 1).trim();
+        try {
+            return decodeURIComponent(value);
+        } catch {
+            return value;
+        }
     }
-    return cookies;
+    return undefined;
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
 /**
+ * The RFC 9457 members every error body keeps, whatever its schema declares.
+ * Kizuna fills the first four, and `instance` names the occurrence.
+ */
+const PROBLEM_ENVELOPE: ReadonlySet<string> = new Set(['type', 'title', 'status', 'detail', 'instance']);
+
+/**
+ * A body a handler or guard returned, as JSON would send it, with every key
+ * its declared response leaves out removed, whether or not the body is
+ * otherwise valid. With `validate`, a body the schema rejects throws. It also
+ * throws when the body cannot be stripped, and the caller then answers `500`
+ * rather than send it. A status the route does not declare, a stream, and a
+ * body sent raw are left as they are.
+ *
  * An error body is checked as the wire shape, envelope and all, because the
  * author only ever supplies `detail` and extensions.
  */
-const assertDeclaredBody = (route: RouteDefinition, routeKey: string, status: number, body: unknown): void => {
+export const declaredResponseBody = (
+    route: RouteDefinition,
+    routeKey: string,
+    status: number,
+    body: unknown,
+    validate: boolean
+): unknown => {
     const responseSpec = route.responses[status];
-    if (responseSpec === undefined || isStreamResponse(responseSpec)) return;
-    const bodySchema = 'safeParse' in responseSpec ? responseSpec : responseSpec.body;
-    const wire = status >= 400 && body !== null && typeof body === 'object' ? problemFromBody(status, body) : body;
-    const parsed = bodySchema.safeParse(wire);
-    if (!parsed.success) throw new ResponseValidationError(routeKey, status, parsed.error.issues);
+    const bodySchema = responseSpec === undefined ? undefined : resolveResponseBody(responseSpec);
+    if (bodySchema === undefined) return body;
+    const isProblem = status >= 400 && isRecord(body);
+    const wire = isProblem ? problemFromBody(status, body) : body;
+    if (validate) {
+        const parsed = bodySchema.safeParse(wire);
+        if (!parsed.success) throw new ResponseValidationError(routeKey, status, parsed.error.issues);
+    }
+    if (isProblem) {
+        const stripped = stripUndeclared(bodySchema, wire);
+        const declared = isRecord(stripped) ? stripped : {};
+        return Object.fromEntries(
+            Object.entries(body).flatMap(([key, value]) => {
+                if (Object.hasOwn(declared, key)) return [[key, declared[key]]];
+                const scalar = typeof value === 'string' || typeof value === 'number';
+                return PROBLEM_ENVELOPE.has(key) && scalar ? [[key, value]] : [];
+            })
+        );
+    }
+    if (status >= 400) return body;
+    const isBinary = isBinarySchema(bodySchema);
+    const contentType = resolveResponseContentType(responseSpec) ?? (isBinary ? 'application/octet-stream' : 'application/json');
+    if (isBinary || !isJsonMediaType(contentType)) return body;
+    return stripUndeclared(bodySchema, body);
 };
 
 /**
@@ -964,7 +1012,7 @@ export const extractCredential = (scheme: SecurityScheme, request: AdapterReques
     if (openapi.type === 'apiKey') {
         let value: string | undefined;
         if (openapi.in === 'header') value = getHeaderValue(headers[openapi.name.toLowerCase()]);
-        else if (openapi.in === 'cookie') value = parseCookies(getHeaderValue(headers['cookie']))[openapi.name];
+        else if (openapi.in === 'cookie') value = readCookie(getHeaderValue(headers['cookie']), openapi.name);
         else {
             const query = (request.query ?? {}) as Record<string, unknown>;
             const queryValue = query[openapi.name];
@@ -1214,10 +1262,12 @@ const responseBytes = (body: unknown, response: ResponseDefinition | undefined):
 };
 
 /**
- * Send the `ETag` a response declares, and turn the request into a
+ * Send the `ETag` a response declares, and turn a GET or HEAD into a
  * `304 Not Modified` when the caller's `If-None-Match` already covers it.
  * RFC 9110 section 15.4.5 keeps the cache headers on the 304, since the caller
- * needs them to know how long to hold what it already has.
+ * needs them to know how long to hold what it already has. Any other method
+ * sends its response: RFC 9110 section 13.1.2 answers it with `412`, and only
+ * the handler knows whether to, since its change has already run.
  */
 const withEtag = async (result: AdapterResult, route: RouteDefinition, request: AdapterRequest<unknown>): Promise<AdapterResult> => {
     if (result.kind !== 'success' || result.status >= 300 || result.body === undefined) return result;
@@ -1233,7 +1283,9 @@ const withEtag = async (result: AdapterResult, route: RouteDefinition, request: 
     };
 
     const requestHeaders = (request.headers ?? {}) as Record<string, string | string[] | undefined>;
-    if (!etagMatches(getHeaderValue(requestHeaders['if-none-match']), etag)) {
+    const method = request.method.toUpperCase();
+    const conditional = method === 'GET' || method === 'HEAD';
+    if (!conditional || !etagMatches(getHeaderValue(requestHeaders['if-none-match']), etag)) {
         return {
             ...result,
             headers,
@@ -1546,11 +1598,10 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
             }
             if (outcome.kind === 'denied') {
                 const { denial } = outcome;
-                if (responseValidation) assertDeclaredBody(route, routeKey, denial.status, denial.body);
                 return {
                     kind: 'guard-denied',
                     status: denial.status,
-                    body: denial.body,
+                    body: declaredResponseBody(route, routeKey, denial.status, denial.body, responseValidation === true) as GuardDenialBody,
                     headers: denial.headers,
                 };
             }
@@ -1628,7 +1679,7 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
                 response: handlerResult.response,
             };
         }
-        if (responseValidation) assertDeclaredBody(route, routeKey, handlerResult.status, handlerResult.body);
+        const body = declaredResponseBody(route, routeKey, handlerResult.status, handlerResult.body, responseValidation === true);
         const successHeaders =
             route.method === 'OPTIONS'
                 ? {
@@ -1641,17 +1692,28 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
             routeKey,
             route,
             status: handlerResult.status,
-            body: handlerResult.body,
+            body,
             headers: successHeaders,
         };
     } catch (error) {
         if (error instanceof ResponseError) {
+            let body: unknown;
+            try {
+                body = declaredResponseBody(route, routeKey, error.status, error.body, false);
+            } catch (stripError) {
+                return {
+                    kind: 'handler-error',
+                    routeKey,
+                    route,
+                    error: stripError,
+                };
+            }
             return {
                 kind: 'success',
                 routeKey,
                 route,
                 status: error.status,
-                body: error.body,
+                body,
                 headers: error.headers ?? {},
             };
         }
@@ -1946,15 +2008,20 @@ const renderResult = (
 };
 
 /**
- * A query string or form as an object. A repeated key collects every value into a list.
+ * A query string or form as an object. A repeated key collects every value into
+ * a list. A key named after an `Object.prototype` member is a key like any other,
+ * and `__proto__` is dropped, so the object stays plain.
  */
 export const entriesToObject = (source: URLSearchParams | FormData): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
     for (const [key, value] of source.entries()) {
-        const existing = result[key];
-        if (existing === undefined) {
+        if (key === '__proto__') continue;
+        if (!Object.hasOwn(result, key)) {
             result[key] = value;
-        } else if (Array.isArray(existing)) {
+            continue;
+        }
+        const existing = result[key];
+        if (Array.isArray(existing)) {
             existing.push(value);
         } else {
             result[key] = [existing, value];

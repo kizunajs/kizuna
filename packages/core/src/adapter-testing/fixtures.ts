@@ -1033,6 +1033,25 @@ export const cachedRoutes = k.routes({
                 id: params.id,
             },
         })),
+    createTaggedUser: k
+        .route({
+            method: 'POST',
+            path: '/tagged-users',
+            responses: {
+                200: {
+                    body: z.object({
+                        id: z.string(),
+                    }),
+                    etag: true,
+                },
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: {
+                id: '1',
+            },
+        })),
 });
 
 export const cachedInput = {
@@ -1481,3 +1500,299 @@ export const streamedEventsText =
     'event: delta\ndata: {"text":"a"}\n\n: keep-alive\n\nevent: done\ndata: {"count":1}\nid: evt-1\nretry: 5000\n\n';
 export const streamedTicksText = 'data: {"tick":1}\n\ndata: {"tick":2}\n\n';
 export const streamedLinesText = 'one\ntwo\n';
+
+/**
+ * An employee as the store holds it, with fields no response declares.
+ */
+const storedEmployee = {
+    id: '1',
+    name: 'Ada',
+    salary: 98000,
+    profile: {
+        bio: 'Writes the payroll engine',
+        bankAccount: 'NO9386011117947',
+    },
+};
+
+const EmployeeSchema = z.object({
+    id: z.string(),
+    name: z.string(),
+});
+
+export const strippedTools = k.routes({
+    lookupEmployee: k
+        .route({
+            method: 'GET',
+            path: '/employees/lookup',
+            summary: 'Look up the employee on duty',
+            tool: true,
+            responses: {
+                200: EmployeeSchema,
+            },
+        })
+        .handler(() => {
+            const employee: z.input<typeof EmployeeSchema> = storedEmployee;
+            return {
+                status: 200,
+                body: employee,
+            };
+        }),
+});
+
+/**
+ * Handlers that return more than their responses declare, for the features that strip it.
+ */
+export const strippedRoutes = k.routes({
+    tools: strippedTools,
+    getEmployee: k
+        .route({
+            method: 'GET',
+            path: '/employees/:id',
+            responses: {
+                200: z.object({
+                    id: z.string(),
+                    name: z.string(),
+                    profile: z.object({
+                        bio: z.string(),
+                    }),
+                }),
+            },
+        })
+        .handler(() => {
+            const employee: {
+                id: string;
+                name: string;
+                profile: {
+                    bio: string;
+                };
+            } = storedEmployee;
+            return {
+                status: 200,
+                body: employee,
+            };
+        }),
+    listEmployees: k
+        .route({
+            method: 'GET',
+            path: '/employees',
+            responses: {
+                200: z.object({
+                    employees: z.array(EmployeeSchema),
+                }),
+            },
+        })
+        .handler(() => {
+            const employees: z.input<typeof EmployeeSchema>[] = [storedEmployee, storedEmployee];
+            return {
+                status: 200,
+                body: {
+                    employees,
+                },
+            };
+        }),
+    deleteEmployee: k
+        .route({
+            method: 'DELETE',
+            path: '/employees/:id',
+            responses: {
+                204: z.void(),
+                409: ProblemDetailsSchema.extend({
+                    openShifts: z.int(),
+                }),
+            },
+        })
+        .handler(({ throwError }) => {
+            const conflict = {
+                detail: 'Ada has open shifts',
+                openShifts: 2,
+                internalQuery: 'SELECT * FROM shifts WHERE employee_id = 1',
+            };
+            const body: {
+                detail: string;
+                openShifts: number;
+            } = conflict;
+            return throwError({
+                status: 409,
+                body,
+            });
+        }),
+    watchEmployee: k
+        .route({
+            method: 'GET',
+            path: '/employees/:id/events',
+            responses: {
+                200: {
+                    stream: {
+                        updated: EmployeeSchema,
+                    },
+                },
+            },
+        })
+        .handler(() => ({
+            status: 200,
+            body: async function* () {
+                const employee: z.input<typeof EmployeeSchema> = storedEmployee;
+                yield {
+                    event: 'updated',
+                    data: employee,
+                };
+            },
+        })),
+    askAssistant: k
+        .route({
+            method: 'GET',
+            path: '/assistant',
+            responses: {
+                200: {
+                    stream: {
+                        done: z.object({
+                            ok: z.boolean(),
+                        }),
+                    },
+                    tools: strippedTools,
+                },
+            },
+        })
+        .handler(({ tools }) => ({
+            status: 200,
+            body: async function* () {
+                const result = yield* tools.run({
+                    id: 'call_1',
+                    name: 'lookup_employee',
+                });
+                yield {
+                    event: 'done',
+                    data: {
+                        ok: result.state === 'done',
+                    },
+                };
+            },
+        })),
+});
+
+export const strippedInput = {
+    ...config,
+    routes: [strippedRoutes],
+};
+
+export const strippedContract = defineConfig(strippedInput).api;
+
+interface CookieKConfig {
+    auth: {
+        identities: {
+            visitor: typeof visitorIdentity;
+        };
+    };
+}
+
+const cookieK = new Kizuna<CookieKConfig>();
+
+export const visitorSession = 'sess_ada';
+
+export const visitorIdentity = cookieK.identity
+    .apiKey({
+        name: 'session',
+        in: 'cookie',
+        context: z.object({
+            visitorId: z.string(),
+        }),
+    })
+    .guard(({ apiKey, deny }) => {
+        if (apiKey?.value !== visitorSession)
+            return deny({
+                status: 403,
+                body: {
+                    detail: 'Forbidden',
+                },
+            });
+        return {
+            visitorId: '1',
+        };
+    });
+
+export const cookieRoutes = cookieK.routes({
+    getVisit: cookieK
+        .route({
+            method: 'GET',
+            path: '/visit',
+            auth: 'visitor',
+            responses: {
+                200: z.object({
+                    visitorId: z.string(),
+                }),
+            },
+        })
+        .handler(({ auth }) => ({
+            status: 200,
+            body: {
+                visitorId: auth.visitor.visitorId,
+            },
+        })),
+});
+
+export const cookieInput = {
+    auth: {
+        identities: {
+            visitor: visitorIdentity,
+        },
+    },
+    routes: [cookieRoutes],
+};
+
+export const cookieContract = defineConfig(cookieInput).api;
+
+/**
+ * Routes reading request headers and query keys, for the features about how a
+ * request's names reach the handler.
+ */
+export const requestNameRoutes = k.routes({
+    getTenant: k
+        .route({
+            method: 'GET',
+            path: '/tenant',
+            headers: z.object({
+                'X-Tenant-Id': z.string(),
+            }),
+            responses: {
+                200: z.object({
+                    tenantId: z.string(),
+                }),
+            },
+        })
+        .handler(({ headers }) => ({
+            status: 200,
+            body: {
+                tenantId: headers['X-Tenant-Id'],
+            },
+        })),
+    search: k
+        .route({
+            method: 'GET',
+            path: '/search',
+            query: z.looseObject({
+                term: z.string().optional(),
+            }),
+            responses: {
+                200: z.object({
+                    keys: z.array(z.string()),
+                    constructorValue: z.unknown(),
+                    plainPrototype: z.boolean(),
+                }),
+            },
+        })
+        .handler(({ query }) => ({
+            status: 200,
+            body: {
+                keys: Object.keys(query),
+                constructorValue: Object.hasOwn(query, 'constructor') ? query['constructor'] : 'inherited',
+                plainPrototype: Object.getPrototypeOf(query) === Object.prototype,
+            },
+        })),
+});
+
+export const requestNameInput = {
+    ...config,
+    routes: [requestNameRoutes],
+};
+
+export const requestNameContract = defineConfig(requestNameInput).api;

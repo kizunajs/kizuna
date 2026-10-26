@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type { RouteDefinition, StreamDefinition, StreamResponseDefinition } from './types.js';
 import { isBinarySchema, resolveBaseType } from './zod-internals.js';
 import type { StreamWithTools } from './tool-events.js';
+import { stripUndeclared } from './strip-undeclared.js';
 import { isJsonMediaType, isStreamResponse, isSuccessStatus, isZodSchema } from './generator-utils.js';
 
 export interface StreamContext {
@@ -9,6 +10,9 @@ export interface StreamContext {
 }
 
 interface EventFields {
+    /**
+     * ASCII alone, since the client sends it back as the `Last-Event-ID` header.
+     */
     id?: string;
     retry?: number;
 }
@@ -193,6 +197,10 @@ export const formatEvent = (item: EventItem | StreamComment, named: boolean): st
         if (/[\r\n\0]/.test(item.id)) {
             throw new Error(`A server-sent event id cannot contain a line break or NUL: ${JSON.stringify(item.id)}.`);
         }
+        // The id comes back as the `Last-Event-ID` header, where servers read bytes outside ASCII differently.
+        if (/[\u0080-\uffff]/.test(item.id)) {
+            throw new Error(`A server-sent event id cannot hold characters outside ASCII: ${JSON.stringify(item.id)}.`);
+        }
         text += `id: ${item.id}\n`;
     }
     if (item.retry !== undefined) {
@@ -248,13 +256,25 @@ export const encodeStreamBody = (source: StreamSource, options: EncodeStreamOpti
     }
     const iterator = iterable[Symbol.asyncIterator]();
 
+    /**
+     * The message as its schema declares it, without the fields it leaves out,
+     * whether or not the message is otherwise valid. One the schema rejects
+     * throws when validating.
+     */
+    const declared = (schema: z.ZodType, value: unknown): unknown => {
+        if (options.validate) {
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                throw new Error(
+                    `Stream message validation failed for ${source.routeKey} (status ${source.status}): ${parsed.error.issues.map((issue) => issue.message).join('; ')}`
+                );
+            }
+        }
+        return stripUndeclared(schema, value);
+    };
+
     const validate = (schema: z.ZodType, value: unknown): void => {
-        if (!options.validate) return;
-        const parsed = schema.safeParse(value);
-        if (parsed.success) return;
-        throw new Error(
-            `Stream message validation failed for ${source.routeKey} (status ${source.status}): ${parsed.error.issues.map((issue) => issue.message).join('; ')}`
-        );
+        if (options.validate) declared(schema, value);
     };
 
     const encode = (item: unknown): Uint8Array => {
@@ -271,8 +291,15 @@ export const encodeStreamBody = (source: StreamSource, options: EncodeStreamOpti
                 if (schema === undefined) {
                     throw new Error(`${source.routeKey} yielded event ${JSON.stringify(event.event)}, which its stream does not declare.`);
                 }
-                validate(schema, event.data);
-                return encoder.encode(formatEvent(event, named));
+                return encoder.encode(
+                    formatEvent(
+                        {
+                            ...event,
+                            data: declared(schema, event.data),
+                        },
+                        named
+                    )
+                );
             }
             case 'text':
                 if (typeof item !== 'string') {

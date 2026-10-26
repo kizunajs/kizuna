@@ -183,7 +183,7 @@ kizuna.api.mount(app, {
 
 | Option               | Default | Description                                                                                                                                                                               |
 | -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `responseValidation` | `false` | Validate handler return values against response schemas. Enable in development.                                                                                                           |
+| `responseValidation` | `false` | Answer `500` when a handler's body fails its response schema. Off, that body is sent. Fields the schema leaves out are removed either way. Enable in development.                         |
 | `formatError`        | none    | Reshape error (`>= 400`) response bytes for migrating clients. Most don't need it (use Problem Details extension members). See [Migrating an existing API](/docs/migration/existing-api). |
 
 ## Streams

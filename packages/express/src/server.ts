@@ -121,8 +121,9 @@ const rawBodyOf = (req: Request): string | undefined => {
 
 export interface ExpressOptions {
     /**
-     * Validate handler return values against the route's response schemas.
-     * Mismatches surface as 500 errors. Enable in development.
+     * Answer 500 when a handler returns a body its response schema rejects.
+     * Off, that body is sent. Fields the schema leaves out are removed either
+     * way. Enable in development.
      *
      * @default false
      */
