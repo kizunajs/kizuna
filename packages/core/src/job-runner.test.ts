@@ -296,6 +296,48 @@ describe('createJobRunner', () => {
             expect((onError.mock.calls[0]?.[1] as Error).message).toBe('boom');
         });
 
+        it('waits for a runAt further away than one timer can hold', async () => {
+            vi.useFakeTimers();
+            try {
+                vi.setSystemTime(new Date('2026-08-05T00:00:00Z'));
+                const cleanup = vi.fn(noop);
+                const runner = createJobRunner(contract, {
+                    indexPost: indexed,
+                    cleanup,
+                });
+                await runner.cleanup.queue({
+                    runAt: new Date('2026-09-04T00:00:00Z'),
+                });
+                await vi.advanceTimersByTimeAsync(29 * 24 * 60 * 60 * 1000);
+                expect(cleanup).not.toHaveBeenCalled();
+                await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+                expect(cleanup).toHaveBeenCalledTimes(1);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
+        it('keeps the runAt it was queued with when the caller changes the date afterwards', async () => {
+            vi.useFakeTimers();
+            try {
+                vi.setSystemTime(new Date('2026-08-05T00:00:00Z'));
+                const cleanup = vi.fn(noop);
+                const runner = createJobRunner(contract, {
+                    indexPost: indexed,
+                    cleanup,
+                });
+                const runAt = new Date('2026-08-06T00:00:00Z');
+                await runner.cleanup.queue({
+                    runAt,
+                });
+                runAt.setUTCDate(runAt.getUTCDate() + 30);
+                await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+                expect(cleanup).toHaveBeenCalledTimes(1);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
+
         it('rejects bad input at the call site rather than in the background', async () => {
             const indexPost = vi.fn();
             const runner = createJobRunner(contract, {
