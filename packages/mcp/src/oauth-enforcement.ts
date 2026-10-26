@@ -2,17 +2,17 @@ import type { z } from 'zod';
 import { problemDetails, problemFromBody, type RequiredPermissions, type SecurityScheme } from 'kizunajs';
 import {
     bearerChallenge,
+    callGuard,
     extractCredential,
-    guardDenyFor,
     insufficientScope,
     requiresDenial,
     withPermissions,
-    isGuardDenial,
     rawResponse,
     type AdapterRequest,
     type GuardDenialBody,
     type GuardRun,
 } from 'kizunajs/adapter';
+import { validationProblem } from './mcp-server.js';
 
 const forbiddenBody = (guardSchema: z.ZodType | undefined, detail: string): GuardDenialBody => {
     const filled = guardSchema?.safeParse(problemDetails(403, detail));
@@ -65,26 +65,39 @@ export const enforceOAuth = async (
     const credential = extractCredential(args.schemeDefinition, credentialRequest);
     const presented = Object.values(credential).some((value) => value !== null);
 
-    const guardResult = await args.guard({
-        ...args.handlerContext,
-        ...credential,
+    const outcome = await callGuard(args.guard, {
+        scheme: args.schemeDefinition,
         params: args.params,
-        deny: guardDenyFor(args.schemeDefinition),
-        ...(args.requestContext && Object.keys(args.requestContext).length > 0
-            ? {
-                  requestContext: args.requestContext,
-              }
-            : {}),
-    } as Parameters<GuardRun>[0]);
+        args: {
+            ...args.handlerContext,
+            ...credential,
+            ...(args.requestContext && Object.keys(args.requestContext).length > 0
+                ? {
+                      requestContext: args.requestContext,
+                  }
+                : {}),
+        },
+    });
 
-    if (isGuardDenial(guardResult)) {
+    if (outcome.kind === 'invalid-params') {
+        return {
+            ok: false,
+            denial: {
+                status: 400,
+                body: validationProblem(outcome.failure),
+            },
+        };
+    }
+
+    if (outcome.kind === 'denied') {
+        const { denial } = outcome;
         const challenge =
-            guardResult.status === 401
+            denial.status === 401
                 ? bearerChallenge({
                       ...(presented
                           ? {
                                 error: 'invalid_token',
-                                error_description: guardResult.body.detail,
+                                error_description: denial.body.detail,
                             }
                           : {}),
                       resource_metadata: args.metadataUrl,
@@ -94,15 +107,14 @@ export const enforceOAuth = async (
         return {
             ok: false,
             denial: {
-                status: guardResult.status,
-                body: guardResult.body,
+                status: denial.status,
+                body: denial.body,
                 challenge,
             },
         };
     }
 
-    const context =
-        guardResult && typeof guardResult === 'object' ? withPermissions(args.scheme, args.schemeDefinition, guardResult) : undefined;
+    const context = outcome.context === undefined ? undefined : withPermissions(args.scheme, args.schemeDefinition, outcome.context);
     const accessCheck = {
         roles: args.roles,
         requires: args.requires,

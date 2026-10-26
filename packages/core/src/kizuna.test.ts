@@ -231,6 +231,155 @@ describe('an auth the identities do not support', () => {
             })
         ).toThrow(/names no identity/);
     });
+
+    it('rejects an empty roles list, which no caller could satisfy', () => {
+        expect(() =>
+            resolve({
+                identity: 'member',
+                roles: [],
+            })
+        ).toThrow(/accepts no role/);
+    });
+
+    it('accepts an empty verb list under requires', () => {
+        expect(
+            resolve({
+                identity: 'member',
+                requires: {
+                    workspace: [],
+                },
+            }).security
+        ).toEqual([
+            {
+                member: [],
+            },
+        ]);
+    });
+});
+
+describe('a tool a streamed response names', () => {
+    const toolK = new Kizuna<{
+        auth: { identities: typeof identities };
+    }>();
+    const toolConfig = {
+        auth: {
+            identities,
+        },
+    };
+
+    const assistantFor = () => {
+        const workspaceTools = toolK.routes({
+            deleteWorkspace: toolK.route({
+                method: 'DELETE',
+                path: '/workspace',
+                auth: {
+                    identity: 'member',
+                    roles: 'owner',
+                },
+                responses: {
+                    204: z.void(),
+                },
+                summary: 'Delete the workspace',
+                tool: true,
+            }),
+        });
+        const assistant = toolK.routes({
+            reply: toolK.route({
+                method: 'POST',
+                path: '/reply',
+                auth: 'user',
+                responses: {
+                    200: {
+                        stream: {
+                            done: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                        tools: workspaceTools,
+                    },
+                },
+            }),
+        });
+        return {
+            workspaceTools,
+            assistant,
+            tool: workspaceTools.deleteWorkspace as RouteDefinition,
+        };
+    };
+
+    it('resolves its auth when `routes` does not list it', () => {
+        const { assistant, tool } = assistantFor();
+        defineConfig({
+            ...toolConfig,
+            routes: [assistant],
+        });
+
+        expect(tool.security).toEqual([
+            {
+                member: [],
+            },
+        ]);
+        expect(tool.roles).toEqual(['owner']);
+        expect(Object.keys(tool.responses).sort()).toEqual(['204', '401', '403']);
+    });
+
+    it('resolves the same whether `routes` lists it too or not', () => {
+        const unlisted = assistantFor();
+        defineConfig({
+            ...toolConfig,
+            routes: [unlisted.assistant],
+        });
+        const listed = assistantFor();
+        defineConfig({
+            ...toolConfig,
+            routes: [listed.workspaceTools, listed.assistant],
+        });
+
+        expect(listed.tool.security).toEqual(unlisted.tool.security);
+        expect(listed.tool.roles).toEqual(unlisted.tool.roles);
+        expect(Object.keys(listed.tool.responses).sort()).toEqual(Object.keys(unlisted.tool.responses).sort());
+    });
+
+    it('is refused without an `auth` when the config declares an identity', () => {
+        const unguardedTools = toolK.routes({
+            // @ts-expect-error every route needs an auth once an identity exists
+            readWorkspace: toolK.route({
+                method: 'GET',
+                path: '/workspace',
+                responses: {
+                    200: z.object({
+                        ok: z.boolean(),
+                    }),
+                },
+                summary: 'Read the workspace',
+                tool: true,
+            }),
+        });
+        const assistant = toolK.routes({
+            reply: toolK.route({
+                method: 'POST',
+                path: '/reply',
+                auth: 'user',
+                responses: {
+                    200: {
+                        stream: {
+                            done: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                        tools: unguardedTools,
+                    },
+                },
+            }),
+        });
+
+        expect(() =>
+            defineConfig({
+                ...toolConfig,
+                routes: [assistant],
+            })
+        ).toThrow(/Tool 'readWorkspace', which route 'reply' streams, declares no `auth`/);
+    });
 });
 
 describe('a route that declares no auth', () => {

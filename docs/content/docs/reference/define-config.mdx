@@ -86,9 +86,9 @@ export const workspaceRoutes = k.routes.workspace({
 });
 ```
 
-`defineConfig` resolves each `auth` onto that route's `security`, `roles` and `requires`, which the [guards](/docs/reference/k-identity), the [route handler](/docs/reference/k-route) types, and the [OpenAPI document](/docs/reference/generate-openapi) all read.
+`defineConfig` resolves each `auth` onto that route's `security`, `roles` and `requires`, which the [guards](/docs/reference/k-identity), the [route handler](/docs/reference/k-route) types, and the [OpenAPI document](/docs/reference/generate-openapi) all read. A route a streamed response names under [`tools`](/docs/tools) resolves the same way, whether `routes` lists it or not.
 
-An identity a route names has to carry a guard, or the config refuses to assemble.
+An identity a route names has to carry a guard, or the config refuses to assemble. An empty `roles: []` accepts no caller, so it throws too.
 
 ## Jobs
 
@@ -105,7 +105,7 @@ export default defineConfig({
 });
 ```
 
-`jobRunner` is required once `jobs` declares one, and its `mode` says how they run: `'http'` serves the two job endpoints, `'in-process'` leaves them unmounted for `startJobs` to tick. A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin and MCP surfaces. See [Jobs](/docs/jobs).
+`jobRunner` is required once `jobs` declares one, and its `mode` says how they run: `'http'` serves the two job endpoints, `'in-process'` leaves them unmounted for `startJobs` to tick. One identity guards both endpoints, so with `'http'` the config throws when two `k.jobs` name different ones. A job carries its own identity, so it declares no `auth`, and it stays out of `api.routes`, the OpenAPI document, and the generated Swift, Kotlin and MCP surfaces. See [Jobs](/docs/jobs).
 
 ## Plugins
 

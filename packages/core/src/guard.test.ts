@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
+    callGuard,
     defineAdapter,
     extractCredential,
     renderJsonResult,
@@ -8,6 +9,7 @@ import {
     type AdapterRequest,
     type AdapterResult,
     type GuardMap,
+    type GuardRun,
 } from './adapter.js';
 import type { RouteDefinition } from './types.js';
 import { Kizuna } from './kizuna.js';
@@ -1176,5 +1178,138 @@ describe('OAuth tokens', () => {
         const result = await run('/report', ['report:read']);
         expect(result.status).toBe(403);
         expect(result.headers?.['www-authenticate']).toBeUndefined();
+    });
+});
+
+describe('callGuard', () => {
+    const twoDenials =
+        (signedIn: boolean): GuardRun =>
+        ({ deny }) => {
+            const unauthorized = deny({
+                status: 401,
+                body: {
+                    detail: 'Sign in first',
+                },
+            });
+            const forbidden = deny({
+                status: 403,
+                body: {
+                    detail: 'Not your workspace',
+                },
+            });
+            return signedIn ? forbidden : unauthorized;
+        };
+
+    it('answers with the denial the guard returns', async () => {
+        expect(
+            await callGuard(twoDenials(true), {
+                scheme: user,
+                params: {},
+                args: {},
+            })
+        ).toMatchObject({
+            kind: 'denied',
+            denial: {
+                status: 403,
+            },
+        });
+        expect(
+            await callGuard(twoDenials(false), {
+                scheme: user,
+                params: {},
+                args: {},
+            })
+        ).toMatchObject({
+            kind: 'denied',
+            denial: {
+                status: 401,
+            },
+        });
+    });
+
+    it('denies when the guard calls `deny` and returns a context', async () => {
+        const outcome = await callGuard(
+            ({ deny }) => {
+                deny({
+                    status: 401,
+                    body: {
+                        detail: 'Sign in first',
+                    },
+                });
+                return {
+                    userId: '1',
+                };
+            },
+            {
+                scheme: user,
+                params: {},
+                args: {},
+            }
+        );
+        expect(outcome).toMatchObject({
+            kind: 'denied',
+            denial: {
+                status: 401,
+            },
+        });
+    });
+
+    describe('an identity with a strict `params` schema', () => {
+        const invite = k.identity.custom({
+            params: z.strictObject({
+                code: z.string(),
+            }),
+        });
+        let seen: unknown;
+        const readCode: GuardRun = ({ params }) => {
+            seen = params;
+        };
+
+        it('reads only the params it declares, beside the other params the route has', async () => {
+            const outcome = await callGuard(readCode, {
+                scheme: invite,
+                params: {
+                    workspaceId: 'ws_1',
+                    code: 'inv_1',
+                },
+                args: {},
+            });
+            expect(outcome.kind).toBe('passed');
+            expect(seen).toEqual({
+                code: 'inv_1',
+            });
+        });
+
+        it('hands a loose schema every param the route has', async () => {
+            const looseInvite = k.identity.custom({
+                params: z.looseObject({
+                    code: z.string(),
+                }),
+            });
+            const outcome = await callGuard(readCode, {
+                scheme: looseInvite,
+                params: {
+                    workspaceId: 'ws_1',
+                    code: 'inv_1',
+                },
+                args: {},
+            });
+            expect(outcome.kind).toBe('passed');
+            expect(seen).toEqual({
+                workspaceId: 'ws_1',
+                code: 'inv_1',
+            });
+        });
+
+        it('refuses a request whose route lacks a param it declares', async () => {
+            const outcome = await callGuard(readCode, {
+                scheme: invite,
+                params: {
+                    workspaceId: 'ws_1',
+                },
+                args: {},
+            });
+            expect(outcome.kind).toBe('invalid-params');
+        });
     });
 });

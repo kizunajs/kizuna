@@ -67,7 +67,10 @@ export interface Identity<
 > extends SecurityScheme<ContextSchema> {
     /**
      * The path parameters this identity's guard reads. A route whose `auth`
-     * names the identity has to carry them, and the guard receives them typed.
+     * names the identity has to carry them, and the guard receives what this
+     * schema parses from them. The schema sees only the params it declares, so
+     * the route's other params never fail it, and a declared param the route
+     * lacks answers `400`.
      */
     readonly params: ParamsSchema;
     /**
@@ -250,7 +253,9 @@ export interface CustomConfig<
     /**
      * The path parameters this identity's guard reads, for a credential that
      * travels in the path. A route whose `auth` names the identity has to carry
-     * them.
+     * them. The guard receives what the schema parses from the params it
+     * declares, and a request it refuses, a declared param missing included,
+     * answers `400` before the guard runs.
      *
      * @example
      * params: z.object({

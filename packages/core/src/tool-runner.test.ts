@@ -156,10 +156,24 @@ interface StreamedMessage {
     data: unknown;
 }
 
+interface Served {
+    api: typeof api;
+    path: string;
+    guards: GuardMap<Record<string, never>>;
+}
+
 /**
  * Stream a reply that runs one call, and collect what it yielded.
  */
-const reply = async (body: ReplyBody, headers: Record<string, string> = {}): Promise<StreamedMessage[]> => {
+const reply = async (
+    body: ReplyBody,
+    headers: Record<string, string> = {},
+    served: Served = {
+        api,
+        path: '/reply',
+        guards,
+    }
+): Promise<StreamedMessage[]> => {
     logged = [];
     results = [];
     const outcomes: AdapterResult[] = [];
@@ -174,7 +188,7 @@ const reply = async (body: ReplyBody, headers: Record<string, string> = {}): Pro
         method: 'POST',
         resolution: {
             kind: 'core-match',
-            path: '/reply',
+            path: served.path,
         },
         query: {},
         headers: {
@@ -184,12 +198,12 @@ const reply = async (body: ReplyBody, headers: Record<string, string> = {}): Pro
         readBody: () => body,
     };
     await adapter.handle({
-        routes: api.routes,
-        router: routerFromRoutes(api.routes) as never,
+        routes: served.api.routes,
+        router: routerFromRoutes(served.api.routes) as never,
         request,
         responseContext: {},
-        guards,
-        schemes: api.securitySchemes,
+        guards: served.guards,
+        schemes: served.api.securitySchemes,
     });
     const outcome = outcomes[0];
     if (outcome?.kind !== 'success') throw new Error(`Expected a stream, got ${outcome?.kind}`);
@@ -402,6 +416,118 @@ describe('tools.run', () => {
             {
                 text: 'Stand up',
                 minutes: 30,
+            },
+        ]);
+    });
+});
+
+describe('the params a call carries', () => {
+    const guardParams: unknown[] = [];
+    const handlerParams: unknown[] = [];
+    const noteTools = k.routes({
+        notes: {
+            read: k
+                .route({
+                    method: 'GET',
+                    path: '/notes/:noteId',
+                    auth: 'user',
+                    responses: {
+                        200: z.object({
+                            noteId: z.string(),
+                        }),
+                    },
+                    summary: 'Read one note',
+                    tool: true,
+                })
+                .handler(({ params }) => {
+                    handlerParams.push(params);
+                    return {
+                        status: 200,
+                        body: {
+                            noteId: params.noteId,
+                        },
+                    };
+                }),
+        },
+    });
+    const noteReply = k.routes({
+        noteReply: k
+            .route({
+                method: 'POST',
+                path: '/note-reply',
+                auth: false,
+                body: z.custom<ReplyBody>(),
+                responses: {
+                    200: {
+                        stream: {
+                            done: z.object({
+                                ok: z.boolean(),
+                            }),
+                        },
+                        tools: noteTools,
+                    },
+                },
+            })
+            .handler(({ body, tools }) => ({
+                status: 200,
+                body: async function* () {
+                    results.push(yield* tools.run(body.call));
+                    yield {
+                        event: 'done',
+                        data: {
+                            ok: true,
+                        },
+                    };
+                },
+            })),
+    });
+    const served = {
+        api: defineConfig({
+            auth: {
+                identities: {
+                    user,
+                },
+            },
+            routes: [noteTools, noteReply],
+        }).api as unknown as typeof api,
+        path: '/note-reply',
+        guards: {
+            user: ({ params }) => {
+                guardParams.push(params);
+                return {
+                    userId: 'ada',
+                };
+            },
+        } satisfies GuardMap<Record<string, never>>,
+    };
+
+    it('keeps only the params the route path names, as HTTP does', async () => {
+        await reply(
+            {
+                call: {
+                    id: 'call_1',
+                    name: 'notes_read',
+                    input: {
+                        params: {
+                            noteId: 'note_1',
+                            workspaceId: 'someone-else',
+                        },
+                    },
+                },
+            },
+            signedIn,
+            served
+        );
+
+        expect(results[0]?.state).toBe('done');
+        expect(guardParams).toEqual([
+            {
+                noteId: 'note_1',
+            },
+        ]);
+        expect(handlerParams).toEqual([
+            {
+                noteId: 'note_1',
             },
         ]);
     });

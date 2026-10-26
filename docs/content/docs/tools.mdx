@@ -187,7 +187,7 @@ const stream = anthropic.messages.stream({
 
 ### Run what the model asks for
 
-`tools.run` takes a call as the model sent it and runs the route as the person who made the request. The route's own validation, guards and handler run, with the credentials the stream request carried, so a handler never passes a token along. Delegate to it with `yield*`: it sends `tool_call`, then `tool_result` or `tool_error`, and returns what the model reads.
+`tools.run` takes a call as the model sent it and runs the route as the person who made the request. The route's own validation, guards and handler run, with the credentials the stream request carried, so a handler never passes a token along. That holds for a route `routes` does not list too, since `defineConfig` resolves the `auth` of every route a stream names. A call's `params` keep only the names the route's path declares, as a URL would. Delegate to it with `yield*`: it sends `tool_call`, then `tool_result` or `tool_error`, and returns what the model reads.
 
 ```ts title="src/routes/assistant.ts"
 import Anthropic from '@anthropic-ai/sdk';

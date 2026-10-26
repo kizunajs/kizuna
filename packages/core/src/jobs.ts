@@ -436,7 +436,7 @@ export const isCompiledJob = (value: unknown): value is CompiledJob => {
  */
 /**
  * Throw when declared jobs do not say how they run, or when the job endpoints
- * would be served with no identity guarding them.
+ * would be served with no identity guarding them, or with more than one.
  */
 export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | undefined): void => {
     const flattened = jobs ? flattenJobs(jobs) : [];
@@ -447,8 +447,17 @@ export const assertJobRunner = (jobs: Jobs | undefined, config: JobsConfig | und
                 "or `jobRunner: { mode: 'in-process' }` when `startJobs` ticks them in this process."
         );
     }
-    if (config.mode === 'in-process' || flattened.some(({ job }) => job.identity !== undefined)) return;
+    if (config.mode === 'in-process') return;
     const base = config.path ?? DEFAULT_JOBS_PATH;
+    const identities = [...new Set(flattened.map(({ job }) => job.identity).filter((identity) => identity !== undefined))];
+    if (identities.length > 1) {
+        const named = identities.map((identity) => `'${identity}'`);
+        throw new Error(
+            `The jobs declare the identities ${named.slice(0, -1).join(', ')} and ${named.at(-1)}, but \`${base}/dispatch\` and \`${base}/run\` are one pair of routes, guarded by one identity. ` +
+                "Declare every job under the same identity, or set `jobRunner: { mode: 'in-process' }` when the jobs run in this process with `startJobs`."
+        );
+    }
+    if (identities.length === 1) return;
     throw new Error(
         `The jobs declare no identity, so \`${base}/dispatch\` and \`${base}/run\` would let anyone trigger them. ` +
             "Pass an identity to `k.jobs`, or set `jobRunner: { mode: 'in-process' }` when the jobs run in this process with `startJobs`."

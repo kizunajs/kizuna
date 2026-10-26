@@ -401,10 +401,10 @@ A caller with several roles returns them as an array, and holds all of them.
 | --------------------------------- | ---------------------------------------- |
 | `false`                           | Public                                   |
 | `'member'`                        | Requires the `member` identity, any role |
-| `['user', 'member']`              | Either identity                          |
+| `['user', 'member']`              | Requires both identities                 |
 | `{ identity, roles?, requires? }` | The same, narrowed                       |
 
-`'member'` is shorthand for `{ identity: 'member' }`. `roles` checks who the caller is and `requires` checks what they hold, so a route with only `roles` does not look at permissions.
+`'member'` is shorthand for `{ identity: 'member' }`. `roles` checks who the caller is and `requires` checks what they hold, so a route with only `roles` does not look at permissions. An empty `roles: []` would let no caller in, so `defineConfig` throws on it. Leave `roles` out to accept every role.
 
 ## Permissions
 

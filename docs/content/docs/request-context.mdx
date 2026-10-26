@@ -32,7 +32,7 @@ export const analytics = k
     }));
 ```
 
-The resolver's `headers` are typed by the schema right above it, and its return is checked against `context`.
+The resolver reads each header as the request carried it, a string, a list of strings or `undefined`. Read one with `getHeaderValue`, which takes the first value. Its return is checked against `context`.
 
 </Step>
 
@@ -117,7 +117,7 @@ export const locale = k
         }),
     })
     .handler(({ headers }) => ({
-        language: negotiateLanguage(headers['accept-language']) ?? 'en',
+        language: negotiateLanguage(getHeaderValue(headers['accept-language'])) ?? 'en',
     }));
 ```
 
@@ -127,11 +127,11 @@ export const locale = k
 
 A resolver receives one object:
 
-| Argument       | What it is                                                                                                |
-| -------------- | --------------------------------------------------------------------------------------------------------- |
-| `headers`      | The declared headers, typed by the schema. A declaration without one gets the adapter's raw header record |
-| `params`       | The matched route's path params, as strings, so a resolver can read `params.workspaceId`                  |
-| native request | The adapter's own request objects                                                                         |
+| Argument       | What it is                                                                               |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| `headers`      | The adapter's raw header record, each value as the request carried it                    |
+| `params`       | The matched route's path params, as strings, so a resolver can read `params.workspaceId` |
+| native request | The adapter's own request objects                                                        |
 
 The native objects differ per adapter:
 

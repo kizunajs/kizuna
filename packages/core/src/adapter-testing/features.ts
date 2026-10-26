@@ -93,6 +93,12 @@ export const ADAPTER_FEATURES = {
     'guards.authFailureModes': {
         summary: 'An unresolved credential is 401 with a challenge; a resolved one missing a permission is 403 without.',
     },
+    'guards.identityParams': {
+        summary: 'A guard receives the path params its identity declares, parsed, and a value they refuse answers 400 before it runs.',
+    },
+    'guards.denyWithoutReturn': {
+        summary: 'A guard that calls `deny` without returning it still refuses the request.',
+    },
     'responses.declaredContentType': {
         summary: 'A route declaring a non-JSON content type sends its body raw under it.',
     },
@@ -182,6 +188,9 @@ export const ADAPTER_FEATURES = {
     },
     'streams.toolsRunAsCaller': {
         summary: 'A tool a stream runs passes its guard with the credentials of the request that is streaming.',
+    },
+    'streams.unlistedToolsGuarded': {
+        summary: 'A tool a stream names, and `routes` does not list, passes its guard the same as a listed one.',
     },
     'streams.itemValidation': {
         summary: 'With `responseValidation` on, a message failing its schema ends the stream.',

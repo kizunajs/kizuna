@@ -210,9 +210,10 @@ export type RequiredPermissions = Record<string, readonly string[]>;
 export type RoutePath = `/${string}`;
 
 /**
- * What a route requires of its caller: an identity name, several of them for
- * either, `false` for a public route, or the object form narrowing to the roles
- * it accepts or the permissions the caller has to hold.
+ * What a route requires of its caller: an identity name, several of them that
+ * are all required, `false` for a public route, or the object form narrowing to
+ * the roles it accepts or the permissions the caller has to hold. `defineConfig`
+ * throws on an empty `roles`, which no caller could satisfy.
  *
  * @example
  * auth: 'member'

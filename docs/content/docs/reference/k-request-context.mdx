@@ -19,10 +19,11 @@ export const logger = k
     }));
 ```
 
-A declaration can also read request `headers`. They stay off the routes and out of the OpenAPI document, and the clients type them, so a caller sets them once and the resolver reads them validated.
+A declaration can also read request `headers`. They stay off the routes and out of the OpenAPI document, and the clients type them, so a caller sets them once. The resolver reads each one as the request carried it.
 
 ```ts title="request-context.ts"
 import { z } from 'zod';
+import { getHeaderValue } from 'kizunajs';
 import { k } from './k';
 
 export const analytics = k
@@ -35,7 +36,7 @@ export const analytics = k
         }),
     })
     .handler(({ headers }) => ({
-        sessionId: headers['x-posthog-session-id'] ?? null,
+        sessionId: getHeaderValue(headers['x-posthog-session-id']) ?? null,
     }));
 ```
 
@@ -93,4 +94,4 @@ val client = APIClient(
 )
 ```
 
-Resolvers run on every route, public ones included, before the guards, which read their values too, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the declared `headers` (validated). The return is checked against the `context` schema. Request context never appears in the OpenAPI document.
+Resolvers run on every route, public ones included, before the guards, which read their values too, and never deny a request. They receive the adapter's native request objects, the route's `params`, and the request's raw `headers`. The return is checked against the `context` schema. Request context never appears in the OpenAPI document.

@@ -1876,3 +1876,143 @@ describe('MCP server: request context in guards', () => {
         await close();
     });
 });
+
+describe('MCP server: what a guard decides on', () => {
+    const invite = k.identity
+        .custom({
+            params: z.object({
+                code: z.int().positive(),
+            }),
+            context: z.object({
+                inviteCode: z.int(),
+            }),
+        })
+        .guard(({ params }) => ({
+            inviteCode: params.code,
+        }));
+
+    const staff = k.identity
+        .bearer({
+            context: z.object({
+                staffId: z.string(),
+            }),
+        })
+        .guard(({ bearer, deny }) => {
+            if (bearer?.token !== 'tok_staff') {
+                deny({
+                    status: 401,
+                    body: {
+                        detail: 'Staff only',
+                    },
+                });
+            }
+            return {
+                staffId: '1',
+            };
+        });
+
+    const guardedK = new Kizuna<{
+        auth: {
+            identities: {
+                invite: typeof invite;
+                staff: typeof staff;
+            };
+        };
+    }>();
+
+    const guardedApi = defineConfig({
+        auth: {
+            identities: {
+                invite,
+                staff,
+            },
+        },
+        routes: [
+            guardedK.routes({
+                acceptInvite: guardedK
+                    .route({
+                        method: 'POST',
+                        path: '/invites/:code',
+                        auth: 'invite',
+                        tool: true,
+                        summary: 'Accept an invite',
+                        responses: {
+                            200: z.object({
+                                inviteCode: z.int(),
+                            }),
+                        },
+                    })
+                    .handler(({ auth }) => ({
+                        status: 200,
+                        body: {
+                            inviteCode: auth.invite.inviteCode,
+                        },
+                    })),
+                staffOnly: guardedK
+                    .route({
+                        method: 'GET',
+                        path: '/staff',
+                        auth: 'staff',
+                        tool: true,
+                        summary: 'Read the staff member',
+                        responses: {
+                            200: z.object({
+                                staffId: z.string(),
+                            }),
+                        },
+                    })
+                    .handler(({ auth }) => ({
+                        status: 200,
+                        body: {
+                            staffId: auth.staff.staffId,
+                        },
+                    })),
+            }),
+        ],
+    }).api as unknown as Parameters<typeof createMcpServer>[0];
+
+    const call = async (name: string, args: Record<string, unknown>) => {
+        const { client, close } = await connectMcpClient(guardedApi);
+        const result = await client.callTool({
+            name,
+            arguments: args,
+        });
+        await close();
+        const content = result.content as Array<{ type: string; text: string }>;
+        return JSON.parse(content[0]!.text) as { status: number; body: Record<string, unknown> };
+    };
+
+    it('hands the guard the params its identity declares, parsed', async () => {
+        const answer = await call('accept_invite', {
+            params: {
+                code: '7',
+            },
+        });
+        expect(answer).toEqual({
+            status: 200,
+            body: {
+                inviteCode: 7,
+            },
+        });
+    });
+
+    it('answers 400 when the params fail the identity schema, before the guard runs', async () => {
+        const answer = await call('accept_invite', {
+            params: {
+                code: 'seven',
+            },
+        });
+        expect(answer.status).toBe(400);
+        expect(answer.body).toMatchObject({
+            detail: 'Invalid path parameters',
+        });
+    });
+
+    it('refuses a call whose guard called `deny` without returning it', async () => {
+        const answer = await call('staff_only', {});
+        expect(answer.status).toBe(401);
+        expect(answer.body).toMatchObject({
+            detail: 'Staff only',
+        });
+    });
+});

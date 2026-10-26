@@ -8,7 +8,7 @@ import {
     type InputRequiredResult,
     type StandardSchemaWithJSON,
 } from '@modelcontextprotocol/server';
-import { flattenRoutes, formatValidationError, validateRequest } from 'kizunajs/adapter';
+import { flattenRoutes, formatValidationError, validateRequest, type ValidationFailure } from 'kizunajs/adapter';
 import {
     ResponseError,
     type AdapterRequest,
@@ -25,8 +25,7 @@ import {
     withPermissions,
     type GuardDenialBody,
     resolveSecurityRequirements,
-    guardDenyFor,
-    isGuardDenial,
+    callGuard,
 } from 'kizunajs/adapter';
 import { contractOf } from 'kizunajs/adapter';
 import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme } from 'kizunajs';
@@ -349,6 +348,21 @@ const toolEnvelope = (status: number, body: unknown): ToolCallResult => {
     };
 };
 
+/**
+ * The 400 body HTTP sends for input that fails validation.
+ */
+export const validationProblem = (failure: ValidationFailure): GuardDenialBody => {
+    const formatted = formatValidationError(failure);
+    return {
+        ...problemDetails(400, formatted.detail),
+        errors: formatted.issues.map((issue) => ({
+            code: issue.code ?? 'custom',
+            path: issue.path,
+            message: issue.message,
+        })),
+    };
+};
+
 // A tool result is `{ status, body }`, not an HTTP response, so no envelope.
 const toolError = (status: number, body: GuardDenialBody): ToolCallResult => ({
     content: [
@@ -436,21 +450,33 @@ const runGuards = async (
         }
         const schemeDefinition = schemes?.[scheme];
         const credential = schemeDefinition ? extractCredential(schemeDefinition, credentialRequest) : {};
-        const guardResult = await guard({
-            ...(handlerContext ?? {}),
-            ...credential,
+        const outcome = await callGuard(guard, {
+            scheme: schemeDefinition,
             params,
-            deny: guardDenyFor(schemeDefinition),
-            ...(Object.keys(requestContext).length > 0 ? { requestContext } : {}),
-        } as Parameters<typeof guard>[0]);
-        if (isGuardDenial(guardResult)) {
+            args: {
+                ...(handlerContext ?? {}),
+                ...credential,
+                ...(Object.keys(requestContext).length > 0
+                    ? {
+                          requestContext,
+                      }
+                    : {}),
+            },
+        });
+        if (outcome.kind === 'invalid-params') {
             return {
                 ok: false,
-                result: toolError(guardResult.status, guardResult.body),
+                result: toolEnvelope(400, validationProblem(outcome.failure)),
             };
         }
-        if (guardResult && typeof guardResult === 'object') {
-            securityContext[scheme] = withPermissions(scheme, schemeDefinition, guardResult);
+        if (outcome.kind === 'denied') {
+            return {
+                ok: false,
+                result: toolError(outcome.denial.status, outcome.denial.body),
+            };
+        }
+        if (outcome.context !== undefined) {
+            securityContext[scheme] = withPermissions(scheme, schemeDefinition, outcome.context);
         }
     }
     const forbidden = requiresDenial({
@@ -498,17 +524,7 @@ const executeToolCall = async (
     });
 
     if (!validation.ok) {
-        const formatted = formatValidationError(validation.error);
-        return toolEnvelope(
-            400,
-            problemDetails(400, formatted.detail, {
-                errors: formatted.issues.map((issue) => ({
-                    code: issue.code ?? 'custom',
-                    path: issue.path,
-                    message: issue.message,
-                })),
-            })
-        );
+        return toolEnvelope(400, validationProblem(validation.error));
     }
 
     const handler = resolveHandler(router, routeKey);
