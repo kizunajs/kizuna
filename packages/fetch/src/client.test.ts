@@ -82,6 +82,25 @@ describe('KizunaClient', () => {
         expect(options.headers.get('Content-Type')).toBe('application/json');
     });
 
+    it('reads a binary body as the bytes the server sent', async () => {
+        const badge = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+        const client = createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: () =>
+                Promise.resolve(
+                    new Response(badge, {
+                        headers: {
+                            'content-type': 'application/octet-stream',
+                        },
+                    })
+                ),
+        });
+
+        const result = await client.downloads.badge();
+
+        expect(result.body).toEqual(badge);
+    });
+
     it('appends query parameters', async () => {
         const fetchMock = stubFetch(200, {
             users: [],
@@ -798,5 +817,291 @@ describe('headers', () => {
 
         const [, options] = fetchMock.mock.calls[0]! as [string, RequestInit & { headers: Headers }];
         expect(options.headers.get('content-type')).toBe('application/vnd.call+json');
+    });
+});
+
+describe('retry', () => {
+    const unavailable = (retryAfter?: string) =>
+        new Response(null, {
+            status: 503,
+            headers:
+                retryAfter === undefined
+                    ? {}
+                    : {
+                          'retry-after': retryAfter,
+                      },
+        });
+
+    const user = () =>
+        new Response(
+            JSON.stringify({
+                id: '1',
+                name: 'Alice',
+            }),
+            {
+                status: 200,
+                headers: {
+                    'content-type': 'application/json',
+                },
+            }
+        );
+
+    const clientWith = (fetchMock: typeof fetch, retry?: Parameters<typeof createClient>[0]['retry']) =>
+        createClient({
+            baseUrl: 'http://localhost:3000',
+            fetch: fetchMock,
+            retry,
+        });
+
+    const getUser = (client: ReturnType<typeof createClient>) =>
+        client.users.getUser({
+            params: {
+                id: '1',
+            },
+        });
+
+    it('sends once when retry is not configured', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(unavailable('0'));
+        const result = await getUser(clientWith(fetchMock));
+        expect(result.status).toBe(503);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits what Retry-After asks and sends again', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(unavailable('0')).mockResolvedValueOnce(user());
+        const result = await getUser(clientWith(fetchMock, {}));
+        expect(result.status).toBe(200);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('reads Retry-After as an HTTP-date', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(unavailable(new Date(Date.now() - 1000).toUTCString()))
+            .mockResolvedValueOnce(user());
+        const result = await getUser(clientWith(fetchMock, {}));
+        expect(result.status).toBe(200);
+    });
+
+    it('hands the response back when Retry-After asks for longer than the maximum delay', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(unavailable('120')).mockResolvedValueOnce(user());
+        const result = await getUser(
+            clientWith(fetchMock, {
+                maximumDelay: 1000,
+            })
+        );
+        expect(result.status).toBe(503);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops after the maximum attempts', async () => {
+        const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(unavailable()));
+        const result = await getUser(
+            clientWith(fetchMock, {
+                maximumAttempts: 3,
+                initialDelay: 0,
+            })
+        );
+        expect(result.status).toBe(503);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('retries a network error', async () => {
+        const fetchMock = vi.fn().mockRejectedValueOnce(new TypeError('fetch failed')).mockResolvedValueOnce(user());
+        const result = await getUser(
+            clientWith(fetchMock, {
+                initialDelay: 0,
+            })
+        );
+        expect(result.status).toBe(200);
+    });
+
+    it('never retries a cancelled request', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        const fetchMock = vi.fn().mockRejectedValue(new DOMException('The operation was aborted.', 'AbortError'));
+        await expect(
+            clientWith(fetchMock, {}).users.getUser({
+                params: {
+                    id: '1',
+                },
+                fetchOptions: {
+                    signal: controller.signal,
+                },
+            })
+        ).rejects.toThrow('aborted');
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('never retries a POST', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(unavailable('0'));
+        const result = await clientWith(fetchMock, {}).users.createUser({
+            body: {
+                name: 'Alice',
+                email: 'alice@example.com',
+            },
+        });
+        expect(result.status).toBe(503);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('reconnect', () => {
+    const encoder = new TextEncoder();
+
+    const droppedAfter = (chunks: string[]): ReadableStream<Uint8Array> => {
+        const pending = [...chunks];
+        return new ReadableStream({
+            pull(controller) {
+                const chunk = pending.shift();
+                if (chunk === undefined) controller.error(new TypeError('network connection was lost'));
+                else controller.enqueue(encoder.encode(chunk));
+            },
+        });
+    };
+
+    const endingAfter = (chunks: string[]): ReadableStream<Uint8Array> =>
+        new ReadableStream({
+            start(controller) {
+                for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+                controller.close();
+            },
+        });
+
+    const events = (body: ReadableStream<Uint8Array>, status = 200) =>
+        new Response(status === 204 ? null : body, {
+            status,
+            headers: {
+                'content-type': 'text/event-stream',
+            },
+        });
+
+    const collect = async <T>(iterable: AsyncIterable<T>): Promise<T[]> => {
+        const items: T[] = [];
+        for await (const item of iterable) items.push(item);
+        return items;
+    };
+
+    const ticksOf = async (
+        fetchMock: typeof fetch,
+        reconnect: Parameters<typeof createClient>[0]['reconnect'],
+        onRequest?: Parameters<typeof createClient>[0]['onRequest']
+    ) => {
+        const result = await createClient({
+            baseUrl: 'http://api',
+            fetch: fetchMock,
+            reconnect,
+            onRequest,
+        }).streams.ticks();
+        if (result.status !== 200) throw new Error('expected a stream');
+        return collect(result.body);
+    };
+
+    const ended = () => events(endingAfter([]), 204);
+
+    it('resumes a dropped stream from the last event it received', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(events(droppedAfter(['data: {"tick":1}\nid: 1\n\ndata: {"tick":2}\nid: 2\n\n'])))
+            .mockResolvedValueOnce(events(endingAfter(['data: {"tick":3}\nid: 3\n\n'])))
+            .mockResolvedValueOnce(ended());
+        const ticks = await ticksOf(fetchMock, {
+            reconnectionTime: 0,
+        });
+        expect(ticks.map((message) => message.data.tick)).toEqual([1, 2, 3]);
+        const [, reopened] = fetchMock.mock.calls[1]! as [string, RequestInit & { headers: Headers }];
+        expect(reopened.headers.get('Last-Event-ID')).toBe('2');
+    });
+
+    it('reconnects a stream the server ended, until it answers 204', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(events(endingAfter(['data: {"tick":1}\nid: 1\n\n'])))
+            .mockResolvedValueOnce(ended());
+        const ticks = await ticksOf(fetchMock, {
+            reconnectionTime: 0,
+        });
+        expect(ticks).toHaveLength(1);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        const [, reopened] = fetchMock.mock.calls[1]! as [string, RequestInit & { headers: Headers }];
+        expect(reopened.headers.get('Last-Event-ID')).toBe('1');
+    });
+
+    it('waits the reconnection time a retry field sets', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(events(droppedAfter(['retry: 0\ndata: {"tick":1}\n\n'])))
+            .mockResolvedValueOnce(ended());
+        const ticks = await ticksOf(fetchMock, {
+            reconnectionTime: 60_000,
+        });
+        expect(ticks).toHaveLength(1);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('fails when the server refuses a reconnection', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(events(droppedAfter(['data: {"tick":1}\n\n'])))
+            .mockResolvedValueOnce(
+                new Response(null, {
+                    status: 401,
+                })
+            );
+        await expect(
+            ticksOf(fetchMock, {
+                reconnectionTime: 0,
+            })
+        ).rejects.toThrow('status 401');
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('runs onRequest again before each reconnection', async () => {
+        let token = 0;
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(events(droppedAfter(['data: {"tick":1}\n\n'])))
+            .mockResolvedValueOnce(ended());
+        await ticksOf(
+            fetchMock,
+            {
+                reconnectionTime: 0,
+            },
+            ({ headers }) => {
+                token += 1;
+                headers.set('Authorization', `Bearer token-${token}`);
+            }
+        );
+        const [, reopened] = fetchMock.mock.calls[1]! as [string, RequestInit & { headers: Headers }];
+        expect(reopened.headers.get('Authorization')).toBe('Bearer token-2');
+    });
+
+    it('fails with the last error once the reconnections run out', async () => {
+        const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(events(droppedAfter([]))));
+        await expect(
+            ticksOf(fetchMock, {
+                reconnectionTime: 0,
+                maximumAttempts: 2,
+            })
+        ).rejects.toThrow('network connection was lost');
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('never reconnects a POST', async () => {
+        const fetchMock = vi.fn().mockResolvedValueOnce(events(droppedAfter(['event: delta\ndata: {"text":"a"}\n\n'])));
+        const result = await createClient({
+            baseUrl: 'http://api',
+            fetch: fetchMock,
+            reconnect: {
+                reconnectionTime: 0,
+            },
+        }).streams.reply({
+            body: {
+                prompt: 'hi',
+            },
+        });
+        if (result.status !== 200) throw new Error('expected a stream');
+        await expect(collect(result.body)).rejects.toThrow('network connection was lost');
+        expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 });

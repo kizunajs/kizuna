@@ -836,6 +836,74 @@ describe('Swift generator: owned type nesting', () => {
         expect(output).toContain('public let baseUnit: BaseUnit');
     });
 
+    it('types a described model field as the model, with its own description', () => {
+        const ArticleStatusSchema = Kizuna.model({
+            title: 'ArticleStatus',
+            schema: z.enum(['draft', 'published']),
+        });
+        const contractRoutes = k.routes({
+            getArticle: k.route({
+                method: 'GET',
+                path: '/articles/:id',
+                responses: {
+                    200: Kizuna.model({
+                        title: 'Article',
+                        schema: z.object({
+                            status: ArticleStatusSchema.describe('Set by the editor'),
+                            previousStatus: ArticleStatusSchema.meta({
+                                deprecated: true,
+                            }),
+                            scheduledStatus: ArticleStatusSchema.describe('Applied at the scheduled time').optional(),
+                        }),
+                    }),
+                },
+            }),
+        });
+
+        const contract = defineConfig({
+            ...config,
+            routes: [contractRoutes],
+        }).api;
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output.match(/enum \w*Status\b/g)).toEqual(['enum ArticleStatus']);
+        expect(output).toContain('/// Set by the editor\n        public let status: ArticleStatus');
+        expect(output).toContain('public var previousStatus: ArticleStatus');
+        expect(output).toContain('public let scheduledStatus: ArticleStatus?');
+    });
+
+    it('declares a model reached only through a described copy with its own description', () => {
+        const AuthorSchema = Kizuna.model({
+            title: 'Author',
+            description: 'The person who wrote an article',
+            schema: z.object({
+                name: z.string(),
+            }),
+        });
+        const contractRoutes = k.routes({
+            getArticle: k.route({
+                method: 'GET',
+                path: '/articles/:id',
+                responses: {
+                    200: Kizuna.model({
+                        title: 'Article',
+                        schema: z.object({
+                            writer: AuthorSchema.describe('Shown in the byline'),
+                        }),
+                    }),
+                },
+            }),
+        });
+
+        const contract = defineConfig({
+            ...config,
+            routes: [contractRoutes],
+        }).api;
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('/// The person who wrote an article\n    public struct Author: Codable');
+        expect(output).toContain('/// Shown in the byline\n        public let writer: Author');
+        expect(output).not.toContain('struct Writer');
+    });
+
     it('keeps a named enum model at top level when its title starts with the parent struct name', () => {
         const FoodSourceSchema = Kizuna.model({
             title: 'FoodSource',
@@ -1076,6 +1144,34 @@ describe('Swift generator: owned type nesting', () => {
     });
 });
 
+describe('Swift generator: retry', () => {
+    it('takes a RetryPolicy and hands it to every request', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        getUser: k.route({
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: z.object({
+                                    id: z.string(),
+                                }),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public struct RetryPolicy: Sendable');
+        expect(output).toContain('timeout: TimeInterval = 30, retry: RetryPolicy? = nil');
+        expect(output).toContain('Kizuna.send(&request, session: session, retry: retry,');
+        expect(output).toContain('let idempotent = ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"].contains(request.httpMethod ?? "GET")');
+    });
+});
+
 describe('Swift generator: nullable', () => {
     const contract = defineConfig({
         ...config,
@@ -1099,10 +1195,106 @@ describe('Swift generator: nullable', () => {
         ],
     }).api;
 
-    it('maps a nullable field to an optional, since Swift has only the one', () => {
+    it('maps a nullable field to an optional with no default, since its key is required', () => {
         const output = generateSwiftClient(contract, baseConfig);
-        expect(output).toContain('let appVersion: String?');
-        expect(output).toContain('let releaseNotes: String?');
+        expect(output).toContain('public let appVersion: String?');
+        expect(output).toContain('appVersion: String?,');
+        expect(output).not.toContain('appVersion: String? = nil');
+    });
+
+    it('maps a nullish field to an optional that defaults to nil and is left out', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public let releaseNotes: String?');
+        expect(output).toContain('releaseNotes: String? = nil');
+        expect(output).not.toContain('Nullish');
+    });
+
+    it('sends a nullable field that holds nil as null', () => {
+        const output = generateSwiftClient(contract, baseConfig);
+        expect(output).toContain('public func encode(to encoder: Encoder) throws');
+        expect(output).toContain('try container.encode(id, forKey: .id)');
+        expect(output).toContain('try container.encode(appVersion, forKey: .appVersion)');
+        expect(output).toContain('try container.encodeIfPresent(releaseNotes, forKey: .releaseNotes)');
+    });
+
+    it('maps a nullish query field to an optional, since a query string has no null', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        listUsers: k.route({
+                            method: 'GET',
+                            path: '/users',
+                            query: z.object({
+                                cursor: z.string().nullish(),
+                            }),
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public let cursor: String?');
+        expect(output).not.toContain('Nullish');
+    });
+
+    it('keeps synthesized encoding when no field is required and nullable', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        getUser: k.route({
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: z.object({
+                                    id: z.string(),
+                                    email: z.string().optional(),
+                                }),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('public let email: String?');
+        expect(output).not.toContain('encoder.container(keyedBy: CodingKeys.self)');
+    });
+
+    it('leaves a nil form field out', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [
+                    k.routes({
+                        uploadAvatar: k.route({
+                            method: 'POST',
+                            path: '/avatar',
+                            contentType: 'multipart/form-data',
+                            body: z.object({
+                                file: z.instanceof(File),
+                                caption: z.string().optional(),
+                            }),
+                            responses: {
+                                204: z.void(),
+                            },
+                        }),
+                    }),
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('multipart.appendFile(name: "file", file: body.file)');
+        expect(output).toContain('if let value = body.caption {');
+        expect(output).toContain('multipart.appendField(name: "caption", value: String(describing: value))');
     });
 });
 
@@ -2052,7 +2244,21 @@ describe('Swift generator: streamed responses', () => {
             'case "delta": return .delta(try decoder.decode(TestAPIClient.Reply.Delta.self, from: Foundation.Data(event.data.utf8)))'
         );
         expect(output).toContain('let data = try await Kizuna.collect(bytes, failure: TestAPIClient.Reply.Failure.self)');
-        expect(output).toContain('static func serverSentEvents(_ bytes: URLSession.AsyncBytes)');
+        expect(output).toContain('static func serverSentEvents(_ first: URLSession.AsyncBytes, reconnect: Reconnection?)');
+    });
+
+    it('runs the response middleware on a streamed response too', () => {
+        const output = generateSwiftClient(
+            defineConfig({
+                ...config,
+                routes: [contractRoutes],
+            }).api,
+            baseConfig
+        );
+        expect(output).toMatch(
+            /Kizuna\.open\(&request, session: \S+, retry: \S+, requestMiddleware: \S+, responseMiddleware: \S*responseMiddleware,/
+        );
+        expect(output).toContain('if let responseMiddleware { await responseMiddleware(request, Foundation.Data(), response) }');
     });
 
     it('reads a text stream line by line', () => {

@@ -2,9 +2,40 @@ import * as path from 'node:path';
 import { ESLintUtils, type TSESTree } from '@typescript-eslint/utils';
 import ts from 'typescript';
 import { AUTHORING_NAMES } from 'kizunajs/authoring-names';
-import { collectSchemaIssues, type SchemaIssue, type SchemaPosition, type SchemaResolver } from '../schema-violations.js';
+import { collectSchemaIssues, type SchemaIssue, type SchemaPosition, type SchemaResolver, type SchemaWire } from '../schema-violations.js';
+import { collectUnsendableFields, type FieldIssue, type RequestPart } from '../field-shapes.js';
 
 const SCHEMA_KEYS: ReadonlySet<string> = new Set(['body', 'query', 'pathParams', 'headers']);
+
+const TEXT_KEYS: ReadonlySet<string> = new Set(['query', 'pathParams', 'headers']);
+
+const FORM_CONTENT_TYPES: ReadonlySet<string> = new Set(['multipart/form-data', 'application/x-www-form-urlencoded']);
+
+/**
+ * The form content type a body's route declares, if it declares one.
+ */
+const formContentType = (property: TSESTree.Property): string | undefined => {
+    const route = property.parent;
+    if (route?.type !== 'ObjectExpression') return undefined;
+    for (const sibling of route.properties) {
+        if (
+            sibling.type === 'Property' &&
+            sibling.key.type === 'Identifier' &&
+            sibling.key.name === 'contentType' &&
+            sibling.value.type === 'Literal' &&
+            typeof sibling.value.value === 'string' &&
+            FORM_CONTENT_TYPES.has(sibling.value.value)
+        )
+            return sibling.value.value;
+    }
+    return undefined;
+};
+
+const PARTS: Readonly<Record<string, RequestPart>> = {
+    pathParams: 'path',
+    query: 'query',
+    headers: 'header',
+};
 
 const createCheckerResolver =
     (checker: ts.TypeChecker): SchemaResolver =>
@@ -88,6 +119,7 @@ const MESSAGE_IDS = {
     collection: ['collection', 'collectionReference'],
     union: ['union', 'unionReference'],
     transform: ['transform', 'transformReference'],
+    nullable: ['nullable', 'nullableReference'],
 } as const satisfies Record<SchemaIssue, readonly [string, string]>;
 
 const calleeName = (node: TSESTree.CallExpression): string | undefined => {
@@ -100,6 +132,8 @@ const calleeName = (node: TSESTree.CallExpression): string | undefined => {
 interface SchemaSite {
     node: TSESTree.Node;
     position: SchemaPosition;
+    wire: SchemaWire;
+    part?: RequestPart;
 }
 
 const schemaNodesOf = (call: TSESTree.CallExpression): SchemaSite[] => {
@@ -112,7 +146,15 @@ const schemaNodesOf = (call: TSESTree.CallExpression): SchemaSite[] => {
                 property.type === 'Property' && property.key.type === 'Identifier' && property.key.name === 'schema'
         );
         // A model is reachable from either direction, so it is read as a request.
-        return schema ? [{ node: schema.value, position: 'request' }] : [];
+        return schema
+            ? [
+                  {
+                      node: schema.value,
+                      position: 'request',
+                      wire: 'json',
+                  },
+              ]
+            : [];
     }
 
     if (name !== AUTHORING_NAMES.routes && name !== AUTHORING_NAMES.defineConfig) return [];
@@ -122,7 +164,25 @@ const schemaNodesOf = (call: TSESTree.CallExpression): SchemaSite[] => {
         if (node.type === 'Property') {
             const isSchemaField = node.key.type === 'Identifier' && SCHEMA_KEYS.has(node.key.name);
             const isStatusResponse = node.key.type === 'Literal' && typeof node.key.value === 'number';
-            if (isSchemaField || isStatusResponse) nodes.push({ node: node.value, position: isStatusResponse ? 'response' : 'request' });
+            if (isSchemaField || isStatusResponse) {
+                const key = node.key.type === 'Identifier' ? node.key.name : undefined;
+                const form = key === 'body' ? formContentType(node) : undefined;
+                const isText = key !== undefined && (TEXT_KEYS.has(key) || form !== undefined);
+                const part: RequestPart | undefined =
+                    form === 'multipart/form-data'
+                        ? 'multipart'
+                        : form !== undefined
+                          ? 'urlencoded'
+                          : key !== undefined
+                            ? PARTS[key]
+                            : undefined;
+                nodes.push({
+                    node: node.value,
+                    position: isStatusResponse ? 'response' : 'request',
+                    wire: isText ? 'text' : 'json',
+                    part,
+                });
+            }
         }
         for (const [key, child] of Object.entries(node)) {
             if (key === 'parent') continue;
@@ -156,6 +216,20 @@ export const noUnsupportedSchema = ESLintUtils.RuleCreator.withoutDocs({
                 'A transform on a response body has no type a client can generate, because its output is whatever the function returns. Declare the response as the shape it sends.',
             transformReference:
                 'This response schema runs a transform, whose output no client can generate a type for. Declare the response as the shape it sends.',
+            nullable:
+                'A query, path, header or form field has no null, so every client leaves a null out and the server rejects the missing key. Use .optional() instead.',
+            nullableReference:
+                'This schema has a .nullable() field, which a query, path, header or form field cannot carry, since none of them has a null. Use .optional() instead.',
+            unsendablePath:
+                'A path parameter arrives as a single string, so a list or an object here cannot be sent. Use a scalar schema, or move the value to query.',
+            unsendableQuery:
+                'A query string carries values and lists of values, so an object, record, tuple or nested list here cannot be sent. Split it into fields of their own, or move it to a body.',
+            unsendableHeader:
+                'A header carries one value, so a list or an object here cannot be sent. Use a scalar schema, or split it into headers of their own.',
+            unsendableForm:
+                'A form carries values, lists of values and files, so an object, record or tuple here cannot be sent. Split it into fields of their own, or take the body as JSON.',
+            binaryFormField: 'A form sends a file part as a File, so a BinarySchema field never validates. Declare it with FileSchema.',
+            fileInUrlencoded: "A urlencoded body cannot carry a file. Send it as contentType: 'multipart/form-data'.",
         },
         schema: [],
     },
@@ -170,9 +244,18 @@ export const noUnsupportedSchema = ESLintUtils.RuleCreator.withoutDocs({
 
         return {
             CallExpression(call) {
-                for (const { node: schemaNode, position } of schemaNodesOf(call)) {
+                for (const { node: schemaNode, position, wire, part } of schemaNodesOf(call)) {
                     const tsNode = services.esTreeNodeToTSNodeMap.get(schemaNode);
-                    for (const { issue, node, viaReference } of collectSchemaIssues(tsNode, resolve, position)) {
+                    const fieldIssues = part ? collectUnsendableFields(tsNode, resolve, part) : [];
+                    for (const { issue, node, viaReference } of fieldIssues) {
+                        const reportNode = (viaReference ? undefined : services.tsNodeToESTreeNodeMap.get(node)) ?? schemaNode;
+                        const messageId: FieldIssue = issue;
+                        const key = `${messageId}@${reportNode.range[0]}`;
+                        if (reported.has(key)) continue;
+                        reported.add(key);
+                        context.report({ node: reportNode, messageId });
+                    }
+                    for (const { issue, node, viaReference } of collectSchemaIssues(tsNode, resolve, position, wire)) {
                         const reportNode = (viaReference ? undefined : services.tsNodeToESTreeNodeMap.get(node)) ?? schemaNode;
                         const messageId = MESSAGE_IDS[issue][viaReference ? 1 : 0];
                         const key = `${messageId}@${reportNode.range[0]}`;

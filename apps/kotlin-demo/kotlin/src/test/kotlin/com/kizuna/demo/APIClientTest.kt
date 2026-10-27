@@ -1,7 +1,11 @@
 package com.kizuna.demo
 
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.Instant
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.test.*
 
 class APIClientTest {
@@ -72,6 +76,29 @@ class APIClientTest {
         assertEquals(API.UserId("1"), response.body.userId)
         assertEquals(2024, response.body.year)
         assertEquals(24, response.body.events)
+    }
+
+    @Test
+    fun testRetryWaitsOutAWarmingUpServer() = runTest {
+        val baseUrl = System.getenv("API_BASE_URL") ?: "http://localhost:8765"
+        val retrying = APIClient(baseUrl = baseUrl, retry = APIClient.RetryPolicy(initialDelay = kotlin.time.Duration.ZERO))
+        val response = retrying.health.ready()
+        assertTrue(response.body.ready)
+    }
+
+    @Test
+    fun testWatchNotificationsResumesAfterADroppedConnection() = runTest {
+        val baseUrl = System.getenv("API_BASE_URL") ?: "http://localhost:8765"
+        val resuming = APIClient(baseUrl = baseUrl, reconnect = APIClient.ReconnectPolicy(reconnectionTime = kotlin.time.Duration.ZERO))
+        val response = resuming.notifications.watchNotifications()
+        assertEquals(listOf("Invoice paid", "New comment", "Report ready"), response.body.take(3).toList().map { it.title })
+    }
+
+    @Test
+    fun testExportUsersReturnsTheCsvAsText() = runTest {
+        val response = client.users.exportUsers()
+        assertTrue(response.body.startsWith("id,name,email"))
+        assertTrue(response.body.contains("Ada Lovelace"))
     }
 
     @Test
@@ -469,5 +496,53 @@ class APIClientTest {
                 )
             }
         }
+    }
+
+    @Test
+    fun testRequiredNullableFieldsAreSentAsNull() = runTest {
+        val updated = client.users.updatePreferences {
+            params(
+                id = API.UserId("1"),
+            ).body(
+                timezone = null,
+                mutedChannels = listOf(
+                    API.MutedChannel(
+                        channel = "email",
+                        until = null,
+                    ),
+                ),
+            )
+        }
+        assertNull(updated.body.timezone)
+        assertNull(updated.body.mutedChannels[0].until)
+
+        val encoded = Json.encodeToString(updated.body)
+        assertTrue(""""timezone":null""" in encoded, "a nullable field is sent as null")
+        assertTrue(""""until":null""" in encoded, "a nested nullable field is sent as null")
+        assertFalse(""""locale"""" in encoded, "an optional field is left out")
+    }
+
+    @Test
+    fun testNullishFieldIsAnOptional() = runTest {
+        for (signature in listOf(null, "Ada")) {
+            val updated = client.users.updatePreferences {
+                params(
+                    id = API.UserId("1"),
+                ).body(
+                    timezone = "Europe/Oslo",
+                    signature = signature,
+                    mutedChannels = emptyList(),
+                )
+            }
+            assertEquals(signature, updated.body.signature)
+        }
+
+        val encoded = Json.encodeToString(
+            API.UserPreferences(
+                timezone = null,
+                mutedChannels = emptyList(),
+            )
+        )
+        assertFalse(""""signature"""" in encoded, "a null nullish field is left out")
     }
 }

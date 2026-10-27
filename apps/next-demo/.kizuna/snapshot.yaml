@@ -51,6 +51,7 @@ routes:
                     optional: true
                     schema:
                       kind: object
+                      nullable: true
                       fields:
                         id:
                           optional: false
@@ -85,6 +86,7 @@ routes:
                       kind: array
                       element:
                         kind: string
+                        nullable: true
           total:
             optional: false
             schema:
@@ -212,6 +214,7 @@ routes:
                     optional: true
                     schema:
                       kind: object
+                      nullable: true
                       fields:
                         id:
                           optional: false
@@ -246,10 +249,12 @@ routes:
                       kind: array
                       element:
                         kind: string
+                        nullable: true
           nextCursor:
             optional: false
             schema:
               kind: number
+              nullable: true
   users.getUser:
     method: GET
     path: /users/:id
@@ -292,6 +297,7 @@ routes:
             optional: true
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -326,6 +332,7 @@ routes:
               kind: array
               element:
                 kind: string
+                nullable: true
       "404":
         kind: object
         fields:
@@ -422,6 +429,7 @@ routes:
             optional: true
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -456,6 +464,7 @@ routes:
               kind: array
               element:
                 kind: string
+                nullable: true
       "404":
         kind: object
         fields:
@@ -529,6 +538,7 @@ routes:
             optional: true
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -563,6 +573,7 @@ routes:
               kind: array
               element:
                 kind: string
+                nullable: true
       "400":
         kind: object
         fields:
@@ -582,6 +593,79 @@ routes:
             optional: false
             schema:
               kind: string
+  users.updatePreferences:
+    method: PUT
+    path: /users/:id/preferences
+    statuses:
+      - 200
+    deprecated: false
+    body:
+      kind: object
+      fields:
+        timezone:
+          optional: false
+          schema:
+            kind: string
+            nullable: true
+        locale:
+          optional: true
+          schema:
+            kind: string
+        signature:
+          optional: true
+          schema:
+            kind: string
+            nullable: true
+        mutedChannels:
+          optional: false
+          schema:
+            kind: array
+            element:
+              kind: object
+              fields:
+                channel:
+                  optional: false
+                  schema:
+                    kind: string
+                until:
+                  optional: false
+                  schema:
+                    kind: string
+                    nullable: true
+    responses:
+      "200":
+        kind: object
+        fields:
+          timezone:
+            optional: false
+            schema:
+              kind: string
+              nullable: true
+          locale:
+            optional: true
+            schema:
+              kind: string
+          signature:
+            optional: true
+            schema:
+              kind: string
+              nullable: true
+          mutedChannels:
+            optional: false
+            schema:
+              kind: array
+              element:
+                kind: object
+                fields:
+                  channel:
+                    optional: false
+                    schema:
+                      kind: string
+                  until:
+                    optional: false
+                    schema:
+                      kind: string
+                      nullable: true
   users.deleteUser:
     method: DELETE
     path: /users/:id
@@ -793,6 +877,40 @@ routes:
             optional: false
             schema:
               kind: string
+  health.ready:
+    method: GET
+    path: /health/ready
+    statuses:
+      - 200
+      - 503
+    deprecated: false
+    responses:
+      "200":
+        kind: object
+        fields:
+          ready:
+            optional: false
+            schema:
+              kind: boolean
+      "503":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
   health.history:
     method: GET
     path: /health/history
@@ -829,6 +947,14 @@ routes:
             optional: false
             schema:
               kind: boolean
+  notifications.watchNotifications:
+    method: GET
+    path: /notifications/stream
+    statuses:
+      - 200
+    deprecated: false
+    responses:
+      "200": null
   notifications.listEvents:
     method: GET
     path: /events
@@ -904,10 +1030,12 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 kind:
                   optional: false
                   schema:
                     kind: enum
+                    nullable: true
                     values:
                       - login
                       - logout
@@ -916,22 +1044,26 @@ routes:
                   optional: false
                   schema:
                     kind: array
+                    nullable: true
                     element:
                       kind: string
                 label:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 tagIds:
                   optional: false
                   schema:
                     kind: array
+                    nullable: true
                     element:
                       kind: string
                 sessionId:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
   notifications.validateConfig:
     method: POST
     path: /schemas/validate
@@ -1266,6 +1398,7 @@ routes:
                     optional: true
                     schema:
                       kind: object
+                      nullable: true
                       fields:
                         id:
                           optional: false
@@ -1300,6 +1433,7 @@ routes:
                       kind: array
                       element:
                         kind: string
+                        nullable: true
       "401":
         kind: object
         fields:
@@ -1400,6 +1534,7 @@ routes:
             optional: true
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -1434,6 +1569,7 @@ routes:
               kind: array
               element:
                 kind: string
+                nullable: true
       "401":
         kind: object
         fields:
@@ -2226,6 +2362,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
   products.listProducts:
     method: GET
     path: /products

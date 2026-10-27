@@ -1,7 +1,15 @@
 import type { z } from 'zod';
 import { ROUTES_GROUP, type Routes, type RouteDefinition, type ResponseDefinition } from './types.js';
 import { isRouteDefinition } from './handler-pipeline.js';
-import { findCoercedSchemaPath, readObjectShape, resolveBaseType } from './zod-internals.js';
+import {
+    findCoercedSchemaPath,
+    isBinarySchema,
+    isFileSchema,
+    readDef,
+    readObjectShape,
+    resolveBaseType,
+    unwrapOptionalWrappers,
+} from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
 import { parsePath, type PathParamsCheck } from './path-params.js';
 import { isStreamResponse, isZodSchema } from './generator-utils.js';
@@ -91,6 +99,91 @@ const assertPathParamsAreScalar = (route: RouteDefinition, routeKey: string): vo
 };
 
 /**
+ * What a field holds once optional and default wrappers are peeled away: a schema kind, or a file or bytes.
+ */
+const fieldKind = (schema: z.core.$ZodType): string => {
+    const { inner } = unwrapOptionalWrappers(schema);
+    if (isFileSchema(inner)) return 'file';
+    if (isBinarySchema(inner)) return 'BinarySchema';
+    return resolveBaseType(inner);
+};
+
+const listElement = (schema: z.core.$ZodType): z.core.$ZodType | undefined => {
+    const def = readDef(unwrapOptionalWrappers(schema).inner);
+    return def.type === 'array' ? def.element : undefined;
+};
+
+const isValue = (kind: string): boolean => !STRUCTURED_TYPES.has(kind) && kind !== 'file' && kind !== 'BinarySchema';
+
+/**
+ * Names a field the way an error shows it: its kind, or what a list holds.
+ */
+const describeField = (schema: z.core.$ZodType): string => {
+    const element = listElement(schema);
+    return element === undefined ? fieldKind(schema) : `array of ${fieldKind(element)}`;
+};
+
+const fieldsOf = (schema: z.ZodType | undefined): [string, z.core.$ZodType][] => Object.entries((schema && readObjectShape(schema)) ?? {});
+
+/**
+ * A query string carries values and lists of values, the way OpenAPI's default `form` style sends them.
+ */
+const assertQuerySendable = (route: RouteDefinition, routeKey: string): void => {
+    for (const [name, field] of fieldsOf(route.query)) {
+        const element = listElement(field);
+        if (element === undefined ? isValue(fieldKind(field)) : isValue(fieldKind(element))) continue;
+        throw new Error(
+            `Route "${routeKey}" declares query field "${name}" as ${describeField(field)}. ` +
+                'A query string carries values and lists of values, so this cannot be sent.\n' +
+                'Split it into fields of their own, or move it to a body.'
+        );
+    }
+};
+
+/**
+ * A header carries one value.
+ */
+const assertHeadersSendable = (route: RouteDefinition, routeKey: string): void => {
+    for (const [name, field] of fieldsOf(route.headers)) {
+        if (listElement(field) === undefined && isValue(fieldKind(field))) continue;
+        throw new Error(
+            `Route "${routeKey}" declares header "${name}" as ${describeField(field)}. ` +
+                'A header carries one value, so this cannot be sent.\n' +
+                'Use a scalar schema (z.string(), z.int(), z.enum([...])), or split it into headers of their own.'
+        );
+    }
+};
+
+/**
+ * A form carries values and lists of values, and a multipart one carries files too (RFC 7578).
+ */
+const assertFormFieldsSendable = (route: RouteDefinition, routeKey: string): void => {
+    if (route.contentType !== 'multipart/form-data' && route.contentType !== 'application/x-www-form-urlencoded') return;
+    const multipart = route.contentType === 'multipart/form-data';
+    for (const [name, field] of fieldsOf(route.body)) {
+        const kind = fieldKind(listElement(field) ?? field);
+        if (kind === 'BinarySchema') {
+            throw new Error(
+                `Route "${routeKey}" declares form field "${name}" as BinarySchema, but a form sends a file part as a File. ` +
+                    'Declare it with FileSchema.'
+            );
+        }
+        if (kind === 'file' && !multipart) {
+            throw new Error(
+                `Route "${routeKey}" declares form field "${name}" as a file, which a urlencoded body cannot carry. ` +
+                    "Send it as contentType: 'multipart/form-data'."
+            );
+        }
+        if (kind === 'file' || isValue(kind)) continue;
+        throw new Error(
+            `Route "${routeKey}" declares form field "${name}" as ${describeField(field)}. ` +
+                'A form carries values, lists of values and files, so this cannot be sent.\n' +
+                'Split it into fields of their own, or take the body as JSON.'
+        );
+    }
+};
+
+/**
  * A tool's description is the one thing a model reads before choosing it, so a
  * route that publishes as one has to carry it.
  */
@@ -114,6 +207,9 @@ const validateRoutes = (routes: Routes, prefix?: string): void => {
             expandStreamTools(value, fullKey);
             assertPathParamsMatchPath(value, fullKey);
             assertPathParamsAreScalar(value, fullKey);
+            assertQuerySendable(value, fullKey);
+            assertHeadersSendable(value, fullKey);
+            assertFormFieldsSendable(value, fullKey);
             assertNoCoercion(value, fullKey);
             assertValidStreams(value, fullKey);
             assertToolDescribed(value, fullKey);

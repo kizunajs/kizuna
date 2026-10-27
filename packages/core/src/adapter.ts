@@ -26,7 +26,6 @@ import { ResponseError } from './response-error.js';
 import { problemDetails, problemFromBody, type ProblemDetails } from './problem-details.js';
 import { isVoidSchema, isBinarySchema } from './zod-internals.js';
 import { resolveCoercionPlans } from './coercion.js';
-export { queryFromSearchParams } from './query-params.js';
 import { isRawResponse, type RawResponse } from './raw-response.js';
 import type { ContentRuntime } from './content.js';
 export { contentOf, CONTENT_META_KEY, type ContentRuntime, type ContentCookies, type ContentMeta } from './content.js';
@@ -271,6 +270,7 @@ export const HANDLER_ARG_KEYS = [
     'plugins',
     'tools',
     'rawBody',
+    'lastEventId',
 ] as const;
 
 /**
@@ -638,6 +638,8 @@ export {
     describeTool,
     modelMayCall,
     selectToolRoutes,
+    toolInputJsonSchema,
+    toolJsonSchema,
     toolOptionsOf,
     toolRefusal,
     type ToolDefinition,
@@ -812,6 +814,11 @@ export interface HandleArgs<NativeRequest, HandlerContext, ResponseContext, TRou
  * header, `undefined` when absent. For guards and request context resolvers on
  * adapters that expose raw header records.
  */
+const streamsEvents = (route: RouteDefinition): boolean =>
+    Object.values(route.responses).some(
+        (response) => isStreamResponse(response) && streamContentType(response) === EVENT_STREAM_MEDIA_TYPE
+    );
+
 export const getHeaderValue = (value: unknown): string | undefined => {
     if (typeof value === 'string') return value;
     if (Array.isArray(value) && typeof value[0] === 'string') return value[0];
@@ -1531,6 +1538,11 @@ const invokeRoute = async <NativeRequest, HandlerContext, ResponseContext>(
                       rawBody: invocation.rawBody,
                   }
                 : {}),
+            ...(streamsEvents(route)
+                ? {
+                      lastEventId: getHeaderValue((invocation.request.headers as Record<string, unknown>)['last-event-id']),
+                  }
+                : {}),
             throwError,
             ...handlerContext,
             ...(tools
@@ -1866,9 +1878,12 @@ const renderResult = (
     }
 };
 
-const formDataToObject = (form: FormData): Record<string, unknown> => {
+/**
+ * A query string or form as an object. A repeated key collects every value into a list.
+ */
+export const entriesToObject = (source: URLSearchParams | FormData): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
-    for (const [key, value] of form.entries()) {
+    for (const [key, value] of source.entries()) {
         const existing = result[key];
         if (existing === undefined) {
             result[key] = value;
@@ -1886,7 +1901,7 @@ const formDataToObject = (form: FormData): Record<string, unknown> => {
  * whose text core already read.
  */
 export const parseBodyText = (text: string, route: RouteDefinition): unknown => {
-    if (route.contentType === 'application/x-www-form-urlencoded') return Object.fromEntries(new URLSearchParams(text));
+    if (route.contentType === 'application/x-www-form-urlencoded') return entriesToObject(new URLSearchParams(text));
     return text.length > 0 ? JSON.parse(text) : undefined;
 };
 
@@ -1899,9 +1914,9 @@ export const parseBodyText = (text: string, route: RouteDefinition): unknown => 
 export const parseFetchBody = async (request: Request, route: RouteDefinition): Promise<unknown> => {
     switch (route.contentType) {
         case 'multipart/form-data':
-            return formDataToObject(await request.formData());
+            return entriesToObject(await request.formData());
         case 'application/x-www-form-urlencoded':
-            return Object.fromEntries(new URLSearchParams(await request.text()));
+            return entriesToObject(new URLSearchParams(await request.text()));
         default: {
             const text = await request.text();
             return text.length > 0 ? JSON.parse(text) : undefined;

@@ -24,7 +24,7 @@ An adapter translates between a native HTTP runtime (Bun, Cloudflare Workers, De
 ## `defineAdapter`
 
 ```ts title="adapter.ts"
-import { defineAdapter, renderJsonResult, parseFetchBody, headersToObject, type AdapterRequest } from 'kizunajs/adapter';
+import { defineAdapter, renderJsonResult, parseFetchBody, entriesToObject, headersToObject, type AdapterRequest } from 'kizunajs/adapter';
 ```
 
 ## Minimal example (fetch-based runtime)
@@ -34,6 +34,7 @@ import {
     defineAdapter,
     renderJsonResult,
     parseFetchBody,
+    entriesToObject,
     headersToObject,
     type AdapterRequest,
     type Routes,
@@ -80,7 +81,7 @@ export const handleRequest = <T extends Routes>(
             kind: 'core-match',
             path: url.pathname,
         },
-        query: Object.fromEntries(url.searchParams),
+        query: entriesToObject(url.searchParams),
         headers: headersToObject(request.headers),
         readBody: (route) => parseFetchBody(request, route),
     };
@@ -168,6 +169,14 @@ Content-type-aware body parsing for fetch-based runtimes (`Request` / `Response`
 
 ```ts
 readBody: (route) => parseFetchBody(request, route),
+```
+
+### `entriesToObject`
+
+Converts a `URLSearchParams` or `FormData` to an object. A repeated key, `?ids=1&ids=2`, becomes a list of every value.
+
+```ts
+query: entriesToObject(url.searchParams),
 ```
 
 ### `headersToObject`

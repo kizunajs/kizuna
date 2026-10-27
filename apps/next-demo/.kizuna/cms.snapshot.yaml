@@ -486,6 +486,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
       "400":
         kind: object
         fields:
@@ -713,6 +714,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
       "400":
         kind: object
         fields:
@@ -922,6 +924,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           usedOn:
             optional: false
             schema:
@@ -1042,10 +1045,12 @@ routes:
             optional: false
             schema:
               kind: record
+              nullable: true
           owner:
             optional: false
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -1063,6 +1068,7 @@ routes:
             optional: false
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -1121,6 +1127,7 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 createdAt:
                   optional: false
                   schema:
@@ -1129,6 +1136,7 @@ routes:
                   optional: false
                   schema:
                     kind: object
+                    nullable: true
                     fields:
                       id:
                         optional: false
@@ -1146,10 +1154,12 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 decidedAt:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
           requireReview:
             optional: false
             schema:
@@ -1265,6 +1275,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   path:
                     optional: false
                     schema:
@@ -1282,6 +1293,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   version:
                     optional: false
                     schema:
@@ -1290,14 +1302,17 @@ routes:
                     optional: false
                     schema:
                       kind: number
+                      nullable: true
                   updatedAt:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   updatedBy:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
       "401":
         kind: object
         fields:
@@ -1361,6 +1376,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -1378,10 +1394,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -1396,10 +1414,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -1506,6 +1526,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -1523,10 +1544,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -1541,10 +1564,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -1867,6 +1892,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   createdAt:
                     optional: false
                     schema:
@@ -1961,6 +1987,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           createdAt:
             optional: false
             schema:
@@ -2055,6 +2082,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           published:
             optional: false
             schema:
@@ -2063,6 +2091,7 @@ routes:
             optional: false
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -2080,6 +2109,7 @@ routes:
             optional: false
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -2138,6 +2168,7 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 createdAt:
                   optional: false
                   schema:
@@ -2146,6 +2177,7 @@ routes:
                   optional: false
                   schema:
                     kind: object
+                    nullable: true
                     fields:
                       id:
                         optional: false
@@ -2163,10 +2195,12 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 decidedAt:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
           requireReview:
             optional: false
             schema:
@@ -2290,6 +2324,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -2307,10 +2342,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -2325,10 +2362,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -2459,6 +2498,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -2476,10 +2516,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -2494,10 +2536,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -2592,6 +2636,7 @@ routes:
           optional: false
           schema:
             kind: string
+            nullable: true
     responses:
       "204":
         kind: void
@@ -2722,6 +2767,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -2739,10 +2785,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -2757,10 +2805,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -2845,10 +2895,12 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   group:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   status:
                     optional: false
                     schema:
@@ -2866,6 +2918,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
       "401":
         kind: object
         fields:
@@ -2929,6 +2982,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -2946,10 +3000,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -2964,10 +3020,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -3074,6 +3132,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -3091,10 +3150,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -3109,10 +3170,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -3435,6 +3498,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   createdAt:
                     optional: false
                     schema:
@@ -3529,6 +3593,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           createdAt:
             optional: false
             schema:
@@ -3623,6 +3688,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           published:
             optional: false
             schema:
@@ -3631,6 +3697,7 @@ routes:
             optional: false
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -3648,6 +3715,7 @@ routes:
             optional: false
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -3706,6 +3774,7 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 createdAt:
                   optional: false
                   schema:
@@ -3714,6 +3783,7 @@ routes:
                   optional: false
                   schema:
                     kind: object
+                    nullable: true
                     fields:
                       id:
                         optional: false
@@ -3731,10 +3801,12 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 decidedAt:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
           requireReview:
             optional: false
             schema:
@@ -3858,6 +3930,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -3875,10 +3948,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -3893,10 +3968,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -4027,6 +4104,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -4044,10 +4122,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -4062,10 +4142,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -4160,6 +4242,7 @@ routes:
           optional: false
           schema:
             kind: string
+            nullable: true
     responses:
       "204":
         kind: void
@@ -4290,6 +4373,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -4307,10 +4391,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -4325,10 +4411,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -4491,6 +4579,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   status:
                     optional: false
                     schema:
@@ -4603,6 +4692,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -4620,10 +4710,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -4638,10 +4730,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -4852,6 +4946,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -4869,10 +4964,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -4887,10 +4984,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -4997,6 +5096,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -5014,10 +5114,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -5032,10 +5134,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -5358,6 +5462,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   createdAt:
                     optional: false
                     schema:
@@ -5452,6 +5557,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           createdAt:
             optional: false
             schema:
@@ -5546,6 +5652,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           published:
             optional: false
             schema:
@@ -5554,6 +5661,7 @@ routes:
             optional: false
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -5571,6 +5679,7 @@ routes:
             optional: false
             schema:
               kind: object
+              nullable: true
               fields:
                 id:
                   optional: false
@@ -5629,6 +5738,7 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 createdAt:
                   optional: false
                   schema:
@@ -5637,6 +5747,7 @@ routes:
                   optional: false
                   schema:
                     kind: object
+                    nullable: true
                     fields:
                       id:
                         optional: false
@@ -5654,10 +5765,12 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
                 decidedAt:
                   optional: false
                   schema:
                     kind: string
+                    nullable: true
           requireReview:
             optional: false
             schema:
@@ -5781,6 +5894,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -5798,10 +5912,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -5816,10 +5932,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -5950,6 +6068,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -5967,10 +6086,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -5985,10 +6106,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -6083,6 +6206,7 @@ routes:
           optional: false
           schema:
             kind: string
+            nullable: true
     responses:
       "204":
         kind: void
@@ -6213,6 +6337,7 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           status:
             optional: false
             schema:
@@ -6230,10 +6355,12 @@ routes:
             optional: false
             schema:
               kind: number
+              nullable: true
           content:
             optional: false
             schema:
               kind: record
+              nullable: true
           complete:
             optional: false
             schema:
@@ -6248,10 +6375,12 @@ routes:
             optional: false
             schema:
               kind: string
+              nullable: true
           updatedBy:
             optional: false
             schema:
               kind: string
+              nullable: true
       "401":
         kind: object
         fields:
@@ -7477,6 +7606,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   createdAt:
                     optional: false
                     schema:
@@ -7485,6 +7615,7 @@ routes:
                     optional: false
                     schema:
                       kind: object
+                      nullable: true
                       fields:
                         id:
                           optional: false
@@ -7502,10 +7633,12 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   decidedAt:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   ref:
                     optional: false
                     schema:
@@ -7518,6 +7651,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
       "401":
         kind: object
         fields:
@@ -7655,6 +7789,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   createdAt:
                     optional: false
                     schema:
@@ -7663,6 +7798,7 @@ routes:
                     optional: false
                     schema:
                       kind: object
+                      nullable: true
                       fields:
                         id:
                           optional: false
@@ -7680,10 +7816,12 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   decidedAt:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
       "400":
         kind: object
         fields:
@@ -7896,6 +8034,7 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   createdAt:
                     optional: false
                     schema:
@@ -7904,6 +8043,7 @@ routes:
                     optional: false
                     schema:
                       kind: object
+                      nullable: true
                       fields:
                         id:
                           optional: false
@@ -7921,10 +8061,12 @@ routes:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
                   decidedAt:
                     optional: false
                     schema:
                       kind: string
+                      nullable: true
       "401":
         kind: object
         fields:

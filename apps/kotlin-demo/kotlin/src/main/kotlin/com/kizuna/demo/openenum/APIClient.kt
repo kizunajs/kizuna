@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
 interface KizunaQueryValue {
@@ -110,6 +112,20 @@ object OpenEnumAPI {
         val email: String,
         val last_name: String? = null,
         val phone: String? = null
+    )
+
+    @Serializable
+    data class UserPreferences(
+        val timezone: String?,
+        val locale: String? = null,
+        val signature: String? = null,
+        val mutedChannels: List<MutedChannel>
+    )
+
+    @Serializable
+    data class MutedChannel(
+        val channel: String,
+        val until: String?
     )
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -222,7 +238,7 @@ object OpenEnumAPI {
     }
 }
 
-class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null) {
+class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestContext = RequestContext(), private val client: OkHttpClient = OkHttpClient(), private val json: Json = Json { ignoreUnknownKeys = true }, private val requestInterceptor: (suspend (Request.Builder) -> Unit)? = null, private val responseInterceptor: (suspend (Request, Response) -> Unit)? = null, private val retry: RetryPolicy? = null, private val reconnect: ReconnectPolicy? = null) {
 
     /** Values sent as headers on every request, from the api's request context. */
     data class RequestContext(
@@ -234,6 +250,34 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         if (requestContext.xPosthogSessionId != null) put("x-posthog-session-id", requestContext.xPosthogSessionId!!)
         if (requestContext.xPosthogDistinctId != null) put("x-posthog-distinct-id", requestContext.xPosthogDistinctId!!)
     }
+
+    /**
+     * Retries a GET, HEAD, OPTIONS, PUT or DELETE that failed on the network or was answered 429 or 503,
+     * waiting what Retry-After asks or backing off.
+     *
+     * @property maximumAttempts Attempts in all, the first included.
+     * @property initialDelay What the first backoff waits at most.
+     * @property maximumDelay What any wait may take.
+     */
+    data class RetryPolicy(
+        val maximumAttempts: Int = 3,
+        val initialDelay: kotlin.time.Duration = 500.milliseconds,
+        val maximumDelay: kotlin.time.Duration = 30.seconds
+    )
+
+    /**
+     * Reconnects an event stream on a GET, HEAD, OPTIONS, PUT or DELETE when its connection drops,
+     * sending the id of the last event as Last-Event-ID.
+     *
+     * @property maximumAttempts Reconnections in a row before the stream fails. An event received resets the count.
+     * @property reconnectionTime What to wait before reconnecting, until the server sends a retry field.
+     * @property maximumDelay What the wait may grow to after reconnections in a row that fail.
+     */
+    data class ReconnectPolicy(
+        val maximumAttempts: Int = 5,
+        val reconnectionTime: kotlin.time.Duration = 3.seconds,
+        val maximumDelay: kotlin.time.Duration = 30.seconds
+    )
 
     data class MultipartFile(
         val data: ByteArray,
@@ -353,7 +397,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         @Serializable
         data class Response(
             val users: List<OpenEnumAPI.User>,
-            val nextCursor: Double? = null
+            val nextCursor: Double?
         )
 
         data class Query(
@@ -497,6 +541,41 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         sealed class Failure(message: String? = null) : Exception(message) {
             data class BadRequest(val body: OpenEnumAPI.ProblemDetails) : Failure()
             data class ValidationError(val body: OpenEnumAPIClient.ValidationError) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
+    object UsersUpdatePreferences {
+
+        data class Params(val id: OpenEnumAPI.UserId)
+
+        data class Body(
+            val timezone: String?,
+            val locale: String? = null,
+            val signature: String? = null,
+            val mutedChannels: List<OpenEnumAPI.MutedChannel>
+        )
+
+        sealed interface Args {
+            val params: Params
+            val body: Body
+        }
+
+        object Scope {
+            fun params(id: OpenEnumAPI.UserId): AfterParams = AfterParams(params = Params(id = id))
+        }
+
+        class AfterParams internal constructor(internal val params: Params) {
+            fun body(timezone: String?, locale: String? = null, signature: String? = null, mutedChannels: List<OpenEnumAPI.MutedChannel>): AfterBody = AfterBody(params = params, body = Body(timezone = timezone, locale = locale, signature = signature, mutedChannels = mutedChannels))
+        }
+
+        class AfterBody internal constructor(override val params: Params, override val body: Body) : Args
+
+        data class Result(val body: OpenEnumAPI.UserPreferences)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class BadRequest(val body: OpenEnumAPIClient.ValidationError) : Failure()
             class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
             class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
         }
@@ -744,6 +823,20 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
+    object HealthReady {
+
+        @Serializable
+        data class Response(val ready: Boolean)
+
+        data class Result(val body: Response)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            data class ServiceUnavailable(val body: OpenEnumAPI.ProblemDetails) : Failure()
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object HealthHistory {
 
         @Serializable
@@ -786,6 +879,19 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
+    object NotificationsWatchNotifications {
+
+        @Serializable
+        data class Message(val title: String)
+
+        data class Result(val body: Flow<Message>)
+
+        sealed class Failure(message: String? = null) : Exception(message) {
+            class Unexpected(val statusCode: Int, val data: ByteArray) : Failure("Unexpected status $statusCode")
+            class Decoding(override val cause: Throwable, val statusCode: Int, val data: ByteArray) : Failure(cause.message)
+        }
+    }
+
     object NotificationsListEvents {
 
         @Serializable
@@ -796,12 +902,12 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
 
         @Serializable
         data class ResponseEcho(
-            val since: Instant? = null,
-            val kind: OpenEnumAPI.EventKind? = null,
-            val ids: List<String>? = null,
-            val label: String? = null,
-            val tagIds: List<String>? = null,
-            val sessionId: String? = null
+            val since: Instant?,
+            val kind: OpenEnumAPI.EventKind?,
+            val ids: List<String>?,
+            val label: String?,
+            val tagIds: List<String>?,
+            val sessionId: String?
         )
 
         data class Query(
@@ -1850,7 +1956,7 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         data class Response(
             val ip: String,
             val protocol: String,
-            val userAgent: String? = null
+            val userAgent: String?
         )
 
         data class Result(val body: Response)
@@ -1915,24 +2021,24 @@ class OpenEnumAPIClient(private val baseUrl: String, requestContext: RequestCont
         }
     }
 
-    val users = OpenEnumAPIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val users = OpenEnumAPIUsersClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val health = OpenEnumAPIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val health = OpenEnumAPIHealthClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val notifications = OpenEnumAPINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val notifications = OpenEnumAPINotificationsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val workspace = OpenEnumAPIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val workspace = OpenEnumAPIWorkspaceClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val assistant = OpenEnumAPIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val assistant = OpenEnumAPIAssistantClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val diagnostics = OpenEnumAPIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val diagnostics = OpenEnumAPIDiagnosticsClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val contact = OpenEnumAPIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val contact = OpenEnumAPIContactClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 
-    val newsletter = OpenEnumAPINewsletterClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor)
+    val newsletter = OpenEnumAPINewsletterClient(client, baseUrl, json, requestContextHeaders, requestInterceptor, responseInterceptor, retry, reconnect)
 }
 
-class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: OpenEnumAPIClient.RetryPolicy?, private val reconnect: OpenEnumAPIClient.ReconnectPolicy?) {
 
     /** List users with pagination */
     @Throws(OpenEnumAPIClient.UsersListUsers.Failure::class)
@@ -1956,7 +2062,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -1989,14 +2095,14 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
             when (val statusCode = httpResponse.code) {
                 200 -> {
                     try {
-                        val payload = json.decodeFromString<String>(data.decodeToString())
+                        val payload = data.decodeToString()
                         return@use OpenEnumAPIClient.UsersExportUsers.Result(body = payload)
                     }
                     catch (error: Exception) { throw OpenEnumAPIClient.UsersExportUsers.Failure.Decoding(error, statusCode, data) }
@@ -2019,7 +2125,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2055,7 +2161,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2099,7 +2205,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2137,7 +2243,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestBuilder = requestBuilder.header("x-request-id", Kizuna.stringifyQueryValue(headers.xRequestId).joinToString(", "))
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2175,7 +2281,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2211,7 +2317,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2249,7 +2355,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2277,6 +2383,46 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
         }
     }
 
+    /** Replace a user's preferences, exercises required nullable fields round-tripping through the clients */
+    @Throws(OpenEnumAPIClient.UsersUpdatePreferences.Failure::class)
+    suspend fun updatePreferences(build: OpenEnumAPIClient.UsersUpdatePreferences.Scope.() -> OpenEnumAPIClient.UsersUpdatePreferences.Args): OpenEnumAPIClient.UsersUpdatePreferences.Result {
+        val args = OpenEnumAPIClient.UsersUpdatePreferences.Scope.build()
+        val params = args.params
+        val body = args.body
+        var path = "/users/:id/preferences"
+        path = path.replace(":id", Kizuna.encodePathSegment(params.id))
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        val requestBody: RequestBody
+        val payload = OpenEnumAPI.UserPreferences(timezone = body.timezone, locale = body.locale, signature = body.signature, mutedChannels = body.mutedChannels)
+        requestBody = json.encodeToString(payload).toRequestBody("application/json".toMediaType())
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("PUT", requestBody)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPI.UserPreferences>(data.decodeToString())
+                        return@use OpenEnumAPIClient.UsersUpdatePreferences.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.Decoding(error, statusCode, data) }
+                }
+                400 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPIClient.ValidationError>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.BadRequest(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
     /** Delete a user */
     @Deprecated("use `archiveUser` instead")
     @Throws(OpenEnumAPIClient.UsersDeleteUser.Failure::class)
@@ -2291,7 +2437,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("DELETE", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2327,7 +2473,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("POST", ByteArray(0).toRequestBody(null))
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2368,7 +2514,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2404,7 +2550,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("POST", ByteArray(0).toRequestBody(null))
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2431,7 +2577,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2468,7 +2614,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("HEAD", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2495,7 +2641,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
             .method("OPTIONS", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2513,7 +2659,7 @@ class OpenEnumAPIUsersClient(private val client: OkHttpClient, private val baseU
     }
 }
 
-class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: OpenEnumAPIClient.RetryPolicy?, private val reconnect: OpenEnumAPIClient.ReconnectPolicy?) {
 
     /** Health check, exercises nested sub-client routing */
     @Throws(OpenEnumAPIClient.HealthCheck.Failure::class)
@@ -2525,7 +2671,7 @@ class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val base
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2552,7 +2698,7 @@ class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val base
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2569,6 +2715,39 @@ class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val base
         }
     }
 
+    /** Readiness, answers 503 with Retry-After once while the server warms up, exercises client retries */
+    @Throws(OpenEnumAPIClient.HealthReady.Failure::class)
+    suspend fun ready(): OpenEnumAPIClient.HealthReady.Result {
+        val path = "/health/ready"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        return httpResponse.use {
+            responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                200 -> {
+                    try {
+                        val payload = json.decodeFromString<OpenEnumAPIClient.HealthReady.Response>(data.decodeToString())
+                        return@use OpenEnumAPIClient.HealthReady.Result(body = payload)
+                    }
+                    catch (error: Exception) { throw OpenEnumAPIClient.HealthReady.Failure.Decoding(error, statusCode, data) }
+                }
+                503 -> {
+                    val payload = try {
+                        json.decodeFromString<OpenEnumAPI.ProblemDetails>(data.decodeToString())
+                    } catch (error: Exception) { throw OpenEnumAPIClient.HealthReady.Failure.Decoding(error, statusCode, data) }
+                    throw OpenEnumAPIClient.HealthReady.Failure.ServiceUnavailable(body = payload)
+                }
+                else -> throw OpenEnumAPIClient.HealthReady.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
     /** Health history, exercises array return type qualification */
     @Throws(OpenEnumAPIClient.HealthHistory.Failure::class)
     suspend fun history(): OpenEnumAPIClient.HealthHistory.Result {
@@ -2579,7 +2758,7 @@ class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val base
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2597,7 +2776,7 @@ class OpenEnumAPIHealthClient(private val client: OkHttpClient, private val base
     }
 }
 
-class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: OpenEnumAPIClient.RetryPolicy?, private val reconnect: OpenEnumAPIClient.ReconnectPolicy?) {
 
     /** Send a notification (discriminated by channel) */
     @Throws(OpenEnumAPIClient.NotificationsSendNotification.Failure::class)
@@ -2613,7 +2792,7 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2632,6 +2811,44 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
                     throw OpenEnumAPIClient.NotificationsSendNotification.Failure.BadRequest(body = payload)
                 }
                 else -> throw OpenEnumAPIClient.NotificationsSendNotification.Failure.Unexpected(statusCode = statusCode, data = data)
+            }
+        }
+    }
+
+    /** Watch notifications, drops a fresh connection after two to exercise resuming from Last-Event-ID */
+    @Throws(OpenEnumAPIClient.NotificationsWatchNotifications.Failure::class)
+    suspend fun watchNotifications(): OpenEnumAPIClient.NotificationsWatchNotifications.Result {
+        val path = "/notifications/stream"
+        val urlBuilder = Kizuna.resolveUrl(baseUrl, path)
+        var requestBuilder = Request.Builder()
+            .url(urlBuilder.build())
+            .method("GET", null)
+        for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
+        requestInterceptor?.invoke(requestBuilder)
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
+        responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
+        if (httpResponse.code == 200) {
+            val reconnection = reconnect?.let { policy ->
+                Kizuna.Reconnection(policy) { lastEventId ->
+                    val again = requestBuilder.build().newBuilder()
+                    if (lastEventId.isNotEmpty()) again.header("Last-Event-ID", lastEventId)
+                    requestInterceptor?.invoke(again)
+                    val reopened = Kizuna.send(client, again.build(), retry)
+                    val eventStream = reopened.header("Content-Type")?.lowercase()?.startsWith("text/event-stream") == true
+                    when {
+                        reopened.code == 204 -> { reopened.close(); null }
+                        reopened.code == 200 && eventStream -> reopened
+                        else -> { reopened.close(); throw OpenEnumAPIClient.NotificationsWatchNotifications.Failure.Unexpected(statusCode = reopened.code, data = ByteArray(0)) }
+                    }
+                }
+            }
+            val body = Kizuna.events<OpenEnumAPIClient.NotificationsWatchNotifications.Message>(httpResponse, reconnection) { event -> json.decodeFromString<OpenEnumAPIClient.NotificationsWatchNotifications.Message>(event.data) }
+            return OpenEnumAPIClient.NotificationsWatchNotifications.Result(body = body)
+        }
+        return httpResponse.use {
+            val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
+            when (val statusCode = httpResponse.code) {
+                else -> throw OpenEnumAPIClient.NotificationsWatchNotifications.Failure.Unexpected(statusCode = statusCode, data = data)
             }
         }
     }
@@ -2673,7 +2890,7 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2711,7 +2928,7 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2756,7 +2973,7 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2780,7 +2997,7 @@ class OpenEnumAPINotificationsClient(private val client: OkHttpClient, private v
     }
 }
 
-class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: OpenEnumAPIClient.RetryPolicy?, private val reconnect: OpenEnumAPIClient.ReconnectPolicy?) {
 
     /** Get workspace info */
     @Throws(OpenEnumAPIClient.WorkspaceGetWorkspace.Failure::class)
@@ -2792,7 +3009,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2831,7 +3048,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
             .method("DELETE", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2875,7 +3092,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2920,7 +3137,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -2964,7 +3181,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3018,7 +3235,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
             .method("DELETE", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3066,7 +3283,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3118,7 +3335,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3160,7 +3377,7 @@ class OpenEnumAPIWorkspaceClient(private val client: OkHttpClient, private val b
     }
 }
 
-class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: OpenEnumAPIClient.RetryPolicy?, private val reconnect: OpenEnumAPIClient.ReconnectPolicy?) {
 
     /** Stream an assistant reply, exercises a server-sent events response */
     @Throws(OpenEnumAPIClient.AssistantReply.Failure::class)
@@ -3177,7 +3394,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
         if (httpResponse.code == 200) {
             val body = Kizuna.events<OpenEnumAPIClient.AssistantReply.Event>(httpResponse) { event ->
@@ -3226,7 +3443,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
         if (httpResponse.code == 200) {
             val body = Kizuna.events<OpenEnumAPIClient.AssistantChat.Event>(httpResponse) { event ->
@@ -3290,7 +3507,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3328,7 +3545,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3366,7 +3583,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3399,7 +3616,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3443,7 +3660,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3479,7 +3696,7 @@ class OpenEnumAPIAssistantClient(private val client: OkHttpClient, private val b
     }
 }
 
-class OpenEnumAPIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class OpenEnumAPIDiagnosticsClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: OpenEnumAPIClient.RetryPolicy?, private val reconnect: OpenEnumAPIClient.ReconnectPolicy?) {
 
     /** Report the caller as Express sees it */
     @Throws(OpenEnumAPIClient.DiagnosticsWhoAmI.Failure::class)
@@ -3491,7 +3708,7 @@ class OpenEnumAPIDiagnosticsClient(private val client: OkHttpClient, private val
             .method("GET", null)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         return httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3509,7 +3726,7 @@ class OpenEnumAPIDiagnosticsClient(private val client: OkHttpClient, private val
     }
 }
 
-class OpenEnumAPIContactClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class OpenEnumAPIContactClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: OpenEnumAPIClient.RetryPolicy?, private val reconnect: OpenEnumAPIClient.ReconnectPolicy?) {
 
     /** Send a message to the team */
     @Throws(OpenEnumAPIClient.ContactSendMessage.Failure::class)
@@ -3526,7 +3743,7 @@ class OpenEnumAPIContactClient(private val client: OkHttpClient, private val bas
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3544,7 +3761,7 @@ class OpenEnumAPIContactClient(private val client: OkHttpClient, private val bas
     }
 }
 
-class OpenEnumAPINewsletterClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?) {
+class OpenEnumAPINewsletterClient(private val client: OkHttpClient, private val baseUrl: String, private val json: Json, private val requestContextHeaders: Map<String, String>, private val requestInterceptor: (suspend (Request.Builder) -> Unit)?, private val responseInterceptor: (suspend (Request, Response) -> Unit)?, private val retry: OpenEnumAPIClient.RetryPolicy?, private val reconnect: OpenEnumAPIClient.ReconnectPolicy?) {
 
     /** Subscribe to the weekly newsletter */
     @Throws(OpenEnumAPIClient.NewsletterSubscribe.Failure::class)
@@ -3561,7 +3778,7 @@ class OpenEnumAPINewsletterClient(private val client: OkHttpClient, private val 
             .method("POST", requestBody)
         for ((name, value) in requestContextHeaders) requestBuilder = requestBuilder.header(name, value)
         requestInterceptor?.invoke(requestBuilder)
-        val httpResponse = Kizuna.execute(client, requestBuilder.build())
+        val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)
         httpResponse.use {
             responseInterceptor?.invoke(requestBuilder.build(), httpResponse)
             val data = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { httpResponse.body?.bytes() ?: ByteArray(0) }
@@ -3582,6 +3799,8 @@ class OpenEnumAPINewsletterClient(private val client: OkHttpClient, private val 
 private object Kizuna {
 
     data class ServerSentEvent(val event: String?, val data: String, val id: String?, val retry: Int?)
+
+    class Reconnection(val policy: OpenEnumAPIClient.ReconnectPolicy, val reopen: suspend (String) -> Response?)
 
     private suspend fun readLine(source: okio.BufferedSource): String? {
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { source.readUtf8Line() }
@@ -3609,39 +3828,78 @@ private object Kizuna {
         }
     }
 
-    fun serverSentEvents(response: Response): Flow<ServerSentEvent> = flow {
-        response.use { open ->
-            val source = open.body?.source() ?: return@use
-            var eventType = ""
-            val dataLines = mutableListOf<String>()
-            var lastEventId = ""
-            var retry: Int? = null
-            while (true) {
-                val line = readLine(source) ?: break
-                if (line.isEmpty()) {
-                    if (dataLines.isNotEmpty()) {
-                        emit(ServerSentEvent(eventType.ifEmpty { null }, dataLines.joinToString("\n"), lastEventId.ifEmpty { null }, retry))
-                        dataLines.clear()
-                        retry = null
-                    }
-                    eventType = ""
-                    continue
-                }
-                if (line.startsWith(":")) continue
-                val separator = line.indexOf(':')
-                val field = if (separator == -1) line else line.substring(0, separator)
-                val value = (if (separator == -1) "" else line.substring(separator + 1)).removePrefix(" ")
-                when (field) {
-                    "event" -> eventType = value
-                    "data" -> dataLines.add(value)
-                    "id" -> if (!value.contains('\u0000')) lastEventId = value
-                    "retry" -> if (value.isNotEmpty() && value.all { it.isDigit() }) retry = value.toIntOrNull()
-                }
+    private val LINE_ENDINGS = okio.ByteString.of('\r'.code.toByte(), '\n'.code.toByte())
+
+    private suspend fun readEventLine(source: okio.BufferedSource): String? {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val end = source.indexOfElement(LINE_ENDINGS)
+            if (end == -1L) {
+                if (source.exhausted()) null else source.readUtf8()
+            }
+            else {
+                val line = source.readUtf8(end)
+                val carriageReturn = source.readByte() == '\r'.code.toByte()
+                if (carriageReturn && source.request(1) && source.buffer[0] == '\n'.code.toByte()) source.skip(1)
+                line
             }
         }
     }
 
-    fun <Event : Any> events(response: Response, decode: (ServerSentEvent) -> Event?): Flow<Event> = serverSentEvents(response).mapNotNull(decode)
+    fun serverSentEvents(response: Response, reconnect: Reconnection?): Flow<ServerSentEvent> = flow {
+        var lastEventId = ""
+        var reconnectionTime = reconnect?.policy?.reconnectionTime ?: 3.seconds
+        var current: Response? = response
+        var attempts = 0
+        var failure: Throwable? = null
+        while (true) {
+            current?.use { open ->
+                val source = open.body?.source() ?: return@use
+                var eventType = ""
+                val dataLines = mutableListOf<String>()
+                var pendingId = lastEventId
+                var retry: Int? = null
+                var firstLine = true
+                while (true) {
+                    val received = try { readEventLine(source) } catch (error: java.io.IOException) { failure = error; null } ?: break
+                    val line = if (firstLine) received.removePrefix("\uFEFF") else received
+                    firstLine = false
+                    if (line.isEmpty()) {
+                        lastEventId = pendingId
+                        if (dataLines.isNotEmpty()) {
+                            emit(ServerSentEvent(eventType.ifEmpty { null }, dataLines.joinToString("\n"), lastEventId.ifEmpty { null }, retry))
+                            attempts = 0
+                            failure = null
+                            dataLines.clear()
+                            retry = null
+                        }
+                        eventType = ""
+                        continue
+                    }
+                    if (line.startsWith(":")) continue
+                    val separator = line.indexOf(':')
+                    val field = if (separator == -1) line else line.substring(0, separator)
+                    val value = (if (separator == -1) "" else line.substring(separator + 1)).removePrefix(" ")
+                    when (field) {
+                        "event" -> eventType = value
+                        "data" -> dataLines.add(value)
+                        "id" -> if (!value.contains('\u0000')) pendingId = value
+                        "retry" -> if (value.isNotEmpty() && value.all { character -> character in '0'..'9' }) value.toIntOrNull()?.let { milliseconds -> retry = milliseconds; reconnectionTime = minOf(milliseconds.milliseconds, 3_600_000.milliseconds) }
+                    }
+                }
+            }
+            if (reconnect == null || attempts >= reconnect.policy.maximumAttempts) {
+                failure?.let { throw it }
+                return@flow
+            }
+            attempts += 1
+            val ceiling = minOf(reconnect.policy.maximumDelay, reconnectionTime * Math.pow(2.0, (attempts - 1).toDouble()))
+            val extra = (ceiling - reconnectionTime).coerceAtLeast(kotlin.time.Duration.ZERO)
+            kotlinx.coroutines.delay(reconnectionTime + extra * Math.random())
+            current = try { reconnect.reopen(lastEventId) ?: return@flow } catch (error: java.io.IOException) { failure = error; null }
+        }
+    }
+
+    fun <Event : Any> events(response: Response, reconnect: Reconnection? = null, decode: (ServerSentEvent) -> Event?): Flow<Event> = serverSentEvents(response, reconnect).mapNotNull(decode)
     fun resolveUrl(baseUrl: String, path: String): HttpUrl.Builder {
         val base = baseUrl.toHttpUrl()
         val trimmedPath = path.trimStart('/')
@@ -3663,6 +3921,47 @@ private object Kizuna {
             is Enum<*> -> listOf(value.name)
             else -> listOf(value.toString())
         }
+    }
+
+    suspend fun send(client: OkHttpClient, request: Request, retry: OpenEnumAPIClient.RetryPolicy?): Response {
+        val idempotent = request.method in setOf("GET", "HEAD", "OPTIONS", "PUT", "DELETE")
+        val policy = retry?.takeIf { idempotent && request.body?.isOneShot() != true }
+        var attempt = 1
+        while (true) {
+            val response = try {
+                execute(client, request)
+            } catch (error: java.io.IOException) {
+                val delay = policy?.let { retryDelay(it, attempt, null) } ?: throw error
+                kotlinx.coroutines.delay(delay)
+                attempt += 1
+                continue
+            }
+            val delay = policy?.let { retryDelay(it, attempt, response) } ?: return response
+            response.close()
+            kotlinx.coroutines.delay(delay)
+            attempt += 1
+        }
+    }
+
+    fun retryDelay(policy: OpenEnumAPIClient.RetryPolicy, attempt: Int, response: Response?): Long? {
+        if (attempt >= policy.maximumAttempts) return null
+        val ceiling = minOf(policy.maximumDelay.inWholeMilliseconds, policy.initialDelay.inWholeMilliseconds shl (attempt - 1))
+        val backoff = (Math.random() * ceiling).toLong()
+        if (response == null) return backoff
+        if (response.code != 429 && response.code != 503) return null
+        val asked = retryAfter(response.header("Retry-After")) ?: return backoff
+        return if (asked <= policy.maximumDelay.inWholeMilliseconds) asked else null
+    }
+
+    fun retryAfter(header: String?): Long? {
+        val value = header?.trim() ?: return null
+        value.toLongOrNull()?.let { return if (it >= 0) it * 1000 else null }
+        val date = try {
+            java.time.ZonedDateTime.parse(value, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+        } catch (_: java.time.format.DateTimeParseException) {
+            return null
+        }
+        return maxOf(0L, date.toInstant().toEpochMilli() - System.currentTimeMillis())
     }
 
     suspend fun execute(client: OkHttpClient, request: Request): Response {

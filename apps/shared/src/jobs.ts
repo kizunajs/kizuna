@@ -76,7 +76,6 @@ export const jobs = k.jobs('scheduler', {
             })
             .handler(() => ({
                 status: 204,
-                body: undefined,
             })),
     },
 });

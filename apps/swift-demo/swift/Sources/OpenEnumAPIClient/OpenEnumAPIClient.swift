@@ -249,6 +249,64 @@ public enum OpenEnumAPI {
         }
     }
 
+    public struct UserPreferences: Codable, Sendable, Equatable {
+        public let timezone: String?
+        public let locale: String?
+        public let signature: String?
+        public let mutedChannels: [MutedChannel]
+
+        private enum CodingKeys: String, CodingKey {
+            case timezone
+            case locale
+            case signature
+            case mutedChannels
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(timezone, forKey: .timezone)
+            try container.encodeIfPresent(locale, forKey: .locale)
+            try container.encodeIfPresent(signature, forKey: .signature)
+            try container.encode(mutedChannels, forKey: .mutedChannels)
+        }
+
+        public init(
+            timezone: String?,
+            locale: String? = nil,
+            signature: String? = nil,
+            mutedChannels: [MutedChannel]
+        ) {
+            self.timezone = timezone
+            self.locale = locale
+            self.signature = signature
+            self.mutedChannels = mutedChannels
+        }
+    }
+
+    public struct MutedChannel: Codable, Sendable, Equatable {
+        public let channel: String
+        public let until: String?
+
+        private enum CodingKeys: String, CodingKey {
+            case channel
+            case until
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(channel, forKey: .channel)
+            try container.encode(until, forKey: .until)
+        }
+
+        public init(
+            channel: String,
+            until: String?
+        ) {
+            self.channel = channel
+            self.until = until
+        }
+    }
+
     public enum NotificationEvent: Codable, Sendable, Equatable {
         case email(EmailEvent)
         case sms(SmsEvent)
@@ -483,6 +541,38 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
+    /// Retries a GET, HEAD, OPTIONS, PUT or DELETE that failed on the network or was answered 429 or 503, waiting what Retry-After asks or backing off.
+    public struct RetryPolicy: Sendable {
+        /// Attempts in all, the first included.
+        public var maximumAttempts: Int
+        /// Seconds the first backoff waits at most.
+        public var initialDelay: TimeInterval
+        /// Seconds any wait may take.
+        public var maximumDelay: TimeInterval
+
+        public init(maximumAttempts: Int = 3, initialDelay: TimeInterval = 0.5, maximumDelay: TimeInterval = 30) {
+            self.maximumAttempts = maximumAttempts
+            self.initialDelay = initialDelay
+            self.maximumDelay = maximumDelay
+        }
+    }
+
+    /// Reconnects an event stream on a GET, HEAD, OPTIONS, PUT or DELETE when its connection drops, sending the id of the last event as Last-Event-ID.
+    public struct ReconnectPolicy: Sendable {
+        /// Reconnections in a row before the stream fails. An event received resets the count.
+        public var maximumAttempts: Int
+        /// Seconds to wait before reconnecting, until the server sends a retry field.
+        public var reconnectionTime: TimeInterval
+        /// Seconds the wait may grow to after reconnections in a row that fail.
+        public var maximumDelay: TimeInterval
+
+        public init(maximumAttempts: Int = 5, reconnectionTime: TimeInterval = 3, maximumDelay: TimeInterval = 30) {
+            self.maximumAttempts = maximumAttempts
+            self.reconnectionTime = reconnectionTime
+            self.maximumDelay = maximumDelay
+        }
+    }
+
     public struct MultipartFile: Sendable, Equatable {
         public let data: Foundation.Data
         public let filename: String
@@ -573,13 +663,17 @@ public final class OpenEnumAPIClient: Sendable {
     let requestContextHeaders: [String: String]
     public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?
     public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?
+    public let retry: RetryPolicy?
+    public let reconnect: ReconnectPolicy?
     let encoder: JSONEncoder
     let decoder: JSONDecoder
 
-    public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, requestContext: RequestContext = RequestContext(), requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil) {
+    public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, retry: RetryPolicy? = nil, reconnect: ReconnectPolicy? = nil, requestContext: RequestContext = RequestContext(), requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil) {
         self.baseURL = baseURL
         self.session = session
         self.timeout = timeout
+        self.retry = retry
+        self.reconnect = reconnect
         self.requestContextHeaders = requestContext.headerFields
         self.requestMiddleware = requestMiddleware
         self.responseMiddleware = responseMiddleware
@@ -785,9 +879,20 @@ public final class OpenEnumAPIClient: Sendable {
             public let users: [OpenEnumAPI.User]
             public let nextCursor: Double?
 
+            private enum CodingKeys: String, CodingKey {
+                case users
+                case nextCursor
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(users, forKey: .users)
+                try container.encode(nextCursor, forKey: .nextCursor)
+            }
+
             public init(
                 users: [OpenEnumAPI.User],
-                nextCursor: Double? = nil
+                nextCursor: Double?
             ) {
                 self.users = users
                 self.nextCursor = nextCursor
@@ -1034,6 +1139,61 @@ public final class OpenEnumAPIClient: Sendable {
             case unexpectedStatus(Int, Foundation.Data)
             case badRequest(OpenEnumAPI.ProblemDetails)
             case validationError(OpenEnumAPIClient.ValidationError)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
+    public enum UsersUpdatePreferences {
+
+        public struct Params: Sendable {
+            public let id: OpenEnumAPI.UserId
+
+            public init(id: OpenEnumAPI.UserId) {
+                self.id = id
+            }
+
+            public static func params(id: OpenEnumAPI.UserId) -> Self {
+                .init(id: id)
+            }
+        }
+
+        public struct Body: Sendable {
+            public let payload: OpenEnumAPI.UserPreferences
+
+            public init(payload: OpenEnumAPI.UserPreferences) {
+                self.payload = payload
+            }
+
+            public static func body(
+                timezone: String?,
+                locale: String? = nil,
+                signature: String? = nil,
+                mutedChannels: [OpenEnumAPI.MutedChannel]
+            ) -> Self {
+                .init(payload: OpenEnumAPI.UserPreferences(timezone: timezone, locale: locale, signature: signature, mutedChannels: mutedChannels))
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: OpenEnumAPI.UserPreferences
+
+            public init(body: OpenEnumAPI.UserPreferences) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case badRequest(OpenEnumAPIClient.ValidationError)
 
             public var isCancelled: Bool {
                 if case .cancelled = self { return true }
@@ -1476,6 +1636,40 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
+    public enum HealthReady {
+
+        public struct Response: Codable, Sendable, Equatable {
+            public let ready: Bool
+
+            public init(ready: Bool) {
+                self.ready = ready
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: Response
+
+            public init(body: Response) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+            case serviceUnavailable(OpenEnumAPI.ProblemDetails)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
     public enum HealthHistory {
 
         public struct ResponseItem: Codable, Sendable, Equatable {
@@ -1560,6 +1754,39 @@ public final class OpenEnumAPIClient: Sendable {
         }
     }
 
+    public enum NotificationsWatchNotifications {
+
+        public struct Message: Codable, Sendable, Equatable {
+            public let title: String
+
+            public init(title: String) {
+                self.title = title
+            }
+        }
+
+        public struct Result: Sendable {
+            public let body: AsyncThrowingStream<Message, Swift.Error>
+
+            public init(body: AsyncThrowingStream<Message, Swift.Error>) {
+                self.body = body
+            }
+        }
+
+        public enum Failure: Swift.Error, Sendable, KizunaDecodableFailure {
+            case requestFailed(Swift.Error)
+            case invalidRequest
+            case cancelled
+            case invalidResponse
+            case decoding(Swift.Error, statusCode: Int, data: Foundation.Data)
+            case unexpectedStatus(Int, Foundation.Data)
+
+            public var isCancelled: Bool {
+                if case .cancelled = self { return true }
+                return false
+            }
+        }
+    }
+
     public enum NotificationsListEvents {
 
         public struct Response: Codable, Sendable, Equatable {
@@ -1583,13 +1810,32 @@ public final class OpenEnumAPIClient: Sendable {
             public let tagIds: [String]?
             public let sessionId: String?
 
+            private enum CodingKeys: String, CodingKey {
+                case since
+                case kind
+                case ids
+                case label
+                case tagIds
+                case sessionId
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(since, forKey: .since)
+                try container.encode(kind, forKey: .kind)
+                try container.encode(ids, forKey: .ids)
+                try container.encode(label, forKey: .label)
+                try container.encode(tagIds, forKey: .tagIds)
+                try container.encode(sessionId, forKey: .sessionId)
+            }
+
             public init(
-                since: Date? = nil,
-                kind: OpenEnumAPI.EventKind? = nil,
-                ids: [String]? = nil,
-                label: String? = nil,
-                tagIds: [String]? = nil,
-                sessionId: String? = nil
+                since: Date?,
+                kind: OpenEnumAPI.EventKind?,
+                ids: [String]?,
+                label: String?,
+                tagIds: [String]?,
+                sessionId: String?
             ) {
                 self.since = since
                 self.kind = kind
@@ -3555,10 +3801,17 @@ public final class OpenEnumAPIClient: Sendable {
                 case userAgent
             }
 
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(ip, forKey: .ip)
+                try container.encode(`protocol`, forKey: .`protocol`)
+                try container.encode(userAgent, forKey: .userAgent)
+            }
+
             public init(
                 ip: String,
                 `protocol`: String,
-                userAgent: String? = nil
+                userAgent: String?
             ) {
                 self.ip = ip
                 self.`protocol` = `protocol`
@@ -3691,7 +3944,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersListUsers.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersListUsers.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.UsersListUsers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersListUsers.Failure.self)
@@ -3711,7 +3964,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersExportUsers.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersExportUsers.Failure.self)
         switch statusCode {
         case 200:
             let body = String(decoding: data, as: UTF8.self)
@@ -3729,7 +3982,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUserBadge.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUserBadge.Failure.self)
         switch statusCode {
         case 200:
             let body = data
@@ -3750,7 +4003,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersLastSessionEvent.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersLastSessionEvent.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPI.UserSessionEvent.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersLastSessionEvent.Failure.self)
@@ -3774,7 +4027,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersSearchUsers.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersSearchUsers.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.UsersSearchUsers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersSearchUsers.Failure.self)
@@ -3796,7 +4049,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         Kizuna.setHeader(&request, name: "x-request-id", value: headers.xRequestId)
-        let (data, statusCode, httpResponse) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersGetUser.Failure.self)
+        let (data, statusCode, httpResponse) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersGetUser.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPI.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersGetUser.Failure.self)
@@ -3819,7 +4072,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.UsersUserActivity.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserActivity.Failure.self)
@@ -3840,7 +4093,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPI.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUserProfile.Failure.self)
@@ -3862,7 +4115,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.UsersCreateUser.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersCreateUser.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersCreateUser.Failure.self)
         switch statusCode {
         case 201:
             let body = try Kizuna.decode(OpenEnumAPI.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersCreateUser.Failure.self)
@@ -3877,6 +4130,29 @@ public struct OpenEnumAPIUsersClient: Sendable {
         }
     }
 
+    /// Replace a user's preferences, exercises required nullable fields round-tripping through the clients
+    public func updatePreferences(_ params: OpenEnumAPIClient.UsersUpdatePreferences.Params, _ body: OpenEnumAPIClient.UsersUpdatePreferences.Body) async throws(OpenEnumAPIClient.UsersUpdatePreferences.Failure) -> OpenEnumAPIClient.UsersUpdatePreferences.Result {
+        var path = "/users/:id/preferences"
+        path = path.replacingOccurrences(of: ":id", with: Kizuna.encodePathSegment(params.id))
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.UsersUpdatePreferences.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "PUT"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.UsersUpdatePreferences.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUpdatePreferences.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPI.UserPreferences.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUpdatePreferences.Failure.self)
+            return OpenEnumAPIClient.UsersUpdatePreferences.Result(body: body)
+        case 400:
+            let payload = try Kizuna.decode(OpenEnumAPIClient.ValidationError.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUpdatePreferences.Failure.self)
+            throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.badRequest(payload)
+        default:
+            throw OpenEnumAPIClient.UsersUpdatePreferences.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
     /// Delete a user
     @available(*, deprecated, message: "use `archiveUser` instead")
     public func deleteUser(_ params: OpenEnumAPIClient.UsersDeleteUser.Params) async throws(OpenEnumAPIClient.UsersDeleteUser.Failure) -> OpenEnumAPIClient.UsersDeleteUser.Result {
@@ -3886,7 +4162,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersDeleteUser.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersDeleteUser.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.UsersDeleteUser.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersDeleteUser.Failure.self)
@@ -3907,7 +4183,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersArchiveUser.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersArchiveUser.Failure.self)
         switch statusCode {
         case 200:
             let payload = try Kizuna.decode(OpenEnumAPIClient.UsersArchiveUser.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersArchiveUser.Failure.self)
@@ -3932,7 +4208,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         multipart.appendField(name: "userId", value: String(describing: body.userId))
         request.httpBody = multipart.finalize()
         request.setValue(multipart.contentType, forHTTPHeaderField: "Content-Type")
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUploadAvatar.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersUploadAvatar.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.UsersUploadAvatar.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersUploadAvatar.Failure.self)
@@ -3953,7 +4229,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "POST"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersPingUser.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersPingUser.Failure.self)
         switch statusCode {
         case 204:
             return
@@ -3972,7 +4248,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersGetMyWork.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersGetMyWork.Failure.self)
         switch statusCode {
         case 200:
             let payload = try Kizuna.decode(OpenEnumAPIClient.UsersGetMyWork.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersGetMyWork.Failure.self)
@@ -3992,7 +4268,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "HEAD"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersCheckUser.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersCheckUser.Failure.self)
         switch statusCode {
         case 200:
             return
@@ -4011,7 +4287,7 @@ public struct OpenEnumAPIUsersClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "OPTIONS"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersDescribeUsers.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.UsersDescribeUsers.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.UsersDescribeUsers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.UsersDescribeUsers.Failure.self)
@@ -4036,7 +4312,7 @@ public struct OpenEnumAPIHealthClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.HealthCheck.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.HealthCheck.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.HealthCheck.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.HealthCheck.Failure.self)
@@ -4053,13 +4329,33 @@ public struct OpenEnumAPIHealthClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.HealthVersion.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.HealthVersion.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.HealthVersion.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.HealthVersion.Failure.self)
             return OpenEnumAPIClient.HealthVersion.Result(body: body)
         default:
             throw OpenEnumAPIClient.HealthVersion.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Readiness, answers 503 with Retry-After once while the server warms up, exercises client retries
+    public func ready() async throws(OpenEnumAPIClient.HealthReady.Failure) -> OpenEnumAPIClient.HealthReady.Result {
+        let path = "/health/ready"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.HealthReady.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.HealthReady.Failure.self)
+        switch statusCode {
+        case 200:
+            let body = try Kizuna.decode(OpenEnumAPIClient.HealthReady.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.HealthReady.Failure.self)
+            return OpenEnumAPIClient.HealthReady.Result(body: body)
+        case 503:
+            let payload = try Kizuna.decode(OpenEnumAPI.ProblemDetails.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.HealthReady.Failure.self)
+            throw OpenEnumAPIClient.HealthReady.Failure.serviceUnavailable(payload)
+        default:
+            throw OpenEnumAPIClient.HealthReady.Failure.unexpectedStatus(statusCode, data)
         }
     }
 
@@ -4070,7 +4366,7 @@ public struct OpenEnumAPIHealthClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.HealthHistory.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.HealthHistory.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode([OpenEnumAPIClient.HealthHistory.ResponseItem].self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.HealthHistory.Failure.self)
@@ -4097,7 +4393,7 @@ public struct OpenEnumAPINotificationsClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.NotificationsSendNotification.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NotificationsSendNotification.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NotificationsSendNotification.Failure.self)
         switch statusCode {
         case 202:
             let body = try Kizuna.decode(OpenEnumAPIClient.NotificationsSendNotification.Response202.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.NotificationsSendNotification.Failure.self)
@@ -4107,6 +4403,40 @@ public struct OpenEnumAPINotificationsClient: Sendable {
             throw OpenEnumAPIClient.NotificationsSendNotification.Failure.badRequest(payload)
         default:
             throw OpenEnumAPIClient.NotificationsSendNotification.Failure.unexpectedStatus(statusCode, data)
+        }
+    }
+
+    /// Watch notifications, drops a fresh connection after two to exercise resuming from Last-Event-ID
+    public func watchNotifications() async throws(OpenEnumAPIClient.NotificationsWatchNotifications.Failure) -> OpenEnumAPIClient.NotificationsWatchNotifications.Result {
+        let path = "/notifications/stream"
+        let url = try Kizuna.makeURL(baseURL: client.baseURL, path: path, queryItems: [], failure: OpenEnumAPIClient.NotificationsWatchNotifications.Failure.self)
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
+        request.httpMethod = "GET"
+        for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
+        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NotificationsWatchNotifications.Failure.self)
+        switch statusCode {
+        case 200:
+            let reopen: @Sendable (String) async throws -> URLSession.AsyncBytes? = { [request, session = client.session, retry = client.retry, requestMiddleware = client.requestMiddleware, responseMiddleware = client.responseMiddleware] lastEventId in
+                var again = request
+                if !lastEventId.isEmpty { again.setValue(lastEventId, forHTTPHeaderField: "Last-Event-ID") }
+                let reopened: (URLSession.AsyncBytes, Int, HTTPURLResponse)
+                do { reopened = try await Kizuna.open(&again, session: session, retry: retry, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: OpenEnumAPIClient.NotificationsWatchNotifications.Failure.self) }
+                catch let failure as OpenEnumAPIClient.NotificationsWatchNotifications.Failure {
+                    if case .requestFailed(let underlying) = failure { throw underlying }
+                    throw failure
+                }
+                if reopened.1 == 204 { return nil }
+                guard reopened.1 == 200 else { throw OpenEnumAPIClient.NotificationsWatchNotifications.Failure.unexpectedStatus(reopened.1, Foundation.Data()) }
+                guard reopened.2.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("text/event-stream") == true else { throw OpenEnumAPIClient.NotificationsWatchNotifications.Failure.invalidResponse }
+                return reopened.0
+            }
+            let body = Kizuna.events(bytes, using: client.decoder, reconnect: client.reconnect.map { Kizuna.Reconnection(policy: $0, reopen: reopen) }) { event, decoder -> OpenEnumAPIClient.NotificationsWatchNotifications.Message? in
+                try decoder.decode(OpenEnumAPIClient.NotificationsWatchNotifications.Message.self, from: Foundation.Data(event.data.utf8))
+            }
+            return OpenEnumAPIClient.NotificationsWatchNotifications.Result(body: body)
+        default:
+            let data = try await Kizuna.collect(bytes, failure: OpenEnumAPIClient.NotificationsWatchNotifications.Failure.self)
+            throw OpenEnumAPIClient.NotificationsWatchNotifications.Failure.unexpectedStatus(statusCode, data)
         }
     }
 
@@ -4123,7 +4453,7 @@ public struct OpenEnumAPINotificationsClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NotificationsListEvents.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NotificationsListEvents.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.NotificationsListEvents.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.NotificationsListEvents.Failure.self)
@@ -4145,7 +4475,7 @@ public struct OpenEnumAPINotificationsClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.NotificationsValidateConfig.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NotificationsValidateConfig.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NotificationsValidateConfig.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.NotificationsValidateConfig.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.NotificationsValidateConfig.Failure.self)
@@ -4171,7 +4501,7 @@ public struct OpenEnumAPINotificationsClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.NotificationsWebhook.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NotificationsWebhook.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NotificationsWebhook.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.NotificationsWebhook.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.NotificationsWebhook.Failure.self)
@@ -4199,7 +4529,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceGetWorkspace.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceGetWorkspace.Failure.self)
@@ -4222,7 +4552,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceDeleteWorkspace.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceDeleteWorkspace.Failure.self)
@@ -4247,7 +4577,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceTransfer.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceTransfer.Failure.self)
@@ -4273,7 +4603,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceMembersListMembers.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceMembersListMembers.Failure.self)
@@ -4298,7 +4628,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
         switch statusCode {
         case 201:
             let body = try Kizuna.decode(OpenEnumAPI.User.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceMembersInviteMember.Failure.self)
@@ -4328,7 +4658,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "DELETE"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceMembersCancelInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceMembersCancelInvite.Failure.self)
@@ -4355,7 +4685,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceInvitesGetInvite.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceInvitesGetInvite.Failure.self)
@@ -4384,7 +4714,7 @@ public struct OpenEnumAPIWorkspaceClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
         switch statusCode {
         case 201:
             let body = try Kizuna.decode(OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.WorkspaceInvitesAcceptInvite.Failure.self)
@@ -4423,7 +4753,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.AssistantReply.Failure.self)
-        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, failure: OpenEnumAPIClient.AssistantReply.Failure.self)
+        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantReply.Failure.self)
         switch statusCode {
         case 200:
             let body = Kizuna.events(bytes, using: client.decoder) { event, decoder -> OpenEnumAPIClient.AssistantReply.Event? in
@@ -4458,7 +4788,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.AssistantChat.Failure.self)
-        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, requestMiddleware: client.requestMiddleware, failure: OpenEnumAPIClient.AssistantChat.Failure.self)
+        let (bytes, statusCode, _) = try await Kizuna.open(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantChat.Failure.self)
         switch statusCode {
         case 200:
             let body = Kizuna.events(bytes, using: client.decoder) { event, decoder -> OpenEnumAPIClient.AssistantChat.Event? in
@@ -4501,7 +4831,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantToolsGetForecast.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantToolsGetForecast.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.AssistantToolsGetForecast.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.AssistantToolsGetForecast.Failure.self)
@@ -4523,7 +4853,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantToolsPlotSignups.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantToolsPlotSignups.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.AssistantToolsPlotSignups.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.AssistantToolsPlotSignups.Failure.self)
@@ -4545,7 +4875,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.AssistantToolsCountWords.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantToolsCountWords.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantToolsCountWords.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.AssistantToolsCountWords.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.AssistantToolsCountWords.Failure.self)
@@ -4565,7 +4895,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantNotesList.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantNotesList.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.AssistantNotesList.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.AssistantNotesList.Failure.self)
@@ -4590,7 +4920,7 @@ public struct OpenEnumAPIAssistantClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.AssistantNotesAdd.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantNotesAdd.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.AssistantNotesAdd.Failure.self)
         switch statusCode {
         case 201:
             let body = try Kizuna.decode(OpenEnumAPIClient.AssistantNotesAdd.Response201.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.AssistantNotesAdd.Failure.self)
@@ -4624,7 +4954,7 @@ public struct OpenEnumAPIDiagnosticsClient: Sendable {
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: client.timeout)
         request.httpMethod = "GET"
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.self)
         switch statusCode {
         case 200:
             let body = try Kizuna.decode(OpenEnumAPIClient.DiagnosticsWhoAmI.Response.self, from: data, using: client.decoder, statusCode: statusCode, failure: OpenEnumAPIClient.DiagnosticsWhoAmI.Failure.self)
@@ -4651,7 +4981,7 @@ public struct OpenEnumAPIContactClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.ContactSendMessage.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.ContactSendMessage.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.ContactSendMessage.Failure.self)
         switch statusCode {
         case 204:
             return
@@ -4680,7 +5010,7 @@ public struct OpenEnumAPINewsletterClient: Sendable {
         for (name, value) in client.requestContextHeaders { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         try Kizuna.encodeBody(&request, value: body.payload, using: client.encoder, failure: OpenEnumAPIClient.NewsletterSubscribe.Failure.self)
-        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NewsletterSubscribe.Failure.self)
+        let (data, statusCode, _) = try await Kizuna.send(&request, session: client.session, retry: client.retry, requestMiddleware: client.requestMiddleware, responseMiddleware: client.responseMiddleware, failure: OpenEnumAPIClient.NewsletterSubscribe.Failure.self)
         switch statusCode {
         case 204:
             return
@@ -4788,22 +5118,68 @@ private enum Kizuna {
         catch { throw Failure.requestFailed(error) }
     }
 
-    static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse) {
+    static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, retry: OpenEnumAPIClient.RetryPolicy?, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse) {
         if let requestMiddleware {
             do { try await requestMiddleware(&request) }
             catch is CancellationError { throw Failure.cancelled }
             catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
             catch { throw Failure.requestFailed(error) }
         }
-        let data: Foundation.Data
-        let response: URLResponse
-        do { (data, response) = try await session.data(for: request) }
-        catch is CancellationError { throw Failure.cancelled }
-        catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
-        catch { throw Failure.requestFailed(error) }
-        if let responseMiddleware { await responseMiddleware(request, data, response) }
-        guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }
-        return (data, httpResponse.statusCode, httpResponse)
+        let policy = retryPolicy(for: request, retry)
+        var attempt = 1
+        while true {
+            let data: Foundation.Data
+            let response: URLResponse
+            do { (data, response) = try await session.data(for: request) }
+            catch is CancellationError { throw Failure.cancelled }
+            catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
+            catch {
+                if let policy, let delay = retryDelay(policy, attempt: attempt, response: nil) {
+                    try await pause(delay, failure: Failure.self)
+                    attempt += 1
+                    continue
+                }
+                throw Failure.requestFailed(error)
+            }
+            if let responseMiddleware { await responseMiddleware(request, data, response) }
+            guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }
+            if let policy, let delay = retryDelay(policy, attempt: attempt, response: httpResponse) {
+                try await pause(delay, failure: Failure.self)
+                attempt += 1
+                continue
+            }
+            return (data, httpResponse.statusCode, httpResponse)
+        }
+    }
+
+    static func retryPolicy(for request: URLRequest, _ retry: OpenEnumAPIClient.RetryPolicy?) -> OpenEnumAPIClient.RetryPolicy? {
+        let idempotent = ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"].contains(request.httpMethod ?? "GET")
+        return idempotent && request.httpBodyStream == nil ? retry : nil
+    }
+
+    static func retryDelay(_ policy: OpenEnumAPIClient.RetryPolicy, attempt: Int, response: HTTPURLResponse?) -> TimeInterval? {
+        guard attempt < policy.maximumAttempts else { return nil }
+        let backoff = Double.random(in: 0...min(policy.maximumDelay, policy.initialDelay * pow(2, Double(attempt - 1))))
+        guard let response else { return backoff }
+        guard [429, 503].contains(response.statusCode) else { return nil }
+        guard let asked = retryAfter(response.value(forHTTPHeaderField: "Retry-After")) else { return backoff }
+        return asked <= policy.maximumDelay ? asked : nil
+    }
+
+    static func retryAfter(_ header: String?) -> TimeInterval? {
+        guard let value = header?.trimmingCharacters(in: .whitespaces) else { return nil }
+        if let seconds = Int(value), seconds >= 0 { return TimeInterval(seconds) }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = formatter.date(from: value) else { return nil }
+        return max(0, date.timeIntervalSinceNow)
+    }
+
+    static func pause<Failure: KizunaFailure>(_ seconds: TimeInterval, failure: Failure.Type) async throws(Failure) {
+        do { try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000)) }
+        catch { throw Failure.cancelled }
     }
 
     static func decode<Value: Decodable, Failure: KizunaDecodableFailure>(_ type: Value.Type, from data: Foundation.Data, using decoder: JSONDecoder, statusCode: Int, failure: Failure.Type) throws(Failure) -> Value {
@@ -4825,21 +5201,44 @@ private enum Kizuna {
         let retry: Int?
     }
 
-    static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse) {
+    struct Reconnection: Sendable {
+        let policy: OpenEnumAPIClient.ReconnectPolicy
+        let reopen: @Sendable (String) async throws -> URLSession.AsyncBytes?
+    }
+
+    static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, retry: OpenEnumAPIClient.RetryPolicy?, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse) {
         if let requestMiddleware {
             do { try await requestMiddleware(&request) }
             catch is CancellationError { throw Failure.cancelled }
             catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
             catch { throw Failure.requestFailed(error) }
         }
-        let bytes: URLSession.AsyncBytes
-        let response: URLResponse
-        do { (bytes, response) = try await session.bytes(for: request) }
-        catch is CancellationError { throw Failure.cancelled }
-        catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
-        catch { throw Failure.requestFailed(error) }
-        guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }
-        return (bytes, httpResponse.statusCode, httpResponse)
+        let policy = retryPolicy(for: request, retry)
+        var attempt = 1
+        while true {
+            let bytes: URLSession.AsyncBytes
+            let response: URLResponse
+            do { (bytes, response) = try await session.bytes(for: request) }
+            catch is CancellationError { throw Failure.cancelled }
+            catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }
+            catch {
+                if let policy, let delay = retryDelay(policy, attempt: attempt, response: nil) {
+                    try await pause(delay, failure: Failure.self)
+                    attempt += 1
+                    continue
+                }
+                throw Failure.requestFailed(error)
+            }
+            if let responseMiddleware { await responseMiddleware(request, Foundation.Data(), response) }
+            guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }
+            if let policy, let delay = retryDelay(policy, attempt: attempt, response: httpResponse) {
+                bytes.task.cancel()
+                try await pause(delay, failure: Failure.self)
+                attempt += 1
+                continue
+            }
+            return (bytes, httpResponse.statusCode, httpResponse)
+        }
     }
 
     static func collect<Failure: KizunaFailure>(_ bytes: URLSession.AsyncBytes, failure: Failure.Type) async throws(Failure) -> Foundation.Data {
@@ -4899,56 +5298,97 @@ private enum Kizuna {
         }
     }
 
-    static func serverSentEvents(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<ServerSentEvent, Swift.Error> {
+    static func serverSentEvents(_ first: URLSession.AsyncBytes, reconnect: Reconnection?) -> AsyncThrowingStream<ServerSentEvent, Swift.Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
-                var eventType = ""
-                var dataLines: [String] = []
                 var lastEventId = ""
-                var retry: Int? = nil
-                do {
-                    for try await line in lines(bytes) {
-                        if line.isEmpty {
-                            if !dataLines.isEmpty {
-                                continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))
-                                dataLines = []
-                                retry = nil
+                var reconnectionTime = reconnect?.policy.reconnectionTime ?? 3
+                var bytes: URLSession.AsyncBytes? = first
+                var attempts = 0
+                var failure: Swift.Error? = nil
+                while true {
+                    if let current = bytes {
+                        var eventType = ""
+                        var dataLines: [String] = []
+                        var pendingId = lastEventId
+                        var retry: Int? = nil
+                        var firstLine = true
+                        do {
+                            for try await received in lines(current) {
+                                let line = firstLine && received.hasPrefix("\u{FEFF}") ? String(received.dropFirst()) : received
+                                firstLine = false
+                                if line.isEmpty {
+                                    lastEventId = pendingId
+                                    if !dataLines.isEmpty {
+                                        continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))
+                                        attempts = 0
+                                        failure = nil
+                                        dataLines = []
+                                        retry = nil
+                                    }
+                                    eventType = ""
+                                    continue
+                                }
+                                if line.hasPrefix(":") { continue }
+                                let field: Substring
+                                var value: Substring
+                                if let separator = line.firstIndex(of: ":") {
+                                    field = line[..<separator]
+                                    value = line[line.index(after: separator)...]
+                                    if value.hasPrefix(" ") { value = value.dropFirst() }
+                                } else {
+                                    field = Substring(line)
+                                    value = ""
+                                }
+                                switch field {
+                                case "event": eventType = String(value)
+                                case "data": dataLines.append(String(value))
+                                case "id": if !value.contains("\0") { pendingId = String(value) }
+                                case "retry": if !value.isEmpty, value.allSatisfy({ $0.isASCII && $0.isNumber }), let milliseconds = Int(value) { retry = milliseconds; reconnectionTime = min(TimeInterval(milliseconds) / 1000, 3600) }
+                                default: break
+                                }
                             }
-                            eventType = ""
-                            continue
                         }
-                        if line.hasPrefix(":") { continue }
-                        let field: Substring
-                        var value: Substring
-                        if let separator = line.firstIndex(of: ":") {
-                            field = line[..<separator]
-                            value = line[line.index(after: separator)...]
-                            if value.hasPrefix(" ") { value = value.dropFirst() }
-                        } else {
-                            field = Substring(line)
-                            value = ""
-                        }
-                        switch field {
-                        case "event": eventType = String(value)
-                        case "data": dataLines.append(String(value))
-                        case "id": if !value.contains("\0") { lastEventId = String(value) }
-                        case "retry": if !value.isEmpty, value.allSatisfy(\.isNumber), let milliseconds = Int(value) { retry = milliseconds }
-                        default: break
-                        }
+                        catch { failure = error }
                     }
-                    continuation.finish()
+                    guard let reconnect, !Task.isCancelled, attempts < reconnect.policy.maximumAttempts else {
+                        continuation.finish(throwing: failure)
+                        return
+                    }
+                    attempts += 1
+                    let ceiling = min(reconnect.policy.maximumDelay, reconnectionTime * pow(2, Double(attempts - 1)))
+                    let delay = max(0, reconnectionTime) + Double.random(in: 0...max(0, ceiling - reconnectionTime))
+                    do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }
+                    catch {
+                        continuation.finish(throwing: failure)
+                        return
+                    }
+                    do {
+                        guard let reopened = try await reconnect.reopen(lastEventId) else {
+                            continuation.finish()
+                            return
+                        }
+                        bytes = reopened
+                    }
+                    catch let error as URLError {
+                        failure = error
+                        bytes = nil
+                    }
+                    catch {
+                        continuation.finish(throwing: error)
+                        return
+                    }
                 }
-                catch { continuation.finish(throwing: error) }
             }
             continuation.onTermination = { _ in task.cancel() }
         }
     }
 
-    static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error> {
+    static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, reconnect: Reconnection? = nil, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    for try await event in serverSentEvents(bytes) {
+                    for try await event in serverSentEvents(bytes, reconnect: reconnect) {
                         if let decoded = try decode(event, decoder) { continuation.yield(decoded) }
                     }
                     continuation.finish()

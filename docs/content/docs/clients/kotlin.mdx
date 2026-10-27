@@ -195,6 +195,23 @@ val user = client.users.getUser {
 Text(user.body.id.value)
 ```
 
+## Optional and null fields
+
+An `.optional()` or `.nullish()` field is a `String?` that defaults to `null` and is left out of the request. A `.nullable()` field is a `String?` with no default, sent as `null` when you pass `null`:
+
+```kotlin
+client.users.updatePreferences {
+    params(
+        id = userId,
+    ).body(
+        timezone = null,
+        mutedChannels = emptyList(),
+    )
+}
+```
+
+See [Optional and null fields](/docs/zod#optional-and-null-fields) for which to declare.
+
 ## Property naming
 
 By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type. A `@file:Suppress(...)` header keeps the IDE green over the generated file.
@@ -317,6 +334,19 @@ suspend fun deleteUser(build: APIClient.UsersDeleteUser.Scope.() -> APIClient.Us
 }
 ```
 
+## Retries
+
+A busy server answers `503` or `429` and says in `Retry-After` when to come back. Pass a `RetryPolicy` and the client waits that long and sends the request again:
+
+```kotlin title="Api.kt"
+val api = APIClient(
+    baseUrl = "https://api.example.com",
+    retry = APIClient.RetryPolicy(maximumAttempts = 3),
+)
+```
+
+Only `GET`, `HEAD`, `OPTIONS`, `PUT` and `DELETE` are retried, so a `POST` that fails is handed back rather than sent twice. A network error is retried too, and a cancelled coroutine never is. Without a `Retry-After` the client backs off from `initialDelay` (500 ms), and a `Retry-After` longer than `maximumDelay` (30 s) hands the response back.
+
 ## Streams
 
 A route whose response [streams](/docs/streaming) returns its `body` as a `Flow`. Named events become a sealed `Event` interface with one class per event, each carrying its decoded payload as `data`:
@@ -336,6 +366,15 @@ result.body.collect { event ->
 ```
 
 A stream of one schema yields that type directly, a `text/*` stream yields one `String` per line, and a binary stream yields `ByteArray` chunks. The status and headers are checked before the method returns, so a `400` throws its `Failure` as on any route. The connection is open when the method returns, so collect the flow; cancelling the collector closes it. A route that mixes a streamed status with another `2xx` is left out of the client, with a warning.
+
+Pass a `ReconnectPolicy` to reconnect an event stream whose connection drops. The client sends the id of the last event it received as `Last-Event-ID`, and the flow carries on. See [Resuming](/docs/streaming#resuming).
+
+```kotlin title="Api.kt"
+val api = APIClient(
+    baseUrl = "https://api.example.com",
+    reconnect = APIClient.ReconnectPolicy(),
+)
+```
 
 ## Keeping it current
 

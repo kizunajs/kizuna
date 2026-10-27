@@ -7,11 +7,11 @@ import {
     isBinarySchema,
     isVoidSchema,
     parsePath,
-    readDef,
     readDiscriminatedUnion,
     readDiscriminatorLiteral,
     readMeta,
     readMetaId,
+    readModelSchema,
     readObjectShape,
     globalRegistrySchemas,
     resolveResponseBody,
@@ -25,6 +25,7 @@ import {
     streamMode,
     streamContentType,
     cacheHeaders,
+    encodeForWire,
 } from 'kizunajs/generator';
 import { getStatusText } from 'kizunajs';
 import type { ApiDefinition, RequiredPermissions, SecurityRequirement } from 'kizunajs';
@@ -145,28 +146,17 @@ const buildDiscriminatorBlock = (
 };
 
 /**
- * What the wire carries for a type JSON Schema has no keyword for, which
- * `unrepresentable: 'any'` would otherwise leave as an empty schema.
- */
-const JSON_ENCODING: Record<string, Record<string, unknown>> = {
-    date: {
-        type: 'string',
-        format: 'date-time',
-    },
-    bigint: {
-        type: 'string',
-    },
-};
-
-/**
  * kizuna's metadata widens JSON Schema: `deprecated` may carry a message,
  * `example` holds one value or several, and `brand` has no keyword. Emit
  * `deprecated: true`, an `examples` array and `x-kizuna-brand`; the message
- * stays in outputs with a place for it, like Swift's `@available`.
+ * stays in outputs with a place for it, like Swift's `@available`. `id` names
+ * the component, so it is dropped.
  */
 const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; jsonSchema: Record<string, unknown> }): void => {
-    const encoding = JSON_ENCODING[readDef(zodSchema).type ?? ''];
-    if (encoding && Object.keys(jsonSchema).length === 0) Object.assign(jsonSchema, encoding);
+    encodeForWire({
+        zodSchema,
+        jsonSchema,
+    });
 
     if (typeof jsonSchema.deprecated === 'string') jsonSchema.deprecated = true;
     if ('example' in jsonSchema) {
@@ -179,10 +169,11 @@ const normalizeMeta = ({ zodSchema, jsonSchema }: { zodSchema: z.core.$ZodType; 
         jsonSchema['x-kizuna-brand'] = jsonSchema.brand;
         delete jsonSchema.brand;
     }
+    delete jsonSchema.id;
 };
 
 const toJsonSchema = (schema: z.ZodType, io: 'input' | 'output' = 'output'): Record<string, unknown> => {
-    const id = readMetaId(schema);
+    const id = readModelSchema(schema) === schema ? readMetaId(schema) : undefined;
     if (id) {
         return {
             $ref: COMPONENT_REF_BASE + id,
@@ -331,6 +322,24 @@ const openApiWalk = (options: GeneratorContext, api: ApiDefinition): GeneratorWa
                         schema: valueSchema,
                     });
                 }
+            }
+
+            const streamsEvents = Object.values(route.responses).some(
+                (response) => isStreamResponse(response) && streamContentType(response) === 'text/event-stream'
+            );
+            const declaresLastEventId = parameters.some(
+                (parameter) => parameter.in === 'header' && parameter.name.toLowerCase() === 'last-event-id'
+            );
+            if (streamsEvents && !declaresLastEventId) {
+                parameters.push({
+                    name: 'Last-Event-ID',
+                    in: 'header',
+                    required: false,
+                    description: 'The id of the last event received, to resume a dropped stream after it',
+                    schema: {
+                        type: 'string',
+                    },
+                });
             }
 
             if (parameters.length > 0) operation.parameters = parameters;

@@ -173,6 +173,22 @@ let user = try await client.users.getUser(
 Text(user.body.id.rawValue)
 ```
 
+## Optional and null fields
+
+An `.optional()` or `.nullish()` field is a `String?` that defaults to `nil` and is left out of the request. A `.nullable()` field is a `String?` with no default, sent as `null` when you pass `nil`:
+
+```swift
+try await client.users.updatePreferences(
+    .params(id: userID),
+    .body(
+        timezone: nil,
+        mutedChannels: []
+    )
+)
+```
+
+See [Optional and null fields](/docs/zod#optional-and-null-fields) for which to declare.
+
 ## Property naming
 
 By default, field names are emitted verbatim, so `total_count` on the wire stays `total_count` in the generated type.
@@ -238,6 +254,19 @@ public func deleteUser(_ params: APIClient.DeleteUser.Params) async throws(APICl
 }
 ```
 
+## Retries
+
+A busy server answers `503` or `429` and says in `Retry-After` when to come back. Pass a `RetryPolicy` and the client waits that long and sends the request again:
+
+```swift title="API.swift"
+let api = APIClient(
+    baseURL: URL(string: "https://api.example.com")!,
+    retry: APIClient.RetryPolicy(maximumAttempts: 3)
+)
+```
+
+Only `GET`, `HEAD`, `OPTIONS`, `PUT` and `DELETE` are retried, so a `POST` that fails is handed back rather than sent twice. A network error is retried too, and a cancelled task never is. Without a `Retry-After` the client backs off from `initialDelay` (0.5 s), and a `Retry-After` longer than `maximumDelay` (30 s) hands the response back.
+
 ## Streams
 
 A route whose response [streams](/docs/streaming) returns its `body` as an `AsyncThrowingStream`. Named events become an `Event` enum with one case per event, each carrying its decoded payload:
@@ -255,6 +284,15 @@ for try await event in result.body {
 ```
 
 A stream of one schema yields that type directly, a `text/*` stream yields one `String` per line, and a binary stream yields `Data` chunks. The status and headers are checked before the method returns, so a `400` throws its `Failure` as on any route. Cancelling the task that reads the stream closes the connection. A route that mixes a streamed status with another `2xx` is left out of the client, with a warning.
+
+Pass a `ReconnectPolicy` to reconnect an event stream whose connection drops. The client sends the id of the last event it received as `Last-Event-ID`, and the loop reading `result.body` carries on. See [Resuming](/docs/streaming#resuming).
+
+```swift title="API.swift"
+let api = APIClient(
+    baseURL: URL(string: "https://api.example.com")!,
+    reconnect: APIClient.ReconnectPolicy()
+)
+```
 
 ## Keeping it current
 

@@ -8,6 +8,9 @@ import styles from '../subpage.module.css';
 export const metadata: Metadata = {
     title: 'FAQ',
     description: 'Answers to common questions about Kizuna.js.',
+    alternates: {
+        canonical: '/faq',
+    },
 };
 
 export default function FaqPage() {

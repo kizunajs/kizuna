@@ -33,6 +33,7 @@ import {
     TypeRegistry,
     mapType,
     collectObjectFields,
+    hasDefault,
     objectFieldCount,
     objectShapeKeys,
     type SwiftBrand,
@@ -471,6 +472,11 @@ const sanitizeEnumCaseName = (value: string): string => {
     return /^[0-9]/.test(camel) ? `_${camel}` : camel;
 };
 
+const defaultArgument = (field: SwiftField): string => {
+    if (!hasDefault(field)) return '';
+    return ' = nil';
+};
+
 const optionalize = (type: string, optional: boolean): string => {
     if (!optional) return type;
     return type.endsWith('?') ? type : `${type}?`;
@@ -494,7 +500,7 @@ const emitNamedFactory = (
     }
     const params = fields.map((field) => {
         const typeExpression = optionalize(field.type, field.optional);
-        const defaultPart = field.optional ? ' = nil' : '';
+        const defaultPart = defaultArgument(field);
         return `${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
     });
     const args = fields.map((field) => `${field.name}: ${escapeKeyword(field.name)}`).join(', ');
@@ -524,7 +530,7 @@ const emitMemberwiseInit = (
     }
     const params = fields.map((field) => {
         const typeExpression = optionalize(field.type, field.optional);
-        const defaultPart = field.optional ? ' = nil' : '';
+        const defaultPart = defaultArgument(field);
         return `${escapeKeyword(field.name)}: ${typeExpression}${defaultPart}`;
     });
     if (params.length === 1) {
@@ -732,9 +738,13 @@ const emitStruct = (
         type: resolveOwnedType(field.type),
     }));
 
+    const needsEncode = !hasFile && type.fields.some((field) => field.requiredNullable === true);
     const needsCodingKeys =
-        !hasFile &&
-        type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name) || field.deprecated === true);
+        needsEncode ||
+        (!hasFile &&
+            type.fields.some((field) => field.name !== field.wireName || SWIFT_KEYWORDS.has(field.name) || field.deprecated === true));
+    const storageName = (field: SwiftField): string =>
+        field.deprecated ? deprecatedStorageName(field, type.fields) : escapeKeyword(field.name);
     writer.block(`public struct ${type.name}: ${conformances}`, () => {
         emitOwnedTypes(writer, lookupName, context, ownedTypeMap, ownedTypeLookup);
         for (const field of type.fields) {
@@ -763,10 +773,18 @@ const emitStruct = (
                 }
             });
         }
+        if (needsEncode) {
+            writer.blank();
+            writer.block('public func encode(to encoder: Encoder) throws', () => {
+                writer.line('var container = encoder.container(keyedBy: CodingKeys.self)');
+                for (const field of type.fields) {
+                    const encodeCall = field.optional && field.requiredNullable !== true ? 'encodeIfPresent' : 'encode';
+                    writer.line(`try container.${encodeCall}(${storageName(field)}, forKey: .${storageName(field)})`);
+                }
+            });
+        }
         writer.blank();
-        emitMemberwiseInit(writer, adjustedFields, (field) =>
-            field.deprecated ? deprecatedStorageName(field, type.fields) : escapeKeyword(field.name)
-        );
+        emitMemberwiseInit(writer, adjustedFields, storageName);
     });
 };
 
@@ -823,7 +841,7 @@ const emitDiscriminatedEnum = (
             const valueFields = payloadStruct.fields.filter((field) => !isDiscriminator(field));
             const factoryParams = valueFields
                 .map((field) => {
-                    const defaultPart = field.optional ? ' = nil' : '';
+                    const defaultPart = defaultArgument(field);
                     const relative = ownedTypeMap && relativeOwnedPath(field.type, ownedTypeMap, lookupName);
                     const fieldType = relative ?? resolveType(field.type, undefined, context);
                     return `${escapeKeyword(field.name)}: ${optionalize(fieldType, field.optional)}${defaultPart}`;
@@ -1308,7 +1326,7 @@ const closure = (writer: SwiftWriter, opener: string, body: () => void): void =>
     writer.line('}');
 };
 
-const emitKizunaStreaming = (writer: SwiftWriter): void => {
+const emitKizunaStreaming = (writer: SwiftWriter, clientName: string): void => {
     writer.blank();
     writer.block('struct ServerSentEvent: Sendable', () => {
         writer.line('let event: String?');
@@ -1317,8 +1335,13 @@ const emitKizunaStreaming = (writer: SwiftWriter): void => {
         writer.line('let retry: Int?');
     });
     writer.blank();
+    writer.block('struct Reconnection: Sendable', () => {
+        writer.line(`let policy: ${clientName}.ReconnectPolicy`);
+        writer.line('let reopen: @Sendable (String) async throws -> URLSession.AsyncBytes?');
+    });
+    writer.blank();
     writer.block(
-        'static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse)',
+        `static func open<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, retry: ${clientName}.RetryPolicy?, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (URLSession.AsyncBytes, Int, HTTPURLResponse)`,
         () => {
             writer.line('if let requestMiddleware {');
             writer.line('    do { try await requestMiddleware(&request) }');
@@ -1326,14 +1349,33 @@ const emitKizunaStreaming = (writer: SwiftWriter): void => {
             writer.line('    catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
             writer.line('    catch { throw Failure.requestFailed(error) }');
             writer.line('}');
-            writer.line('let bytes: URLSession.AsyncBytes');
-            writer.line('let response: URLResponse');
-            writer.line('do { (bytes, response) = try await session.bytes(for: request) }');
-            writer.line('catch is CancellationError { throw Failure.cancelled }');
-            writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
-            writer.line('catch { throw Failure.requestFailed(error) }');
-            writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
-            writer.line('return (bytes, httpResponse.statusCode, httpResponse)');
+            writer.line('let policy = retryPolicy(for: request, retry)');
+            writer.line('var attempt = 1');
+            writer.block('while true', () => {
+                writer.line('let bytes: URLSession.AsyncBytes');
+                writer.line('let response: URLResponse');
+                writer.line('do { (bytes, response) = try await session.bytes(for: request) }');
+                writer.line('catch is CancellationError { throw Failure.cancelled }');
+                writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
+                writer.line('catch {');
+                writer.line('    if let policy, let delay = retryDelay(policy, attempt: attempt, response: nil) {');
+                writer.line('        try await pause(delay, failure: Failure.self)');
+                writer.line('        attempt += 1');
+                writer.line('        continue');
+                writer.line('    }');
+                writer.line('    throw Failure.requestFailed(error)');
+                writer.line('}');
+                // A stream's body is read as it arrives, so the middleware sees the response with an empty body.
+                writer.line('if let responseMiddleware { await responseMiddleware(request, Foundation.Data(), response) }');
+                writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
+                writer.line('if let policy, let delay = retryDelay(policy, attempt: attempt, response: httpResponse) {');
+                writer.line('    bytes.task.cancel()');
+                writer.line('    try await pause(delay, failure: Failure.self)');
+                writer.line('    attempt += 1');
+                writer.line('    continue');
+                writer.line('}');
+                writer.line('return (bytes, httpResponse.statusCode, httpResponse)');
+            });
         }
     );
     writer.blank();
@@ -1399,51 +1441,94 @@ const emitKizunaStreaming = (writer: SwiftWriter): void => {
     });
     writer.blank();
     writer.block(
-        'static func serverSentEvents(_ bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<ServerSentEvent, Swift.Error>',
+        'static func serverSentEvents(_ first: URLSession.AsyncBytes, reconnect: Reconnection?) -> AsyncThrowingStream<ServerSentEvent, Swift.Error>',
         () => {
             closure(writer, 'AsyncThrowingStream { continuation in', () => {
                 writer.block('let task = Task', () => {
-                    writer.line('var eventType = ""');
-                    writer.line('var dataLines: [String] = []');
                     writer.line('var lastEventId = ""');
-                    writer.line('var retry: Int? = nil');
-                    writer.block('do', () => {
-                        writer.block('for try await line in lines(bytes)', () => {
-                            writer.line('if line.isEmpty {');
-                            writer.line('    if !dataLines.isEmpty {');
-                            writer.line(
-                                '        continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))'
-                            );
-                            writer.line('        dataLines = []');
-                            writer.line('        retry = nil');
-                            writer.line('    }');
-                            writer.line('    eventType = ""');
-                            writer.line('    continue');
-                            writer.line('}');
-                            writer.line('if line.hasPrefix(":") { continue }');
-                            writer.line('let field: Substring');
-                            writer.line('var value: Substring');
-                            writer.line('if let separator = line.firstIndex(of: ":") {');
-                            writer.line('    field = line[..<separator]');
-                            writer.line('    value = line[line.index(after: separator)...]');
-                            writer.line('    if value.hasPrefix(" ") { value = value.dropFirst() }');
-                            writer.line('} else {');
-                            writer.line('    field = Substring(line)');
-                            writer.line('    value = ""');
-                            writer.line('}');
-                            writer.line('switch field {');
-                            writer.line('case "event": eventType = String(value)');
-                            writer.line('case "data": dataLines.append(String(value))');
-                            writer.line('case "id": if !value.contains("\\0") { lastEventId = String(value) }');
-                            writer.line(
-                                'case "retry": if !value.isEmpty, value.allSatisfy(\\.isNumber), let milliseconds = Int(value) { retry = milliseconds }'
-                            );
-                            writer.line('default: break');
-                            writer.line('}');
+                    writer.line('var reconnectionTime = reconnect?.policy.reconnectionTime ?? 3');
+                    writer.line('var bytes: URLSession.AsyncBytes? = first');
+                    writer.line('var attempts = 0');
+                    writer.line('var failure: Swift.Error? = nil');
+                    writer.block('while true', () => {
+                        writer.block('if let current = bytes', () => {
+                            writer.line('var eventType = ""');
+                            writer.line('var dataLines: [String] = []');
+                            writer.line('var pendingId = lastEventId');
+                            writer.line('var retry: Int? = nil');
+                            writer.line('var firstLine = true');
+                            writer.block('do', () => {
+                                writer.block('for try await received in lines(current)', () => {
+                                    writer.line(
+                                        'let line = firstLine && received.hasPrefix("\\u{FEFF}") ? String(received.dropFirst()) : received'
+                                    );
+                                    writer.line('firstLine = false');
+                                    writer.line('if line.isEmpty {');
+                                    writer.line('    lastEventId = pendingId');
+                                    writer.line('    if !dataLines.isEmpty {');
+                                    writer.line(
+                                        '        continuation.yield(ServerSentEvent(event: eventType.isEmpty ? nil : eventType, data: dataLines.joined(separator: "\\n"), id: lastEventId.isEmpty ? nil : lastEventId, retry: retry))'
+                                    );
+                                    writer.line('        attempts = 0');
+                                    writer.line('        failure = nil');
+                                    writer.line('        dataLines = []');
+                                    writer.line('        retry = nil');
+                                    writer.line('    }');
+                                    writer.line('    eventType = ""');
+                                    writer.line('    continue');
+                                    writer.line('}');
+                                    writer.line('if line.hasPrefix(":") { continue }');
+                                    writer.line('let field: Substring');
+                                    writer.line('var value: Substring');
+                                    writer.line('if let separator = line.firstIndex(of: ":") {');
+                                    writer.line('    field = line[..<separator]');
+                                    writer.line('    value = line[line.index(after: separator)...]');
+                                    writer.line('    if value.hasPrefix(" ") { value = value.dropFirst() }');
+                                    writer.line('} else {');
+                                    writer.line('    field = Substring(line)');
+                                    writer.line('    value = ""');
+                                    writer.line('}');
+                                    writer.line('switch field {');
+                                    writer.line('case "event": eventType = String(value)');
+                                    writer.line('case "data": dataLines.append(String(value))');
+                                    writer.line('case "id": if !value.contains("\\0") { pendingId = String(value) }');
+                                    writer.line(
+                                        'case "retry": if !value.isEmpty, value.allSatisfy({ $0.isASCII && $0.isNumber }), let milliseconds = Int(value) { retry = milliseconds; reconnectionTime = min(TimeInterval(milliseconds) / 1000, 3600) }'
+                                    );
+                                    writer.line('default: break');
+                                    writer.line('}');
+                                });
+                            });
+                            writer.line('catch { failure = error }');
                         });
-                        writer.line('continuation.finish()');
+                        writer.line('guard let reconnect, !Task.isCancelled, attempts < reconnect.policy.maximumAttempts else {');
+                        writer.line('    continuation.finish(throwing: failure)');
+                        writer.line('    return');
+                        writer.line('}');
+                        writer.line('attempts += 1');
+                        writer.line('let ceiling = min(reconnect.policy.maximumDelay, reconnectionTime * pow(2, Double(attempts - 1)))');
+                        writer.line('let delay = max(0, reconnectionTime) + Double.random(in: 0...max(0, ceiling - reconnectionTime))');
+                        writer.line('do { try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000)) }');
+                        writer.line('catch {');
+                        writer.line('    continuation.finish(throwing: failure)');
+                        writer.line('    return');
+                        writer.line('}');
+                        writer.block('do', () => {
+                            writer.line('guard let reopened = try await reconnect.reopen(lastEventId) else {');
+                            writer.line('    continuation.finish()');
+                            writer.line('    return');
+                            writer.line('}');
+                            writer.line('bytes = reopened');
+                        });
+                        writer.block('catch let error as URLError', () => {
+                            writer.line('failure = error');
+                            writer.line('bytes = nil');
+                        });
+                        writer.block('catch', () => {
+                            writer.line('continuation.finish(throwing: error)');
+                            writer.line('return');
+                        });
                     });
-                    writer.line('catch { continuation.finish(throwing: error) }');
                 });
                 writer.line('continuation.onTermination = { _ in task.cancel() }');
             });
@@ -1451,12 +1536,12 @@ const emitKizunaStreaming = (writer: SwiftWriter): void => {
     );
     writer.blank();
     writer.block(
-        'static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error>',
+        'static func events<Event: Sendable>(_ bytes: URLSession.AsyncBytes, using decoder: JSONDecoder, reconnect: Reconnection? = nil, _ decode: @escaping @Sendable (ServerSentEvent, JSONDecoder) throws -> Event?) -> AsyncThrowingStream<Event, Swift.Error>',
         () => {
             closure(writer, 'AsyncThrowingStream { continuation in', () => {
                 writer.block('let task = Task', () => {
                     writer.block('do', () => {
-                        writer.block('for try await event in serverSentEvents(bytes)', () => {
+                        writer.block('for try await event in serverSentEvents(bytes, reconnect: reconnect)', () => {
                             writer.line('if let decoded = try decode(event, decoder) { continuation.yield(decoded) }');
                         });
                         writer.line('continuation.finish()');
@@ -1565,7 +1650,7 @@ const emitKizunaNamespace = (
         );
         writer.blank();
         writer.block(
-            'static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse)',
+            `static func send<Failure: KizunaFailure>(_ request: inout URLRequest, session: URLSession, retry: ${options.clientName}.RetryPolicy?, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?, failure: Failure.Type) async throws(Failure) -> (Foundation.Data, Int, HTTPURLResponse)`,
             () => {
                 writer.line('if let requestMiddleware {');
                 writer.line('    do { try await requestMiddleware(&request) }');
@@ -1573,15 +1658,72 @@ const emitKizunaNamespace = (
                 writer.line('    catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
                 writer.line('    catch { throw Failure.requestFailed(error) }');
                 writer.line('}');
-                writer.line('let data: Foundation.Data');
-                writer.line('let response: URLResponse');
-                writer.line('do { (data, response) = try await session.data(for: request) }');
-                writer.line('catch is CancellationError { throw Failure.cancelled }');
-                writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
-                writer.line('catch { throw Failure.requestFailed(error) }');
-                writer.line('if let responseMiddleware { await responseMiddleware(request, data, response) }');
-                writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
-                writer.line('return (data, httpResponse.statusCode, httpResponse)');
+                writer.line('let policy = retryPolicy(for: request, retry)');
+                writer.line('var attempt = 1');
+                writer.block('while true', () => {
+                    writer.line('let data: Foundation.Data');
+                    writer.line('let response: URLResponse');
+                    writer.line('do { (data, response) = try await session.data(for: request) }');
+                    writer.line('catch is CancellationError { throw Failure.cancelled }');
+                    writer.line('catch let error as URLError where error.code == .cancelled { throw Failure.cancelled }');
+                    writer.line('catch {');
+                    writer.line('    if let policy, let delay = retryDelay(policy, attempt: attempt, response: nil) {');
+                    writer.line('        try await pause(delay, failure: Failure.self)');
+                    writer.line('        attempt += 1');
+                    writer.line('        continue');
+                    writer.line('    }');
+                    writer.line('    throw Failure.requestFailed(error)');
+                    writer.line('}');
+                    writer.line('if let responseMiddleware { await responseMiddleware(request, data, response) }');
+                    writer.line('guard let httpResponse = response as? HTTPURLResponse else { throw Failure.invalidResponse }');
+                    writer.line('if let policy, let delay = retryDelay(policy, attempt: attempt, response: httpResponse) {');
+                    writer.line('    try await pause(delay, failure: Failure.self)');
+                    writer.line('    attempt += 1');
+                    writer.line('    continue');
+                    writer.line('}');
+                    writer.line('return (data, httpResponse.statusCode, httpResponse)');
+                });
+            }
+        );
+        writer.blank();
+        writer.block(
+            `static func retryPolicy(for request: URLRequest, _ retry: ${options.clientName}.RetryPolicy?) -> ${options.clientName}.RetryPolicy?`,
+            () => {
+                writer.line('let idempotent = ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"].contains(request.httpMethod ?? "GET")');
+                writer.line('return idempotent && request.httpBodyStream == nil ? retry : nil');
+            }
+        );
+        writer.blank();
+        writer.block(
+            `static func retryDelay(_ policy: ${options.clientName}.RetryPolicy, attempt: Int, response: HTTPURLResponse?) -> TimeInterval?`,
+            () => {
+                writer.line('guard attempt < policy.maximumAttempts else { return nil }');
+                writer.line(
+                    'let backoff = Double.random(in: 0...min(policy.maximumDelay, policy.initialDelay * pow(2, Double(attempt - 1))))'
+                );
+                writer.line('guard let response else { return backoff }');
+                writer.line('guard [429, 503].contains(response.statusCode) else { return nil }');
+                writer.line('guard let asked = retryAfter(response.value(forHTTPHeaderField: "Retry-After")) else { return backoff }');
+                writer.line('return asked <= policy.maximumDelay ? asked : nil');
+            }
+        );
+        writer.blank();
+        writer.block('static func retryAfter(_ header: String?) -> TimeInterval?', () => {
+            writer.line('guard let value = header?.trimmingCharacters(in: .whitespaces) else { return nil }');
+            writer.line('if let seconds = Int(value), seconds >= 0 { return TimeInterval(seconds) }');
+            writer.line('let formatter = DateFormatter()');
+            writer.line('formatter.locale = Locale(identifier: "en_US_POSIX")');
+            writer.line('formatter.timeZone = TimeZone(identifier: "GMT")');
+            writer.line('formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"');
+            writer.line('guard let date = formatter.date(from: value) else { return nil }');
+            writer.line('return max(0, date.timeIntervalSinceNow)');
+        });
+        writer.blank();
+        writer.block(
+            'static func pause<Failure: KizunaFailure>(_ seconds: TimeInterval, failure: Failure.Type) async throws(Failure)',
+            () => {
+                writer.line('do { try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000)) }');
+                writer.line('catch { throw Failure.cancelled }');
             }
         );
         writer.blank();
@@ -1608,7 +1750,7 @@ const emitKizunaNamespace = (
                 }
             );
         }
-        if (options.streaming) emitKizunaStreaming(writer);
+        if (options.streaming) emitKizunaStreaming(writer, options.clientName);
         if (options.multipart) {
             writer.blank();
             writer.block('struct MultipartBuilder', () => {
@@ -1698,7 +1840,7 @@ const methodGroups = (method: RouteMethod, context: EmitContext): MethodGroup[] 
             varName: 'query',
             type: groupTypeRef(operationName, 'Query', context),
             factory: 'query',
-            required: method.query.some((field) => !field.optional),
+            required: method.query.some((field) => !hasDefault(field)),
         });
     }
     if (method.headers.length > 0) {
@@ -1706,7 +1848,7 @@ const methodGroups = (method: RouteMethod, context: EmitContext): MethodGroup[] 
             varName: 'headers',
             type: groupTypeRef(operationName, 'Headers', context),
             factory: 'headers',
-            required: method.headers.some((field) => !field.optional),
+            required: method.headers.some((field) => !hasDefault(field)),
         });
     }
 
@@ -1799,7 +1941,7 @@ const emitMethodBody = (writer: SwiftWriter, method: RouteMethod, context: EmitC
         return;
     }
     writer.line(
-        `let (data, statusCode, ${responseBinding}) = try await Kizuna.send(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
+        `let (data, statusCode, ${responseBinding}) = try await Kizuna.send(&request, session: ${receiver}session, retry: ${receiver}retry, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
     );
 
     writer.line('switch statusCode {');
@@ -1910,6 +2052,39 @@ const emitErrorCases = (writer: SwiftWriter, method: RouteMethod, context: EmitC
     }
 };
 
+const IDEMPOTENT_METHODS: ReadonlySet<string> = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
+
+/**
+ * Writes the closure that reopens an event stream and returns the argument handing it to `Kizuna.events`, or nothing
+ * for a method a client may not resend.
+ */
+const emitReopen = (writer: SwiftWriter, method: RouteMethod, receiver: string, failure: string, status: number): string => {
+    if (!IDEMPOTENT_METHODS.has(method.method)) return '';
+    closure(
+        writer,
+        `let reopen: @Sendable (String) async throws -> URLSession.AsyncBytes? = { [request, session = ${receiver}session, retry = ${receiver}retry, requestMiddleware = ${receiver}requestMiddleware, responseMiddleware = ${receiver}responseMiddleware] lastEventId in`,
+        () => {
+            writer.line('var again = request');
+            writer.line('if !lastEventId.isEmpty { again.setValue(lastEventId, forHTTPHeaderField: "Last-Event-ID") }');
+            writer.line('let reopened: (URLSession.AsyncBytes, Int, HTTPURLResponse)');
+            writer.line(
+                `do { reopened = try await Kizuna.open(&again, session: session, retry: retry, requestMiddleware: requestMiddleware, responseMiddleware: responseMiddleware, failure: ${failure}.self) }`
+            );
+            writer.line(`catch let failure as ${failure} {`);
+            writer.line('    if case .requestFailed(let underlying) = failure { throw underlying }');
+            writer.line('    throw failure');
+            writer.line('}');
+            writer.line('if reopened.1 == 204 { return nil }');
+            writer.line(`guard reopened.1 == ${status} else { throw ${failure}.unexpectedStatus(reopened.1, Foundation.Data()) }`);
+            writer.line(
+                `guard reopened.2.value(forHTTPHeaderField: "Content-Type")?.lowercased().hasPrefix("text/event-stream") == true else { throw ${failure}.invalidResponse }`
+            );
+            writer.line('return reopened.0');
+        }
+    );
+    return `, reconnect: ${receiver}reconnect.map { Kizuna.Reconnection(policy: $0, reopen: reopen) }`;
+};
+
 const emitStreamMethodTail = (
     writer: SwiftWriter,
     method: RouteMethod,
@@ -1924,7 +2099,7 @@ const emitStreamMethodTail = (
     const hasHeaders = method.resultHeaderFields.length > 0;
     const collect = `let data = try await Kizuna.collect(bytes, failure: ${failure}.self)`;
     writer.line(
-        `let (bytes, statusCode, ${responseBinding}) = try await Kizuna.open(&request, session: ${receiver}session, requestMiddleware: ${receiver}requestMiddleware, failure: ${failure}.self)`
+        `let (bytes, statusCode, ${responseBinding}) = try await Kizuna.open(&request, session: ${receiver}session, retry: ${receiver}retry, requestMiddleware: ${receiver}requestMiddleware, responseMiddleware: ${receiver}responseMiddleware, failure: ${failure}.self)`
     );
     writer.line('switch statusCode {');
     writer.line(`case ${stream.status}:`);
@@ -1936,22 +2111,32 @@ const emitStreamMethodTail = (
         } else if (stream.events) {
             const events = stream.events;
             const elementType = streamElementType(method, context, 'actor');
-            closure(writer, `let body = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
-                writer.line('switch event.event {');
-                for (const event of events) {
-                    const payloadType = resolveType(event.type, method.operationName, context);
-                    writer.line(
-                        `case ${stringLiteral(event.name)}: return .${escapeKeyword(event.caseName)}(try decoder.decode(${payloadType}.self, from: Foundation.Data(event.data.utf8)))`
-                    );
+            const reconnect = emitReopen(writer, method, receiver, failure, stream.status);
+            closure(
+                writer,
+                `let body = Kizuna.events(bytes, using: ${receiver}decoder${reconnect}) { event, decoder -> ${elementType}? in`,
+                () => {
+                    writer.line('switch event.event {');
+                    for (const event of events) {
+                        const payloadType = resolveType(event.type, method.operationName, context);
+                        writer.line(
+                            `case ${stringLiteral(event.name)}: return .${escapeKeyword(event.caseName)}(try decoder.decode(${payloadType}.self, from: Foundation.Data(event.data.utf8)))`
+                        );
+                    }
+                    writer.line('default: return nil');
+                    writer.line('}');
                 }
-                writer.line('default: return nil');
-                writer.line('}');
-            });
+            );
         } else {
             const elementType = streamElementType(method, context, 'actor');
-            closure(writer, `let body = Kizuna.events(bytes, using: ${receiver}decoder) { event, decoder -> ${elementType}? in`, () => {
-                writer.line(`try decoder.decode(${elementType}.self, from: Foundation.Data(event.data.utf8))`);
-            });
+            const reconnect = emitReopen(writer, method, receiver, failure, stream.status);
+            closure(
+                writer,
+                `let body = Kizuna.events(bytes, using: ${receiver}decoder${reconnect}) { event, decoder -> ${elementType}? in`,
+                () => {
+                    writer.line(`try decoder.decode(${elementType}.self, from: Foundation.Data(event.data.utf8))`);
+                }
+            );
         }
         for (const field of successResponse.responseHeaders) {
             writer.line(`let ${escapeKeyword(field.name)} = httpResponse.value(forHTTPHeaderField: ${stringLiteral(field.wireName)})`);
@@ -2038,11 +2223,20 @@ const emitBodyEncoding = (writer: SwiftWriter, method: RouteMethod, context: Emi
         writer.line('var multipart = Kizuna.MultipartBuilder()');
         for (const field of body.multipartFields) {
             const flattenedField = body.flattened.find((candidate) => candidate.name === field.name);
-            const accessor = `body.${escapeKeyword(field.name)}`;
-            if (field.isFile || flattenedField?.isFile === true) {
-                writer.line(`multipart.appendFile(name: ${stringLiteral(field.wireName)}, file: ${accessor})`);
+            const isFile = field.isFile || flattenedField?.isFile === true;
+            const append = (accessor: string): void => {
+                if (isFile) {
+                    writer.line(`multipart.appendFile(name: ${stringLiteral(field.wireName)}, file: ${accessor})`);
+                } else {
+                    writer.line(`multipart.appendField(name: ${stringLiteral(field.wireName)}, value: String(describing: ${accessor}))`);
+                }
+            };
+            if (flattenedField?.optional === true) {
+                writer.block(`if let value = body.${escapeKeyword(field.name)}`, () => {
+                    append('value');
+                });
             } else {
-                writer.line(`multipart.appendField(name: ${stringLiteral(field.wireName)}, value: String(describing: ${accessor}))`);
+                append(`body.${escapeKeyword(field.name)}`);
             }
         }
         writer.line('request.httpBody = multipart.finalize()');
@@ -2073,7 +2267,7 @@ const emitClient = (
     const usesMultipart = allMethods.some((method) => method.body?.kind === 'multipart');
 
     const contextFields = context.requestContextFields;
-    const contextRequired = contextFields.some((field) => !field.optional);
+    const contextRequired = contextFields.some((field) => !hasDefault(field));
 
     writer.blank();
     writer.block(`public final class ${clientName}: Sendable`, () => {
@@ -2086,7 +2280,7 @@ const emitClient = (
                 }
                 writer.blank();
                 const initParams = contextFields
-                    .map((field) => `${escapeKeyword(field.name)}: ${field.type}${field.optional ? ' = nil' : ''}`)
+                    .map((field) => `${escapeKeyword(field.name)}: ${field.type}${defaultArgument(field)}`)
                     .join(', ');
                 writer.block(`public init(${initParams})`, () => {
                     for (const field of contextFields) {
@@ -2109,6 +2303,45 @@ const emitClient = (
                 });
             });
         }
+        writer.blank();
+        writer.docComment(
+            'Retries a GET, HEAD, OPTIONS, PUT or DELETE that failed on the network or was answered 429 or 503, waiting what Retry-After asks or backing off.'
+        );
+        writer.block('public struct RetryPolicy: Sendable', () => {
+            writer.docComment('Attempts in all, the first included.');
+            writer.line('public var maximumAttempts: Int');
+            writer.docComment('Seconds the first backoff waits at most.');
+            writer.line('public var initialDelay: TimeInterval');
+            writer.docComment('Seconds any wait may take.');
+            writer.line('public var maximumDelay: TimeInterval');
+            writer.blank();
+            writer.block('public init(maximumAttempts: Int = 3, initialDelay: TimeInterval = 0.5, maximumDelay: TimeInterval = 30)', () => {
+                writer.line('self.maximumAttempts = maximumAttempts');
+                writer.line('self.initialDelay = initialDelay');
+                writer.line('self.maximumDelay = maximumDelay');
+            });
+        });
+        writer.blank();
+        writer.docComment(
+            'Reconnects an event stream on a GET, HEAD, OPTIONS, PUT or DELETE when its connection drops, sending the id of the last event as Last-Event-ID.'
+        );
+        writer.block('public struct ReconnectPolicy: Sendable', () => {
+            writer.docComment('Reconnections in a row before the stream fails. An event received resets the count.');
+            writer.line('public var maximumAttempts: Int');
+            writer.docComment('Seconds to wait before reconnecting, until the server sends a retry field.');
+            writer.line('public var reconnectionTime: TimeInterval');
+            writer.docComment('Seconds the wait may grow to after reconnections in a row that fail.');
+            writer.line('public var maximumDelay: TimeInterval');
+            writer.blank();
+            writer.block(
+                'public init(maximumAttempts: Int = 5, reconnectionTime: TimeInterval = 3, maximumDelay: TimeInterval = 30)',
+                () => {
+                    writer.line('self.maximumAttempts = maximumAttempts');
+                    writer.line('self.reconnectionTime = reconnectionTime');
+                    writer.line('self.maximumDelay = maximumDelay');
+                }
+            );
+        });
         if (usesMultipart) {
             writer.blank();
             writer.block('public struct MultipartFile: Sendable, Equatable', () => {
@@ -2209,17 +2442,21 @@ const emitClient = (
         }
         writer.line('public let requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)?');
         writer.line('public let responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)?');
+        writer.line('public let retry: RetryPolicy?');
+        writer.line('public let reconnect: ReconnectPolicy?');
         writer.line('let encoder: JSONEncoder');
         writer.line('let decoder: JSONDecoder');
         writer.blank();
         const contextInitParam =
             contextFields.length > 0 ? `, requestContext: RequestContext${contextRequired ? '' : ' = RequestContext()'}` : '';
         writer.block(
-            `public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30${contextInitParam}, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)`,
+            `public init(baseURL: URL, session: URLSession = .shared, timeout: TimeInterval = 30, retry: RetryPolicy? = nil, reconnect: ReconnectPolicy? = nil${contextInitParam}, requestMiddleware: (@Sendable (inout URLRequest) async throws -> Void)? = nil, responseMiddleware: (@Sendable (URLRequest, Foundation.Data, URLResponse) async -> Void)? = nil)`,
             () => {
                 writer.line('self.baseURL = baseURL');
                 writer.line('self.session = session');
                 writer.line('self.timeout = timeout');
+                writer.line('self.retry = retry');
+                writer.line('self.reconnect = reconnect');
                 if (contextFields.length > 0) {
                     writer.line('self.requestContextHeaders = requestContext.headerFields');
                 }

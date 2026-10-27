@@ -11,6 +11,57 @@ const baseConfig = {
     namespaceName: 'TestAPI',
 };
 
+describe('Kotlin generator: retry', () => {
+    it('takes a RetryPolicy and hands it to every request', () => {
+        const output = generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        getUser: {
+                            method: 'GET',
+                            path: '/users/:id',
+                            responses: {
+                                200: z.object({
+                                    id: z.string(),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('data class RetryPolicy(');
+        expect(output).toContain('private val retry: RetryPolicy? = null,');
+        expect(output).toContain('val httpResponse = Kizuna.send(client, requestBuilder.build(), retry)');
+        expect(output).toContain('val idempotent = request.method in setOf("GET", "HEAD", "OPTIONS", "PUT", "DELETE")');
+    });
+});
+
+describe('Kotlin generator: text bodies', () => {
+    it('reads a text body as its text, never as JSON', () => {
+        const contract = defineConfig({
+            routes: [
+                {
+                    exportUsers: {
+                        method: 'GET',
+                        path: '/users/export',
+                        responses: {
+                            200: {
+                                body: z.string(),
+                                contentType: 'text/csv',
+                            },
+                        },
+                    },
+                },
+            ],
+        }).api;
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val payload = data.decodeToString()');
+        expect(output).not.toContain('json.decodeFromString<String>(data.decodeToString())');
+    });
+});
+
 describe('Kotlin generator: z.void()', () => {
     it('emits no body param and Response return for z.void() body and response', () => {
         const contract = defineConfig({
@@ -60,10 +111,68 @@ describe('Kotlin generator: nullable', () => {
         ],
     }).api;
 
-    it('maps a nullable field to a nullable type, since Kotlin has only the one', () => {
+    it('maps a nullable field to a nullable type with no default, since its key is required', () => {
         const output = generateKotlinClient(contract, baseConfig);
-        expect(output).toContain('val appVersion: String?');
-        expect(output).toContain('val releaseNotes: String?');
+        expect(output).toContain('val appVersion: String?,');
+        expect(output).not.toContain('val appVersion: String? = null');
+    });
+
+    it('maps a nullish field to an optional that defaults to null and is left out', () => {
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val releaseNotes: String? = null');
+        expect(output).not.toContain('Nullish');
+    });
+
+    it('maps a nullish query field to an optional, since a query string has no null', () => {
+        const output = generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        listUsers: {
+                            method: 'GET',
+                            path: '/users',
+                            query: z.object({
+                                cursor: z.string().nullish(),
+                            }),
+                            responses: {
+                                200: z.object({
+                                    ok: z.boolean(),
+                                }),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('val cursor: String? = null');
+        expect(output).not.toContain('Nullish');
+    });
+
+    it('leaves a null form field out', () => {
+        const output = generateKotlinClient(
+            defineConfig({
+                routes: [
+                    {
+                        uploadAvatar: {
+                            method: 'POST',
+                            path: '/avatar',
+                            contentType: 'multipart/form-data',
+                            body: z.object({
+                                file: z.instanceof(File),
+                                caption: z.string().optional(),
+                            }),
+                            responses: {
+                                204: z.void(),
+                            },
+                        },
+                    },
+                ],
+            }).api,
+            baseConfig
+        );
+        expect(output).toContain('if (body.caption != null) {');
+        expect(output).toContain('multipartBuilder.addFormDataPart("caption", body.caption.toString())');
     });
 });
 
@@ -1214,6 +1323,71 @@ describe('Kotlin generator: discriminated union', () => {
         expect(output).toContain('val baseUnit: BaseUnit');
     });
 
+    it('types a described model field as the model', () => {
+        const ArticleStatusSchema = Kizuna.model({
+            title: 'ArticleStatus',
+            schema: z.enum(['draft', 'published']),
+        });
+        const contract = defineConfig({
+            routes: [
+                {
+                    getArticle: {
+                        method: 'GET',
+                        path: '/articles/:id',
+                        responses: {
+                            200: Kizuna.model({
+                                title: 'Article',
+                                schema: z.object({
+                                    status: ArticleStatusSchema.describe('Set by the editor'),
+                                    previousStatus: ArticleStatusSchema.meta({
+                                        deprecated: true,
+                                    }),
+                                    scheduledStatus: ArticleStatusSchema.describe('Applied at the scheduled time').optional(),
+                                }),
+                            }),
+                        },
+                    },
+                },
+            ],
+        }).api;
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output.match(/enum class \w*Status\b/g)).toEqual(['enum class ArticleStatus']);
+        expect(output).toContain('val status: ArticleStatus');
+        expect(output).toContain('val previousStatus: ArticleStatus');
+        expect(output).toContain('val scheduledStatus: ArticleStatus? = null');
+    });
+
+    it('declares a model reached only through a described copy', () => {
+        const AuthorSchema = Kizuna.model({
+            title: 'Author',
+            schema: z.object({
+                name: z.string(),
+            }),
+        });
+        const contract = defineConfig({
+            routes: [
+                {
+                    getArticle: {
+                        method: 'GET',
+                        path: '/articles/:id',
+                        responses: {
+                            200: Kizuna.model({
+                                title: 'Article',
+                                schema: z.object({
+                                    writer: AuthorSchema.describe('Shown in the byline'),
+                                }),
+                            }),
+                        },
+                    },
+                },
+            ],
+        }).api;
+        const output = generateKotlinClient(contract, baseConfig);
+        expect(output).toContain('val writer: Author');
+        expect(output).toContain('data class Author(');
+        expect(output).not.toContain('class Writer');
+    });
+
     it('keeps a named enum model at top level when its title starts with the parent class name', () => {
         const FoodSourceSchema = Kizuna.model({
             title: 'FoodSource',
@@ -2108,7 +2282,7 @@ describe('Kotlin generator: streamed responses', () => {
         expect(output).toContain(
             '"delta" -> TestAPIClient.Reply.Event.Delta(json.decodeFromString<TestAPIClient.Reply.Delta>(event.data))'
         );
-        expect(output).toContain('fun serverSentEvents(response: Response): Flow<ServerSentEvent>');
+        expect(output).toContain('fun serverSentEvents(response: Response, reconnect: Reconnection?): Flow<ServerSentEvent>');
         expect(output).toContain('import kotlinx.coroutines.flow.*');
     });
 

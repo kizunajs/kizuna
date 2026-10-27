@@ -14,14 +14,14 @@ import { contentOf, flattenRoutes } from 'kizunajs/adapter';
 import type { z } from 'zod';
 
 /**
- * A schema reduced to what a comparison needs: its kind, its fields, and the
- * values it accepts when it is closed.
+ * A schema reduced to what a comparison needs: its kind, whether it accepts
+ * `null`, its fields, and the values it accepts when it is closed.
  */
 export type SchemaNode =
-    | { kind: 'object'; fields: Record<string, { optional: boolean; schema: SchemaNode }>; refinements?: number }
-    | { kind: 'array'; element: SchemaNode; refinements?: number }
-    | { kind: 'enum'; values: string[]; refinements?: number }
-    | { kind: string; refinements?: number };
+    | { kind: 'object'; nullable?: true; fields: Record<string, { optional: boolean; schema: SchemaNode }>; refinements?: number }
+    | { kind: 'array'; nullable?: true; element: SchemaNode; refinements?: number }
+    | { kind: 'enum'; nullable?: true; values: string[]; refinements?: number }
+    | { kind: string; nullable?: true; refinements?: number };
 
 export interface RouteSnapshot {
     method: string;
@@ -32,30 +32,6 @@ export interface RouteSnapshot {
      * `true` when the route is `hidden`, so in no generated client.
      */
     hidden?: true;
-    sunset?: string;
-    body?: SchemaNode;
-    query?: SchemaNode;
-    headers?: SchemaNode;
-    /**
-     * Keyed by status, `null` when the status answers with no body.
-     */
-    responses: Record<string, SchemaNode | null>;
-}
-
-export interface ApiSnapshot {
-    routes: Record<string, RouteSnapshot>;
-    jobs: string[];
-    /**
-     * MCP tool name, keyed by the route key that publishes it.
-     */
-    tools: Record<string, string>;
-}
-
-export interface RouteSnapshot {
-    method: string;
-    path: string;
-    statuses: number[];
-    deprecated: boolean;
     sunset?: string;
     body?: SchemaNode;
     query?: SchemaNode;
@@ -126,8 +102,20 @@ const refinementCount = (schema: z.core.$ZodType): number | undefined => {
  * A Zod schema reduced to the shape a comparison reads.
  */
 export const toSchemaNode = (schema: z.core.$ZodType): SchemaNode => {
-    const { inner } = unwrapOptionalWrappers(schema);
+    const { inner, nullable } = unwrapOptionalWrappers(schema);
     const def = readDef(inner);
+
+    // `z.union([UserSchema, z.null()])` says what `.nullable()` says.
+    const options = def.type === 'union' ? (def.options ?? []) : [];
+    const nonNull = options.filter((option) => readDef(option).type !== 'null');
+    if (nonNull.length === 1 && options.length > 1) {
+        return {
+            ...toSchemaNode(nonNull[0]!),
+            nullable: true,
+        };
+    }
+
+    const nullability: { nullable?: true } = nullable ? { nullable: true } : {};
     const refinements = refinementCount(inner);
     const carry = refinements === undefined ? {} : { refinements };
 
@@ -137,22 +125,23 @@ export const toSchemaNode = (schema: z.core.$ZodType): SchemaNode => {
         for (const [key, field] of Object.entries(shape)) {
             fields[key] = { optional: unwrapOptionalWrappers(field).optional, schema: toSchemaNode(field) };
         }
-        return { kind: 'object', fields, ...carry };
+        return { kind: 'object', ...nullability, fields, ...carry };
     }
 
-    if (def.type === 'array' && def.element) return { kind: 'array', element: toSchemaNode(def.element), ...carry };
+    if (def.type === 'array' && def.element) return { kind: 'array', ...nullability, element: toSchemaNode(def.element), ...carry };
     if (def.type === 'enum') {
         return {
             kind: 'enum',
+            ...nullability,
             values: Object.values(def.entries ?? {})
                 .map(String)
                 .sort(),
             ...carry,
         };
     }
-    if (def.type === 'literal') return { kind: 'enum', values: (def.values ?? []).map(String).sort(), ...carry };
+    if (def.type === 'literal') return { kind: 'enum', ...nullability, values: (def.values ?? []).map(String).sort(), ...carry };
 
-    return { kind: def.type ?? 'unknown', ...carry };
+    return { kind: def.type ?? 'unknown', ...nullability, ...carry };
 };
 
 const sunsetOf = (route: RouteDefinition): string | undefined => {

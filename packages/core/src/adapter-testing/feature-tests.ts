@@ -346,26 +346,6 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             });
         },
 
-        'query.lists': async () => {
-            const one = await api.request({
-                method: 'GET',
-                path: '/query-lists?ids=a',
-            });
-            expect(one.status).toBe(200);
-            expect(one.body).toEqual({
-                ids: ['a'],
-            });
-            const several = await api.request({
-                method: 'GET',
-                path: '/query-lists?ids=a&ids=b&pages=1&pages=2',
-            });
-            expect(several.status).toBe(200);
-            expect(several.body).toEqual({
-                ids: ['a', 'b'],
-                pages: [1, 2],
-            });
-        },
-
         'query.coercion': async () => {
             await createAda();
             await api.request({
@@ -383,6 +363,62 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
             expect(response.status).toBe(200);
             expect(response.body).toEqual({
                 users: [
+                    {
+                        id: '2',
+                        name: 'Grace',
+                    },
+                ],
+                total: 2,
+            });
+        },
+
+        'query.singleValueArray': async () => {
+            await createAda();
+            await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Grace',
+                    email: 'grace@example.com',
+                },
+            });
+            const response = await api.request({
+                method: 'GET',
+                path: '/users?ids=2',
+            });
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                users: [
+                    {
+                        id: '2',
+                        name: 'Grace',
+                    },
+                ],
+                total: 1,
+            });
+        },
+
+        'query.repeatedKeys': async () => {
+            await createAda();
+            await api.request({
+                method: 'POST',
+                path: '/users',
+                body: {
+                    name: 'Grace',
+                    email: 'grace@example.com',
+                },
+            });
+            const response = await api.request({
+                method: 'GET',
+                path: '/users?ids=1&ids=2',
+            });
+            expect(response.status).toBe(200);
+            expect(response.body).toEqual({
+                users: [
+                    {
+                        id: '1',
+                        name: 'Ada',
+                    },
                     {
                         id: '2',
                         name: 'Grace',
@@ -962,6 +998,23 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.headers.get('content-type')).toContain('text/event-stream');
                 expect(response.headers.get('cache-control')).toBe('no-store');
                 expect(response.text).toBe(streamedEventsText);
+            });
+        },
+        'streams.lastEventId': async () => {
+            await usingStreams(async (streams) => {
+                const resumed = await streams.request({
+                    method: 'GET',
+                    path: '/notifications',
+                    headers: {
+                        'last-event-id': '1',
+                    },
+                });
+                expect(resumed.text).toBe('data: {"title":"New comment"}\nid: 2\n\ndata: {"title":"Report ready"}\nid: 3\n\n');
+                const fresh = await streams.request({
+                    method: 'GET',
+                    path: '/notifications',
+                });
+                expect(fresh.text).toContain('id: 1\n');
             });
         },
         'streams.unnamedData': async () => {

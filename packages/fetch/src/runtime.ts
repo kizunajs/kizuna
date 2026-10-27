@@ -5,10 +5,13 @@
  */
 export const runtimeSource = String.raw`/**
  * What the client knows about one response: nothing for a body it reads as
- * JSON, the media type for one that streams.
+ * JSON, how to read one that is not, the media type for one that streams.
  */
 export type GeneratedResponse =
     | Record<string, never>
+    | {
+          read: 'bytes' | 'text';
+      }
     | {
           stream: true;
           contentType: string;
@@ -49,9 +52,49 @@ export interface OutgoingRequest {
 export interface ClientConfig {
     baseUrl: string;
     baseHeaders?: Record<string, string>;
-    credentials?: RequestCredentials;
+    credentials?: RequestInit['credentials'];
     fetch?: typeof fetch;
     onRequest?: (request: OutgoingRequest) => void | Promise<void>;
+    retry?: RetryOptions;
+    reconnect?: ReconnectOptions;
+}
+
+/**
+ * Retries a GET, HEAD, OPTIONS, PUT or DELETE that failed on the network or
+ * was answered 429 or 503, waiting what Retry-After asks or backing off.
+ */
+export interface RetryOptions {
+    /**
+     * Attempts in all, the first included.
+     */
+    maximumAttempts?: number;
+    /**
+     * Milliseconds the first backoff waits at most.
+     */
+    initialDelay?: number;
+    /**
+     * Milliseconds any wait may take.
+     */
+    maximumDelay?: number;
+}
+
+/**
+ * Reconnects an event stream on a GET, HEAD, OPTIONS, PUT or DELETE when its
+ * connection drops, sending the id of the last event as Last-Event-ID.
+ */
+export interface ReconnectOptions {
+    /**
+     * Reconnections in a row before the stream fails. An event received resets the count.
+     */
+    maximumAttempts?: number;
+    /**
+     * Milliseconds to wait before reconnecting, until the server sends a retry field.
+     */
+    reconnectionTime?: number;
+    /**
+     * Milliseconds the wait may grow to after reconnections in a row that fail.
+     */
+    maximumDelay?: number;
 }
 
 /**
@@ -114,7 +157,7 @@ const buildFormData = (fields: Record<string, unknown>): FormData => {
 /**
  * A multipart body leaves Content-Type to fetch, which adds the boundary.
  */
-const encodeBody = (route: GeneratedRoute, body: unknown, headers: Headers): BodyInit => {
+const encodeBody = (route: GeneratedRoute, body: unknown, headers: Headers): NonNullable<RequestInit['body']> => {
     switch (route.contentType) {
         case 'multipart/form-data':
             return body instanceof FormData ? body : buildFormData(body as Record<string, unknown>);
@@ -162,17 +205,29 @@ const findLineEnd = (buffer: string, final: boolean): { index: number; length: n
 /**
  * Reads text/event-stream as the WHATWG HTML specification parses it.
  */
-async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<ServerSentEvent> {
+interface EventStreamState {
+    lastEventId: string;
+    reconnectionTime: number;
+}
+
+async function* readEvents(
+    body: ReadableStream<Uint8Array>,
+    state: EventStreamState = {
+        lastEventId: '',
+        reconnectionTime: 3000,
+    }
+): AsyncGenerator<ServerSentEvent> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
     let first = true;
     let dataLines: string[] = [];
     let eventType = '';
-    let lastEventId = '';
+    let lastEventId = state.lastEventId;
     let retry: number | undefined;
 
     const dispatch = (): ServerSentEvent | undefined => {
+        state.lastEventId = lastEventId;
         if (dataLines.length === 0) {
             eventType = '';
             return undefined;
@@ -207,7 +262,10 @@ async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<Ser
                 if (!value.includes('\0')) lastEventId = value;
                 break;
             case 'retry':
-                if (/^\d+$/.test(value)) retry = Number(value);
+                if (/^\d+$/.test(value)) {
+                    retry = Number(value);
+                    state.reconnectionTime = Math.min(retry, 3_600_000);
+                }
                 break;
         }
         return undefined;
@@ -234,6 +292,57 @@ async function* readEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<Ser
         }
     } finally {
         void reader.cancel().catch(() => undefined);
+    }
+}
+
+async function* reconnectingEvents(
+    first: Response,
+    reopen: (lastEventId: string) => Promise<Response>,
+    options: ReconnectOptions,
+    signal: AbortSignal | null | undefined
+): AsyncGenerator<ServerSentEvent> {
+    const maximumAttempts = options.maximumAttempts ?? 5;
+    const maximumDelay = options.maximumDelay ?? 30_000;
+    const state: EventStreamState = {
+        lastEventId: '',
+        reconnectionTime: options.reconnectionTime ?? 3000,
+    };
+    let response: Response | undefined = first;
+    let attempts = 0;
+    let failure: unknown;
+    for (;;) {
+        if (response?.body) {
+            try {
+                for await (const message of readEvents(response.body, state)) {
+                    attempts = 0;
+                    failure = undefined;
+                    yield message;
+                }
+            } catch (error) {
+                failure = error;
+            }
+        }
+        if (signal?.aborted) throw signal.reason;
+        if (attempts >= maximumAttempts) {
+            if (failure !== undefined) throw failure;
+            return;
+        }
+        attempts += 1;
+        const ceiling = Math.min(maximumDelay, state.reconnectionTime * 2 ** (attempts - 1));
+        await wait(state.reconnectionTime + Math.random() * Math.max(0, ceiling - state.reconnectionTime), signal);
+        try {
+            response = await reopen(state.lastEventId);
+        } catch (error) {
+            if (signal?.aborted) throw error;
+            failure = error;
+            response = undefined;
+            continue;
+        }
+        if (response.status === 204) return;
+        const contentType = response.headers.get('content-type') ?? '';
+        if (response.status !== first.status || !contentType.toLowerCase().startsWith('text/event-stream')) {
+            throw new Error('Reconnecting to the event stream failed with status ' + response.status);
+        }
     }
 }
 
@@ -276,40 +385,111 @@ const readStream = (body: ReadableStream<Uint8Array>, contentType: string): Asyn
     return readBytes(body);
 };
 
+const IDEMPOTENT_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'PUT', 'DELETE']);
+
+const RETRY_STATUSES = new Set([429, 503]);
+
+const retryAfter = (header: string | null): number | undefined => {
+    if (header === null) return undefined;
+    if (/^\d+$/.test(header.trim())) return Number(header.trim()) * 1000;
+    const date = Date.parse(header);
+    return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
+};
+
+const wait = (milliseconds: number, signal: AbortSignal | null | undefined): Promise<void> =>
+    new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(signal.reason);
+            return;
+        }
+        const onAbort = () => {
+            clearTimeout(timer);
+            reject(signal?.reason);
+        };
+        const timer = setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+        }, milliseconds);
+        signal?.addEventListener('abort', onAbort, {
+            once: true,
+        });
+    });
+
+const send = async (url: string, init: RequestInit, route: GeneratedRoute, config: ClientConfig): Promise<Response> => {
+    const fetcher = config.fetch ?? fetch;
+    const retry = config.retry;
+    if (retry === undefined || !IDEMPOTENT_METHODS.has(route.method)) return fetcher(url, init);
+    const maximumAttempts = retry.maximumAttempts ?? 3;
+    const initialDelay = retry.initialDelay ?? 500;
+    const maximumDelay = retry.maximumDelay ?? 30_000;
+    for (let attempt = 1; ; attempt += 1) {
+        const backoff = Math.random() * Math.min(maximumDelay, initialDelay * 2 ** (attempt - 1));
+        let response: Response;
+        try {
+            response = await fetcher(url, init);
+        } catch (error) {
+            if (attempt >= maximumAttempts || init.signal?.aborted || !(error instanceof TypeError)) throw error;
+            await wait(backoff, init.signal);
+            continue;
+        }
+        if (attempt >= maximumAttempts || !RETRY_STATUSES.has(response.status)) return response;
+        const asked = retryAfter(response.headers.get('retry-after'));
+        if (asked !== undefined && asked > maximumDelay) return response;
+        await response.body?.cancel();
+        await wait(asked ?? backoff, init.signal);
+    }
+};
+
 const buildMethod = (route: GeneratedRoute, config: ClientConfig) => {
     const call = async (args: CallArgs = {}) => {
         const query = args.query === undefined ? '' : buildSearchParams(args.query).toString();
         const url = config.baseUrl + buildPath(route.path, args.params) + (query.length > 0 ? '?' + query : '');
-        const headers = new Headers(config.baseHeaders);
-        for (const [name, value] of Object.entries(args.headers ?? {})) {
-            if (value !== undefined) headers.set(name, value);
-        }
-        const init: RequestInit = {
-            method: route.method,
-            headers,
+        const prepare = async (lastEventId = ''): Promise<RequestInit> => {
+            const headers = new Headers(config.baseHeaders);
+            for (const [name, value] of Object.entries(args.headers ?? {})) {
+                if (value !== undefined) headers.set(name, value);
+            }
+            if (lastEventId !== '') headers.set('Last-Event-ID', lastEventId);
+            const init: RequestInit = {
+                method: route.method,
+                headers,
+            };
+            if (args.body !== undefined) init.body = encodeBody(route, args.body, headers);
+            if (config.credentials !== undefined) init.credentials = config.credentials;
+            await config.onRequest?.({
+                url,
+                method: route.method,
+                headers,
+                route,
+            });
+            return {
+                ...init,
+                ...args.fetchOptions,
+            };
         };
-        if (args.body !== undefined) init.body = encodeBody(route, args.body, headers);
-        if (config.credentials !== undefined) init.credentials = config.credentials;
-        await config.onRequest?.({
-            url,
-            method: route.method,
-            headers,
-            route,
-        });
 
-        const response = await (config.fetch ?? fetch)(url, {
-            ...init,
-            ...args.fetchOptions,
-        });
+        const response = await send(url, await prepare(), route, config);
         const responseHeaders: Record<string, string> = {};
         response.headers.forEach((value, name) => {
             responseHeaders[name] = value;
         });
         const declared = route.responses[response.status];
         if (declared !== undefined && 'stream' in declared && response.body !== null) {
+            const essence = (declared.contentType.split(';')[0] ?? '').trim().toLowerCase();
+            const reconnect = essence === 'text/event-stream' && IDEMPOTENT_METHODS.has(route.method) ? config.reconnect : undefined;
+            const reopen = async (lastEventId: string) => send(url, await prepare(lastEventId), route, config);
             return {
                 status: response.status,
-                body: readStream(response.body, declared.contentType),
+                body: reconnect
+                    ? reconnectingEvents(response, reopen, reconnect, args.fetchOptions?.signal)
+                    : readStream(response.body, declared.contentType),
+                headers: responseHeaders,
+            };
+        }
+        if (declared !== undefined && 'read' in declared) {
+            return {
+                status: response.status,
+                body: declared.read === 'bytes' ? new Uint8Array(await response.arrayBuffer()) : await response.text(),
                 headers: responseHeaders,
             };
         }

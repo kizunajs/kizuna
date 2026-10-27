@@ -207,6 +207,12 @@ test('conforms to the shared adapter type catalogue', () => {
             expectTypeOf<Handlers<typeof rawBodyContract>['receiveSigned']>().parameter(0).toMatchTypeOf<{ rawBody: string }>();
             expectTypeOf<Parameters<Handlers<typeof inferenceContract>['createUser']>[0]>().not.toHaveProperty('rawBody');
         },
+        'handler.lastEventId': () => {
+            expectTypeOf<Handlers<typeof streamInferenceContract>['reply']>()
+                .parameter(0)
+                .toMatchTypeOf<{ lastEventId: string | undefined }>();
+            expectTypeOf<Parameters<Handlers<typeof inferenceContract>['createUser']>[0]>().not.toHaveProperty('lastEventId');
+        },
         'handler.context': () => {
             expectTypeOf<Handlers<typeof inferenceContract>['getUser']>().parameter(0).toMatchTypeOf<HonoHandlerContext>();
         },

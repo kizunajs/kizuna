@@ -56,6 +56,95 @@ describe('a field tightening', () => {
     });
 });
 
+describe('a field becoming nullable', () => {
+    const before = z.object({
+        nickname: z.string(),
+    });
+    const after = z.object({
+        nickname: z.string().nullable(),
+    });
+
+    it('breaks a response, because callers decode a value that was never null', () => {
+        expect(summaries(before, after, 'response')).toEqual(['BREAKING nickname can now be null']);
+    });
+
+    it('does not break a request, because callers may keep sending a string', () => {
+        expect(summaries(before, after, 'request')).toEqual(['changed  nickname can now be null']);
+    });
+
+    it('reads a union with null the same as .nullable()', () => {
+        expect(
+            summaries(
+                before,
+                z.object({
+                    nickname: z.union([z.string(), z.null()]),
+                }),
+                'response'
+            )
+        ).toEqual(['BREAKING nickname can now be null']);
+    });
+
+    it('reports an array element that can now be null', () => {
+        expect(
+            summaries(
+                z.object({
+                    tags: z.array(z.string()),
+                }),
+                z.object({
+                    tags: z.array(z.string().nullable()),
+                }),
+                'response'
+            )
+        ).toEqual(['BREAKING tags[] can now be null']);
+    });
+});
+
+describe('a field no longer nullable', () => {
+    const before = z.object({
+        nickname: z.string().nullable(),
+    });
+    const after = z.object({
+        nickname: z.string(),
+    });
+
+    it('breaks a request, because callers sending null are rejected', () => {
+        expect(summaries(before, after, 'request')).toEqual(['BREAKING nickname can no longer be null']);
+    });
+
+    it('does not break a response, because callers already handle a string', () => {
+        expect(summaries(before, after, 'response')).toEqual(['changed  nickname can no longer be null']);
+    });
+});
+
+describe('a field becoming optional', () => {
+    const before = z.object({
+        email: z.string(),
+    });
+    const after = z.object({
+        email: z.string().optional(),
+    });
+
+    it('breaks a response, because callers read a key that may now be missing', () => {
+        expect(summaries(before, after, 'response')).toEqual(['BREAKING email may now be left out']);
+    });
+
+    it('does not break a request, because callers may keep sending it', () => {
+        expect(summaries(before, after, 'request')).toEqual(['changed  email is now optional']);
+    });
+
+    it('reports both halves of .nullish()', () => {
+        expect(
+            summaries(
+                before,
+                z.object({
+                    email: z.string().nullish(),
+                }),
+                'response'
+            )
+        ).toEqual(['BREAKING email may now be left out', 'BREAKING email can now be null']);
+    });
+});
+
 describe('enums, where direction decides everything', () => {
     const before = z.object({ role: z.enum(['owner', 'member']) });
 

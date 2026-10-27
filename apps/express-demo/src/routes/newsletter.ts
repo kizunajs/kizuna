@@ -23,7 +23,6 @@ export const newsletter = k.routes.newsletter({
 
             return {
                 status: 204,
-                body: undefined,
             };
         }),
 });

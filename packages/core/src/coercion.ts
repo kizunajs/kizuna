@@ -8,11 +8,17 @@ import { readDef, readObjectShape, resolveBaseType, WRAPPER_TYPES } from './zod-
  */
 const COERCIBLE_TYPES: ReadonlySet<string> = new Set(['number', 'int', 'boolean', 'bigint', 'date']);
 
-interface CoercionField {
-    key: string;
-    type: string;
-    array: boolean;
-}
+type CoercionField =
+    | {
+          key: string;
+          type: string;
+          array: false;
+      }
+    | {
+          key: string;
+          type: string | undefined;
+          array: true;
+      };
 
 /**
  * The fields of one request schema that need coercion, or `null` when none do.
@@ -41,11 +47,11 @@ const buildCoercionPlan = (schema: z.ZodType): CoercionPlan => {
     for (const [key, fieldSchema] of Object.entries(shape)) {
         const baseType = resolveBaseType(fieldSchema);
         if (baseType === 'array') {
-            // Every array field is planned: one value, `?ids=a`, is a list of one.
             const element = resolveArrayElement(fieldSchema);
+            const elementType = element ? resolveBaseType(element) : undefined;
             fields.push({
                 key,
-                type: element ? resolveBaseType(element) : 'unknown',
+                type: elementType !== undefined && COERCIBLE_TYPES.has(elementType) ? elementType : undefined,
                 array: true,
             });
             continue;
@@ -110,16 +116,14 @@ const coerceValue = (value: unknown, type: string): unknown => {
 };
 
 /**
- * A list field's value: one string is a list of one, per the form style
- * OpenAPI gives query arrays by default, and each item is coerced when its
- * kind needs it.
+ * A lone value is a one-item list, the way OpenAPI's default `form` style
+ * sends `?tag=work`.
  */
-const coerceArray = (value: unknown, type: string): unknown => {
-    const list = typeof value === 'string' ? [value] : value;
-    if (!Array.isArray(list)) return value;
-    if (!COERCIBLE_TYPES.has(type)) return list;
-    let changed = list !== value;
-    const coerced = list.map((item) => {
+const coerceArray = (value: unknown, type: string | undefined): unknown => {
+    const items = Array.isArray(value) ? value : [value];
+    if (type === undefined) return items;
+    let changed = items !== value;
+    const coerced = items.map((item) => {
         const next = coerceValue(item, type);
         if (next !== item) changed = true;
         return next;

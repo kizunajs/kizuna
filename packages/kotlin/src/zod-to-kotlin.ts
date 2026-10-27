@@ -11,6 +11,7 @@ import {
     readMetaBrand,
     readMetaDescription,
     readMetaId,
+    readModelSchema,
     readObjectShape,
     unwrapOptionalWrappers,
     toPascalCase,
@@ -24,6 +25,7 @@ export interface KotlinField {
     wireName: string;
     type: string;
     optional: boolean;
+    requiredNullable?: boolean;
     description?: string;
     isFile?: boolean;
     deprecated?: boolean;
@@ -84,6 +86,7 @@ export interface KotlinBrand {
 export interface MapResult {
     expression: string;
     optional: boolean;
+    requiredNullable?: boolean;
     isFile?: boolean;
 }
 
@@ -213,6 +216,7 @@ const objectFields = (
             wireName: key,
             type: result.expression,
             optional: result.optional,
+            requiredNullable: result.requiredNullable,
             description: readMetaDescription(value),
             isFile: result.isFile,
             deprecated: deprecation !== undefined,
@@ -256,6 +260,9 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
             optional: false,
         };
     }
+
+    const model = readModelSchema(schema);
+    if (model !== undefined && model !== schema) return mapUnbrandedType(model, registry, hint);
 
     const id = readMetaId(schema);
     const def = readDef(schema);
@@ -346,6 +353,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
         return {
             expression: innerResult.expression.endsWith('?') ? innerResult.expression : `${innerResult.expression}?`,
             optional: true,
+            requiredNullable: nullable && !optional,
             isFile: innerResult.isFile,
         };
     }
@@ -561,6 +569,8 @@ const sanitizeCaseName = (literal: string): string => {
 export const collectObjectFields = (schema: z.core.$ZodType, registry: TypeRegistry, hint: string): KotlinField[] => {
     return objectFields(schema, registry, hint);
 };
+
+export const hasDefault = (field: KotlinField): boolean => field.optional && field.requiredNullable !== true;
 
 export const objectFieldCount = (schema: z.core.$ZodType): number => {
     return Object.keys(readObjectShape(schema) ?? {}).length;

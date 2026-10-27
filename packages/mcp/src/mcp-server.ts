@@ -1,7 +1,14 @@
 import { z } from 'zod';
 import { problemDetails } from 'kizunajs';
-import { McpServer, inputRequired, inputResponse, type CallToolResult, type InputRequiredResult } from '@modelcontextprotocol/server';
-import { flattenRoutes, validateRequest } from 'kizunajs/adapter';
+import {
+    McpServer,
+    inputRequired,
+    inputResponse,
+    type CallToolResult,
+    type InputRequiredResult,
+    type StandardSchemaWithJSON,
+} from '@modelcontextprotocol/server';
+import { flattenRoutes, formatValidationError, validateRequest } from 'kizunajs/adapter';
 import {
     ResponseError,
     type AdapterRequest,
@@ -25,8 +32,16 @@ import { contractOf, jobRunnerFrom, pluginExportsOf, JOBS_META, type JobsMeta } 
 import type { ApiDefinition, Routes, RouteDefinition, SecurityScheme, ToolView } from 'kizunajs';
 import { isIdempotentMethod, isSafeMethod } from './method.js';
 import { deriveToolNames } from 'kizunajs/generator';
-import { buildToolOutputSchema, toolSchema } from './schema.js';
-import { buildToolInputSchema, describeTool, selectToolRoutes, toolOptionsOf, type ToolInputSchema } from 'kizunajs/adapter';
+import { buildToolOutputSchema } from './schema.js';
+import {
+    buildToolInputSchema,
+    describeTool,
+    selectToolRoutes,
+    toolInputJsonSchema,
+    toolJsonSchema,
+    toolOptionsOf,
+    type ToolInputSchema,
+} from 'kizunajs/adapter';
 
 export interface McpServerOptions {
     /**
@@ -111,6 +126,16 @@ export const APPROVED_META = 'io.kizunajs/approved';
 const approvalTitle = (route: RouteDefinition): string => toolOptionsOf(route)?.title ?? route.summary ?? `${route.method} ${route.path}`;
 
 /**
+ * How long a client may keep the tool list. It changes only when the app
+ * deploys. `private`, because the endpoint may sit behind a credential a shared
+ * cache should not answer for.
+ */
+const TOOL_LIST_CACHE = {
+    ttlMs: 5 * 60 * 1000,
+    cacheScope: 'private' as const,
+};
+
+/**
  * What a tool handler is handed beyond its arguments. Only the answers to an
  * earlier elicitation are read here.
  */
@@ -185,6 +210,23 @@ const approval = (
         isError: true,
     };
 };
+
+/**
+ * What the SDK publishes for a tool. Input passes through unchecked, so the
+ * call is validated once, by `validateRequest`, as an HTTP request is. Output
+ * keeps the route's own check.
+ */
+const publishedSchema = (jsonSchema: Record<string, unknown>, check?: z.ZodType): StandardSchemaWithJSON<Record<string, unknown>> => ({
+    '~standard': {
+        version: 1,
+        vendor: 'kizuna',
+        validate: check === undefined ? (value) => ({ value: value as Record<string, unknown> }) : (check['~standard'].validate as never),
+        jsonSchema: {
+            input: () => jsonSchema,
+            output: () => jsonSchema,
+        },
+    },
+});
 
 /**
  * What the route says about itself, over what its method already implies.
@@ -306,6 +348,32 @@ export const buildMcpTools = (routes: Routes): McpTool[] => {
     return definitions;
 };
 
+interface PublishedTool {
+    definition: McpTool;
+    inputSchema: StandardSchemaWithJSON<Record<string, unknown>>;
+    outputSchema: StandardSchemaWithJSON<Record<string, unknown>>;
+    annotations: Annotations;
+}
+
+const publishedTools = new WeakMap<Routes, PublishedTool[]>();
+
+/**
+ * Every tool with its schemas converted, built once per API rather than on
+ * every MCP request.
+ */
+const publishedToolsFor = (routes: Routes): PublishedTool[] => {
+    const cached = publishedTools.get(routes);
+    if (cached) return cached;
+    const built = buildMcpTools(routes).map((definition) => ({
+        definition,
+        inputSchema: publishedSchema(toolInputJsonSchema(definition.route)),
+        outputSchema: publishedSchema(toolJsonSchema(definition.outputSchema, 'output'), definition.outputSchema),
+        annotations: buildToolAnnotations(definition.route),
+    }));
+    publishedTools.set(routes, built);
+    return built;
+};
+
 /**
  * What a client puts in front of the model before it picks a tool.
  */
@@ -363,7 +431,7 @@ const toolEnvelope = (status: number, body: unknown): ToolCallResult => {
         content: [
             {
                 type: 'text' as const,
-                text: JSON.stringify(envelope, null, 2),
+                text: JSON.stringify(envelope),
             },
         ],
         ...(isError
@@ -380,14 +448,10 @@ const toolError = (status: number, body: GuardDenialBody): ToolCallResult => ({
     content: [
         {
             type: 'text' as const,
-            text: JSON.stringify(
-                {
-                    status,
-                    body,
-                },
-                null,
-                2
-            ),
+            text: JSON.stringify({
+                status,
+                body,
+            }),
         },
     ],
     isError: true,
@@ -525,29 +589,21 @@ const executeToolCall = async (
         params,
         query,
         body,
-        headers: {},
+        headers: credentialHeaders ?? {},
     });
 
     if (!validation.ok) {
-        return {
-            content: [
-                {
-                    type: 'text' as const,
-                    text: JSON.stringify(
-                        {
-                            status: 400,
-                            body: {
-                                detail: `Validation failed: ${validation.error.stage}`,
-                                errors: validation.error.issues,
-                            },
-                        },
-                        null,
-                        2
-                    ),
-                },
-            ],
-            isError: true,
-        };
+        const formatted = formatValidationError(validation.error);
+        return toolEnvelope(
+            400,
+            problemDetails(400, formatted.detail, {
+                errors: formatted.issues.map((issue) => ({
+                    code: issue.code ?? 'custom',
+                    path: issue.path,
+                    message: issue.message,
+                })),
+            })
+        );
     }
 
     const handler = resolveHandler(router, routeKey);
@@ -556,16 +612,12 @@ const executeToolCall = async (
             content: [
                 {
                     type: 'text' as const,
-                    text: JSON.stringify(
-                        {
-                            status: 500,
-                            body: {
-                                detail: `Handler not implemented: ${routeKey}`,
-                            },
+                    text: JSON.stringify({
+                        status: 500,
+                        body: {
+                            detail: `Handler not implemented: ${routeKey}`,
                         },
-                        null,
-                        2
-                    ),
+                    }),
                 },
             ],
             isError: true,
@@ -615,24 +667,8 @@ const executeToolCall = async (
             return toolEnvelope(error.status, error.body);
         }
 
-        return {
-            content: [
-                {
-                    type: 'text' as const,
-                    text: JSON.stringify(
-                        {
-                            status: 500,
-                            body: {
-                                detail: error instanceof Error ? error.message : 'Internal Server Error',
-                            },
-                        },
-                        null,
-                        2
-                    ),
-                },
-            ],
-            isError: true,
-        };
+        console.error(`[kizuna] tool "${routeKey}" threw:`, error);
+        return toolEnvelope(500, problemDetails(500, 'Internal Server Error'));
     }
 };
 
@@ -665,8 +701,8 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
         ...(Object.keys(pluginExports).length === 0 ? {} : { plugins: pluginExports }),
     };
 
-    const definitions = buildMcpTools(api.routes);
-    const views = collectViews(definitions);
+    const tools = publishedToolsFor(api.routes);
+    const views = collectViews(tools.map(({ definition }) => definition));
 
     const server = new McpServer(
         {
@@ -674,7 +710,14 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
             version: options?.version ?? '1.0.0',
         },
         {
-            instructions: buildInstructions(contract, definitions, options?.instructions),
+            instructions: buildInstructions(
+                contract,
+                tools.map(({ definition }) => definition),
+                options?.instructions
+            ),
+            cacheHints: {
+                'tools/list': TOOL_LIST_CACHE,
+            },
             ...(views.length === 0
                 ? {}
                 : {
@@ -715,7 +758,7 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
         );
     }
 
-    for (const definition of definitions) {
+    for (const { definition, inputSchema, outputSchema, annotations } of tools) {
         const uiMeta = toolUiMeta(definition.route);
         server.registerTool(
             definition.name,
@@ -726,9 +769,9 @@ export const createMcpServer = (api: ApiWithRouter, options?: McpServerOptions):
                           title: definition.title,
                       }),
                 description: definition.description,
-                inputSchema: definition.inputSchema.shape === undefined ? undefined : toolSchema(z.object(definition.inputSchema.shape)),
-                outputSchema: toolSchema(definition.outputSchema),
-                annotations: buildToolAnnotations(definition.route),
+                inputSchema,
+                outputSchema,
+                annotations,
                 ...(uiMeta === undefined
                     ? {}
                     : {

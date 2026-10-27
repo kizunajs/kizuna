@@ -11,3 +11,9 @@ export const CoercedQuery = z.object({
 export const NestedCoerced = z.object({
     filter: CoercedQuery,
 });
+
+export const NoteSearch = z.object({
+    filter: z.object({
+        status: z.string(),
+    }),
+});

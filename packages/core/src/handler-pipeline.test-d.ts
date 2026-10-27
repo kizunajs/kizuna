@@ -100,6 +100,45 @@ test('error statuses (4xx/5xx) require a Problem Details schema: non-envelope sh
     expectTypeOf<Extract<HandlerReturn<Route>, { status: 500 }>['body']>().toEqualTypeOf<never>();
 });
 
+test('a response with no body may leave body out', () => {
+    const voidRoutes = k.routes({
+        archiveUser: k.route({
+            method: 'POST',
+            path: '/users/:id/archive',
+            responses: {
+                204: z.void(),
+                404: ProblemDetailsSchema,
+            },
+        }),
+    });
+
+    type Return = HandlerReturn<(typeof voidRoutes)['archiveUser']>;
+    expectTypeOf<{ status: 204 }>().toExtend<Return>();
+    expectTypeOf<{ status: 204; body: undefined }>().toExtend<Return>();
+    expectTypeOf<{ status: 404 }>().not.toExtend<Return>();
+});
+
+test('a response with a body still requires it', () => {
+    expectTypeOf<{ status: 200 }>().not.toExtend<HandlerReturn<GetUserRoute>>();
+});
+
+test('an error status without a Problem Details schema stays unconstructable without a body', () => {
+    const customErrorRoutes = k.routes({
+        getThing: k.route({
+            method: 'GET',
+            path: '/things/:id',
+            responses: {
+                204: z.void(),
+                404: z.object({
+                    message: z.string(),
+                }),
+            },
+        }),
+    });
+
+    expectTypeOf<{ status: 404 }>().not.toExtend<HandlerReturn<(typeof customErrorRoutes)['getThing']>>();
+});
+
 test('Problem Details extension members surface on the handler body', () => {
     type Return = HandlerReturn<CreateUserRoute>;
     type ConflictBody = Extract<Return, { status: 409 }>['body'];

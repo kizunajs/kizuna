@@ -39,8 +39,11 @@ export const ADAPTER_FEATURES = {
     'query.coercion': {
         summary: 'Query strings coerce to the declared types before validation.',
     },
-    'query.lists': {
-        summary: 'A list query param takes one value or the key repeated, `?ids=a&ids=b`, and reaches the handler as a list.',
+    'query.singleValueArray': {
+        summary: 'A single value for a list query param arrives as a one-item list.',
+    },
+    'query.repeatedKeys': {
+        summary: 'A repeated query key arrives as a list of every value.',
     },
     'body.json': {
         summary: 'A JSON body validates and reaches the handler typed.',
@@ -152,6 +155,9 @@ export const ADAPTER_FEATURES = {
     },
     'streams.sseFraming': {
         summary: 'A streamed status writes each yield as a server-sent event under `text/event-stream` with `Cache-Control: no-store`.',
+    },
+    'streams.lastEventId': {
+        summary: 'An event stream handler reads the `Last-Event-ID` a reconnecting client sends.',
     },
     'streams.unnamedData': {
         summary: 'A stream of one schema writes `data` lines alone.',

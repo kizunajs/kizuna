@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { build, type Plugin } from 'esbuild';
+import ts from 'typescript';
 import { generateFetchClient } from '../packages/fetch/src/generator.js';
 import kizuna from '../apps/express-demo/kizuna.config.js';
 
@@ -224,6 +225,26 @@ describe('a generated client stays client-safe end to end', () => {
         );
         expect(failures, `the generated client failed to bundle:\n${failures.join('\n')}`).toEqual([]);
         expect(await bundleInputs(clientFile, [])).toEqual([fs.realpathSync(clientFile)]);
+    }, 60_000);
+
+    /**
+     * A server or a library package often leaves the DOM lib out, and
+     * `@types/node` declares the fetch globals but not every DOM name.
+     */
+    test('the generated client typechecks without the DOM lib', () => {
+        const program = ts.createProgram([clientFile], {
+            strict: true,
+            noEmit: true,
+            skipLibCheck: true,
+            target: ts.ScriptTarget.ES2024,
+            module: ts.ModuleKind.NodeNext,
+            moduleResolution: ts.ModuleResolutionKind.NodeNext,
+            lib: ['lib.es2024.d.ts'],
+            typeRoots: [path.join(ROOT, 'apps/express-demo/node_modules/@types')],
+            types: ['node'],
+        });
+        const errors = ts.getPreEmitDiagnostics(program).map((diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+        expect(errors, `the generated client failed to typecheck without the DOM lib:\n${errors.join('\n')}`).toEqual([]);
     }, 60_000);
 });
 

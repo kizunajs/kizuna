@@ -142,13 +142,28 @@ Its keys are checked against the path, so a name the path does not carry is a co
 pathParams declares "userId", which is not a parameter in path "/users/:id"
 ```
 
-Each value must be a scalar, since a path segment arrives as one string. Structured values belong in `query`. To parse one into something richer, use `z.string().transform(...)`:
+Each value must be a scalar, since a path segment arrives as one string. Lists belong in `query`. To parse one into something richer, use `z.string().transform(...)`:
 
 ```ts
 pathParams: z.object({
     tags: z.string().transform((value) => value.split(',')),
 }),
 ```
+
+### What each part can carry
+
+A route can only declare what its part of the request can send, and `k.routes` throws on anything else when the config loads:
+
+| Part                                        | Carries                                                       |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| `pathParams`                                | a value: a string, number, boolean, enum, date or bigint      |
+| `query`                                     | a value, or a list of values                                  |
+| `headers`                                   | a value                                                       |
+| a `multipart/form-data` body                | values, lists of values, and files declared with `FileSchema` |
+| an `application/x-www-form-urlencoded` body | values and lists of values                                    |
+| a JSON body                                 | anything JSON can hold                                        |
+
+An object in a query or a form can't be sent. Split it into fields of their own, or move it to a JSON body.
 
 ## Handler arguments
 
@@ -369,7 +384,7 @@ Values in the URL and in headers always arrive as strings. Kizuna coerces them t
 | `z.bigint()`             | `"9007199254740993"` | `9007199254740993n` |
 | `z.date()`               | an ISO 8601 string   | `Date`              |
 
-Arrays of these coerce too (`z.array(z.number())`). The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
+Arrays of these coerce too (`z.array(z.number())`). A list repeats its key, `?ids=1&ids=2`, and a single `?ids=1` arrives as a one-item list. The fetch client serializes `Date` and `bigint` values for you, so a `z.date()` query param round-trips without manual formatting. Request bodies are sent as JSON and keep their types.
 
 Because coercion is built in, **`z.coerce` is not supported**, and `k.routes` throws if any schema uses it. Declare the plain schema (`z.number()`, `z.date()`, `z.bigint()`). To receive a different type than you send, use `z.string().transform(...)`.
 
@@ -391,6 +406,14 @@ responses: {
     204: z.void(),
     404: ProblemDetailsSchema,
 },
+```
+
+The handler answers it with the status alone:
+
+```ts
+return {
+    status: 204,
+};
 ```
 
 To type response headers, give the status a `{ body, headers }` object:
@@ -532,6 +555,8 @@ responses: {
     },
 },
 ```
+
+Every client reads that body as the text the server sent, never as JSON.
 
 For binary responses, use [`BinarySchema`](/docs/reference/binary-and-file-schemas) for a body of raw bytes (`Uint8Array`/`Buffer`), such as a PDF download:
 

@@ -27,7 +27,6 @@ export const metadata: Metadata = {
     openGraph: {
         type: 'website',
         siteName: 'Kizuna.js',
-        url: '/',
         images: [
             {
                 url: '/open-graph.jpg',

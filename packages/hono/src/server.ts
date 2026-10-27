@@ -1,7 +1,6 @@
 import type { Context, Env, Hono, MiddlewareHandler } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import {
-    queryFromSearchParams,
     type AdapterRequest,
     type RouteDefinition,
     type Routes,
@@ -26,6 +25,7 @@ import {
     type Adapter,
     renderJsonResult,
     parseFetchBody,
+    entriesToObject,
     headersToObject,
 } from 'kizunajs/adapter';
 import type { SecurityScheme } from 'kizunajs';
@@ -131,7 +131,7 @@ export function mountHono<E extends Env = Env>(api: HonoApi, app: Hono<E>, optio
                     route,
                     params: c.req.param() as Record<string, string>,
                 },
-                query: queryFromSearchParams(url.searchParams),
+                query: entriesToObject(url.searchParams),
                 headers: headersToObject(c.req.raw.headers),
                 readBody: (r: RouteDefinition) => parseFetchBody(c.req.raw, r),
                 readRawBody: () => c.req.raw.text(),

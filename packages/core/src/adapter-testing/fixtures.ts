@@ -57,25 +57,6 @@ export const resetUsers = (): void => {
 };
 
 export const userRoutes = k.routes({
-    queryLists: k
-        .route({
-            method: 'GET',
-            path: '/query-lists',
-            query: z.object({
-                ids: z.array(z.string()).optional(),
-                pages: z.array(z.int()).optional(),
-            }),
-            responses: {
-                200: z.object({
-                    ids: z.array(z.string()).optional(),
-                    pages: z.array(z.int()).optional(),
-                }),
-            },
-        })
-        .handler(({ query }) => ({
-            status: 200,
-            body: query,
-        })),
     getUser: k
         .route({
             method: 'GET',
@@ -142,6 +123,7 @@ export const userRoutes = k.routes({
             query: z.object({
                 page: z.number().int().min(1).default(1),
                 limit: z.number().int().min(1).default(10),
+                ids: z.array(z.string()).optional(),
             }),
             responses: {
                 200: z.object({
@@ -156,7 +138,7 @@ export const userRoutes = k.routes({
             },
         })
         .handler(({ query }) => {
-            const all = Array.from(users.values());
+            const all = Array.from(users.values()).filter((user) => !query.ids || query.ids.includes(user.id));
             const start = (query.page - 1) * query.limit;
             return {
                 status: 200,
@@ -1196,6 +1178,21 @@ const createStreamGate = () => {
 
 export const streamGate = createStreamGate();
 
+const notifications = [
+    {
+        id: '1',
+        title: 'Invoice paid',
+    },
+    {
+        id: '2',
+        title: 'New comment',
+    },
+    {
+        id: '3',
+        title: 'Report ready',
+    },
+];
+
 export const streamRoutes = k.routes({
     watchEvents: k
         .route({
@@ -1265,6 +1262,32 @@ export const streamRoutes = k.routes({
                 },
             };
         }),
+    watchNotifications: k
+        .route({
+            method: 'GET',
+            path: '/notifications',
+            responses: {
+                200: {
+                    stream: z.object({
+                        title: z.string(),
+                    }),
+                },
+            },
+        })
+        .handler(({ lastEventId }) => ({
+            status: 200,
+            body: async function* () {
+                const after = lastEventId === undefined ? 0 : Number(lastEventId);
+                for (const notification of notifications.filter((candidate) => Number(candidate.id) > after)) {
+                    yield {
+                        id: notification.id,
+                        data: {
+                            title: notification.title,
+                        },
+                    };
+                }
+            },
+        })),
     watchTicks: k
         .route({
             method: 'GET',

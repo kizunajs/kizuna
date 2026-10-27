@@ -262,6 +262,13 @@ describe('Zod meta() in OpenAPI output', () => {
         });
     });
 
+    it('names a component by its key, with no id keyword', () => {
+        const spec = generateJson(taggedContract, baseConfig);
+        const userSchema = spec.components?.schemas?.TaggedUser as Record<string, unknown> | undefined;
+        expect(userSchema).not.toHaveProperty('id');
+        expect(userSchema?.properties).toHaveProperty('id');
+    });
+
     it('preserves description and emits example as examples on properties', () => {
         const spec = generateJson(taggedContract, baseConfig);
         const userSchema = spec.components?.schemas?.TaggedUser as Record<string, unknown> | undefined;
@@ -299,6 +306,44 @@ describe('Zod meta() in OpenAPI output', () => {
         const responseSchema = spec.paths['/raw']?.get?.responses['200']?.content?.['application/json']?.schema;
         expect(responseSchema).not.toEqual({
             $ref: '#/components/schemas/RawTagged',
+        });
+    });
+
+    it('keeps a described model field as a $ref with its own description', () => {
+        const ArticleStatusSchema = Kizuna.model({
+            title: 'ArticleStatus',
+            schema: z.enum(['draft', 'published']),
+        });
+        const articleRoutes = k.routes({
+            updateArticle: k.route({
+                method: 'PATCH',
+                path: '/articles/:id',
+                body: z.object({
+                    status: ArticleStatusSchema.describe('Set by the editor'),
+                }),
+                responses: {
+                    200: ArticleStatusSchema.describe('The status after the update'),
+                },
+            }),
+        });
+        const spec = generateJson(
+            defineConfig({
+                ...config,
+                routes: [articleRoutes],
+            }).api,
+            baseConfig
+        );
+        const operation = spec.paths['/articles/{id}']?.patch;
+        const bodySchema = operation?.requestBody?.content?.['application/json']?.schema as
+            | { properties: Record<string, unknown> }
+            | undefined;
+        expect(bodySchema?.properties['status']).toEqual({
+            description: 'Set by the editor',
+            $ref: '#/components/schemas/ArticleStatus',
+        });
+        expect(operation?.responses['200']?.content?.['application/json']?.schema).toEqual({
+            description: 'The status after the update',
+            $ref: '#/components/schemas/ArticleStatus',
         });
     });
 });
@@ -2431,6 +2476,21 @@ describe('streams', () => {
             title: 'Streams',
             version: '1.0.0',
         },
+    });
+
+    it('documents the Last-Event-ID a reconnecting client sends on an event stream, and on no other stream', () => {
+        expect(spec.paths['/ticks']!.get!.parameters).toEqual([
+            {
+                name: 'Last-Event-ID',
+                in: 'header',
+                required: false,
+                description: 'The id of the last event received, to resume a dropped stream after it',
+                schema: {
+                    type: 'string',
+                },
+            },
+        ]);
+        expect(spec.paths['/lines']!.get!.parameters).toBeUndefined();
     });
 
     it('documents named events under text/event-stream as a oneOf of messages', () => {

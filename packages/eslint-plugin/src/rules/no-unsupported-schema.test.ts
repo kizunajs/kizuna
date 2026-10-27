@@ -32,7 +32,11 @@ describe.each([
     ['without type information', { jsDocParsingMode: 'all' }],
 ])('no-unsupported-schema (%s)', (_label, parserOptions) => {
     it('flags imported schemas with the reference-variant messages, on the reference', async () => {
-        expect(await messageIdsFor('contract-violations.ts', parserOptions)).toEqual(['coerceReference', 'coerceReference']);
+        expect(await messageIdsFor('contract-violations.ts', parserOptions)).toEqual([
+            'coerceReference',
+            'unsendableQuery',
+            'coerceReference',
+        ]);
     });
 
     it('leaves a clean referenced schema alone', async () => {
@@ -65,5 +69,22 @@ describe.each([
 
     it('flags a transform on the way out but not on the way in', async () => {
         expect(await messageIdsFor('contract-transform.ts', parserOptions)).toEqual(['transform']);
+    });
+
+    it('flags a field its part of the request cannot carry, and leaves JSON bodies and responses alone', async () => {
+        expect(await messageIdsFor('contract-fields.ts', parserOptions)).toEqual([
+            'unsendablePath',
+            'unsendableQuery',
+            'unsendableQuery',
+            'unsendableHeader',
+            'unsendableQuery',
+            'binaryFormField',
+            'unsendableForm',
+            'fileInUrlencoded',
+        ]);
+    });
+
+    it('flags a required nullable query, header or form field, and leaves JSON bodies and responses alone', async () => {
+        expect(await messageIdsFor('contract-nullable.ts', parserOptions)).toEqual(['nullable', 'nullable', 'nullable']);
     });
 });

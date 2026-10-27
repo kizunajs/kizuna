@@ -5,7 +5,7 @@ import type { Routes, RouteDefinition } from './types.js';
 import type { ApiDefinition } from './api-definition.js';
 import { isRouteDefinition } from './handler-pipeline.js';
 import { describeIssue, pluginRoutesOf } from './plugin-server.js';
-import { globalRegistrySchemas, readMetaDescription } from './zod-internals.js';
+import { globalRegistrySchemas, readMetaDescription, readModelSchema } from './zod-internals.js';
 import type { GeneratedFile } from './config.js';
 import type { z } from 'zod';
 
@@ -28,6 +28,7 @@ export {
     readDiscriminatedUnion,
     readMeta,
     readMetaId,
+    readModelSchema,
     readMetaDescription,
     readMetaBrand,
     readMetaExamples,
@@ -41,6 +42,7 @@ export {
 } from './zod-internals.js';
 
 export { deprecationHeaders } from './deprecation.js';
+export { encodeForWire } from './json-encoding.js';
 export { toToolName, deriveToolNames, type ToolOrigin, type ToolNameEntry } from './tool-name.js';
 export {
     streamMode,
@@ -222,7 +224,8 @@ const reachModels = (value: unknown, models: Map<z.core.$ZodType, string>, found
     if (typeof value !== 'object' || value === null || seen.has(value)) return;
     seen.add(value);
     if (isSchema(value)) {
-        if (models.has(value)) found.add(value);
+        const model = readModelSchema(value);
+        if (model !== undefined && models.has(model)) found.add(model);
         const def = value._zod.def as unknown as Record<string, unknown>;
         for (const [key, child] of Object.entries(def)) {
             if (key === 'checks') continue;
