@@ -63,7 +63,7 @@ export default async function FrontPage() {
                 <a href="/blog">Blog</a>
                 <a href="/team">Team</a>
                 <a href="/contact">Contact</a>
-                <a href="/cms">Edit content</a>
+                <a href="/cms-api/admin">Edit content</a>
                 <a href="/demo">API demo</a>
             </nav>
             <Hero {...content.hero} />

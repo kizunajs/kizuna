@@ -39,7 +39,7 @@ export default async function Home() {
                 <a href="http://localhost:8000/" target="_blank" rel="noreferrer">
                     Express demo page (:8000) →
                 </a>
-                <a href="/cms">Content (sign in) →</a>
+                <a href="/cms-api/admin">Admin (sign in) →</a>
                 <a href="/">Shop home →</a>
             </nav>
 
