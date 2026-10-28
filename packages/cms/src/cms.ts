@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ContentRuntime, PluginApi } from 'kizunajs/plugin';
 import { flattenRoutes } from 'kizunajs/adapter';
 import { HANDLER } from './handler-key.js';
-import { readDef, readMetaBrand, toToolName, unwrapOptionalWrappers } from 'kizunajs/generator';
+import { encodeForWire, readDef, readMetaBrand, toToolName, unwrapOptionalWrappers } from 'kizunajs/generator';
 import type { RouteDefinition, Roles } from 'kizunajs';
 import {
     describeFields,
@@ -1124,6 +1124,7 @@ export class CmsService {
                     unrepresentable: 'any',
                     reused: 'inline',
                     io: 'input',
+                    override: encodeForWire,
                 }) as Record<string, unknown>,
                 ...(draft === null ? {} : { value: getAtPath(draft, field.path) }),
             });

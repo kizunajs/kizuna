@@ -101,6 +101,10 @@ const FrontPage = definePage({
             name: 'tagline',
             schema: z.string().default('Welcome'),
         },
+        {
+            name: 'saleEndsAt',
+            schema: z.date().optional(),
+        },
     ],
     migrate: {
         1: (document) => ({
@@ -484,6 +488,15 @@ describe('describe', () => {
         });
         expect(byPath['hero']).toMatchObject({
             block: 'hero',
+        });
+    });
+
+    it('describes a date field as a date-time string, the form JSON carries it in', async () => {
+        const response = await asEditor(request(app).get('/editing/describe').query({ ref: 'page:frontPage' }));
+        const saleEndsAt = response.body.fields.find((field: { path: string }) => field.path === 'saleEndsAt');
+        expect(saleEndsAt.schema).toMatchObject({
+            type: 'string',
+            format: 'date-time',
         });
     });
 
