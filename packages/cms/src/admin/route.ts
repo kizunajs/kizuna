@@ -6,6 +6,7 @@ import type { CmsService } from '../cms.js';
 import { CONFIG_PLACEHOLDER, readBuilt } from '../document-view.js';
 import type { ResolvedCmsOptions } from '../options.js';
 import type { AdminConfig, AdminRoute } from './config.js';
+import { listOptionsOf } from './list-options.js';
 
 /**
  * Where the admin is served, under the CMS's `path`.
@@ -38,6 +39,7 @@ export const editingRoutesOf = (api: PluginApi): Record<string, AdminRoute> =>
     );
 
 export const adminConfigFor = (options: ResolvedCmsOptions, api: PluginApi): AdminConfig => ({
+    lists: listOptionsOf(options.collections ?? []),
     siteUrl: originOf(options.preview?.url),
     apiPath: options.apiPath ?? '/api',
     routes: editingRoutesOf(api),

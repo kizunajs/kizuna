@@ -688,3 +688,148 @@ a.k-admin-row:hover {
         display: none;
     }
 }
+
+/* List rows that link, tick, nest and drag; the filter chips and the bulk bar over them. */
+
+.k-admin-row[data-linked] {
+    position: relative;
+}
+
+.k-admin-row[data-linked]:hover {
+    background: var(--k-tint);
+}
+
+.k-admin-row-link {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    outline: none;
+}
+
+.k-admin-row-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+}
+
+.k-admin-row-link:focus-visible::after {
+    outline: 2px solid var(--k-ink);
+    outline-offset: -2px;
+}
+
+.k-admin-row input[type='checkbox'],
+.k-admin-caret {
+    position: relative;
+    z-index: 1;
+}
+
+.k-admin-row input[type='checkbox'] {
+    margin: 0;
+    accent-color: var(--k-ink);
+}
+
+.k-admin-rows[data-selectable] .k-admin-row {
+    grid-template-columns: 18px minmax(0, 1fr) 170px 96px;
+}
+
+.k-admin-row-title[data-tree] {
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding-left: calc(var(--k-depth, 0) * 20px);
+}
+
+.k-admin-caret {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+}
+
+.k-admin-row[draggable='true'] {
+    cursor: grab;
+}
+
+.k-admin-row[data-over] {
+    background: var(--k-tint);
+    box-shadow: inset 0 0 0 1px var(--k-line-strong);
+}
+
+.k-admin-drop-top {
+    padding: 10px;
+    border: 1px dashed var(--k-line-strong);
+    border-radius: 10px;
+    font-size: 12.5px;
+    text-align: center;
+    color: var(--k-muted);
+}
+
+.k-admin-drop-top[data-over] {
+    background: var(--k-tint);
+    color: var(--k-ink);
+}
+
+.k-admin-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.k-admin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--k-control);
+    box-shadow: var(--k-control-elevation);
+    font-size: 12.5px;
+    color: var(--k-muted);
+    cursor: pointer;
+}
+
+.k-admin-chip:hover {
+    background: var(--k-control-hover);
+}
+
+.k-admin-chip[data-active] {
+    color: var(--k-ink);
+}
+
+.k-admin-chip b {
+    font-weight: 600;
+    color: var(--k-ink);
+}
+
+.k-admin-bulk {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: var(--k-radius-control);
+    background: var(--k-surface);
+    box-shadow: var(--k-elevation);
+    font-size: 13px;
+}
+
+.k-admin-bulk-failures {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.k-admin-bulk-failures ul {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 12.5px;
+}
+
+@media (max-width: 860px) {
+    .k-admin-rows[data-selectable] .k-admin-row {
+        grid-template-columns: 18px minmax(0, 1fr) auto;
+    }
+}

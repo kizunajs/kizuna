@@ -165,6 +165,8 @@ export function Admin({ config }: { config: AdminConfig }) {
                     connection={connection}
                     collection={collection}
                     group={groupOf(collection.name)}
+                    options={config.lists[collection.name]}
+                    routes={config.routes}
                     onOpen={openDocument}
                 />
             );

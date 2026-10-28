@@ -11,6 +11,7 @@ const readConfig = (): AdminConfig => {
             apiPath: '/api',
             routes: {},
             groups: {},
+            lists: {},
         };
     }
 };
