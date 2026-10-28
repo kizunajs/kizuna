@@ -1,0 +1,77 @@
+---
+title: The admin
+description: 'The CMS in a browser tab: every collection in a list, the fields beside your site, and every version of a page.'
+---
+
+Some work needs room. Tagging forty articles, finding last week's orders, or reading a page beside the site it changes is easier on a full screen than in a chat. The admin is that screen. It saves to the same drafts as the chat and the page, under the same rules, so an editor moves between them freely.
+
+## Signing in
+
+The admin is at `/cms` on your site. Editors sign in the way they sign in to your app, as the editor identity under `auth` on `cms()`. A signed-out editor is sent to your `signInPath` and comes back once they are in. Kizuna keeps no accounts and stores no passwords.
+
+```ts title="kizuna.config.ts"
+content: cms({
+    auth: {
+        identity: 'editor',
+    },
+    signInPath: '/login',
+}),
+```
+
+## The sidebar
+
+The sidebar opens on the [dashboard](/docs/cms/dashboard), and lists everything the editor may open under headings. A heading comes from `group` on a global, collection or view:
+
+```ts title="src/cms/orders.ts"
+export const Orders = defineView({
+    name: 'orders',
+    group: 'Shop',
+    fields: orderFields,
+    list: searchOrders,
+    get: getOrder,
+});
+```
+
+Pages sit under Content, and so does anything without a `group`. A view the editor may not see is left out, along with whatever else their [access](/docs/cms/editing/access) keeps from them. ⌘K searches everything in the sidebar.
+
+## Lists
+
+A collection or view opens as a list. Its options decide what the list shows:
+
+| Option    | The list                                                             |
+| --------- | -------------------------------------------------------------------- |
+| `title`   | The field each row is named by                                       |
+| `columns` | The columns it starts with. Each editor can show and hide their own. |
+| `search`  | The fields the search box looks in                                   |
+| `indexes` | The fields it filters and sorts by, beside the item's status         |
+
+Tick rows and a bar offers **Publish**, **Unpublish** and **Delete** for all of them at once, asking first, as a single publish does. A field holding a list of ids, like an article's `tags`, adds **Add tag** to the bar. A long list comes in pages, with the number of items above it.
+
+A view's list is what its `list` function returns for the search box.
+
+## Editing
+
+An item opens on three tabs:
+
+- **Edit** shows the fields with their [layout](/docs/cms/fields#layout): tabs, rows, collapsible sections and the sidebar.
+- **Live preview** puts your site in [draft mode](/docs/cms/next#draft-mode) where the sidebar was, at desktop or phone width. What you type shows on the page as you type it, through [live updates](/docs/cms/next#live-updates).
+- **Versions** lists every draft and published copy, with who saved it. **Compare** shows what changed since, and **Restore** makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual.
+
+The draft saves a moment after you stop typing, and the header says when it last did. **Save draft** saves at once. **Ask for review** sends it to someone to look at first, as in [Reviews](/docs/cms/editing/reviews), and **Publish** lists every change and asks you to confirm.
+
+## The admin, the page and the chat
+
+All three write the same drafts through the same `editing` routes, so a rule the admin keeps holds for a model too. What differs is how much room each has:
+
+|                     | The admin                  | MCP tools               | A view in the chat           |
+| ------------------- | -------------------------- | ----------------------- | ---------------------------- |
+| Signing in          | Your editor identity       | OAuth, through the host | The host signs in            |
+| Dashboard           | Widgets and charts         | The numbers, as data    | No                           |
+| Lists, bulk actions | Search, filters and paging | Change many at once     | No, long lists need room     |
+| Editing fields      | Tabs, rows and sidebar     | Saves drafts by field   | A quick change of a field    |
+| Live preview        | Beside the fields          | No                      | Depends on the host's frames |
+| Versions            | Compare and restore        | List and restore        | No                           |
+| Publishing          | Publish, after a confirm   | Always asks first       | The approval, as a card      |
+| Actions, like Send  | Buttons                    | One tool per action     | The confirm, as a card       |
+
+A model reads a collection the way the admin lists it, and a nested collection like [tags](/docs/cms/collections#trees) arrives as its tree. [Agents and tools](/docs/cms/editing/agents) lists the tools.

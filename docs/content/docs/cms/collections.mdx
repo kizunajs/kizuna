@@ -94,6 +94,50 @@ The CMS records every id an item holds as it saves, so this needs no index and n
 },
 ```
 
+## Trees
+
+A shop's tags nest: Workshop sits under Lighting, and Brushed brass under Brass under Materials. A collection whose items point at one of their own is a tree, and `tree` names the field that points up:
+
+```ts title="src/cms/content.ts"
+export const TagId = Kizuna.brand('TagId', z.string());
+
+export const Tags = defineCollection({
+    name: 'tags',
+    id: TagId,
+    group: 'Content',
+    tree: 'parent',
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().max(40),
+        },
+        {
+            name: 'parent',
+            schema: TagId.optional(),
+            position: 'sidebar',
+        },
+    ],
+});
+```
+
+A tag without a `parent` is at the top. An article holds its tags as it holds any item:
+
+```ts title="src/cms/content.ts"
+{
+    name: 'tags',
+    schema: z.array(Tags.id),
+    position: 'sidebar',
+},
+```
+
+Wherever a tag appears, editors and the model see it by its path, like "Lighting / Workshop". In the [admin](/docs/cms/editing/admin):
+
+- The tags list shows the tree, and dragging a row onto another tag sets its `parent` in a draft.
+- The article's picker shows the tree too, so an editor finds Workshop by opening Lighting.
+- A filter on a tag can include every tag under it, so "Lighting and below" finds an article tagged Workshop.
+
+A save that would put a tag under itself, or under one of its own, is refused. Pages need no `tree`, since each already sits beside its route.
+
 ## Actions
 
 An action is a button on an item, and its handler is your code. A newsletter is content, so it is a collection, and sending it is an action:

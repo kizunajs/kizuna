@@ -1,0 +1,78 @@
+---
+title: Dashboard
+description: "The admin's first page: your shop's numbers, the reviews waiting on you, and a way into every collection."
+---
+
+An editor opening the [admin](/docs/cms/editing/admin) wants to know what needs them: how the shop is doing, what is waiting for their review, and where to start writing. The dashboard shows that, from widgets you list under `dashboard` on `cms()`:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    dashboard: [
+        {
+            type: 'stat',
+            label: 'Revenue this week',
+            value: revenueThisWeek,
+            auth: {
+                roles: 'admin',
+            },
+        },
+        {
+            type: 'chart',
+            label: 'Orders per day',
+            data: ordersPerDay,
+        },
+        {
+            type: 'reviews',
+        },
+        {
+            type: 'collections',
+        },
+    ],
+}),
+```
+
+A widget is a plain object with a `type`, the way a [layout](/docs/cms/fields#layout) item is, and the dashboard shows them in the order listed.
+
+| `type`        | Shows                                                                                                        | Takes            |
+| ------------- | ------------------------------------------------------------------------------------------------------------ | ---------------- |
+| `stat`        | One number                                                                                                   | `label`, `value` |
+| `chart`       | Bars over time                                                                                               | `label`, `data`  |
+| `reviews`     | The reviews waiting on the person signed in                                                                  |                  |
+| `collections` | Every collection and view they may open, by group, with a count and, on a collection, a **+** for a new item |                  |
+
+Without `dashboard`, the admin shows `reviews` and `collections`.
+
+## Numbers from your code
+
+A `stat` or `chart` gets its numbers from your function, which runs on your server when the dashboard opens. Revenue can come from Stripe and orders from your own database, since the CMS never needs to hold them. Each function receives `editor` and `plugins`.
+
+`value` returns what the stat shows:
+
+```ts title="src/cms/dashboard.ts"
+export async function revenueThisWeek() {
+    const total = await revenueSince(startOfWeek(new Date()));
+    return formatKroner(total);
+}
+```
+
+Return `{ value, detail }` to add a line under the number, like "Up 12% on last week".
+
+`data` returns the chart's bars, oldest first:
+
+```ts title="src/cms/dashboard.ts"
+export async function ordersPerDay() {
+    const days = await countOrdersByDay({
+        days: 14,
+    });
+    return days.map((day) => ({
+        label: formatDay(day.date),
+        value: day.count,
+    }));
+}
+```
+
+## Who sees a widget
+
+`auth` on a widget keeps it to some editors, written the way a [route's `auth`](/docs/access-control) is: `roles`, or `requires` for permissions. In the config above, editors never see revenue. The server checks it, so a widget's function never runs for someone who may not see it.
+
+The built-in widgets follow the editor's own [access](/docs/cms/editing/access): `collections` lists only what they may open, and `reviews` only what they were asked to look at.

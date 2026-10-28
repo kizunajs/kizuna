@@ -11,6 +11,7 @@ defineView(definition: ViewDefinition): View
 | ---------------------------- | -------------------------------- | ----------------------------------------------------------------------- |
 | `name`                       | `string`                         | The view's key, camelCase                                               |
 | `label`                      | `string`                         | What editors see it called. Without it, the name, written out           |
+| `group`                      | `string`                         | A heading it is listed under in the admin                               |
 | `auth`                       | `{ roles?, requires? }`          | Who sees the view at all                                                |
 | `fields`                     | `Field[]`                        | What editors see of each record, with [layout](/docs/cms/fields#layout) |
 | `list`                       | `({ query, editor }) => items`   | The records matching the search box                                     |

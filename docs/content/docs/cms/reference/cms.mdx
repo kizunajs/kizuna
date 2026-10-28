@@ -15,6 +15,7 @@ content: cms({
     collections,
     relationships,
     views,
+    dashboard,
     auth,
     reviews,
     media,
@@ -42,6 +43,7 @@ content: cms({
 | `collections`   | `defineCollection` results, shared by every site                                          |
 | `relationships` | `defineRelationship` results                                                              |
 | `views`         | `defineView` results: data the CMS shows but does not store                               |
+| `dashboard`     | The admin's first page: `stat`, `chart`, `reviews` and `collections` widgets              |
 | `auth`          | `identity`, `roles`, `sites`, `publish`, `people`, `invalidate`                           |
 | `reviews`       | `roles` that may approve, `onReviewRequested`                                             |
 | `media`         | S3 settings or a `storage`, `publicPath`, `maxBytes`                                      |
