@@ -38,16 +38,27 @@ export const editingRoutesOf = (api: PluginApi): Record<string, AdminRoute> =>
             ])
     );
 
-export const adminConfigFor = (options: ResolvedCmsOptions, api: PluginApi): AdminConfig => ({
-    lists: listOptionsOf(options.collections ?? []),
+/**
+ * The role in an editor's claims that lets them edit, or their first one when
+ * every role may.
+ */
+export const editingRoleOf = (role: unknown, editingRoles: readonly string[] | undefined): string | null => {
+    const held = (Array.isArray(role) ? role : [role]).filter((candidate): candidate is string => typeof candidate === 'string');
+    return held.find((candidate) => editingRoles === undefined || editingRoles.includes(candidate)) ?? null;
+};
+
+export const adminConfigFor = (options: ResolvedCmsOptions, api: PluginApi, role: string | null = null): AdminConfig => ({
     siteUrl: originOf(options.preview?.url),
     apiPath: options.apiPath ?? '/api',
+    role,
+    signOutPath: options.signOutPath ?? null,
     routes: editingRoutesOf(api),
     groups: Object.fromEntries(
         [...(options.collections ?? []), ...(options.views ?? [])].flatMap((definition) =>
             definition.group === undefined ? [] : [[definition.name, definition.group]]
         )
     ),
+    lists: listOptionsOf(options.collections ?? []),
 });
 
 /**
@@ -101,7 +112,9 @@ export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api
                 })
             );
         }
-        const page = (await readBuilt('admin.html')).replace(CONFIG_PLACEHOLDER, () => embedded(adminConfigFor(options, api)));
+        const page = (await readBuilt('admin.html')).replace(CONFIG_PLACEHOLDER, () =>
+            embedded(adminConfigFor(options, api, editingRoleOf(role, service.roles)))
+        );
         return rawResponse(
             new Response(page, {
                 status: 200,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EditorContext, type EditorContextValue } from '../view/context.js';
 import { Logo } from '../view/logo.js';
-import { Avatar, usePeople } from '../view/people.js';
+import { usePeople } from '../view/people.js';
 import { CommandPalette } from './command-palette.js';
 import type { AdminConfig } from './config.js';
 import { connectOverHttp } from './connection.js';
@@ -19,6 +19,7 @@ import {
     type Screen,
 } from './navigation.js';
 import { Loading } from './parts.js';
+import { SignedIn } from './signed-in.js';
 import { RecordScreen, ViewList } from './view-screen.js';
 import type { ViewSummary } from './views.js';
 
@@ -256,12 +257,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                             </div>
                         ))}
                     </div>
-                    {me === undefined ? null : (
-                        <div className="k-admin-nav-foot">
-                            <Avatar person={me} size={26} />
-                            <span className="k-ellipsis">{me.name}</span>
-                        </div>
-                    )}
+                    <SignedIn person={me} role={config.role} signOutPath={config.signOutPath} />
                 </nav>
                 <main className="k-admin-main">{shown}</main>
             </div>

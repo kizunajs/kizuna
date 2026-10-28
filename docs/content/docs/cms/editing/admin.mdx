@@ -18,6 +18,18 @@ content: cms({
 }),
 ```
 
+The foot of the sidebar shows who is signed in, with their role. Signing out belongs to your app too. Name the route that ends an editor's session as `signOutPath`, and a **Sign out** link sits beside their name. It is a link, so the route answers `GET`.
+
+```ts title="kizuna.config.ts"
+content: cms({
+    auth: {
+        identity: 'editor',
+    },
+    signInPath: '/login',
+    signOutPath: '/logout',
+}),
+```
+
 ## The sidebar
 
 The sidebar opens on the [dashboard](/docs/cms/dashboard), and lists everything the editor may open under headings. A heading comes from `group` on a global, collection or view:

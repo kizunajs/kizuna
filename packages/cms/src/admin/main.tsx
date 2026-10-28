@@ -9,6 +9,8 @@ const readConfig = (): AdminConfig => {
         return {
             siteUrl: null,
             apiPath: '/api',
+            role: null,
+            signOutPath: null,
             routes: {},
             groups: {},
             lists: {},

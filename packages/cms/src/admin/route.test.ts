@@ -69,6 +69,7 @@ const config = defineConfig({
             roles: ['editor'],
         },
         signInPath: '/login',
+        signOutPath: '/logout',
         apiPath: '/cms-api',
         preview: {
             url: 'https://site.example/blog',
@@ -121,5 +122,12 @@ describe('the admin route', () => {
             path: '/editing/collections/:name/items/:id/draft',
         });
         expect(served.routes['content_pages_get_page']).toBeUndefined();
+    });
+
+    it('tells the admin the role the editor signed in with, and where Sign out goes', async () => {
+        const response = await request(app).get('/admin').set('authorization', 'Bearer editor-token');
+        const served = configOf(response.text);
+        expect(served.role).toBe('editor');
+        expect(served.signOutPath).toBe('/logout');
     });
 });

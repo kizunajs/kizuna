@@ -20,6 +20,14 @@ export interface AdminConfig {
      */
     apiPath: string;
     /**
+     * The role the editor signed in with, shown under their name.
+     */
+    role: string | null;
+    /**
+     * Where Sign out goes, from `signOutPath` on `cms()`.
+     */
+    signOutPath: string | null;
+    /**
      * The editing routes, by the tool name the editor calls them by.
      */
     routes: Record<string, AdminRoute>;

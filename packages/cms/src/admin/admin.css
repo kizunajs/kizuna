@@ -831,6 +831,50 @@ a.k-admin-row:hover {
     }
 }
 
+/* The editor signed in, at the foot of the sidebar. */
+
+.k-admin-signed-in {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    color: var(--k-ink);
+}
+
+.k-admin-role {
+    font-size: 11.5px;
+    color: var(--k-muted);
+}
+
+.k-admin-sign-out {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 4px 8px;
+    border-radius: 8px;
+    color: var(--k-muted);
+}
+
+.k-admin-sign-out:hover {
+    background: var(--k-tint);
+    color: var(--k-ink);
+}
+
+.k-admin-sign-out:focus-visible {
+    outline: 2px solid var(--k-ink);
+    outline-offset: 2px;
+}
+
+/* Phones keep signing out, though the sidebar folds into a row. */
+@media (max-width: 860px) {
+    .k-admin-nav-foot {
+        display: flex;
+        padding-inline: 0;
+    }
+}
+
 /* List rows that link, tick, nest and drag; the filter chips and the bulk bar over them. */
 
 .k-admin-row[data-linked] {

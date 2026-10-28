@@ -284,6 +284,11 @@ export interface CmsPluginOptions<
      */
     signInPath?: string;
     /**
+     * Where the admin's Sign out link goes: a page or route of your app that
+     * ends the editor's session. Without one, the admin shows no link.
+     */
+    signOutPath?: string;
+    /**
      * Where the site is, so the editor can show its draft beside the form.
      *
      * @example
@@ -429,6 +434,7 @@ export const CmsPluginOptionsSchema = z
         previewSecret: z.string().optional(),
         revalidate: z.custom<CmsPluginOptions['revalidate']>(isFunction).optional(),
         signInPath: z.string().optional(),
+        signOutPath: z.string().optional(),
         preview: z
             .object({
                 url: z.url(),

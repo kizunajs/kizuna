@@ -24,6 +24,7 @@ content: cms({
     on,
     preview,
     signInPath,
+    signOutPath,
     apiPath,
     path,
     revalidate,
@@ -52,6 +53,7 @@ content: cms({
 | `on`            | `published`, `unpublished`, `deleted` for every document                                  |
 | `preview`       | `url` of the site, for the editor's preview                                               |
 | `signInPath`    | Where a signed-out editor is sent                                                         |
+| `signOutPath`   | Where the admin's Sign out link goes, a route of your app that ends the session           |
 | `apiPath`       | Where the config is mounted, default `/api`                                               |
 | `path`          | Where the CMS routes sit under it, default `/cms`                                         |
 | `revalidate`    | A function that revalidates tags, when the site runs elsewhere                            |
