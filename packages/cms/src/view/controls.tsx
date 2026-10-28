@@ -246,14 +246,19 @@ function NumberControl({ schema, value, onChange, disabled, id }: ControlProps) 
 
 function BooleanControl({ value, onChange, disabled, id }: ControlProps) {
     return (
-        <Switch.Root
-            className="k-switch"
-            id={id}
-            checked={value === true}
-            onCheckedChange={(checked) => onChange(checked)}
-            disabled={disabled}>
-            <Switch.Thumb className="k-switch__thumb" />
-        </Switch.Root>
+        <span className="k-toggle">
+            <Switch.Root
+                className="k-switch"
+                id={id}
+                checked={value === true}
+                onCheckedChange={(checked) => onChange(checked)}
+                disabled={disabled}>
+                <Switch.Thumb className="k-switch__thumb" />
+            </Switch.Root>
+            <span className="k-toggle__state" aria-hidden="true">
+                {value === true ? 'On' : 'Off'}
+            </span>
+        </span>
     );
 }
 

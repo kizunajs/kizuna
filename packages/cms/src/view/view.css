@@ -751,6 +751,18 @@
         color: var(--k-muted);
     }
 
+    .k-toggle {
+        display: inline-flex;
+        align-items: center;
+        align-self: flex-start;
+        gap: 10px;
+    }
+
+    .k-toggle__state {
+        font-size: 14px;
+        color: var(--k-muted);
+    }
+
     .k-switch {
         position: relative;
         display: inline-flex;
