@@ -150,16 +150,7 @@ export const Footer = defineGlobal({
     group: 'Site',
     fields: [
         {
-            name: 'tagline',
-            schema: z.string().min(1).max(160).describe('One line under the logo.'),
-        },
-        {
-            name: 'navItems',
-            label: 'Links',
-            schema: z.array(LinkSchema).max(8),
-        },
-        {
-            type: 'collapsible',
+            type: 'tab',
             label: 'Newsletter',
             fields: [
                 {
@@ -175,22 +166,9 @@ export const Footer = defineGlobal({
             ],
         },
         {
-            type: 'collapsible',
-            label: 'The shop',
+            type: 'tab',
+            label: 'Visit',
             fields: [
-                {
-                    type: 'row',
-                    fields: [
-                        {
-                            name: 'contactEmail',
-                            schema: z.email(),
-                        },
-                        {
-                            name: 'phone',
-                            schema: z.string().min(1).max(20),
-                        },
-                    ],
-                },
                 {
                     name: 'address',
                     schema: z.string().min(1).max(120),
@@ -206,6 +184,34 @@ export const Footer = defineGlobal({
                         )
                         .max(7)
                         .default([]),
+                },
+                {
+                    type: 'row',
+                    fields: [
+                        {
+                            name: 'contactEmail',
+                            schema: z.email(),
+                        },
+                        {
+                            name: 'phone',
+                            schema: z.string().min(1).max(20),
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Links',
+            fields: [
+                {
+                    name: 'tagline',
+                    schema: z.string().min(1).max(160).describe('One line under the logo.'),
+                },
+                {
+                    name: 'navItems',
+                    label: 'Links',
+                    schema: z.array(LinkSchema).max(8),
                 },
             ],
         },

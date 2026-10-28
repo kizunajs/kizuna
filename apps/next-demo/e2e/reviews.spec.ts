@@ -7,6 +7,11 @@ test('an editor names an owner and asks her to review, and she approves it so it
     let editor = await openEditor(edda, '/contact');
     await editor.locator('#field-heading-input').fill('Ask the growers');
     await editor.locator('#field-intro-input').fill('We answer every weekday from 9 to 16.');
+    await editor
+        .getByRole('tab', {
+            name: 'Form',
+        })
+        .click();
     await editor.locator('#field-buttonLabel-input').fill('Send');
     await editor.locator('#field-thanks-input').fill('Thanks. We will be in touch today.');
     await expect(

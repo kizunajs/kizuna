@@ -31,26 +31,26 @@ export default definePage({
                     name: 'caption',
                     schema: z.string().max(80).optional().describe('A few words under the photo.'),
                 },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Hiring',
+            fields: [
                 {
-                    type: 'collapsible',
-                    label: 'Hiring',
-                    fields: [
-                        {
-                            name: 'hiringHeading',
-                            label: 'Hiring heading',
-                            schema: HeadingSchema.optional().describe('Leave empty to hide the band at the end of the page.'),
-                        },
-                        {
-                            name: 'hiringText',
-                            label: 'Hiring text',
-                            schema: z.string().max(200).optional(),
-                        },
-                        {
-                            name: 'hiringEmail',
-                            label: 'Hiring email',
-                            schema: z.email().optional(),
-                        },
-                    ],
+                    name: 'hiringHeading',
+                    label: 'Hiring heading',
+                    schema: HeadingSchema.optional().describe('Leave empty to hide the band at the end of the page.'),
+                },
+                {
+                    name: 'hiringText',
+                    label: 'Hiring text',
+                    schema: z.string().max(200).optional(),
+                },
+                {
+                    name: 'hiringEmail',
+                    label: 'Hiring email',
+                    schema: z.email().optional(),
                 },
             ],
         },

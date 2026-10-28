@@ -10,12 +10,14 @@ test.describe('the editor in a host', () => {
         const editor = await openEditor(page, '/team');
         await expect(editor.locator('.k-header__name')).toHaveText('Team');
         await expect(
-            editor.getByLabel('Heading', {
+            editor.getByRole('textbox', {
+                name: 'Heading',
                 exact: true,
             })
         ).toBeVisible();
         await expect(
-            editor.getByLabel('Intro', {
+            editor.getByRole('textbox', {
+                name: 'Intro',
                 exact: true,
             })
         ).toBeVisible();

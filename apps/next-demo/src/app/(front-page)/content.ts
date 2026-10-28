@@ -16,8 +16,8 @@ import {
 import { ToneSchema, tones } from '../../cms/schemas';
 
 /**
- * The front page. Its sections are filled in under Content, and the sidebar
- * picks which of them show and in what order.
+ * The front page, a tab per section. The sidebar picks which sections show
+ * and in what order.
  */
 export default definePage({
     name: 'frontPage',
@@ -25,37 +25,80 @@ export default definePage({
     fields: [
         {
             type: 'tab',
-            label: 'Content',
+            label: 'Hero',
             fields: [
                 {
                     name: 'hero',
                     schema: HeroBlockSchema,
                 },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Statement',
+            fields: [
                 {
                     name: 'statement',
                     schema: StatementBlockSchema.optional(),
                 },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Categories',
+            fields: [
                 {
                     name: 'categories',
                     schema: CategoriesBlockSchema.optional(),
                 },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Products',
+            fields: [
                 {
                     name: 'products',
                     schema: ProductsBlockSchema.optional(),
                 },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Photo',
+            fields: [
                 {
                     name: 'photo',
                     label: 'Wide photo',
                     schema: MediaBlockSchema.optional(),
                 },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Columns',
+            fields: [
                 {
                     name: 'columns',
                     schema: ContentBlockSchema.optional(),
                 },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Journal',
+            fields: [
                 {
                     name: 'articles',
+                    label: 'Articles',
                     schema: ArchiveBlockSchema.optional(),
                 },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Call to action',
+            fields: [
                 {
                     name: 'callToAction',
                     label: 'Call to action',
