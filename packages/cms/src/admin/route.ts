@@ -9,9 +9,27 @@ import type { AdminConfig, AdminRoute } from './config.js';
 import { listOptionsOf } from './list-options.js';
 
 /**
- * Where the admin is served, under the CMS's `path`.
+ * Where the admin is served under the CMS's `path`, unless `adminPath` names
+ * another.
  */
 export const ADMIN_PATH = '/admin';
+
+/**
+ * Where the browser opens the admin, from the site's root.
+ */
+export const adminPathOf = (options: ResolvedCmsOptions, base: '' | `/${string}`): string =>
+    options.adminPath ?? `${options.apiPath ?? '/api'}${base}${ADMIN_PATH}`;
+
+/**
+ * The admin route's path: within the API when `adminPath` is under `apiPath`,
+ * and the whole of it otherwise, for a mount at the site's root.
+ */
+export const adminRoutePathOf = (options: ResolvedCmsOptions, base: '' | `/${string}`): `/${string}` => {
+    const adminPath = adminPathOf(options, base);
+    const mount = (options.apiPath ?? '/api').replace(/\/+$/, '');
+    if (adminPath === mount) return '/';
+    return (adminPath.startsWith(`${mount}/`) ? adminPath.slice(mount.length) : adminPath) as `/${string}`;
+};
 
 const originOf = (url: string | undefined): string | null => {
     if (url === undefined) return null;
@@ -68,13 +86,14 @@ export const adminConfigFor = (options: ResolvedCmsOptions, api: PluginApi, role
 const embedded = (config: AdminConfig): string => JSON.stringify(config).replaceAll('<', '\\u003c');
 
 /**
- * `GET /admin`: the CMS in a browser tab, for an editor signed in as the
- * editor identity. Anyone else goes to `signInPath`, and comes back after.
+ * `GET /admin`, or `adminPath`: the CMS in a browser tab, for an editor signed
+ * in as the editor identity. Anyone else goes to `signInPath`, and comes back
+ * after.
  */
 export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: PluginApi, base: '' | `/${string}`) =>
     route({
         method: 'GET',
-        path: `${base}${ADMIN_PATH}`,
+        path: adminRoutePathOf(options, base),
         auth: false,
         summary: 'The admin, for a signed-in editor',
         responses: {
@@ -102,12 +121,11 @@ export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api
                     })
                 );
             }
-            const back = `${options.apiPath ?? '/api'}${base}${ADMIN_PATH}`;
             return rawResponse(
                 new Response(null, {
                     status: 307,
                     headers: {
-                        location: `${options.signInPath}?next=${encodeURIComponent(back)}`,
+                        location: `${options.signInPath}?next=${encodeURIComponent(adminPathOf(options, base))}`,
                     },
                 })
             );

@@ -7,7 +7,7 @@ Some work needs room. Tagging forty articles, finding last week's orders, or rea
 
 ## Signing in
 
-The admin is at `/admin` under the CMS's routes, so `/api/admin` with the default `apiPath`. Editors sign in the way they sign in to your app, as the editor identity under `auth` on `cms()`. A signed-out editor is sent to your `signInPath` and comes back once they are in. Kizuna keeps no accounts and stores no passwords.
+The admin is at `/admin` under the CMS's routes, so `/api/admin` with the default `apiPath`. Editors sign in the way they sign in to your app, as the editor identity under `auth` on `cms()`. A signed-out editor is sent to your `signInPath` and comes back to the admin once they are in. Kizuna keeps no accounts and stores no passwords.
 
 ```ts title="kizuna.config.ts"
 content: cms({
@@ -29,6 +29,30 @@ content: cms({
     signOutPath: '/logout',
 }),
 ```
+
+## Its address
+
+Editors bookmark the admin, so give it an address they remember. `adminPath` is the path from your site's root:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    auth: {
+        identity: 'editor',
+    },
+    signInPath: '/login',
+    adminPath: '/admin',
+}),
+```
+
+A path under `apiPath` is served by the mount you already have. Anywhere else, like `/admin` above, mount the config a second time at the site's root, from a route file at the admin's path:
+
+```ts title="src/app/admin/route.ts"
+import kizuna from '@kizuna-config';
+
+export const { GET, HEAD } = kizuna.api.mount();
+```
+
+With no `basePath`, the route matches the path as the browser sent it, and Next sends this file nothing but `/admin`. The admin calls the CMS's routes at `apiPath` wherever it is served, and an editor who signs in comes back to `adminPath`.
 
 ## The sidebar
 

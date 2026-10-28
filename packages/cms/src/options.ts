@@ -289,6 +289,19 @@ export interface CmsPluginOptions<
      */
     signOutPath?: string;
     /**
+     * Where the admin is served, from the site's root. A path under `apiPath`
+     * is served by the API's own mount. Anywhere else, mount the API a second
+     * time at the root, from a route file at this path.
+     *
+     * @default `/admin` under `apiPath` and `path`, so '/api/admin'
+     *
+     * @example
+     * ```ts
+     * adminPath: '/admin',
+     * ```
+     */
+    adminPath?: `/${string}`;
+    /**
      * Where the site is, so the editor can show its draft beside the form.
      *
      * @example
@@ -435,6 +448,7 @@ export const CmsPluginOptionsSchema = z
         revalidate: z.custom<CmsPluginOptions['revalidate']>(isFunction).optional(),
         signInPath: z.string().optional(),
         signOutPath: z.string().optional(),
+        adminPath: RoutePathSchema.optional(),
         preview: z
             .object({
                 url: z.url(),

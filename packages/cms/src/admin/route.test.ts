@@ -53,31 +53,45 @@ const Articles = defineCollection({
 });
 
 const pglite = new PGlite();
-const config = defineConfig({
-    adapter: expressAdapter(),
-    auth: {
-        identities: {
-            editor,
-        },
-    },
-    content: cms({
-        db: drizzle(pglite),
-        pages: {},
-        collections: [Articles],
+const configWith = (adminPath?: `/${string}`) =>
+    defineConfig({
+        adapter: expressAdapter(),
         auth: {
-            identity: 'editor',
-            roles: ['editor'],
+            identities: {
+                editor,
+            },
         },
-        signInPath: '/login',
-        signOutPath: '/logout',
-        apiPath: '/cms-api',
-        preview: {
-            url: 'https://site.example/blog',
-        },
-    }),
-});
+        content: cms({
+            db: drizzle(pglite),
+            pages: {},
+            collections: [Articles],
+            auth: {
+                identity: 'editor',
+                roles: ['editor'],
+            },
+            signInPath: '/login',
+            signOutPath: '/logout',
+            apiPath: '/cms-api',
+            adminPath,
+            preview: {
+                url: 'https://site.example/blog',
+            },
+        }),
+    });
+const config = configWith();
 const app = express();
 config.api.mount(app);
+
+/**
+ * An app serving the CMS API at `/cms-api`, as the docs mount it.
+ */
+const appServing = (adminPath: `/${string}`) => {
+    const served = express();
+    const cmsApi = express.Router();
+    configWith(adminPath).api.mount(cmsApi);
+    served.use('/cms-api', cmsApi);
+    return served;
+};
 
 afterAll(async () => {
     await pglite.close();
@@ -129,5 +143,33 @@ describe('the admin route', () => {
         const served = configOf(response.text);
         expect(served.role).toBe('editor');
         expect(served.signOutPath).toBe('/logout');
+    });
+});
+
+describe('adminPath', () => {
+    it('serves the admin under apiPath from the API mount', async () => {
+        const served = appServing('/cms-api/editor');
+        const signedIn = await request(served).get('/cms-api/editor').set('authorization', 'Bearer editor-token');
+        expect(signedIn.status).toBe(200);
+        expect(configOf(signedIn.text).apiPath).toBe('/cms-api');
+        const signedOut = await request(served).get('/cms-api/editor');
+        expect(signedOut.headers['location']).toBe(`/login?next=${encodeURIComponent('/cms-api/editor')}`);
+    });
+
+    it('serves the admin outside apiPath from a second mount at the root', async () => {
+        const served = express();
+        const cmsApi = express.Router();
+        const atRoot = express.Router();
+        const moved = configWith('/editor');
+        moved.api.mount(cmsApi);
+        moved.api.mount(atRoot);
+        served.use('/cms-api', cmsApi);
+        served.get('/editor', atRoot);
+        const signedIn = await request(served).get('/editor').set('authorization', 'Bearer editor-token');
+        expect(signedIn.status).toBe(200);
+        expect(configOf(signedIn.text).apiPath).toBe('/cms-api');
+        const signedOut = await request(served).get('/editor');
+        expect(signedOut.status).toBe(307);
+        expect(signedOut.headers['location']).toBe(`/login?next=${encodeURIComponent('/editor')}`);
     });
 });
