@@ -2,15 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.js';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
-import { FieldForm, type SaveFailure, type SaveState } from '../view/form.js';
+import { FieldForm, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
 import { OwnerControl, ReviewBadge, type People } from '../view/people.js';
 import { PublishReview } from '../view/review.js';
 import { documentTitle, valueAt, type Description, type Draft } from '../view/schema.js';
 import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
+import { ItemActions } from './action-buttons.js';
 import { hrefOf } from './navigation.js';
 import { Loading, SaveIndicator, Status, Topbar, problemOf } from './parts.js';
-import { ItemActions } from './action-buttons.js';
+import { AdminPreview } from './preview-pane.js';
+import { Versions } from './versions.js';
 import type { WaitingReview } from './dashboard.js';
 
 /**
@@ -23,6 +25,28 @@ const POLL_MS = 3000;
  * How long a field someone else changed stays marked.
  */
 const CHANGED_MS = 4000;
+
+/**
+ * How long the field the person pointed at in the preview stays marked.
+ */
+const POINTED_MS = 1600;
+
+type DocumentTab = 'edit' | 'preview' | 'versions';
+
+const TABS: Array<{ key: DocumentTab; label: string }> = [
+    {
+        key: 'edit',
+        label: 'Edit',
+    },
+    {
+        key: 'preview',
+        label: 'Live preview',
+    },
+    {
+        key: 'versions',
+        label: 'Versions',
+    },
+];
 
 interface Problem {
     detail?: string;
@@ -86,7 +110,8 @@ const crumbOf = (ref: string, collectionLabel: (name: string) => string | undefi
 
 /**
  * One document's fields in the editor's form, saved to its draft as the
- * person types, with its owner, its review and Publish in the bar above.
+ * person types, with its owner, its review and Publish in the bar above. Its
+ * tabs put the site in draft mode beside the fields, and list its versions.
  */
 export function DocumentScreen({
     connection,
@@ -111,6 +136,11 @@ export function DocumentScreen({
     const [formKey, setFormKey] = useState(0);
     const [changed, setChanged] = useState<ReadonlySet<string>>(new Set());
     const [linkProblem, setLinkProblem] = useState<string | undefined>();
+    const [tab, setTab] = useState<DocumentTab>('edit');
+    // The preview stays loaded once opened, so going back to it shows the page where it was.
+    const [previewOpened, setPreviewOpened] = useState(false);
+    const [pointed, setPointed] = useState<string | undefined>();
+    const form = useRef<FieldFormHandle>(null);
     const seen = useRef<string | null>(null);
     const busy = useRef(false);
     const saves = useRef(0);
@@ -179,6 +209,32 @@ export function DocumentScreen({
         const timer = window.setTimeout(() => setChanged(new Set()), CHANGED_MS);
         return () => window.clearTimeout(timer);
     }, [changed]);
+
+    useEffect(() => {
+        if (pointed === undefined) return;
+        const timer = window.setTimeout(() => setPointed(undefined), POINTED_MS);
+        return () => window.clearTimeout(timer);
+    }, [pointed]);
+
+    /**
+     * A click on a field in the preview: one of this document's points at it
+     * in the form, and another document's opens that document.
+     */
+    const pointAt = useCallback((ref: string | null, path: string, framedPath: string | undefined): void => {
+        const current = latest.current;
+        if (current === undefined) return;
+        const own = ref === null ? current.kind === 'page' && current.path === framedPath : ref === current.ref;
+        if (own) {
+            setPointed(path);
+            return;
+        }
+        if (ref !== null) {
+            window.location.hash = hrefOf({
+                kind: 'document',
+                ref,
+            });
+        }
+    }, []);
 
     const save = useCallback(
         async (ref: string, changes: Record<string, unknown>): Promise<SaveFailure | undefined> => {
@@ -307,6 +363,12 @@ export function DocumentScreen({
     }
 
     const title = documentTitle(document);
+    const previewPath = document.path ?? document.usedOn.pages[0]?.path ?? '/';
+    const unsaved = saveState === 'pending' || saveState === 'saving';
+    const showTab = (key: DocumentTab): void => {
+        setTab(key);
+        if (key === 'preview') setPreviewOpened(true);
+    };
     return (
         <EditorContext.Provider value={editorContext}>
             <Topbar crumb={crumbNode} title={title}>
@@ -338,6 +400,13 @@ export function DocumentScreen({
                         </button>
                     ) : null}
                 </div>
+                <button
+                    type="button"
+                    className="k-button k-button-secondary"
+                    disabled={saveState !== 'pending'}
+                    onClick={() => void form.current?.flush()}>
+                    Save draft
+                </button>
                 <PublishReview
                     connection={connection}
                     candidates={reviewCandidates}
@@ -353,40 +422,86 @@ export function DocumentScreen({
                 />
             </Topbar>
             <div className="k-admin-body">
+                <div className="k-tab-bar k-admin-document-tabs" role="tablist" aria-label="Document">
+                    {TABS.map((entry) =>
+                        entry.key === 'preview' && siteUrl === null ? null : (
+                            <button
+                                key={entry.key}
+                                id={`document-tab-${entry.key}`}
+                                type="button"
+                                role="tab"
+                                aria-selected={tab === entry.key}
+                                aria-controls={`document-panel-${entry.key}`}
+                                className="k-tab"
+                                onClick={() => showTab(entry.key)}>
+                                {entry.label}
+                            </button>
+                        )
+                    )}
+                </div>
                 {linkProblem === undefined ? null : (
                     <p className="k-error" role="alert">
                         {linkProblem}
                     </p>
                 )}
-                {document.usedOn.everywhere ? <p className="k-note">This shows on every page.</p> : null}
-                {!document.complete && document.missing.length > 0 ? (
-                    <p className="k-note">Fill in {document.missing.join(', ')} before publishing.</p>
-                ) : null}
-                <FieldForm
-                    key={`${document.ref}:${formKey}`}
-                    fields={document.fields}
-                    layout={document.layout}
-                    draft={document.draft}
-                    onSave={(changes) => save(document.ref, changes)}
-                    onState={(state) => {
-                        typing.current = state === 'pending' || state === 'saving';
-                        setSaveState(state);
-                    }}
-                    changed={changed}
-                    pointed={undefined}
-                />
-                {document.kind === 'item' ? (
-                    <ItemActions
-                        connection={connection}
-                        documentRef={document.ref}
-                        actions={document.actions}
-                        onRan={() =>
-                            void describe(document.ref, {
-                                remount: false,
-                            })
-                        }
-                    />
-                ) : null}
+                <div
+                    id={`document-panel-${tab}`}
+                    role="tabpanel"
+                    aria-labelledby={`document-tab-${tab}`}
+                    className="k-admin-editing"
+                    data-tab={tab}>
+                    <div className="k-admin-editing-fields" hidden={tab === 'versions'}>
+                        {document.usedOn.everywhere ? <p className="k-note">This shows on every page.</p> : null}
+                        {!document.complete && document.missing.length > 0 ? (
+                            <p className="k-note">Fill in {document.missing.join(', ')} before publishing.</p>
+                        ) : null}
+                        <FieldForm
+                            key={`${document.ref}:${formKey}`}
+                            ref={form}
+                            fields={document.fields}
+                            layout={document.layout}
+                            draft={document.draft}
+                            onSave={(changes) => save(document.ref, changes)}
+                            onState={(state) => {
+                                typing.current = state === 'pending' || state === 'saving';
+                                setSaveState(state);
+                            }}
+                            changed={changed}
+                            pointed={pointed}
+                        />
+                        {document.kind === 'item' ? (
+                            <ItemActions
+                                connection={connection}
+                                documentRef={document.ref}
+                                actions={document.actions}
+                                onRan={() =>
+                                    void describe(document.ref, {
+                                        remount: false,
+                                    })
+                                }
+                            />
+                        ) : null}
+                    </div>
+                    {previewOpened && siteUrl !== null ? (
+                        <div className="k-admin-preview" hidden={tab !== 'preview'}>
+                            <AdminPreview connection={connection} siteUrl={siteUrl} path={previewPath} onPoint={pointAt} />
+                        </div>
+                    ) : null}
+                    {tab === 'versions' ? (
+                        <Versions
+                            connection={connection}
+                            documentRef={document.ref}
+                            version={document.version}
+                            fields={document.fields}
+                            draft={document.draft}
+                            people={people}
+                            disabled={unsaved}
+                            onRestored={async () => {
+                                await describe(document.ref);
+                            }}
+                        />
+                    ) : null}
+                </div>
             </div>
         </EditorContext.Provider>
     );

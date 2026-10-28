@@ -1,4 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useImperativeHandle,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
+    type ReactNode,
+    type Ref,
+} from 'react';
 import { ChevronRight, CircleAlert } from 'lucide-react';
 import { arrange, inSidebar, tabSets, type Arranged } from './arrange.js';
 import { ICON } from './context.js';
@@ -37,6 +47,14 @@ export interface FieldFormProps {
      * The field the person pointed at in the preview.
      */
     pointed: string | undefined;
+    ref?: Ref<FieldFormHandle>;
+}
+
+export interface FieldFormHandle {
+    /**
+     * Saves what the person typed at once, instead of after the pause.
+     */
+    flush: () => Promise<void>;
 }
 
 const refusalFor = (field: DescribedField): string =>
@@ -51,7 +69,7 @@ const layoutId = (id: string): string => `layout-${id.replace(/[^a-zA-Z0-9_-]/g,
  * collapsibles, with the sidebar beside them when the form is wide enough. A
  * change saves to the draft a moment after typing stops.
  */
-export function FieldForm({ fields, layout, draft, onSave, onState, changed, pointed }: FieldFormProps) {
+export function FieldForm({ fields, layout, draft, onSave, onState, changed, pointed, ref }: FieldFormProps) {
     const [values, setValues] = useState<Record<string, unknown>>({});
     const [shownTabs, setShownTabs] = useState<Readonly<Record<string, string>>>({});
     const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -103,6 +121,14 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
         () => () => {
             void flush();
         },
+        [flush]
+    );
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            flush,
+        }),
         [flush]
     );
 
