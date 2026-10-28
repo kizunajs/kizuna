@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { readMetaBrand } from 'kizunajs/generator';
 import { assertFields, dataFields, shapeOf, type DataFieldOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
 import type { PageMigration } from './page.js';
+import { assertActions, type Action } from './action.js';
+import type { Resolved } from './output.js';
 
 /**
  * What every kind of content shares: its name, its fields, and the schema they
@@ -94,7 +96,31 @@ export interface CollectionDefinition<Name extends string, Fields extends FieldL
      * tree: 'parent',
      */
     tree?: DataFieldOf<Fields>['name'];
+    /**
+     * Buttons on an item, keyed by name, each running your own handler on the
+     * published item.
+     *
+     * @example
+     * actions: {
+     *     send: {
+     *         confirm: 'Send to everyone on the weekly list?',
+     *         handler: async ({ item, plugins }) => {
+     *             await plugins.resend.sendBroadcast({
+     *                 subject: item.subject,
+     *             });
+     *         },
+     *     },
+     * },
+     */
+    actions?: Readonly<Record<string, Action<CollectionItem<Fields, Id>>>>;
 }
+
+/**
+ * One published item of a collection, as an action receives it.
+ */
+export type CollectionItem<Fields extends FieldList, Id extends z.ZodType> = {
+    id: z.output<Id>;
+} & Resolved<z.output<z.ZodObject<ShapeOf<Fields>, z.core.$strip>>>;
 
 /**
  * Content with many instances and no route: team members, testimonials, FAQs.
@@ -178,6 +204,7 @@ export const defineCollection = <const Name extends string, const Fields extends
     for (const index of definition.indexes ?? []) {
         if (!names.has(index)) throw new Error(`${owner} indexes '${index}', which is not one of its fields.`);
     }
+    assertActions(definition.actions, owner);
     return {
         ...definition,
         [COLLECTION]: true,

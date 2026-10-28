@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { CropSchema, FocalPointSchema } from './image.js';
+import { AvailableActionSchema } from './action.js';
 
 /**
  * Where a page stands: nothing saved, a draft never published, published with
@@ -218,6 +219,7 @@ export const DescribedPageSchema = Kizuna.model({
                 'The tabs, rows and collapsibles that arrange the fields, in the order they are shown. Empty when the fields are listed plainly.'
             ),
         draft: z.record(z.string(), z.unknown()).nullable(),
+        actions: z.array(AvailableActionSchema).optional().describe("For an item, the buttons its collection's actions show the caller."),
         ...ReviewFields,
     }),
 });

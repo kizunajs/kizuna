@@ -12,9 +12,11 @@ export {
     type GlobalDefinition,
     type Collection,
     type CollectionDefinition,
+    type CollectionItem,
     type ContentDefinition,
 } from './definitions.js';
 export { formatRef, parseRef, type DocumentRef } from './refs.js';
+export { type Action, type ActionContext, type ActionHandler, type ActionOptions, type Editor } from './action.js';
 export { resolvedSchema, ResolvedImageSchema } from './content-schema.js';
 export {
     dataFields,

@@ -52,6 +52,7 @@ import { ImageQuerySchema, InvalidateBodySchema } from './wire.js';
 import { sameContent } from './same-content.js';
 import { assertReviewed, decideReviews, documentLabel, peopleOf, requestReviews, reviewOf, setOwner, waitingReviews } from './reviews.js';
 import type { Person } from './options.js';
+import { collectionActionRoutes, itemActions } from './action-routes.js';
 
 interface Args {
     params: Record<string, string>;
@@ -1270,6 +1271,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     layout: cms.describeLayout(ref),
                     draft,
                     ...(await reviewFields(cms, state)),
+                    ...(ref.type === 'item'
+                        ? {
+                              actions: await itemActions(cms, cms.collection(ref.collection), ref.id, cms.caller(args.auth)),
+                          }
+                        : {}),
                 },
                 headers: {
                     etag: state.etag,
@@ -1688,6 +1694,12 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 createUpload,
                 completeUpload,
             },
+            actions: collectionActionRoutes({
+                collections: options.collections ?? [],
+                editor,
+                editingBase,
+                guarded,
+            }),
             whereUsed,
             searchItems,
             createPreview,
