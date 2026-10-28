@@ -174,25 +174,20 @@
     /* The page header every screen shares: the trail back, the title large, a line of facts, and the actions. */
 
     .k-page-header {
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        padding: 18px var(--k-gutter) 8px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            'nav nav'
+            'title actions'
+            'meta meta'
+            'bar bar';
+        align-items: center;
+        column-gap: 24px;
+        padding: 20px var(--k-gutter) 8px;
     }
 
-    .k-page-header__top {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 14px 24px;
-    }
-
-    .k-page-header__main {
-        display: flex;
-        flex: 1 1 320px;
-        flex-direction: column;
-        gap: 4px;
+    .k-page-header__nav {
+        grid-area: nav;
         min-width: 0;
     }
 
@@ -226,9 +221,11 @@
     }
 
     .k-page-header__title {
+        grid-area: title;
+        min-width: 0;
         min-height: 1.2em;
-        margin: 0;
-        font-size: 26px;
+        margin: 8px 0 0;
+        font-size: 24px;
         font-weight: 600;
         letter-spacing: -0.02em;
         line-height: 1.2;
@@ -237,15 +234,17 @@
 
     .k-page-header__meta {
         display: flex;
+        grid-area: meta;
         flex-wrap: wrap;
         align-items: center;
         gap: 4px 0;
         min-height: 22px;
+        margin: 6px 0 0;
         font-size: 12.5px;
         color: var(--k-muted);
     }
 
-    .k-page-header__meta > * + *::before {
+    .k-page-header__meta:not(.k-page-header__meta--pairs) > * + *::before {
         margin: 0 8px;
         color: var(--k-muted);
         content: '·';
@@ -261,10 +260,38 @@
         line-height: inherit;
     }
 
+    /* Labelled facts: a muted label and its value, each pair spaced from the next. */
+    .k-page-header__meta--pairs {
+        gap: 6px 24px;
+        margin-top: 10px;
+        color: var(--k-ink);
+    }
+
+    .k-page-header__pair {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    .k-page-header__pair dt {
+        color: var(--k-muted);
+    }
+
+    .k-page-header__pair dd {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        margin: 0;
+    }
+
     .k-page-header__actions {
         display: flex;
+        grid-area: actions;
+        margin-top: 8px;
         flex-wrap: wrap;
         align-items: center;
+        justify-content: flex-end;
         gap: 8px;
     }
 
@@ -277,9 +304,12 @@
 
     .k-page-header__bar {
         display: flex;
+        grid-area: bar;
+        flex-wrap: wrap;
         align-items: center;
+        gap: 2px;
         min-width: 0;
-        padding: 16px 0 14px;
+        padding: 14px 0 10px;
     }
 
     .k-dashboard__range {
@@ -834,7 +864,8 @@
     }
 
     .k-document__views .k-tab,
-    .k-document__preview-toggle {
+    .k-document__preview-toggle,
+    .k-document__info-toggle {
         height: 32px;
         border-radius: 8px;
         font-size: 13.5px;
@@ -857,13 +888,20 @@
 
     .k-document__divider {
         width: 1px;
-        height: 18px;
+        height: 16px;
         margin: 0 8px;
         background: var(--k-line-strong);
     }
 
-    .k-document__preview-toggle {
+    .k-document__preview-toggle,
+    .k-document__info-toggle {
         padding: 0 10px 0 8px;
+    }
+
+    .k-document__info-toggle[data-popup-open] {
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
+        color: var(--k-ink);
     }
 
     .k-document__short {
@@ -926,21 +964,16 @@
         gap: 0;
     }
 
+    /* The fields fill the main column, and the sidebar column keeps its width. */
     .k-document .k-form__main {
-        flex: 2 1 560px;
-        padding: 28px 32px 48px var(--k-gutter);
-    }
-
-    /* The fields stop at 720px, while field tabs run the column's width. */
-    .k-document .k-form__fields > :not(.k-tabs),
-    .k-document .k-form__fields > .k-tabs > [role='tabpanel'] {
-        max-width: 720px;
+        flex: 1 1 0;
+        padding: 28px var(--k-gutter) 48px;
     }
 
     /* The sidebar column runs the full height beside the fields, a hairline on its left edge. */
     .k-document .k-form__sidebar {
-        flex: 1 1 300px;
-        padding: 28px var(--k-gutter) 48px 24px;
+        flex: 0 0 360px;
+        padding: 28px var(--k-gutter) 48px;
         background: var(--k-surface);
         box-shadow: inset 1px 0 0 var(--k-line);
     }
@@ -949,18 +982,28 @@
         padding: 0 var(--k-gutter) 24px;
     }
 
-    /* Field tabs lead the main column, their hairline across its whole width. */
-    .k-document .k-form__fields > .k-tabs:first-child > .k-tab-bar {
-        margin: 0 -32px 0 calc(-1 * var(--k-gutter));
-        padding: 0 32px 0 var(--k-gutter);
+    /* Field tabs lead the main column just under the header, their hairline across its whole width. */
+    .k-document .k-form__main:has(> .k-form__fields > .k-tabs:first-child) {
+        padding-top: 0;
     }
 
+    .k-document .k-form__fields > .k-tabs:first-child {
+        gap: 32px;
+    }
+
+    /* Field tabs lead the main column, their hairline across its whole width. */
+    .k-document .k-form__fields > .k-tabs:first-child > .k-tab-bar {
+        margin: 0 calc(-1 * var(--k-gutter));
+        padding: 0 var(--k-gutter);
+    }
+
+    /* Info: the document's facts in a popover from the header's row. */
     .k-document-info {
         display: flex;
         flex-direction: column;
         gap: 10px;
-        padding-top: 20px;
-        box-shadow: inset 0 1px 0 var(--k-line);
+        width: min(340px, calc(100vw - 32px));
+        padding: 14px 16px 16px;
     }
 
     .k-document-info__heading {
@@ -1043,18 +1086,18 @@
 
     .k-document[data-preview='true'] .k-form__main {
         flex: none;
-        padding: 20px 24px 0 var(--k-gutter);
+        padding: 20px var(--k-gutter) 0;
     }
 
     .k-document[data-preview='true'] .k-form__fields > .k-tabs:first-child > .k-tab-bar {
-        margin: 0 -24px 0 calc(-1 * var(--k-gutter));
-        padding: 0 24px 0 var(--k-gutter);
+        margin: 0 calc(-1 * var(--k-gutter));
+        padding: 0 var(--k-gutter);
     }
 
     .k-document[data-preview='true'] .k-form__sidebar {
         flex: none;
         margin-top: 20px;
-        padding: 24px 24px 48px var(--k-gutter);
+        padding: 24px var(--k-gutter) 48px;
         background: none;
         box-shadow: inset 0 1px 0 var(--k-line);
     }
@@ -1256,6 +1299,15 @@
     }
 
     @media (max-width: 860px) {
+        .k-document .k-form__main,
+        .k-document .k-form__sidebar {
+            flex-basis: 100%;
+        }
+
+        .k-document .k-form__sidebar {
+            box-shadow: inset 0 1px 0 var(--k-line);
+        }
+
         .k-document__preview {
             position: static;
             flex-basis: 100%;
@@ -1317,17 +1369,10 @@
         }
 
         .k-document__views .k-tab,
-        .k-document__preview-toggle {
+        .k-document__preview-toggle,
+        .k-document__info-toggle {
             height: 40px;
             padding: 0 12px;
-        }
-
-        .k-document__divider {
-            display: none;
-        }
-
-        .k-document__preview-toggle {
-            margin-left: auto;
         }
 
         .k-document__long {
@@ -2538,14 +2583,22 @@
         color: var(--k-muted);
     }
 
-    /* On a phone, the header's actions take the full width, a thumb's height. */
+    /* On a phone, the header's actions take the full width, a thumb's height, under its facts. */
     @media (max-width: 860px) {
-        .k-page-header__main {
-            flex-basis: 100%;
+        .k-page-header {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-areas:
+                'nav'
+                'title'
+                'meta'
+                'actions'
+                'bar';
         }
 
         .k-page-header__actions {
+            justify-content: flex-start;
             width: 100%;
+            margin-top: 10px;
         }
 
         .k-page-header__actions > .k-button {

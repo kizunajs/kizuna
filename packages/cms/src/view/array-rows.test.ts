@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { indexLabelOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './array-rows.js';
+import { itemNounOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './array-rows.js';
 import type { JsonSchema } from './schema.js';
 
 const contact: JsonSchema = {
@@ -29,12 +29,6 @@ describe('a list item row', () => {
         expect(singularOf('Addresses')).toBe('Address');
         expect(singularOf('Press')).toBe('Press');
         expect(singularOf('Team')).toBe('Team');
-    });
-
-    it('numbers items with two digits', () => {
-        expect(indexLabelOf(0)).toBe('01');
-        expect(indexLabelOf(11)).toBe('12');
-        expect(indexLabelOf(120)).toBe('121');
     });
 
     it('takes its title from the first text and its tag from the first choice', () => {
@@ -67,5 +61,42 @@ describe('the open items', () => {
 
     it('drop an item that is gone', () => {
         expect([...remapOpen(new Set([0, 2]), (index) => (index === 0 ? undefined : index - 1))]).toEqual([1]);
+    });
+});
+
+describe('itemNounOf', () => {
+    it('names an item by the name its schema gives', () => {
+        const root: JsonSchema = {
+            $defs: {
+                'CMS.Image': {
+                    type: 'object',
+                },
+            },
+        };
+        expect(
+            itemNounOf(
+                {
+                    $ref: '#/$defs/CMS.Image',
+                },
+                root,
+                'Images'
+            )
+        ).toBe('image');
+        expect(
+            itemNounOf(
+                {
+                    type: 'object',
+                    title: 'OpeningHours',
+                },
+                {},
+                'Hours'
+            )
+        ).toBe('opening hours');
+    });
+
+    it('falls back to the singular of a plural label, then to "item"', () => {
+        expect(itemNounOf(contact, contact, 'Links')).toBe('link');
+        expect(itemNounOf(contact, contact, 'Menu')).toBe('item');
+        expect(itemNounOf(contact, contact, undefined)).toBe('item');
     });
 });

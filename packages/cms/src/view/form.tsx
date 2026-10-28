@@ -14,7 +14,7 @@ import { Tabs } from '@base-ui/react/tabs';
 import { ChevronDown, CircleAlert } from 'lucide-react';
 import { arrange, inSidebar, tabSets, type Arranged } from './arrange.js';
 import { ICON } from './context.js';
-import { Control, foldsItems, listsItems, Required, Row } from './controls.js';
+import { Control, foldsItems, listsItems, Required } from './controls.js';
 import { labelOf, valueAt, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
@@ -49,11 +49,6 @@ export interface FieldFormProps {
      * The field the person pointed at in the preview.
      */
     pointed: string | undefined;
-    /**
-     * What closes the sidebar under its fields, like the admin's facts about
-     * the document. With it, the sidebar always shows.
-     */
-    aside?: ReactNode;
     /**
      * The top-level fields the draft still needs before it can publish, each
      * marked where it sits.
@@ -90,7 +85,7 @@ export const changesForWire = (changes: Record<string, unknown>): Record<string,
  * collapsibles, with the sidebar beside them when the form is wide enough. A
  * change saves to the draft a moment after typing stops.
  */
-export function FieldForm({ fields, layout, draft, onSave, onState, changed, pointed, aside, missing, ref }: FieldFormProps) {
+export function FieldForm({ fields, layout, draft, onSave, onState, changed, pointed, missing, ref }: FieldFormProps) {
     const [values, setValues] = useState<Record<string, unknown>>({});
     const [shownTabs, setShownTabs] = useState<Readonly<Record<string, string>>>({});
     const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -263,40 +258,49 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
         return false;
     };
 
-    const section = (field: DescribedField): ReactNode => {
+    const section = (field: DescribedField, headed = true): ReactNode => {
         const children = fields.filter((candidate) => candidate.parent === field.path);
         if (children.length > 0) {
-            // A block's fields sit under its name as a heading, with no surface of their own.
+            // A block's fields sit under its name as a heading, with no surface of their own. A tab that holds it alone already names it.
             return (
-                <section key={field.path} id={fieldDomId(field.path)} className="k-group" aria-labelledby={fieldDomId(field.path) + '-heading'}>
-                    <div className="k-group__head">
-                        <h3 className="k-group__title" id={fieldDomId(field.path) + '-heading'}>
-                            {labelOf(field)}
-                        </h3>
-                        {field.help === undefined ? null : <p className="k-group__description">{field.help}</p>}
-                    </div>
+                <section
+                    key={field.path}
+                    id={fieldDomId(field.path)}
+                    className="k-group"
+                    data-headed={headed}
+                    aria-label={headed ? undefined : labelOf(field)}
+                    aria-labelledby={headed ? fieldDomId(field.path) + '-heading' : undefined}>
+                    {headed ? (
+                        <div className="k-group__head">
+                            <h3 className="k-group__title" id={fieldDomId(field.path) + '-heading'}>
+                                {labelOf(field)}
+                            </h3>
+                            {field.help === undefined ? null : <p className="k-group__description">{field.help}</p>}
+                        </div>
+                    ) : field.help === undefined ? null : (
+                        <p className="k-group__description">{field.help}</p>
+                    )}
                     <div className="k-fields">
-                        {shown(arranged.blocks.get(field.path) ?? [], 'k-fields', (child) => (
-                            <div
-                                key={child.path}
-                                id={fieldDomId(child.path)}
-                                className="k-field__control"
-                                data-changed={isMarked(child.path, changed)}
-                                data-pointed={isMarked(child.path, pointed)}>
-                                <Row label={labelOf(child)} htmlFor={fieldDomId(child.path) + '-input'} required={child.required}>
-                                    {control(child, child.writable && field.writable)}
-                                </Row>
-                            </div>
-                        ))}
+                        {shown(arranged.blocks.get(field.path) ?? [], 'k-fields', (child) => leaf(child, child.writable && field.writable))}
                     </div>
                 </section>
             );
         }
-        // A list reads its help under its label, and one whose items fold draws both itself, with Collapse all and Expand all beside them.
+        return leaf(field, field.writable);
+    };
+
+    /**
+     * One field: its label, its input and its help. A list reads its help
+     * under its label, and one whose items fold draws both itself, with
+     * Collapse all and Expand all beside them.
+     */
+    const leaf = (field: DescribedField, writable: boolean): ReactNode => {
         const folds = foldsItems(field.schema, field.schema);
         const list = listsItems(field.schema);
         const label = (
-            <label className={list ? 'k-field__label k-field__label--list' : 'k-field__label'} htmlFor={folds ? undefined : fieldDomId(field.path) + '-input'}>
+            <label
+                className={list ? 'k-field__label k-field__label--list' : 'k-field__label'}
+                htmlFor={folds ? undefined : fieldDomId(field.path) + '-input'}>
                 {labelOf(field)}
                 {field.required ? <Required /> : null}
             </label>
@@ -319,7 +323,7 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                     data-changed={isMarked(field.path, changed)}
                     data-pointed={isMarked(field.path, pointed)}
                     data-missing={needed}>
-                    {control(field, field.writable, folds ? head : undefined, list)}
+                    {control(field, writable, folds ? head : undefined, list)}
                     {needed ? <p className="k-field__needed">Needed before publishing.</p> : null}
                 </div>
             </section>
@@ -406,7 +410,11 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                     </Tabs.List>
                     {entry.tabs.map((tab) => (
                         <Tabs.Panel key={tab.item.id} value={tab.item.id} keepMounted className={stack}>
-                            {shown(tab.content, stack, leaf)}
+                            {shown(tab.content, stack, (field) =>
+                                leaf === section && (tab.content.length === 1 || labelOf(field) === tab.item.label)
+                                    ? section(field, false)
+                                    : leaf(field)
+                            )}
                         </Tabs.Panel>
                     ))}
                 </Tabs.Root>
@@ -415,14 +423,13 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
 
     return (
         <div className="k-form">
-            <div className="k-form__columns" data-sidebar={arranged.sidebar.length > 0 || aside !== undefined}>
+            <div className="k-form__columns" data-sidebar={arranged.sidebar.length > 0}>
                 <div className="k-form__main">
                     <div className="k-form__fields k-stack">{shown(arranged.main, 'k-stack', section)}</div>
                 </div>
-                {arranged.sidebar.length > 0 || aside !== undefined ? (
+                {arranged.sidebar.length > 0 ? (
                     <aside className="k-form__sidebar k-stack" aria-label="Sidebar">
                         {shown(arranged.sidebar, 'k-stack', section)}
-                        {aside}
                     </aside>
                 ) : null}
             </div>

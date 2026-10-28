@@ -98,6 +98,12 @@
         outline-offset: 2px;
     }
 
+    /* A label hands focus to its control, so it never shows a ring of its own. */
+    label:focus,
+    label:focus-visible {
+        outline: none;
+    }
+
     /* Layout */
 
     .k-shell {
@@ -471,30 +477,33 @@
         display: none;
     }
 
-    /* A collapsible in the form: a soft strip the whole of which toggles, its fields on a fainter fill under it. */
+    /* A collapsible in the form is a card: the strip that toggles it, and its fields padded under it once open. */
     .k-collapsible--strip {
         gap: 0;
+        border-radius: var(--k-radius-card);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
     }
 
     .k-collapsible--strip > .k-collapsible__trigger {
         width: 100%;
-        height: 40px;
-        padding: 0 4px 0 14px;
-        border-radius: var(--k-radius-control);
-        background: var(--k-surface);
-        box-shadow: var(--k-elevation);
+        height: 44px;
+        padding: 0 6px 0 16px;
+        border-radius: var(--k-radius-card);
+        background: none;
         font-size: 13.5px;
         color: var(--k-ink);
         text-align: left;
-        transition: background-color 0.15s ease;
     }
 
     .k-collapsible--strip > .k-collapsible__trigger:hover {
         background: var(--k-tint);
+        color: var(--k-ink);
     }
 
     .k-collapsible--strip > .k-collapsible__trigger[data-panel-open] {
-        border-radius: var(--k-radius-control) var(--k-radius-control) 0 0;
+        border-radius: var(--k-radius-card) var(--k-radius-card) 0 0;
+        box-shadow: inset 0 -1px 0 var(--k-line);
     }
 
     .k-collapsible__chevron {
@@ -513,13 +522,7 @@
     }
 
     .k-collapsible--strip > .k-collapsible__panel {
-        padding: 20px;
-        border-radius: 0 0 var(--k-radius-control) var(--k-radius-control);
-        background: rgb(255 255 255 / 0.02);
-    }
-
-    :root[data-theme='light'] .k-collapsible--strip > .k-collapsible__panel {
-        background: rgb(0 0 0 / 0.015);
+        padding: 20px 16px 24px;
     }
 
     /* A block's fields under its name as a heading, a hairline above it and no surface of its own. */
@@ -531,6 +534,10 @@
         padding-top: 36px;
         box-shadow: inset 0 1px 0 var(--k-line);
         scroll-margin: 12px;
+    }
+
+    .k-group[data-headed='false'] > .k-group__description {
+        margin-bottom: 16px;
     }
 
     .k-group:first-child {
@@ -571,8 +578,7 @@
 
     .k-field__label,
     .k-row__label,
-    .k-sheet__label,
-    .k-inline-fields__label {
+    .k-sheet__label {
         display: block;
         overflow: hidden;
         font-size: 13px;
@@ -885,49 +891,6 @@
         width: 32px;
     }
 
-    /* Short items caption their inputs once, above the first row. */
-    .k-array__captions {
-        display: flex;
-        gap: 8px;
-        padding-right: 38px;
-        font-size: 12px;
-        line-height: 18px;
-        color: var(--k-muted);
-    }
-
-    .k-array__captions[data-grip='true'] {
-        padding-left: 30px;
-    }
-
-    .k-array__caption {
-        flex: 1 1 0;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .k-inline-fields {
-        display: flex;
-        gap: 8px;
-    }
-
-    .k-inline-fields__field {
-        display: flex;
-        flex: 1 1 0;
-        flex-direction: column;
-        min-width: 0;
-    }
-
-    .k-inline-fields__label {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        overflow: hidden;
-        clip-path: inset(50%);
-        white-space: nowrap;
-    }
-
     .k-array__add {
         align-self: flex-start;
         padding: 0 12px 0 10px;
@@ -1019,57 +982,50 @@
         gap: 8px;
     }
 
+    /* Each item is a row like any other in a list: its handle, a filled row with its title that opens it, a chevron and remove. Its fields open under the row. */
     .k-array--folds .k-array__item {
         flex-direction: column;
         align-items: stretch;
         gap: 0;
-        border-radius: var(--k-radius-control);
+        border-radius: var(--k-radius-card);
+    }
+
+    /* Open, the item becomes a card around its row and its fields. */
+    .k-array--folds .k-array__item:has(> .k-array__row .k-array__summary[data-panel-open]) {
+        margin-inline: -8px;
+        padding: 8px;
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
     }
 
     .k-array__row {
         display: flex;
         align-items: center;
-        gap: 4px;
-        height: 40px;
-        padding: 0 4px;
-        border-radius: var(--k-radius-control);
-        background: var(--k-surface);
-        box-shadow: var(--k-elevation);
-        transition: background-color 0.15s ease;
-    }
-
-    .k-array__row:hover {
-        background: var(--k-tint);
-    }
-
-    .k-array__row:has(.k-array__summary[data-panel-open]) {
-        border-radius: var(--k-radius-control) var(--k-radius-control) 0 0;
+        gap: 6px;
     }
 
     .k-array__summary {
         display: flex;
         flex: 1;
-        align-items: baseline;
+        align-items: center;
         gap: 10px;
         min-width: 0;
-        height: 40px;
-        padding: 0 4px;
+        height: var(--k-control-height);
+        padding: 0 12px;
         border: 0;
-        background: none;
+        border-radius: var(--k-radius-control);
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
         font: inherit;
-        font-size: 13.5px;
+        font-size: 14px;
         text-align: left;
-        line-height: 40px;
         color: var(--k-ink);
         cursor: pointer;
+        transition: background-color 0.15s ease;
     }
 
-    .k-array__index {
-        flex-shrink: 0;
-        font-family: var(--k-mono);
-        font-size: 12px;
-        font-variant-numeric: tabular-nums;
-        color: var(--k-muted);
+    .k-array__summary:hover {
+        background: var(--k-control-hover);
     }
 
     .k-array__tag {
@@ -1103,13 +1059,7 @@
     }
 
     .k-array__panel {
-        padding: 20px 20px 24px;
-        border-radius: 0 0 var(--k-radius-control) var(--k-radius-control);
-        background: rgb(255 255 255 / 0.02);
-    }
-
-    :root[data-theme='light'] .k-array__panel {
-        background: rgb(0 0 0 / 0.015);
+        padding: 18px 76px 8px 30px;
     }
 
     .k-array__panel[hidden] {

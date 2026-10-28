@@ -6,6 +6,7 @@ const field = (path: string, extra: Partial<DescribedField> = {}): DescribedFiel
     path,
     name: path.split('.').at(-1)!,
     readOnly: false,
+    required: false,
     writable: true,
     schema: {},
     ...extra,

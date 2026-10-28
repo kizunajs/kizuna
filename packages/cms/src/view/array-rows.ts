@@ -12,10 +12,17 @@ export const singularOf = (label: string): string => {
 };
 
 /**
- * An item's place in its list as its row shows it: "01", "02", and on past
- * a hundred.
+ * What one item of a list is called, in lower case: the name its schema
+ * gives, "image" for `CMS.Image`, or else the singular of a plural label, or
+ * else "item".
  */
-export const indexLabelOf = (index: number): string => String(index + 1).padStart(2, '0');
+export const itemNounOf = (itemSchema: JsonSchema, root: JsonSchema, label: string | undefined): string => {
+    const resolved = resolveRef(itemSchema, root);
+    const named = typeof resolved.title === 'string' ? resolved.title : itemSchema.$ref?.split('/').at(-1);
+    if (named !== undefined && named !== '') return humanize(named.split('.').at(-1)!).toLowerCase();
+    if (label !== undefined && singularOf(label) !== label) return singularOf(label).toLowerCase();
+    return 'item';
+};
 
 /**
  * The property that names an item in its row: the first one holding text.

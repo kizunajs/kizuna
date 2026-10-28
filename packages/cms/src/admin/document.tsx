@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Popover } from '@base-ui/react/popover';
 import { Tabs } from '@base-ui/react/tabs';
-import { CircleAlert, ExternalLink, PanelRight } from 'lucide-react';
+import { CircleAlert, ExternalLink, Info, PanelRight } from 'lucide-react';
 import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.js';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
@@ -428,70 +429,64 @@ export function DocumentScreen({
         });
     };
 
+    const owner =
+        people === undefined || people.people.length === 0 ? null : (
+            <OwnerControl
+                owner={document.owner}
+                people={people}
+                title={title}
+                onChange={async (picked) => {
+                    const tools = toolsFor(document.ref);
+                    if (tools === undefined) return;
+                    await connection.call(`${tools.prefix}_set_owner`, {
+                        params: tools.params,
+                        body: {
+                            owner: picked,
+                        },
+                    });
+                    await describe(document.ref);
+                }}
+            />
+        );
+
     const info = (
-        <section className="k-document-info" aria-labelledby="k-document-info">
-            <h2 className="k-document-info__heading" id="k-document-info">
-                Document
-            </h2>
-            <dl className="k-document-info__list">
-                <dt>Status</dt>
-                <dd>
-                    <Status status={document.status} />
-                </dd>
-                {people === undefined || people.people.length === 0 ? null : (
-                    <>
-                        <dt>Owner</dt>
-                        <dd>
-                            <OwnerControl
-                                owner={document.owner}
-                                people={people}
-                                title={title}
-                                onChange={async (owner) => {
-                                    const tools = toolsFor(document.ref);
-                                    if (tools === undefined) return;
-                                    await connection.call(`${tools.prefix}_set_owner`, {
-                                        params: tools.params,
-                                        body: {
-                                            owner,
-                                        },
-                                    });
-                                    await describe(document.ref);
-                                }}
-                            />
-                        </dd>
-                    </>
-                )}
-                {siteUrl !== null && document.path !== null ? (
-                    <>
-                        <dt>Page</dt>
-                        <dd>
-                            <button type="button" className="k-document-info__link" onClick={() => void openOnSite(document.path!)}>
-                                <span className="k-ellipsis">{document.path}</span>
-                                <ExternalLink {...ICON} />
-                            </button>
-                        </dd>
-                    </>
-                ) : null}
-                {dates.created === null ? null : (
-                    <>
-                        <dt>Created</dt>
-                        <dd>{savedAtOf(dates.created, now)}</dd>
-                    </>
-                )}
-                {updatedAt === null ? null : (
-                    <>
-                        <dt>Updated</dt>
-                        <dd>{savedAtOf(updatedAt, now)}</dd>
-                    </>
-                )}
-                {dates.published === null ? null : (
-                    <>
-                        <dt>Published</dt>
-                        <dd>{savedAtOf(dates.published, now)}</dd>
-                    </>
-                )}
-            </dl>
-        </section>
+        <Popover.Root>
+            <Popover.Trigger className="k-tab k-document__info-toggle">
+                <Info {...ICON} />
+                Info
+            </Popover.Trigger>
+            <Popover.Portal>
+                <Popover.Positioner sideOffset={6} align="end" className="k-positioner">
+                    <Popover.Popup className="k-popup k-document-info">
+                        <Popover.Title className="k-document-info__heading">Document</Popover.Title>
+                        <dl className="k-document-info__list">
+                            <dt>Status</dt>
+                            <dd>
+                                <Status status={document.status} />
+                            </dd>
+                            {dates.created === null ? null : (
+                                <>
+                                    <dt>Created</dt>
+                                    <dd>{savedAtOf(dates.created, now)}</dd>
+                                </>
+                            )}
+                            {updatedAt === null ? null : (
+                                <>
+                                    <dt>Updated</dt>
+                                    <dd>{savedAtOf(updatedAt, now)}</dd>
+                                </>
+                            )}
+                            {dates.published === null ? null : (
+                                <>
+                                    <dt>Published</dt>
+                                    <dd>{savedAtOf(dates.published, now)}</dd>
+                                </>
+                            )}
+                        </dl>
+                    </Popover.Popup>
+                </Popover.Positioner>
+            </Popover.Portal>
+        </Popover.Root>
     );
 
     return (
@@ -501,12 +496,48 @@ export function DocumentScreen({
                     crumbs={[crumb]}
                     title={title}
                     meta={[
-                        updatedAt === null ? null : `Updated ${relativeTimeOf(updatedAt, now)}`,
-                        STATUS_FACT[document.status],
-                        updatedByName === undefined ? null : `by ${updatedByName}`,
-                        document.usedOn.everywhere ? 'Shows on every page' : null,
-                        document.review !== null ? <ReviewBadge review={document.review} me={people?.me} /> : null,
-                        saveState === 'idle' ? null : <SaveIndicator state={saveState} />,
+                        {
+                            label: 'Status',
+                            value: STATUS_FACT[document.status] ?? document.status,
+                        },
+                        updatedAt === null
+                            ? null
+                            : {
+                                  label: 'Updated',
+                                  value: `${relativeTimeOf(updatedAt, now)}${updatedByName === undefined ? '' : ` by ${updatedByName}`}`,
+                              },
+                        owner === null
+                            ? null
+                            : {
+                                  label: 'Owner',
+                                  value: owner,
+                              },
+                        siteUrl === null || document.path === null
+                            ? null
+                            : {
+                                  label: 'Page',
+                                  value: (
+                                      <button
+                                          type="button"
+                                          className="k-document-info__link"
+                                          onClick={() => void openOnSite(document.path!)}>
+                                          <span className="k-ellipsis">{document.path}</span>
+                                          <ExternalLink {...ICON} />
+                                      </button>
+                                  ),
+                              },
+                        document.usedOn.everywhere
+                            ? {
+                                  label: 'Shows',
+                                  value: 'On every page',
+                              }
+                            : null,
+                        document.review === null
+                            ? null
+                            : {
+                                  label: 'Review',
+                                  value: <ReviewBadge review={document.review} me={people?.me} />,
+                              },
                     ]}
                     tabs={
                         <>
@@ -521,27 +552,28 @@ export function DocumentScreen({
                                     )}
                                 </Tabs.Tab>
                             </Tabs.List>
+                            <span className="k-document__divider" aria-hidden="true" />
                             {previewPath === null ? null : (
-                                <>
-                                    <span className="k-document__divider" aria-hidden="true" />
-                                    <button
-                                        type="button"
-                                        className="k-tab k-document__preview-toggle"
-                                        aria-pressed={previewShown}
-                                        onClick={() => {
-                                            setPreviewOn(!previewShown);
-                                            setPreviewOpened(true);
-                                            setView('edit');
-                                        }}>
-                                        <PanelRight {...ICON} />
-                                        Live preview
-                                    </button>
-                                </>
+                                <button
+                                    type="button"
+                                    className="k-tab k-document__preview-toggle"
+                                    aria-pressed={previewShown}
+                                    onClick={() => {
+                                        setPreviewOn(!previewShown);
+                                        setPreviewOpened(true);
+                                        setView('edit');
+                                    }}>
+                                    <PanelRight {...ICON} />
+                                    <span className="k-document__long">Live preview</span>
+                                    <span className="k-document__short">Preview</span>
+                                </button>
                             )}
+                            {info}
                         </>
                     }
                     actions={
                         <>
+                            <SaveIndicator state={saveState} />
                             {blocker === undefined ? null : (
                                 <button type="button" className="k-document__blocker" id="k-document-blocker" onClick={showBlocker}>
                                     <CircleAlert {...ICON} />
@@ -607,7 +639,6 @@ export function DocumentScreen({
                             }}
                             changed={changed}
                             pointed={pointed}
-                            aside={info}
                             missing={document.complete ? [] : document.missing}
                         />
                     </div>

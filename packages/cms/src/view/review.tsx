@@ -511,7 +511,10 @@ export function PublishReview({
 
     return (
         <AlertDialog.Root open={open} onOpenChange={setOpen}>
-            <AlertDialog.Trigger className="k-button k-button--primary k-review__trigger" disabled={disabled} aria-describedby={describedBy}>
+            <AlertDialog.Trigger
+                className="k-button k-button--primary k-review__trigger"
+                disabled={disabled}
+                aria-describedby={describedBy}>
                 {waiting > 0 ? `Review ${waiting}` : 'Publish'}
             </AlertDialog.Trigger>
             <AlertDialog.Portal>

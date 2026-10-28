@@ -140,7 +140,7 @@ A save that would put a tag under itself, or under one of its own, is refused. P
 
 ## Actions
 
-An action is a button on an item, and its handler is your code. A newsletter is content, so it is a collection, and sending it is an action:
+An action is an entry in an item's `…` menu in the admin, and its handler is your code. A newsletter is content, so it is a collection, and sending it is an action:
 
 ```ts title="src/cms/content.ts"
 export const Newsletters = defineCollection({
@@ -174,7 +174,7 @@ export const Newsletters = defineCollection({
 });
 ```
 
-Editors write the newsletter as a draft, ask for a review, and an admin presses Send. `item` is the published item. Actions take the same options as a [view's](/docs/cms/views#actions).
+Editors write the newsletter as a draft, ask for a review, and an admin picks Send. `item` is the published item. Actions take the same options as a [view's](/docs/cms/views#actions).
 
 ## Live preview
 
