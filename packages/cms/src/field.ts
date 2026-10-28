@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 import type { RequiredPermissions } from 'kizunajs';
-import { isZodSchema, readMetaDescription, unwrapOptionalWrappers } from 'kizunajs/generator';
+import { isZodSchema, readMetaDescription, readModelSchema, unwrapOptionalWrappers } from 'kizunajs/generator';
 
 /**
  * Who may write a field, narrowing the plugin's own `auth`. The vocabulary is a
@@ -334,12 +334,20 @@ export const shapeOf = <Fields extends FieldList>(fields: Fields): ShapeOf<Field
 };
 
 /**
+ * A schema's `.describe()` text, unless the schema is a `Kizuna.model`,
+ * whose description says what the model is rather than what the field holds.
+ */
+const ownDescription = (schema: z.core.$ZodType): string | undefined =>
+    readModelSchema(schema) === schema ? undefined : readMetaDescription(schema);
+
+/**
  * The guidance a field shows: its own `description`, or the schema's
- * `.describe()` text, read through `.optional()` and `.default()`.
+ * `.describe()` text, read through `.optional()` and `.default()`. A model's
+ * own description, like `ImageSchema`'s, never shows under a field.
  */
 export const fieldDescription = (field: Field): string | undefined => {
     if (field.description !== undefined) return field.description;
-    return readMetaDescription(field.schema) ?? readMetaDescription(unwrapOptionalWrappers(field.schema).inner);
+    return ownDescription(field.schema) ?? ownDescription(unwrapOptionalWrappers(field.schema).inner);
 };
 
 /**

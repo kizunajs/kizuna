@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from 'kizunajs';
 import { defineBlock } from './block.js';
 import { fieldDescription, undeclaredFieldRoles } from './field.js';
+import { ImageSchema } from './image.js';
 import { isPage, definePage } from './page.js';
 
 const ProductId = Kizuna.brand('ProductId', z.string());
@@ -149,6 +150,24 @@ describe('fieldDescription', () => {
 
     it('is undefined when neither says anything', () => {
         expect(fieldDescription(FrontPage.fields[0])).toBeUndefined();
+    });
+
+    it("leaves out a model's own description, through .optional()", () => {
+        expect(
+            fieldDescription({
+                name: 'photo',
+                schema: ImageSchema.optional(),
+            })
+        ).toBeUndefined();
+    });
+
+    it('keeps a description the field gives a model with .describe()', () => {
+        expect(
+            fieldDescription({
+                name: 'photo',
+                schema: ImageSchema.describe('A square portrait, at least 480 pixels wide.'),
+            })
+        ).toBe('A square portrait, at least 480 pixels wide.');
     });
 });
 
