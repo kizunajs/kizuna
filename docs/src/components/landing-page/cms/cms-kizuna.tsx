@@ -158,7 +158,7 @@ export function CmsKizuna() {
     return (
         <Section
             align="center"
-            title="Your CMS, with all of Kizuna"
+            title="Your CMS, with all of Kizuna.js"
             description="The CMS lives in a Kizuna config, so routes, jobs, plugins and typed clients are a line away.">
             <div className={styles.layout}>
                 <Cards extras={left} side="left" />

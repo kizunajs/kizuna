@@ -6,6 +6,7 @@
         "define-block",
         "define-global",
         "define-collection",
+        "define-view",
         "define-relationship",
         "define-site",
         "schemas",

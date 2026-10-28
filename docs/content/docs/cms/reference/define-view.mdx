@@ -1,0 +1,51 @@
+---
+title: defineView()
+description: 'Data the CMS shows and changes but does not store, read and saved by your own functions.'
+---
+
+```ts
+defineView(definition: ViewDefinition): View
+```
+
+| Option                       | Type                             | Description                                                             |
+| ---------------------------- | -------------------------------- | ----------------------------------------------------------------------- |
+| `name`                       | `string`                         | The view's key, camelCase                                               |
+| `label`                      | `string`                         | What editors see it called. Without it, the name, written out           |
+| `auth`                       | `{ roles?, requires? }`          | Who sees the view at all                                                |
+| `fields`                     | `Field[]`                        | What editors see of each record, with [layout](/docs/cms/fields#layout) |
+| `list`                       | `({ query, editor }) => items`   | The records matching the search box                                     |
+| `get`                        | `({ id, editor }) => item`       | One record by id                                                        |
+| `actions`                    | `Record<string, Action>`         | Buttons. `save` is the main one. Without it, the view is read only      |
+| `title`, `columns`, `search` | `string`, `string[]`, `string[]` | The list: each record's title, its columns, and what search looks in    |
+
+An action is a handler, or `{ label, confirm, when, auth, handler }`. Every handler receives `id`, `item`, `editor`, `jobs` and `plugins`, and `save` also receives `data`.
+
+```ts
+export const AppUsers = defineView({
+    name: 'appUsers',
+    label: 'App users',
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'email',
+            schema: z.email(),
+        },
+    ],
+    list: async ({ query }) => {
+        return searchAppUsers(query);
+    },
+    get: async ({ id }) => {
+        return getAppUser(id);
+    },
+    actions: {
+        save: async ({ id, data }) => {
+            return updateAppUser(id, data);
+        },
+    },
+});
+```
+
+See [Views](/docs/cms/views).

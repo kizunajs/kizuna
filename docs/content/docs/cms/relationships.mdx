@@ -45,7 +45,7 @@ export const Products = defineRelationship({
 });
 ```
 
-It runs as the editor, so your route decides what they see. The page holds `z.array(Products.id)` and fetches the products itself:
+It runs as the editor, so your route decides what they see. To let editors change the products themselves, add a [view](/docs/cms/views). The page holds `z.array(Products.id)` and fetches the products itself:
 
 ```tsx
 const featured = inStoredOrder(content.featured, result.body.products, (product) => product.id);

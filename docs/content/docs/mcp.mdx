@@ -218,13 +218,13 @@ The first call answers with the elicitation rather than a result, asking `Allow 
 
 ## Showing a view
 
-A host that supports [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview), such as Claude, can show a tool's result as a page rather than as text. Declare the page once with `defineView`, and name it under `ui` on the routes whose results it shows:
+A host that supports [MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview), such as Claude, can show a tool's result as a page rather than as text. Declare the page once with `defineMcpView`, and name it under `ui` on the routes whose results it shows:
 
 ```ts title="src/views.ts"
 import { readFile } from 'node:fs/promises';
-import { defineView } from 'kizunajs';
+import { defineMcpView } from 'kizunajs';
 
-export const userView = defineView({
+export const userView = defineMcpView({
     uri: 'ui://users/user',
     name: 'User',
     html: () => readFile(new URL('./user-view.html', import.meta.url), 'utf8'),
@@ -242,7 +242,7 @@ tool: {
 The host blocks every origin a view does not list. `csp` names the ones it may reach:
 
 ```ts title="src/views.ts"
-export const userView = defineView({
+export const userView = defineMcpView({
     uri: 'ui://users/user',
     name: 'User',
     html: () => readFile(new URL('./user-view.html', import.meta.url), 'utf8'),

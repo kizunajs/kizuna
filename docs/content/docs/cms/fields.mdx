@@ -3,7 +3,7 @@ title: Fields
 description: 'Every page, block, global and collection is a list of fields: a name, a Zod schema, and who may edit it.'
 ---
 
-A page is a list of fields beside its route. A block is a set of fields several pages share. A global is content every page shows, and a collection holds many items of one shape, like articles. Each field is a name, a Zod schema, and who may edit it.
+A page is a list of fields beside its route. A block is a set of fields several pages share. A global is content every page shows, and a collection holds many items of one shape, like articles. A [view](/docs/cms/views) uses the same fields for data the CMS does not store. Each field is a name, a Zod schema, and who may edit it.
 
 ```ts
 {
@@ -26,8 +26,66 @@ A page is a list of fields beside its route. A block is a set of fields several 
 | `options`     | For an enum, the label editors see for each value: `{ design: 'Design' }`.                                                                  |
 | `metadata`    | `'title'`, `'description'` or `'image'`: the part of the [search result](/docs/cms/seo#mark-the-fields-it-starts-from) this field fills in. |
 | `localized`   | Whether the field is translated, when the schema's own default is wrong. See [Localization](/docs/cms/localization#what-is-translated).     |
+| `position`    | `'sidebar'` puts the field beside the main column. See [Layout](#layout).                                                                   |
+| `width`       | How much of a row the field takes, like `'50%'`.                                                                                            |
+| `condition`   | Shows the field only when it returns true, from the other fields' values: `({ data }) => data.category === 'guide'`.                        |
 
 A field listed twice fails to compile, and a role the editor identity does not declare fails when the config assembles.
+
+## Layout
+
+Fields show in the order they are listed. Three kinds of item arrange them, and each holds fields of its own:
+
+```ts
+fields: [
+    {
+        type: 'tab',
+        label: 'Content',
+        fields: [
+            {
+                name: 'title',
+                schema: z.string().max(80),
+            },
+            {
+                name: 'body',
+                schema: RichTextSchema,
+            },
+        ],
+    },
+    {
+        type: 'tab',
+        label: 'Card',
+        fields: [
+            {
+                type: 'row',
+                fields: [
+                    {
+                        name: 'image',
+                        schema: ImageSchema,
+                    },
+                    {
+                        name: 'summary',
+                        schema: z.string().max(160),
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        name: 'category',
+        schema: z.enum(['news', 'guide']),
+        position: 'sidebar',
+    },
+],
+```
+
+| Item                                     | Shows                              |
+| ---------------------------------------- | ---------------------------------- |
+| `{ type: 'tab', label, fields }`         | Its fields under a tab             |
+| `{ type: 'row', fields }`                | Its fields side by side            |
+| `{ type: 'collapsible', label, fields }` | Its fields in a section that folds |
+
+An item with `type` arranges the screen, and an item with `name` is content. Layout never shapes the content itself: the page above reads `title`, `body`, `image`, `summary` and `category`, all at the top level, so moving a field into a tab changes nothing a page or a client reads. `position: 'sidebar'` works on a field and on a collapsible section.
 
 ## Limits that keep the design
 

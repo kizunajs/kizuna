@@ -60,8 +60,10 @@ Deliberate omissions: no first-party transports, no stored state, and no per-job
 - Core owns a small contract in `content.ts`: the provider's documents (ref, kind, name, schema, latest migrate step), which the snapshot records and `kizuna diff` compares, and the reader `defineConfig` hands back as `kizuna.content`. A `published` event waits for its first listener.
 - The adapter supplies the runtime the reader needs: a tagged cache, revalidation, draft mode, cookies and not-found. `nextAdapter()` does, importing Next only when called so the CLI can load the config. Without a runtime, reads go uncached.
 - The CMS API serves draft mode itself at `/draft`, behind the editor identity, and sends a signed-out editor to `signInPath`. Drafts show only while a signed preview cookie verifies, and the preview renews it.
-- Things that live outside the CMS are relationships, made with `defineRelationship`. A page holds their ids and fetches what it shows of them; `options` feeds only the editor's picker, as the editor. The CMS does not edit them.
-- Globals, collections and relationships are exported in PascalCase, `Articles`, with a camelCase `name`, `articles`. Blocks take `name` like the rest.
+- Things that live outside the CMS are relationships, made with `defineRelationship`. A page holds their ids and fetches what it shows of them; `options` feeds only the editor's picker, as the editor.
+- Editing data the CMS does not store is a view, made with `defineView` and named under `views` on `cms()`. A view takes the same field list as a collection, and its `list`, `get` and `actions` are the app's own functions, so the CMS stores nothing for it. Access is `auth` on the view, on each field and on each action, enforced on the server.
+- Fields arrange themselves with layout items in the same list: `{ type: 'tab' | 'row' | 'collapsible', fields }`, plus `position: 'sidebar'`. Layout never nests the data; content reads flat.
+- Globals, collections, relationships and views are exported in PascalCase, `Articles`, with a camelCase `name`, `articles`. Blocks take `name` like the rest.
 - Model names keep the `Cms` prefix, since Zod's global registry is shared by every config in one process.
 
 # Tools
@@ -71,7 +73,7 @@ A tool is a route a model may call. Settled; don't relitigate.
 - A tool is not a second kind of declaration. A route says `tool` and it publishes, so there is one place a route runs whoever asked.
 - `tool: true` takes the route's `summary` as what a model reads, so a route that publishes carries one. The object form's fields are MCP's own, field for field: `description`, `title`, `readOnlyHint`, `idempotentHint`, `destructiveHint`, `openWorldHint`.
 - `needsApproval` is kizuna's own, the one field MCP cannot declare: the person approves each call before it runs. It is a boolean. A rule that depends on the input belongs in the handler.
-- `ui` names a view built with `defineView`, and `visibility` says who may call the tool, both MCP Apps' own. A view is self-contained HTML the MCP endpoint serves as a resource. A tool only a view calls says `visibility: ['app']`, and a stream cannot name it.
+- `ui` names a view built with `defineMcpView`, and `visibility` says who may call the tool, both MCP Apps' own. A view is self-contained HTML the MCP endpoint serves as a resource. A tool only a view calls says `visibility: ['app']`, and a stream cannot name it.
 - The hints default from the method's RFC 9110 semantics. Declare one only to say what the method cannot.
 - A tool is addressed by its dotted key, `weather.getForecast`, and publishes as `weather_get_forecast`.
 - A route that streams, or that takes a form body, never publishes: a tool result is one value and tool input is JSON.

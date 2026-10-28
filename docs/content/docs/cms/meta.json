@@ -12,6 +12,7 @@
         "blocks",
         "globals",
         "collections",
+        "views",
         "rich-text",
         "changing-the-shape",
         "---Workflow---",

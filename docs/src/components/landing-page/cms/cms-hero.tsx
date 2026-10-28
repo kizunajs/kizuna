@@ -12,7 +12,7 @@ export function CmsHero({ className }: { className?: string }) {
         <section className={clsx(hero.hero, className)}>
             <HeroBackdrop className={hero.backdrop} />
 
-            <h1 className={hero.headline}>The content system for your whole business</h1>
+            <h1 className={hero.headline}>The content platform for your whole business</h1>
             <p className={hero.tagline}>
                 Declare the fields beside the route. Get the editor in your chat, the preview, a typed content API, and more.
             </p>

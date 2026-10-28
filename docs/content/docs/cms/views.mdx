@@ -1,0 +1,238 @@
+---
+title: Views
+description: "Data the CMS does not store, like your app's users, shown and changed in the editor through your own functions."
+---
+
+A view shows editors data that lives somewhere else: your app's users, its orders, product reviews, products in Stripe. You write how it is read and saved. The CMS gives it a list, a page per record, and buttons.
+
+## Collection or view
+
+Both take the same [fields](/docs/cms/fields). What differs is who keeps the data.
+
+| You have                                          | Use                | Who stores it                              |
+| ------------------------------------------------- | ------------------ | ------------------------------------------ |
+| Content you write: articles, newsletters          | `defineCollection` | The CMS, with drafts, versions and reviews |
+| Data that lives elsewhere: users, orders, reviews | `defineView`       | You, through `list`, `get` and `actions`   |
+
+## A view
+
+```ts title="src/cms/app-users.ts"
+import { z } from 'zod';
+import { defineView } from '@kizunajs/cms';
+
+export const AppUsers = defineView({
+    name: 'appUsers',
+    label: 'App users',
+    auth: {
+        roles: ['support', 'admin'],
+    },
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().max(60),
+        },
+        {
+            name: 'email',
+            schema: z.email(),
+        },
+        {
+            name: 'plan',
+            schema: z.enum(['free', 'pro']),
+            auth: {
+                roles: 'admin',
+            },
+        },
+    ],
+    list: async ({ query }) => {
+        return searchAppUsers(query);
+    },
+    get: async ({ id }) => {
+        return getAppUser(id);
+    },
+    actions: {
+        save: async ({ id, data }) => {
+            return updateAppUser(id, data);
+        },
+        resetPassword: async ({ id }) => {
+            await sendPasswordReset(id);
+        },
+    },
+});
+```
+
+Name it under `views` on `cms()`, and App users shows up in the editor beside your content:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    views: [
+        AppUsers,
+    ],
+}),
+```
+
+`list` receives what the editor typed in the search box and returns the matching records. `get` returns one record by its id. The fields decide what editors see of it, so a user with a hundred columns shows only these three. The data can come from any database, or from another service entirely.
+
+## Actions
+
+Each action is a button, and its handler is your code. `save` is the main button, and saves the fields the editor changed. A view without `save` is read only. Every other action becomes a button beside it, named after its key: `resetPassword` reads "Reset password".
+
+An action written as an object says more about its button:
+
+```ts
+refund: {
+    label: 'Refund order',
+    confirm: 'Refund this order? The customer gets their money back.',
+    when: ({ item }) => item.status === 'shipped',
+    handler: async ({ id }) => {
+        await refundOrder(id);
+    },
+},
+```
+
+| Option    | What it does                                           |
+| --------- | ------------------------------------------------------ |
+| `label`   | The button's words. Without it, the key, written out.  |
+| `confirm` | A question the editor answers before the handler runs. |
+| `when`    | Shows the button only for records it returns true for. |
+| `auth`    | Who sees the button and may run it.                    |
+| `handler` | Your code.                                             |
+
+A handler receives:
+
+| Argument  | What it is                                   |
+| --------- | -------------------------------------------- |
+| `id`      | The record's id                              |
+| `item`    | The record, as `get` returned it             |
+| `data`    | On `save`, the fields the editor may change  |
+| `editor`  | The signed-in editor                         |
+| `jobs`    | Your app's jobs, to queue work               |
+| `plugins` | Your plugins' exports, like `plugins.resend` |
+
+Because the handler is yours, it runs whoever presses the button. An order marked shipped sends its email from the handler that marks it.
+
+## Who can do what
+
+Access is written the way a [route's `auth`](/docs/access-control) is: `roles`, or `requires` for permissions. Roles come from the editor identity, as they do for [fields](/docs/cms/editing/permissions).
+
+| On        | Decides                                              |
+| --------- | ---------------------------------------------------- |
+| The view  | Who sees it at all                                   |
+| A field   | Who may change it. Everyone else sees it greyed out. |
+| An action | Who sees its button and may run it                   |
+
+`readOnly: true` on a field shows it to everyone and lets nobody change it. The server checks all of it: a `save` that changes a field the editor may not write is answered `403`, the same answer the model gets, and the handler never runs.
+
+```ts
+actions: {
+    delete: {
+        auth: {
+            roles: 'admin',
+        },
+        confirm: 'Delete this user and all their data?',
+        handler: async ({ id }) => {
+            await deleteAppUser(id);
+        },
+    },
+},
+```
+
+## The list and the page
+
+`title` names each record in the list, `columns` picks what the list shows, and `search` says which fields the search box looks in:
+
+```ts
+export const Orders = defineView({
+    name: 'orders',
+    title: 'id',
+    columns: ['id', 'customer', 'status'],
+    search: ['id', 'customer'],
+    fields: orderFields,
+    list: searchOrders,
+    get: getOrder,
+});
+```
+
+The page arranges its fields with the same [layout](/docs/cms/fields#layout) as a collection: tabs, rows, collapsible sections and the sidebar.
+
+## Moderating product reviews
+
+Customers write reviews in your app. Moderators approve or reject them, and with no `save`, nobody changes a customer's words:
+
+```ts title="src/cms/product-reviews.ts"
+export const ProductReviews = defineView({
+    name: 'productReviews',
+    label: 'Product reviews',
+    auth: {
+        roles: 'moderator',
+    },
+    fields: [
+        {
+            name: 'product',
+            schema: ProductId,
+        },
+        {
+            name: 'rating',
+            schema: z.int().min(1).max(5),
+        },
+        {
+            name: 'text',
+            schema: z.string().max(2000),
+        },
+        {
+            name: 'status',
+            schema: z.enum(['pending', 'approved', 'rejected']),
+            position: 'sidebar',
+        },
+    ],
+    list: searchReviews,
+    get: getReview,
+    actions: {
+        approve: async ({ id }) => {
+            await setReviewStatus(id, 'approved');
+        },
+        reject: async ({ id }) => {
+            await setReviewStatus(id, 'rejected');
+        },
+    },
+});
+```
+
+## Products in Stripe
+
+A view needs no database of its own. This one reads and writes Stripe:
+
+```ts title="src/cms/products.ts"
+export const Products = defineView({
+    name: 'products',
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().max(80),
+        },
+        {
+            name: 'description',
+            schema: z.string().max(400),
+        },
+        {
+            name: 'active',
+            schema: z.boolean(),
+            position: 'sidebar',
+        },
+    ],
+    list: async ({ query }) => {
+        return stripe.products.search({
+            query: `name~"${query}"`,
+        });
+    },
+    get: async ({ id }) => {
+        return stripe.products.retrieve(id);
+    },
+    actions: {
+        save: async ({ id, data }) => {
+            return stripe.products.update(id, data);
+        },
+    },
+});
+```
+
+A page that holds a product's id still uses a [relationship](/docs/cms/relationships) for its picker. The view is where editors change the product itself.

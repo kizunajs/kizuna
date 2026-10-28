@@ -14,6 +14,7 @@ content: cms({
     globals,
     collections,
     relationships,
+    views,
     auth,
     reviews,
     media,
@@ -40,6 +41,7 @@ content: cms({
 | `globals`       | `defineGlobal` results, shared by every site                                              |
 | `collections`   | `defineCollection` results, shared by every site                                          |
 | `relationships` | `defineRelationship` results                                                              |
+| `views`         | `defineView` results: data the CMS shows but does not store                               |
 | `auth`          | `identity`, `roles`, `sites`, `publish`, `people`, `invalidate`                           |
 | `reviews`       | `roles` that may approve, `onReviewRequested`                                             |
 | `media`         | S3 settings or a `storage`, `publicPath`, `maxBytes`                                      |
