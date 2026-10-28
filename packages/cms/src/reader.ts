@@ -4,7 +4,8 @@ import type { Output } from './output.js';
 import { CmsHttpError, collectionCacheTag, documentCacheTag, pageCacheTag, type CmsService } from './cms.js';
 import { servesCollection } from './page.js';
 import type { ParamsOf } from './dynamic.js';
-import type { Collection, Global } from './definitions.js';
+import type { Collection, ContentDefinition, Global } from './definitions.js';
+import { latestMigration } from './content.js';
 import { formatRef, type DocumentRef } from './refs.js';
 import { encodeSourcePaths } from './source-path.js';
 import { PREVIEW_COOKIE } from './preview-token.js';
@@ -183,6 +184,17 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
     const cached = <Args extends unknown[], Result>(read: (...args: Args) => Promise<Result>, keys: string[], tags: string[]) =>
         runtime === undefined ? read : runtime.cache(read, keys, tags);
 
+    /**
+     * A cache key that names the definition's latest migrate step, since a
+     * framework's cache can outlive a restart: content cached in an earlier
+     * shape is never read back once a definition migrates it.
+     */
+    const keyOf = (definition: ContentDefinition, ...parts: string[]): string[] => [
+        'kizuna-cms',
+        ...parts,
+        `migration:${latestMigration(definition)}`,
+    ];
+
     const missing = async (what: string): Promise<never> => {
         if (runtime !== undefined) return runtime.notFound();
         throw new CmsHttpError(404, {
@@ -216,7 +228,7 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
     const reader = (ref: DocumentRef, fallBack: boolean) => {
         const readPublished = cached(
             async () => (await service.published(ref))?.content ?? null,
-            ['kizuna-cms', 'published', formatRef(ref)],
+            keyOf(service.target(ref).definition, 'published', formatRef(ref)),
             [ref.type === 'page' ? pageCacheTag(ref.name, ref.site) : documentCacheTag(ref)]
         );
         return async (): Promise<Record<string, unknown> | undefined> => {
@@ -258,7 +270,7 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
                 const id = await service.findItem(collection, JSON.parse(params) as Record<string, string>, 'published');
                 return id === undefined ? null : ((await service.published(item(id)))?.content ?? null);
             },
-            ['kizuna-cms', 'published', `page:${name}`],
+            keyOf(listing.definition, 'published', `page:${name}`),
             [collectionCacheTag(collection)]
         );
         const readAt = async (params: Record<string, string>): Promise<Record<string, unknown> | undefined> => {
@@ -306,7 +318,7 @@ const siteReader = (service: CmsService, site: string): CmsReader<PageMap> => {
                     draft: false,
                     ...(JSON.parse(input) as ListInput<unknown>),
                 }),
-            ['kizuna-cms', 'list', collection],
+            keyOf(listing.definition, 'list', collection),
             [collectionCacheTag(collection)]
         );
         return async (input: ListInput<unknown> = {}) => {
