@@ -32,7 +32,7 @@ import {
 import type { View } from './view-definition.js';
 
 export const ViewSummarySchema = Kizuna.model({
-    title: 'Cms.View',
+    title: 'CMS.View',
     schema: z.object({
         name: z.string(),
         label: z.string(),
@@ -45,7 +45,7 @@ export const ViewSummarySchema = Kizuna.model({
 });
 
 export const ViewRowSchema = Kizuna.model({
-    title: 'Cms.ViewRow',
+    title: 'CMS.ViewRow',
     schema: z.object({
         id: z.string(),
         title: z.string(),
@@ -54,7 +54,7 @@ export const ViewRowSchema = Kizuna.model({
 });
 
 export const ViewRecordSchema = Kizuna.model({
-    title: 'Cms.ViewRecord',
+    title: 'CMS.ViewRecord',
     schema: z.object({
         view: z.string(),
         id: z.string(),

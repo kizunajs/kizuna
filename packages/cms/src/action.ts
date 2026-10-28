@@ -212,7 +212,7 @@ export const assertActionAccess = (actions: readonly ResolvedAction[], owner: st
  * One button the editor shows on an item.
  */
 export const AvailableActionSchema = Kizuna.model({
-    title: 'Cms.Action',
+    title: 'CMS.Action',
     schema: z.object({
         name: z.string().describe('The key the action runs under.'),
         label: z.string(),

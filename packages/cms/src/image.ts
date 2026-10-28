@@ -38,7 +38,7 @@ export const FocalPointSchema = z
  * },
  */
 export const ImageSchema = Kizuna.model({
-    title: 'Cms.Image',
+    title: 'CMS.Image',
     description: 'An uploaded image, with the crop, focal point and alt text for this use of it.',
     schema: z.object({
         id: z.string().min(1).describe('The media id of the uploaded file.'),
@@ -46,7 +46,7 @@ export const ImageSchema = Kizuna.model({
         crop: CropSchema.optional(),
         focalPoint: FocalPointSchema.optional(),
     }),
-}).brand<'Cms.Image'>();
+}).brand<'CMS.Image'>();
 
 /**
  * An image as a field stores it.
@@ -70,4 +70,4 @@ export interface ResolvedImage {
  * `.default()`.
  */
 export const isImageSchema = (schema: z.core.$ZodType): boolean =>
-    readMetaId(schema) === 'Cms.Image' || readMetaId(unwrapOptionalWrappers(schema).inner) === 'Cms.Image';
+    readMetaId(schema) === 'CMS.Image' || readMetaId(unwrapOptionalWrappers(schema).inner) === 'CMS.Image';

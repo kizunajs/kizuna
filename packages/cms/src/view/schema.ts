@@ -154,7 +154,7 @@ export const resolveRef = (schema: JsonSchema, root: JsonSchema): JsonSchema => 
 
 export const isImage = (schema: JsonSchema, root: JsonSchema): boolean => {
     const resolved = resolveRef(schema, root);
-    if (schema.$ref === '#/$defs/Cms.Image' || resolved['id'] === 'Cms.Image') return true;
+    if (schema.$ref === '#/$defs/CMS.Image' || resolved['id'] === 'CMS.Image') return true;
     const keys = Object.keys(resolved.properties ?? {});
     return keys.includes('id') && keys.includes('alt') && keys.every((key) => ['id', 'alt', 'crop', 'focalPoint'].includes(key));
 };

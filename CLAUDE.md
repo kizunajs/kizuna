@@ -64,7 +64,7 @@ Deliberate omissions: no first-party transports, no stored state, and no per-job
 - Editing data the CMS does not store is a view, made with `defineView` and named under `views` on `cms()`. A view takes the same field list as a collection, and its `list`, `get` and `actions` are the app's own functions, so the CMS stores nothing for it. Access is `auth` on the view, on each field and on each action, enforced on the server.
 - Fields arrange themselves with layout items in the same list: `{ type: 'tab' | 'row' | 'collapsible', fields }`, plus `position: 'sidebar'`. Layout never nests the data; content reads flat.
 - Globals, collections, relationships and views are exported in PascalCase, `Articles`, with a camelCase `name`, `articles`. Blocks take `name` like the rest.
-- Model names live under the `Cms` namespace, `Cms.Image`, since Zod's global registry is shared by every config in one process.
+- Model names live under the `CMS` namespace, `CMS.Image`, since Zod's global registry is shared by every config in one process.
 
 # Tools
 
