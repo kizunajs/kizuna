@@ -11,6 +11,7 @@ import { localMediaStorage } from './src/cms/media-storage';
 import { pages } from './src/cms.pages';
 import { db } from './src/db';
 import { editors } from './src/cms/people';
+import { AppUsers } from './src/cms/app-users';
 
 /**
  * The CMS API: editors, the content they change, and an MCP endpoint of its
@@ -34,6 +35,7 @@ export default defineConfig({
         globals: [Site],
         collections: [Employees, Articles],
         relationships: [Products],
+        views: [AppUsers],
         auth: {
             identity: 'editor',
             roles: ['editor', 'admin'],

@@ -162,4 +162,14 @@ export const Articles = defineCollection({
         }),
     },
     indexes: ['topic'],
+    actions: {
+        announce: {
+            label: 'Announce to the team',
+            confirm: 'Post this article to the team channel?',
+            handler: ({ item, editor }) => {
+                // The demo sends no messages, so the announcement goes to the server log.
+                console.log(`[demo] ${String(editor['name'])} announced "${item.title}" at /blog/${item.slug}`);
+            },
+        },
+    },
 });
