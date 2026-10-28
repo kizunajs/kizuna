@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertDialog } from '@base-ui/react/alert-dialog';
+import { Checkbox } from '@base-ui/react/checkbox';
 import { Check, CircleAlert, LoaderCircle, Undo2 } from 'lucide-react';
 import { toolsFor, type Connection } from './connection.js';
 import { ICON, useEditorContext } from './context.js';
@@ -556,16 +557,15 @@ export function PublishReview({
                                     {several || document.review !== null ? (
                                         <div className="k-review-heading">
                                             {several ? (
-                                                <button
-                                                    type="button"
+                                                <Checkbox.Root
                                                     className="k-check"
-                                                    role="checkbox"
-                                                    aria-checked={!skipped.has(document.ref)}
                                                     aria-label={`Include ${document.title}`}
-                                                    data-checked={skipped.has(document.ref) ? undefined : ''}
-                                                    onClick={() => toggle(document.ref)}>
-                                                    {skipped.has(document.ref) ? null : <Check {...ICON} />}
-                                                </button>
+                                                    checked={!skipped.has(document.ref)}
+                                                    onCheckedChange={() => toggle(document.ref)}>
+                                                    <Checkbox.Indicator className="k-check-indicator">
+                                                        <Check {...ICON} />
+                                                    </Checkbox.Indicator>
+                                                </Checkbox.Root>
                                             ) : null}
                                             <h3 className="k-review-document">{document.title}</h3>
                                             {document.review !== null ? <ReviewBadge review={document.review} me={me} /> : null}

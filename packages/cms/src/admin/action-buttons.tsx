@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { Toast } from '@base-ui/react/toast';
 import { CircleAlert, LoaderCircle } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { itemActionCall, outcomeOf, shownActions, type AvailableAction, type Outcome } from './actions.js';
+import { ConfirmDialog } from './confirm.js';
 
 /**
  * One button in the bar.
@@ -11,7 +13,7 @@ export interface ActionButton {
     name: string;
     label: string;
     /**
-     * Asked inside the page before the button runs.
+     * Asked in a dialog before the button runs.
      */
     confirm?: string | undefined;
     primary?: boolean;
@@ -19,24 +21,31 @@ export interface ActionButton {
 }
 
 /**
- * A row of buttons. One with a question asks it first, and what the server
- * answered shows below once it runs.
+ * A row of buttons. One with a question asks it first in a dialog. A problem
+ * the server answered shows below the row, and anything else as a toast.
  */
 export function ActionBar({ buttons, onRun }: { buttons: readonly ActionButton[]; onRun: (name: string) => Promise<Outcome> }) {
     const [confirming, setConfirming] = useState<ActionButton | undefined>();
     const [running, setRunning] = useState<string | undefined>();
-    const [outcome, setOutcome] = useState<Outcome | undefined>();
+    const [problem, setProblem] = useState<string | undefined>();
+    const toasts = Toast.useToastManager();
 
     const run = async (button: ActionButton): Promise<void> => {
         setConfirming(undefined);
-        setOutcome(undefined);
+        setProblem(undefined);
         setRunning(button.name);
         const answered = await onRun(button.name);
         setRunning(undefined);
-        setOutcome(answered);
+        if (answered.problem) {
+            setProblem(answered.message);
+            return;
+        }
+        toasts.add({
+            description: answered.message,
+        });
     };
 
-    if (buttons.length === 0 && outcome === undefined) return null;
+    if (buttons.length === 0 && problem === undefined) return null;
 
     return (
         <div className="k-admin-actions">
@@ -48,7 +57,7 @@ export function ActionBar({ buttons, onRun }: { buttons: readonly ActionButton[]
                             type="button"
                             className={`k-button k-button-small ${button.primary === true ? 'k-button-primary' : 'k-button-secondary'}`}
                             disabled={button.disabled === true || running !== undefined}
-                            aria-expanded={button.confirm === undefined ? undefined : confirming?.name === button.name}
+                            aria-haspopup={button.confirm === undefined ? undefined : 'dialog'}
                             onClick={() => {
                                 if (button.confirm === undefined) void run(button);
                                 else setConfirming(button);
@@ -59,40 +68,24 @@ export function ActionBar({ buttons, onRun }: { buttons: readonly ActionButton[]
                     ))}
                 </div>
             )}
-            {confirming === undefined ? null : (
-                <div
-                    className="k-admin-confirm"
-                    role="group"
-                    aria-label={confirming.label}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Escape') setConfirming(undefined);
-                    }}>
-                    <p>{confirming.confirm}</p>
-                    <div className="k-admin-action-row">
-                        <button
-                            type="button"
-                            className="k-button k-button-small k-button-primary"
-                            autoFocus
-                            onClick={() => void run(confirming)}>
-                            {confirming.label}
-                        </button>
-                        <button
-                            type="button"
-                            className="k-button k-button-small k-button-secondary"
-                            onClick={() => setConfirming(undefined)}>
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            )}
-            {outcome === undefined ? null : outcome.problem ? (
+            <ConfirmDialog
+                confirming={
+                    confirming?.confirm === undefined
+                        ? undefined
+                        : {
+                              label: confirming.label,
+                              question: confirming.confirm,
+                          }
+                }
+                onConfirm={() => {
+                    if (confirming !== undefined) void run(confirming);
+                }}
+                onCancel={() => setConfirming(undefined)}
+            />
+            {problem === undefined ? null : (
                 <p className="k-error" role="alert">
                     <CircleAlert {...ICON} />
-                    {outcome.message}
-                </p>
-            ) : (
-                <p className="k-help" role="status">
-                    {outcome.message}
+                    {problem}
                 </p>
             )}
         </div>

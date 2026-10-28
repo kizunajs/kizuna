@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { CircleAlert, Plus } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
+import { Hint } from '../view/hint.js';
 import { parseRef } from '../refs.js';
-import { BarChart } from './chart.js';
+import { Chart, Legend, Sparkline } from './chart.js';
 import {
+    changeOf,
     groupsOf,
     runsOf,
+    tileColumnsOf,
     type ChartWidgetBody,
     type CollectionsWidgetBody,
     type DashboardWidgetBody,
@@ -31,23 +34,39 @@ const kindOf = (ref: string, collections: readonly CollectionSummary[]): string 
 };
 
 function StatTile({ widget }: { widget: StatWidgetBody }) {
+    const change = widget.change === undefined ? undefined : changeOf(widget.change);
     return (
         <div className="k-section k-admin-tile">
-            <span className="k-admin-tile-label">{widget.label}</span>
-            <strong className="k-admin-tile-value">{widget.value}</strong>
+            <span className="k-admin-tile-head">
+                <span className="k-admin-tile-label">{widget.label}</span>
+                {change === undefined ? null : (
+                    <span className="k-admin-change" data-direction={change.direction}>
+                        {change.text}
+                    </span>
+                )}
+            </span>
+            <span className="k-admin-tile-body">
+                <strong className="k-admin-tile-value">{widget.value}</strong>
+                {widget.trend === undefined ? null : <Sparkline values={widget.trend} />}
+            </span>
             {widget.detail === undefined ? null : <span className="k-admin-tile-detail">{widget.detail}</span>}
         </div>
     );
 }
 
 function ChartCard({ widget }: { widget: ChartWidgetBody }) {
+    const compares = widget.data.some((point) => point.previous !== undefined);
     return (
         <section className="k-section k-admin-chart" aria-label={widget.label}>
-            <h2 className="k-section-title">{widget.label}</h2>
+            <div className="k-admin-chart-head">
+                <h2 className="k-section-title">{widget.label}</h2>
+                {widget.description === undefined ? null : <span className="k-admin-chart-description">{widget.description}</span>}
+                {compares ? <Legend style={widget.style} /> : null}
+            </div>
             {widget.data.length === 0 ? (
                 <p className="k-help k-admin-chart-empty">No numbers yet.</p>
             ) : (
-                <BarChart label={widget.label} data={widget.data} />
+                <Chart label={widget.label} style={widget.style} data={widget.data} />
             )}
         </section>
     );
@@ -113,14 +132,16 @@ function CollectionCards({
                                     <span className="k-help">{collection.count === null ? 'View' : WHOLE.format(collection.count)}</span>
                                 </a>
                                 {collection.kind === 'collection' ? (
-                                    <button
-                                        type="button"
-                                        className="k-icon-button"
-                                        aria-label={`Add to ${collection.label}`}
-                                        disabled={creating !== undefined}
-                                        onClick={() => onCreate(collection.name)}>
-                                        <Plus {...ICON} />
-                                    </button>
+                                    <Hint label={`Add to ${collection.label}`}>
+                                        <button
+                                            type="button"
+                                            className="k-icon-button k-admin-card-add"
+                                            aria-label={`Add to ${collection.label}`}
+                                            disabled={creating !== undefined}
+                                            onClick={() => onCreate(collection.name)}>
+                                            <Plus {...ICON} />
+                                        </button>
+                                    </Hint>
                                 ) : null}
                             </div>
                         ))}
@@ -174,6 +195,10 @@ export function Dashboard({
         }
         onOpen(created.ref);
     };
+
+    // The first row of stat tiles sets the columns every row shares.
+    const firstStats = runsOf(widgets ?? []).find((run) => run.kind === 'stats');
+    const columns = tileColumnsOf(firstStats?.kind === 'stats' ? firstStats.widgets.length : 0);
 
     const body = (() => {
         if (failure !== undefined) {
@@ -238,7 +263,9 @@ export function Dashboard({
     return (
         <>
             <Topbar title="Dashboard" />
-            <div className="k-admin-body">{body}</div>
+            <div className="k-admin-body k-admin-dashboard" data-columns={columns}>
+                {body}
+            </div>
         </>
     );
 }

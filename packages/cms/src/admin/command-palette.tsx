@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Autocomplete } from '@base-ui/react/autocomplete';
 import { Dialog } from '@base-ui/react/dialog';
 import { Search } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
@@ -24,44 +25,9 @@ const useShortcut = (toggle: () => void): void => {
     }, [toggle]);
 };
 
-function ResultGroup({
-    label,
-    results,
-    offset,
-    active,
-    optionId,
-    onHover,
-    onPick,
-}: {
+interface ResultGroup {
     label: string;
-    results: readonly SearchResult[];
-    offset: number;
-    active: number;
-    optionId: (index: number) => string;
-    onHover: (index: number) => void;
-    onPick: (result: SearchResult) => void;
-}) {
-    if (results.length === 0) return null;
-    return (
-        <div className="k-admin-palette-group" role="group" aria-label={label}>
-            <p className="k-admin-palette-heading" aria-hidden="true">
-                {label}
-            </p>
-            {results.map((result, index) => (
-                <div
-                    key={hrefOf(result.screen)}
-                    id={optionId(offset + index)}
-                    className="k-admin-palette-option"
-                    role="option"
-                    aria-selected={active === offset + index}
-                    onMouseMove={() => onHover(offset + index)}
-                    onClick={() => onPick(result)}>
-                    <span className="k-ellipsis">{result.label}</span>
-                    {result.detail === '' ? null : <span className="k-admin-palette-detail k-ellipsis">{result.detail}</span>}
-                </div>
-            ))}
-        </div>
-    );
+    items: SearchResult[];
 }
 
 /**
@@ -79,11 +45,8 @@ export function CommandPalette({
 }) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
-    const [active, setActive] = useState(0);
     const [documents, setDocuments] = useState<SearchResult[] | undefined>();
     const input = useRef<HTMLInputElement>(null);
-    const listId = useId();
-    const optionId = (index: number): string => `${listId}-${index}`;
 
     const toggle = useCallback(() => setOpen((shown) => !shown), []);
     useShortcut(toggle);
@@ -101,51 +64,32 @@ export function CommandPalette({
     }, [open, connection, collections]);
 
     const places = useMemo(() => placesOf(sections), [sections]);
-    const results = useMemo(
-        () =>
-            searchOf({
-                query,
-                places,
-                documents: documents ?? [],
-            }),
-        [query, places, documents]
-    );
-    const flat = [...results.places, ...results.documents];
-    const shownActive = Math.min(active, Math.max(0, flat.length - 1));
-
-    const activeId = optionId(shownActive);
-    useEffect(() => {
-        window.document.getElementById(activeId)?.scrollIntoView({
-            block: 'nearest',
+    const groups = useMemo<ResultGroup[]>(() => {
+        const results = searchOf({
+            query,
+            places,
+            documents: documents ?? [],
         });
-    }, [activeId, results]);
+        return [
+            {
+                label: 'Go to',
+                items: results.places,
+            },
+            {
+                label: 'Documents',
+                items: results.documents,
+            },
+        ].filter((group) => group.items.length > 0);
+    }, [query, places, documents]);
 
     const change = (shown: boolean): void => {
         setOpen(shown);
-        if (!shown) {
-            setQuery('');
-            setActive(0);
-        }
+        if (!shown) setQuery('');
     };
 
     const pick = (result: SearchResult): void => {
         window.location.hash = hrefOf(result.screen);
         change(false);
-    };
-
-    const move = (event: KeyboardEvent<HTMLInputElement>): void => {
-        if (flat.length === 0) return;
-        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault();
-            const step = event.key === 'ArrowDown' ? 1 : -1;
-            setActive((shownActive + step + flat.length) % flat.length);
-        } else if (event.key === 'Home' || event.key === 'End') {
-            event.preventDefault();
-            setActive(event.key === 'Home' ? 0 : flat.length - 1);
-        } else if (event.key === 'Enter') {
-            event.preventDefault();
-            pick(flat[shownActive]!);
-        }
     };
 
     const searching = query.trim() !== '';
@@ -163,53 +107,56 @@ export function CommandPalette({
                 <Dialog.Backdrop className="k-backdrop" />
                 <Dialog.Popup className="k-admin-palette" initialFocus={input}>
                     <Dialog.Title className="k-admin-visually-hidden">Search the admin</Dialog.Title>
-                    <label className="k-admin-palette-field">
-                        <Search {...ICON} />
-                        <input
-                            ref={input}
-                            type="text"
-                            role="combobox"
-                            aria-label="Search the admin"
-                            aria-expanded="true"
-                            aria-controls={listId}
-                            aria-autocomplete="list"
-                            aria-activedescendant={flat.length === 0 ? undefined : optionId(shownActive)}
-                            placeholder="Search pages, collections and titles"
-                            autoComplete="off"
-                            spellCheck={false}
-                            value={query}
-                            onChange={(event) => {
-                                setQuery(event.target.value);
-                                setActive(0);
-                            }}
-                            onKeyDown={move}
-                        />
-                    </label>
-                    <div id={listId} className="k-admin-palette-results" role="listbox" aria-label="Results">
-                        <ResultGroup
-                            label="Go to"
-                            results={results.places}
-                            offset={0}
-                            active={shownActive}
-                            optionId={optionId}
-                            onHover={setActive}
-                            onPick={pick}
-                        />
-                        <ResultGroup
-                            label="Documents"
-                            results={results.documents}
-                            offset={results.places.length}
-                            active={shownActive}
-                            optionId={optionId}
-                            onHover={setActive}
-                            onPick={pick}
-                        />
-                        {flat.length === 0 ? (
-                            <p className="k-admin-palette-empty" role="status">
-                                {searching && documents === undefined ? 'Searching…' : 'Nothing matches'}
-                            </p>
-                        ) : null}
-                    </div>
+                    <Autocomplete.Root
+                        open
+                        inline
+                        items={groups}
+                        filter={null}
+                        autoHighlight="always"
+                        keepHighlight
+                        itemToStringValue={(result: SearchResult) => result.label}
+                        value={query}
+                        onValueChange={(next, details) => {
+                            if (details.reason !== 'item-press') setQuery(next);
+                        }}>
+                        <label className="k-admin-palette-field">
+                            <Search {...ICON} />
+                            <Autocomplete.Input
+                                ref={input}
+                                aria-label="Search the admin"
+                                placeholder="Search pages, collections and titles"
+                                spellCheck={false}
+                            />
+                        </label>
+                        <div className="k-admin-palette-results">
+                            <Autocomplete.Empty>
+                                <p className="k-admin-palette-empty">
+                                    {searching && documents === undefined ? 'Searching…' : 'Nothing matches'}
+                                </p>
+                            </Autocomplete.Empty>
+                            <Autocomplete.List className="k-admin-palette-list" aria-label="Results">
+                                {(group: ResultGroup) => (
+                                    <Autocomplete.Group key={group.label} items={group.items} className="k-admin-palette-group">
+                                        <Autocomplete.GroupLabel className="k-admin-palette-heading">{group.label}</Autocomplete.GroupLabel>
+                                        <Autocomplete.Collection>
+                                            {(result: SearchResult) => (
+                                                <Autocomplete.Item
+                                                    key={hrefOf(result.screen)}
+                                                    value={result}
+                                                    className="k-admin-palette-option"
+                                                    onClick={() => pick(result)}>
+                                                    <span className="k-ellipsis">{result.label}</span>
+                                                    {result.detail === '' ? null : (
+                                                        <span className="k-admin-palette-detail k-ellipsis">{result.detail}</span>
+                                                    )}
+                                                </Autocomplete.Item>
+                                            )}
+                                        </Autocomplete.Collection>
+                                    </Autocomplete.Group>
+                                )}
+                            </Autocomplete.List>
+                        </div>
+                    </Autocomplete.Root>
                 </Dialog.Popup>
             </Dialog.Portal>
         </Dialog.Root>

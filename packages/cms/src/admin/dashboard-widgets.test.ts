@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupsOf, runsOf, type DashboardCollection, type DashboardWidgetBody } from './dashboard-widgets.js';
+import { changeOf, groupsOf, runsOf, tileColumnsOf, type DashboardCollection, type DashboardWidgetBody } from './dashboard-widgets.js';
 
 const revenue: DashboardWidgetBody = {
     type: 'stat',
@@ -16,6 +16,7 @@ const orders: DashboardWidgetBody = {
 const ordersPerDay: DashboardWidgetBody = {
     type: 'chart',
     label: 'Orders per day',
+    style: 'bar',
     data: [],
 };
 
@@ -82,5 +83,42 @@ describe('the collection groups', () => {
 
     it('leaves out Content when nothing sits under it', () => {
         expect(groupsOf([collection('orders', 'Shop')]).map((group) => group.label)).toEqual(['Shop']);
+    });
+});
+
+describe('changeOf', () => {
+    it('shows a rise with an up arrow and one decimal', () => {
+        expect(changeOf(0.081)).toEqual({
+            text: '↑ 8.1%',
+            direction: 'up',
+        });
+    });
+
+    it('shows a fall with a down arrow, dropping a trailing zero', () => {
+        expect(changeOf(-0.02)).toEqual({
+            text: '↓ 2%',
+            direction: 'down',
+        });
+    });
+
+    it('shows no arrow for a change that rounds to nothing', () => {
+        expect(changeOf(0.0004)).toEqual({
+            text: '0%',
+            direction: 'none',
+        });
+    });
+});
+
+describe('tileColumnsOf', () => {
+    it('gives each of up to four tiles a column', () => {
+        expect([1, 2, 3, 4].map(tileColumnsOf)).toEqual([1, 2, 3, 4]);
+    });
+
+    it('fills the rows evenly beyond four', () => {
+        expect([5, 6, 7, 8, 9].map(tileColumnsOf)).toEqual([3, 3, 4, 4, 3]);
+    });
+
+    it('keeps four columns when there are no tiles', () => {
+        expect(tileColumnsOf(0)).toBe(4);
     });
 });

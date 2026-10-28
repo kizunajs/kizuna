@@ -347,16 +347,13 @@ textarea {
     width: fit-content;
     height: 28px;
     padding: 0 10px 0 6px;
+    border: 0;
     border-radius: 7px;
+    background: none;
     font-size: 13px;
     font-weight: 600;
     color: var(--k-muted);
-    list-style: none;
     cursor: pointer;
-}
-
-.k-collapsible-summary::-webkit-details-marker {
-    display: none;
 }
 
 .k-collapsible-summary:hover {
@@ -368,8 +365,12 @@ textarea {
     transition: transform 0.15s ease;
 }
 
-.k-collapsible[open] > .k-collapsible-summary svg {
+.k-collapsible-summary[data-panel-open] svg {
     transform: rotate(90deg);
+}
+
+.k-collapsible-panel[hidden] {
+    display: none;
 }
 
 .k-row {
@@ -636,21 +637,56 @@ textarea {
 
 /* Lists */
 
+/* Items are rows on the field's own background, apart by spacing alone. */
 .k-list {
+    --k-inline-label-height: 18px;
+    --k-inline-label-gap: 4px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 14px;
 }
 
 .k-list-item {
     position: relative;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 6px;
-    padding: 10px;
     border-radius: 12px;
-    background: var(--k-surface);
-    box-shadow: var(--k-elevation);
+}
+
+/* The handle and the remove button line up with the item's first input. */
+.k-list-item > .k-grip,
+.k-list-item > .k-icon-button {
+    height: var(--k-control-height);
+}
+
+.k-list-item[data-one-row='true'] > .k-grip,
+.k-list-item[data-one-row='true'] > .k-icon-button {
+    margin-top: calc(var(--k-inline-label-height) + var(--k-inline-label-gap));
+}
+
+.k-inline-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.k-inline-field {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: var(--k-inline-label-gap);
+    min-width: min(100%, 120px);
+}
+
+.k-inline-label {
+    overflow: hidden;
+    height: var(--k-inline-label-height);
+    font-size: 12px;
+    line-height: var(--k-inline-label-height);
+    color: var(--k-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .k-list-body {
@@ -665,6 +701,7 @@ textarea {
 
 .k-list-item[data-dragged='true'] {
     z-index: 1;
+    background: var(--k-popup);
     box-shadow:
         var(--k-elevation),
         0 12px 28px -8px rgb(0 0 0 / 0.5);
@@ -704,8 +741,9 @@ textarea {
 
 /* Popups */
 
+/* Above dialogs and sheets too, since a popup opened from inside one belongs over it. */
 .k-positioner {
-    z-index: 10;
+    z-index: 25;
 }
 
 .k-popup {
@@ -784,6 +822,19 @@ textarea {
     padding: 8px 10px;
 }
 
+/* A label beside an icon button, over every other popup. */
+.k-tooltip-positioner {
+    z-index: 30;
+}
+
+.k-tooltip {
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
 .k-thumb-small {
     width: 22px;
     height: 22px;
@@ -794,10 +845,105 @@ textarea {
 
 /* Images */
 
-.k-image {
+/* The field is one row: a thumbnail, its name and size, and its buttons. It fits a narrow sidebar. */
+.k-image-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    min-height: var(--k-control-height);
+}
+
+.k-image-thumb {
+    display: block;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+
+span.k-image-thumb {
+    background: var(--k-control);
+}
+
+.k-image-name {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    font-size: 13.5px;
+    line-height: 1.35;
+}
+
+/* A long alt text or file name wraps to two lines before it truncates. */
+.k-image-title {
+    display: -webkit-box;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+.k-image-size {
+    font-size: 12px;
+    color: var(--k-muted);
+}
+
+.k-image-buttons {
+    display: flex;
+    flex-shrink: 0;
+    gap: 2px;
+}
+
+/* A sheet from the right, for what a field holds beyond its row. */
+.k-sheet {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 21;
     display: flex;
     flex-direction: column;
     gap: 14px;
+    width: min(420px, 100vw);
+    padding: 16px 20px 24px;
+    overflow-y: auto;
+    background: var(--k-popup);
+    box-shadow: var(--k-popup-shadow);
+    color: var(--k-ink);
+}
+
+.k-sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+.k-sheet-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.k-sheet-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.k-sheet-label {
+    font-size: 12px;
+    color: var(--k-muted);
+}
+
+.k-sheet .k-image-frame img {
+    max-height: 360px;
 }
 
 .k-image-frame {
@@ -830,12 +976,6 @@ textarea {
     background: #0c0c0c;
     box-shadow: 0 1px 4px rgb(0 0 0 / 0.4);
     pointer-events: none;
-}
-
-.k-image-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
 }
 
 .k-crop {
@@ -1671,9 +1811,18 @@ textarea {
     cursor: pointer;
 }
 
-.k-check[data-checked] {
+.k-check:is([data-checked], [data-indeterminate]) {
     border-color: transparent;
     background: var(--k-ink);
+}
+
+.k-check:focus-visible {
+    outline: 2px solid var(--k-ink);
+    outline-offset: 2px;
+}
+
+.k-check-indicator {
+    display: flex;
 }
 
 .k-check svg {

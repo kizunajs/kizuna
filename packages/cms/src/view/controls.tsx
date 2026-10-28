@@ -1,14 +1,18 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Collapsible } from '@base-ui/react/collapsible';
+import { Combobox } from '@base-ui/react/combobox';
+import { Dialog } from '@base-ui/react/dialog';
 import { NumberField } from '@base-ui/react/number-field';
-import { Popover } from '@base-ui/react/popover';
 import { Select } from '@base-ui/react/select';
 import { Switch } from '@base-ui/react/switch';
-import { Check, ChevronsUpDown, GripVertical, Plus, Search, X } from 'lucide-react';
+import { Check, ChevronRight, ChevronsUpDown, GripVertical, Pencil, Plus, Search, X } from 'lucide-react';
 import { ICON, useEditorContext } from './context.js';
+import { Hint } from './hint.js';
 import { MediaPicker, type MediaRecord } from './media.js';
 import { emptyFor, humanize, isImage, isRichText, resolveRef, typeOf, type JsonSchema } from './schema.js';
 import { RichTextControl } from './rich-text.js';
 import { isSeo, SeoControl } from './seo.js';
+import { stringInputOf } from './string-input.js';
 
 export interface ControlProps {
     schema: JsonSchema;
@@ -126,11 +130,11 @@ function StringControl({ schema, labels, value, onChange, disabled, required, id
             />
         );
     }
-    const long = schema.maxLength === undefined || schema.maxLength > 120;
+    const input = stringInputOf(schema);
     const over = schema.maxLength !== undefined && text.length > schema.maxLength;
     return (
         <div className="k-text">
-            {long ? (
+            {input === 'textarea' ? (
                 <textarea
                     id={id}
                     className="k-input k-textarea"
@@ -143,7 +147,7 @@ function StringControl({ schema, labels, value, onChange, disabled, required, id
                 <input
                     id={id}
                     className="k-input"
-                    type="text"
+                    type={input}
                     value={text}
                     disabled={disabled}
                     onChange={(event) => set(event.target.value)}
@@ -240,46 +244,58 @@ function ReferenceControl({ value, onChange, brand, disabled, id }: ControlProps
     }, [open, query, search]);
 
     return (
-        <Popover.Root open={open} onOpenChange={setOpen}>
-            <Popover.Trigger className="k-input k-select" disabled={disabled} id={id}>
+        <Combobox.Root
+            items={results}
+            filter={null}
+            autoHighlight
+            value={chosen ?? null}
+            onValueChange={(next) => {
+                if (next !== null) onChange(next.id);
+            }}
+            itemToStringLabel={(result) => result.label}
+            isItemEqualToValue={(result, picked) => result.id === picked.id}
+            inputValue={query}
+            onInputValueChange={(next) => setQuery(next)}
+            open={open}
+            onOpenChange={(next) => {
+                setOpen(next);
+                if (!next) setQuery('');
+            }}
+            disabled={disabled}>
+            <Combobox.Trigger className="k-input k-select" id={id}>
                 <span className="k-select-value">
                     {chosen?.image !== undefined ? <img className="k-thumb-small" src={resolveUrl(chosen.image)} alt="" /> : null}
                     {chosen?.label ?? (current === '' ? <span className="k-placeholder">Choose</span> : current)}
                 </span>
                 <ChevronsUpDown {...ICON} className="k-select-icon" />
-            </Popover.Trigger>
-            <Popover.Portal>
-                <Popover.Positioner sideOffset={6} align="start" className="k-positioner">
-                    <Popover.Popup className="k-popup k-picker">
+            </Combobox.Trigger>
+            <Combobox.Portal>
+                <Combobox.Positioner sideOffset={6} align="start" className="k-positioner">
+                    <Combobox.Popup className="k-popup k-picker">
                         <label className="k-search">
                             <Search {...ICON} />
-                            <input autoFocus placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} />
+                            <Combobox.Input placeholder="Search" aria-label="Search" />
                         </label>
-                        <div className="k-picker-list" role="listbox">
-                            {results.length === 0 ? <p className="k-help">Nothing found</p> : null}
-                            {results.map((result) => (
-                                <button
-                                    key={result.id}
-                                    type="button"
-                                    role="option"
-                                    aria-selected={result.id === current}
-                                    className="k-menu-item"
-                                    onClick={() => {
-                                        onChange(result.id);
-                                        setOpen(false);
-                                    }}>
+                        <Combobox.Empty>
+                            <p className="k-help">Nothing found</p>
+                        </Combobox.Empty>
+                        <Combobox.List className="k-picker-list">
+                            {(result: SearchResult) => (
+                                <Combobox.Item key={result.id} value={result} className="k-menu-item">
                                     {result.image !== undefined ? (
                                         <img className="k-thumb-small" src={resolveUrl(result.image)} alt="" />
                                     ) : null}
                                     <span className="k-ellipsis">{result.label}</span>
-                                    {result.id === current ? <Check {...ICON} className="k-menu-check" /> : null}
-                                </button>
-                            ))}
-                        </div>
-                    </Popover.Popup>
-                </Popover.Positioner>
-            </Popover.Portal>
-        </Popover.Root>
+                                    <Combobox.ItemIndicator className="k-menu-check">
+                                        <Check {...ICON} />
+                                    </Combobox.ItemIndicator>
+                                </Combobox.Item>
+                            )}
+                        </Combobox.List>
+                    </Combobox.Popup>
+                </Combobox.Positioner>
+            </Combobox.Portal>
+        </Combobox.Root>
     );
 }
 
@@ -317,10 +333,16 @@ const CROP_EDGES: Array<{ key: keyof NonNullable<ImageRef['crop']>; label: strin
     },
 ];
 
+/**
+ * An image as one compact row: a thumbnail, its alt text or file name, and
+ * buttons to edit or remove it. Edit opens a sheet with the image at size,
+ * where a click sets the focal point, with Replace, its alt text and its crop.
+ */
 function ImageControl({ value, onChange, disabled }: ControlProps) {
     const { connection, resolveUrl } = useEditorContext();
     const image = (value ?? {}) as ImageRef;
     const [record, setRecord] = useState<MediaRecord | undefined>();
+    const [editing, setEditing] = useState(false);
     useEffect(() => {
         if (image.id === undefined) {
             setRecord(undefined);
@@ -342,102 +364,148 @@ function ImageControl({ value, onChange, disabled }: ControlProps) {
             alt: image.alt ?? '',
             ...patch,
         });
+    const pick = (picked: MediaRecord): void =>
+        set({
+            id: picked.id,
+            alt: image.alt === undefined || image.alt === '' ? (picked.alt ?? '') : image.alt,
+            crop: undefined,
+            focalPoint: undefined,
+        });
+
+    if (image.id === undefined) return <MediaPicker current={undefined} disabled={disabled} onPick={pick} />;
+
     const source = record === undefined ? undefined : resolveUrl(record.url);
+    const title = image.alt === undefined || image.alt === '' ? (record?.filename ?? 'Image') : image.alt;
     return (
-        <div className="k-image">
-            {source !== undefined ? (
-                <div className="k-image-frame">
-                    <img
-                        src={source}
-                        alt=""
-                        data-editable={!disabled}
-                        onClick={(event) => {
-                            if (disabled) return;
-                            const rect = event.currentTarget.getBoundingClientRect();
-                            set({
-                                focalPoint: {
-                                    x: Math.round(((event.clientX - rect.left) / rect.width) * 100) / 100,
-                                    y: Math.round(((event.clientY - rect.top) / rect.height) * 100) / 100,
-                                },
-                            });
-                        }}
-                    />
-                    {image.focalPoint !== undefined ? (
-                        <span
-                            className="k-focal"
-                            style={{
-                                left: `${image.focalPoint.x * 100}%`,
-                                top: `${image.focalPoint.y * 100}%`,
-                            }}
-                        />
-                    ) : null}
-                </div>
-            ) : null}
-            <div className="k-image-actions">
-                <MediaPicker
-                    current={image.id}
-                    disabled={disabled}
-                    onPick={(picked) =>
-                        set({
-                            id: picked.id,
-                            alt: image.alt === undefined || image.alt === '' ? (picked.alt ?? '') : image.alt,
-                            crop: undefined,
-                            focalPoint: undefined,
-                        })
-                    }
-                />
-                {record !== undefined ? (
-                    <span className="k-help">
-                        {record.width} × {record.height}
-                        {disabled ? '' : ' · click the image to set its focus'}
-                    </span>
-                ) : null}
-            </div>
-            <Row label="Alt text">
-                <input
-                    className="k-input"
-                    type="text"
-                    value={image.alt ?? ''}
-                    disabled={disabled}
-                    placeholder="What the image shows"
-                    onChange={(event) =>
-                        set({
-                            alt: event.target.value,
-                        })
-                    }
-                />
-            </Row>
-            {disabled || image.id === undefined ? null : (
-                <Row label="Crop">
-                    <div className="k-crop">
-                        {CROP_EDGES.map((edge) => (
-                            <NumberField.Root
-                                key={edge.key}
-                                value={image.crop?.[edge.key] ?? (edge.key === 'width' || edge.key === 'height' ? 1 : 0)}
-                                min={0}
-                                max={1}
-                                step={0.01}
-                                onValueChange={(next) =>
-                                    set({
-                                        crop: {
-                                            x: 0,
-                                            y: 0,
-                                            width: 1,
-                                            height: 1,
-                                            ...image.crop,
-                                            [edge.key]: next ?? 0,
-                                        },
-                                    })
-                                }>
-                                <NumberField.Group className="k-crop-edge">
-                                    <span>{edge.label}</span>
-                                    <NumberField.Input className="k-input" aria-label={`Crop ${edge.key}`} />
-                                </NumberField.Group>
-                            </NumberField.Root>
-                        ))}
-                    </div>
-                </Row>
+        <div className="k-image-row">
+            {record === undefined ? (
+                <span className="k-image-thumb" aria-hidden="true" />
+            ) : (
+                <img className="k-image-thumb" src={resolveUrl(`${record.url}?w=120`)} alt="" />
             )}
+            <span className="k-image-name">
+                <span className="k-image-title">{title}</span>
+                {record === undefined ? null : (
+                    <span className="k-image-size">
+                        {record.width} × {record.height}
+                    </span>
+                )}
+            </span>
+            <span className="k-image-buttons">
+                <Dialog.Root open={editing} onOpenChange={setEditing}>
+                    <Hint label="Edit image">
+                        <Dialog.Trigger className="k-icon-button" aria-label="Edit image">
+                            <Pencil {...ICON} />
+                        </Dialog.Trigger>
+                    </Hint>
+                    <Dialog.Portal>
+                        <Dialog.Backdrop className="k-backdrop" />
+                        <Dialog.Popup className="k-sheet">
+                            <div className="k-sheet-head">
+                                <Dialog.Title className="k-dialog-title k-ellipsis">{record?.filename ?? 'Image'}</Dialog.Title>
+                                <Dialog.Close className="k-icon-button" aria-label="Close">
+                                    <X {...ICON} />
+                                </Dialog.Close>
+                            </div>
+                            {source === undefined ? null : (
+                                <div className="k-image-frame">
+                                    <img
+                                        src={source}
+                                        alt=""
+                                        data-editable={!disabled}
+                                        onClick={(event) => {
+                                            if (disabled) return;
+                                            const rect = event.currentTarget.getBoundingClientRect();
+                                            set({
+                                                focalPoint: {
+                                                    x: Math.round(((event.clientX - rect.left) / rect.width) * 100) / 100,
+                                                    y: Math.round(((event.clientY - rect.top) / rect.height) * 100) / 100,
+                                                },
+                                            });
+                                        }}
+                                    />
+                                    {image.focalPoint !== undefined ? (
+                                        <span
+                                            className="k-focal"
+                                            style={{
+                                                left: `${image.focalPoint.x * 100}%`,
+                                                top: `${image.focalPoint.y * 100}%`,
+                                            }}
+                                        />
+                                    ) : null}
+                                </div>
+                            )}
+                            {disabled ? null : (
+                                <div className="k-sheet-actions">
+                                    <MediaPicker current={image.id} disabled={disabled} onPick={pick} />
+                                    <span className="k-help">Click the image to set its focus.</span>
+                                </div>
+                            )}
+                            <label className="k-sheet-field">
+                                <span className="k-sheet-label">Alt text</span>
+                                <input
+                                    className="k-input"
+                                    type="text"
+                                    value={image.alt ?? ''}
+                                    disabled={disabled}
+                                    placeholder="What the image shows"
+                                    onChange={(event) =>
+                                        set({
+                                            alt: event.target.value,
+                                        })
+                                    }
+                                />
+                            </label>
+                            {disabled ? null : (
+                                <Collapsible.Root className="k-collapsible">
+                                    <Collapsible.Trigger className="k-collapsible-summary">
+                                        <ChevronRight {...ICON} />
+                                        Crop
+                                    </Collapsible.Trigger>
+                                    <Collapsible.Panel className="k-collapsible-panel">
+                                        <div className="k-crop">
+                                            {CROP_EDGES.map((edge) => (
+                                                <NumberField.Root
+                                                    key={edge.key}
+                                                    value={
+                                                        image.crop?.[edge.key] ?? (edge.key === 'width' || edge.key === 'height' ? 1 : 0)
+                                                    }
+                                                    min={0}
+                                                    max={1}
+                                                    step={0.01}
+                                                    onValueChange={(next) =>
+                                                        set({
+                                                            crop: {
+                                                                x: 0,
+                                                                y: 0,
+                                                                width: 1,
+                                                                height: 1,
+                                                                ...image.crop,
+                                                                [edge.key]: next ?? 0,
+                                                            },
+                                                        })
+                                                    }>
+                                                    <NumberField.Group className="k-crop-edge">
+                                                        <span>{edge.label}</span>
+                                                        <NumberField.Input className="k-input" aria-label={`Crop ${edge.key}`} />
+                                                    </NumberField.Group>
+                                                </NumberField.Root>
+                                            ))}
+                                        </div>
+                                    </Collapsible.Panel>
+                                </Collapsible.Root>
+                            )}
+                        </Dialog.Popup>
+                    </Dialog.Portal>
+                </Dialog.Root>
+                {disabled ? null : (
+                    <Hint label="Remove image">
+                        <button type="button" className="k-icon-button" aria-label="Remove image" onClick={() => onChange(undefined)}>
+                            <X {...ICON} />
+                        </button>
+                    </Hint>
+                )}
+            </span>
         </div>
     );
 }
@@ -475,6 +543,8 @@ function ArrayControl(props: ControlProps) {
     const { schema, root, value, onChange, disabled } = props;
     const items = Array.isArray(value) ? value : [];
     const itemSchema = schema.items ?? {};
+    const resolvedItem = resolveRef(itemSchema, root);
+    const oneRow = typeOf(resolvedItem) === 'object' && fitsOneRow(resolvedItem, root);
     const max = schema.maxItems;
     const min = schema.minItems ?? 0;
     // Editors like rich text read their value once, so a move or a removal remounts every item.
@@ -549,6 +619,7 @@ function ArrayControl(props: ControlProps) {
                         rows.current[index] = row;
                     }}
                     className="k-list-item"
+                    data-one-row={oneRow}
                     data-dragged={drag?.from === index}
                     style={{
                         transform: `translateY(${shiftFor(index, drag)}px)`,
@@ -564,15 +635,27 @@ function ArrayControl(props: ControlProps) {
                         </button>
                     )}
                     <div className="k-list-body">
-                        <Control
-                            {...props}
-                            id={undefined}
-                            schema={itemSchema}
-                            root={root}
-                            value={item}
-                            required
-                            onChange={(next) => onChange(items.map((existing, at) => (at === index ? next : existing)))}
-                        />
+                        {oneRow ? (
+                            <InlineObjectControl
+                                {...props}
+                                id={undefined}
+                                schema={resolvedItem}
+                                root={root}
+                                value={item}
+                                required
+                                onChange={(next) => onChange(items.map((existing, at) => (at === index ? next : existing)))}
+                            />
+                        ) : (
+                            <Control
+                                {...props}
+                                id={undefined}
+                                schema={itemSchema}
+                                root={root}
+                                value={item}
+                                required
+                                onChange={(next) => onChange(items.map((existing, at) => (at === index ? next : existing)))}
+                            />
+                        )}
                     </div>
                     {disabled ? null : (
                         <button
@@ -623,33 +706,83 @@ export function Row({ label, htmlFor, children }: { label: string; htmlFor?: str
 }
 
 /**
+ * The most properties a list item lays side by side.
+ */
+const ONE_ROW_PROPERTIES = 4;
+
+/**
+ * Whether every property of an object edits on one line, so a list item can
+ * lay them side by side.
+ */
+const fitsOneRow = (schema: JsonSchema, root: JsonSchema): boolean => {
+    const properties = Object.values(schema.properties ?? {});
+    if (properties.length === 0 || properties.length > ONE_ROW_PROPERTIES) return false;
+    return properties.every((property) => {
+        const resolved = resolveRef(property, root);
+        if (isRichText(property) || isRichText(resolved) || isSeo(property) || isSeo(resolved) || isImage(property, root)) return false;
+        const type = typeOf(resolved);
+        if (type === 'string') return stringInputOf(resolved) !== 'textarea';
+        return type === 'number' || type === 'integer' || type === 'boolean';
+    });
+};
+
+/**
+ * The control for one property of an object, writing the object as a whole.
+ */
+function PropertyControl({ props, name, property, id }: { props: ControlProps; name: string; property: JsonSchema; id?: string }) {
+    const current = (props.value ?? {}) as Record<string, unknown>;
+    return (
+        <Control
+            {...props}
+            id={id}
+            schema={property}
+            brand={undefined}
+            searchTool={undefined}
+            labels={undefined}
+            value={current[name]}
+            required={props.schema.required?.includes(name)}
+            onChange={(next) => {
+                const updated = {
+                    ...current,
+                };
+                if (next === undefined) delete updated[name];
+                else updated[name] = next;
+                props.onChange(updated);
+            }}
+        />
+    );
+}
+
+/**
  * An object's properties, a row each, editing the object as a whole.
  */
 function ObjectControl(props: ControlProps) {
-    const current = (props.value ?? {}) as Record<string, unknown>;
     return (
         <div className="k-group">
-            {Object.entries(props.schema.properties ?? {}).map(([key, property]) => (
-                <Row key={key} label={humanize(key)}>
-                    <Control
-                        {...props}
-                        id={undefined}
-                        schema={property}
-                        brand={undefined}
-                        searchTool={undefined}
-                        labels={undefined}
-                        value={current[key]}
-                        required={props.schema.required?.includes(key)}
-                        onChange={(next) => {
-                            const updated = {
-                                ...current,
-                            };
-                            if (next === undefined) delete updated[key];
-                            else updated[key] = next;
-                            props.onChange(updated);
-                        }}
-                    />
+            {Object.entries(props.schema.properties ?? {}).map(([name, property]) => (
+                <Row key={name} label={humanize(name)}>
+                    <PropertyControl props={props} name={name} property={property} />
                 </Row>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * A short object's properties side by side, each with a small label above,
+ * for a list item whose properties all edit on one line.
+ */
+function InlineObjectControl(props: ControlProps) {
+    const base = useId();
+    return (
+        <div className="k-inline-fields">
+            {Object.entries(props.schema.properties ?? {}).map(([name, property]) => (
+                <div key={name} className="k-inline-field">
+                    <label className="k-inline-label" htmlFor={`${base}-${name}`}>
+                        {humanize(name)}
+                    </label>
+                    <PropertyControl props={props} name={name} property={property} id={`${base}-${name}`} />
+                </div>
             ))}
         </div>
     );

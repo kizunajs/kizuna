@@ -257,7 +257,12 @@ export function Admin({ config }: { config: AdminConfig }) {
                             </div>
                         ))}
                     </div>
-                    <SignedIn person={me} role={config.role} signOutPath={config.signOutPath} />
+                    <SignedIn
+                        person={me}
+                        role={config.role}
+                        signOutPath={config.signOutPath}
+                        signOutMethod={config.signOutMethod ?? 'GET'}
+                    />
                 </nav>
                 <main className="k-admin-main">{shown}</main>
             </div>

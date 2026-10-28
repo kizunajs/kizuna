@@ -17,6 +17,7 @@ import { isActiveAnnotation, isActiveDecorator, isActiveListItem, isActiveStyle 
 import { Bold, Code, Heading2, Heading3, Italic, Link, List, ListOrdered, Pilcrow, Quote, Underline, Unlink } from 'lucide-react';
 import { ICON, useEditorContext } from './context.js';
 import type { ControlProps } from './controls.js';
+import { Hint } from './hint.js';
 import { MediaPicker, type MediaRecord } from './media.js';
 import { SAFE_HREF } from './schema.js';
 
@@ -181,16 +182,17 @@ const RICH_TEXT_NODES = [
 
 function ToolbarButton(props: { label: string; active: boolean; onPress: () => void; children: ReactNode }) {
     return (
-        <button
-            type="button"
-            className="k-tool"
-            title={props.label}
-            aria-label={props.label}
-            aria-pressed={props.active}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={props.onPress}>
-            {props.children}
-        </button>
+        <Hint label={props.label}>
+            <button
+                type="button"
+                className="k-tool"
+                aria-label={props.label}
+                aria-pressed={props.active}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={props.onPress}>
+                {props.children}
+            </button>
+        </Hint>
     );
 }
 

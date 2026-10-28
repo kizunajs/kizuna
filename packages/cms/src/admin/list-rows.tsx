@@ -1,5 +1,6 @@
 import { useMemo, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Checkbox } from '@base-ui/react/checkbox';
+import { Check, ChevronDown, ChevronRight, Minus } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import { treeLinesOf, type TreePlace } from './list-tree.js';
 import { hrefOf } from './navigation.js';
@@ -37,25 +38,51 @@ const toggled = (selected: ReadonlySet<string>, refs: readonly string[], on: boo
     return next;
 };
 
+/**
+ * A row's tick box, or the head's, which shows a dash while only some rows
+ * are ticked.
+ */
+function Tick({
+    label,
+    checked,
+    indeterminate = false,
+    onChange,
+}: {
+    label: string;
+    checked: boolean;
+    indeterminate?: boolean;
+    onChange: (checked: boolean) => void;
+}) {
+    return (
+        <Checkbox.Root
+            className="k-check"
+            aria-label={label}
+            checked={checked}
+            indeterminate={indeterminate}
+            onCheckedChange={(next) => onChange(next)}>
+            <Checkbox.Indicator className="k-check-indicator">
+                {indeterminate ? <Minus {...ICON} /> : <Check {...ICON} />}
+            </Checkbox.Indicator>
+        </Checkbox.Root>
+    );
+}
+
 function Head({ rows, selection }: { rows: readonly ListRow[]; selection: Selection | undefined }) {
     const ticked = rows.filter((row) => selection?.selected.has(row.ref)).length;
     return (
         <div className="k-admin-row k-admin-row-head" role="row">
             {selection === undefined ? null : (
                 <span role="columnheader">
-                    <input
-                        type="checkbox"
-                        aria-label="Select every row shown"
+                    <Tick
+                        label="Select every row shown"
                         checked={rows.length > 0 && ticked === rows.length}
-                        ref={(input) => {
-                            if (input !== null) input.indeterminate = ticked > 0 && ticked < rows.length;
-                        }}
-                        onChange={(event) =>
+                        indeterminate={ticked > 0 && ticked < rows.length}
+                        onChange={(checked) =>
                             selection.onChange(
                                 toggled(
                                     selection.selected,
                                     rows.map((row) => row.ref),
-                                    event.target.checked
+                                    checked
                                 )
                             )
                         }
@@ -116,11 +143,10 @@ function Line({ row, title, selection, lead, depth, drop }: LineProps) {
                   })}>
             {selection === undefined ? null : (
                 <span role="cell">
-                    <input
-                        type="checkbox"
-                        aria-label={`Select ${title}`}
+                    <Tick
+                        label={`Select ${title}`}
                         checked={selection.selected.has(row.ref)}
-                        onChange={(event) => selection.onChange(toggled(selection.selected, [row.ref], event.target.checked))}
+                        onChange={(checked) => selection.onChange(toggled(selection.selected, [row.ref], checked))}
                     />
                 </span>
             )}

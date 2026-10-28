@@ -9,6 +9,8 @@ import {
     type ReactNode,
     type Ref,
 } from 'react';
+import { Collapsible } from '@base-ui/react/collapsible';
+import { Tabs } from '@base-ui/react/tabs';
 import { ChevronRight, CircleAlert } from 'lucide-react';
 import { arrange, inSidebar, tabSets, type Arranged } from './arrange.js';
 import { ICON } from './context.js';
@@ -61,8 +63,6 @@ const refusalFor = (field: DescribedField): string =>
     field.readOnly ? 'Read only' : `Only ${(field.roles ?? ['another role']).join(' or ')} can change this`;
 
 const domId = (path: string): string => `field-${path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
-
-const layoutId = (id: string): string => `layout-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
 /**
  * The changes as JSON carries them. An emptied field goes as `null`, which
@@ -307,63 +307,54 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
             if (entry.kind === 'collapsible') {
                 const id = entry.item.id;
                 return (
-                    <details
+                    <Collapsible.Root
                         key={id}
                         className="k-collapsible"
                         open={!folded.has(id)}
-                        onToggle={(event) => {
-                            const open = event.currentTarget.open;
+                        onOpenChange={(open) =>
                             setFolded((previous) => {
                                 if (open !== previous.has(id)) return previous;
                                 const next = new Set(previous);
                                 if (open) next.delete(id);
                                 else next.add(id);
                                 return next;
-                            });
-                        }}>
-                        <summary className="k-collapsible-summary">
+                            })
+                        }>
+                        <Collapsible.Trigger className="k-collapsible-summary">
                             <ChevronRight {...ICON} />
                             {entry.item.label}
-                        </summary>
-                        <div className={stack}>{shown(entry.content, stack, leaf)}</div>
-                    </details>
+                        </Collapsible.Trigger>
+                        <Collapsible.Panel keepMounted className={`k-collapsible-panel ${stack}`}>
+                            {shown(entry.content, stack, leaf)}
+                        </Collapsible.Panel>
+                    </Collapsible.Root>
                 );
             }
             const active = shownTabs[entry.id] ?? entry.id;
             return (
-                <div key={entry.id} className="k-tabs">
-                    <div className="k-tab-bar" role="tablist">
+                <Tabs.Root
+                    key={entry.id}
+                    className="k-tabs"
+                    value={active}
+                    onValueChange={(tab: string) =>
+                        setShownTabs((previous) => ({
+                            ...previous,
+                            [entry.id]: tab,
+                        }))
+                    }>
+                    <Tabs.List className="k-tab-bar">
                         {entry.tabs.map((tab) => (
-                            <button
-                                key={tab.item.id}
-                                id={layoutId(tab.item.id) + '-tab'}
-                                type="button"
-                                role="tab"
-                                aria-selected={tab.item.id === active}
-                                aria-controls={layoutId(tab.item.id)}
-                                className="k-tab"
-                                onClick={() =>
-                                    setShownTabs((previous) => ({
-                                        ...previous,
-                                        [entry.id]: tab.item.id,
-                                    }))
-                                }>
+                            <Tabs.Tab key={tab.item.id} value={tab.item.id} className="k-tab">
                                 {tab.item.label}
-                            </button>
+                            </Tabs.Tab>
                         ))}
-                    </div>
+                    </Tabs.List>
                     {entry.tabs.map((tab) => (
-                        <div
-                            key={tab.item.id}
-                            id={layoutId(tab.item.id)}
-                            role="tabpanel"
-                            aria-labelledby={layoutId(tab.item.id) + '-tab'}
-                            className={stack}
-                            hidden={tab.item.id !== active}>
+                        <Tabs.Panel key={tab.item.id} value={tab.item.id} keepMounted className={stack}>
                             {shown(tab.content, stack, leaf)}
-                        </div>
+                        </Tabs.Panel>
                     ))}
-                </div>
+                </Tabs.Root>
             );
         });
 

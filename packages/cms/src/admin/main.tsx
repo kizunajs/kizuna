@@ -1,6 +1,9 @@
 import { createRoot } from 'react-dom/client';
+import { Toast } from '@base-ui/react/toast';
+import { Tooltip } from '@base-ui/react/tooltip';
 import { Admin } from './admin.js';
 import type { AdminConfig } from './config.js';
+import { Toasts } from './toasts.js';
 
 const readConfig = (): AdminConfig => {
     try {
@@ -18,4 +21,11 @@ const readConfig = (): AdminConfig => {
     }
 };
 
-createRoot(window.document.getElementById('root')!).render(<Admin config={readConfig()} />);
+createRoot(window.document.getElementById('root')!).render(
+    <Toast.Provider>
+        <Tooltip.Provider>
+            <Admin config={readConfig()} />
+            <Toasts />
+        </Tooltip.Provider>
+    </Toast.Provider>
+);

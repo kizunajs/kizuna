@@ -11,11 +11,25 @@ export interface StatWidgetBody {
     label: string;
     value: string;
     detail?: string;
+    /**
+     * How far the number moved since the period before, as a signed
+     * fraction: 0.081 is up 8.1%.
+     */
+    change?: number;
+    /**
+     * Values for a small line beside the number, oldest first.
+     */
+    trend?: number[];
 }
 
 export interface ChartWidgetBody {
     type: 'chart';
     label: string;
+    /**
+     * What the numbers count, like "Succeeded orders · NOK".
+     */
+    description?: string;
+    style: 'bar' | 'line';
     data: ChartBar[];
 }
 
@@ -113,4 +127,43 @@ export const groupsOf = (collections: readonly DashboardCollection[]): Collectio
             label,
             collections: members,
         }));
+};
+
+/**
+ * A change as the stat tile shows it: an arrow and a percentage with at most
+ * one decimal, and no arrow when it rounds to nothing.
+ */
+export const changeOf = (change: number): { text: string; direction: 'up' | 'down' | 'none' } => {
+    const percent = Math.round(Math.abs(change) * 1000) / 10;
+    if (percent === 0) {
+        return {
+            text: '0%',
+            direction: 'none',
+        };
+    }
+    return change > 0
+        ? {
+              text: `↑ ${percent}%`,
+              direction: 'up',
+          }
+        : {
+              text: `↓ ${percent}%`,
+              direction: 'down',
+          };
+};
+
+/**
+ * The most columns the dashboard's grid has.
+ */
+const MOST_COLUMNS = 4;
+
+/**
+ * How many columns the dashboard's grid has for a row of stat tiles: one per
+ * tile up to four, so no tile sits alone, and beyond four as few as fill the
+ * rows evenly.
+ */
+export const tileColumnsOf = (tiles: number): number => {
+    if (tiles <= 0) return MOST_COLUMNS;
+    if (tiles <= MOST_COLUMNS) return tiles;
+    return Math.ceil(tiles / Math.ceil(tiles / MOST_COLUMNS));
 };

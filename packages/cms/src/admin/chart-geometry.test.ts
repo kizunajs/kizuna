@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { BAR_GAP, barPath, chartSummary, labelledBars, placeBars, positionOf, scaleOf, WIDEST_BAR } from './chart-geometry.js';
+import {
+    areaPath,
+    BAR_SHARE,
+    barPath,
+    chartSummary,
+    labelledBars,
+    linePath,
+    linePointsOf,
+    placeBars,
+    positionOf,
+    scaleOf,
+    sparklineOf,
+    WIDEST_BAR,
+} from './chart-geometry.js';
 
 const days = (values: readonly number[]) =>
     values.map((value, index) => ({
@@ -111,10 +124,17 @@ describe('placing the bars', () => {
             scale: scaleOf(data.map((bar) => bar.value)),
         });
 
-    it('leaves the gap between neighbours', () => {
+    it('fills the same share of each slot however many bars there are', () => {
         const [first, second] = plot(days([3, 4, 5, 6]), 100);
-        expect(first?.width).toBe(25 - BAR_GAP);
-        expect((second?.x ?? 0) - ((first?.x ?? 0) + (first?.width ?? 0))).toBe(BAR_GAP);
+        expect(first?.width).toBe(25 * BAR_SHARE);
+        expect((second?.x ?? 0) - ((first?.x ?? 0) + (first?.width ?? 0))).toBeCloseTo(25 * (1 - BAR_SHARE));
+        const month = Array.from(
+            {
+                length: 30,
+            },
+            () => 1
+        );
+        expect(plot(days(month), 300)[0]?.width).toBe(10 * BAR_SHARE);
     });
 
     it('stops a bar growing past the widest, centred in its slot', () => {
@@ -150,5 +170,72 @@ describe('the chart summary', () => {
 
     it('says when there are no bars', () => {
         expect(chartSummary('Orders per day', [], format)).toBe('Orders per day: no numbers yet.');
+    });
+});
+
+describe('comparing periods', () => {
+    const compared = [
+        {
+            label: '15 Oct',
+            value: 10,
+            previous: 8,
+        },
+        {
+            label: '16 Oct',
+            value: 12,
+        },
+    ];
+    const plot = {
+        left: 0,
+        right: 100,
+        top: 0,
+        bottom: 100,
+        scale: scaleOf([10, 12, 8]),
+    };
+
+    it('splits each bar in two, the period before on the left', () => {
+        const [first] = placeBars(compared, plot);
+        expect(first?.previous?.x).toBeLessThan(first?.x ?? 0);
+        expect((first?.previous?.width ?? 0) + (first?.width ?? 0)).toBeLessThan(WIDEST_BAR);
+    });
+
+    it('leaves out the bar before where a point has none', () => {
+        expect(placeBars(compared, plot)[1]?.previous).toBeUndefined();
+    });
+
+    it('breaks the line where a value is missing', () => {
+        const points = linePointsOf([10, undefined, 12, 11], plot);
+        expect(points[1]).toBeUndefined();
+        expect(linePath(points).match(/M/g)).toHaveLength(2);
+    });
+
+    it('draws a value alone between gaps as a dot', () => {
+        expect(linePath(linePointsOf([10, undefined], plot))).toMatch(/h0$/);
+    });
+
+    it('closes the area under a line on the baseline', () => {
+        expect(areaPath(linePointsOf([10, 12], plot), 100)).toMatch(/V100 H25 Z$/);
+    });
+});
+
+describe('a sparkline', () => {
+    it('needs two values', () => {
+        expect(sparklineOf([4], 60, 20)).toBeUndefined();
+    });
+
+    it('spans its own lowest and highest values', () => {
+        const sparkline = sparklineOf([10, 30, 20], 60, 20);
+        expect(sparkline?.line).toMatch(/^M0,18 /);
+        expect(sparkline?.line).toContain('30,2');
+    });
+
+    it('draws a flat trend through the middle', () => {
+        expect(sparklineOf([5, 5], 60, 20)?.line).toMatch(/^M0,10 /);
+    });
+});
+
+describe('the chart summary of a line', () => {
+    it('counts points', () => {
+        expect(chartSummary('Visitors per day', days([3, 4]), String, 'point')).toMatch(/^Visitors per day: 2 points,/);
     });
 });

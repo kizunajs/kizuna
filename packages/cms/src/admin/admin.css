@@ -6,6 +6,15 @@ body {
     background: var(--k-canvas);
 }
 
+/* Popups portal to the end of the body, so the app gets a stacking context of its own and they sit above it. */
+body {
+    position: relative;
+}
+
+#root {
+    isolation: isolate;
+}
+
 a {
     color: inherit;
     text-decoration: none;
@@ -194,15 +203,18 @@ a {
     gap: 10px;
 }
 
+/* One surface: the link fills the card, and the + sits inside its right edge. */
 .k-admin-card {
     display: flex;
     align-items: center;
-    gap: 8px;
     min-width: 0;
-    padding: 6px 8px 6px 4px;
     border-radius: 12px;
     background: var(--k-surface);
     box-shadow: var(--k-elevation);
+}
+
+.k-admin-card:has(.k-admin-card-link:hover) {
+    background: var(--k-control);
 }
 
 .k-admin-card-link {
@@ -210,13 +222,29 @@ a {
     flex: 1;
     flex-direction: column;
     min-width: 0;
-    padding: 6px 10px;
-    border-radius: 8px;
+    padding: 12px 14px;
+    border-radius: inherit;
     font-size: 13.5px;
+    outline: none;
 }
 
-.k-admin-card-link:hover {
-    background: var(--k-tint);
+.k-admin-card-link:focus-visible {
+    outline: 2px solid var(--k-ink);
+    outline-offset: -2px;
+}
+
+.k-admin-card-link:has(+ .k-admin-card-add) {
+    padding-right: 4px;
+}
+
+.k-admin-card-add {
+    flex-shrink: 0;
+    margin-right: 8px;
+}
+
+.k-admin-card-add:hover:not(:disabled) {
+    background: var(--k-control-hover);
+    box-shadow: var(--k-control-elevation);
 }
 
 /* Lists */
@@ -350,21 +378,6 @@ a.k-admin-row:hover {
     gap: 8px;
 }
 
-.k-admin-confirm {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 12px 14px;
-    border-radius: var(--k-radius-control);
-    background: var(--k-surface);
-    box-shadow: var(--k-elevation);
-}
-
-.k-admin-confirm p {
-    margin: 0;
-    font-size: 13.5px;
-}
-
 .k-admin-inline-link {
     color: var(--k-ink);
     text-decoration: underline;
@@ -427,14 +440,64 @@ a.k-admin-row:hover {
     white-space: nowrap;
 }
 
-.k-admin-tiles {
+/* Tiles and panels share one column grid, so every row's edges line up. The first row of tiles sets the columns, one per tile up to four. */
+.k-admin-dashboard {
+    --k-dashboard-columns: 4;
+    --k-panel-lead: 2;
+    --k-panel-follow: 2;
+}
+
+.k-admin-dashboard[data-columns='1'] {
+    --k-dashboard-columns: 1;
+    --k-panel-lead: 1;
+    --k-panel-follow: 1;
+}
+
+.k-admin-dashboard[data-columns='2'] {
+    --k-dashboard-columns: 2;
+    --k-panel-lead: 1;
+    --k-panel-follow: 1;
+}
+
+.k-admin-dashboard[data-columns='3'] {
+    --k-dashboard-columns: 3;
+    --k-panel-lead: 2;
+    --k-panel-follow: 1;
+}
+
+@media (max-width: 1180px) {
+    .k-admin-dashboard:is([data-columns='3'], [data-columns='4']) {
+        --k-dashboard-columns: 2;
+        --k-panel-lead: 1;
+        --k-panel-follow: 1;
+    }
+}
+
+@media (max-width: 640px) {
+    .k-admin-dashboard[data-columns] {
+        --k-dashboard-columns: 1;
+        --k-panel-lead: 1;
+        --k-panel-follow: 1;
+    }
+}
+
+.k-admin-tiles,
+.k-admin-panels {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(var(--k-dashboard-columns), minmax(0, 1fr));
     gap: 10px;
 }
 
 .k-admin-tile {
     gap: 2px;
+    min-width: 0;
+}
+
+.k-admin-tile-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
     min-width: 0;
 }
 
@@ -448,7 +511,28 @@ a.k-admin-row:hover {
     font-size: 12px;
 }
 
+.k-admin-change {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--k-ink);
+}
+
+.k-admin-change[data-direction='none'] {
+    color: var(--k-muted);
+}
+
+.k-admin-tile-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
 .k-admin-tile-value {
+    min-width: 0;
     font-size: 28px;
     font-weight: 600;
     letter-spacing: -0.02em;
@@ -456,19 +540,26 @@ a.k-admin-row:hover {
     overflow-wrap: anywhere;
 }
 
-.k-admin-panels {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
+.k-admin-sparkline {
+    flex-shrink: 0;
+    overflow: visible;
 }
 
+/* Panels pair up, the first of a pair the wider when the columns do not split evenly, and one left alone spans the row. */
 .k-admin-panels > * {
-    flex: 1 1 280px;
     min-width: 0;
 }
 
-.k-admin-panels > .k-admin-chart {
-    flex: 1.6 1 360px;
+.k-admin-panels > :nth-child(odd) {
+    grid-column: span var(--k-panel-lead);
+}
+
+.k-admin-panels > :nth-child(even) {
+    grid-column: span var(--k-panel-follow);
+}
+
+.k-admin-panels > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
 }
 
 .k-admin-groups {
@@ -478,8 +569,11 @@ a.k-admin-row:hover {
 }
 
 .k-admin-chart-frame {
-    position: relative;
     min-width: 0;
+}
+
+.k-admin-chart-stage {
+    position: relative;
 }
 
 .k-admin-chart-plot {
@@ -523,6 +617,90 @@ a.k-admin-row:hover {
     opacity: 1;
 }
 
+/* The period before is the same ink, paler, and dashed as a line. */
+.k-admin-chart-bar[data-previous] {
+    opacity: 0.28;
+}
+
+.k-admin-chart-bar[data-previous][data-active='true'] {
+    opacity: 0.42;
+}
+
+.k-admin-chart-line,
+.k-admin-chart-previous-line {
+    fill: none;
+    stroke: var(--k-ink);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.k-admin-chart-previous-line {
+    stroke: var(--k-muted);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+}
+
+.k-admin-chart-area {
+    fill: var(--k-ink);
+    opacity: 0.07;
+}
+
+.k-admin-chart-crosshair {
+    stroke: var(--k-line-strong);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.k-admin-chart-dot {
+    fill: var(--k-ink);
+    stroke: var(--k-canvas);
+    stroke-width: 2;
+}
+
+.k-admin-chart-dot[data-previous] {
+    fill: var(--k-muted);
+}
+
+.k-admin-chart-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    min-width: 0;
+}
+
+.k-admin-chart-description {
+    font-size: 12px;
+    color: var(--k-muted);
+}
+
+.k-admin-legend {
+    display: flex;
+    gap: 12px;
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--k-muted);
+}
+
+.k-admin-legend-entry {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.k-admin-legend-bar {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--k-ink);
+    opacity: 0.78;
+}
+
+.k-admin-legend-bar[data-previous] {
+    opacity: 0.28;
+}
+
 .k-admin-chart-tip {
     position: absolute;
     display: flex;
@@ -546,6 +724,10 @@ a.k-admin-row:hover {
 .k-admin-chart-tip strong {
     font-size: 13px;
     font-variant-numeric: tabular-nums;
+}
+
+.k-admin-chart-tip span:first-child {
+    color: var(--k-ink);
 }
 
 .k-admin-chart-tip span {
@@ -770,11 +952,14 @@ a.k-admin-row:hover {
 }
 
 .k-admin-palette-results {
+    padding: 8px;
+    overflow-y: auto;
+}
+
+.k-admin-palette-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 8px;
-    overflow-y: auto;
 }
 
 .k-admin-palette-group {
@@ -805,7 +990,7 @@ a.k-admin-row:hover {
     cursor: pointer;
 }
 
-.k-admin-palette-option[aria-selected='true'] {
+.k-admin-palette-option[data-highlighted] {
     background: var(--k-control);
     box-shadow: var(--k-control-elevation);
 }
@@ -853,8 +1038,16 @@ a.k-admin-row:hover {
     gap: 6px;
     margin-left: auto;
     padding: 4px 8px;
+    border: 0;
     border-radius: 8px;
+    background: none;
+    font: inherit;
     color: var(--k-muted);
+    cursor: pointer;
+}
+
+.k-admin-nav-foot > form {
+    margin-left: auto;
 }
 
 .k-admin-sign-out:hover {
@@ -865,6 +1058,57 @@ a.k-admin-row:hover {
 .k-admin-sign-out:focus-visible {
     outline: 2px solid var(--k-ink);
     outline-offset: 2px;
+}
+
+/* The row opens the account menu: the name and the role a line each, and a chevron. */
+.k-admin-account {
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    font: inherit;
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.k-admin-account:hover,
+.k-admin-account[data-popup-open] {
+    background: var(--k-tint);
+}
+
+.k-admin-account:focus-visible {
+    outline: 2px solid var(--k-ink);
+    outline-offset: 2px;
+}
+
+.k-admin-account-chevron {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--k-muted);
+}
+
+.k-admin-account-menu {
+    max-width: min(320px, calc(100vw - 32px));
+}
+
+.k-admin-account-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 10px 8px;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.k-admin-account-name {
+    font-weight: 500;
+}
+
+.k-admin-account-separator {
+    height: 1px;
+    margin: 0 4px 4px;
+    background: var(--k-line);
 }
 
 /* Phones keep signing out, though the sidebar folds into a row. */
@@ -904,15 +1148,10 @@ a.k-admin-row:hover {
     outline-offset: -2px;
 }
 
-.k-admin-row input[type='checkbox'],
+.k-admin-row .k-check,
 .k-admin-caret {
     position: relative;
     z-index: 1;
-}
-
-.k-admin-row input[type='checkbox'] {
-    margin: 0;
-    accent-color: var(--k-ink);
 }
 
 .k-admin-rows[data-selectable] .k-admin-row {
@@ -1018,4 +1257,41 @@ a.k-admin-row:hover {
     .k-admin-rows[data-selectable] .k-admin-row {
         grid-template-columns: 18px minmax(0, 1fr) auto;
     }
+}
+
+/* What an action said once it ran, in the corner, newest at the bottom. */
+
+.k-admin-toasts {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    width: min(360px, calc(100vw - 32px));
+}
+
+.k-admin-toast[data-limited] {
+    display: none;
+}
+
+.k-admin-toast-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 14px;
+}
+
+.k-admin-toast-text {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 13.5px;
+}
+
+.k-admin-toast-close {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
 }

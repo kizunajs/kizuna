@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, CircleAlert, Plus, Search } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
+import { Hint } from '../view/hint.js';
 import { humanize } from '../view/schema.js';
 import { BulkBar } from './bulk-bar.js';
 import { bulkSummaryOf, offeredActions, runBulk, type BulkAction, type BulkSummary } from './bulk.js';
@@ -121,14 +122,16 @@ export function ListScreen({
                             {shownPage * PAGE_SIZE + 1} to {Math.min((shownPage + 1) * PAGE_SIZE, matching.length)} of {matching.length}
                         </span>
                         <span className="k-admin-pager-pages">
-                            <button
-                                type="button"
-                                className="k-icon-button"
-                                aria-label="Previous page"
-                                disabled={shownPage === 0}
-                                onClick={() => setPage(shownPage - 1)}>
-                                <ChevronLeft {...ICON} />
-                            </button>
+                            <Hint label="Previous page">
+                                <button
+                                    type="button"
+                                    className="k-icon-button"
+                                    aria-label="Previous page"
+                                    disabled={shownPage === 0}
+                                    onClick={() => setPage(shownPage - 1)}>
+                                    <ChevronLeft {...ICON} />
+                                </button>
+                            </Hint>
                             {pagesAround(shownPage, pageCount).map((number, index) =>
                                 number === null ? (
                                     <span key={`gap-${index}`} className="k-admin-pager-gap">
@@ -146,14 +149,16 @@ export function ListScreen({
                                     </button>
                                 )
                             )}
-                            <button
-                                type="button"
-                                className="k-icon-button"
-                                aria-label="Next page"
-                                disabled={shownPage === pageCount - 1}
-                                onClick={() => setPage(shownPage + 1)}>
-                                <ChevronRight {...ICON} />
-                            </button>
+                            <Hint label="Next page">
+                                <button
+                                    type="button"
+                                    className="k-icon-button"
+                                    aria-label="Next page"
+                                    disabled={shownPage === pageCount - 1}
+                                    onClick={() => setPage(shownPage + 1)}>
+                                    <ChevronRight {...ICON} />
+                                </button>
+                            </Hint>
                         </span>
                     </nav>
                 ) : null}

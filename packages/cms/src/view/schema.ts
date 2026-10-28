@@ -71,6 +71,10 @@ export interface Description {
     name: string;
     label?: string;
     path: string | null;
+    /**
+     * The page Live preview opens on, or `null` when no page shows it.
+     */
+    previewPath: string | null;
     usedOn: {
         everywhere: boolean;
         pages: Array<{

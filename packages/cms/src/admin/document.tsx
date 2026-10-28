@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Tabs } from '@base-ui/react/tabs';
 import { ExternalLink } from 'lucide-react';
 import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.js';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
@@ -363,7 +364,9 @@ export function DocumentScreen({
     }
 
     const title = documentTitle(document);
-    const previewPath = document.path ?? document.usedOn.pages[0]?.path ?? '/';
+    const previewPath = siteUrl === null ? null : document.previewPath;
+    // A document that stops showing on a page, after a change or a reload, falls back to Edit.
+    const shownTab = tab === 'preview' && previewPath === null ? 'edit' : tab;
     const unsaved = saveState === 'pending' || saveState === 'saving';
     const showTab = (key: DocumentTab): void => {
         setTab(key);
@@ -421,36 +424,24 @@ export function DocumentScreen({
                     onPublished={() => undefined}
                 />
             </Topbar>
-            <div className="k-admin-body">
-                <div className="k-tab-bar k-admin-document-tabs" role="tablist" aria-label="Document">
+            <Tabs.Root value={shownTab} onValueChange={(key: DocumentTab) => showTab(key)} className="k-admin-body">
+                <Tabs.List className="k-tab-bar k-admin-document-tabs" aria-label="Document">
                     {TABS.map((entry) =>
-                        entry.key === 'preview' && siteUrl === null ? null : (
-                            <button
-                                key={entry.key}
-                                id={`document-tab-${entry.key}`}
-                                type="button"
-                                role="tab"
-                                aria-selected={tab === entry.key}
-                                aria-controls={`document-panel-${entry.key}`}
-                                className="k-tab"
-                                onClick={() => showTab(entry.key)}>
+                        entry.key === 'preview' && previewPath === null ? null : (
+                            <Tabs.Tab key={entry.key} value={entry.key} className="k-tab">
                                 {entry.label}
-                            </button>
+                            </Tabs.Tab>
                         )
                     )}
-                </div>
+                </Tabs.List>
                 {linkProblem === undefined ? null : (
                     <p className="k-error" role="alert">
                         {linkProblem}
                     </p>
                 )}
-                <div
-                    id={`document-panel-${tab}`}
-                    role="tabpanel"
-                    aria-labelledby={`document-tab-${tab}`}
-                    className="k-admin-editing"
-                    data-tab={tab}>
-                    <div className="k-admin-editing-fields" hidden={tab === 'versions'}>
+                {/* One panel serves every tab, since Live preview shows the fields beside the site. */}
+                <Tabs.Panel value={shownTab} className="k-admin-editing" data-tab={shownTab}>
+                    <div className="k-admin-editing-fields" hidden={shownTab === 'versions'}>
                         {document.usedOn.everywhere ? <p className="k-note">This shows on every page.</p> : null}
                         {!document.complete && document.missing.length > 0 ? (
                             <p className="k-note">Fill in {document.missing.join(', ')} before publishing.</p>
@@ -482,12 +473,12 @@ export function DocumentScreen({
                             />
                         ) : null}
                     </div>
-                    {previewOpened && siteUrl !== null ? (
-                        <div className="k-admin-preview" hidden={tab !== 'preview'}>
+                    {previewOpened && siteUrl !== null && previewPath !== null ? (
+                        <div className="k-admin-preview" hidden={shownTab !== 'preview'}>
                             <AdminPreview connection={connection} siteUrl={siteUrl} path={previewPath} onPoint={pointAt} />
                         </div>
                     ) : null}
-                    {tab === 'versions' ? (
+                    {shownTab === 'versions' ? (
                         <Versions
                             connection={connection}
                             documentRef={document.ref}
@@ -501,8 +492,8 @@ export function DocumentScreen({
                             }}
                         />
                     ) : null}
-                </div>
-            </div>
+                </Tabs.Panel>
+            </Tabs.Root>
         </EditorContext.Provider>
     );
 }

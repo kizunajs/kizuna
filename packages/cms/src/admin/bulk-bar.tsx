@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { Toast } from '@base-ui/react/toast';
 import { CircleAlert, LoaderCircle } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import { bulkLabelOf, bulkQuestionOf, type BulkAction, type BulkSummary } from './bulk.js';
+import { ConfirmDialog } from './confirm.js';
 
 /**
  * The bar over a list with rows ticked: an action for all of them, asked
- * first inside the page, and how each item went once it ran.
+ * first in a dialog. The items it could not run on are listed below the bar,
+ * and a run that went through everywhere says so in a toast.
  */
 export function BulkBar({
     count,
@@ -20,18 +23,25 @@ export function BulkBar({
 }) {
     const [confirming, setConfirming] = useState<BulkAction | undefined>();
     const [running, setRunning] = useState<BulkAction | undefined>();
-    const [summary, setSummary] = useState<BulkSummary | undefined>();
+    const [failed, setFailed] = useState<BulkSummary | undefined>();
+    const toasts = Toast.useToastManager();
 
     const run = async (action: BulkAction): Promise<void> => {
         setConfirming(undefined);
-        setSummary(undefined);
+        setFailed(undefined);
         setRunning(action);
         const answered = await onRun(action);
         setRunning(undefined);
-        setSummary(answered);
+        if (answered.problem) {
+            setFailed(answered);
+            return;
+        }
+        toasts.add({
+            description: answered.message,
+        });
     };
 
-    if (count === 0 && summary === undefined) return null;
+    if (count === 0 && failed === undefined) return null;
 
     return (
         <div className="k-admin-actions">
@@ -44,9 +54,9 @@ export function BulkBar({
                             type="button"
                             className="k-button k-button-small k-button-secondary"
                             disabled={running !== undefined}
-                            aria-expanded={confirming === action}
+                            aria-haspopup="dialog"
                             onClick={() => {
-                                setSummary(undefined);
+                                setFailed(undefined);
                                 setConfirming(action);
                             }}>
                             {running === action ? <LoaderCircle {...ICON} className="k-spin" /> : null}
@@ -63,50 +73,34 @@ export function BulkBar({
                     </button>
                 </div>
             )}
-            {confirming === undefined || count === 0 ? null : (
-                <div
-                    className="k-admin-confirm"
-                    role="group"
-                    aria-label={bulkLabelOf(confirming)}
-                    onKeyDown={(event) => {
-                        if (event.key === 'Escape') setConfirming(undefined);
-                    }}>
-                    <p>{bulkQuestionOf(confirming, count)}</p>
-                    <div className="k-admin-action-row">
-                        <button
-                            type="button"
-                            className="k-button k-button-small k-button-primary"
-                            autoFocus
-                            onClick={() => void run(confirming)}>
-                            {bulkLabelOf(confirming)}
-                        </button>
-                        <button
-                            type="button"
-                            className="k-button k-button-small k-button-secondary"
-                            onClick={() => setConfirming(undefined)}>
-                            Cancel
-                        </button>
-                    </div>
-                </div>
-            )}
-            {summary === undefined ? null : summary.problem ? (
+            <ConfirmDialog
+                confirming={
+                    confirming === undefined || count === 0
+                        ? undefined
+                        : {
+                              label: bulkLabelOf(confirming),
+                              question: bulkQuestionOf(confirming, count),
+                          }
+                }
+                onConfirm={() => {
+                    if (confirming !== undefined) void run(confirming);
+                }}
+                onCancel={() => setConfirming(undefined)}
+            />
+            {failed === undefined ? null : (
                 <div className="k-admin-bulk-failures" role="alert">
                     <p className="k-error">
                         <CircleAlert {...ICON} />
-                        {summary.message}
+                        {failed.message}
                     </p>
                     <ul>
-                        {summary.failures.map((failure, index) => (
+                        {failed.failures.map((failure, index) => (
                             <li key={index}>
                                 <b>{failure.title}</b>: {failure.problem}
                             </li>
                         ))}
                     </ul>
                 </div>
-            ) : (
-                <p className="k-help" role="status">
-                    {summary.message}
-                </p>
             )}
         </div>
     );
