@@ -65,6 +65,14 @@ const domId = (path: string): string => `field-${path.replace(/[^a-zA-Z0-9_-]/g,
 const layoutId = (id: string): string => `layout-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
 /**
+ * The changes as JSON carries them. An emptied field goes as `null`, which
+ * the server reads as clearing an optional field, where `undefined` would
+ * drop the key and the change with it.
+ */
+export const changesForWire = (changes: Record<string, unknown>): Record<string, unknown> =>
+    Object.fromEntries(Object.entries(changes).map(([path, value]) => [path, value === undefined ? null : value]));
+
+/**
  * Every field of a document, a section each, arranged in its tabs, rows and
  * collapsibles, with the sidebar beside them when the form is wide enough. A
  * change saves to the draft a moment after typing stops.
@@ -92,7 +100,7 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
         pending.current = {};
         saving.current = true;
         latestState.current('saving');
-        const failure = await latestSave.current(sending);
+        const failure = await latestSave.current(changesForWire(sending));
         saving.current = false;
         if (failure === undefined) {
             setProblem(undefined);
