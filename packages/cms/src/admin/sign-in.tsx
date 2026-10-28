@@ -4,6 +4,7 @@ import { Field } from '@base-ui/react/field';
 import { Form } from '@base-ui/react/form';
 import { Logo } from '../view/logo.js';
 import type { SignInConfig } from './sign-in-config.js';
+import { useTheme } from './theme.js';
 
 const NO_ACCESS = 'This account cannot edit. Sign in as an editor.';
 
@@ -23,6 +24,8 @@ const messageFor = (status: number): string => {
  * to `next`.
  */
 export function SignIn({ config }: { config: SignInConfig }) {
+    // The screen shows the light or dark the editor chose in the admin.
+    useTheme();
     const [error, setError] = useState<string | null>(config.noAccess ? NO_ACCESS : null);
     const [pending, setPending] = useState(false);
 

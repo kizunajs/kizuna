@@ -22,6 +22,7 @@ import {
 } from './navigation.js';
 import { Loading } from './parts.js';
 import { SignedIn } from './signed-in.js';
+import { useTheme } from './theme.js';
 import { RecordScreen, ViewList } from './view-screen.js';
 import type { ViewSummary } from './views.js';
 
@@ -36,21 +37,6 @@ const useScreen = (): Screen => {
         return () => window.removeEventListener('hashchange', follow);
     }, []);
     return screen;
-};
-
-/**
- * The system's light or dark, which the editor's tokens follow.
- */
-const useSystemTheme = (): void => {
-    useEffect(() => {
-        const query = window.matchMedia('(prefers-color-scheme: light)');
-        const apply = (): void => {
-            window.document.documentElement.dataset['theme'] = query.matches ? 'light' : 'dark';
-        };
-        apply();
-        query.addEventListener('change', apply);
-        return () => query.removeEventListener('change', apply);
-    }, []);
 };
 
 /**
@@ -83,7 +69,7 @@ const open = (screen: Screen): void => {
  * bar's menu button.
  */
 export function Admin({ config }: { config: AdminConfig }) {
-    useSystemTheme();
+    const [theme, chooseTheme] = useTheme();
     const connection = useMemo(() => connectOverHttp(config), [config]);
     const people = usePeople(connection);
     const screen = useScreen();
@@ -188,7 +174,7 @@ export function Admin({ config }: { config: AdminConfig }) {
     const me = people === undefined ? undefined : people.people.find((person) => person.id === people.me);
 
     const shown = (() => {
-        if (screen.kind === 'pages') return <PagesList connection={connection} />;
+        if (screen.kind === 'pages') return <PagesList connection={connection} routes={config.routes} />;
         if (screen.kind === 'collection') {
             const collection = collections?.find((candidate) => candidate.name === screen.name);
             if (collection === undefined) {
@@ -287,7 +273,14 @@ export function Admin({ config }: { config: AdminConfig }) {
         </div>
     );
     const signedIn = (
-        <SignedIn person={me} role={config.role} signOutPath={config.signOutPath} signOutMethod={config.signOutMethod ?? 'GET'} />
+        <SignedIn
+            person={me}
+            role={config.role}
+            signOutPath={config.signOutPath}
+            signOutMethod={config.signOutMethod ?? 'GET'}
+            theme={theme}
+            onThemeChange={chooseTheme}
+        />
     );
 
     return (

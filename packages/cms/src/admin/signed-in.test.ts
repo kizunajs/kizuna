@@ -16,6 +16,8 @@ const render = (signOutPath: string | null, signOutMethod: 'GET' | 'POST' = 'GET
             role: 'contentEditor',
             signOutPath,
             signOutMethod,
+            theme: 'system',
+            onThemeChange: () => undefined,
         })
     );
 
@@ -36,9 +38,10 @@ describe('SignedIn', () => {
         expect(html).toContain('aria-haspopup="menu"');
     });
 
-    it('shows the editor as plain text when there is nowhere to sign out', () => {
+    it('still opens the menu, for the theme, when there is nowhere to sign out', () => {
         const html = render(null);
-        expect(html).not.toContain('<button');
+        expect(html).not.toContain('<form');
+        expect(html).toContain('aria-haspopup="menu"');
         expect(html).toContain(`<span class="k-ellipsis">${LONG_NAME}</span>`);
     });
 });

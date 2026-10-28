@@ -39,6 +39,23 @@
         text-decoration: none;
     }
 
+    /* The page gutter: the space between the sidebar and a screen, and at the screen's right edge. */
+    :root {
+        --k-gutter: 32px;
+    }
+
+    @media (max-width: 1440px) {
+        :root {
+            --k-gutter: 24px;
+        }
+    }
+
+    @media (max-width: 1024px) {
+        :root {
+            --k-gutter: 16px;
+        }
+    }
+
     .k-admin {
         display: grid;
         grid-template-columns: 232px minmax(0, 1fr);
@@ -151,7 +168,7 @@
         flex-direction: column;
         gap: 14px;
         min-width: 0;
-        padding: 10px 24px 28px;
+        padding: 10px var(--k-gutter) 28px;
     }
 
     /* The page header every screen shares: the trail back, the title large, a line of facts, and the actions. */
@@ -160,7 +177,7 @@
         display: flex;
         flex-direction: column;
         gap: 14px;
-        padding: 18px 24px 8px;
+        padding: 18px var(--k-gutter) 8px;
     }
 
     .k-page-header__top {
@@ -230,7 +247,7 @@
 
     .k-page-header__meta > * + *::before {
         margin: 0 8px;
-        color: var(--k-line-strong);
+        color: var(--k-muted);
         content: '·';
     }
 
@@ -399,11 +416,6 @@
     @media (max-width: 860px) {
         .k-admin {
             grid-template-columns: minmax(0, 1fr);
-        }
-
-        .k-page-header,
-        .k-admin__body {
-            padding-inline: 16px;
         }
     }
 
@@ -847,11 +859,15 @@
         width: 1px;
         height: 18px;
         margin: 0 8px;
-        background: var(--k-line);
+        background: var(--k-line-strong);
     }
 
     .k-document__preview-toggle {
         padding: 0 10px 0 8px;
+    }
+
+    .k-document__short {
+        display: none;
     }
 
     .k-document__preview-toggle[aria-pressed='true'] {
@@ -881,7 +897,7 @@
     }
 
     .k-document__problem {
-        padding: 10px 24px 0;
+        padding: 10px var(--k-gutter) 0;
     }
 
     .k-document__body {
@@ -912,7 +928,7 @@
 
     .k-document .k-form__main {
         flex: 2 1 560px;
-        padding: 28px 32px 48px 24px;
+        padding: 28px 32px 48px var(--k-gutter);
     }
 
     /* The fields stop at 720px, while field tabs run the column's width. */
@@ -924,19 +940,19 @@
     /* The sidebar column runs the full height beside the fields, a hairline on its left edge. */
     .k-document .k-form__sidebar {
         flex: 1 1 300px;
-        padding: 28px 24px 48px;
+        padding: 28px var(--k-gutter) 48px 24px;
         background: var(--k-surface);
         box-shadow: inset 1px 0 0 var(--k-line);
     }
 
     .k-document .k-form > .k-error {
-        padding: 0 24px 24px;
+        padding: 0 var(--k-gutter) 24px;
     }
 
-    /* Field tabs run under the header's hairline, their own hairline across the main column. */
+    /* Field tabs lead the main column, their hairline across its whole width. */
     .k-document .k-form__fields > .k-tabs:first-child > .k-tab-bar {
-        margin: -28px -32px 0 -24px;
-        padding: 0 32px 0 24px;
+        margin: 0 -32px 0 calc(-1 * var(--k-gutter));
+        padding: 0 32px 0 var(--k-gutter);
     }
 
     .k-document-info {
@@ -1027,20 +1043,38 @@
 
     .k-document[data-preview='true'] .k-form__main {
         flex: none;
-        padding: 20px 24px 0;
+        padding: 20px 24px 0 var(--k-gutter);
     }
 
     .k-document[data-preview='true'] .k-form__fields > .k-tabs:first-child > .k-tab-bar {
-        margin: -20px -24px 0;
-        padding: 0 24px;
+        margin: 0 -24px 0 calc(-1 * var(--k-gutter));
+        padding: 0 24px 0 var(--k-gutter);
     }
 
     .k-document[data-preview='true'] .k-form__sidebar {
         flex: none;
         margin-top: 20px;
-        padding: 24px 24px 48px;
+        padding: 24px 24px 48px var(--k-gutter);
         background: none;
         box-shadow: inset 0 1px 0 var(--k-line);
+    }
+
+    /* Stacked under the fields, an image keeps its one-row card. */
+    .k-document[data-preview='true'] .k-form__sidebar .k-image {
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 6px 8px 8px;
+    }
+
+    .k-document[data-preview='true'] .k-form__sidebar .k-image__thumb {
+        width: 40px;
+        height: 40px;
+        aspect-ratio: auto;
+    }
+
+    .k-document[data-preview='true'] .k-form__sidebar .k-image__meta {
+        padding-left: 0;
     }
 
     .k-document__preview {
@@ -1056,11 +1090,36 @@
 
     .k-preview--admin {
         flex: 1;
+        gap: 0;
+    }
+
+    .k-preview--admin .k-preview__bar {
+        min-height: 48px;
+        padding: 6px 12px;
+        box-shadow: inset 0 -1px 0 var(--k-line);
+    }
+
+    .k-preview--admin .k-preview__stage {
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+    }
+
+    .k-preview__device {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .k-preview__size {
+        font-size: 12.5px;
+        font-variant-numeric: tabular-nums;
+        color: var(--k-muted);
     }
 
     /* Versions: a row each, newest first, with when, where it stood, who saved it, and what can be done with it. */
     .k-document__versions {
-        padding: 24px 24px 48px;
+        padding: 24px var(--k-gutter) 48px;
     }
 
     .k-versions {
@@ -1211,17 +1270,17 @@
     /* Phones: the fields and the sidebar stack, inputs grow to a thumb's height, and the header's buttons share its width. */
     @media (max-width: 640px) {
         .k-document .k-form__main {
-            padding: 24px 16px 32px;
+            padding: 24px var(--k-gutter) 32px;
         }
 
         .k-document .k-form__fields > .k-tabs:first-child > .k-tab-bar {
-            margin: -24px -16px 0;
-            padding: 0 16px;
+            margin: 0 calc(-1 * var(--k-gutter));
+            padding: 0 var(--k-gutter);
         }
 
         .k-document .k-form__sidebar {
             flex-basis: 100%;
-            padding: 24px 16px 40px;
+            padding: 24px var(--k-gutter) 40px;
             box-shadow: inset 0 1px 0 var(--k-line);
         }
 
@@ -1271,8 +1330,16 @@
             margin-left: auto;
         }
 
+        .k-document__long {
+            display: none;
+        }
+
+        .k-document__short {
+            display: inline;
+        }
+
         .k-document__versions {
-            padding: 16px;
+            padding: 16px var(--k-gutter);
         }
 
         .k-document-menu .k-menu__item {
@@ -1558,9 +1625,18 @@
         font-weight: 500;
     }
 
+    .k-account-menu__label {
+        padding: 6px 10px 4px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--k-muted);
+    }
+
     .k-account-menu__separator {
         height: 1px;
-        margin: 0 4px 4px;
+        margin: 4px;
         background: var(--k-line);
     }
 
@@ -1641,6 +1717,10 @@
     }
 
     /* Lists: the toolbar and its panels, then the table on one surface with its pager. */
+
+    .k-admin__body.k-list-screen {
+        padding-inline: var(--k-gutter, 24px);
+    }
 
     .k-list-toolbar {
         display: flex;
