@@ -488,7 +488,7 @@
     .k-collapsible--strip > .k-collapsible__trigger {
         width: 100%;
         height: 44px;
-        padding: 0 6px 0 16px;
+        padding: 0 6px 0 14px;
         border-radius: var(--k-radius-card);
         background: none;
         font-size: 13.5px;
@@ -503,7 +503,6 @@
 
     .k-collapsible--strip > .k-collapsible__trigger[data-panel-open] {
         border-radius: var(--k-radius-card) var(--k-radius-card) 0 0;
-        box-shadow: inset 0 -1px 0 var(--k-line);
     }
 
     .k-collapsible__chevron {
@@ -522,7 +521,8 @@
     }
 
     .k-collapsible--strip > .k-collapsible__panel {
-        padding: 20px 16px 24px;
+        gap: 20px;
+        padding: 4px 14px 16px;
     }
 
     /* A block's fields under its name as a heading, a hairline above it and no surface of its own. */
@@ -957,19 +957,6 @@
         min-width: 0;
     }
 
-    .k-array__label {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        min-width: 0;
-    }
-
-    .k-field__label--list {
-        font-size: 14px;
-        font-weight: 600;
-        line-height: 20px;
-    }
-
     .k-array__toggles {
         display: flex;
         flex-shrink: 0;
@@ -979,29 +966,33 @@
     .k-array__items {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
     }
 
-    /* Each item is a row like any other in a list: its handle, a filled row with its title that opens it, a chevron and remove. Its fields open under the row. */
+    /* Each item is one filled row: its handle, its title that opens it, a chevron and remove. Open, it grows into a card with its fields under the row. */
     .k-array--folds .k-array__item {
         flex-direction: column;
         align-items: stretch;
         gap: 0;
-        border-radius: var(--k-radius-card);
     }
 
-    /* Open, the item becomes a card around its row and its fields. */
-    .k-array--folds .k-array__item:has(> .k-array__row .k-array__summary[data-panel-open]) {
-        margin-inline: -8px;
-        padding: 8px;
+    .k-array--folds .k-array__item,
+    .k-array__item--value {
+        border-radius: var(--k-radius-control);
         background: var(--k-surface);
         box-shadow: var(--k-elevation);
+    }
+
+    .k-array--folds .k-array__item:has(> .k-array__row .k-array__summary[data-panel-open]) {
+        border-radius: var(--k-radius-card);
     }
 
     .k-array__row {
         display: flex;
         align-items: center;
         gap: 6px;
+        min-height: 40px;
+        padding: 0 4px;
     }
 
     .k-array__summary {
@@ -1010,22 +1001,48 @@
         align-items: center;
         gap: 10px;
         min-width: 0;
-        height: var(--k-control-height);
-        padding: 0 12px;
+        height: 40px;
+        padding: 0;
         border: 0;
-        border-radius: var(--k-radius-control);
-        background: var(--k-control);
-        box-shadow: var(--k-control-elevation);
+        background: none;
         font: inherit;
-        font-size: 14px;
+        font-size: 13.5px;
         text-align: left;
         color: var(--k-ink);
         cursor: pointer;
-        transition: background-color 0.15s ease;
     }
 
-    .k-array__summary:hover {
-        background: var(--k-control-hover);
+    .k-array__row .k-icon-button,
+    .k-array__row .k-array__grip,
+    .k-array__item--value > .k-icon-button,
+    .k-array__item--value > .k-array__grip {
+        flex: 0 0 28px;
+        width: 28px;
+        height: 28px;
+        border-radius: 7px;
+    }
+
+    /* Remove sits close to the chevron beside it. */
+    .k-array__row > .k-array__chevron + .k-icon-button {
+        margin-left: -4px;
+    }
+
+    /* A list of single values: each value's control sits in the row, on its fill. */
+    .k-array__item--value {
+        align-items: center;
+        min-height: 36px;
+        padding: 0 4px;
+    }
+
+    .k-array__item--value .k-array__body :is(.k-input, .k-select) {
+        height: 36px;
+        padding-inline: 2px 4px;
+        background: none;
+        box-shadow: none;
+    }
+
+    .k-array__item--value .k-array__body :is(.k-input, .k-select):hover {
+        background: none;
     }
 
     .k-array__tag {
@@ -1059,7 +1076,7 @@
     }
 
     .k-array__panel {
-        padding: 18px 76px 8px 30px;
+        padding: 8px 16px 18px;
     }
 
     .k-array__panel[hidden] {
@@ -1251,19 +1268,18 @@
         align-items: center;
         gap: 10px;
         min-width: 0;
-        padding: 8px 6px 8px 8px;
-        border-radius: 12px;
-        background: var(--k-surface);
-        box-shadow: var(--k-elevation);
-        container-type: inline-size;
+        padding: 6px;
+        border-radius: var(--k-radius-control);
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
     }
 
     .k-image__thumb {
         display: block;
         flex-shrink: 0;
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
+        width: 44px;
+        height: 44px;
+        border-radius: 7px;
         object-fit: cover;
     }
 
@@ -1285,7 +1301,8 @@
         flex-direction: column;
         justify-content: center;
         min-width: 0;
-        font-size: 13.5px;
+        font-size: 13px;
+        font-weight: 500;
         line-height: 1.35;
     }
 
@@ -1297,6 +1314,7 @@
 
     .k-image__size {
         font-size: 12px;
+        font-weight: 400;
         color: var(--k-muted);
     }
 
@@ -1309,13 +1327,14 @@
     .k-form__sidebar .k-image {
         flex-direction: column;
         align-items: stretch;
-        gap: 8px;
-        padding: 8px;
+        gap: 6px;
+        border-radius: var(--k-radius-card);
     }
 
     .k-form__sidebar .k-image__thumb {
         width: 100%;
         height: auto;
+        border-radius: var(--k-radius-control);
         aspect-ratio: 3 / 2;
     }
 

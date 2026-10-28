@@ -14,7 +14,7 @@ import { Tabs } from '@base-ui/react/tabs';
 import { ChevronDown, CircleAlert } from 'lucide-react';
 import { arrange, inSidebar, tabSets, type Arranged } from './arrange.js';
 import { ICON } from './context.js';
-import { Control, foldsItems, listsItems, Required } from './controls.js';
+import { Control, foldsItems, Required } from './controls.js';
 import { labelOf, valueAt, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
@@ -218,7 +218,7 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
     const errorFor = (path: string): string | undefined =>
         Object.entries(fieldErrors).find(([errorPath]) => errorPath === path || errorPath.startsWith(`${path}.`))?.[1];
 
-    const control = (field: DescribedField, writable: boolean, heading?: ReactNode, helpAbove = false): ReactNode => {
+    const control = (field: DescribedField, writable: boolean, heading?: ReactNode): ReactNode => {
         const error = errorFor(field.path);
         return (
             <>
@@ -245,7 +245,7 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                         required
                     />
                 </div>
-                {field.help !== undefined && !helpAbove ? <p className="k-help">{field.help}</p> : null}
+                {field.help !== undefined ? <p className="k-help">{field.help}</p> : null}
                 {writable ? null : <p className="k-help">{refusalFor(field)}</p>}
             </>
         );
@@ -290,40 +290,27 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
     };
 
     /**
-     * One field: its label, its input and its help. A list reads its help
-     * under its label, and one whose items fold draws both itself, with
-     * Collapse all and Expand all beside them.
+     * One field: its label, its input and its help. A list whose items fold
+     * draws its label itself, with Collapse all and Expand all beside it.
      */
     const leaf = (field: DescribedField, writable: boolean): ReactNode => {
         const folds = foldsItems(field.schema, field.schema);
-        const list = listsItems(field.schema);
         const label = (
-            <label
-                className={list ? 'k-field__label k-field__label--list' : 'k-field__label'}
-                htmlFor={folds ? undefined : fieldDomId(field.path) + '-input'}>
+            <label className="k-field__label" htmlFor={folds ? undefined : fieldDomId(field.path) + '-input'}>
                 {labelOf(field)}
                 {field.required ? <Required /> : null}
             </label>
         );
-        const head =
-            list && field.help !== undefined ? (
-                <span className="k-array__label">
-                    {label}
-                    <span className="k-help">{field.help}</span>
-                </span>
-            ) : (
-                label
-            );
         const needed = field.parent === undefined && missing?.includes(field.name) === true;
         return (
             <section key={field.path} id={fieldDomId(field.path)} className="k-field">
-                {folds ? null : head}
+                {folds ? null : label}
                 <div
                     className="k-field__control"
                     data-changed={isMarked(field.path, changed)}
                     data-pointed={isMarked(field.path, pointed)}
                     data-missing={needed}>
-                    {control(field, writable, folds ? head : undefined, list)}
+                    {control(field, writable, folds ? label : undefined)}
                     {needed ? <p className="k-field__needed">Needed before publishing.</p> : null}
                 </div>
             </section>

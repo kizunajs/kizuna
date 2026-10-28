@@ -734,15 +734,6 @@ export const foldsItems = (schema: JsonSchema, root: JsonSchema): boolean => {
 };
 
 /**
- * Whether a schema edits as a list of items, rather than as rich text, which
- * stores a list too.
- */
-export const listsItems = (schema: JsonSchema): boolean => {
-    const resolved = resolveRef(schema, schema);
-    return typeOf(resolved) === 'array' && !isRichText(schema) && !isRichText(resolved);
-};
-
-/**
  * Follows the pointer while an item is dragged by its handle, moving the
  * others aside, and hands back where it landed.
  */
@@ -961,6 +952,8 @@ function ArrayControl(props: ControlProps) {
         );
     }
 
+    // A list of single values, like ids or choices, shows each value's control in a filled row.
+    const single = ['string', 'number', 'integer', 'boolean'].includes(typeOf(resolvedItem) ?? '');
     return (
         <div className="k-array" data-dragging={drag !== undefined}>
             {items.map((item, index) => (
@@ -969,7 +962,7 @@ function ArrayControl(props: ControlProps) {
                     ref={(row) => {
                         rows.current[index] = row;
                     }}
-                    className="k-array__item"
+                    className={single ? 'k-array__item k-array__item--value' : 'k-array__item'}
                     data-dragged={drag?.from === index}
                     style={{
                         transform: `translateY(${shiftFor(index, drag)}px)`,

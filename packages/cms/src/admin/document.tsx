@@ -457,13 +457,32 @@ export function DocumentScreen({
             </Popover.Trigger>
             <Popover.Portal>
                 <Popover.Positioner sideOffset={6} align="end" className="k-positioner">
-                    <Popover.Popup className="k-popup k-document-info">
-                        <Popover.Title className="k-document-info__heading">Document</Popover.Title>
+                    <Popover.Popup className="k-popup k-document-info" aria-label="Document info">
                         <dl className="k-document-info__list">
                             <dt>Status</dt>
                             <dd>
                                 <Status status={document.status} />
                             </dd>
+                            {owner === null ? null : (
+                                <>
+                                    <dt>Owner</dt>
+                                    <dd>{owner}</dd>
+                                </>
+                            )}
+                            {siteUrl === null || document.path === null ? null : (
+                                <>
+                                    <dt>Page</dt>
+                                    <dd>
+                                        <button
+                                            type="button"
+                                            className="k-document-info__link"
+                                            onClick={() => void openOnSite(document.path!)}>
+                                            <span className="k-ellipsis">{document.path}</span>
+                                            <ExternalLink {...ICON} />
+                                        </button>
+                                    </dd>
+                                </>
+                            )}
                             {dates.created === null ? null : (
                                 <>
                                     <dt>Created</dt>
@@ -512,20 +531,6 @@ export function DocumentScreen({
                                   label: 'Owner',
                                   value: owner,
                               },
-                        siteUrl === null || document.path === null
-                            ? null
-                            : {
-                                  label: 'Page',
-                                  value: (
-                                      <button
-                                          type="button"
-                                          className="k-document-info__link"
-                                          onClick={() => void openOnSite(document.path!)}>
-                                          <span className="k-ellipsis">{document.path}</span>
-                                          <ExternalLink {...ICON} />
-                                      </button>
-                                  ),
-                              },
                         document.usedOn.everywhere
                             ? {
                                   label: 'Shows',
@@ -552,7 +557,7 @@ export function DocumentScreen({
                                     )}
                                 </Tabs.Tab>
                             </Tabs.List>
-                            <span className="k-document__divider" aria-hidden="true" />
+                            <span className="k-document__spacer" />
                             {previewPath === null ? null : (
                                 <button
                                     type="button"
