@@ -57,14 +57,14 @@ export interface ToolView {
  *
  * @example
  * ```ts
- * export const userView = defineView({
+ * export const userView = defineMcpView({
  *     uri: 'ui://users/user',
  *     name: 'User',
  *     html: () => readFile(userViewPath, 'utf8'),
  * });
  * ```
  */
-export const defineView = (view: ToolView): ToolView => view;
+export const defineMcpView = (view: ToolView): ToolView => view;
 
 /**
  * Who may call a tool, in MCP Apps' terms: `model` lets the model call it,

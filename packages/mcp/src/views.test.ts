@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Kizuna, defineConfig, defineView } from 'kizunajs';
+import { Kizuna, defineConfig, defineMcpView } from 'kizunajs';
 import { assembleApi } from 'kizunajs/adapter';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { createMcpServer } from './mcp-server.js';
 
 const k = new Kizuna();
 
-const userView = defineView({
+const userView = defineMcpView({
     uri: 'ui://users/user',
     name: 'User',
     description: 'One user, editable',
@@ -209,7 +209,7 @@ describe('MCP views', () => {
 
 describe('defineConfig: views', () => {
     it('throws when two views share a uri', () => {
-        const other = defineView({
+        const other = defineMcpView({
             uri: 'ui://users/user',
             name: 'Other',
             html: () => '',

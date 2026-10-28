@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { Kizuna } from './kizuna.js';
 import { ProblemDetailsSchema } from './error-response.js';
 import { HANDLER } from './types.js';
-import { defineView } from './tool-view.js';
+import { defineMcpView } from './tool-view.js';
 
 interface Config {
     groups: typeof kGroups;
@@ -236,7 +236,7 @@ test('tool rejects an option it does not know', () => {
 });
 
 test('tool names a view and who may call it', () => {
-    const userView = defineView({
+    const userView = defineMcpView({
         uri: 'ui://users/user',
         name: 'User',
         html: () => '<!doctype html>',
@@ -271,7 +271,7 @@ test('visibility takes only model and app', () => {
 });
 
 test('a view uri starts with ui://', () => {
-    defineView({
+    defineMcpView({
         // @ts-expect-error MCP Apps serves views under ui://
         uri: 'https://example.com/user',
         name: 'User',

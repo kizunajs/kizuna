@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineView, type ToolView } from 'kizunajs';
+import { defineMcpView, type ToolView } from 'kizunajs';
 import type { ResolvedCmsOptions } from './options.js';
 
 /**
@@ -86,7 +86,7 @@ export const documentViewFor = (options: {
     const config: DocumentViewConfig = {
         siteUrl: site ?? null,
     };
-    return defineView({
+    return defineMcpView({
         uri: DOCUMENT_VIEW_URI,
         name: 'Content editor',
         description: "A document's fields as a form, with the site's draft beside it.",
