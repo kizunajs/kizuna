@@ -33,18 +33,20 @@ content: cms({
 
 A widget is a plain object with a `type`, the way a [layout](/docs/cms/fields#layout) item is, and the dashboard shows them in the order listed.
 
-| `type`        | Shows                                                                                                        | Takes            |
-| ------------- | ------------------------------------------------------------------------------------------------------------ | ---------------- |
-| `stat`        | One number                                                                                                   | `label`, `value` |
-| `chart`       | Bars over time                                                                                               | `label`, `data`  |
-| `reviews`     | The reviews waiting on the person signed in                                                                  |                  |
-| `collections` | Every collection and view they may open, by group, with a count and, on a collection, a **+** for a new item |                  |
+| `type`        | Shows                                                                                                        | Takes                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| `stat`        | One number                                                                                                   | `label`, `value`                        |
+| `chart`       | Bars or a line over time                                                                                     | `label`, `data`, `style`, `description` |
+| `reviews`     | The reviews waiting on the person signed in                                                                  |                                         |
+| `collections` | Every collection and view they may open, by group, with a count and, on a collection, a **+** for a new item |                                         |
 
 Without `dashboard`, the admin shows `reviews` and `collections`.
 
 ## Numbers from your code
 
 A `stat` or `chart` gets its numbers from your function, which runs on your server when the dashboard opens. Revenue can come from Stripe and orders from your own database, since the CMS never needs to hold them. Each function receives `editor` and `plugins`.
+
+### Stats
 
 `value` returns what the stat shows:
 
@@ -55,9 +57,41 @@ export async function revenueThisWeek() {
 }
 ```
 
-Return `{ value, detail }` to add a line under the number, like "Up 12% on last week".
+Return `{ value, detail }` to add a line under the number, like "48 orders".
 
-`data` returns the chart's bars, oldest first:
+Add `change` to say how far the number moved since the period before, as a fraction: `0.081` shows as ↑ 8.1% and `-0.02` as ↓ 2%.
+
+```ts title="src/cms/dashboard.ts"
+export async function revenueThisWeek() {
+    const now = new Date();
+    const total = await revenueForWeek(now);
+    const lastWeek = await revenueForWeek(daysBefore(now, 7));
+    return {
+        value: formatKroner(total),
+        change: (total - lastWeek) / lastWeek,
+    };
+}
+```
+
+When last week sold nothing, the division gives no finite number, and the stat shows no change.
+
+Add `trend` to draw a small line beside the number, from values oldest first:
+
+```ts title="src/cms/dashboard.ts"
+export async function visitorsToday() {
+    const days = await countVisitorsByDay({
+        days: 14,
+    });
+    return {
+        value: await countVisitorsToday(),
+        trend: days.map((day) => day.count),
+    };
+}
+```
+
+### Charts
+
+`data` returns the chart's points, oldest first:
 
 ```ts title="src/cms/dashboard.ts"
 export async function ordersPerDay() {
@@ -67,6 +101,47 @@ export async function ordersPerDay() {
     return days.map((day) => ({
         label: formatDay(day.date),
         value: day.count,
+    }));
+}
+```
+
+A chart draws bars. `style: 'line'` draws a line through the points instead:
+
+```ts title="kizuna.config.ts"
+{
+    type: 'chart',
+    label: 'Sales over time',
+    style: 'line',
+    data: salesPerDay,
+},
+```
+
+A value is a plain number, and the chart labels its axis from them. `description` names what the numbers count, in a line under the label:
+
+```ts title="kizuna.config.ts"
+{
+    type: 'chart',
+    label: 'Sales over time',
+    description: 'Succeeded orders · NOK',
+    data: salesPerDay,
+},
+```
+
+Give a point a `previous` value to compare it with the same point in the period before. The chart draws the period before as a dashed line, or a paler bar, behind this one, with a legend telling them apart:
+
+```ts title="src/cms/dashboard.ts"
+export async function salesPerDay() {
+    const thisMonth = await revenueByDay({
+        days: 30,
+    });
+    const lastMonth = await revenueByDay({
+        days: 30,
+        endingDaysAgo: 30,
+    });
+    return thisMonth.map((day, index) => ({
+        label: formatDay(day.date),
+        value: day.total,
+        previous: lastMonth[index]?.total,
     }));
 }
 ```

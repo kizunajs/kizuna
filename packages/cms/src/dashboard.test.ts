@@ -184,6 +184,49 @@ const configured = mount(
     ])
 );
 const plain = mount(assemble(undefined));
+const compared = mount(
+    assemble([
+        {
+            type: 'stat',
+            label: 'Revenue this week',
+            value: () => ({
+                value: 'kr 48 200',
+                change: 0.081,
+                trend: [31, 40, 38, 48],
+            }),
+        },
+        {
+            type: 'stat',
+            label: 'Orders this week',
+            value: () => ({
+                value: 12,
+                change: (12 - 0) / 0,
+            }),
+        },
+        {
+            type: 'chart',
+            label: 'Sales over time',
+            description: 'Succeeded orders · NOK',
+            style: 'line',
+            data: () => [
+                {
+                    label: '1 Oct',
+                    value: 4200,
+                    previous: 3900,
+                },
+                {
+                    label: '2 Oct',
+                    value: 5100,
+                    previous: Number.NaN,
+                },
+                {
+                    label: '3 Oct',
+                    value: 4800,
+                },
+            ],
+        },
+    ])
+);
 
 const as = (who: 'ada' | 'grace', call: request.Test) => call.set('authorization', `Bearer ${who}-token`);
 
@@ -231,6 +274,7 @@ describe('the dashboard', () => {
             {
                 type: 'chart',
                 label: 'Orders per day',
+                style: 'bar',
                 data: [
                     {
                         label: 'Mon',
@@ -301,6 +345,49 @@ describe('the dashboard', () => {
         expect(adaCollections.collections.map((entry: { name: string }) => entry.name)).toEqual(['employees']);
     });
 
+    it("sends a stat's change and trend, leaving out a change that is not a finite number", async () => {
+        const response = await as('ada', request(compared).get('/editing/dashboard'));
+        expect(response.body.widgets.slice(0, 2)).toEqual([
+            {
+                type: 'stat',
+                label: 'Revenue this week',
+                value: 'kr 48 200',
+                change: 0.081,
+                trend: [31, 40, 38, 48],
+            },
+            {
+                type: 'stat',
+                label: 'Orders this week',
+                value: '12',
+            },
+        ]);
+    });
+
+    it("sends a line chart's description and each point's previous value", async () => {
+        const response = await as('ada', request(compared).get('/editing/dashboard'));
+        expect(response.body.widgets[2]).toEqual({
+            type: 'chart',
+            label: 'Sales over time',
+            description: 'Succeeded orders · NOK',
+            style: 'line',
+            data: [
+                {
+                    label: '1 Oct',
+                    value: 4200,
+                    previous: 3900,
+                },
+                {
+                    label: '2 Oct',
+                    value: 5100,
+                },
+                {
+                    label: '3 Oct',
+                    value: 4800,
+                },
+            ],
+        });
+    });
+
     it('shows reviews and collections without `dashboard`', async () => {
         const response = await as('ada', request(plain).get('/editing/dashboard'));
         expect(response.status).toBe(200);
@@ -349,5 +436,18 @@ describe('checking the dashboard', () => {
                 } as never,
             ])
         ).toThrow(/data/);
+    });
+
+    it('refuses a chart style it cannot draw', () => {
+        expect(() =>
+            assemble([
+                {
+                    type: 'chart',
+                    label: 'Orders per day',
+                    style: 'pie',
+                    data: () => [],
+                } as never,
+            ])
+        ).toThrow(/style/);
     });
 });

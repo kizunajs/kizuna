@@ -15,7 +15,7 @@ export interface DashboardContext {
 }
 
 /**
- * What a stat shows: the number, or the number with a line under it.
+ * What a stat shows: the number, or the number with more about it.
  */
 export type StatValue =
     | string
@@ -23,17 +23,30 @@ export type StatValue =
     | {
           value: string | number;
           /**
-           * A line under the number, like "Up 12% on last week".
+           * A line under the number, like "48 orders".
            */
           detail?: string;
+          /**
+           * How far the number moved since the period before, as a signed
+           * fraction: `0.081` shows as ↑ 8.1%.
+           */
+          change?: number;
+          /**
+           * Values for a small line beside the number, oldest first.
+           */
+          trend?: readonly number[];
       };
 
 /**
- * One bar of a chart.
+ * One point of a chart.
  */
 export interface ChartBar {
     label: string;
     value: number;
+    /**
+     * The same point in the period before, drawn behind this one.
+     */
+    previous?: number;
 }
 
 interface WidgetAccess {
@@ -61,7 +74,7 @@ export interface StatWidget extends WidgetAccess {
 }
 
 /**
- * Bars over time, from your function, oldest first.
+ * Bars or a line over time, from your function, oldest first.
  *
  * @example
  * {
@@ -73,6 +86,15 @@ export interface StatWidget extends WidgetAccess {
 export interface ChartWidget extends WidgetAccess {
     type: 'chart';
     label: string;
+    /**
+     * What the numbers count, in a line under the label, like
+     * "Succeeded orders · NOK".
+     */
+    description?: string;
+    /**
+     * Bars, the default, or a line through the points.
+     */
+    style?: 'bar' | 'line';
     data: (context: DashboardContext) => readonly ChartBar[] | Promise<readonly ChartBar[]>;
 }
 
@@ -131,8 +153,10 @@ export const DashboardWidgetSchema = z.discriminatedUnion('type', [
     z.object({
         type: z.literal('chart'),
         label: z.string().min(1),
+        description: z.string().min(1).optional(),
+        style: z.enum(['bar', 'line']).optional(),
         data: z.custom<ChartWidget['data']>(isFunction, {
-            error: "must be a function returning the chart's bars",
+            error: "must be a function returning the chart's points",
         }),
         auth: WidgetAuthSchema,
     }),

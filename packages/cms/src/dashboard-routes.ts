@@ -9,7 +9,14 @@ import { accessRefusal, writtenOut } from './action.js';
 import { handlerContext, type EditingArgs, type Guarded } from './action-routes.js';
 import { waitingReviews } from './reviews.js';
 import { WaitingReviewsSchema } from './wire.js';
-import { DEFAULT_DASHBOARD, type DashboardContext, type DashboardWidget, type StatValue } from './dashboard.js';
+import {
+    DEFAULT_DASHBOARD,
+    type ChartBar,
+    type ChartWidget,
+    type DashboardContext,
+    type DashboardWidget,
+    type StatValue,
+} from './dashboard.js';
 
 export const StatWidgetSchema = Kizuna.model({
     title: 'CMS.StatWidget',
@@ -17,7 +24,9 @@ export const StatWidgetSchema = Kizuna.model({
         type: z.literal('stat'),
         label: z.string(),
         value: z.string().describe('What the stat shows, as your function wrote it.'),
-        detail: z.string().optional().describe('A line under the number, like "Up 12% on last week".'),
+        detail: z.string().optional().describe('A line under the number, like "48 orders".'),
+        change: z.number().optional().describe('How far the number moved since the period before, as a signed fraction: 0.081 is up 8.1%.'),
+        trend: z.array(z.number()).optional().describe('Values for a small line beside the number, oldest first.'),
     }),
 });
 
@@ -26,14 +35,17 @@ export const ChartWidgetSchema = Kizuna.model({
     schema: z.object({
         type: z.literal('chart'),
         label: z.string(),
+        description: z.string().optional().describe('What the numbers count, like "Succeeded orders · NOK".'),
+        style: z.enum(['bar', 'line']).describe('Bars, or a line through the points.'),
         data: z
             .array(
                 z.object({
                     label: z.string(),
                     value: z.number(),
+                    previous: z.number().optional().describe('The same point in the period before.'),
                 })
             )
-            .describe('The bars, oldest first.'),
+            .describe('The points, oldest first.'),
     }),
 });
 
@@ -77,6 +89,12 @@ export const DashboardSchema = Kizuna.model({
 
 type WidgetBody = z.output<typeof DashboardSchema>['widgets'][number];
 
+/**
+ * Whether a number survives JSON. A change divided by a period that sold
+ * nothing does not, and is left out rather than sent as null.
+ */
+const isFiniteNumber = (value: number | undefined): value is number => value !== undefined && Number.isFinite(value);
+
 const statBody = (label: string, result: StatValue): WidgetBody => {
     const stat =
         typeof result === 'object'
@@ -93,8 +111,38 @@ const statBody = (label: string, result: StatValue): WidgetBody => {
             : {
                   detail: stat.detail,
               }),
+        ...(isFiniteNumber(stat.change)
+            ? {
+                  change: stat.change,
+              }
+            : {}),
+        ...(stat.trend === undefined
+            ? {}
+            : {
+                  trend: [...stat.trend],
+              }),
     };
 };
+
+const chartBody = (widget: ChartWidget, points: readonly ChartBar[]): WidgetBody => ({
+    type: 'chart',
+    label: widget.label,
+    ...(widget.description === undefined
+        ? {}
+        : {
+              description: widget.description,
+          }),
+    style: widget.style ?? 'bar',
+    data: points.map((point) => ({
+        label: point.label,
+        value: point.value,
+        ...(isFiniteNumber(point.previous)
+            ? {
+                  previous: point.previous,
+              }
+            : {}),
+    })),
+});
 
 interface DashboardRouteInput {
     widgets: readonly DashboardWidget[] | undefined;
@@ -161,16 +209,7 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
             const widgets = await Promise.all(
                 shown.map(async (widget): Promise<WidgetBody> => {
                     if (widget.type === 'stat') return statBody(widget.label, await widget.value(context));
-                    if (widget.type === 'chart') {
-                        return {
-                            type: 'chart',
-                            label: widget.label,
-                            data: (await widget.data(context)).map((bar) => ({
-                                label: bar.label,
-                                value: bar.value,
-                            })),
-                        };
-                    }
+                    if (widget.type === 'chart') return chartBody(widget, await widget.data(context));
                     if (widget.type === 'reviews') {
                         return {
                             type: 'reviews',
