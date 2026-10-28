@@ -131,6 +131,15 @@ export default definePage({
                 .max(7)
                 .default(['statement', 'categories', 'products', 'photo', 'columns', 'articles', 'callToAction']),
             description: 'The sections under the hero, in this order. Remove one to hide it, or add it again to show it.',
+            options: {
+                statement: 'Statement',
+                categories: 'Categories',
+                products: 'Products',
+                photo: 'Wide photo',
+                columns: 'Columns',
+                articles: 'Journal',
+                callToAction: 'Call to action',
+            },
             position: 'sidebar',
         },
         {
