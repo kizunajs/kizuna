@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EditorContext, type EditorContextValue } from '../view/context.js';
 import { Logo } from '../view/logo.js';
 import { Avatar, usePeople } from '../view/people.js';
+import { CommandPalette } from './command-palette.js';
 import type { AdminConfig } from './config.js';
 import { connectOverHttp } from './connection.js';
 import { Dashboard, type WaitingReview } from './dashboard.js';
@@ -223,6 +224,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                         aria-label="Dashboard">
                         <Logo />
                     </a>
+                    <CommandPalette connection={connection} sections={sections} collections={collections} />
                     <div className="k-admin-nav-groups">
                         <div className="k-admin-nav-group">
                             <a
