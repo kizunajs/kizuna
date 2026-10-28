@@ -4,6 +4,7 @@ import { sendContactMessage } from './actions';
 import { Hero } from '../../components/blocks/Hero';
 import { PersonTile } from '../../components/PersonTile';
 import { optional } from '../../lib/optional';
+import { listOf } from '../../lib/stored';
 import styles from './page.module.css';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -19,8 +20,10 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
     const content = await kizuna.content.pages.contactPage.get();
     const footer = await optional(() => kizuna.content.globals.footer.get());
     const contacts = await kizuna.content.collections.employees.getMany({
-        ids: content.contacts,
+        ids: [...listOf(content.contacts)],
     });
+    const subjects = listOf(content.subjects);
+    const hours = listOf(footer?.openingHours);
 
     return (
         <main>
@@ -46,11 +49,11 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
                                     <input name="email" type="email" autoComplete="email" required className={styles.input} />
                                 </label>
                             </div>
-                            {content.subjects.length === 0 ? null : (
+                            {subjects.length === 0 ? null : (
                                 <label className={styles.field}>
                                     <span className={styles.label}>About</span>
                                     <select name="subject" className={styles.select}>
-                                        {content.subjects.map((subject) => (
+                                        {subjects.map((subject) => (
                                             <option key={subject} value={subject}>
                                                 {subject}
                                             </option>
@@ -75,11 +78,11 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
                             <p className={styles.address}>{footer.address}</p>
                             {content.directions === undefined ? null : <p className={styles.muted}>{content.directions}</p>}
                         </div>
-                        {footer.openingHours.length === 0 ? null : (
+                        {hours.length === 0 ? null : (
                             <div className={styles.detail}>
                                 <h2 className={styles.detailTitle}>Open</h2>
                                 <dl className={styles.hours}>
-                                    {footer.openingHours.map((row) => (
+                                    {hours.map((row) => (
                                         <div key={row.days} className={styles.hoursRow}>
                                             <dt>{row.days}</dt>
                                             <dd>{row.hours}</dd>

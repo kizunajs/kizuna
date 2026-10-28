@@ -3,6 +3,7 @@ import { Fragment, type ReactNode } from 'react';
 import { inStoredOrder } from '@kizunajs/cms/next';
 import kizuna from '@kizuna-config';
 import { apiClient } from '../../lib/api-client';
+import { listOf } from '../../lib/stored';
 import { Hero } from '../../components/blocks/Hero';
 import { Statement } from '../../components/blocks/Statement';
 import { Categories } from '../../components/blocks/Categories';
@@ -43,7 +44,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function FrontPage() {
     const content = await kizuna.content.pages.frontPage.get();
     const products =
-        content.products === undefined ? [] : inStoredOrder(content.products.products, await listProducts(), (product) => product.id);
+        content.products === undefined
+            ? []
+            : inStoredOrder([...listOf(content.products.products)], await listProducts(), (product) => product.id);
 
     // Each section the sidebar lists, once, in its order. A section with no content shows nothing.
     const render: Record<(typeof content.sections)[number], () => ReactNode> = {
@@ -57,10 +60,22 @@ export default async function FrontPage() {
             content.callToAction === undefined ? null : <CallToAction {...content.callToAction} tone={content.callToActionTone} />,
     };
 
+    // A front page stored before the sidebar listed its sections shows them all, in the usual order.
+    const usual: Array<(typeof content.sections)[number]> = [
+        'statement',
+        'categories',
+        'products',
+        'photo',
+        'columns',
+        'articles',
+        'callToAction',
+    ];
+    const order = listOf(content.sections).length > 0 ? listOf(content.sections) : usual;
+
     return (
         <main>
             <Hero {...content.hero} impact={content.heroImpact} />
-            {[...new Set(content.sections)].map((section) => (
+            {[...new Set(order)].map((section) => (
                 <Fragment key={section}>{render[section]()}</Fragment>
             ))}
         </main>

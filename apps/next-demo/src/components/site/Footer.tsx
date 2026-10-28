@@ -1,5 +1,6 @@
 import kizuna from '@kizuna-config';
 import { optional } from '../../lib/optional';
+import { listOf } from '../../lib/stored';
 import { Emphasis } from '../Emphasis';
 import { NewsletterForm } from '../newsletter/NewsletterForm';
 import { Logo } from './Logo';
@@ -30,10 +31,14 @@ const demoLinks = [
 
 export async function Footer() {
     const footer = await optional(() => kizuna.content.globals.footer.get());
+    const hours = listOf(footer?.openingHours);
+    // Before opening hours were rows, they were one line of text.
+    const hoursLine = typeof footer?.openingHours === 'string' ? (footer.openingHours as string) : undefined;
+    const links = listOf(footer?.navItems);
 
     return (
         <footer className={styles.footer}>
-            {footer?.newsletterHeading === undefined || !footer.showNewsletter ? null : (
+            {footer?.newsletterHeading === undefined || footer.showNewsletter === false ? null : (
                 <section className={styles.newsletter} aria-label="Newsletter">
                     <h2 className={styles.newsletterHeading}>
                         <Emphasis text={footer.newsletterHeading} />
@@ -54,9 +59,10 @@ export async function Footer() {
                         <div className={styles.column}>
                             <h2 className={styles.columnTitle}>Visit</h2>
                             <p>{footer.address}</p>
-                            {footer.openingHours.length === 0 ? null : (
+                            {hoursLine === undefined ? null : <p>{hoursLine}</p>}
+                            {hours.length === 0 ? null : (
                                 <dl className={styles.hours}>
-                                    {footer.openingHours.map((row) => (
+                                    {hours.map((row) => (
                                         <div key={row.days} className={styles.hoursRow}>
                                             <dt>{row.days}</dt>
                                             <dd>{row.hours}</dd>
@@ -74,10 +80,10 @@ export async function Footer() {
                                 {footer.contactEmail}
                             </a>
                         </div>
-                        {footer.navItems.length === 0 ? null : (
+                        {links.length === 0 ? null : (
                             <div className={styles.column}>
                                 <h2 className={styles.columnTitle}>Explore</h2>
-                                {footer.navItems.map((item) => (
+                                {links.map((item) => (
                                     <a key={item.href} href={item.href} className={styles.link}>
                                         {item.label}
                                     </a>

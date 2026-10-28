@@ -30,6 +30,15 @@ export default async function TeamPage() {
             people: items.filter((employee) => employee.department === department),
         }))
         .filter((group) => group.people.length > 0);
+    // People stored under a department the site no longer has still show, after the rest.
+    const placed = new Set<string>(Object.keys(departments));
+    const unplaced = items.filter((employee) => !placed.has(employee.department));
+    if (unplaced.length > 0) {
+        shown.push({
+            label: 'Also on the team',
+            people: unplaced,
+        });
+    }
 
     return (
         <main>

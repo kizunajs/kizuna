@@ -10,13 +10,13 @@ test.describe('the editor in a host', () => {
         const editor = await openEditor(page, '/team');
         await expect(editor.locator('.k-header__name')).toHaveText('Team');
         await expect(
-            editor.locator('.k-field__label', {
-                hasText: 'Heading',
+            editor.getByLabel('Heading', {
+                exact: true,
             })
         ).toBeVisible();
         await expect(
-            editor.locator('.k-field__label', {
-                hasText: 'Intro',
+            editor.getByLabel('Intro', {
+                exact: true,
             })
         ).toBeVisible();
     });
@@ -81,11 +81,11 @@ test.describe('the editor in a host', () => {
         await editor
             .frameLocator('iframe[title="Draft preview"]')
             .getByRole('link', {
-                name: 'Edit content',
+                name: 'API demo',
             })
             .click();
-        // `/cms` sends a signed-out visitor to `/login`, which has no content in the CMS.
-        await expect(editor.getByText('Nothing to edit on /login')).toBeVisible();
+        // The API demo is a page of the app's own, with no content in the CMS.
+        await expect(editor.getByText('Nothing to edit on /demo')).toBeVisible();
     });
 
     test('fullscreen frames the live site where the host approves it, and pointing at a field focuses it', async ({ page }) => {

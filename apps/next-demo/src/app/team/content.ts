@@ -37,17 +37,17 @@ export default definePage({
                     fields: [
                         {
                             name: 'hiringHeading',
-                            label: 'Heading',
+                            label: 'Hiring heading',
                             schema: HeadingSchema.optional().describe('Leave empty to hide the band at the end of the page.'),
                         },
                         {
                             name: 'hiringText',
-                            label: 'Text',
+                            label: 'Hiring text',
                             schema: z.string().max(200).optional(),
                         },
                         {
                             name: 'hiringEmail',
-                            label: 'Email',
+                            label: 'Hiring email',
                             schema: z.email().optional(),
                         },
                     ],

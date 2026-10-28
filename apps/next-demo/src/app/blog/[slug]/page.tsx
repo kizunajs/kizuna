@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { Output } from '@kizunajs/cms';
 import kizuna from '@kizuna-config';
+import { listOf } from '../../../lib/stored';
 import { topics, type Articles } from '../../../cms/content';
 import { formatDate } from '../../../lib/format';
 import { sizedImage } from '../../../lib/image';
@@ -58,9 +59,9 @@ export default async function ArticlePage({ params }: Props) {
                   ids: [article.author],
               });
     const related =
-        article.related.length > 0
+        listOf(article.related).length > 0
             ? await kizuna.content.collections.articles.getMany({
-                  ids: article.related,
+                  ids: [...listOf(article.related)],
               })
             : await latestBeside(article.slug, article.topic);
 

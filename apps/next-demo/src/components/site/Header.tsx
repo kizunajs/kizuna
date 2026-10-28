@@ -1,5 +1,6 @@
 import kizuna from '@kizuna-config';
 import { optional } from '../../lib/optional';
+import { listOf } from '../../lib/stored';
 import { Logo } from './Logo';
 import styles from './Header.module.css';
 
@@ -10,6 +11,7 @@ import styles from './Header.module.css';
 export async function Header() {
     const header = await optional(() => kizuna.content.globals.header.get());
     const announcement = header?.showAnnouncement === false ? undefined : header?.announcement;
+    const links = listOf(header?.navItems);
 
     return (
         <div className={styles.top}>
@@ -26,9 +28,9 @@ export async function Header() {
             <header className={styles.header}>
                 <div className={styles.inner}>
                     <Logo />
-                    {(header?.navItems ?? []).length === 0 ? null : (
+                    {links.length === 0 ? null : (
                         <nav className={styles.nav} aria-label="Main">
-                            {header?.navItems.map((item) => (
+                            {links.map((item) => (
                                 <a key={item.href} href={item.href} className={styles.link}>
                                     {item.label}
                                 </a>
