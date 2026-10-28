@@ -17,6 +17,17 @@ export {
 } from './definitions.js';
 export { formatRef, parseRef, type DocumentRef } from './refs.js';
 export { type Action, type ActionContext, type ActionHandler, type ActionOptions, type Editor } from './action.js';
+export {
+    defineView,
+    isView,
+    VIEW,
+    type View,
+    type ViewActions,
+    type ViewColumn,
+    type ViewData,
+    type ViewDefinition,
+    type ViewRecords,
+} from './view-definition.js';
 export { resolvedSchema, ResolvedImageSchema } from './content-schema.js';
 export {
     dataFields,

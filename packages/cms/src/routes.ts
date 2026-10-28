@@ -53,6 +53,7 @@ import { sameContent } from './same-content.js';
 import { assertReviewed, decideReviews, documentLabel, peopleOf, requestReviews, reviewOf, setOwner, waitingReviews } from './reviews.js';
 import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
+import { listViewsRoute, viewRoutes } from './view-routes.js';
 
 interface Args {
     params: Record<string, string>;
@@ -1700,6 +1701,22 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 editingBase,
                 guarded,
             }),
+            ...((options.views ?? []).length === 0
+                ? {}
+                : {
+                      listViews: listViewsRoute({
+                          views: options.views ?? [],
+                          editor,
+                          editingBase,
+                          guarded,
+                      }),
+                      views: viewRoutes({
+                          views: options.views ?? [],
+                          editor,
+                          editingBase,
+                          guarded,
+                      }),
+                  }),
             whereUsed,
             searchItems,
             createPreview,

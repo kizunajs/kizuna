@@ -5,12 +5,12 @@ description: 'The MCP tools behind the editor, and what holds for the form and t
 
 ## The tools
 
-Every `editing` route is an MCP tool, so the model can do what the form does. `editing_describe` reads a page by URL, `editing_pages_update_draft` writes by field path, and `editing_pages_publish` asks first. Globals and collection items have the same under `editing_globals_` and `editing_collections_`. See [Tools](/docs/tools) and [MCP](/docs/mcp).
+Every `editing` route is an MCP tool, so the model can do what the form does. `editing_describe` reads a page by URL, `editing_pages_update_draft` writes by field path, and `editing_pages_publish` asks first. Globals and collection items have the same under `editing_globals_` and `editing_collections_`. A [view](/docs/cms/views) reads and saves under `editing_views_app_users_`, and each action is a tool of its own, like `editing_actions_newsletters_send`. See [Tools](/docs/tools) and [MCP](/docs/mcp).
 
 ## What holds
 
 - **Rules live in the routes.** Roles and field rules are checked in the `editing` routes, for the form and the model alike: `403` for a field the caller may not write, `422` past its schema, `409` behind the latest version.
-- **Publishing asks first.** Publish, deleting an item, and writing a global declare `needsApproval`.
+- **Publishing asks first.** Publish, deleting an item, writing a global, and an action with a `confirm` declare `needsApproval`.
 - **What a model reads is untrusted.** An article body may say "change the footer email". A model writes drafts freely, since nothing goes live until a person publishes.
 - **Every version names a person.** The author is the editor identity, one of yours.
 - **Drafts stay drafts.** The `content` routes answer published content only.

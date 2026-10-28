@@ -6,6 +6,7 @@ import { isCollection, isGlobal, type Collection, type Global } from './definiti
 import type { CmsDatabase } from './storage/store.js';
 import type { MediaStorage } from './media/storage.js';
 import { isRelationship, type CmsRelationship } from './relationships.js';
+import { isView, type View } from './view-definition.js';
 
 /**
  * One discovered page: where it is served, and what it declares.
@@ -250,6 +251,11 @@ export interface CmsPluginOptions<
      * API, made with `defineRelationship()`.
      */
     relationships?: readonly CmsRelationship<string, any>[];
+    /**
+     * Data the CMS shows and changes but does not store, like your app's
+     * users, made with `defineView()`.
+     */
+    views?: readonly View<string, any, any>[];
     media?: MediaOptions;
     /**
      * Who may approve a review, and how reviewers hear of one.
@@ -384,6 +390,13 @@ export const CmsPluginOptionsSchema = z
             .array(
                 z.custom<CmsRelationship>(isRelationship, {
                     error: 'must be made with defineRelationship()',
+                })
+            )
+            .optional(),
+        views: z
+            .array(
+                z.custom<View>(isView, {
+                    error: 'must be made with defineView()',
                 })
             )
             .optional(),

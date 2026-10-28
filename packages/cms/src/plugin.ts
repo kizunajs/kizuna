@@ -23,6 +23,7 @@ import { draftEventsRoute } from './draft-events.js';
 import { adminRoute } from './admin/route.js';
 import { routePrefix } from './options.js';
 import { assertActionAccess, resolveActions } from './action.js';
+import { assertViews } from './view-routes.js';
 import { assertTree } from './tree.js';
 import { resolve } from 'node:path';
 
@@ -170,6 +171,7 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
         assertActionAccess(resolveActions(definition.actions), `Collection '${definition.name}'`, identityRoles, label);
         assertTree(definition);
     }
+    assertViews(options.views ?? [], [...names.keys()], identityRoles, label);
     for (const entry of allPages) {
         const served = entry.page.collection;
         if (served !== undefined && !(options.collections ?? []).includes(served)) {
