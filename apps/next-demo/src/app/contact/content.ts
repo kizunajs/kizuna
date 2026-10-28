@@ -32,7 +32,8 @@ export default definePage({
                         {
                             name: 'subjects',
                             schema: z.array(z.string().min(1).max(40)).max(5).default([]),
-                            description: 'What a message can be about, offered as a choice above the message. Leave empty to hide the choice.',
+                            description:
+                                'What a message can be about, offered as a choice above the message. Leave empty to hide the choice.',
                         },
                         {
                             name: 'buttonLabel',

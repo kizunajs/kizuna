@@ -42,7 +42,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function FrontPage() {
     const content = await kizuna.content.pages.frontPage.get();
-    const products = content.products === undefined ? [] : inStoredOrder(content.products.products, await listProducts(), (product) => product.id);
+    const products =
+        content.products === undefined ? [] : inStoredOrder(content.products.products, await listProducts(), (product) => product.id);
 
     // Each section the sidebar lists, once, in its order. A section with no content shows nothing.
     const render: Record<(typeof content.sections)[number], () => ReactNode> = {
@@ -52,7 +53,8 @@ export default async function FrontPage() {
         photo: () => (content.photo === undefined ? null : <Media {...content.photo} tone={content.photoTone} />),
         columns: () => (content.columns === undefined ? null : <Content {...content.columns} />),
         articles: () => (content.articles === undefined ? null : <Archive {...content.articles} />),
-        callToAction: () => (content.callToAction === undefined ? null : <CallToAction {...content.callToAction} tone={content.callToActionTone} />),
+        callToAction: () =>
+            content.callToAction === undefined ? null : <CallToAction {...content.callToAction} tone={content.callToActionTone} />,
     };
 
     return (

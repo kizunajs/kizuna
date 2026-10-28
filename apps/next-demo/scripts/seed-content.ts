@@ -498,7 +498,8 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             name: 'footer',
         },
         {
-            tagline: 'A plant shop on Grünerløkka. Houseplants, ferns and trees from growers we know, and help for as long as you keep them.',
+            tagline:
+                'A plant shop on Grünerløkka. Houseplants, ferns and trees from growers we know, and help for as long as you keep them.',
             navItems: [
                 {
                     label: 'Plant care guides',
@@ -599,11 +600,13 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             caption: 'The spruce wood at our grower in Hurdal, where the team goes every September',
             photoLayout: 'wide',
             hiringHeading: 'Want to work *with plants*?',
-            hiringText: 'We hire for the spring rush every February. Write to Ingrid with a few lines about the plants you have kept alive.',
+            hiringText:
+                'We hire for the spring rush every February. Write to Ingrid with a few lines about the plants you have kept alive.',
             hiringEmail: 'jobb@hagenplanter.no',
             seo: {
                 title: 'The team behind Hagen',
-                description: 'Meet the nine people who run Hagen, a plant shop on Grünerløkka in Oslo: the shop, plant care, office plants and delivery.',
+                description:
+                    'Meet the nine people who run Hagen, a plant shop on Grünerløkka in Oslo: the shop, plant care, office plants and delivery.',
             },
         }
     );
@@ -641,7 +644,8 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             contacts: [personId('Martin Hale'), personId('Marco Reyes'), personId('Ingrid Solberg')].filter((id) => id !== undefined),
             seo: {
                 title: 'Contact and opening hours',
-                description: 'Visit Hagen at Markveien 38 on Grünerløkka, or ask the plant care desk about any plant. We answer every weekday.',
+                description:
+                    'Visit Hagen at Markveien 38 on Grünerløkka, or ask the plant care desk about any plant. We answer every weekday.',
             },
         }
     );

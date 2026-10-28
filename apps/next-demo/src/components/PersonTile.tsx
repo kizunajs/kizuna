@@ -35,7 +35,9 @@ export function PersonTile({ employee, compact = false }: { employee: Output<typ
                 {employee.email === undefined && employee.phone === undefined ? null : (
                     <p className={styles.contact}>
                         {employee.email === undefined ? null : <a href={`mailto:${employee.email}`}>{employee.email}</a>}
-                        {employee.phone === undefined ? null : <a href={`tel:${employee.phone.replace(/[^+\d]/g, '')}`}>{employee.phone}</a>}
+                        {employee.phone === undefined ? null : (
+                            <a href={`tel:${employee.phone.replace(/[^+\d]/g, '')}`}>{employee.phone}</a>
+                        )}
                     </p>
                 )}
             </div>

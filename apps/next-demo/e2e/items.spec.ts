@@ -8,18 +8,18 @@ test.describe('items shown on a page', () => {
 
     test('clicking an item on a page opens it, and goes back to the page', async ({ page }) => {
         const editor = await openEditor(page, '/team');
-        await expect(editor.locator('.k-stage')).toHaveAttribute('data-ready', 'true');
+        await expect(editor.locator('.k-preview__stage')).toHaveAttribute('data-ready', 'true');
         const site = editor.frameLocator('iframe[title="Draft preview"]');
         await site.getByText('Ingrid Solberg').first().click();
-        await expect(editor.locator('.k-title-name')).toHaveText('Ingrid Solberg');
+        await expect(editor.locator('.k-header__name')).toHaveText('Ingrid Solberg');
 
         await editor
             .getByRole('button', {
                 name: 'Back to Team',
             })
             .click();
-        await expect(editor.locator('.k-title-name')).toHaveText('Team');
-        await expect(editor.locator('.k-back')).toBeHidden();
+        await expect(editor.locator('.k-header__name')).toHaveText('Team');
+        await expect(editor.locator('.k-header__back')).toBeHidden();
     });
 
     test('the switcher opens any page, global or item, and adds an item', async ({ page }) => {
@@ -30,22 +30,22 @@ test.describe('items shown on a page', () => {
             })
             .click();
         await expect(
-            editor.locator('.k-switcher-heading', {
+            editor.locator('.k-switcher__heading', {
                 hasText: 'Pages',
             })
         ).toBeVisible();
         await expect(
-            editor.locator('.k-switcher-heading', {
+            editor.locator('.k-switcher__heading', {
                 hasText: 'On every page',
             })
         ).toBeVisible();
         await editor.getByPlaceholder('Find a page or item').fill('aiko');
         await editor
-            .locator('.k-switcher-row', {
+            .locator('.k-switcher__row', {
                 hasText: 'Aiko Tanaka',
             })
             .click();
-        await expect(editor.locator('.k-title-name')).toHaveText('Aiko Tanaka');
+        await expect(editor.locator('.k-header__name')).toHaveText('Aiko Tanaka');
 
         await editor
             .getByRole('button', {
@@ -53,13 +53,13 @@ test.describe('items shown on a page', () => {
             })
             .click();
         await editor
-            .locator('.k-switcher-heading-row', {
+            .locator('.k-switcher__heading-row', {
                 hasText: 'Employees',
             })
             .getByRole('button', {
                 name: 'New',
             })
             .click();
-        await expect(editor.locator('.k-title-name')).toHaveText('Untitled');
+        await expect(editor.locator('.k-header__name')).toHaveText('Untitled');
     });
 });

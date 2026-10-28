@@ -28,7 +28,14 @@ export function NewsletterForm() {
             </label>
             <button type="submit" className={styles.submit} disabled={pending} aria-label="Subscribe">
                 <svg viewBox="0 0 20 20" aria-hidden="true" className={styles.arrow}>
-                    <path d="M4 10h11M11 5.5 15.5 10 11 14.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                        d="M4 10h11M11 5.5 15.5 10 11 14.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
                 </svg>
             </button>
         </form>

@@ -56,7 +56,7 @@ export const openEditor = async (
     });
     await page.goto(`/dev/claude?url=${encodeURIComponent(path)}${options.framesSite === true ? '&frames=1' : ''}`);
     const editor = page.frameLocator('#view');
-    await expect(editor.locator('.k-title-name')).toBeVisible();
+    await expect(editor.locator('.k-header__name')).toBeVisible();
     return editor;
 };
 

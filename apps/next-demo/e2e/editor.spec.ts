@@ -8,14 +8,14 @@ test.describe('the editor in a host', () => {
 
     test('opens on the document the tool read, with a field per schema entry', async ({ page }) => {
         const editor = await openEditor(page, '/team');
-        await expect(editor.locator('.k-title-name')).toHaveText('Team');
+        await expect(editor.locator('.k-header__name')).toHaveText('Team');
         await expect(
-            editor.locator('.k-section-title', {
+            editor.locator('.k-field__label', {
                 hasText: 'Heading',
             })
         ).toBeVisible();
         await expect(
-            editor.locator('.k-section-title', {
+            editor.locator('.k-field__label', {
                 hasText: 'Intro',
             })
         ).toBeVisible();
@@ -43,17 +43,17 @@ test.describe('the editor in a host', () => {
     }) => {
         const editor = await openEditor(page, '/team');
         await expect(editor.locator('iframe[title="Draft preview"]')).toHaveAttribute('sandbox', 'allow-same-origin');
-        await expect(editor.locator('.k-stage')).toHaveAttribute('data-ready', 'true');
+        await expect(editor.locator('.k-preview__stage')).toHaveAttribute('data-ready', 'true');
         const site = editor.frameLocator('iframe[title="Draft preview"]');
         await expect(heading(site)).toBeVisible();
         await heading(site).click();
-        await expect(editor.locator('#field-heading .k-field')).toHaveAttribute('data-pointed', 'true');
+        await expect(editor.locator('#field-heading .k-field__control')).toHaveAttribute('data-pointed', 'true');
         await expect.poll(async () => (await modelContext(page)).join('\n')).toContain('pointing at Heading');
     });
 
     test('browsing the preview follows a link, and the form follows to that page', async ({ page }) => {
         const editor = await openEditor(page, '/');
-        await expect(editor.locator('.k-stage')).toHaveAttribute('data-ready', 'true');
+        await expect(editor.locator('.k-preview__stage')).toHaveAttribute('data-ready', 'true');
         await editor
             .getByRole('radio', {
                 name: 'Browse',
@@ -66,13 +66,13 @@ test.describe('the editor in a host', () => {
             })
             .first()
             .click();
-        await expect(editor.locator('.k-title-name')).toHaveText('Team');
+        await expect(editor.locator('.k-header__name')).toHaveText('Team');
         await expect(heading(site)).toContainText(/Meet the team|The people who keep it green/);
     });
 
     test('a page with no content in the CMS says there is nothing to edit there', async ({ page }) => {
         const editor = await openEditor(page, '/');
-        await expect(editor.locator('.k-stage')).toHaveAttribute('data-ready', 'true');
+        await expect(editor.locator('.k-preview__stage')).toHaveAttribute('data-ready', 'true');
         await editor
             .getByRole('radio', {
                 name: 'Browse',
@@ -92,11 +92,11 @@ test.describe('the editor in a host', () => {
         const editor = await openEditor(page, '/team', {
             framesSite: true,
         });
-        await expect(editor.locator('.k-stage')).toHaveAttribute('data-ready', 'true');
+        await expect(editor.locator('.k-preview__stage')).toHaveAttribute('data-ready', 'true');
         const site = editor.frameLocator('iframe[title="Draft preview"]');
         await expect(heading(site)).toBeVisible();
         await heading(site).click();
-        await expect(editor.locator('#field-heading .k-field')).toHaveAttribute('data-pointed', 'true');
+        await expect(editor.locator('#field-heading .k-field__control')).toHaveAttribute('data-pointed', 'true');
         await expect.poll(async () => (await modelContext(page)).join('\n')).toContain('pointing at Heading');
     });
 
@@ -117,12 +117,12 @@ test.describe('the editor in a host', () => {
             .click();
         const dialog = editor.getByRole('alertdialog');
         await expect(dialog).toContainText('Publish Team?');
-        const heading = dialog.locator('.k-review-row', {
+        const heading = dialog.locator('.k-review__row', {
             hasText: 'Heading',
         });
         await expect(heading.locator('ins')).toContainText('take back');
         await expect(
-            dialog.locator('.k-review-row', {
+            dialog.locator('.k-review__row', {
                 hasText: 'Intro',
             })
         ).toBeVisible();

@@ -47,7 +47,13 @@ export function Hero({ impact = 'high', eyebrow, heading, subheading, image, cap
             <section className={styles.medium}>
                 <div className={styles.mediumText}>{text}</div>
                 <figure className={styles.mediumFigure}>
-                    <img className={styles.mediumImage} src={sizedImage(image.url, 1000, 1250)} alt={image.alt} width={1000} height={1250} />
+                    <img
+                        className={styles.mediumImage}
+                        src={sizedImage(image.url, 1000, 1250)}
+                        alt={image.alt}
+                        width={1000}
+                        height={1250}
+                    />
                     {caption === undefined ? null : <figcaption className={styles.mediumCaption}>{caption}</figcaption>}
                 </figure>
             </section>
