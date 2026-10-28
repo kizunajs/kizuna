@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import { usePathname, useRouter } from 'next/navigation';
 import { fieldElementFor, markedElements, type Source } from './source-marks.js';
 import { envelope, openEnvelope, type EditorMessage, type PreviewMessage } from './preview-messages.js';
+import { useLiveDraft } from './preview-live.js';
 
 export interface PreviewOverlayProps {
     /**
@@ -11,6 +12,11 @@ export interface PreviewOverlayProps {
      * mode.
      */
     draftPath: string;
+    /**
+     * The CMS's draft events route, which says when a draft the page shows
+     * changes.
+     */
+    eventsPath?: string;
 }
 
 /**
@@ -304,6 +310,7 @@ export function PreviewOverlay(props: PreviewOverlayProps) {
             if (owner === claim) owner = undefined;
         };
     }, []);
+    useLiveDraft(framed === undefined ? undefined : props.eventsPath);
     if (framed === undefined) return null;
     return framed ? <FramedPreview /> : <StandalonePreview {...props} />;
 }

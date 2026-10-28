@@ -37,6 +37,7 @@ import {
     type Migration,
 } from './storage/store.js';
 import { previewSecret, signPreviewToken, verifyPreviewToken } from './preview-token.js';
+import { DraftNotices } from './draft-notices.js';
 import type { PageStatusSchema } from './wire.js';
 import type { CmsRelationship, RelationshipOption } from './relationships.js';
 
@@ -255,6 +256,7 @@ const mediaStorageFrom = (options: ResolvedCmsOptions['media']): MediaStorage =>
  */
 export class CmsService {
     readonly store: DocumentStore;
+    readonly notices: DraftNotices;
     readonly media: MediaService;
     /**
      * The default site's pages.
@@ -283,6 +285,7 @@ export class CmsService {
         private readonly api: PluginApi
     ) {
         this.store = new DocumentStore(options.db);
+        this.notices = new DraftNotices(options.db);
         this.sites = Object.fromEntries(Object.entries(sitesOf(options)).map(([site, declared]) => [site, declared.pages]));
         this.pages = this.sites[DEFAULT_SITE] ?? {};
         this.globals = Object.fromEntries((options.globals ?? []).map((definition) => [definition.name, definition]));
@@ -923,6 +926,10 @@ export class CmsService {
                 summary: 'Created',
                 migration: migrationOf(listing.definition),
             });
+            await this.notices.publish({
+                ref: formatRef(ref),
+                paths: null,
+            });
             return this.draftState(ref);
         }
         return this.update({
@@ -1244,6 +1251,10 @@ export class CmsService {
             }
             throw error;
         }
+        await this.notices.publish({
+            ref: formatRef(input.ref),
+            paths,
+        });
         return this.draftState(input.ref);
     }
 
@@ -1320,6 +1331,10 @@ export class CmsService {
             summary: `Restored version ${version}`,
             refs: refsOf(target.definition, migrated),
             migration: migrationOf(target.definition),
+        });
+        await this.notices.publish({
+            ref: formatRef(ref),
+            paths: null,
         });
         return this.draftState(ref);
     }

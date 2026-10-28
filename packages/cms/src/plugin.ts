@@ -19,6 +19,7 @@ import { describeFields, type DescribedField } from './content.js';
 import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from './discovery.js';
 import { PREVIEW_COOKIE, PREVIEW_TTL_SECONDS } from './preview-token.js';
 import { PREVIEW_PROXY_PATH, PROXY_CORS, previewProxyUrl, proxyToSite } from './preview-proxy.js';
+import { draftEventsRoute } from './draft-events.js';
 import { routePrefix } from './options.js';
 import { resolve } from 'node:path';
 
@@ -252,6 +253,7 @@ const definition = definePlugin({
             generators,
             routes: {
                 draft: draftRoute(service, options, api, base),
+                draftEvents: draftEventsRoute(service, options, api, base),
                 previewProxy: previewProxyRoute(service, options, base),
                 previewProxyPreflight: previewProxyPreflightRoute(base),
             },
