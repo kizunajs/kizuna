@@ -529,6 +529,10 @@ routes:
                   optional: false
                   schema:
                     kind: string
+                directions:
+                  optional: true
+                  schema:
+                    kind: string
                 subjects:
                   optional: false
                   schema:
@@ -541,10 +545,6 @@ routes:
                     kind: string
                 thanks:
                   optional: false
-                  schema:
-                    kind: string
-                directions:
-                  optional: true
                   schema:
                     kind: string
                 seo:
@@ -804,39 +804,12 @@ routes:
             schema:
               kind: object
               fields:
-                tagline:
-                  optional: false
-                  schema:
-                    kind: string
-                navItems:
-                  optional: false
-                  schema:
-                    kind: array
-                    element:
-                      kind: object
-                      fields:
-                        label:
-                          optional: false
-                          schema:
-                            kind: string
-                        href:
-                          optional: false
-                          schema:
-                            kind: string
                 newsletterHeading:
                   optional: true
                   schema:
                     kind: string
                 newsletterText:
                   optional: true
-                  schema:
-                    kind: string
-                contactEmail:
-                  optional: false
-                  schema:
-                    kind: string
-                phone:
-                  optional: false
                   schema:
                     kind: string
                 address:
@@ -855,6 +828,33 @@ routes:
                           schema:
                             kind: string
                         hours:
+                          optional: false
+                          schema:
+                            kind: string
+                contactEmail:
+                  optional: false
+                  schema:
+                    kind: string
+                phone:
+                  optional: false
+                  schema:
+                    kind: string
+                tagline:
+                  optional: false
+                  schema:
+                    kind: string
+                navItems:
+                  optional: false
+                  schema:
+                    kind: array
+                    element:
+                      kind: object
+                      fields:
+                        label:
+                          optional: false
+                          schema:
+                            kind: string
+                        href:
                           optional: false
                           schema:
                             kind: string
@@ -1628,6 +1628,10 @@ routes:
                       element:
                         kind: string
                   readOnly:
+                    optional: false
+                    schema:
+                      kind: boolean
+                  required:
                     optional: false
                     schema:
                       kind: boolean
@@ -8677,6 +8681,10 @@ routes:
                     optional: false
                     schema:
                       kind: boolean
+                  required:
+                    optional: false
+                    schema:
+                      kind: boolean
                   writable:
                     optional: false
                     schema:
@@ -8894,6 +8902,10 @@ routes:
                       element:
                         kind: string
                   readOnly:
+                    optional: false
+                    schema:
+                      kind: boolean
+                  required:
                     optional: false
                     schema:
                       kind: boolean
@@ -9167,6 +9179,10 @@ routes:
                       element:
                         kind: string
                   readOnly:
+                    optional: false
+                    schema:
+                      kind: boolean
+                  required:
                     optional: false
                     schema:
                       kind: boolean
@@ -10996,39 +11012,12 @@ content:
     schema:
       kind: object
       fields:
-        tagline:
-          optional: false
-          schema:
-            kind: string
-        navItems:
-          optional: false
-          schema:
-            kind: array
-            element:
-              kind: object
-              fields:
-                label:
-                  optional: false
-                  schema:
-                    kind: string
-                href:
-                  optional: false
-                  schema:
-                    kind: string
         newsletterHeading:
           optional: true
           schema:
             kind: string
         newsletterText:
           optional: true
-          schema:
-            kind: string
-        contactEmail:
-          optional: false
-          schema:
-            kind: string
-        phone:
-          optional: false
           schema:
             kind: string
         address:
@@ -11047,6 +11036,33 @@ content:
                   schema:
                     kind: string
                 hours:
+                  optional: false
+                  schema:
+                    kind: string
+        contactEmail:
+          optional: false
+          schema:
+            kind: string
+        phone:
+          optional: false
+          schema:
+            kind: string
+        tagline:
+          optional: false
+          schema:
+            kind: string
+        navItems:
+          optional: false
+          schema:
+            kind: array
+            element:
+              kind: object
+              fields:
+                label:
+                  optional: false
+                  schema:
+                    kind: string
+                href:
                   optional: false
                   schema:
                     kind: string
@@ -11149,6 +11165,10 @@ content:
           optional: false
           schema:
             kind: string
+        directions:
+          optional: true
+          schema:
+            kind: string
         subjects:
           optional: true
           schema:
@@ -11161,10 +11181,6 @@ content:
             kind: string
         thanks:
           optional: false
-          schema:
-            kind: string
-        directions:
-          optional: true
           schema:
             kind: string
         seo:

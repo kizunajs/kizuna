@@ -311,6 +311,10 @@ export namespace API {
             layout?: Array<string>;
             readOnly: boolean;
             /**
+             * Whether the document needs a value here before it can publish.
+             */
+            required: boolean;
+            /**
              * Whether the caller may write this field.
              */
             writable: boolean;
@@ -988,13 +992,13 @@ export namespace API {
                      * Why someone should write, in a sentence or two.
                      */
                     intro: string;
+                    directions?: string;
                     subjects: Array<string>;
                     buttonLabel: string;
                     /**
                      * Shown after the form is sent.
                      */
                     thanks: string;
-                    directions?: string;
                     seo?: {
                         /**
                          * What search results show as the title. 30 to 60 characters show in full.
@@ -1092,6 +1096,21 @@ export namespace API {
                 version: number;
                 updatedAt: string;
                 content: {
+                    newsletterHeading?: string;
+                    newsletterText?: string;
+                    address: string;
+                    openingHours: Array<{
+                        /**
+                         * Like Monday to Friday.
+                         */
+                        days: string;
+                        /**
+                         * Like 10 to 18, or Closed.
+                         */
+                        hours: string;
+                    }>;
+                    contactEmail: string;
+                    phone: string;
                     /**
                      * One line under the logo.
                      */
@@ -1105,21 +1124,6 @@ export namespace API {
                          * A page on this site, like /blog, or an https address.
                          */
                         href: string;
-                    }>;
-                    newsletterHeading?: string;
-                    newsletterText?: string;
-                    contactEmail: string;
-                    phone: string;
-                    address: string;
-                    openingHours: Array<{
-                        /**
-                         * Like Monday to Friday.
-                         */
-                        days: string;
-                        /**
-                         * Like 10 to 18, or Closed.
-                         */
-                        hours: string;
                     }>;
                     showNewsletter: boolean;
                 };
