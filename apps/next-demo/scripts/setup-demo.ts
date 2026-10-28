@@ -9,7 +9,20 @@ import { seedContent } from './seed-content';
 
 const PASSWORD = process.env.DEMO_PASSWORD ?? 'kizuna-demo';
 
-const people = [
+const people: Array<{
+    email: string;
+    name: string;
+    role: string;
+    image: string;
+    password?: string;
+}> = [
+    {
+        email: 'dev@kizunajs.com',
+        name: 'Kizuna Dev',
+        role: 'admin',
+        image: 'https://picsum.photos/id/1005/96/96',
+        password: 'password1234',
+    },
     {
         email: 'editor@example.com',
         name: 'Edda Editor',
@@ -37,7 +50,7 @@ const people = [
 ];
 
 /**
- * Creates the auth and CMS tables and indexes when they are missing, the two
+ * Creates the auth and CMS tables and indexes when they are missing, the
  * demo accounts, and the seed content. Safe to run on every start. A real app
  * runs the migrations `kizuna cms migrate` and better-auth's CLI write instead.
  */
@@ -71,10 +84,10 @@ const main = async (): Promise<void> => {
                 body: {
                     email: person.email,
                     name: person.name,
-                    password: PASSWORD,
+                    password: person.password ?? PASSWORD,
                 },
             });
-            console.log(`[demo] created ${person.email} with password ${PASSWORD}`);
+            console.log(`[demo] created ${person.email} with password ${person.password ?? PASSWORD}`);
         }
         await db
             .update(user)
