@@ -159,3 +159,124 @@ export const isJsonMediaType = (contentType: string): boolean => {
     const essence = (contentType.split(';')[0] ?? '').trim().toLowerCase();
     return essence === 'application/json' || essence.endsWith('+json');
 };
+
+/**
+ * A type name read from a hint, each dotted segment PascalCased on its own, so
+ * a field of `Billing.Invoice` is `Billing.InvoiceLine` and nests with it.
+ */
+export const typeNameFromHint = (hint: string): string =>
+    hint
+        .split('.')
+        .map((segment) => sanitizeIdentifier(toPascalCase(segment)))
+        .join('.');
+
+/**
+ * Throws when a dotted name nests under a name that is already a type, like a
+ * model `Billing` beside `Billing.Invoice`, since no client can declare a type
+ * and a namespace under one name.
+ */
+export const assertFreeNamespaces = (names: Iterable<string>, generator: string): void => {
+    const declared = new Set(names);
+    for (const name of declared) {
+        const segments = name.split('.');
+        for (let length = 1; length < segments.length; length += 1) {
+            const namespace = segments.slice(0, length).join('.');
+            if (declared.has(namespace)) {
+                throw new Error(
+                    `${generator}: ${JSON.stringify(name)} nests under ${JSON.stringify(namespace)}, which is already a type. Rename one of them.`
+                );
+            }
+        }
+    }
+};
+
+/**
+ * A type inside a namespace, or a namespace holding more of them.
+ */
+export type NamespaceEntry<Item> =
+    | {
+          kind: 'type';
+          item: Item;
+          /**
+           * The name it is declared under, its last segment: `Invoice` for `Billing.Invoice`.
+           */
+          localName: string;
+      }
+    | {
+          kind: 'namespace';
+          name: string;
+          /**
+           * The namespace's own path, `['Billing']`.
+           */
+          path: string[];
+          entries: Array<NamespaceEntry<Item>>;
+      };
+
+/**
+ * Types arranged the way a client nests dotted names. A namespace takes the
+ * place of its first member, so names without a dot keep their order.
+ */
+export const groupByNamespace = <Item>(
+    items: readonly Item[],
+    nameOf: (item: Item) => string,
+    path: string[] = []
+): Array<NamespaceEntry<Item>> => {
+    const entries: Array<NamespaceEntry<Item>> = [];
+    const members = new Map<string, Item[]>();
+    for (const item of items) {
+        const segments = nameOf(item).split('.').slice(path.length);
+        const [head, ...rest] = segments;
+        if (head === undefined) continue;
+        if (rest.length === 0) {
+            entries.push({
+                kind: 'type',
+                item,
+                localName: head,
+            });
+            continue;
+        }
+        const existing = members.get(head);
+        if (existing !== undefined) {
+            existing.push(item);
+            continue;
+        }
+        members.set(head, [item]);
+        entries.push({
+            kind: 'namespace',
+            name: head,
+            path: [...path, head],
+            entries: [],
+        });
+    }
+    for (const entry of entries) {
+        if (entry.kind === 'namespace') entry.entries = groupByNamespace(members.get(entry.name) ?? [], nameOf, entry.path);
+    }
+    return entries;
+};
+
+/**
+ * The names a declaration inside `path` resolves before the root's own: every
+ * type and namespace declared in each namespace on the way in. A reference
+ * whose first segment is one of them has to be written from the root.
+ */
+export const namespaceScope = (names: Iterable<string>, path: readonly string[]): Set<string> => {
+    const scope = new Set<string>();
+    if (path.length === 0) return scope;
+    for (const name of names) {
+        const segments = name.split('.');
+        for (let depth = 1; depth <= path.length && depth < segments.length; depth += 1) {
+            if (segments[depth - 1] !== path[depth - 1]) break;
+            scope.add(segments[depth]!);
+        }
+    }
+    return scope;
+};
+
+/**
+ * A reference as written inside `scope`, prefixed with the root when a name
+ * declared along the way would otherwise capture it.
+ */
+export const qualifyReference = (reference: string, scope: ReadonlySet<string>, root: string): string => {
+    const [head] = reference.split('.');
+    return head !== undefined && scope.has(head) ? `${root}.${reference}` : reference;
+};

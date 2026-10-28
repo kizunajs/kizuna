@@ -15,10 +15,13 @@ import {
     toPascalCase,
     unwrapOptionalWrappers,
     type StreamMode,
+    type NamespaceEntry,
     listedRoutes,
+    assertFreeNamespaces,
+    groupByNamespace,
 } from 'kizunajs/generator';
 import { runtimeSource } from './runtime.js';
-import { TypeCollector, docComment, sampleObject, sampleValue, typeOf } from './zod-to-typescript.js';
+import { TypeCollector, docComment, sampleObject, sampleValue, typeOf, type NamedType } from './zod-to-typescript.js';
 
 /**
  * What a generated client is called, and what its header says.
@@ -370,16 +373,37 @@ type KizunaBrand<Name extends string> = {
 
 `;
 
+/**
+ * The named types, a dotted name nested in a namespace per segment:
+ * `Billing.Invoice` is `export type Invoice` inside `export namespace Billing`.
+ */
+const emitModels = (entries: Array<NamespaceEntry<NamedType>>, collector: TypeCollector, namespaceName: string): string[] =>
+    entries.map((entry) => {
+        if (entry.kind === 'namespace') {
+            return `export namespace ${entry.name} {\n${indent(emitModels(entry.entries, collector, namespaceName).join('\n\n'))}\n}`;
+        }
+        const model = entry.item;
+        const doc = model.description ? `/**\n * ${model.description}\n */\n` : '';
+        const path = model.name.split('.').slice(0, -1);
+        return `${doc}export type ${entry.localName} = ${collector.resolve(model.body, path, namespaceName)};`;
+    });
+
 export const generateFetchClient = (contract: ApiDefinition, options: FetchClientOptions = {}): string => {
     const { namespace: namespaceName = 'API', regenerateCommand = 'kizuna generate', source } = options;
     const collector = new TypeCollector();
     const tree = emitTree(listedRoutes(contract), '', collector, namespaceName);
     const requestContext = emitRequestContext(contract, collector);
 
-    const models = collector.all().map((model) => {
-        const doc = model.description ? `/**\n * ${model.description}\n */\n` : '';
-        return `${doc}export type ${model.name} = ${model.body};`;
-    });
+    const named = collector.all();
+    assertFreeNamespaces(
+        named.map((model) => model.name),
+        '@kizunajs/fetch'
+    );
+    const models = emitModels(
+        groupByNamespace(named, (model) => model.name),
+        collector,
+        namespaceName
+    );
 
     const api = [...models, ...tree.declarations].join('\n\n');
     const brands = emitBrandConstructors(collector, namespaceName);
@@ -392,7 +416,7 @@ export const generateFetchClient = (contract: ApiDefinition, options: FetchClien
         ` * Regenerate: ${regenerateCommand}`,
     ].join('\n');
 
-    return `/* eslint-disable */
+    const client = `/* eslint-disable */
 /**
 ${header}
  */
@@ -423,6 +447,8 @@ export const createClient = (config: ClientConfig): Client => buildClient(routes
 export const createClient = (config: ClientConfig & { requestContext${requestContext.required ? '' : '?'}: RequestContext }): Client =>
     buildClient(routes, config) as unknown as Client;`
 }
+`;
 
+    return `${collector.resolve(client, [], namespaceName)}
 ${runtimeSource}`;
 };

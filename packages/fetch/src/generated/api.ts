@@ -15,6 +15,28 @@ type KizunaBrand<Name extends string> = {
 };
 
 export namespace API {
+    export namespace Billing {
+        export type Center = {
+            centerId: CenterId;
+            invoiceEmail: string;
+        };
+
+        export type Invoice = {
+            id: string;
+            status: Billing.InvoiceStatus;
+            lines: Array<Billing.InvoiceLine>;
+            center: API.Center;
+            billing: Billing.Center;
+        };
+
+        export type InvoiceLine = {
+            description: string;
+            amount: number;
+        };
+
+        export type InvoiceStatus = "draft" | "sent" | "paid";
+    }
+
     export type Center = {
         id: CenterId;
         name: string;
@@ -335,6 +357,15 @@ export namespace API {
         export type Result =
             | { status: 200; body: Center; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace BillingGetInvoice {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: Billing.Invoice; headers: Record<string, string> };
     }
 
     export namespace ActivityGetActivity {
@@ -706,6 +737,21 @@ export interface Client {
             fetchOptions?: RequestInit;
         }, API.CentersMoveCenter.Result>;
     };
+    billing: {
+        /**
+         * @example
+         * const result = await client.billing.getInvoice({
+         *     params: {
+         *         id: '1',
+         *     },
+         * });
+         */
+        getInvoice: ClientMethod<'GET', false, {
+            params: API.BillingGetInvoice.Params;
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.BillingGetInvoice.Result>;
+    };
     activity: {
         /**
          * @example
@@ -974,6 +1020,15 @@ const routes: GeneratedRoutes = {
             responses: {
                 200: {},
                 400: {},
+            },
+        },
+    },
+    billing: {
+        getInvoice: {
+            method: 'GET',
+            path: '/invoices/:id',
+            responses: {
+                200: {},
             },
         },
     },

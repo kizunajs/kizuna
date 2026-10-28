@@ -63,6 +63,38 @@ const CenterSchema = Kizuna.model({
     }),
 });
 
+const InvoiceStatusSchema = Kizuna.model({
+    title: 'Billing.InvoiceStatus',
+    schema: z.enum(['draft', 'sent', 'paid']),
+});
+
+const InvoiceLineSchema = Kizuna.model({
+    title: 'Billing.InvoiceLine',
+    schema: z.object({
+        description: z.string(),
+        amount: z.number(),
+    }),
+});
+
+const BillingCenterSchema = Kizuna.model({
+    title: 'Billing.Center',
+    schema: z.object({
+        centerId: CenterId,
+        invoiceEmail: z.email(),
+    }),
+});
+
+const InvoiceSchema = Kizuna.model({
+    title: 'Billing.Invoice',
+    schema: z.object({
+        id: z.string(),
+        status: InvoiceStatusSchema,
+        lines: z.array(InvoiceLineSchema),
+        center: CenterSchema,
+        billing: BillingCenterSchema,
+    }),
+});
+
 export const MissingRelationSchema = ProblemDetailsSchema.extend({
     missingRelation: z.string(),
 });
@@ -442,6 +474,16 @@ const routes = k.routes({
             }),
             responses: {
                 200: CenterSchema,
+            },
+        }),
+    },
+    billing: {
+        getInvoice: k.route({
+            method: 'GET',
+            path: '/invoices/:id',
+            auth: false,
+            responses: {
+                200: InvoiceSchema,
             },
         }),
     },

@@ -402,3 +402,76 @@ describe('a branded schema', () => {
         expect(source).not.toContain('KizunaBrand');
     });
 });
+
+describe('a dotted model name', () => {
+    const ParcelSchema = Kizuna.model({
+        title: 'Shipping.Parcel',
+        schema: z.object({
+            id: z.string(),
+            weight: z.number(),
+        }),
+    });
+
+    const TrackingEventSchema = Kizuna.model({
+        title: 'Shipping.Tracking.Event',
+        schema: z.object({
+            parcel: ParcelSchema,
+            at: z.string(),
+        }),
+    });
+
+    const dotted = generateFetchClient(
+        defineConfig({
+            routes: [
+                k.routes({
+                    trackParcel: k.route({
+                        method: 'GET',
+                        path: '/parcels/:id/events',
+                        responses: {
+                            200: z.array(TrackingEventSchema),
+                        },
+                    }),
+                }),
+            ],
+        }).api
+    );
+
+    it('declares the model inside a namespace per segment', () => {
+        expect(dotted).toContain(
+            'export namespace Shipping {\n        export type Parcel = {\n            id: string;\n            weight: number;\n        };\n\n        export namespace Tracking {\n            export type Event = {'
+        );
+    });
+
+    it('references the model by its dotted name', () => {
+        expect(dotted).toContain('parcel: Shipping.Parcel;');
+        expect(dotted).toContain('body: Array<Shipping.Tracking.Event>;');
+    });
+
+    it('fails when a model has the name another nests under', () => {
+        const ShippingSchema = Kizuna.model({
+            title: 'Shipping',
+            schema: z.object({
+                carrier: z.string(),
+            }),
+        });
+        const contract = defineConfig({
+            routes: [
+                k.routes({
+                    getShipping: k.route({
+                        method: 'GET',
+                        path: '/shipping',
+                        responses: {
+                            200: z.object({
+                                shipping: ShippingSchema,
+                                parcel: ParcelSchema,
+                            }),
+                        },
+                    }),
+                }),
+            ],
+        }).api;
+        expect(() => generateFetchClient(contract)).toThrow(
+            '@kizunajs/fetch: "Shipping.Parcel" nests under "Shipping", which is already a type. Rename one of them.'
+        );
+    });
+});

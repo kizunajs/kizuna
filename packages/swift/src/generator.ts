@@ -26,6 +26,11 @@ import {
     streamMode,
     routeStreams,
     soleStreamResponse,
+    assertFreeNamespaces,
+    groupByNamespace,
+    namespaceScope,
+    qualifyReference,
+    type NamespaceEntry,
 } from 'kizunajs/generator';
 import type { ApiDefinition } from 'kizunajs';
 import { SwiftWriter, stringLiteral } from './emit.js';
@@ -650,6 +655,53 @@ const qualifyOwnedVariants = (
     })),
 });
 
+/**
+ * Declares a type under `declaredName`, its last segment when a namespace holds it, while its
+ * registry name still finds the types it owns.
+ */
+const emitType = (
+    writer: SwiftWriter,
+    type: SwiftType,
+    declaredName: string,
+    context: EmitContext,
+    ownedTypeMap: Map<string, string>,
+    ownedTypeLookup: Map<string, SwiftType>
+): void => {
+    writer.blank();
+    writer.docComment(type.description);
+    if (type.kind === 'struct') {
+        emitStruct(
+            writer,
+            {
+                ...type,
+                name: declaredName,
+            },
+            context,
+            ownedTypeMap,
+            ownedTypeLookup,
+            type.name
+        );
+    } else if (type.kind === 'enum') {
+        emitStringEnum(writer, declaredName, type.cases, type.unknownCase, type.description);
+    } else {
+        emitDiscriminatedEnum(
+            writer,
+            qualifyOwnedVariants(
+                {
+                    ...type,
+                    name: declaredName,
+                },
+                ownedTypeMap,
+                type.name
+            ),
+            context,
+            type.name,
+            ownedTypeMap,
+            ownedTypeLookup
+        );
+    }
+};
+
 const emitTypes = (
     writer: SwiftWriter,
     types: SwiftType[],
@@ -658,23 +710,70 @@ const emitTypes = (
     ownedTypeLookup: Map<string, SwiftType> = new Map()
 ): void => {
     for (const type of types) {
-        writer.blank();
-        writer.docComment(type.description);
-        if (type.kind === 'struct') {
-            emitStruct(writer, type, context, ownedTypeMap, ownedTypeLookup);
-        } else if (type.kind === 'enum') {
-            emitStringEnum(writer, type.name, type.cases, type.unknownCase, type.description);
-        } else {
-            emitDiscriminatedEnum(
-                writer,
-                qualifyOwnedVariants(type, ownedTypeMap, type.name),
-                context,
-                type.name,
-                ownedTypeMap,
-                ownedTypeLookup
-            );
-        }
+        emitType(writer, type, type.name, context, ownedTypeMap, ownedTypeLookup);
     }
+};
+
+/**
+ * The shared types, a dotted name nested in a caseless enum per segment: `Billing.Invoice` is
+ * `public struct Invoice` inside `public enum Billing`.
+ */
+const emitNamespacedTypes = (
+    writer: SwiftWriter,
+    entries: Array<NamespaceEntry<SwiftType>>,
+    context: EmitContext,
+    ownedTypeMap: Map<string, string>,
+    ownedTypeLookup: Map<string, SwiftType>
+): void => {
+    for (const entry of entries) {
+        if (entry.kind === 'type') {
+            emitType(writer, entry.item, entry.localName, context, ownedTypeMap, ownedTypeLookup);
+            continue;
+        }
+        writer.blank();
+        writer.block(`public enum ${entry.name}`, () => {
+            emitNamespacedTypes(writer, entry.entries, context, ownedTypeMap, ownedTypeLookup);
+        });
+    }
+};
+
+const TYPE_REFERENCE = /[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/g;
+
+/**
+ * Inside `enum Billing`, a top-level `Invoice` reads as `Billing.Invoice`. Writes the references a
+ * namespaced type makes to such a type from the root namespace instead, `API.Invoice`.
+ */
+const qualifyShadowedReferences = (
+    type: SwiftType,
+    path: readonly string[],
+    rootNames: ReadonlySet<string>,
+    namespaceName: string
+): SwiftType => {
+    const scope = namespaceScope(rootNames, path);
+    if (scope.size === 0) return type;
+    const qualify = (expression: string): string =>
+        expression.replace(TYPE_REFERENCE, (reference) =>
+            rootNames.has(reference) ? qualifyReference(reference, scope, namespaceName) : reference
+        );
+    if (type.kind === 'struct') {
+        return {
+            ...type,
+            fields: type.fields.map((field) => ({
+                ...field,
+                type: qualify(field.type),
+            })),
+        };
+    }
+    if (type.kind === 'discriminated-enum') {
+        return {
+            ...type,
+            variants: type.variants.map((variant) => ({
+                ...variant,
+                payloadType: qualify(variant.payloadType),
+            })),
+        };
+    }
+    return type;
 };
 
 const emitOwnedTypes = (
@@ -2558,8 +2657,20 @@ const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, regis
         }
         if (bestMatch !== undefined) ownedTypeMap.set(type.name, bestMatch);
     }
-    const ownedTypeLookup = new Map(sharedTypes.filter((type) => ownedTypeMap.has(type.name)).map((type) => [type.name, type]));
-    const topLevelSharedTypes = sharedTypes.filter((type) => !ownedTypeMap.has(type.name));
+    const rootNames = new Set([
+        ...sharedTypes.filter((type) => !ownedTypeMap.has(type.name)).map((type) => type.name),
+        ...registry.allBrands().map((brand) => brand.name),
+    ]);
+    assertFreeNamespaces(rootNames, '@kizunajs/swift');
+    const rootOwner = (typeName: string): string => {
+        const owner = ownedTypeMap.get(typeName);
+        return owner === undefined ? typeName : rootOwner(owner);
+    };
+    const emittedSharedTypes = sharedTypes.map((type) =>
+        qualifyShadowedReferences(type, rootOwner(type.name).split('.').slice(0, -1), rootNames, namespaceName)
+    );
+    const ownedTypeLookup = new Map(emittedSharedTypes.filter((type) => ownedTypeMap.has(type.name)).map((type) => [type.name, type]));
+    const topLevelSharedTypes = emittedSharedTypes.filter((type) => !ownedTypeMap.has(type.name));
 
     const requestContextFields: SwiftField[] = [];
     for (const declaration of Object.values(api.requestContext ?? {})) {
@@ -2579,7 +2690,13 @@ const renderSwiftClient = (api: ApiDefinition, partition: RoutesPartition, regis
     };
 
     writer.block(`public enum ${namespaceName}`, () => {
-        emitTypes(writer, topLevelSharedTypes, context, ownedTypeMap, ownedTypeLookup);
+        emitNamespacedTypes(
+            writer,
+            groupByNamespace(topLevelSharedTypes, (type) => type.name),
+            context,
+            ownedTypeMap,
+            ownedTypeLookup
+        );
         for (const brand of registry.allBrands()) {
             writer.blank();
             emitBrand(writer, brand);

@@ -18,6 +18,7 @@ import {
     toCamelCase,
     sanitizeFieldName,
     sanitizeIdentifier,
+    typeNameFromHint,
 } from 'kizunajs/generator';
 
 export interface SwiftField {
@@ -248,7 +249,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
     // Discriminated union
     const discriminated = readDiscriminatedUnion(schema);
     if (discriminated) {
-        const enumName = id ?? sanitizeIdentifier(toPascalCase(hint));
+        const enumName = id ?? typeNameFromHint(hint);
         if (id) registry.markExplicitId(enumName);
         if (!registry.has(enumName)) {
             // placeholder to prevent recursion
@@ -390,7 +391,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
             };
         }
         case 'object': {
-            const structName = sanitizeIdentifier(toPascalCase(hint));
+            const structName = typeNameFromHint(hint);
             if (!registry.has(structName)) {
                 registry.add({
                     kind: 'struct',
@@ -412,7 +413,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
             };
         }
         case 'enum': {
-            const enumName = id ?? sanitizeIdentifier(toPascalCase(hint));
+            const enumName = id ?? typeNameFromHint(hint);
             if (id) registry.markExplicitId(enumName);
             const entries = def.entries ?? {};
             const cases = Object.values(entries);

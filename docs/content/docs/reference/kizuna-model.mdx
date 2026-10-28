@@ -17,11 +17,11 @@ import { Kizuna } from 'kizunajs';
 Kizuna.model(options: ModelOptions): ZodType
 ```
 
-| Option        | Type      | Required | Description                                               |
-| ------------- | --------- | -------- | --------------------------------------------------------- |
-| `title`       | `string`  | Yes      | The name used in generated output (`User`, `Event`, etc.) |
-| `description` | `string`  | No       | Description included in the OpenAPI spec                  |
-| `schema`      | `ZodType` | Yes      | The Zod schema defining the shape and validation          |
+| Option        | Type      | Required | Description                                                                                                                                                                  |
+| ------------- | --------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | `string`  | Yes      | The name used in generated output (`User`, `Event`, etc.). A dot nests it, so `Billing.Invoice` generates `API.Billing.Invoice`. See [Dotted names](/docs/zod#dotted-names). |
+| `description` | `string`  | No       | Description included in the OpenAPI spec                                                                                                                                     |
+| `schema`      | `ZodType` | Yes      | The Zod schema defining the shape and validation                                                                                                                             |
 
 ## Returns
 

@@ -2542,3 +2542,149 @@ describe('Kotlin generator: brands', () => {
         expect(output).toContain('val parentId: TestAPI.CenterId?');
     });
 });
+
+describe('Kotlin generator: dotted model names', () => {
+    const CarrierSchema = Kizuna.model({
+        title: 'Carrier',
+        schema: z.object({
+            name: z.string(),
+        }),
+    });
+
+    const ShippingCarrierSchema = Kizuna.model({
+        title: 'Shipping.Carrier',
+        schema: z.object({
+            accountNumber: z.string(),
+        }),
+    });
+
+    const ParcelStatusSchema = Kizuna.model({
+        title: 'Shipping.ParcelStatus',
+        schema: z.enum(['pending', 'delivered']),
+    });
+
+    const CheckpointSchema = Kizuna.model({
+        title: 'Shipping.Tracking.Checkpoint',
+        schema: z.object({
+            city: z.string(),
+        }),
+    });
+
+    const ParcelSchema = Kizuna.model({
+        title: 'Shipping.Parcel',
+        schema: z.object({
+            id: z.string(),
+            status: ParcelStatusSchema,
+            dimensions: z.object({
+                width: z.number(),
+                height: z.number(),
+            }),
+            carrier: CarrierSchema,
+            account: ShippingCarrierSchema,
+            checkpoints: z.array(CheckpointSchema),
+        }),
+    });
+
+    const DeliveredSchema = Kizuna.model({
+        title: 'Shipping.Delivered',
+        schema: z.object({
+            kind: z.literal('delivered'),
+            signedBy: z.string(),
+        }),
+    });
+
+    const TrackingEventSchema = Kizuna.model({
+        title: 'Shipping.TrackingEvent',
+        schema: z.discriminatedUnion('kind', [
+            DeliveredSchema,
+            z.object({
+                kind: z.literal('scanned'),
+                carrier: CarrierSchema,
+            }),
+        ]),
+    });
+
+    const dottedRoutes = k.routes({
+        getParcel: k.route({
+            method: 'GET',
+            path: '/parcels/:id',
+            responses: {
+                200: ParcelSchema,
+            },
+        }),
+        listEvents: k.route({
+            method: 'GET',
+            path: '/parcels/:id/events',
+            responses: {
+                200: z.array(TrackingEventSchema),
+            },
+        }),
+    });
+
+    const output = generateKotlinClient(
+        defineConfig({
+            routes: [dottedRoutes],
+        }).api,
+        baseConfig
+    );
+
+    it('nests a dotted model in an object per segment', () => {
+        expect(output).toContain('object TestAPI {\n\n    object Shipping {\n\n        @Serializable\n        data class Parcel(');
+        expect(output).toContain('        enum class ParcelStatus(override val wireValue: String) : KizunaQueryValue {');
+        expect(output).toContain(
+            '        object Tracking {\n\n            @Serializable\n            data class Checkpoint(val city: String)'
+        );
+        expect(output).toContain('        sealed interface TrackingEvent {');
+    });
+
+    it('nests an anonymous field type under its dotted owner', () => {
+        expect(output).toContain('            data class Dimensions(');
+        expect(output).toContain('            val dimensions: Dimensions,');
+    });
+
+    it('references a model in the namespace by its dotted name', () => {
+        expect(output).toContain('            val status: Shipping.ParcelStatus,');
+        expect(output).toContain('            val checkpoints: List<Shipping.Tracking.Checkpoint>');
+        expect(output).toContain('        data class Delivered(val signedBy: String) : Shipping.TrackingEvent');
+    });
+
+    it('writes a top-level model from the root where the namespace declares one of the same name', () => {
+        expect(output).toContain('            val carrier: TestAPI.Carrier,');
+        expect(output).toContain('            val account: Shipping.Carrier,');
+        expect(output).toContain('            data class Scanned(val carrier: TestAPI.Carrier) : TrackingEvent');
+    });
+
+    it('qualifies the dotted model fully in the client', () => {
+        expect(output).toContain('data class Result(val body: TestAPI.Shipping.Parcel)');
+        expect(output).toContain('data class Result(val body: List<TestAPI.Shipping.TrackingEvent>)');
+    });
+
+    it('fails when a model has the name another nests under', () => {
+        const ShippingSchema = Kizuna.model({
+            title: 'Shipping',
+            schema: z.object({
+                carrier: z.string(),
+            }),
+        });
+        const conflicting = k.routes({
+            getShipping: k.route({
+                method: 'GET',
+                path: '/shipping',
+                responses: {
+                    200: z.object({
+                        shipping: ShippingSchema,
+                        parcel: ParcelSchema,
+                    }),
+                },
+            }),
+        });
+        expect(() =>
+            generateKotlinClient(
+                defineConfig({
+                    routes: [conflicting],
+                }).api,
+                baseConfig
+            )
+        ).toThrow('@kizunajs/kotlin: "Shipping.Parcel" nests under "Shipping", which is already a type. Rename one of them.');
+    });
+});

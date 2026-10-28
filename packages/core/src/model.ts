@@ -6,7 +6,8 @@ export interface ModelOptions<T extends z.ZodType> {
      * The name of this schema in the generated OpenAPI spec and client code.
      *
      * Appears as the key in `components/schemas` and as the struct/class name
-     * in generated Swift clients.
+     * in generated Swift clients. A dot nests it: `Billing.Invoice` is
+     * `Invoice` inside a `Billing` namespace in every client.
      */
     title: string;
     /**
@@ -34,6 +35,9 @@ export interface ModelOptions<T extends z.ZodType> {
  * ```
  */
 export const createModel = <T extends z.ZodType>(options: ModelOptions<T>): T => {
+    if (options.title.split('.').some((segment) => segment === '')) {
+        throw new Error(`Kizuna.model: ${JSON.stringify(options.title)} needs a name on both sides of every dot, like "Billing.Invoice".`);
+    }
     const model = options.schema.meta({
         id: options.title,
         description: options.description,

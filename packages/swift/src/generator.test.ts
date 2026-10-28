@@ -2552,3 +2552,151 @@ describe('Swift generator: brands', () => {
         ).toThrow('brand "CenterId" wraps both String and Int');
     });
 });
+
+describe('Swift generator: dotted model names', () => {
+    const CarrierSchema = Kizuna.model({
+        title: 'Carrier',
+        schema: z.object({
+            name: z.string(),
+        }),
+    });
+
+    const ShippingCarrierSchema = Kizuna.model({
+        title: 'Shipping.Carrier',
+        schema: z.object({
+            accountNumber: z.string(),
+        }),
+    });
+
+    const ParcelStatusSchema = Kizuna.model({
+        title: 'Shipping.ParcelStatus',
+        schema: z.enum(['pending', 'delivered']),
+    });
+
+    const CheckpointSchema = Kizuna.model({
+        title: 'Shipping.Tracking.Checkpoint',
+        schema: z.object({
+            city: z.string(),
+        }),
+    });
+
+    const ParcelSchema = Kizuna.model({
+        title: 'Shipping.Parcel',
+        schema: z.object({
+            id: z.string(),
+            status: ParcelStatusSchema,
+            dimensions: z.object({
+                width: z.number(),
+                height: z.number(),
+            }),
+            carrier: CarrierSchema,
+            account: ShippingCarrierSchema,
+            checkpoints: z.array(CheckpointSchema),
+        }),
+    });
+
+    const DeliveredSchema = Kizuna.model({
+        title: 'Shipping.Delivered',
+        schema: z.object({
+            kind: z.literal('delivered'),
+            signedBy: z.string(),
+        }),
+    });
+
+    const TrackingEventSchema = Kizuna.model({
+        title: 'Shipping.TrackingEvent',
+        schema: z.discriminatedUnion('kind', [
+            DeliveredSchema,
+            z.object({
+                kind: z.literal('scanned'),
+                carrier: CarrierSchema,
+            }),
+        ]),
+    });
+
+    const dottedRoutes = k.routes({
+        getParcel: k.route({
+            method: 'GET',
+            path: '/parcels/:id',
+            responses: {
+                200: ParcelSchema,
+            },
+        }),
+        listEvents: k.route({
+            method: 'GET',
+            path: '/parcels/:id/events',
+            responses: {
+                200: z.array(TrackingEventSchema),
+            },
+        }),
+    });
+
+    const output = generateSwiftClient(
+        defineConfig({
+            ...config,
+            routes: [dottedRoutes],
+        }).api,
+        baseConfig
+    );
+
+    it('nests a dotted model in a caseless enum per segment', () => {
+        expect(output).toContain(
+            'public enum TestAPI {\n\n    public enum Shipping {\n\n        public struct Parcel: Codable, Sendable, Equatable {'
+        );
+        expect(output).toContain('        public enum ParcelStatus: String, Codable, Sendable {');
+        expect(output).toContain('        public enum Tracking {\n\n            public struct Checkpoint: Codable, Sendable, Equatable {');
+        expect(output).toContain('        public enum TrackingEvent: Codable, Sendable, Equatable {');
+    });
+
+    it('nests an anonymous field type under its dotted owner', () => {
+        expect(output).toContain('            public struct Dimensions: Codable, Sendable, Equatable {');
+        expect(output).toContain('            public let dimensions: Dimensions');
+    });
+
+    it('references a model in the namespace by its dotted name', () => {
+        expect(output).toContain('            public let status: Shipping.ParcelStatus');
+        expect(output).toContain('            public let checkpoints: [Shipping.Tracking.Checkpoint]');
+        expect(output).toContain('            case delivered(Shipping.Delivered)');
+    });
+
+    it('writes a top-level model from the root where the namespace declares one of the same name', () => {
+        expect(output).toContain('            public let carrier: TestAPI.Carrier');
+        expect(output).toContain('            public let account: Shipping.Carrier');
+        expect(output).toContain('                public let carrier: TestAPI.Carrier');
+    });
+
+    it('qualifies the dotted model fully in the client', () => {
+        expect(output).toContain('public let body: TestAPI.Shipping.Parcel');
+        expect(output).toContain('public let body: [TestAPI.Shipping.TrackingEvent]');
+    });
+
+    it('fails when a model has the name another nests under', () => {
+        const ShippingSchema = Kizuna.model({
+            title: 'Shipping',
+            schema: z.object({
+                carrier: z.string(),
+            }),
+        });
+        const conflicting = k.routes({
+            getShipping: k.route({
+                method: 'GET',
+                path: '/shipping',
+                responses: {
+                    200: z.object({
+                        shipping: ShippingSchema,
+                        parcel: ParcelSchema,
+                    }),
+                },
+            }),
+        });
+        expect(() =>
+            generateSwiftClient(
+                defineConfig({
+                    ...config,
+                    routes: [conflicting],
+                }).api,
+                baseConfig
+            )
+        ).toThrow('@kizunajs/swift: "Shipping.Parcel" nests under "Shipping", which is already a type. Rename one of them.');
+    });
+});

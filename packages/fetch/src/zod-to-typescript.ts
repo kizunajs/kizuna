@@ -11,6 +11,8 @@ import {
     readMetaId,
     readModelSchema,
     readObjectShape,
+    namespaceScope,
+    qualifyReference,
     sanitizeIdentifier,
     toPascalCase,
     unwrapOptionalWrappers,
@@ -120,6 +122,23 @@ export class TypeCollector {
         }));
     }
 
+    /**
+     * A reference to a named type, marked so `resolve` can write it for the
+     * namespace it lands in. Inside `Billing`, a top-level `Invoice` has to be
+     * written `API.Invoice`, or `Billing.Invoice` captures it.
+     */
+    reference(name: string): string {
+        return `${REFERENCE_MARK}${name}${REFERENCE_MARK}`;
+    }
+
+    /**
+     * Writes every reference in `text` as it reads from inside `path`.
+     */
+    resolve(text: string, path: readonly string[], root: string): string {
+        const scope = namespaceScope([...this.named.keys(), ...this.brands.keys()], path);
+        return text.replace(REFERENCE_PATTERN, (_, name: string) => qualifyReference(name, scope, root));
+    }
+
     all(): NamedType[] {
         for (const name of this.brands.keys()) {
             if (this.named.has(name)) {
@@ -136,6 +155,9 @@ export class TypeCollector {
 }
 
 const quote = (value: string): string => JSON.stringify(value);
+
+const REFERENCE_MARK = '\u0000';
+const REFERENCE_PATTERN = /\u0000([^\u0000]+)\u0000/g;
 
 /**
  * What a brand wraps: the scalars, as the JSON carries them.
@@ -327,7 +349,7 @@ export const typeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: 
     const type = unbrandedTypeOf(schema, collector, hint);
     const brand = readMetaBrand(schema);
     if (brand === undefined || !BRANDABLE_BASES.has(type)) return type;
-    return collector.addBrand(brand, type, sampleValue(schema, 0, brand));
+    return collector.reference(collector.addBrand(brand, type, sampleValue(schema, 0, brand)));
 };
 
 const unbrandedTypeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint: string): string => {
@@ -358,7 +380,7 @@ const unbrandedTypeOf = (schema: z.core.$ZodType, collector: TypeCollector, hint
                 body: structuralType(schema, collector, modelName),
             });
         }
-        return modelName;
+        return collector.reference(modelName);
     }
 
     return structuralType(schema, collector, hint);

@@ -18,6 +18,7 @@ import {
     toCamelCase,
     sanitizeFieldName,
     sanitizeIdentifier,
+    typeNameFromHint,
 } from 'kizunajs/generator';
 
 export interface KotlinField {
@@ -269,7 +270,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
 
     const discriminated = readDiscriminatedUnion(schema);
     if (discriminated) {
-        const enumName = id ?? sanitizeIdentifier(toPascalCase(hint));
+        const enumName = id ?? typeNameFromHint(hint);
         if (id) registry.markExplicitId(enumName);
         if (!registry.has(enumName)) {
             registry.add({
@@ -421,7 +422,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
             };
         }
         case 'object': {
-            const className = sanitizeIdentifier(toPascalCase(hint));
+            const className = typeNameFromHint(hint);
             if (!registry.has(className)) {
                 registry.add({
                     kind: 'data-class',
@@ -443,7 +444,7 @@ const mapUnbrandedType = (schema: z.core.$ZodType, registry: TypeRegistry, hint:
             };
         }
         case 'enum': {
-            const enumName = id ?? sanitizeIdentifier(toPascalCase(hint));
+            const enumName = id ?? typeNameFromHint(hint);
             if (id) registry.markExplicitId(enumName);
             const entries = def.entries ?? {};
             const cases = Object.values(entries);

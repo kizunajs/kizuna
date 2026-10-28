@@ -24,6 +24,11 @@ import {
     streamMode,
     routeStreams,
     soleStreamResponse,
+    assertFreeNamespaces,
+    groupByNamespace,
+    namespaceScope,
+    qualifyReference,
+    type NamespaceEntry,
 } from 'kizunajs/generator';
 import type { ApiDefinition } from 'kizunajs';
 import { KotlinWriter, stringLiteral } from './emit.js';
@@ -875,6 +880,68 @@ const emitTypes = (
     for (const type of types) {
         emitType(writer, type, ownedTypeMap, ownedTypeLookup, undefined, registry);
     }
+};
+
+/**
+ * The shared types, a dotted name nested in an object per segment: `Billing.Invoice` is
+ * `data class Invoice` inside `object Billing`.
+ */
+const emitNamespacedTypes = (
+    writer: KotlinWriter,
+    entries: Array<NamespaceEntry<KotlinType>>,
+    ownedTypeMap: Map<string, string>,
+    ownedTypeLookup: Map<string, KotlinType>,
+    registry: TypeRegistry
+): void => {
+    for (const entry of entries) {
+        if (entry.kind === 'type') {
+            emitType(
+                writer,
+                {
+                    ...entry.item,
+                    name: entry.localName,
+                },
+                ownedTypeMap,
+                ownedTypeLookup,
+                entry.item.name,
+                registry
+            );
+            continue;
+        }
+        writer.blank();
+        writer.block(`object ${entry.name}`, () => {
+            emitNamespacedTypes(writer, entry.entries, ownedTypeMap, ownedTypeLookup, registry);
+        });
+    }
+};
+
+const TYPE_REFERENCE = /[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/g;
+
+/**
+ * Inside `object Billing`, a top-level `Invoice` reads as `Billing.Invoice`. Writes the references
+ * a namespaced type makes to such a type from the root object instead, `API.Invoice`.
+ */
+const qualifyShadowedReferences = (
+    type: KotlinType,
+    path: readonly string[],
+    rootNames: ReadonlySet<string>,
+    namespaceName: string
+): KotlinType => {
+    const scope = namespaceScope(rootNames, path);
+    if (scope.size === 0) return type;
+    const qualify = (expression: string): string =>
+        expression.replace(TYPE_REFERENCE, (reference) =>
+            rootNames.has(reference) ? qualifyReference(reference, scope, namespaceName) : reference
+        );
+    if (type.kind !== 'data-class') return type;
+    return {
+        ...type,
+        fields: type.fields.map((field) => ({
+            ...field,
+            type: qualify(field.type),
+        })),
+        sealedParent: type.sealedParent === undefined ? undefined : qualify(type.sealedParent),
+    };
 };
 
 const emitConstructorClass = (writer: KotlinWriter, declaration: string, params: string[]): void => {
@@ -2117,8 +2184,30 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
         }
         if (bestMatch !== undefined) ownedTypeMap.set(type.name, bestMatch);
     }
-    const ownedTypeLookup = new Map(sharedTypes.filter((type) => ownedTypeMap.has(type.name)).map((type) => [type.name, type]));
-    const topLevelSharedTypes = sharedTypes.filter((type) => !ownedTypeMap.has(type.name) && !registry.isSealedVariantPayload(type.name));
+    const rootNames = new Set([
+        ...sharedTypes
+            .filter((type) => !ownedTypeMap.has(type.name) && !registry.isSealedVariantPayload(type.name))
+            .map((type) => type.name),
+        ...registry.allBrands().map((brand) => brand.name),
+    ]);
+    assertFreeNamespaces(rootNames, '@kizunajs/kotlin');
+    // A sealed variant's payload nests in its sealed interface, so it sits where the interface does.
+    const rootOwner = (typeName: string): string => {
+        const sealedPath = registry.sealedVariantPath(typeName);
+        if (sealedPath !== undefined) return rootOwner(sealedPath.slice(0, sealedPath.lastIndexOf('.')));
+        const owner = ownedTypeMap.get(typeName);
+        return owner === undefined ? typeName : rootOwner(owner);
+    };
+    const emittedSharedTypes = sharedTypes.map((type) => {
+        const emitted = qualifyShadowedReferences(type, rootOwner(type.name).split('.').slice(0, -1), rootNames, namespaceName);
+        // The sealed interface reads its variants' fields from the registry.
+        if (emitted !== type) registry.replace(emitted);
+        return emitted;
+    });
+    const ownedTypeLookup = new Map(emittedSharedTypes.filter((type) => ownedTypeMap.has(type.name)).map((type) => [type.name, type]));
+    const topLevelSharedTypes = emittedSharedTypes.filter(
+        (type) => !ownedTypeMap.has(type.name) && !registry.isSealedVariantPayload(type.name)
+    );
 
     const requestContextFields: KotlinField[] = [];
     for (const declaration of Object.values(api.requestContext ?? {})) {
@@ -2137,7 +2226,13 @@ const renderKotlinClient = (api: ApiDefinition, partition: ApiPartition, registr
     };
 
     writer.block(`object ${namespaceName}`, () => {
-        emitTypes(writer, topLevelSharedTypes, ownedTypeMap, ownedTypeLookup, registry);
+        emitNamespacedTypes(
+            writer,
+            groupByNamespace(topLevelSharedTypes, (type) => type.name),
+            ownedTypeMap,
+            ownedTypeLookup,
+            registry
+        );
         for (const brand of registry.allBrands()) {
             writer.blank();
             emitBrand(writer, brand);

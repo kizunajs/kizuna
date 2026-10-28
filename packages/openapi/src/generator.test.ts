@@ -2786,3 +2786,75 @@ describe('OpenAPI: plugin options', () => {
         );
     });
 });
+
+describe('a dotted model name', () => {
+    const ParcelSchema = Kizuna.model({
+        title: 'Shipping.Parcel',
+        schema: z.object({
+            id: z.string(),
+        }),
+    });
+
+    const DeliveredSchema = Kizuna.model({
+        title: 'Shipping.Delivered',
+        schema: z.object({
+            kind: z.literal('delivered'),
+            parcel: ParcelSchema,
+        }),
+    });
+
+    const ReturnedSchema = Kizuna.model({
+        title: 'Shipping.Returned',
+        schema: z.object({
+            kind: z.literal('returned'),
+            reason: z.string(),
+        }),
+    });
+
+    const TrackingEventSchema = Kizuna.model({
+        title: 'Shipping.TrackingEvent',
+        schema: z.discriminatedUnion('kind', [DeliveredSchema, ReturnedSchema]),
+    });
+
+    const dottedContract = defineConfig({
+        ...config,
+        routes: [
+            k.routes({
+                trackParcel: k.route({
+                    method: 'GET',
+                    path: '/parcels/:id/events',
+                    responses: {
+                        200: z.array(TrackingEventSchema),
+                    },
+                }),
+            }),
+        ],
+    }).api;
+
+    const spec = generateJson(dottedContract, baseConfig);
+
+    it('is a valid OpenAPI 3.1 document', async () => {
+        await expect(spec).toBeAValidOpenAPIDefinition();
+    });
+
+    it('keys the component by the dotted name', () => {
+        expect(spec.components?.schemas).toHaveProperty(['Shipping.Parcel']);
+        const delivered = spec.components?.schemas?.['Shipping.Delivered'] as Record<string, unknown> | undefined;
+        expect(delivered?.properties).toMatchObject({
+            parcel: {
+                $ref: '#/components/schemas/Shipping.Parcel',
+            },
+        });
+    });
+
+    it('maps each discriminator value to the dotted component', () => {
+        const union = spec.components?.schemas?.['Shipping.TrackingEvent'] as Record<string, unknown> | undefined;
+        expect(union?.discriminator).toEqual({
+            propertyName: 'kind',
+            mapping: {
+                delivered: '#/components/schemas/Shipping.Delivered',
+                returned: '#/components/schemas/Shipping.Returned',
+            },
+        });
+    });
+});

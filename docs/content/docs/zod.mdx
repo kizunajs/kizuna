@@ -62,6 +62,64 @@ Routes deprecate too, with dates and sunset headers. See [Deprecations](/docs/de
 
 [`Kizuna.model`](/docs/reference/kizuna-model) registers a schema under a stable name, so the OpenAPI document emits `#/components/schemas/User` and the Swift and Kotlin clients emit a `User` type, instead of repeating the shape inline everywhere it appears. Only names registered through `Kizuna.model` reach the generators.
 
+### Dotted names
+
+A name has to be unique across every schema in the process, since Zod keeps one registry for all of them. A dot gives a family of models a shared first name, and each client nests them under it:
+
+```ts title="billing.ts"
+export const InvoiceSchema = Kizuna.model({
+    title: 'Billing.Invoice',
+    schema: z.object({
+        id: z.string(),
+        total: z.number(),
+    }),
+});
+```
+
+<Tabs groupId="dotted-model" items={['TypeScript', 'Swift', 'Kotlin', 'OpenAPI']}>
+
+<Tab value="TypeScript">
+
+```ts
+const renderInvoice = (invoice: API.Billing.Invoice) => {
+    // ...
+};
+```
+
+</Tab>
+
+<Tab value="Swift">
+
+```swift
+func render(_ invoice: API.Billing.Invoice) {
+    // ...
+}
+```
+
+</Tab>
+
+<Tab value="Kotlin">
+
+```kotlin
+fun render(invoice: API.Billing.Invoice) {
+    // ...
+}
+```
+
+</Tab>
+
+<Tab value="OpenAPI">
+
+```yaml
+$ref: '#/components/schemas/Billing.Invoice'
+```
+
+</Tab>
+
+</Tabs>
+
+`Billing.Invoice` and `Billing.InvoiceLine` share one `Billing` namespace. A name without a dot stays at the top, as `API.Invoice`. A model can't be named `Billing` while others nest under it, since a client can't declare a type and a namespace with one name, so generation fails and names both.
+
 ## Branded IDs
 
 A user ID and a workspace ID are both strings, so passing one where the other belongs compiles. [`Kizuna.brand`](/docs/reference/kizuna-brand) gives the ID its own type in the handler and in every client, so the swap stops compiling. The wire stays a plain string.

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { readMetaId, readMetaDescription } from './generator.js';
 import { Kizuna } from './kizuna.js';
+import { toolJsonSchema } from './tool-definitions.js';
 
 describe('Kizuna.model', () => {
     it('sets the meta id from title', () => {
@@ -103,5 +104,53 @@ describe('Kizuna.model', () => {
             }),
         });
         expect(readMetaId(Article.refine((article) => article.title.length > 0))).toBeUndefined();
+    });
+
+    it('keeps the dots in a dotted title', () => {
+        const Invoice = Kizuna.model({
+            title: 'Billing.Invoice',
+            schema: z.object({
+                id: z.string(),
+            }),
+        });
+        expect(readMetaId(Invoice)).toBe('Billing.Invoice');
+    });
+
+    it('rejects a dotted title with an empty name in it', () => {
+        for (const title of ['Billing..Invoice', '.Invoice', 'Billing.']) {
+            expect(() =>
+                Kizuna.model({
+                    title,
+                    schema: z.object({
+                        id: z.string(),
+                    }),
+                })
+            ).toThrow(`Kizuna.model: ${JSON.stringify(title)} needs a name on both sides of every dot, like "Billing.Invoice".`);
+        }
+    });
+
+    it('gives a tool a reference to a dotted model it can resolve', () => {
+        const InvoiceLine = Kizuna.model({
+            title: 'Billing.InvoiceLine',
+            schema: z.object({
+                amount: z.number(),
+            }),
+        });
+        const schema = toolJsonSchema(
+            z.object({
+                first: InvoiceLine,
+                second: InvoiceLine,
+            }),
+            'input'
+        );
+        expect(schema.properties).toEqual({
+            first: {
+                $ref: '#/$defs/Billing.InvoiceLine',
+            },
+            second: {
+                $ref: '#/$defs/Billing.InvoiceLine',
+            },
+        });
+        expect(schema.$defs).toHaveProperty(['Billing.InvoiceLine']);
     });
 });

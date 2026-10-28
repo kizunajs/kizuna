@@ -77,6 +77,12 @@ export {
     statusToCamelCase,
     isSuccessStatus,
     mergeHeaderFields,
+    typeNameFromHint,
+    assertFreeNamespaces,
+    groupByNamespace,
+    namespaceScope,
+    qualifyReference,
+    type NamespaceEntry,
 } from './generator-utils.js';
 
 export interface GeneratorRouteContext {
