@@ -256,6 +256,9 @@ const mediaStorageFrom = (options: ResolvedCmsOptions['media']): MediaStorage =>
  */
 export class CmsService {
     readonly store: DocumentStore;
+    /**
+     * Tells the draft preview, on every server instance, when a draft is saved.
+     */
     readonly notices: DraftNotices;
     readonly media: MediaService;
     /**
@@ -1140,6 +1143,7 @@ export class CmsService {
         for (const field of describeFields(definition)) push(field, undefined);
         return described;
     }
+
 
     /**
      * Where else a document appears, for the warning shown before a shared
