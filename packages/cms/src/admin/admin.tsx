@@ -206,7 +206,7 @@ export function Admin({ config }: { config: AdminConfig }) {
             }
             return <ViewList key={view.name} connection={connection} view={view} group={groupOf(view.name)} />;
         }
-        return <Dashboard connection={connection} waiting={waiting} collections={collections} sections={sections} onOpen={openDocument} />;
+        return <Dashboard connection={connection} collections={collections} onOpen={openDocument} />;
     })();
 
     return (

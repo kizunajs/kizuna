@@ -415,3 +415,139 @@ a.k-admin-row:hover {
         display: none;
     }
 }
+
+/* Dashboard widgets: stat tiles, bar charts in the ink tone, and the rows they sit in. */
+
+.k-admin-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.k-admin-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.k-admin-tile {
+    gap: 2px;
+    min-width: 0;
+}
+
+.k-admin-tile-label,
+.k-admin-tile-detail {
+    font-size: 12.5px;
+    color: var(--k-muted);
+}
+
+.k-admin-tile-detail {
+    font-size: 12px;
+}
+
+.k-admin-tile-value {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+}
+
+.k-admin-panels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.k-admin-panels > * {
+    flex: 1 1 280px;
+    min-width: 0;
+}
+
+.k-admin-panels > .k-admin-chart {
+    flex: 1.6 1 360px;
+}
+
+.k-admin-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.k-admin-chart-frame {
+    position: relative;
+    min-width: 0;
+}
+
+.k-admin-chart-plot {
+    display: block;
+    overflow: visible;
+    border-radius: 6px;
+}
+
+.k-admin-chart-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 190px;
+}
+
+.k-admin-chart-grid {
+    stroke: var(--k-line);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.k-admin-chart-baseline {
+    stroke: var(--k-line-strong);
+    stroke-width: 1;
+    shape-rendering: crispEdges;
+}
+
+.k-admin-chart-axis {
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    fill: var(--k-muted);
+}
+
+.k-admin-chart-bar {
+    fill: var(--k-ink);
+    opacity: 0.78;
+    transition: opacity 0.1s ease;
+}
+
+.k-admin-chart-bar[data-active='true'] {
+    opacity: 1;
+}
+
+.k-admin-chart-tip {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    padding: 5px 9px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+    transform: translate(-50%, calc(-100% - 8px));
+}
+
+.k-admin-chart-tip[data-align='start'] {
+    transform: translate(0, calc(-100% - 8px));
+}
+
+.k-admin-chart-tip[data-align='end'] {
+    transform: translate(-100%, calc(-100% - 8px));
+}
+
+.k-admin-chart-tip strong {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+.k-admin-chart-tip span {
+    color: var(--k-muted);
+}
