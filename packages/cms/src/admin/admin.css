@@ -1075,8 +1075,12 @@
     }
 
     /* Live preview: the fields take two fifths, the sidebar's fields under the main ones, and the site the rest. */
+    .k-document[data-preview='true'] .k-document__body {
+        flex-wrap: nowrap;
+    }
+
     .k-document[data-preview='true'] .k-document__fields {
-        flex: 2 1 380px;
+        flex: 2 1 0;
     }
 
     .k-document[data-preview='true'] .k-form__columns {
@@ -1124,7 +1128,7 @@
         position: sticky;
         top: 0;
         display: flex;
-        flex: 3 1 560px;
+        flex: 3 1 0;
         height: 100vh;
         min-width: 0;
         background: var(--k-surface);
@@ -1136,16 +1140,18 @@
         gap: 0;
     }
 
+    /* The pane's own toolbar, then the site framed below it with room around. */
     .k-preview--admin .k-preview__bar {
-        min-height: 48px;
-        padding: 6px 12px;
-        box-shadow: inset 0 -1px 0 var(--k-line);
+        flex-wrap: nowrap;
+        min-height: 56px;
+        padding: 10px var(--k-gutter);
     }
 
     .k-preview--admin .k-preview__stage {
-        border-radius: 0;
-        background: none;
-        box-shadow: none;
+        margin: 0 12px 12px;
+        border-radius: var(--k-radius-control);
+        background: var(--k-canvas);
+        box-shadow: var(--k-elevation);
     }
 
     .k-preview__device {
@@ -1309,9 +1315,17 @@
             box-shadow: inset 0 1px 0 var(--k-line);
         }
 
+        .k-document[data-preview='true'] .k-document__body {
+            flex-wrap: wrap;
+        }
+
+        .k-document[data-preview='true'] .k-document__fields,
+        .k-document__preview {
+            flex-basis: 100%;
+        }
+
         .k-document__preview {
             position: static;
-            flex-basis: 100%;
             height: 70vh;
         }
 
@@ -1653,8 +1667,9 @@
         color: var(--k-muted);
     }
 
+    /* The menu is as wide as the row that opens it. */
     .k-account-menu {
-        width: 264px;
+        width: var(--anchor-width);
         max-width: calc(100vw - 32px);
     }
 
@@ -1671,19 +1686,84 @@
         font-weight: 500;
     }
 
-    .k-account-menu__label {
-        padding: 6px 10px 4px;
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
+    .k-account-menu__role {
+        font-size: 12px;
         color: var(--k-muted);
     }
 
     .k-account-menu__separator {
         height: 1px;
-        margin: 4px;
+        margin: 0 4px 4px;
         background: var(--k-line);
+    }
+
+    /* Theme: its label, and the three choices as one row on a track. */
+    :root,
+    :root[data-theme='dark'] {
+        --k-account-choice: rgb(255 255 255 / 0.12);
+        --k-account-choice-elevation: var(--k-control-elevation);
+    }
+
+    :root[data-theme='light'] {
+        --k-account-choice: #ffffff;
+        --k-account-choice-elevation: 0 0 0 1px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.08);
+    }
+
+    .k-account-menu__theme {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 4px 6px 6px 10px;
+    }
+
+    .k-account-menu__label {
+        font-size: 13px;
+    }
+
+    .k-account-menu__choices {
+        display: flex;
+        gap: 2px;
+        padding: 2px;
+        border-radius: 9px;
+        background: var(--k-control);
+    }
+
+    .k-account-menu__choice {
+        display: inline-flex;
+        align-items: center;
+        height: 26px;
+        padding: 0 8px;
+        border-radius: 7px;
+        font-size: 12.5px;
+        color: var(--k-muted);
+        cursor: pointer;
+        outline: none;
+    }
+
+    .k-account-menu__choice:hover {
+        color: var(--k-ink);
+    }
+
+    .k-account-menu__choice[data-checked] {
+        background: var(--k-account-choice);
+        box-shadow: var(--k-account-choice-elevation);
+        font-weight: 500;
+        color: var(--k-ink);
+    }
+
+    .k-account-menu__choice:focus-visible,
+    .k-account-menu__choice[data-highlighted]:focus-visible {
+        outline: 2px solid var(--k-ink);
+        outline-offset: 1px;
+    }
+
+    .k-account-menu .k-menu__item {
+        font-size: 13.5px;
+    }
+
+    .k-account-menu .k-menu__item svg {
+        color: var(--k-muted);
     }
 
     /* Phones: the sidebar opens as a sheet from the bar's menu button, its rows a thumb's height. */
@@ -1694,7 +1774,7 @@
         gap: 4px;
         height: 56px;
         padding: 0 6px;
-        background: var(--k-surface);
+        box-shadow: inset 0 -1px 0 var(--k-line);
     }
 
     .k-phone-bar__button {
@@ -1721,8 +1801,10 @@
         width: min(336px, calc(100vw - 54px));
         overflow-y: auto;
         overscroll-behavior: contain;
-        background: linear-gradient(var(--k-surface), var(--k-surface)), var(--k-canvas);
-        box-shadow: 0 24px 48px -12px rgb(0 0 0 / 0.6);
+        background: var(--k-canvas);
+        box-shadow:
+            inset -1px 0 0 var(--k-line),
+            0 24px 48px -12px rgb(0 0 0 / 0.6);
         color: var(--k-ink);
         outline: none;
         transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);

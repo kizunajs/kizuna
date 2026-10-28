@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import { Check, ChevronsUpDown, LogOut } from 'lucide-react';
+import { ChevronsUpDown, LogOut } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import { Avatar } from '../view/people.js';
 import { humanize, type PersonView } from '../view/schema.js';
@@ -8,9 +8,10 @@ import { THEME_CHOICES, type ThemeChoice } from './theme.js';
 
 /**
  * The editor signed in, at the foot of the sidebar. The row opens a menu
- * with their full name, the theme, and Sign out when the app names where
- * signing out happens. The row keeps the name and the role to a line each,
- * however long. Sign out is a link for `GET`, and sends a form for `POST`.
+ * as wide as itself, with their full name, the theme as one row of three
+ * choices, and Sign out when the app names where signing out happens. The
+ * row keeps the name and the role to a line each, however long. Sign out is
+ * a link for `GET`, and sends a form for `POST`.
  */
 export function SignedIn({
     person,
@@ -69,22 +70,22 @@ export function SignedIn({
                         <Menu.Popup className="k-popup k-menu k-account-menu">
                             <div className="k-account-menu__head">
                                 <span className="k-account-menu__name">{person.name}</span>
-                                {roleLabel === undefined ? null : <span className="k-sidebar__role">{roleLabel}</span>}
+                                {roleLabel === undefined ? null : <span className="k-account-menu__role">{roleLabel}</span>}
                             </div>
                             <Menu.Separator className="k-account-menu__separator" />
-                            <Menu.Group>
+                            <Menu.Group className="k-account-menu__theme">
                                 <Menu.GroupLabel className="k-account-menu__label">Theme</Menu.GroupLabel>
-                                <Menu.RadioGroup value={theme} onValueChange={(value: ThemeChoice) => onThemeChange(value)}>
+                                <Menu.RadioGroup
+                                    className="k-account-menu__choices"
+                                    value={theme}
+                                    onValueChange={(value: ThemeChoice) => onThemeChange(value)}>
                                     {THEME_CHOICES.map((choice) => (
                                         <Menu.RadioItem
                                             key={choice.value}
                                             value={choice.value}
-                                            className="k-menu__item"
+                                            className="k-account-menu__choice"
                                             closeOnClick={false}>
                                             {choice.label}
-                                            <Menu.RadioItemIndicator className="k-menu__check">
-                                                <Check {...ICON} />
-                                            </Menu.RadioItemIndicator>
                                         </Menu.RadioItem>
                                     ))}
                                 </Menu.RadioGroup>
