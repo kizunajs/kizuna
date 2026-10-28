@@ -12,7 +12,7 @@ import { WaitingReviewsSchema } from './wire.js';
 import { DEFAULT_DASHBOARD, type DashboardContext, type DashboardWidget, type StatValue } from './dashboard.js';
 
 export const StatWidgetSchema = Kizuna.model({
-    title: 'CmsStatWidget',
+    title: 'Cms.StatWidget',
     schema: z.object({
         type: z.literal('stat'),
         label: z.string(),
@@ -22,7 +22,7 @@ export const StatWidgetSchema = Kizuna.model({
 });
 
 export const ChartWidgetSchema = Kizuna.model({
-    title: 'CmsChartWidget',
+    title: 'Cms.ChartWidget',
     schema: z.object({
         type: z.literal('chart'),
         label: z.string(),
@@ -38,7 +38,7 @@ export const ChartWidgetSchema = Kizuna.model({
 });
 
 export const ReviewsWidgetSchema = Kizuna.model({
-    title: 'CmsReviewsWidget',
+    title: 'Cms.ReviewsWidget',
     schema: z.object({
         type: z.literal('reviews'),
         reviews: WaitingReviewsSchema.shape.reviews.describe('The reviews waiting on the person signed in.'),
@@ -46,7 +46,7 @@ export const ReviewsWidgetSchema = Kizuna.model({
 });
 
 export const CollectionsWidgetSchema = Kizuna.model({
-    title: 'CmsCollectionsWidget',
+    title: 'Cms.CollectionsWidget',
     schema: z.object({
         type: z.literal('collections'),
         collections: z
@@ -67,7 +67,7 @@ export const CollectionsWidgetSchema = Kizuna.model({
 });
 
 export const DashboardSchema = Kizuna.model({
-    title: 'CmsDashboard',
+    title: 'Cms.Dashboard',
     schema: z.object({
         widgets: z
             .array(z.discriminatedUnion('type', [StatWidgetSchema, ChartWidgetSchema, ReviewsWidgetSchema, CollectionsWidgetSchema]))

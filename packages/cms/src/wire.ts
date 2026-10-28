@@ -10,7 +10,7 @@ import { AvailableActionSchema } from './action.js';
 export const PageStatusSchema = z.enum(['empty', 'draft', 'published', 'changed']);
 
 export const PageSummarySchema = Kizuna.model({
-    title: 'CmsPageSummary',
+    title: 'Cms.PageSummary',
     schema: z.object({
         name: z.string(),
         site: z.string().describe('The site the page belongs to, default unless several apps share the CMS.'),
@@ -47,7 +47,7 @@ export const TreePlacementShape = {
 };
 
 export const EditorItemSchema = Kizuna.model({
-    title: 'CmsEditorItem',
+    title: 'Cms.EditorItem',
     schema: z.object({
         id: z.string(),
         ref: z.string(),
@@ -68,7 +68,7 @@ export const CreateItemBodySchema = z
     .optional();
 
 export const PublishedPageSchema = Kizuna.model({
-    title: 'CmsPublishedPage',
+    title: 'Cms.PublishedPage',
     schema: z.object({
         name: z.string(),
         path: z.string(),
@@ -79,7 +79,7 @@ export const PublishedPageSchema = Kizuna.model({
 });
 
 export const DraftPageSchema = Kizuna.model({
-    title: 'CmsDraft',
+    title: 'Cms.Draft',
     schema: z.object({
         ref: z.string().describe('The document: page:<name>, page:<site>:<name>, global:<name> or item:<collection>:<id>.'),
         name: z.string(),
@@ -99,7 +99,7 @@ export const DraftPageSchema = Kizuna.model({
 });
 
 export const StoredContentSchema = Kizuna.model({
-    title: 'CmsStoredContent',
+    title: 'Cms.StoredContent',
     schema: z.object({
         ref: z.string(),
         version: z.int(),
@@ -115,7 +115,7 @@ export const DraftHeadersSchema = z.object({
 });
 
 export const DescribedFieldSchema = Kizuna.model({
-    title: 'CmsField',
+    title: 'Cms.Field',
     schema: z.object({
         path: z.string().describe('The dotted path a change is keyed by.'),
         name: z.string(),
@@ -142,7 +142,7 @@ export const DescribedFieldSchema = Kizuna.model({
 });
 
 export const DescribedLayoutSchema = Kizuna.model({
-    title: 'CmsLayout',
+    title: 'Cms.Layout',
     schema: z.object({
         id: z.string().describe('What the fields inside it name in their layout.'),
         type: z.enum(['tab', 'row', 'collapsible']),
@@ -164,7 +164,7 @@ export const UsedOnSchema = z
     .describe('Where else the document appears, to say before changing shared content.');
 
 export const PersonSchema = Kizuna.model({
-    title: 'CmsPerson',
+    title: 'Cms.Person',
     schema: z.object({
         id: z.string(),
         name: z.string(),
@@ -173,7 +173,7 @@ export const PersonSchema = Kizuna.model({
 });
 
 export const ReviewStateSchema = Kizuna.model({
-    title: 'CmsReviewState',
+    title: 'Cms.ReviewState',
     schema: z.object({
         id: z.string(),
         status: z
@@ -200,7 +200,7 @@ const ReviewFields = {
 };
 
 export const DescribedPageSchema = Kizuna.model({
-    title: 'CmsDescribed',
+    title: 'Cms.Described',
     schema: z.object({
         ref: z.string(),
         kind: z.enum(['page', 'global', 'item']),
@@ -225,7 +225,7 @@ export const DescribedPageSchema = Kizuna.model({
 });
 
 export const MissingFieldsSchema = Kizuna.model({
-    title: 'CmsMissingFields',
+    title: 'Cms.MissingFields',
     schema: z.object({
         name: z.string(),
         complete: z.boolean(),
@@ -235,7 +235,7 @@ export const MissingFieldsSchema = Kizuna.model({
 });
 
 export const VersionSchema = Kizuna.model({
-    title: 'CmsVersion',
+    title: 'Cms.Version',
     schema: z.object({
         version: z.int(),
         summary: z.string().nullable(),
@@ -246,7 +246,7 @@ export const VersionSchema = Kizuna.model({
 });
 
 export const DraftChangesSchema = Kizuna.model({
-    title: 'CmsDraftChanges',
+    title: 'Cms.DraftChanges',
     schema: z.object({
         ref: z.string(),
         label: z.string().describe('What editors call the document.'),
@@ -268,14 +268,14 @@ export const DraftChangesSchema = Kizuna.model({
 });
 
 export const RevertBodySchema = Kizuna.model({
-    title: 'CmsRevert',
+    title: 'Cms.Revert',
     schema: z.object({
         paths: z.array(z.string()).min(1).describe('The fields to set back to what is published, from the changes list.'),
     }),
 });
 
 export const VersionListSchema = Kizuna.model({
-    title: 'CmsVersionList',
+    title: 'Cms.VersionList',
     schema: z.object({
         name: z.string(),
         versions: z.array(VersionSchema),
@@ -283,7 +283,7 @@ export const VersionListSchema = Kizuna.model({
 });
 
 export const VersionContentSchema = Kizuna.model({
-    title: 'CmsVersionContent',
+    title: 'Cms.VersionContent',
     schema: z.object({
         ref: z.string(),
         version: z.int(),
@@ -295,7 +295,7 @@ export const VersionContentSchema = Kizuna.model({
 });
 
 export const WhereUsedSchema = Kizuna.model({
-    title: 'CmsWhereUsed',
+    title: 'Cms.WhereUsed',
     schema: z.object({
         brand: z.string(),
         id: z.string(),
@@ -311,7 +311,7 @@ export const WhereUsedSchema = Kizuna.model({
 });
 
 export const UpdateDraftBodySchema = Kizuna.model({
-    title: 'CmsUpdateDraft',
+    title: 'Cms.UpdateDraft',
     schema: z.object({
         changes: z
             .record(z.string(), z.unknown())
@@ -337,14 +337,14 @@ export const PublishBodySchema = z
     .optional();
 
 export const RollbackBodySchema = Kizuna.model({
-    title: 'CmsRollback',
+    title: 'Cms.Rollback',
     schema: z.object({
         version: z.int().min(1).describe('The version to restore as a new draft.'),
     }),
 });
 
 export const MediaSchema = Kizuna.model({
-    title: 'CmsMedia',
+    title: 'Cms.Media',
     schema: z.object({
         id: z.string(),
         url: z.string(),
@@ -361,14 +361,14 @@ export const MediaSchema = Kizuna.model({
 });
 
 export const MediaListSchema = Kizuna.model({
-    title: 'CmsMediaList',
+    title: 'Cms.MediaList',
     schema: z.object({
         media: z.array(MediaSchema),
     }),
 });
 
 export const UpdateMediaBodySchema = Kizuna.model({
-    title: 'CmsUpdateMedia',
+    title: 'Cms.UpdateMedia',
     schema: z.object({
         alt: z.string().optional(),
         focalPoint: FocalPointSchema.optional(),
@@ -376,7 +376,7 @@ export const UpdateMediaBodySchema = Kizuna.model({
 });
 
 export const CreateUploadBodySchema = Kizuna.model({
-    title: 'CmsCreateUpload',
+    title: 'Cms.CreateUpload',
     schema: z.object({
         filename: z.string().min(1).max(255),
         contentType: z.string().min(1),
@@ -385,7 +385,7 @@ export const CreateUploadBodySchema = Kizuna.model({
 });
 
 export const UploadSchema = Kizuna.model({
-    title: 'CmsUpload',
+    title: 'Cms.Upload',
     schema: z.object({
         uploadId: z.string(),
         url: z.string().describe('Where the browser sends the file with PUT.'),
@@ -395,7 +395,7 @@ export const UploadSchema = Kizuna.model({
 });
 
 export const PreviewSchema = Kizuna.model({
-    title: 'CmsPreview',
+    title: 'Cms.Preview',
     schema: z.object({
         token: z.string(),
         expiresIn: z.int().describe('Seconds until the token stops working.'),
@@ -439,7 +439,7 @@ export const InvalidateBodySchema = z.object({
 });
 
 export const PeopleSchema = Kizuna.model({
-    title: 'CmsPeople',
+    title: 'Cms.People',
     schema: z.object({
         me: z.string().describe('The caller, by their id.'),
         people: z.array(PersonSchema).describe('Everyone who edits, to name as an owner or a reviewer.'),
@@ -447,14 +447,14 @@ export const PeopleSchema = Kizuna.model({
 });
 
 export const OwnerBodySchema = Kizuna.model({
-    title: 'CmsSetOwner',
+    title: 'Cms.SetOwner',
     schema: z.object({
         owner: z.string().nullable().describe('The id of the person who looks after it, from the people list, or null for nobody.'),
     }),
 });
 
 export const RequestReviewBodySchema = Kizuna.model({
-    title: 'CmsRequestReview',
+    title: 'Cms.RequestReview',
     schema: z.object({
         refs: z.array(z.string()).min(1).describe('The documents to review, like page:frontPage. They are reviewed as one request.'),
         reviewers: z.array(z.string()).min(1).describe('The ids of the people to ask, from the people list.'),
@@ -463,7 +463,7 @@ export const RequestReviewBodySchema = Kizuna.model({
 });
 
 export const DecideReviewBodySchema = Kizuna.model({
-    title: 'CmsDecideReview',
+    title: 'Cms.DecideReview',
     schema: z.object({
         ids: z.array(z.string()).min(1).describe('The reviews to answer, from the waiting list.'),
         decision: z.enum(['approve', 'requestChanges']),
@@ -472,7 +472,7 @@ export const DecideReviewBodySchema = Kizuna.model({
 });
 
 export const WaitingReviewsSchema = Kizuna.model({
-    title: 'CmsWaitingReviews',
+    title: 'Cms.WaitingReviews',
     schema: z.object({
         reviews: z.array(
             ReviewStateSchema.extend({
@@ -485,7 +485,7 @@ export const WaitingReviewsSchema = Kizuna.model({
 });
 
 export const ReviewListSchema = Kizuna.model({
-    title: 'CmsReviews',
+    title: 'Cms.Reviews',
     schema: z.object({
         reviews: z.array(ReviewStateSchema),
     }),

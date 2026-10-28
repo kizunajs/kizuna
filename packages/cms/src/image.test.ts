@@ -5,7 +5,7 @@ import { ImageSchema, isImageSchema } from './image.js';
 
 describe('ImageSchema', () => {
     it('is a named model', () => {
-        expect(readMetaId(ImageSchema)).toBe('CmsImage');
+        expect(readMetaId(ImageSchema)).toBe('Cms.Image');
     });
 
     it('stores a media id, alt text and per-use overrides', () => {
