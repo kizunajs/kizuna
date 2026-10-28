@@ -23,7 +23,7 @@ A page is a list of fields beside its route. A block is a set of fields several 
 | `description` | Guidance under the input, for editors and the agent. Overrides the schema's `.describe()` here.                                             |
 | `auth`        | Who may write the field, in a route's own words: `roles`, or `requires` for permissions.                                                    |
 | `readOnly`    | Visible to editors and the agent, writable by nobody.                                                                                       |
-| `options`     | For an enum, the label editors see for each value: `{ design: 'Design' }`.                                                                  |
+| `options`     | For an enum, or a list of one, the label editors see for each value: `{ design: 'Design' }`.                                                |
 | `metadata`    | `'title'`, `'description'` or `'image'`: the part of the [search result](/docs/cms/seo#mark-the-fields-it-starts-from) this field fills in. |
 | `localized`   | Whether the field is translated, when the schema's own default is wrong. See [Localization](/docs/cms/localization#what-is-translated).     |
 | `position`    | `'sidebar'` puts the field beside the main column. See [Layout](#layout).                                                                   |

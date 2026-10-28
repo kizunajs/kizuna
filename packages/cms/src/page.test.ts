@@ -5,6 +5,7 @@ import { defineBlock } from './block.js';
 import { fieldDescription, undeclaredFieldRoles } from './field.js';
 import { ImageSchema } from './image.js';
 import { isPage, definePage } from './page.js';
+import { RichTextSchema } from './rich-text.js';
 
 const ProductId = Kizuna.brand('ProductId', z.string());
 
@@ -99,7 +100,7 @@ describe('page', () => {
                     },
                 ],
             })
-        ).toThrow("definePage('teamPage') gives the field 'heading' options, which only an enum takes.");
+        ).toThrow("definePage('teamPage') gives the field 'heading' options, which only an enum or a list of one takes.");
         expect(() =>
             definePage({
                 name: 'teamPage',
@@ -114,6 +115,38 @@ describe('page', () => {
                 ],
             })
         ).toThrow("definePage('teamPage') labels the option 'sales' of 'department', which its enum does not have.");
+    });
+
+    it('takes options for a list of an enum, and checks them against its values', () => {
+        expect(() =>
+            definePage({
+                name: 'frontPage',
+                fields: [
+                    {
+                        name: 'sections',
+                        schema: z.array(z.enum(['statement', 'callToAction'])).default([]),
+                        options: {
+                            statement: 'Statement',
+                            callToAction: 'Call to action',
+                        },
+                    },
+                ],
+            })
+        ).not.toThrow();
+        expect(() =>
+            definePage({
+                name: 'frontPage',
+                fields: [
+                    {
+                        name: 'sections',
+                        schema: z.array(z.enum(['statement', 'callToAction'])),
+                        options: {
+                            photo: 'Wide photo',
+                        },
+                    },
+                ],
+            })
+        ).toThrow("definePage('frontPage') labels the option 'photo' of 'sections', which its enum does not have.");
     });
 
     it('throws on a migrate step that is not a version number', () => {
@@ -168,6 +201,24 @@ describe('fieldDescription', () => {
                 schema: ImageSchema.describe('A square portrait, at least 480 pixels wide.'),
             })
         ).toBe('A square portrait, at least 480 pixels wide.');
+    });
+
+    it("leaves out rich text's own description, through .optional()", () => {
+        expect(
+            fieldDescription({
+                name: 'body',
+                schema: RichTextSchema.optional(),
+            })
+        ).toBeUndefined();
+    });
+
+    it('keeps a description the field gives rich text with .describe()', () => {
+        expect(
+            fieldDescription({
+                name: 'body',
+                schema: RichTextSchema.describe('The article, under 1,500 words.'),
+            })
+        ).toBe('The article, under 1,500 words.');
     });
 });
 

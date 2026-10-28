@@ -296,7 +296,7 @@ export const assertFields = (fields: FieldList, owner: string): void => {
         if (field.options !== undefined) {
             const values = enumValuesOf(field.schema);
             if (values === undefined) {
-                throw new Error(`${owner} gives the field '${field.name}' options, which only an enum takes.`);
+                throw new Error(`${owner} gives the field '${field.name}' options, which only an enum or a list of one takes.`);
             }
             for (const value of Object.keys(field.options)) {
                 if (!values.includes(value)) {
@@ -316,12 +316,22 @@ export const assertFields = (fields: FieldList, owner: string): void => {
 };
 
 /**
- * The values of an enum, under any `.optional()` or `.default()`, or
- * `undefined` for any other schema.
+ * The values of an enum, or of the enum a list holds, under any `.optional()`
+ * or `.default()`, or `undefined` for any other schema.
  */
 const enumValuesOf = (schema: z.ZodType): string[] | undefined => {
-    const inner = unwrapOptionalWrappers(schema).inner as unknown as { options?: unknown; _zod?: { def?: { type?: string } } };
-    return inner._zod?.def?.type === 'enum' && Array.isArray(inner.options) ? inner.options.map(String) : undefined;
+    const inner = unwrapOptionalWrappers(schema).inner as unknown as {
+        options?: unknown;
+        _zod?: {
+            def?: {
+                type?: string;
+                element?: z.ZodType;
+            };
+        };
+    };
+    const def = inner._zod?.def;
+    if (def?.type === 'array' && def.element !== undefined) return enumValuesOf(def.element);
+    return def?.type === 'enum' && Array.isArray(inner.options) ? inner.options.map(String) : undefined;
 };
 
 /**
@@ -333,17 +343,30 @@ export const shapeOf = <Fields extends FieldList>(fields: Fields): ShapeOf<Field
     return shape as ShapeOf<Fields>;
 };
 
+const agentFacingSchemas = new WeakSet<z.core.$ZodType>();
+
 /**
- * A schema's `.describe()` text, unless the schema is a `Kizuna.model`,
- * whose description says what the model is rather than what the field holds.
+ * Marks a built-in schema whose description is written for agents, like
+ * `RichTextSchema`'s, so a field using it shows only its own description.
+ */
+export const describedForAgents = <Schema extends z.core.$ZodType>(schema: Schema): Schema => {
+    agentFacingSchemas.add(schema);
+    return schema;
+};
+
+/**
+ * A schema's `.describe()` text, unless the schema is a `Kizuna.model` or a
+ * built-in schema, whose description says what the schema is rather than what
+ * the field holds.
  */
 const ownDescription = (schema: z.core.$ZodType): string | undefined =>
-    readModelSchema(schema) === schema ? undefined : readMetaDescription(schema);
+    readModelSchema(schema) === schema || agentFacingSchemas.has(schema) ? undefined : readMetaDescription(schema);
 
 /**
  * The guidance a field shows: its own `description`, or the schema's
  * `.describe()` text, read through `.optional()` and `.default()`. A model's
- * own description, like `ImageSchema`'s, never shows under a field.
+ * own description, like `ImageSchema`'s, never shows under a field, and nor
+ * does a built-in schema's, like `RichTextSchema`'s.
  */
 export const fieldDescription = (field: Field): string | undefined => {
     if (field.description !== undefined) return field.description;

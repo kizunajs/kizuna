@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { describedForAgents } from './field.js';
 import { ImageSchema } from './image.js';
 
 const KEY = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
@@ -73,11 +74,13 @@ export const RichTextImageSchema = z.object({
  *     schema: RichTextSchema,
  * },
  */
-export const RichTextSchema = z.array(z.discriminatedUnion('_type', [RichTextBlockSchema, RichTextImageSchema])).meta({
-    'x-kizuna': 'rich-text',
-    description:
-        'Portable Text: an array of blocks. A text block has _type "block", a unique _key, a style (normal, h2, h3, h4, blockquote), an optional listItem (bullet, number) and level, markDefs holding links, and children spans with text and marks. An image block has _type "image", a _key and an image.',
-});
+export const RichTextSchema = describedForAgents(
+    z.array(z.discriminatedUnion('_type', [RichTextBlockSchema, RichTextImageSchema])).meta({
+        'x-kizuna': 'rich-text',
+        description:
+            'Portable Text: an array of blocks. A text block has _type "block", a unique _key, a style (normal, h2, h3, h4, blockquote), an optional listItem (bullet, number) and level, markDefs holding links, and children spans with text and marks. An image block has _type "image", a _key and an image.',
+    })
+);
 
 /**
  * Rich text as stored.
