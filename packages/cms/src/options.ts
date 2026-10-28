@@ -7,6 +7,7 @@ import type { CmsDatabase } from './storage/store.js';
 import type { MediaStorage } from './media/storage.js';
 import { isRelationship, type CmsRelationship } from './relationships.js';
 import { isView, type View } from './view-definition.js';
+import { DashboardWidgetSchema, type DashboardWidget } from './dashboard.js';
 
 /**
  * One discovered page: where it is served, and what it declares.
@@ -256,6 +257,11 @@ export interface CmsPluginOptions<
      * users, made with `defineView()`.
      */
     views?: readonly View<string, any, any>[];
+    /**
+     * The admin's first page, as widgets in the order shown. Without it,
+     * `reviews` and `collections`.
+     */
+    dashboard?: readonly DashboardWidget[];
     media?: MediaOptions;
     /**
      * Who may approve a review, and how reviewers hear of one.
@@ -400,6 +406,7 @@ export const CmsPluginOptionsSchema = z
                 })
             )
             .optional(),
+        dashboard: z.array(DashboardWidgetSchema).optional(),
         media: z
             .object({
                 bucket: z.string().optional(),

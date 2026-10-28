@@ -54,6 +54,7 @@ import { assertReviewed, decideReviews, documentLabel, peopleOf, requestReviews,
 import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
 import { listViewsRoute, viewRoutes } from './view-routes.js';
+import { dashboardRoute } from './dashboard-routes.js';
 
 interface Args {
     params: Record<string, string>;
@@ -1717,6 +1718,14 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                           guarded,
                       }),
                   }),
+            dashboard: dashboardRoute({
+                widgets: options.dashboard,
+                collections: options.collections ?? [],
+                views: options.views ?? [],
+                editor,
+                editingBase,
+                guarded,
+            }),
             whereUsed,
             searchItems,
             createPreview,

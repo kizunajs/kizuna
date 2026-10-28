@@ -28,6 +28,16 @@ export {
     type ViewDefinition,
     type ViewRecords,
 } from './view-definition.js';
+export {
+    type ChartBar,
+    type ChartWidget,
+    type CollectionsWidget,
+    type DashboardContext,
+    type DashboardWidget,
+    type ReviewsWidget,
+    type StatValue,
+    type StatWidget,
+} from './dashboard.js';
 export { resolvedSchema, ResolvedImageSchema } from './content-schema.js';
 export {
     dataFields,
