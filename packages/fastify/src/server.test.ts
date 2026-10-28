@@ -5,7 +5,7 @@ import { Kizuna } from 'kizunajs';
 import { defineConfig } from 'kizunajs';
 import type { AddressInfo } from 'node:net';
 import { fastifyAdapter, type FastifyApi } from './server.js';
-import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { fetchStream, nodeHeaders, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 
 interface Config {
     adapter: ReturnType<typeof fastifyAdapter>;
@@ -93,7 +93,7 @@ testAdapterFeatures({
                 });
                 return {
                     status: response.statusCode,
-                    headers: new Headers(response.headers as Record<string, string>),
+                    headers: nodeHeaders(response.headers),
                     body: readTestBody(response.body),
                     text: response.body,
                 };

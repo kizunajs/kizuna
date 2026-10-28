@@ -988,6 +988,16 @@ export const testAdapterFeatures = <Api>(adapter: AdapterUnderTest<Api>): void =
                 expect(response.text).toBe('not json at all');
             });
         },
+        'plugins.rawResponseCookies': async () => {
+            await usingPlugins(async (mounted) => {
+                const response = await mounted.request({
+                    method: 'GET',
+                    path: '/probe/cookies',
+                });
+                expect(response.status).toBe(204);
+                expect(response.headers.getSetCookie()).toEqual(['session=abc; Path=/; HttpOnly', 'theme=dark; Path=/']);
+            });
+        },
         'streams.sseFraming': async () => {
             await usingStreams(async (streams) => {
                 const response = await streams.request({

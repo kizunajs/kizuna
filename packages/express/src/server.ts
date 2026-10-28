@@ -176,7 +176,12 @@ const writeStream = (open: NonNullable<RenderedResult['stream']>, res: ServerRes
 const writeWebResponse = async (response: unknown, res: Response): Promise<void> => {
     if (!(response instanceof globalThis.Response)) return;
     res.status(response.status);
-    response.headers.forEach((value, name) => res.setHeader(name, value));
+    response.headers.forEach((value, name) => {
+        if (name !== 'set-cookie') res.setHeader(name, value);
+    });
+    // Each cookie is its own header line, so they are set together rather than one over the last.
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length > 0) res.setHeader('set-cookie', cookies);
     if (!response.body) {
         res.end();
         return;

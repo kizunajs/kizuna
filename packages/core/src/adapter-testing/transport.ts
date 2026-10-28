@@ -113,6 +113,18 @@ export const collectStreamText = async (body: ReadableStream<Uint8Array>): Promi
 };
 
 /**
+ * Turn node's header record into `Headers`, appending each value of a repeated header such as `set-cookie`.
+ */
+export const nodeHeaders = (headers: Record<string, string | string[] | number | undefined>): Headers => {
+    const built = new Headers();
+    for (const [name, value] of Object.entries(headers)) {
+        if (value === undefined) continue;
+        for (const entry of Array.isArray(value) ? value : [value]) built.append(name, String(entry));
+    }
+    return built;
+};
+
+/**
  * Falls back to raw text because a framework's own error pages (Hono's 404, for one) are not JSON.
  */
 export const readTestBody = (text: string): unknown => {

@@ -126,7 +126,12 @@ const writeWebResponse = async (response: unknown, reply: FastifyReply): Promise
     if (!(response instanceof globalThis.Response)) return;
     reply.hijack();
     reply.raw.statusCode = response.status;
-    response.headers.forEach((value, name) => reply.raw.setHeader(name, value));
+    response.headers.forEach((value, name) => {
+        if (name !== 'set-cookie') reply.raw.setHeader(name, value);
+    });
+    // Each cookie is its own header line, so they are set together rather than one over the last.
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length > 0) reply.raw.setHeader('set-cookie', cookies);
     if (!response.body) {
         reply.raw.end();
         return;

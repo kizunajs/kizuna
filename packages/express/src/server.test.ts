@@ -3,7 +3,7 @@ import request from 'supertest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { expressAdapter, type ExpressApi } from './server.js';
-import { fetchStream, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
+import { fetchStream, nodeHeaders, readTestBody, testAdapterFeatures } from '../../core/src/adapter-testing/index.js';
 import { defineConfig } from 'kizunajs';
 
 testAdapterFeatures({
@@ -39,7 +39,7 @@ testAdapterFeatures({
                 const text = response.text ?? (Buffer.isBuffer(response.body) ? response.body.toString('binary') : '');
                 return {
                     status: response.status,
-                    headers: new Headers(response.headers as Record<string, string>),
+                    headers: nodeHeaders(response.headers),
                     body: readTestBody(text),
                     text,
                 };

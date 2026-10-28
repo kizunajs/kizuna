@@ -1079,6 +1079,23 @@ const probePlugin = definePlugin({
                     })
                 )
             ),
+            cookies: route({
+                method: 'GET',
+                path: '/probe/cookies',
+                responses: {
+                    204: z.void(),
+                },
+            }).handler(() =>
+                rawResponse(
+                    new Response(null, {
+                        status: 204,
+                        headers: [
+                            ['Set-Cookie', 'session=abc; Path=/; HttpOnly'],
+                            ['Set-Cookie', 'theme=dark; Path=/'],
+                        ],
+                    })
+                )
+            ),
         },
         exports: {
             label: () => options.label,
