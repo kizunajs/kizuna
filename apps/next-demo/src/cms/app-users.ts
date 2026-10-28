@@ -19,6 +19,7 @@ const roles = {
 export const AppUsers = defineView({
     name: 'appUsers',
     label: 'App users',
+    group: 'People',
     title: 'name',
     columns: ['name', 'email', 'role'],
     search: ['name', 'email'],

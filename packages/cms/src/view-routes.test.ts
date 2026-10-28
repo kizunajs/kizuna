@@ -61,6 +61,7 @@ const resets: string[] = [];
 const AppUsers = defineView({
     name: 'appUsers',
     label: 'App users',
+    group: 'People',
     auth: {
         roles: ['support', 'admin'],
     },
@@ -222,6 +223,7 @@ describe('listing views', () => {
             {
                 name: 'appUsers',
                 label: 'App users',
+                group: 'People',
                 title: 'name',
                 columns: ['name', 'email'],
                 search: ['name', 'email'],
@@ -232,6 +234,7 @@ describe('listing views', () => {
             {
                 name: 'productReviews',
                 label: 'Product reviews',
+                group: null,
                 title: 'text',
                 columns: ['text'],
                 search: [],

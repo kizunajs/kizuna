@@ -124,7 +124,7 @@ const openable = async (cms: CmsService, input: DashboardRouteInput, caller: Cal
                 kind: 'view' as const,
                 name: view.name,
                 label: view.label ?? writtenOut(view.name),
-                group: null,
+                group: view.group ?? null,
                 count: null,
             })),
     ];

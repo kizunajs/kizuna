@@ -36,6 +36,7 @@ export const ViewSummarySchema = Kizuna.model({
     schema: z.object({
         name: z.string(),
         label: z.string(),
+        group: z.string().nullable().describe('The heading the sidebar lists it under.'),
         title: z.string().describe('The field that names each record in the list.'),
         columns: z.array(z.string()).describe('The fields the list shows.'),
         search: z.array(z.string()).describe('The fields the search box looks in.'),
@@ -363,6 +364,7 @@ export const listViewsRoute = (input: ViewRouteInput) =>
                         .map((view) => ({
                             name: view.name,
                             label: labelOf(view),
+                            group: view.group ?? null,
                             title: titleFieldOf(view),
                             columns: [...(view.columns ?? [titleFieldOf(view)])],
                             search: [...(view.search ?? [])],

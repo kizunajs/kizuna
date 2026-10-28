@@ -71,6 +71,7 @@ const Employees = defineCollection({
 const AppUsers = defineView({
     name: 'appUsers',
     label: 'App users',
+    group: 'People',
     auth: {
         roles: 'admin',
     },
@@ -289,7 +290,7 @@ describe('the dashboard', () => {
                     kind: 'view',
                     name: 'appUsers',
                     label: 'App users',
-                    group: null,
+                    group: 'People',
                     count: null,
                 },
             ],
