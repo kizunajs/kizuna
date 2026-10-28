@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { route, type PluginApi } from 'kizunajs/plugin';
 import { adapterContextOf, authenticate } from 'kizunajs/adapter';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
-import { addressOf, type CmsService } from './cms.js';
+import { addressOf, collectionPreviewPath, type CmsService } from './cms.js';
 import { getAtPath } from './content.js';
 import type { DraftNotice } from './draft-notices.js';
 import type { ResolvedCmsOptions } from './options.js';
@@ -47,8 +47,8 @@ const cookieValue = (header: string | string[] | undefined, name: string): strin
  * `GET /editing/preview/events`: the draft changes of the documents a page in
  * draft mode shows, as server-sent events. `refs` names the documents the page
  * marks, and `path` the address it is at, for a page whose draft is not shown
- * yet. Guarded like the draft route: the preview cookie, or the editor
- * identity.
+ * yet, or a collection's preview page. Guarded like the draft route: the
+ * preview cookie, or the editor identity.
  */
 export const draftEventsRoute = (service: CmsService, options: ResolvedCmsOptions, api: PluginApi, base: '' | `/${string}`) =>
     route({
@@ -113,7 +113,11 @@ export const draftEventsRoute = (service: CmsService, options: ResolvedCmsOption
             if (ref === undefined) return false;
             try {
                 const state = await service.draftState(ref);
-                return addressOf(state.target, state.row?.draft ?? state.row?.published) === query.path;
+                const content = state.row?.draft ?? state.row?.published;
+                if (addressOf(state.target, content) === query.path) return true;
+                // A preview page that has nothing to show yet marks nothing, so it follows the item by its path.
+                const preview = collectionPreviewPath(state.target, content);
+                return preview !== undefined && new URL(preview, 'http://cms.local').pathname === query.path;
             } catch {
                 return false;
             }

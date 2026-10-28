@@ -13,7 +13,9 @@ export {
     type Collection,
     type CollectionDefinition,
     type CollectionItem,
+    type CollectionPreview,
     type ContentDefinition,
+    type DraftItem,
 } from './definitions.js';
 export { formatRef, parseRef, type DocumentRef } from './refs.js';
 export { type Action, type ActionContext, type ActionHandler, type ActionOptions, type Editor } from './action.js';

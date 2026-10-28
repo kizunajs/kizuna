@@ -42,4 +42,4 @@ export default definePage({
 });
 ```
 
-Each route param reads the item field it names, so `[slug]` reads `slug`. That field is text, indexed and unique, since it is the address. Editors create articles as items of the collection, and the preview opens each one at its address.
+Each route param reads the item field it names, so `[slug]` reads `slug`. That field is text, indexed and unique, since it is the address. Editors create articles as items of the collection, and the preview opens each one at its address, unless the collection names a [preview page](/docs/cms/collections#live-preview) of its own.

@@ -113,7 +113,37 @@ export interface CollectionDefinition<Name extends string, Fields extends FieldL
      * },
      */
     actions?: Readonly<Record<string, Action<CollectionItem<Fields, Id>>>>;
+    /**
+     * The page of your app the admin's Live preview shows an item on. `url`
+     * returns its path on the site, which opens in draft mode.
+     *
+     * @example
+     * preview: {
+     *     url: ({ item }) => `/preview/employees/${item.id}`,
+     * },
+     */
+    preview?: CollectionPreview<DraftItem<Fields, Id>>;
 }
+
+/**
+ * Where the admin's Live preview shows an item.
+ */
+export interface CollectionPreview<Item> {
+    /**
+     * The item's preview page, as a path on the site, such as `'/team'`.
+     * A method, so one typed from a collection's items still fits where any
+     * collection's is taken.
+     */
+    url(input: { item: Item }): string;
+}
+
+/**
+ * An item as its draft stands, which may still be missing fields: its id
+ * and the values saved so far.
+ */
+export type DraftItem<Fields extends FieldList, Id extends z.ZodType> = {
+    id: z.output<Id>;
+} & Partial<z.output<z.ZodObject<ShapeOf<Fields>, z.core.$strip>>>;
 
 /**
  * One published item of a collection, as an action receives it.
@@ -205,6 +235,9 @@ export const defineCollection = <const Name extends string, const Fields extends
         if (!names.has(index)) throw new Error(`${owner} indexes '${index}', which is not one of its fields.`);
     }
     assertActions(definition.actions, owner);
+    if (definition.preview !== undefined && typeof definition.preview.url !== 'function') {
+        throw new Error(`${owner} has a \`preview\` without a \`url\` function, like ({ item }) => \`/team/\${item.id}\`.`);
+    }
     return {
         ...definition,
         [COLLECTION]: true,

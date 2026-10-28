@@ -219,6 +219,44 @@ export const addressOf = (target: Target, content: Record<string, unknown> | nul
     target.path ?? (target.pattern === undefined ? undefined : fillPath(target.pattern, content));
 
 /**
+ * The path an item's collection names in `preview.url`, given the item as
+ * its draft stands. `undefined` for anything else.
+ */
+export const collectionPreviewPath = (target: Target, content: Record<string, unknown> | null | undefined): string | undefined => {
+    if (target.ref.type !== 'item') return undefined;
+    const preview = (target.definition as Collection).preview;
+    if (preview === undefined) return undefined;
+    const path: unknown = preview.url({
+        item: {
+            ...content,
+            id: target.ref.id,
+        },
+    });
+    if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) {
+        throw new Error(
+            `defineCollection('${target.ref.collection}') has a preview.url that returned ${JSON.stringify(path)}. It returns a path on the site, like '/team'.`
+        );
+    }
+    return path;
+};
+
+/**
+ * The page the admin's Live preview opens a document on: its collection's
+ * `preview.url`, where it is served, or the first page that shows it. A
+ * global shows on every page, so it opens on the front page. `null` for an
+ * item no page shows.
+ */
+export const previewPathOf = (
+    target: Target,
+    content: Record<string, unknown> | null | undefined,
+    usedOn: { pages: ReadonlyArray<{ path: string }> }
+): string | null =>
+    collectionPreviewPath(target, content) ??
+    addressOf(target, content) ??
+    usedOn.pages[0]?.path ??
+    (target.kind === 'global' ? '/' : null);
+
+/**
  * A collection, resolved: where its items are stored, what they follow, and
  * the routes that serve them.
  */

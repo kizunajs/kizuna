@@ -10,6 +10,7 @@ import { defineConfig, Kizuna } from 'kizunajs';
 import { pluginExportsOf } from 'kizunajs/adapter';
 import { expressAdapter } from '@kizunajs/express';
 import { definePage } from './page.js';
+import { defineCollection } from './definitions.js';
 import type { CmsExports } from './setup.js';
 import { cms } from './provider.js';
 import { DocumentStore } from './storage/store.js';
@@ -53,6 +54,24 @@ const FrontPage = definePage({
     ],
 });
 
+const Employees = defineCollection({
+    name: 'employees',
+    id: Kizuna.brand('EmployeeId', z.string()),
+    preview: {
+        url: ({ item }) => `/preview/employees/${item.id}`,
+    },
+    fields: [
+        {
+            name: 'name',
+            schema: z.string().min(1),
+        },
+        {
+            name: 'photo',
+            schema: z.string(),
+        },
+    ],
+});
+
 const pglite = new PGlite();
 const db = drizzle(pglite);
 let app: express.Express;
@@ -77,6 +96,7 @@ beforeAll(async () => {
                     page: FrontPage,
                 },
             },
+            collections: [Employees],
             auth: {
                 identity: 'editor',
             },
@@ -295,6 +315,36 @@ describe('the draft events route', () => {
         expect(await nextChange(next)).toEqual({
             ref: 'page:frontPage',
             texts: null,
+        });
+        events.close();
+    });
+
+    it("follows the item a collection's preview page shows, before the page marks it", async () => {
+        const created = await request(app)
+            .post('/editing/collections/employees/items')
+            .set('authorization', 'Bearer editor-token')
+            .send({
+                values: {
+                    name: 'Ada Lovelace',
+                },
+            });
+        const id = created.body.name as string;
+        const events = await openEvents(`path=/preview/employees/${id}`, `${PREVIEW_COOKIE}=${signPreviewToken(previewSecret(undefined))}`);
+        const next = blocksOf(events.response.body!);
+        await next();
+        await request(app)
+            .patch(`/editing/collections/employees/items/${id}/draft`)
+            .set('authorization', 'Bearer editor-token')
+            .send({
+                changes: {
+                    photo: 'ada.jpg',
+                },
+            });
+        expect(await nextChange(next)).toEqual({
+            ref: `item:employees:${id}`,
+            texts: {
+                photo: 'ada.jpg',
+            },
         });
         events.close();
     });

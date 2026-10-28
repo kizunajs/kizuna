@@ -131,6 +131,8 @@ content: cms({
 
 A page in draft mode follows its drafts as they change, whoever saves them: you in the editor, an agent through MCP, or someone editing on the page. When a save changes text the page shows as it is, the new text replaces the old one in place. Any other change, like an image, a list or text the page formats, renders the page again with `router.refresh()`, which keeps scroll position and client state.
 
+The page a collection names as its [preview](/docs/cms/collections#live-preview) also hears about that collection's items before it shows them, so a new employee appears on the team page as soon as their draft is complete.
+
 The preview listens at `/api/editing/preview/events`, a stream of server-sent events that opens only while the preview cookie verifies or for a signed-in editor. It reconnects after the connection drops, and renders the page again on reconnecting, since saves made in between never reached it.
 
 Saves reach every server instance through Postgres `LISTEN` and `NOTIFY` on the CMS's database, with node-postgres, postgres.js and PGlite. A driver that cannot listen, like Neon over HTTP, passes on the saves made on its own instance only.

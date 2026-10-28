@@ -3,7 +3,7 @@ import { route, type PluginDeclaration } from 'kizunajs/plugin';
 import { BinarySchema, ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import type { RouteAuth } from 'kizunajs';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
-import { addressOf, CmsHttpError, type CmsService, type DraftState } from './cms.js';
+import { addressOf, CmsHttpError, previewPathOf, type CmsService, type DraftState } from './cms.js';
 import { DEFAULT_SITE, routePrefix, sitesOf, type CmsPluginOptions, type PageMap } from './options.js';
 import type { ContentDefinition } from './definitions.js';
 import { dataFields } from './field.js';
@@ -1252,6 +1252,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             }
             const state = await cms.draftState(ref);
             const draft = state.row?.draft ?? state.row?.published ?? null;
+            const usedOn = await cms.usedOn(ref);
             return {
                 status: 200,
                 body: {
@@ -1264,7 +1265,8 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                               label: state.target.definition.label,
                           }),
                     path: addressOf(state.target, draft) ?? null,
-                    usedOn: await cms.usedOn(ref),
+                    previewPath: previewPathOf(state.target, draft, usedOn),
+                    usedOn,
                     status: state.status,
                     version: state.version,
                     complete: state.complete,

@@ -207,6 +207,12 @@ export const DescribedPageSchema = Kizuna.model({
         name: z.string(),
         label: z.string().optional().describe('What editors call it. For an item, what they call its collection.'),
         path: z.string().nullable(),
+        previewPath: z
+            .string()
+            .nullable()
+            .describe(
+                "The page the Live preview opens on: an item's `preview.url`, where the document is served, or the first page that shows it. Null when no page shows it."
+            ),
         usedOn: UsedOnSchema,
         status: PageStatusSchema,
         version: z.int(),

@@ -176,6 +176,57 @@ export const Newsletters = defineCollection({
 
 Editors write the newsletter as a draft, ask for a review, and an admin presses Send. `item` is the published item. Actions take the same options as a [view's](/docs/cms/views#actions).
 
+## Live preview
+
+An article has a page of its own, so the admin's **Live preview** opens it there. An employee only appears on other pages, so its collection names the page to show it on:
+
+```ts title="src/cms/content.ts"
+export const Employees = defineCollection({
+    name: 'employees',
+    id: EmployeeId,
+    preview: {
+        url: () => '/team',
+    },
+    fields: [
+        // ...
+    ],
+});
+```
+
+The team page lists employees with `list()`, which includes drafts in draft mode, so the editor sees the employee they are changing among the rest, updating as they type.
+
+When the card appears in several places, a page of its own can show it in each of them. `url` receives the item, so the page can take its id:
+
+```ts title="src/cms/content.ts"
+preview: {
+    url: ({ item }) => `/preview/employees/${item.id}`,
+},
+```
+
+```tsx title="src/app/preview/employees/[id]/page.tsx"
+import kizuna from '@kizuna-config';
+import { EmployeeCard } from '../../../../components/employee-card';
+
+export default async function EmployeePreview({ params }: { params: Promise<{ id: string }> }) {
+    const employee = await kizuna.content.collections.employees.get({
+        id: (await params).id,
+    });
+
+    return (
+        <>
+            <EmployeeCard employee={employee} />
+            <EmployeeCard employee={employee} variant="compact" />
+        </>
+    );
+}
+```
+
+The page renders through your own components, so the preview matches the site. In draft mode `get` reads the draft, and outside it the published item, as any page does.
+
+`item` is the draft as it stands: the id, and the fields saved so far. A new item may not have them all yet, so `url` should work from the id alone. `url` returns a path on the site, which opens in [draft mode](/docs/cms/next#draft-mode).
+
+A collection without `preview` opens its items on their own page when one [shows the collection](/docs/cms/pages#pages-that-show-a-collection), and otherwise on the first page that holds them. An item no page shows opens without a Live preview.
+
 ## Collection or your own table
 
 Would you keep the record if the website did not exist?

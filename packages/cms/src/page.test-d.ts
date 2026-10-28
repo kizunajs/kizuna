@@ -5,7 +5,7 @@ import { Kizuna } from 'kizunajs';
 import { defineBlock } from './block.js';
 import { ImageSchema } from './image.js';
 import { definePage } from './page.js';
-import { defineCollection } from './definitions.js';
+import { defineCollection, type Collection } from './definitions.js';
 import type { Output } from './output.js';
 
 const ProductId = Kizuna.brand('ProductId', z.string());
@@ -320,4 +320,26 @@ test('a collection indexes a field inside a tab', () => {
         // @ts-expect-error there is no title field
         indexes: ['title'],
     });
+});
+
+test("a collection's preview url reads the item as its draft stands", () => {
+    const EmployeeId = Kizuna.brand('EmployeeId', z.string());
+    const Employees = defineCollection({
+        name: 'employees',
+        id: EmployeeId,
+        preview: {
+            url: ({ item }) => {
+                expectTypeOf(item.id).toEqualTypeOf<z.output<typeof EmployeeId>>();
+                expectTypeOf(item.department).toEqualTypeOf<'design' | 'engineering' | undefined>();
+                return `/preview/employees/${item.id}`;
+            },
+        },
+        fields: [
+            {
+                name: 'department',
+                schema: z.enum(['design', 'engineering']),
+            },
+        ],
+    });
+    expectTypeOf(Employees).toExtend<Collection>();
 });
