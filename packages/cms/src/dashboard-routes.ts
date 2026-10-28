@@ -10,10 +10,14 @@ import { handlerContext, type EditingArgs, type Guarded } from './action-routes.
 import { waitingReviews } from './reviews.js';
 import { WaitingReviewsSchema } from './wire.js';
 import {
+    DashboardPeriodKeySchema,
     DEFAULT_DASHBOARD,
+    DEFAULT_PERIOD,
+    periodOf,
     type ChartBar,
     type ChartWidget,
     type DashboardContext,
+    type DashboardPeriodKey,
     type DashboardWidget,
     type StatValue,
 } from './dashboard.js';
@@ -81,6 +85,19 @@ export const CollectionsWidgetSchema = Kizuna.model({
 export const DashboardSchema = Kizuna.model({
     title: 'CMS.Dashboard',
     schema: z.object({
+        period: z
+            .object({
+                key: DashboardPeriodKeySchema,
+                from: z.iso.datetime(),
+                to: z.iso.datetime(),
+                previous: z
+                    .object({
+                        from: z.iso.datetime(),
+                        to: z.iso.datetime(),
+                    })
+                    .describe('The period of the same length just before.'),
+            })
+            .describe('The period the numbers count over, ending now.'),
         widgets: z
             .array(z.discriminatedUnion('type', [StatWidgetSchema, ChartWidgetSchema, ReviewsWidgetSchema, CollectionsWidgetSchema]))
             .describe('The widgets the person may see, in the order listed.'),
@@ -189,6 +206,11 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
         auth: input.editor,
         summary: "Read the admin's dashboard: its numbers, the reviews waiting on you, and the collections you may open",
         tool: true,
+        query: z.object({
+            period: DashboardPeriodKeySchema.default(DEFAULT_PERIOD).describe(
+                'The period the numbers count over, ending now: the last 24 hours, 7, 30 or 90 days.'
+            ),
+        }),
         responses: {
             200: {
                 body: DashboardSchema,
@@ -199,9 +221,11 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
         input.guarded(async (cms, args: EditingArgs) => {
             const caller = cms.caller(args.auth);
             const { editor, plugins } = handlerContext(cms, args);
+            const period = periodOf((args.query?.['period'] as DashboardPeriodKey | undefined) ?? DEFAULT_PERIOD, new Date());
             const context: DashboardContext = {
                 editor,
                 plugins,
+                period,
             };
             const shown = (input.widgets ?? DEFAULT_DASHBOARD).filter(
                 (widget) => accessRefusal(widget.auth, caller, 'A widget') === undefined
@@ -225,6 +249,15 @@ export const dashboardRoute = (input: DashboardRouteInput) =>
             return {
                 status: 200,
                 body: {
+                    period: {
+                        key: period.key,
+                        from: period.from.toISOString(),
+                        to: period.to.toISOString(),
+                        previous: {
+                            from: period.previous.from.toISOString(),
+                            to: period.previous.to.toISOString(),
+                        },
+                    },
                     widgets,
                 },
             };

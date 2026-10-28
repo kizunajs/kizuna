@@ -85,6 +85,8 @@ const AppUsers = defineView({
     get: () => undefined,
 });
 
+const DAY = 24 * 60 * 60 * 1000;
+
 const revenueCalls: DashboardContext[] = [];
 const orderCalls: DashboardContext[] = [];
 
@@ -386,6 +388,45 @@ describe('the dashboard', () => {
                 },
             ],
         });
+    });
+
+    it('counts over the last 7 days without `period`, and sends the period it counted over', async () => {
+        const before = Date.now();
+        const response = await as('grace', request(configured).get('/editing/dashboard'));
+        const { period } = revenueCalls[0]!;
+        expect(period.key).toBe('7d');
+        expect(period.to.getTime()).toBeGreaterThanOrEqual(before);
+        expect(period.to.getTime() - period.from.getTime()).toBe(7 * DAY);
+        expect(period.previous.to.getTime()).toBe(period.from.getTime());
+        expect(period.previous.to.getTime() - period.previous.from.getTime()).toBe(7 * DAY);
+        expect(orderCalls[0]!.period).toEqual(period);
+        expect(response.body.period).toEqual({
+            key: '7d',
+            from: period.from.toISOString(),
+            to: period.to.toISOString(),
+            previous: {
+                from: period.previous.from.toISOString(),
+                to: period.previous.to.toISOString(),
+            },
+        });
+    });
+
+    it('hands every function the period the editor picked', async () => {
+        const response = await as('grace', request(configured).get('/editing/dashboard?period=30d'));
+        expect(response.status).toBe(200);
+        expect(response.body.period.key).toBe('30d');
+        for (const { period } of [revenueCalls[0]!, orderCalls[0]!]) {
+            expect(period.key).toBe('30d');
+            expect(period.to.getTime() - period.from.getTime()).toBe(30 * DAY);
+            expect(period.previous.to.getTime() - period.previous.from.getTime()).toBe(30 * DAY);
+        }
+    });
+
+    it('answers 400 to a period it does not offer, and runs no function', async () => {
+        const response = await as('grace', request(configured).get('/editing/dashboard?period=1y'));
+        expect(response.status).toBe(400);
+        expect(revenueCalls).toEqual([]);
+        expect(orderCalls).toEqual([]);
     });
 
     it('shows reviews and collections without `dashboard`', async () => {

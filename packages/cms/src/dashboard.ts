@@ -4,6 +4,63 @@ import type { FieldAuth } from './field.js';
 import { undeclaredAccess, type Editor } from './action.js';
 
 /**
+ * The periods the editor picks from.
+ */
+export const DashboardPeriodKeySchema = z.enum(['24h', '7d', '30d', '90d']);
+
+/**
+ * One of the periods the editor picks from.
+ */
+export type DashboardPeriodKey = z.output<typeof DashboardPeriodKeySchema>;
+
+/**
+ * The period the dashboard opens on.
+ */
+export const DEFAULT_PERIOD: DashboardPeriodKey = '7d';
+
+const HOUR = 60 * 60 * 1000;
+
+const LENGTH: Record<DashboardPeriodKey, number> = {
+    '24h': 24 * HOUR,
+    '7d': 7 * 24 * HOUR,
+    '30d': 30 * 24 * HOUR,
+    '90d': 90 * 24 * HOUR,
+};
+
+/**
+ * The period the dashboard counts over, ending now.
+ */
+export interface DashboardPeriod {
+    key: DashboardPeriodKey;
+    from: Date;
+    to: Date;
+    /**
+     * The period of the same length just before, ending at `from`.
+     */
+    previous: {
+        from: Date;
+        to: Date;
+    };
+}
+
+/**
+ * The period `key` names, ending at `now`.
+ */
+export const periodOf = (key: DashboardPeriodKey, now: Date): DashboardPeriod => {
+    const length = LENGTH[key];
+    const from = new Date(now.getTime() - length);
+    return {
+        key,
+        from,
+        to: now,
+        previous: {
+            from: new Date(from.getTime() - length),
+            to: new Date(from),
+        },
+    };
+};
+
+/**
  * What a stat's `value` and a chart's `data` receive.
  */
 export interface DashboardContext {
@@ -12,6 +69,10 @@ export interface DashboardContext {
      * The plugins' exports, like `plugins.stripe`.
      */
     plugins: Record<string, any>;
+    /**
+     * The period the editor picked.
+     */
+    period: DashboardPeriod;
 }
 
 /**
@@ -63,8 +124,8 @@ interface WidgetAccess {
  * @example
  * {
  *     type: 'stat',
- *     label: 'Revenue this week',
- *     value: revenueThisWeek,
+ *     label: 'Revenue',
+ *     value: revenue,
  * }
  */
 export interface StatWidget extends WidgetAccess {

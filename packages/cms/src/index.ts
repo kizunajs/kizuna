@@ -35,6 +35,8 @@ export {
     type ChartWidget,
     type CollectionsWidget,
     type DashboardContext,
+    type DashboardPeriod,
+    type DashboardPeriodKey,
     type DashboardWidget,
     type ReviewsWidget,
     type StatValue,

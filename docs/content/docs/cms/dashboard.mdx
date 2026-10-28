@@ -10,8 +10,8 @@ content: cms({
     dashboard: [
         {
             type: 'stat',
-            label: 'Revenue this week',
-            value: revenueThisWeek,
+            label: 'Revenue',
+            value: revenue,
             auth: {
                 roles: 'admin',
             },
@@ -44,15 +44,30 @@ Without `dashboard`, the admin shows `reviews` and `collections`.
 
 ## Numbers from your code
 
-A `stat` or `chart` gets its numbers from your function, which runs on your server when the dashboard opens. Revenue can come from Stripe and orders from your own database, since the CMS never needs to hold them. Each function receives `editor` and `plugins`.
+A `stat` or `chart` gets its numbers from your function, which runs on your server when the dashboard opens. Revenue can come from Stripe and orders from your own database, since the CMS never needs to hold them. Each function receives `editor`, `plugins` and `period`.
+
+### The period
+
+The editor picks the period the dashboard counts over, at its top right: the last 24 hours, the last 7 days, the last 30 days or the last 90 days. The dashboard opens on the last 7 days.
+
+Your function receives the period they picked. A widget's label names what it counts, like "Revenue", and the picker says over which days:
+
+| `period`   | What it is                                                   |
+| ---------- | ------------------------------------------------------------ |
+| `key`      | `'24h'`, `'7d'`, `'30d'` or `'90d'`                          |
+| `from`     | When the period starts, a `Date`                             |
+| `to`       | When it ends: now                                            |
+| `previous` | The period of the same length just before, as `{ from, to }` |
+
+`previous` is what a stat's change and a chart's comparison count over, so neither needs date arithmetic of your own.
 
 ### Stats
 
 `value` returns what the stat shows:
 
 ```ts title="src/cms/dashboard.ts"
-export async function revenueThisWeek() {
-    const total = await revenueSince(startOfWeek(new Date()));
+export async function revenue({ period }: DashboardContext) {
+    const total = await revenueBetween(period.from, period.to);
     return formatKroner(total);
 }
 ```
@@ -62,28 +77,25 @@ Return `{ value, detail }` to add a line under the number, like "48 orders".
 Add `change` to say how far the number moved since the period before, as a fraction: `0.081` shows as ↑ 8.1% and `-0.02` as ↓ 2%.
 
 ```ts title="src/cms/dashboard.ts"
-export async function revenueThisWeek() {
-    const now = new Date();
-    const total = await revenueForWeek(now);
-    const lastWeek = await revenueForWeek(daysBefore(now, 7));
+export async function revenue({ period }: DashboardContext) {
+    const total = await revenueBetween(period.from, period.to);
+    const before = await revenueBetween(period.previous.from, period.previous.to);
     return {
         value: formatKroner(total),
-        change: (total - lastWeek) / lastWeek,
+        change: (total - before) / before,
     };
 }
 ```
 
-When last week sold nothing, the division gives no finite number, and the stat shows no change.
+When the period before sold nothing, the division gives no finite number, and the stat shows no change.
 
 Add `trend` to draw a small line beside the number, from values oldest first:
 
 ```ts title="src/cms/dashboard.ts"
-export async function visitorsToday() {
-    const days = await countVisitorsByDay({
-        days: 14,
-    });
+export async function visitors({ period }: DashboardContext) {
+    const days = await countVisitorsByDay(period.from, period.to);
     return {
-        value: await countVisitorsToday(),
+        value: await countVisitors(period.from, period.to),
         trend: days.map((day) => day.count),
     };
 }
@@ -94,10 +106,8 @@ export async function visitorsToday() {
 `data` returns the chart's points, oldest first:
 
 ```ts title="src/cms/dashboard.ts"
-export async function ordersPerDay() {
-    const days = await countOrdersByDay({
-        days: 14,
-    });
+export async function ordersPerDay({ period }: DashboardContext) {
+    const days = await countOrdersByDay(period.from, period.to);
     return days.map((day) => ({
         label: formatDay(day.date),
         value: day.count,
@@ -130,18 +140,13 @@ A value is a plain number, and the chart labels its axis from them. `description
 Give a point a `previous` value to compare it with the same point in the period before. The chart draws the period before as a dashed line, or a paler bar, behind this one, with a legend telling them apart:
 
 ```ts title="src/cms/dashboard.ts"
-export async function salesPerDay() {
-    const thisMonth = await revenueByDay({
-        days: 30,
-    });
-    const lastMonth = await revenueByDay({
-        days: 30,
-        endingDaysAgo: 30,
-    });
-    return thisMonth.map((day, index) => ({
+export async function salesPerDay({ period }: DashboardContext) {
+    const days = await revenueByDay(period.from, period.to);
+    const before = await revenueByDay(period.previous.from, period.previous.to);
+    return days.map((day, index) => ({
         label: formatDay(day.date),
         value: day.total,
-        previous: lastMonth[index]?.total,
+        previous: before[index]?.total,
     }));
 }
 ```
