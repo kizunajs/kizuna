@@ -20,6 +20,10 @@ export interface DescribedField {
     description: string | undefined;
     auth: FieldAuth | undefined;
     readOnly: boolean;
+    /**
+     * Whether the document needs a value here before it can publish.
+     */
+    required: boolean;
     schema: z.ZodType;
     position: 'sidebar' | undefined;
     width: string | undefined;
@@ -74,6 +78,7 @@ const describe = (field: Field, parentPath: string, within: readonly string[], l
         description: fieldDescription(field),
         auth: field.auth,
         readOnly: field.readOnly === true,
+        required: !unwrapOptionalWrappers(field.schema).optional,
         schema: field.schema,
         position: field.position,
         width: field.width,

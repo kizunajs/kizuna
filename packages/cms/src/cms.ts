@@ -1300,6 +1300,7 @@ export class CmsService {
                           layout: field.layout,
                       }),
                 readOnly: field.readOnly,
+                required: field.required,
                 writable: pathRefusal(definition.fields, field.path, caller) === undefined,
                 ...(roles === undefined ? {} : { roles }),
                 ...(brand === undefined ? {} : { brand }),

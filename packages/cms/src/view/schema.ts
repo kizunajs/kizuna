@@ -42,6 +42,10 @@ export interface DescribedField {
      */
     layout?: string[];
     readOnly: boolean;
+    /**
+     * Whether the document needs a value here before it can publish.
+     */
+    required: boolean;
     writable: boolean;
     roles?: string[];
     brand?: string;
@@ -141,6 +145,10 @@ export interface Draft {
     complete: boolean;
     missing: string[];
     updatedAt: string | null;
+    /**
+     * Who saved it last, by id.
+     */
+    updatedBy: string | null;
 }
 
 /**

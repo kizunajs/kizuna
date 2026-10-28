@@ -491,6 +491,20 @@ describe('describe', () => {
         });
     });
 
+    it('says which fields need a value before the document publishes', async () => {
+        const response = await asEditor(request(app).get('/editing/describe').query({ ref: 'page:frontPage' }));
+        const required = Object.fromEntries(
+            response.body.fields.map((field: { path: string; required: boolean }) => [field.path, field.required])
+        );
+        expect(required).toMatchObject({
+            'hero.heading': true,
+            'hero.image': false,
+            featured: true,
+            tagline: false,
+            saleEndsAt: false,
+        });
+    });
+
     it('describes a date field as a date-time string, the form JSON carries it in', async () => {
         const response = await asEditor(request(app).get('/editing/describe').query({ ref: 'page:frontPage' }));
         const saleEndsAt = response.body.fields.find((field: { path: string }) => field.path === 'saleEndsAt');

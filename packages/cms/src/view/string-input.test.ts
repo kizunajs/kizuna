@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { JsonSchema } from './schema.js';
-import { stringInputOf } from './string-input.js';
+import { counterShown, stringInputOf } from './string-input.js';
 
 const inputFor = (schema: z.ZodType): string => stringInputOf(z.toJSONSchema(schema) as JsonSchema);
 
@@ -32,5 +32,18 @@ describe('stringInputOf', () => {
     it('gives a plain string allowed past 120 characters a textarea', () => {
         expect(inputFor(z.string().max(121))).toBe('textarea');
         expect(inputFor(z.string().max(500))).toBe('textarea');
+    });
+});
+
+describe('counterShown', () => {
+    it('shows once the text reaches nine tenths of its limit', () => {
+        expect(counterShown(10, 60)).toBe(false);
+        expect(counterShown(53, 60)).toBe(false);
+        expect(counterShown(54, 60)).toBe(true);
+        expect(counterShown(70, 60)).toBe(true);
+    });
+
+    it('never shows without a limit', () => {
+        expect(counterShown(5000, undefined)).toBe(false);
     });
 });

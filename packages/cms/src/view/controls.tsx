@@ -13,21 +13,25 @@ import {
     ChevronsUpDown,
     Ellipsis,
     GripVertical,
+    LoaderCircle,
     Lock,
     LockOpen,
     Pencil,
     Plus,
+    RotateCcw,
     Search,
+    Upload,
     X,
 } from 'lucide-react';
 import { indexLabelOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './array-rows.js';
 import { ICON, useEditorContext } from './context.js';
 import { Hint } from './hint.js';
-import { MediaPicker, type MediaRecord } from './media.js';
+import { cropOf, edgesOf, type CropEdges } from './crop.js';
+import { MediaPicker, uploadMedia, type MediaRecord } from './media.js';
 import { emptyFor, humanize, isImage, isRichText, resolveRef, typeOf, type JsonSchema } from './schema.js';
 import { RichTextControl } from './rich-text.js';
 import { isSeo, SeoControl } from './seo.js';
-import { stringInputOf } from './string-input.js';
+import { counterShown, stringInputOf } from './string-input.js';
 
 export interface ControlProps {
     schema: JsonSchema;
@@ -193,7 +197,7 @@ function StringControl(props: ControlProps) {
     if (props.name === 'slug' && input === 'text') return <SlugControl {...props} />;
     const over = schema.maxLength !== undefined && text.length > schema.maxLength;
     return (
-        <div className="k-text-field">
+        <div className="k-text-field" data-counted={counterShown(text.length, schema.maxLength)}>
             {input === 'textarea' ? (
                 <textarea
                     id={id}
@@ -213,9 +217,9 @@ function StringControl(props: ControlProps) {
                     onChange={(event) => set(event.target.value)}
                 />
             )}
-            {schema.maxLength !== undefined ? (
+            {counterShown(text.length, schema.maxLength) ? (
                 <span className="k-counter" data-over={over}>
-                    {text.length}/{schema.maxLength}
+                    {text.length} / {schema.maxLength}
                 </span>
             ) : null}
         </div>
@@ -372,35 +376,41 @@ interface ImageRef {
     };
 }
 
-const CROP_EDGES: Array<{ key: keyof NonNullable<ImageRef['crop']>; label: string }> = [
+const CROP_EDGES: Array<{ key: keyof CropEdges; label: string }> = [
     {
-        key: 'x',
-        label: 'X',
+        key: 'top',
+        label: 'Top',
     },
     {
-        key: 'y',
-        label: 'Y',
+        key: 'right',
+        label: 'Right',
     },
     {
-        key: 'width',
-        label: 'W',
+        key: 'bottom',
+        label: 'Bottom',
     },
     {
-        key: 'height',
-        label: 'H',
+        key: 'left',
+        label: 'Left',
     },
 ];
 
 /**
- * An image as one compact row: a thumbnail, its alt text or file name, and
- * buttons to edit or remove it. Edit opens a sheet with the image at size,
- * where a click sets the focal point, with Replace, its alt text and its crop.
+ * An image as a card: a thumbnail, its file name and size, and buttons to
+ * edit or remove it. In a narrow column the image shows large above its name.
+ * Edit opens a sheet with the image at size, where a click sets the focal
+ * point, with its alt text and its crop, kept once the person applies them.
+ * An empty field takes an image from the library or a file dropped on it.
  */
-function ImageControl({ value, onChange, disabled }: ControlProps) {
+function ImageControl({ value, onChange, disabled, required }: ControlProps) {
     const { connection, resolveUrl } = useEditorContext();
     const image = (value ?? {}) as ImageRef;
     const [record, setRecord] = useState<MediaRecord | undefined>();
     const [editing, setEditing] = useState(false);
+    const [sheet, setSheet] = useState<ImageRef>(image);
+    const [over, setOver] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [problem, setProblem] = useState<string | undefined>();
     useEffect(() => {
         if (image.id === undefined) {
             setRecord(undefined);
@@ -416,155 +426,269 @@ function ImageControl({ value, onChange, disabled }: ControlProps) {
                 if (answer.status === 200) setRecord(answer.body);
             });
     }, [connection, image.id]);
-    const set = (patch: Partial<ImageRef>): void =>
+    const pick = (picked: MediaRecord): void =>
         onChange({
             ...image,
-            alt: image.alt ?? '',
-            ...patch,
-        });
-    const pick = (picked: MediaRecord): void =>
-        set({
             id: picked.id,
             alt: image.alt === undefined || image.alt === '' ? (picked.alt ?? '') : image.alt,
             crop: undefined,
             focalPoint: undefined,
         });
+    const drop = async (file: File | undefined): Promise<void> => {
+        setOver(false);
+        if (file === undefined || disabled) return;
+        if (!file.type.startsWith('image/')) {
+            setProblem('Drop an image file.');
+            return;
+        }
+        setUploading(true);
+        setProblem(undefined);
+        const uploaded = await uploadMedia(connection, file);
+        setUploading(false);
+        if ('problem' in uploaded) {
+            setProblem(uploaded.problem);
+            return;
+        }
+        pick(uploaded);
+    };
 
-    if (image.id === undefined) return <MediaPicker current={undefined} disabled={disabled} onPick={pick} />;
+    if (image.id === undefined) {
+        return (
+            <div
+                className="k-image-drop"
+                data-over={over}
+                onDragOver={(event) => {
+                    if (disabled) return;
+                    event.preventDefault();
+                    setOver(true);
+                }}
+                onDragLeave={() => setOver(false)}
+                onDrop={(event) => {
+                    event.preventDefault();
+                    void drop(event.dataTransfer.files[0]);
+                }}>
+                {over ? (
+                    <span className="k-image-drop__over">
+                        <Upload {...ICON} />
+                        Drop to upload
+                    </span>
+                ) : uploading ? (
+                    <span className="k-image-drop__over">
+                        <LoaderCircle {...ICON} className="k-spin" />
+                        Uploading
+                    </span>
+                ) : (
+                    <>
+                        <MediaPicker current={undefined} disabled={disabled} onPick={pick} />
+                        {disabled ? null : <span className="k-image-drop__hint">or drag and drop a file</span>}
+                    </>
+                )}
+                {problem === undefined ? null : (
+                    <p className="k-error k-image-drop__problem" role="alert">
+                        {problem}
+                    </p>
+                )}
+            </div>
+        );
+    }
 
     const source = record === undefined ? undefined : resolveUrl(record.url);
-    const title = image.alt === undefined || image.alt === '' ? (record?.filename ?? 'Image') : image.alt;
+    const edges = record === undefined ? undefined : edgesOf(sheet.crop, record.width, record.height);
+    const setEdge = (edge: keyof CropEdges, next: number | null): void => {
+        if (record === undefined || edges === undefined) return;
+        setSheet({
+            ...sheet,
+            crop: cropOf(
+                {
+                    ...edges,
+                    [edge]: next ?? 0,
+                },
+                record.width,
+                record.height
+            ),
+        });
+    };
     return (
         <div className="k-image">
             {record === undefined ? (
                 <span className="k-image__thumb" aria-hidden="true" />
             ) : (
-                <img className="k-image__thumb" src={resolveUrl(`${record.url}?w=120`)} alt="" />
+                <img className="k-image__thumb" src={resolveUrl(`${record.url}?w=640`)} alt={image.alt ?? ''} />
             )}
-            <span className="k-image__name">
-                <span className="k-image__title">{title}</span>
-                {record === undefined ? null : (
-                    <span className="k-image__size">
-                        {record.width} × {record.height}
+            <span className="k-image__meta">
+                <span className="k-image__name">
+                    <span className="k-image__title" title={record?.filename}>
+                        {record?.filename ?? 'Image'}
                     </span>
-                )}
-            </span>
-            <span className="k-image__buttons">
-                <Dialog.Root open={editing} onOpenChange={setEditing}>
-                    <Hint label="Edit image">
-                        <Dialog.Trigger className="k-icon-button" aria-label="Edit image">
-                            <Pencil {...ICON} />
-                        </Dialog.Trigger>
-                    </Hint>
-                    <Dialog.Portal>
-                        <Dialog.Backdrop className="k-backdrop" />
-                        <Dialog.Popup className="k-sheet">
-                            <div className="k-sheet__head">
-                                <Dialog.Title className="k-dialog__title k-ellipsis">{record?.filename ?? 'Image'}</Dialog.Title>
-                                <Dialog.Close className="k-icon-button" aria-label="Close">
-                                    <X {...ICON} />
-                                </Dialog.Close>
-                            </div>
-                            {source === undefined ? null : (
-                                <div className="k-image-frame">
-                                    <img
-                                        src={source}
-                                        alt=""
-                                        data-editable={!disabled}
-                                        onClick={(event) => {
-                                            if (disabled) return;
-                                            const rect = event.currentTarget.getBoundingClientRect();
-                                            set({
-                                                focalPoint: {
-                                                    x: Math.round(((event.clientX - rect.left) / rect.width) * 100) / 100,
-                                                    y: Math.round(((event.clientY - rect.top) / rect.height) * 100) / 100,
-                                                },
-                                            });
-                                        }}
-                                    />
-                                    {image.focalPoint !== undefined ? (
-                                        <span
-                                            className="k-image-frame__focal"
-                                            style={{
-                                                left: `${image.focalPoint.x * 100}%`,
-                                                top: `${image.focalPoint.y * 100}%`,
-                                            }}
-                                        />
-                                    ) : null}
+                    {record === undefined ? null : (
+                        <span className="k-image__size">
+                            {record.width} × {record.height}
+                        </span>
+                    )}
+                </span>
+                <span className="k-image__buttons">
+                    <Dialog.Root
+                        open={editing}
+                        onOpenChange={(open) => {
+                            if (open) setSheet(image);
+                            setEditing(open);
+                        }}>
+                        <Hint label="Edit image">
+                            <Dialog.Trigger className="k-icon-button" aria-label="Edit image">
+                                <Pencil {...ICON} />
+                            </Dialog.Trigger>
+                        </Hint>
+                        <Dialog.Portal>
+                            <Dialog.Backdrop className="k-backdrop" />
+                            <Dialog.Popup className="k-sheet k-sheet--image">
+                                <div className="k-sheet__head">
+                                    <Dialog.Title className="k-dialog__title k-ellipsis">{record?.filename ?? 'Image'}</Dialog.Title>
+                                    <Dialog.Close className="k-icon-button" aria-label="Close">
+                                        <X {...ICON} />
+                                    </Dialog.Close>
                                 </div>
-                            )}
-                            {disabled ? null : (
-                                <div className="k-sheet__actions">
-                                    <MediaPicker current={image.id} disabled={disabled} onPick={pick} />
-                                    <span className="k-help">Click the image to set its focus.</span>
-                                </div>
-                            )}
-                            <label className="k-sheet__field">
-                                <span className="k-sheet__label">Alt text</span>
-                                <input
-                                    className="k-input"
-                                    type="text"
-                                    value={image.alt ?? ''}
-                                    disabled={disabled}
-                                    placeholder="What the image shows"
-                                    onChange={(event) =>
-                                        set({
-                                            alt: event.target.value,
-                                        })
-                                    }
-                                />
-                            </label>
-                            {disabled ? null : (
-                                <Collapsible.Root className="k-collapsible">
-                                    <Collapsible.Trigger className="k-collapsible__trigger">
-                                        <ChevronRight {...ICON} />
-                                        Crop
-                                    </Collapsible.Trigger>
-                                    <Collapsible.Panel className="k-collapsible__panel">
-                                        <div className="k-crop">
-                                            {CROP_EDGES.map((edge) => (
-                                                <NumberField.Root
-                                                    key={edge.key}
-                                                    value={
-                                                        image.crop?.[edge.key] ?? (edge.key === 'width' || edge.key === 'height' ? 1 : 0)
-                                                    }
-                                                    min={0}
-                                                    max={1}
-                                                    step={0.01}
-                                                    onValueChange={(next) =>
-                                                        set({
-                                                            crop: {
-                                                                x: 0,
-                                                                y: 0,
-                                                                width: 1,
-                                                                height: 1,
-                                                                ...image.crop,
-                                                                [edge.key]: next ?? 0,
-                                                            },
+                                {source === undefined ? null : (
+                                    <div className="k-sheet__group">
+                                        <div className="k-image-frame">
+                                            <img
+                                                src={source}
+                                                alt=""
+                                                data-editable={!disabled}
+                                                onClick={(event) => {
+                                                    if (disabled) return;
+                                                    const rect = event.currentTarget.getBoundingClientRect();
+                                                    setSheet({
+                                                        ...sheet,
+                                                        focalPoint: {
+                                                            x: Math.round(((event.clientX - rect.left) / rect.width) * 100) / 100,
+                                                            y: Math.round(((event.clientY - rect.top) / rect.height) * 100) / 100,
+                                                        },
+                                                    });
+                                                }}
+                                            />
+                                            {edges === undefined || record === undefined ? null : (
+                                                <span
+                                                    className="k-image-frame__crop"
+                                                    style={{
+                                                        top: `${(edges.top / record.height) * 100}%`,
+                                                        right: `${(edges.right / record.width) * 100}%`,
+                                                        bottom: `${(edges.bottom / record.height) * 100}%`,
+                                                        left: `${(edges.left / record.width) * 100}%`,
+                                                    }}
+                                                />
+                                            )}
+                                            {sheet.focalPoint !== undefined ? (
+                                                <span
+                                                    className="k-image-frame__focal"
+                                                    style={{
+                                                        left: `${sheet.focalPoint.x * 100}%`,
+                                                        top: `${sheet.focalPoint.y * 100}%`,
+                                                    }}
+                                                />
+                                            ) : null}
+                                        </div>
+                                        <div className="k-sheet__row">
+                                            <p className="k-help">Click the image to set its focus. Crops keep that point in view.</p>
+                                            {disabled || sheet.focalPoint === undefined ? null : (
+                                                <button
+                                                    type="button"
+                                                    className="k-text-button"
+                                                    onClick={() =>
+                                                        setSheet({
+                                                            ...sheet,
+                                                            focalPoint: undefined,
                                                         })
                                                     }>
-                                                    <NumberField.Group className="k-crop__edge">
-                                                        <span className="k-sheet__label" aria-hidden="true">
-                                                            {edge.label}
-                                                        </span>
-                                                        <NumberField.Input className="k-input" aria-label={`Crop ${edge.key}`} />
-                                                    </NumberField.Group>
-                                                </NumberField.Root>
-                                            ))}
+                                                    <RotateCcw {...ICON} />
+                                                    Reset focus
+                                                </button>
+                                            )}
                                         </div>
-                                    </Collapsible.Panel>
-                                </Collapsible.Root>
-                            )}
-                        </Dialog.Popup>
-                    </Dialog.Portal>
-                </Dialog.Root>
-                {disabled ? null : (
-                    <Hint label="Remove image">
-                        <button type="button" className="k-icon-button" aria-label="Remove image" onClick={() => onChange(undefined)}>
-                            <X {...ICON} />
-                        </button>
-                    </Hint>
-                )}
+                                    </div>
+                                )}
+                                <div className="k-row">
+                                    <label className="k-row__label" htmlFor="k-image-alt">
+                                        Alt text
+                                        {required === true ? <Required /> : null}
+                                    </label>
+                                    <div className="k-row__input">
+                                        <input
+                                            id="k-image-alt"
+                                            className="k-input"
+                                            type="text"
+                                            value={sheet.alt ?? ''}
+                                            disabled={disabled}
+                                            placeholder="What the image shows"
+                                            onChange={(event) =>
+                                                setSheet({
+                                                    ...sheet,
+                                                    alt: event.target.value,
+                                                })
+                                            }
+                                        />
+                                        <p className="k-help">What the image shows, for screen readers and search.</p>
+                                    </div>
+                                </div>
+                                {disabled || edges === undefined || record === undefined ? null : (
+                                    <Collapsible.Root className="k-collapsible" defaultOpen={sheet.crop !== undefined}>
+                                        <Collapsible.Trigger className="k-collapsible__trigger">
+                                            <ChevronRight {...ICON} />
+                                            Crop
+                                        </Collapsible.Trigger>
+                                        <Collapsible.Panel className="k-collapsible__panel k-sheet__group">
+                                            <div className="k-crop">
+                                                {CROP_EDGES.map((edge) => (
+                                                    <NumberField.Root
+                                                        key={edge.key}
+                                                        value={edges[edge.key]}
+                                                        min={0}
+                                                        step={1}
+                                                        onValueChange={(next) => setEdge(edge.key, next)}>
+                                                        <NumberField.Group className="k-crop__edge">
+                                                            <label className="k-row__label" htmlFor={`k-crop-${edge.key}`}>
+                                                                {edge.label}
+                                                            </label>
+                                                            <NumberField.Input className="k-input" id={`k-crop-${edge.key}`} />
+                                                        </NumberField.Group>
+                                                    </NumberField.Root>
+                                                ))}
+                                            </div>
+                                            <p className="k-help">
+                                                Pixels trimmed from each edge of the {record.width} × {record.height} original.
+                                            </p>
+                                        </Collapsible.Panel>
+                                    </Collapsible.Root>
+                                )}
+                                {disabled ? null : (
+                                    <div className="k-sheet__foot">
+                                        <MediaPicker current={image.id} disabled={disabled} onPick={pick} />
+                                        <span className="k-review__spacer" />
+                                        <Dialog.Close className="k-button k-button--secondary k-button--small">Cancel</Dialog.Close>
+                                        <button
+                                            type="button"
+                                            className="k-button k-button--primary k-button--small"
+                                            onClick={() => {
+                                                onChange({
+                                                    ...sheet,
+                                                    alt: sheet.alt ?? '',
+                                                });
+                                                setEditing(false);
+                                            }}>
+                                            Apply
+                                        </button>
+                                    </div>
+                                )}
+                            </Dialog.Popup>
+                        </Dialog.Portal>
+                    </Dialog.Root>
+                    {disabled ? null : (
+                        <Hint label="Remove image">
+                            <button type="button" className="k-icon-button" aria-label="Remove image" onClick={() => onChange(undefined)}>
+                                <X {...ICON} />
+                            </button>
+                        </Hint>
+                    )}
+                </span>
             </span>
         </div>
     );
@@ -609,6 +733,15 @@ export const foldsItems = (schema: JsonSchema, root: JsonSchema): boolean => {
     const itemSchema = resolved.items ?? {};
     const item = resolveRef(itemSchema, root);
     return typeOf(item) === 'object' && !isImage(itemSchema, root) && !isRichText(item) && !isSeo(item) && !fitsOneRow(item, root);
+};
+
+/**
+ * Whether a schema edits as a list of items, rather than as rich text, which
+ * stores a list too.
+ */
+export const listsItems = (schema: JsonSchema): boolean => {
+    const resolved = resolveRef(schema, schema);
+    return typeOf(resolved) === 'array' && !isRichText(schema) && !isRichText(resolved);
 };
 
 /**
@@ -733,21 +866,15 @@ function ArrayControl(props: ControlProps) {
             </button>
         );
 
-    const footer = (
-        <div className="k-array__footer">
-            {disabled ? (
-                <span />
-            ) : (
-                <button type="button" className="k-text-button" disabled={max !== undefined && items.length >= max} onClick={add}>
-                    <Plus {...ICON} />
-                    {folds ? `Add ${singular.toLowerCase()}` : 'Add'}
-                </button>
-            )}
-            <span className="k-counter">
-                {items.length}
-                {max !== undefined ? `/${max}` : ''}
-            </span>
-        </div>
+    const footer = disabled ? null : (
+        <button
+            type="button"
+            className="k-button k-button--secondary k-button--small k-array__add"
+            disabled={max !== undefined && items.length >= max}
+            onClick={add}>
+            <Plus {...ICON} />
+            Add {singular.toLowerCase()}
+        </button>
     );
 
     if (folds) {
@@ -877,8 +1004,19 @@ function ArrayControl(props: ControlProps) {
         );
     }
 
+    const captions = oneRow ? Object.keys(resolvedItem.properties ?? {}) : [];
     return (
-        <div className="k-array" data-dragging={drag !== undefined}>
+        <div className="k-array" data-dragging={drag !== undefined} data-one-row={oneRow}>
+            {captions.length === 0 || items.length === 0 ? null : (
+                <div className="k-array__captions" aria-hidden="true" data-grip={!disabled}>
+                    {captions.map((name) => (
+                        <span key={name} className="k-array__caption">
+                            {humanize(name)}
+                            {resolvedItem.required?.includes(name) === true ? <Required /> : null}
+                        </span>
+                    ))}
+                </div>
+            )}
             {items.map((item, index) => (
                 <div
                     key={`${generation}:${index}`}
@@ -897,6 +1035,7 @@ function ArrayControl(props: ControlProps) {
                             <InlineObjectControl
                                 {...props}
                                 id={undefined}
+                                row={index + 1}
                                 schema={resolvedItem}
                                 root={root}
                                 value={item}
@@ -1029,18 +1168,18 @@ function ObjectControl(props: ControlProps) {
 }
 
 /**
- * A short object's properties side by side, each with a small label above,
- * for a list item whose properties all edit on one line.
+ * A short object's properties side by side, for a list item whose properties
+ * all edit on one line. The list captions them once above its first row, so
+ * each input names its property and row to a screen reader alone.
  */
-function InlineObjectControl(props: ControlProps) {
+function InlineObjectControl(props: ControlProps & { row: number }) {
     const base = useId();
     return (
         <div className="k-inline-fields">
             {Object.entries(props.schema.properties ?? {}).map(([name, property]) => (
                 <div key={name} className="k-inline-fields__field">
                     <label className="k-inline-fields__label" htmlFor={`${base}-${name}`}>
-                        {humanize(name)}
-                        {props.schema.required?.includes(name) === true ? <Required /> : null}
+                        {humanize(name)}, row {props.row}
                     </label>
                     <PropertyControl props={props} name={name} property={property} id={`${base}-${name}`} />
                 </div>

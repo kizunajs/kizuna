@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { ImageIcon } from 'lucide-react';
+import type { Connection } from './connection.js';
 import { ICON, useEditorContext } from './context.js';
 
 export interface MediaRecord {
@@ -74,3 +75,51 @@ export function MediaPicker({
         </Popover.Root>
     );
 }
+
+/**
+ * Uploads one file: the CMS hands back where to send it, the browser sends it
+ * there, and the CMS checks it and adds it to the library.
+ */
+export const uploadMedia = async (connection: Connection, file: File): Promise<MediaRecord | { problem: string }> => {
+    const started = await connection.call<{ uploadId: string; url: string; headers: Record<string, string>; maxBytes: number }>(
+        'editing_media_create_upload',
+        {
+            body: {
+                filename: file.name,
+                contentType: file.type === '' ? 'application/octet-stream' : file.type,
+                size: file.size,
+            },
+        }
+    );
+    if (started.status !== 201) {
+        return {
+            problem: (started.body as { detail?: string } | undefined)?.detail ?? 'The upload could not start.',
+        };
+    }
+    if (file.size > started.body.maxBytes) {
+        return {
+            problem: `The file is larger than ${Math.floor(started.body.maxBytes / 1_000_000)} MB.`,
+        };
+    }
+    const sent = await fetch(started.body.url, {
+        method: 'PUT',
+        headers: started.body.headers,
+        body: file,
+    }).catch(() => undefined);
+    if (sent === undefined || !sent.ok) {
+        return {
+            problem: 'The file did not upload.',
+        };
+    }
+    const finished = await connection.call<MediaRecord>('editing_media_complete_upload', {
+        params: {
+            uploadId: started.body.uploadId,
+        },
+    });
+    if (finished.status !== 201) {
+        return {
+            problem: (finished.body as { detail?: string } | undefined)?.detail ?? 'The file was not accepted.',
+        };
+    }
+    return finished.body;
+};

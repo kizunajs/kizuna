@@ -17,3 +17,15 @@ export const stringInputOf = (schema: JsonSchema): 'email' | 'url' | 'text' | 't
     if (schema.format !== undefined) return 'text';
     return schema.maxLength !== undefined && schema.maxLength > ONE_LINE_LENGTH ? 'textarea' : 'text';
 };
+
+/**
+ * How near its limit a string gets before its counter shows: nine tenths.
+ */
+const COUNTER_FROM = 0.9;
+
+/**
+ * Whether a string's counter shows. It stays out of the way until the text
+ * nears the limit, so only a field about to run out of room counts.
+ */
+export const counterShown = (length: number, maxLength: number | undefined): boolean =>
+    maxLength !== undefined && length >= Math.floor(maxLength * COUNTER_FROM);

@@ -252,8 +252,56 @@
     .k-field__control {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--k-label-gap);
         min-width: 0;
+    }
+
+    /* An error sits in a small popup at the input's top right, and a thin red ring marks the input. */
+    .k-field__input {
+        position: relative;
+        min-width: 0;
+    }
+
+    .k-field__error {
+        position: absolute;
+        right: 0;
+        bottom: calc(100% + 6px);
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        max-width: 100%;
+        margin: 0;
+        padding: 4px 8px;
+        border-radius: 8px;
+        background: var(--k-popup);
+        box-shadow:
+            inset 0 1px 0 rgb(255 255 255 / 0.05),
+            0 12px 24px -8px rgb(0 0 0 / 0.6);
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 16px;
+        color: var(--k-ink);
+    }
+
+    .k-field__input[data-invalid='true'] :is(.k-input, .k-rich) {
+        box-shadow:
+            var(--k-control-elevation),
+            inset 0 0 0 1px oklch(71% 0.165 22 / 0.85);
+    }
+
+    /* A field the draft needs before it can publish: a faint outline, and why under it. */
+    .k-field__control[data-missing='true'] :is(.k-input, .k-rich, .k-image-drop) {
+        outline: 2px solid var(--k-line-strong);
+        outline-offset: 2px;
+    }
+
+    .k-field__needed {
+        margin: 0;
+        font-size: 12.5px;
+        font-weight: 500;
+        line-height: 18px;
+        color: var(--k-ink);
     }
 
     /* The input the person pointed at in the preview takes the focus outline. One the model changed gets a fainter one, for a moment. */
@@ -293,6 +341,11 @@
         gap: 14px;
     }
 
+    .k-form__main {
+        display: flex;
+        flex-direction: column;
+    }
+
     .k-form__main,
     .k-form__sidebar {
         min-width: 0;
@@ -309,7 +362,7 @@
     .k-tabs {
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: var(--k-field-gap);
     }
 
     [role='tabpanel'][hidden] {
@@ -322,12 +375,52 @@
         gap: 2px;
     }
 
+    /* Field tabs: a line of names over a hairline, the shown one underlined. */
+    .k-tab-bar--underline {
+        gap: 24px;
+        box-shadow: inset 0 -1px 0 var(--k-line);
+    }
+
+    .k-tab.k-tab--underline {
+        position: relative;
+        height: 40px;
+        padding: 0;
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--k-muted);
+    }
+
+    .k-tab.k-tab--underline:hover {
+        color: var(--k-ink);
+    }
+
+    .k-tab.k-tab--underline[aria-selected='true'] {
+        background: none;
+        box-shadow: none;
+        font-weight: 600;
+        color: var(--k-ink);
+    }
+
+    .k-tab.k-tab--underline[aria-selected='true']::after {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 2px;
+        border-radius: 2px;
+        background: var(--k-ink);
+        content: '';
+    }
+
     /* A row's cells sit side by side, and wrap to stack once one would be narrower than 180px. */
     .k-layout-row {
         display: flex;
         flex-wrap: wrap;
-        align-items: start;
-        gap: 14px;
+        align-items: flex-start;
+        gap: 16px;
     }
 
     .k-layout-row__cell {
@@ -336,7 +429,7 @@
     }
 
     .k-layout-row__cell[data-width='true'] {
-        flex: 1 1 calc(var(--k-width) - 14px);
+        flex: 1 1 calc(var(--k-width) - 16px);
     }
 
     .k-collapsible {
@@ -378,6 +471,96 @@
         display: none;
     }
 
+    /* A collapsible in the form: a soft strip the whole of which toggles, its fields on a fainter fill under it. */
+    .k-collapsible--strip {
+        gap: 0;
+    }
+
+    .k-collapsible--strip > .k-collapsible__trigger {
+        width: 100%;
+        height: 40px;
+        padding: 0 4px 0 14px;
+        border-radius: var(--k-radius-control);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+        font-size: 13.5px;
+        color: var(--k-ink);
+        text-align: left;
+        transition: background-color 0.15s ease;
+    }
+
+    .k-collapsible--strip > .k-collapsible__trigger:hover {
+        background: var(--k-tint);
+    }
+
+    .k-collapsible--strip > .k-collapsible__trigger[data-panel-open] {
+        border-radius: var(--k-radius-control) var(--k-radius-control) 0 0;
+    }
+
+    .k-collapsible__chevron {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        margin-left: auto;
+        border-radius: 8px;
+        color: var(--k-muted);
+    }
+
+    .k-collapsible--strip > .k-collapsible__trigger[data-panel-open] svg {
+        transform: rotate(180deg);
+    }
+
+    .k-collapsible--strip > .k-collapsible__panel {
+        padding: 20px;
+        border-radius: 0 0 var(--k-radius-control) var(--k-radius-control);
+        background: rgb(255 255 255 / 0.02);
+    }
+
+    :root[data-theme='light'] .k-collapsible--strip > .k-collapsible__panel {
+        background: rgb(0 0 0 / 0.015);
+    }
+
+    /* A block's fields under its name as a heading, a hairline above it and no surface of its own. */
+    .k-group {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        margin-top: 12px;
+        padding-top: 36px;
+        box-shadow: inset 0 1px 0 var(--k-line);
+        scroll-margin: 12px;
+    }
+
+    .k-group:first-child {
+        margin-top: 0;
+        padding-top: 0;
+        box-shadow: none;
+    }
+
+    .k-group__head {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+    }
+
+    .k-group__title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 22px;
+        letter-spacing: -0.01em;
+    }
+
+    .k-group__description {
+        margin: 0;
+        font-size: 13px;
+        line-height: 18px;
+        color: var(--k-muted);
+    }
+
     /* Every label sits above its input. */
     .k-row {
         display: flex;
@@ -409,13 +592,14 @@
     .k-row__input {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--k-label-gap);
         min-width: 0;
     }
 
     .k-help {
         margin: 0;
         font-size: 12.5px;
+        line-height: 18px;
         color: var(--k-muted);
     }
 
@@ -452,8 +636,10 @@
     /* Inputs */
 
     .k-input {
+        display: block;
         width: 100%;
         height: var(--k-control-height);
+        margin: 0;
         padding: 0 12px;
         border: 0;
         border-radius: var(--k-radius-control);
@@ -463,13 +649,21 @@
         transition: background-color 0.15s ease;
     }
 
+    .k-input:read-only:not(.k-select) {
+        cursor: default;
+    }
+
     .k-input:hover:not(:disabled) {
         background: var(--k-control-hover);
     }
 
-    .k-input:disabled {
+    /* Read only: the fainter surface fill, muted text, and no hover. */
+    .k-input:disabled,
+    .k-input:disabled:hover {
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
         color: var(--k-muted);
-        cursor: not-allowed;
+        cursor: default;
     }
 
     .k-input::placeholder {
@@ -479,8 +673,13 @@
     .k-textarea {
         height: auto;
         min-height: 88px;
-        padding: 10px 12px 28px;
+        padding: 10px 12px;
+        line-height: 1.45;
         resize: vertical;
+    }
+
+    .k-text-field[data-counted='true'] .k-textarea {
+        padding-bottom: 28px;
     }
 
     .k-text-field {
@@ -500,8 +699,15 @@
         pointer-events: none;
     }
 
-    .k-text-field input.k-input {
-        padding-right: 64px;
+    .k-text-field[data-counted='true'] input.k-input {
+        padding-right: 72px;
+    }
+
+    .k-text-field input.k-input + .k-counter {
+        top: 11px;
+        right: 12px;
+        bottom: auto;
+        line-height: 18px;
     }
 
     .k-counter[data-over='true'] {
@@ -516,6 +722,14 @@
         gap: 8px;
         text-align: left;
         cursor: pointer;
+    }
+
+    .k-select > :first-child {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .k-select__value {
@@ -533,6 +747,10 @@
 
     .k-switch {
         position: relative;
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        align-self: flex-start;
         width: 38px;
         height: 22px;
         padding: 0;
@@ -644,11 +862,9 @@
 
     /* Items are rows on the field's own background, apart by spacing alone. */
     .k-array {
-        --k-inline-label-height: 18px;
-        --k-inline-label-gap: 4px;
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 8px;
     }
 
     .k-array__item {
@@ -659,20 +875,40 @@
         border-radius: 12px;
     }
 
-    /* The handle and the remove button line up with the item's first input. */
+    /* The handle and the remove button line up with the item's inputs. */
     .k-array__item > .k-array__grip,
     .k-array__item > .k-icon-button {
         height: var(--k-control-height);
     }
 
-    .k-array__item[data-one-row='true'] > .k-array__grip,
-    .k-array__item[data-one-row='true'] > .k-icon-button {
-        margin-top: calc(var(--k-inline-label-height) + var(--k-inline-label-gap));
+    .k-array__item > .k-icon-button {
+        width: 32px;
+    }
+
+    /* Short items caption their inputs once, above the first row. */
+    .k-array__captions {
+        display: flex;
+        gap: 8px;
+        padding-right: 38px;
+        font-size: 12px;
+        line-height: 18px;
+        color: var(--k-muted);
+    }
+
+    .k-array__captions[data-grip='true'] {
+        padding-left: 30px;
+    }
+
+    .k-array__caption {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .k-inline-fields {
         display: flex;
-        flex-wrap: wrap;
         gap: 8px;
     }
 
@@ -680,18 +916,25 @@
         display: flex;
         flex: 1 1 0;
         flex-direction: column;
-        gap: var(--k-inline-label-gap);
-        min-width: min(100%, 120px);
+        min-width: 0;
     }
 
     .k-inline-fields__label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
         overflow: hidden;
-        height: var(--k-inline-label-height);
-        font-size: 12px;
-        line-height: var(--k-inline-label-height);
-        color: var(--k-muted);
-        text-overflow: ellipsis;
+        clip-path: inset(50%);
         white-space: nowrap;
+    }
+
+    .k-array__add {
+        align-self: flex-start;
+        padding: 0 12px 0 10px;
+    }
+
+    .k-array > .k-array__add {
+        margin-top: 4px;
     }
 
     .k-array__body {
@@ -738,23 +981,30 @@
         cursor: grabbing;
     }
 
-    .k-array__footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-    /* Items that fold: a row each, its number, tag and title, with the fields under it once open. */
+    /* Items that fold: a strip each, its number, tag and title, with the fields on a fainter fill under it once open. */
     .k-array--folds {
-        gap: 10px;
+        gap: 12px;
     }
 
     .k-array__head {
         display: flex;
-        align-items: baseline;
+        align-items: flex-end;
         justify-content: space-between;
         gap: 12px;
         min-width: 0;
+    }
+
+    .k-array__label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .k-field__label--list {
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 20px;
     }
 
     .k-array__toggles {
@@ -766,7 +1016,7 @@
     .k-array__items {
         display: flex;
         flex-direction: column;
-        gap: 2px;
+        gap: 8px;
     }
 
     .k-array--folds .k-array__item {
@@ -780,13 +1030,20 @@
         display: flex;
         align-items: center;
         gap: 4px;
-        min-height: 40px;
-        padding: 0 2px;
+        height: 40px;
+        padding: 0 4px;
         border-radius: var(--k-radius-control);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+        transition: background-color 0.15s ease;
     }
 
     .k-array__row:hover {
         background: var(--k-tint);
+    }
+
+    .k-array__row:has(.k-array__summary[data-panel-open]) {
+        border-radius: var(--k-radius-control) var(--k-radius-control) 0 0;
     }
 
     .k-array__summary {
@@ -846,7 +1103,13 @@
     }
 
     .k-array__panel {
-        padding: 8px 6px 18px 30px;
+        padding: 20px 20px 24px;
+        border-radius: 0 0 var(--k-radius-control) var(--k-radius-control);
+        background: rgb(255 255 255 / 0.02);
+    }
+
+    :root[data-theme='light'] .k-array__panel {
+        background: rgb(0 0 0 / 0.015);
     }
 
     .k-array__panel[hidden] {
@@ -1032,13 +1295,17 @@
 
     /* Images */
 
-    /* The field is one row: a thumbnail, its name and size, and its buttons. It fits a narrow sidebar. */
+    /* The field is a card: a thumbnail, its name and size, and its buttons. In a narrow column the image shows large above them. */
     .k-image {
         display: flex;
         align-items: center;
         gap: 10px;
         min-width: 0;
-        min-height: var(--k-control-height);
+        padding: 8px 6px 8px 8px;
+        border-radius: 12px;
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+        container-type: inline-size;
     }
 
     .k-image__thumb {
@@ -1054,6 +1321,14 @@
         background: var(--k-control);
     }
 
+    .k-image__meta {
+        display: flex;
+        flex: 1;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
     .k-image__name {
         display: flex;
         flex: 1;
@@ -1064,14 +1339,10 @@
         line-height: 1.35;
     }
 
-    /* A long alt text or file name wraps to two lines before it truncates. */
     .k-image__title {
-        display: -webkit-box;
         overflow: hidden;
-        overflow-wrap: anywhere;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .k-image__size {
@@ -1083,6 +1354,69 @@
         display: flex;
         flex-shrink: 0;
         gap: 2px;
+    }
+
+    .k-form__sidebar .k-image {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .k-form__sidebar .k-image__thumb {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 3 / 2;
+    }
+
+    .k-form__sidebar .k-image__meta {
+        padding-left: 4px;
+    }
+
+    /* An empty image field: the library's button, and room to drop a file. */
+    .k-image-drop {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        min-height: 68px;
+        padding: 16px;
+        border: 1px dashed var(--k-line-strong);
+        border-radius: 12px;
+        background: var(--k-surface);
+        transition: background-color 0.15s ease;
+    }
+
+    .k-image-drop:hover {
+        background: rgb(255 255 255 / 0.05);
+    }
+
+    .k-image-drop[data-over='true'] {
+        justify-content: center;
+        border-color: rgb(255 255 255 / 0.6);
+        background: var(--k-control);
+    }
+
+    :root[data-theme='light'] .k-image-drop[data-over='true'] {
+        border-color: rgb(0 0 0 / 0.5);
+    }
+
+    .k-image-drop__hint {
+        font-size: 13px;
+        color: var(--k-muted);
+    }
+
+    .k-image-drop__over {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        height: 34px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .k-image-drop__problem {
+        flex-basis: 100%;
     }
 
     /* A sheet from the right, for what a field holds beyond its row. */
@@ -1129,6 +1463,40 @@
         color: var(--k-muted);
     }
 
+    .k-sheet--image {
+        gap: 16px;
+        width: min(520px, 100vw);
+    }
+
+    .k-sheet__group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .k-sheet__row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .k-sheet__foot {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin-top: auto;
+    }
+
+    .k-image-frame__crop {
+        position: absolute;
+        box-shadow:
+            0 0 0 999px rgb(0 0 0 / 0.55),
+            inset 0 0 0 1px rgb(255 255 255 / 0.6);
+        pointer-events: none;
+    }
+
     .k-sheet .k-image-frame img {
         max-height: 360px;
     }
@@ -1168,7 +1536,7 @@
     .k-crop {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 6px;
+        gap: 8px;
     }
 
     .k-crop__edge {
@@ -1179,7 +1547,7 @@
     }
 
     .k-crop__edge .k-input {
-        padding: 0 8px;
+        padding: 0 10px;
     }
 
     .k-media {

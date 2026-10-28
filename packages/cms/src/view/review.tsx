@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { AlertDialog } from '@base-ui/react/alert-dialog';
 import { Checkbox } from '@base-ui/react/checkbox';
 import { Check, CircleAlert, LoaderCircle, Undo2 } from 'lucide-react';
@@ -252,6 +252,10 @@ export interface PublishReviewProps {
     everywhere: boolean;
     disabled: boolean;
     /**
+     * The id of what says why the button is disabled.
+     */
+    describedBy?: string | undefined;
+    /**
      * Called after a revert or a publish, so the form and the preview show the
      * drafts as they now stand.
      */
@@ -260,6 +264,14 @@ export interface PublishReviewProps {
      * Called once everything listed is published.
      */
     onPublished: (titles: string[]) => void;
+    ref?: Ref<PublishReviewHandle>;
+}
+
+export interface PublishReviewHandle {
+    /**
+     * Opens the dialog on asking for a review of what changed.
+     */
+    ask: () => void;
 }
 
 /**
@@ -274,10 +286,14 @@ export function PublishReview({
     waiting,
     everywhere,
     disabled,
+    describedBy,
     onChanged,
     onPublished,
+    ref,
 }: PublishReviewProps) {
     const [open, setOpen] = useState(false);
+    // Set by `ask`, so the dialog moves on to asking once the changes load.
+    const askOnLoad = useRef(false);
     const [pending, setPending] = useState<Pending[] | undefined>();
     const [busy, setBusy] = useState<string | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
@@ -402,6 +418,24 @@ export function PublishReview({
         setStep('ask');
     };
 
+    useImperativeHandle(
+        ref,
+        () => ({
+            ask: () => {
+                askOnLoad.current = true;
+                setOpen(true);
+            },
+        }),
+        []
+    );
+
+    // Once the changes load, a dialog opened by `ask` moves on to asking.
+    useEffect(() => {
+        if (!askOnLoad.current || pending === undefined) return;
+        askOnLoad.current = false;
+        if (selected.length > 0) startAsking();
+    }, [pending]);
+
     const ask = async (): Promise<void> => {
         setBusy('ask');
         setProblem(undefined);
@@ -477,7 +511,7 @@ export function PublishReview({
 
     return (
         <AlertDialog.Root open={open} onOpenChange={setOpen}>
-            <AlertDialog.Trigger className="k-button k-button--primary" disabled={disabled}>
+            <AlertDialog.Trigger className="k-button k-button--primary k-review__trigger" disabled={disabled} aria-describedby={describedBy}>
                 {waiting > 0 ? `Review ${waiting}` : 'Publish'}
             </AlertDialog.Trigger>
             <AlertDialog.Portal>

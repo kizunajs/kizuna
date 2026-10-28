@@ -207,6 +207,7 @@ const describeRecord = (cms: CmsService, view: View, record: object, caller: Cal
                       layout: field.layout,
                   }),
             readOnly: field.readOnly,
+            required: field.required,
             writable: saves && pathRefusal(view.fields, field.path, caller) === undefined,
             ...(roles === undefined
                 ? {}

@@ -11,10 +11,10 @@ import {
 } from 'react';
 import { Collapsible } from '@base-ui/react/collapsible';
 import { Tabs } from '@base-ui/react/tabs';
-import { ChevronRight, CircleAlert } from 'lucide-react';
+import { ChevronDown, CircleAlert } from 'lucide-react';
 import { arrange, inSidebar, tabSets, type Arranged } from './arrange.js';
 import { ICON } from './context.js';
-import { Control, foldsItems, Row } from './controls.js';
+import { Control, foldsItems, listsItems, Required, Row } from './controls.js';
 import { labelOf, valueAt, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
@@ -49,6 +49,16 @@ export interface FieldFormProps {
      * The field the person pointed at in the preview.
      */
     pointed: string | undefined;
+    /**
+     * What closes the sidebar under its fields, like the admin's facts about
+     * the document. With it, the sidebar always shows.
+     */
+    aside?: ReactNode;
+    /**
+     * The top-level fields the draft still needs before it can publish, each
+     * marked where it sits.
+     */
+    missing?: readonly string[];
     ref?: Ref<FieldFormHandle>;
 }
 
@@ -62,7 +72,10 @@ export interface FieldFormHandle {
 const refusalFor = (field: DescribedField): string =>
     field.readOnly ? 'Read only' : `Only ${(field.roles ?? ['another role']).join(' or ')} can change this`;
 
-const domId = (path: string): string => `field-${path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+/**
+ * The id of the element that holds a field, to scroll to it.
+ */
+export const fieldDomId = (path: string): string => `field-${path.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
 /**
  * The changes as JSON carries them. An emptied field goes as `null`, which
@@ -77,7 +90,7 @@ export const changesForWire = (changes: Record<string, unknown>): Record<string,
  * collapsibles, with the sidebar beside them when the form is wide enough. A
  * change saves to the draft a moment after typing stops.
  */
-export function FieldForm({ fields, layout, draft, onSave, onState, changed, pointed, ref }: FieldFormProps) {
+export function FieldForm({ fields, layout, draft, onSave, onState, changed, pointed, aside, missing, ref }: FieldFormProps) {
     const [values, setValues] = useState<Record<string, unknown>>({});
     const [shownTabs, setShownTabs] = useState<Readonly<Record<string, string>>>({});
     const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -183,7 +196,7 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
 
     useEffect(() => {
         if (pointed === undefined) return;
-        const section = document.getElementById(domId(pointed));
+        const section = document.getElementById(fieldDomId(pointed));
         section?.scrollIntoView({
             block: 'nearest',
             behavior: 'smooth',
@@ -210,33 +223,38 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
     const errorFor = (path: string): string | undefined =>
         Object.entries(fieldErrors).find(([errorPath]) => errorPath === path || errorPath.startsWith(`${path}.`))?.[1];
 
-    const control = (field: DescribedField, writable: boolean, heading?: ReactNode): ReactNode => (
-        <>
-            <Control
-                id={domId(field.path) + '-input'}
-                name={field.name}
-                label={labelOf(field)}
-                heading={heading}
-                schema={field.schema}
-                root={field.schema}
-                value={valueOf(field.path)}
-                onChange={(value) => change(field.path, value)}
-                disabled={!writable}
-                brand={field.brand}
-                searchTool={field.searchTool}
-                labels={field.options}
-                required
-            />
-            {errorFor(field.path) !== undefined ? (
-                <p className="k-error" role="alert">
-                    <CircleAlert {...ICON} />
-                    {errorFor(field.path)}
-                </p>
-            ) : null}
-            {field.help !== undefined ? <p className="k-help">{field.help}</p> : null}
-            {writable ? null : <p className="k-help">{refusalFor(field)}</p>}
-        </>
-    );
+    const control = (field: DescribedField, writable: boolean, heading?: ReactNode, helpAbove = false): ReactNode => {
+        const error = errorFor(field.path);
+        return (
+            <>
+                <div className="k-field__input" data-invalid={error !== undefined}>
+                    {error === undefined ? null : (
+                        <p className="k-field__error" role="alert">
+                            <CircleAlert {...ICON} />
+                            {error}
+                        </p>
+                    )}
+                    <Control
+                        id={fieldDomId(field.path) + '-input'}
+                        name={field.name}
+                        label={labelOf(field)}
+                        heading={heading}
+                        schema={field.schema}
+                        root={field.schema}
+                        value={valueOf(field.path)}
+                        onChange={(value) => change(field.path, value)}
+                        disabled={!writable}
+                        brand={field.brand}
+                        searchTool={field.searchTool}
+                        labels={field.options}
+                        required
+                    />
+                </div>
+                {field.help !== undefined && !helpAbove ? <p className="k-help">{field.help}</p> : null}
+                {writable ? null : <p className="k-help">{refusalFor(field)}</p>}
+            </>
+        );
+    };
 
     const isMarked = (path: string, marks: ReadonlySet<string> | string | undefined): boolean => {
         if (marks === undefined) return false;
@@ -247,39 +265,63 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
 
     const section = (field: DescribedField): ReactNode => {
         const children = fields.filter((candidate) => candidate.parent === field.path);
-        // A list whose items fold draws the label itself, with Collapse all and Expand all beside it.
-        const folds = children.length === 0 && foldsItems(field.schema, field.schema);
-        const label = (
-            <label className="k-field__label" htmlFor={children.length === 0 && !folds ? domId(field.path) + '-input' : undefined}>
-                {labelOf(field)}
-            </label>
-        );
-        return (
-            <section key={field.path} id={domId(field.path)} className="k-field">
-                {folds ? null : label}
-                {children.length === 0 ? (
-                    <div
-                        className="k-field__control"
-                        data-changed={isMarked(field.path, changed)}
-                        data-pointed={isMarked(field.path, pointed)}>
-                        {control(field, field.writable, folds ? label : undefined)}
+        if (children.length > 0) {
+            // A block's fields sit under its name as a heading, with no surface of their own.
+            return (
+                <section key={field.path} id={fieldDomId(field.path)} className="k-group" aria-labelledby={fieldDomId(field.path) + '-heading'}>
+                    <div className="k-group__head">
+                        <h3 className="k-group__title" id={fieldDomId(field.path) + '-heading'}>
+                            {labelOf(field)}
+                        </h3>
+                        {field.help === undefined ? null : <p className="k-group__description">{field.help}</p>}
                     </div>
-                ) : (
                     <div className="k-fields">
                         {shown(arranged.blocks.get(field.path) ?? [], 'k-fields', (child) => (
                             <div
                                 key={child.path}
-                                id={domId(child.path)}
+                                id={fieldDomId(child.path)}
                                 className="k-field__control"
                                 data-changed={isMarked(child.path, changed)}
                                 data-pointed={isMarked(child.path, pointed)}>
-                                <Row label={labelOf(child)} htmlFor={domId(child.path) + '-input'}>
+                                <Row label={labelOf(child)} htmlFor={fieldDomId(child.path) + '-input'} required={child.required}>
                                     {control(child, child.writable && field.writable)}
                                 </Row>
                             </div>
                         ))}
                     </div>
-                )}
+                </section>
+            );
+        }
+        // A list reads its help under its label, and one whose items fold draws both itself, with Collapse all and Expand all beside them.
+        const folds = foldsItems(field.schema, field.schema);
+        const list = listsItems(field.schema);
+        const label = (
+            <label className={list ? 'k-field__label k-field__label--list' : 'k-field__label'} htmlFor={folds ? undefined : fieldDomId(field.path) + '-input'}>
+                {labelOf(field)}
+                {field.required ? <Required /> : null}
+            </label>
+        );
+        const head =
+            list && field.help !== undefined ? (
+                <span className="k-array__label">
+                    {label}
+                    <span className="k-help">{field.help}</span>
+                </span>
+            ) : (
+                label
+            );
+        const needed = field.parent === undefined && missing?.includes(field.name) === true;
+        return (
+            <section key={field.path} id={fieldDomId(field.path)} className="k-field">
+                {folds ? null : head}
+                <div
+                    className="k-field__control"
+                    data-changed={isMarked(field.path, changed)}
+                    data-pointed={isMarked(field.path, pointed)}
+                    data-missing={needed}>
+                    {control(field, field.writable, folds ? head : undefined, list)}
+                    {needed ? <p className="k-field__needed">Needed before publishing.</p> : null}
+                </div>
             </section>
         );
     };
@@ -320,7 +362,7 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                 return (
                     <Collapsible.Root
                         key={id}
-                        className="k-collapsible"
+                        className="k-collapsible k-collapsible--strip"
                         open={!folded.has(id)}
                         onOpenChange={(open) =>
                             setFolded((previous) => {
@@ -332,8 +374,10 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                             })
                         }>
                         <Collapsible.Trigger className="k-collapsible__trigger">
-                            <ChevronRight {...ICON} />
                             {entry.item.label}
+                            <span className="k-collapsible__chevron">
+                                <ChevronDown {...ICON} />
+                            </span>
                         </Collapsible.Trigger>
                         <Collapsible.Panel keepMounted className={`k-collapsible__panel ${stack}`}>
                             {shown(entry.content, stack, leaf)}
@@ -353,9 +397,9 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                             [entry.id]: tab,
                         }))
                     }>
-                    <Tabs.List className="k-tab-bar">
+                    <Tabs.List className="k-tab-bar k-tab-bar--underline">
                         {entry.tabs.map((tab) => (
-                            <Tabs.Tab key={tab.item.id} value={tab.item.id} className="k-tab">
+                            <Tabs.Tab key={tab.item.id} value={tab.item.id} className="k-tab k-tab--underline">
                                 {tab.item.label}
                             </Tabs.Tab>
                         ))}
@@ -371,10 +415,15 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
 
     return (
         <div className="k-form">
-            <div className="k-form__columns" data-sidebar={arranged.sidebar.length > 0}>
-                <div className="k-form__main k-stack">{shown(arranged.main, 'k-stack', section)}</div>
-                {arranged.sidebar.length > 0 ? (
-                    <aside className="k-form__sidebar k-stack">{shown(arranged.sidebar, 'k-stack', section)}</aside>
+            <div className="k-form__columns" data-sidebar={arranged.sidebar.length > 0 || aside !== undefined}>
+                <div className="k-form__main">
+                    <div className="k-form__fields k-stack">{shown(arranged.main, 'k-stack', section)}</div>
+                </div>
+                {arranged.sidebar.length > 0 || aside !== undefined ? (
+                    <aside className="k-form__sidebar k-stack" aria-label="Sidebar">
+                        {shown(arranged.sidebar, 'k-stack', section)}
+                        {aside}
+                    </aside>
                 ) : null}
             </div>
             {problem !== undefined ? (

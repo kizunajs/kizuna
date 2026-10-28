@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
 import { toolsFor, type Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
-import type { People } from '../view/people.js';
-import type { DescribedField } from '../view/schema.js';
+import { Avatar, type People } from '../view/people.js';
+import type { DescribedField, PersonView } from '../view/schema.js';
 import { fieldChanges, savedAtOf, type FieldChange, type VersionSummary } from './history.js';
 import { Loading, Status, problemOf } from './parts.js';
 
 /**
- * Every version of a document, newest first, with who saved it. Compare lists
+ * Every version of a document, newest first, with where it stood and who
+ * saved it. Compare lists
  * the fields a version holds differently from the draft, and Restore makes
  * it the draft.
  */
@@ -21,6 +22,7 @@ export function Versions({
     people,
     disabled,
     onRestored,
+    onOpen,
 }: {
     connection: Connection;
     documentRef: string;
@@ -36,6 +38,10 @@ export function Versions({
      */
     disabled: boolean;
     onRestored: () => Promise<void>;
+    /**
+     * Goes back to editing the current draft.
+     */
+    onOpen: () => void;
 }) {
     const [versions, setVersions] = useState<VersionSummary[] | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
@@ -108,73 +114,104 @@ export function Versions({
     if (versions === undefined) return <Loading problem={problem} />;
     if (versions.length === 0) return <p className="k-help">Nothing is saved yet. The first save adds a version.</p>;
 
-    const nameOf = (author: string): string => people?.people.find((person) => person.id === author)?.name ?? author;
+    const personOf = (author: string): PersonView =>
+        people?.people.find((person) => person.id === author) ?? {
+            id: author,
+            name: author,
+        };
     const changes: FieldChange[] = compared === undefined ? [] : fieldChanges(fields, compared.content, draft);
+    const live = versions.find((entry) => entry.published)?.version;
 
     return (
         <div className="k-versions">
+            <p className="k-help">Every save, newest first. Compare shows what changed against the current draft.</p>
             {problem === undefined ? null : (
                 <p className="k-error" role="alert">
                     {problem}
                 </p>
             )}
-            {versions.map((entry, index) => (
-                <div key={entry.version} className="k-versions__entry">
-                    <div className="k-versions__version">
-                        <b className="k-versions__date">{savedAtOf(entry.createdAt)}</b>
-                        <span className="k-versions__detail">
-                            <span className="k-ellipsis">
-                                {entry.summary ?? 'Saved'} by {nameOf(entry.createdBy)}
-                            </span>
-                            {entry.published ? <Status status="published" /> : null}
-                        </span>
-                        {index === 0 ? (
-                            <span className="k-help">Current draft</span>
-                        ) : (
-                            <span className="k-versions__actions">
-                                {working === entry.version ? <LoaderCircle {...ICON} className="k-spin" /> : null}
-                                <button
-                                    type="button"
-                                    className="k-button k-button--secondary k-button--small"
-                                    aria-expanded={compared?.version === entry.version}
-                                    disabled={working !== undefined}
-                                    onClick={() => void compare(entry.version)}>
-                                    Compare
-                                </button>
-                                <button
-                                    type="button"
-                                    className="k-button k-button--secondary k-button--small"
-                                    disabled={working !== undefined || disabled}
-                                    onClick={() => void restore(entry.version)}>
-                                    Restore
-                                </button>
-                            </span>
-                        )}
-                    </div>
-                    {compared?.version === entry.version ? (
-                        changes.length === 0 ? (
-                            <p className="k-help k-compare__empty">This version holds what the draft holds.</p>
-                        ) : (
-                            <div className="k-compare" role="table" aria-label={`Version ${entry.version} against the draft`}>
-                                <div className="k-compare__row k-compare__row--head" role="row">
-                                    <span role="columnheader">Field</span>
-                                    <span role="columnheader">This version</span>
-                                    <span role="columnheader">The draft</span>
-                                </div>
-                                {changes.map((change) => (
-                                    <div key={change.path} className="k-compare__row" role="row">
-                                        <span role="cell">{change.label}</span>
-                                        <span role="cell" className="k-compare__then">
-                                            {change.then}
-                                        </span>
-                                        <span role="cell">{change.now}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )
-                    ) : null}
+            <div className="k-versions__table" role="table" aria-label="Versions">
+                <div className="k-versions__row k-versions__row--head" role="row">
+                    <span role="columnheader">Saved</span>
+                    <span role="columnheader">Status</span>
+                    <span role="columnheader">By</span>
+                    <span role="columnheader" className="k-versions__actions">
+                        Actions
+                    </span>
                 </div>
-            ))}
+                {versions.map((entry, index) => {
+                    const author = personOf(entry.createdBy);
+                    return (
+                        <div key={entry.version} className="k-versions__entry" role="rowgroup">
+                            <div className="k-versions__row" role="row" data-current={index === 0}>
+                                <span className="k-versions__saved" role="cell">
+                                    <span>{savedAtOf(entry.createdAt)}</span>
+                                    {index === 0 ? (
+                                        <span className="k-versions__note">Current draft</span>
+                                    ) : entry.version === live ? (
+                                        <span className="k-versions__note">Live on the site</span>
+                                    ) : null}
+                                </span>
+                                <span role="cell">
+                                    <Status status={entry.published ? 'published' : 'draft'} />
+                                </span>
+                                <span className="k-versions__by" role="cell">
+                                    <Avatar person={author} />
+                                    <span className="k-ellipsis">{author.name}</span>
+                                </span>
+                                <span className="k-versions__actions" role="cell">
+                                    {working === entry.version ? <LoaderCircle {...ICON} className="k-spin" /> : null}
+                                    {index === 0 ? (
+                                        <button type="button" className="k-versions__quiet" onClick={onOpen}>
+                                            Open
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <button
+                                                type="button"
+                                                className="k-button k-button--secondary"
+                                                aria-expanded={compared?.version === entry.version}
+                                                disabled={working !== undefined}
+                                                onClick={() => void compare(entry.version)}>
+                                                Compare
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="k-versions__quiet"
+                                                disabled={working !== undefined || disabled}
+                                                onClick={() => void restore(entry.version)}>
+                                                Restore
+                                            </button>
+                                        </>
+                                    )}
+                                </span>
+                            </div>
+                            {compared?.version === entry.version ? (
+                                changes.length === 0 ? (
+                                    <p className="k-help k-compare__empty">This version holds what the draft holds.</p>
+                                ) : (
+                                    <div className="k-compare" role="table" aria-label={`Version ${entry.version} against the draft`}>
+                                        <div className="k-compare__row k-compare__row--head" role="row">
+                                            <span role="columnheader">Field</span>
+                                            <span role="columnheader">This version</span>
+                                            <span role="columnheader">The draft</span>
+                                        </div>
+                                        {changes.map((change) => (
+                                            <div key={change.path} className="k-compare__row" role="row">
+                                                <span role="cell">{change.label}</span>
+                                                <span role="cell" className="k-compare__then">
+                                                    {change.then}
+                                                </span>
+                                                <span role="cell">{change.now}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            ) : null}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }

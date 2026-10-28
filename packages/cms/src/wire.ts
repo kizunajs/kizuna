@@ -132,6 +132,7 @@ export const DescribedFieldSchema = Kizuna.model({
             .optional()
             .describe('The ids of the tabs, rows and collapsibles it sits in, outermost first, from the layout list.'),
         readOnly: z.boolean(),
+        required: z.boolean().describe('Whether the document needs a value here before it can publish.'),
         writable: z.boolean().describe('Whether the caller may write this field.'),
         roles: z.array(z.string()).optional().describe('The roles that may write it, when narrowed.'),
         brand: z.string().optional().describe('The brand of the ids this field holds, when a collection or relationship holds them.'),
