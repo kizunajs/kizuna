@@ -7,7 +7,7 @@ Some work needs room. Tagging forty articles, finding last week's orders, or rea
 
 ## Signing in
 
-The admin is at `/cms` on your site. Editors sign in the way they sign in to your app, as the editor identity under `auth` on `cms()`. A signed-out editor is sent to your `signInPath` and comes back once they are in. Kizuna keeps no accounts and stores no passwords.
+The admin is at `/admin` under the CMS's routes, so `/api/admin` with the default `apiPath`. Editors sign in the way they sign in to your app, as the editor identity under `auth` on `cms()`. A signed-out editor is sent to your `signInPath` and comes back once they are in. Kizuna keeps no accounts and stores no passwords.
 
 ```ts title="kizuna.config.ts"
 content: cms({

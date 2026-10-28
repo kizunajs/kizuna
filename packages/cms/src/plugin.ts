@@ -20,6 +20,7 @@ import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from
 import { PREVIEW_COOKIE, PREVIEW_TTL_SECONDS } from './preview-token.js';
 import { PREVIEW_PROXY_PATH, PROXY_CORS, previewProxyUrl, proxyToSite } from './preview-proxy.js';
 import { draftEventsRoute } from './draft-events.js';
+import { adminRoute } from './admin/route.js';
 import { routePrefix } from './options.js';
 import { resolve } from 'node:path';
 
@@ -256,6 +257,7 @@ const definition = definePlugin({
                 draftEvents: draftEventsRoute(service, options, api, base),
                 previewProxy: previewProxyRoute(service, options, base),
                 previewProxyPreflight: previewProxyPreflightRoute(base),
+                admin: adminRoute(service, options, api, base),
             },
             validate: () => validate(service, options, api),
         };
