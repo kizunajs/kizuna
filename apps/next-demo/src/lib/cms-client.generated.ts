@@ -20,7 +20,7 @@ export namespace API {
      */
     export type ArticleId = string & KizunaBrand<"ArticleId">;
 
-    export namespace Cms {
+    export namespace CMS {
         export type Action = {
             /**
              * The key the action runs under.
@@ -79,7 +79,7 @@ export namespace API {
             /**
              * The widgets the person may see, in the order listed.
              */
-            widgets: Array<Cms.StatWidget | Cms.ChartWidget | Cms.ReviewsWidget | Cms.CollectionsWidget>;
+            widgets: Array<CMS.StatWidget | CMS.ChartWidget | CMS.ReviewsWidget | CMS.CollectionsWidget>;
         };
 
         export type DecideReview = {
@@ -104,6 +104,10 @@ export namespace API {
             label?: string;
             path: string | null;
             /**
+             * The page the Live preview opens on: an item's `preview.url`, where the document is served, or the first page that shows it. Null when no page shows it.
+             */
+            previewPath: string | null;
+            /**
              * Where else the document appears, to say before changing shared content.
              */
             usedOn: {
@@ -120,24 +124,24 @@ export namespace API {
             version: number;
             complete: boolean;
             missing: Array<string>;
-            fields: Array<Cms.Field>;
+            fields: Array<CMS.Field>;
             /**
              * The tabs, rows and collapsibles that arrange the fields, in the order they are shown. Empty when the fields are listed plainly.
              */
-            layout: Array<Cms.Layout>;
+            layout: Array<CMS.Layout>;
             draft: Record<string, unknown> | null;
             /**
              * For an item, the buttons its collection's actions show the caller.
              */
-            actions?: Array<Cms.Action>;
+            actions?: Array<CMS.Action>;
             /**
              * The person who looks after it, if anyone does.
              */
-            owner: Cms.Person | null;
+            owner: CMS.Person | null;
             /**
              * Its latest review since it was last published.
              */
-            review: Cms.ReviewState | null;
+            review: CMS.ReviewState | null;
             /**
              * Whether publishing waits for an approval.
              */
@@ -184,11 +188,11 @@ export namespace API {
             /**
              * The person who looks after it, if anyone does.
              */
-            owner: Cms.Person | null;
+            owner: CMS.Person | null;
             /**
              * Its latest review since it was last published.
              */
-            review: Cms.ReviewState | null;
+            review: CMS.ReviewState | null;
             /**
              * Whether publishing waits for an approval.
              */
@@ -348,7 +352,7 @@ export namespace API {
         };
 
         export type MediaList = {
-            media: Array<Cms.Media>;
+            media: Array<CMS.Media>;
         };
 
         export type MissingFields = {
@@ -395,7 +399,7 @@ export namespace API {
             /**
              * Everyone who edits, to name as an owner or a reviewer.
              */
-            people: Array<Cms.Person>;
+            people: Array<CMS.Person>;
         };
 
         export type Person = {
@@ -430,7 +434,7 @@ export namespace API {
         };
 
         export type Reviews = {
-            reviews: Array<Cms.ReviewState>;
+            reviews: Array<CMS.ReviewState>;
         };
 
         export type ReviewState = {
@@ -443,11 +447,11 @@ export namespace API {
              * The draft version it was asked about, or the one the reviewer answered.
              */
             version: number;
-            reviewers: Array<Cms.Person>;
-            requestedBy: Cms.Person;
+            reviewers: Array<CMS.Person>;
+            requestedBy: CMS.Person;
             note: string | null;
             createdAt: string;
-            decidedBy: Cms.Person | null;
+            decidedBy: CMS.Person | null;
             decisionNote: string | null;
             decidedAt: string | null;
         };
@@ -467,11 +471,11 @@ export namespace API {
                  * The draft version it was asked about, or the one the reviewer answered.
                  */
                 version: number;
-                reviewers: Array<Cms.Person>;
-                requestedBy: Cms.Person;
+                reviewers: Array<CMS.Person>;
+                requestedBy: CMS.Person;
                 note: string | null;
                 createdAt: string;
-                decidedBy: Cms.Person | null;
+                decidedBy: CMS.Person | null;
                 decisionNote: string | null;
                 decidedAt: string | null;
                 ref: string;
@@ -584,7 +588,7 @@ export namespace API {
 
         export type VersionList = {
             name: string;
-            versions: Array<Cms.Version>;
+            versions: Array<CMS.Version>;
         };
 
         export type View = {
@@ -620,12 +624,12 @@ export namespace API {
              * Whether the caller may save nothing in it.
              */
             readOnly: boolean;
-            fields: Array<Cms.Field>;
-            layout: Array<Cms.Layout>;
+            fields: Array<CMS.Field>;
+            layout: Array<CMS.Layout>;
             /**
              * The buttons beside save the caller may press.
              */
-            actions: Array<Cms.Action>;
+            actions: Array<CMS.Action>;
             /**
              * The record, as its fields show it.
              */
@@ -652,11 +656,11 @@ export namespace API {
                  * The draft version it was asked about, or the one the reviewer answered.
                  */
                 version: number;
-                reviewers: Array<Cms.Person>;
-                requestedBy: Cms.Person;
+                reviewers: Array<CMS.Person>;
+                requestedBy: CMS.Person;
                 note: string | null;
                 createdAt: string;
-                decidedBy: Cms.Person | null;
+                decidedBy: CMS.Person | null;
                 decisionNote: string | null;
                 decidedAt: string | null;
                 ref: string;
@@ -719,6 +723,7 @@ export namespace API {
                 updatedAt: string;
                 content: {
                     hero: {
+                        impact: "high" | "medium" | "low";
                         /**
                          * Under 8 words.
                          */
@@ -734,16 +739,98 @@ export namespace API {
                             width: number;
                             height: number;
                         };
-                        cta: {
+                        links: Array<{
                             /**
                              * Two or three words.
                              */
                             label: string;
+                            /**
+                             * A page on this site, like /blog, or an https address.
+                             */
                             href: string;
-                        };
+                        }>;
                     };
-                    featured: Array<ProductId>;
-                    articles: Array<ArticleId>;
+                    intro?: {
+                        columns: Array<{
+                            heading?: string;
+                            body: Array<{
+                                _type: "block";
+                                _key: string;
+                                style: "normal" | "h2" | "h3" | "h4" | "blockquote";
+                                listItem?: "bullet" | "number";
+                                level?: number;
+                                markDefs: Array<{
+                                    _type: "link";
+                                    _key: string;
+                                    /**
+                                     * An https or http URL, mailto:, tel:, a path on this site like /blog, or an #anchor.
+                                     */
+                                    href: string;
+                                }>;
+                                children: Array<{
+                                    _type: "span";
+                                    _key: string;
+                                    text: string;
+                                    marks: Array<string>;
+                                }>;
+                            } | {
+                                _type: "image";
+                                _key: string;
+                                image: {
+                                    id: string;
+                                    url: string;
+                                    alt: string;
+                                    width: number;
+                                    height: number;
+                                };
+                            }>;
+                        }>;
+                    };
+                    shop: {
+                        /**
+                         * Under 8 words.
+                         */
+                        heading: string;
+                        products: Array<ProductId>;
+                    };
+                    media?: {
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                    };
+                    latest: {
+                        /**
+                         * Under 8 words.
+                         */
+                        heading: string;
+                        topic?: "news" | "guides" | "stories";
+                        articles: Array<ArticleId>;
+                    };
+                    callToAction?: {
+                        /**
+                         * Under 8 words.
+                         */
+                        heading: string;
+                        /**
+                         * Why they should, in a sentence or two.
+                         */
+                        body: string;
+                        links: Array<{
+                            /**
+                             * Two or three words.
+                             */
+                            label: string;
+                            /**
+                             * A page on this site, like /blog, or an https address.
+                             */
+                            href: string;
+                        }>;
+                    };
                     seo: {
                         /**
                          * What search results show as the title. 30 to 60 characters show in full.
@@ -793,11 +880,11 @@ export namespace API {
                      */
                     intro: string;
                     buttonLabel: string;
-                    contacts: Array<EmployeeId>;
                     /**
                      * Shown after the form is sent.
                      */
                     thanks: string;
+                    contacts: Array<EmployeeId>;
                 };
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
@@ -829,17 +916,55 @@ export namespace API {
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
     }
 
-    export namespace ContentGlobalsSite {
+    export namespace ContentGlobalsHeader {
+        export type Result =
+            | { status: 200; body: {
+                version: number;
+                updatedAt: string;
+                content: {
+                    navItems: Array<{
+                        /**
+                         * Two or three words.
+                         */
+                        label: string;
+                        /**
+                         * A page on this site, like /blog, or an https address.
+                         */
+                        href: string;
+                    }>;
+                    announcement?: string;
+                };
+            }; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace ContentGlobalsFooter {
         export type Result =
             | { status: 200; body: {
                 version: number;
                 updatedAt: string;
                 content: {
                     /**
-                     * One line under every page.
+                     * One line under the logo.
                      */
-                    footerText: string;
+                    tagline: string;
+                    navItems: Array<{
+                        /**
+                         * Two or three words.
+                         */
+                        label: string;
+                        /**
+                         * A page on this site, like /blog, or an https address.
+                         */
+                        href: string;
+                    }>;
                     contactEmail: string;
+                    phone: string;
+                    address: string;
+                    /**
+                     * When the shop is open, like Mon to Fri 10 to 18.
+                     */
+                    openingHours: string;
                 };
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
@@ -867,8 +992,9 @@ export namespace API {
                      * Their title, as on a business card.
                      */
                     role: string;
-                    department: "design" | "engineering" | "sales" | "support";
                     email?: string;
+                    phone?: string;
+                    bio?: string;
                     photo?: {
                         id: string;
                         url: string;
@@ -876,7 +1002,7 @@ export namespace API {
                         width: number;
                         height: number;
                     };
-                    bio?: string;
+                    department: "design" | "engineering" | "sales" | "support";
                     order: number;
                     id: string;
                 }>;
@@ -897,8 +1023,9 @@ export namespace API {
                  * Their title, as on a business card.
                  */
                 role: string;
-                department: "design" | "engineering" | "sales" | "support";
                 email?: string;
+                phone?: string;
+                bio?: string;
                 photo?: {
                     id: string;
                     url: string;
@@ -906,7 +1033,7 @@ export namespace API {
                     width: number;
                     height: number;
                 };
-                bio?: string;
+                department: "design" | "engineering" | "sales" | "support";
                 order: number;
                 id: string;
             }; headers: Record<string, string> }
@@ -917,7 +1044,8 @@ export namespace API {
         export type Query = {
             slug?: string;
             topic?: "news" | "guides" | "stories";
-            orderBy?: "slug" | "topic" | "publishedAt" | "updatedAt";
+            publishedOn?: string;
+            orderBy?: "slug" | "topic" | "publishedOn" | "publishedAt" | "updatedAt";
             direction?: "asc" | "desc";
             limit?: number;
             /**
@@ -965,9 +1093,10 @@ export namespace API {
                         };
                     }>;
                     /**
-                     * One or two sentences for the blog index.
+                     * One or two sentences for the blog index and search results.
                      */
                     excerpt: string;
+                    related: Array<ArticleId>;
                     cover: {
                         id: string;
                         url: string;
@@ -976,9 +1105,10 @@ export namespace API {
                         height: number;
                     };
                     /**
-                     * Lowercase words joined by dashes, like spring-sale.
+                     * Lowercase words joined by dashes, like plant-now-for-april.
                      */
                     slug: string;
+                    publishedOn?: string;
                     topic: "news" | "guides" | "stories";
                     author?: EmployeeId;
                     id: string;
@@ -1031,9 +1161,10 @@ export namespace API {
                     };
                 }>;
                 /**
-                 * One or two sentences for the blog index.
+                 * One or two sentences for the blog index and search results.
                  */
                 excerpt: string;
+                related: Array<ArticleId>;
                 cover: {
                     id: string;
                     url: string;
@@ -1042,9 +1173,10 @@ export namespace API {
                     height: number;
                 };
                 /**
-                 * Lowercase words joined by dashes, like spring-sale.
+                 * Lowercase words joined by dashes, like plant-now-for-april.
                  */
                 slug: string;
+                publishedOn?: string;
                 topic: "news" | "guides" | "stories";
                 author?: EmployeeId;
                 id: string;
@@ -1093,7 +1225,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Described; headers: Record<string, string> }
+            | { status: 200; body: CMS.Described; headers: Record<string, string> }
             | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -1105,7 +1237,7 @@ export namespace API {
     export namespace EditingPagesList {
         export type Result =
             | { status: 200; body: {
-                pages: Array<Cms.PageSummary>;
+                pages: Array<CMS.PageSummary>;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -1119,7 +1251,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: {
+            | { status: 200; body: CMS.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1134,7 +1266,7 @@ export namespace API {
             name: string;
         };
 
-        export type Body = Cms.UpdateDraft;
+        export type Body = CMS.UpdateDraft;
 
         export type Headers = {
             /**
@@ -1144,7 +1276,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: {
+            | { status: 200; body: CMS.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1163,7 +1295,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.MissingFields; headers: Record<string, string> }
+            | { status: 200; body: CMS.MissingFields; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1177,7 +1309,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.StoredContent; headers: Record<string, string> }
+            | { status: 200; body: CMS.StoredContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1191,7 +1323,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.VersionList; headers: Record<string, string> }
+            | { status: 200; body: CMS.VersionList; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1206,7 +1338,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.VersionContent; headers: Record<string, string> }
+            | { status: 200; body: CMS.VersionContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1220,7 +1352,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.DraftChanges; headers: Record<string, string> }
+            | { status: 200; body: CMS.DraftChanges; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1233,10 +1365,10 @@ export namespace API {
             name: string;
         };
 
-        export type Body = Cms.Revert;
+        export type Body = CMS.Revert;
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1256,7 +1388,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1271,7 +1403,7 @@ export namespace API {
             name: string;
         };
 
-        export type Body = Cms.SetOwner;
+        export type Body = CMS.SetOwner;
 
         export type Result =
             | { status: 204; body: undefined; headers: Record<string, string> }
@@ -1290,10 +1422,10 @@ export namespace API {
             name: string;
         };
 
-        export type Body = Cms.Rollback;
+        export type Body = CMS.Rollback;
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1327,7 +1459,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: {
+            | { status: 200; body: CMS.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1342,7 +1474,7 @@ export namespace API {
             name: string;
         };
 
-        export type Body = Cms.UpdateDraft;
+        export type Body = CMS.UpdateDraft;
 
         export type Headers = {
             /**
@@ -1352,7 +1484,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: {
+            | { status: 200; body: CMS.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1371,7 +1503,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.MissingFields; headers: Record<string, string> }
+            | { status: 200; body: CMS.MissingFields; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1385,7 +1517,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.StoredContent; headers: Record<string, string> }
+            | { status: 200; body: CMS.StoredContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1399,7 +1531,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.VersionList; headers: Record<string, string> }
+            | { status: 200; body: CMS.VersionList; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1414,7 +1546,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.VersionContent; headers: Record<string, string> }
+            | { status: 200; body: CMS.VersionContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1428,7 +1560,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.DraftChanges; headers: Record<string, string> }
+            | { status: 200; body: CMS.DraftChanges; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1441,10 +1573,10 @@ export namespace API {
             name: string;
         };
 
-        export type Body = Cms.Revert;
+        export type Body = CMS.Revert;
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1464,7 +1596,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1479,7 +1611,7 @@ export namespace API {
             name: string;
         };
 
-        export type Body = Cms.SetOwner;
+        export type Body = CMS.SetOwner;
 
         export type Result =
             | { status: 204; body: undefined; headers: Record<string, string> }
@@ -1498,10 +1630,10 @@ export namespace API {
             name: string;
         };
 
-        export type Body = Cms.Rollback;
+        export type Body = CMS.Rollback;
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1548,7 +1680,7 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: {
-                items: Array<Cms.EditorItem>;
+                items: Array<CMS.EditorItem>;
             }; headers: Record<string, string> }
             | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1571,7 +1703,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 201; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 201; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1604,7 +1736,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: {
+            | { status: 200; body: CMS.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1620,7 +1752,7 @@ export namespace API {
             id: string;
         };
 
-        export type Body = Cms.UpdateDraft;
+        export type Body = CMS.UpdateDraft;
 
         export type Headers = {
             /**
@@ -1630,7 +1762,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: {
+            | { status: 200; body: CMS.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1650,7 +1782,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.MissingFields; headers: Record<string, string> }
+            | { status: 200; body: CMS.MissingFields; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1665,7 +1797,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.StoredContent; headers: Record<string, string> }
+            | { status: 200; body: CMS.StoredContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1680,7 +1812,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.VersionList; headers: Record<string, string> }
+            | { status: 200; body: CMS.VersionList; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1696,7 +1828,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.VersionContent; headers: Record<string, string> }
+            | { status: 200; body: CMS.VersionContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1711,7 +1843,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.DraftChanges; headers: Record<string, string> }
+            | { status: 200; body: CMS.DraftChanges; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1725,10 +1857,10 @@ export namespace API {
             id: string;
         };
 
-        export type Body = Cms.Revert;
+        export type Body = CMS.Revert;
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1749,7 +1881,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1765,7 +1897,7 @@ export namespace API {
             id: string;
         };
 
-        export type Body = Cms.SetOwner;
+        export type Body = CMS.SetOwner;
 
         export type Result =
             | { status: 204; body: undefined; headers: Record<string, string> }
@@ -1785,10 +1917,10 @@ export namespace API {
             id: string;
         };
 
-        export type Body = Cms.Rollback;
+        export type Body = CMS.Rollback;
 
         export type Result =
-            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1800,7 +1932,7 @@ export namespace API {
 
     export namespace EditingMediaList {
         export type Result =
-            | { status: 200; body: Cms.MediaList; headers: Record<string, string> }
+            | { status: 200; body: CMS.MediaList; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1813,7 +1945,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.Media; headers: Record<string, string> }
+            | { status: 200; body: CMS.Media; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1840,10 +1972,10 @@ export namespace API {
             id: string;
         };
 
-        export type Body = Cms.UpdateMedia;
+        export type Body = CMS.UpdateMedia;
 
         export type Result =
-            | { status: 200; body: Cms.Media; headers: Record<string, string> }
+            | { status: 200; body: CMS.Media; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1853,10 +1985,10 @@ export namespace API {
     }
 
     export namespace EditingMediaCreateUpload {
-        export type Body = Cms.CreateUpload;
+        export type Body = CMS.CreateUpload;
 
         export type Result =
-            | { status: 201; body: Cms.Upload; headers: Record<string, string> }
+            | { status: 201; body: CMS.Upload; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1871,7 +2003,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 201; body: Cms.Media; headers: Record<string, string> }
+            | { status: 201; body: CMS.Media; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1897,7 +2029,7 @@ export namespace API {
     export namespace EditingListViews {
         export type Result =
             | { status: 200; body: {
-                views: Array<Cms.View>;
+                views: Array<CMS.View>;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -1915,7 +2047,7 @@ export namespace API {
 
         export type Result =
             | { status: 200; body: {
-                items: Array<Cms.ViewRow>;
+                items: Array<CMS.ViewRow>;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -1930,7 +2062,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.ViewRecord; headers: Record<string, string> }
+            | { status: 200; body: CMS.ViewRecord; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1951,7 +2083,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.ViewRecord; headers: Record<string, string> }
+            | { status: 200; body: CMS.ViewRecord; headers: Record<string, string> }
             | { status: 204; body: undefined; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -1969,7 +2101,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.ViewRecord; headers: Record<string, string> }
+            | { status: 200; body: CMS.ViewRecord; headers: Record<string, string> }
             | { status: 204; body: undefined; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -1981,7 +2113,7 @@ export namespace API {
 
     export namespace EditingDashboard {
         export type Result =
-            | { status: 200; body: Cms.Dashboard; headers: Record<string, string> }
+            | { status: 200; body: CMS.Dashboard; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1995,7 +2127,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.WhereUsed; headers: Record<string, string> }
+            | { status: 200; body: CMS.WhereUsed; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -2071,7 +2203,7 @@ export namespace API {
 
     export namespace EditingPeopleList {
         export type Result =
-            | { status: 200; body: Cms.People; headers: Record<string, string> }
+            | { status: 200; body: CMS.People; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -2087,7 +2219,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: Cms.WaitingReviews; headers: Record<string, string> }
+            | { status: 200; body: CMS.WaitingReviews; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -2096,10 +2228,10 @@ export namespace API {
     }
 
     export namespace EditingReviewsRequest {
-        export type Body = Cms.RequestReview;
+        export type Body = CMS.RequestReview;
 
         export type Result =
-            | { status: 201; body: Cms.Reviews; headers: Record<string, string> }
+            | { status: 201; body: CMS.Reviews; headers: Record<string, string> }
             | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -2111,10 +2243,10 @@ export namespace API {
     }
 
     export namespace EditingReviewsDecide {
-        export type Body = Cms.DecideReview;
+        export type Body = CMS.DecideReview;
 
         export type Result =
-            | { status: 200; body: Cms.Reviews; headers: Record<string, string> }
+            | { status: 200; body: CMS.Reviews; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -2192,15 +2324,25 @@ export interface Client {
         };
         globals: {
             /**
-             * Read the published site global
+             * Read the published header global
              *
              * @example
-             * const result = await client.content.globals.site();
+             * const result = await client.content.globals.header();
              */
-            site: ClientMethod<'GET', false, {
+            header: ClientMethod<'GET', false, {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
-            }, API.ContentGlobalsSite.Result>;
+            }, API.ContentGlobalsHeader.Result>;
+            /**
+             * Read the published footer global
+             *
+             * @example
+             * const result = await client.content.globals.footer();
+             */
+            footer: ClientMethod<'GET', false, {
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.ContentGlobalsFooter.Result>;
         };
         collections: {
             employees: {
@@ -3366,9 +3508,17 @@ const routes: GeneratedRoutes = {
             },
         },
         globals: {
-            site: {
+            header: {
                 method: 'GET',
-                path: '/content/globals/site',
+                path: '/content/globals/header',
+                responses: {
+                    200: {},
+                    404: {},
+                },
+            },
+            footer: {
+                method: 'GET',
+                path: '/content/globals/footer',
                 responses: {
                     200: {},
                     404: {},
