@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pluginExportsOf } from 'kizunajs/adapter';
-import type { CmsExports } from './plugin.js';
+import type { CmsExports } from './setup.js';
 import { CmsHttpError, type CmsService } from './cms.js';
 import type { EnvironmentOptions } from './options.js';
 import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from './discovery.js';

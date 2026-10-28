@@ -59,7 +59,7 @@ export {
 export { isImageSchema, type ImageRef, type ResolvedImage } from './image.js';
 export { type Output, type Resolved } from './output.js';
 export { cms } from './provider.js';
-export { type CmsExports, type CmsSetup } from './plugin.js';
+export { type CmsExports, type CmsSetup } from './setup.js';
 export { type CmsRoutes } from './routes.js';
 export {
     defineRelationship,

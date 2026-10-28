@@ -11,7 +11,7 @@ import { expressAdapter } from '@kizunajs/express';
 import { defineBlock } from './block.js';
 import { definePage } from './page.js';
 import { ImageSchema } from './image.js';
-import type { CmsExports } from './plugin.js';
+import type { CmsExports } from './setup.js';
 import { cms as cmsContent } from './provider.js';
 import { defineRelationship } from './relationships.js';
 import { memoryMediaStorage } from './media/storage.js';

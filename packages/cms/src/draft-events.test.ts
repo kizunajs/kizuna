@@ -10,7 +10,7 @@ import { defineConfig, Kizuna } from 'kizunajs';
 import { pluginExportsOf } from 'kizunajs/adapter';
 import { expressAdapter } from '@kizunajs/express';
 import { definePage } from './page.js';
-import type { CmsExports } from './plugin.js';
+import type { CmsExports } from './setup.js';
 import { cms } from './provider.js';
 import { DocumentStore } from './storage/store.js';
 import { DraftNotices, DRAFT_CHANNEL, type DraftNotice } from './draft-notices.js';

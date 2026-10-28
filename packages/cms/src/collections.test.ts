@@ -13,7 +13,7 @@ import { memoryMediaStorage } from './media/storage.js';
 import { DocumentStore } from './storage/store.js';
 import { indexSql } from './storage/migration.js';
 import { pluginExportsOf } from 'kizunajs/adapter';
-import type { CmsExports } from './plugin.js';
+import type { CmsExports } from './setup.js';
 
 const k = new Kizuna();
 const roles = Kizuna.roles(['editor', 'admin']);

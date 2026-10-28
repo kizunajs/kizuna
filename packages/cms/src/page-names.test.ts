@@ -5,7 +5,7 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { defineConfig, Kizuna } from 'kizunajs';
 import { pluginExportsOf } from 'kizunajs/adapter';
 import { definePage } from './page.js';
-import type { CmsExports } from './plugin.js';
+import type { CmsExports } from './setup.js';
 import { cms } from './provider.js';
 import { DocumentStore } from './storage/store.js';
 import type { CmsService } from './cms.js';

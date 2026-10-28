@@ -7,7 +7,7 @@ import { pluginExportsOf } from 'kizunajs/adapter';
 import { definePage } from './page.js';
 import { defineCollection, defineGlobal } from './definitions.js';
 import { definePages } from './options.js';
-import type { CmsExports } from './plugin.js';
+import type { CmsExports } from './setup.js';
 import { cms as cmsContent } from './provider.js';
 import type { ContentRuntime } from 'kizunajs/plugin';
 import { DocumentStore } from './storage/store.js';

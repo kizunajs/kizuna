@@ -46,11 +46,11 @@ export interface CmsExports<
      */
     sites: Sites;
     /**
-     * The globals the plugin was given.
+     * The globals cms() was given.
      */
     globals: Globals;
     /**
-     * The collections the plugin was given.
+     * The collections cms() was given.
      */
     collections: Collections;
     /**
