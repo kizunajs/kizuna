@@ -29,15 +29,15 @@ export function SignedIn({
     if (person === undefined) {
         if (signOutPath === null) return null;
         return (
-            <div className="k-admin-nav-foot">
+            <div className="k-sidebar__foot">
                 {signOutMethod === 'GET' ? (
-                    <a className="k-admin-sign-out" href={signOutPath}>
+                    <a className="k-sidebar__sign-out" href={signOutPath}>
                         <LogOut {...ICON} />
                         Sign out
                     </a>
                 ) : (
                     <form method="post" action={signOutPath}>
-                        <button type="submit" className="k-admin-sign-out">
+                        <button type="submit" className="k-sidebar__sign-out">
                             <LogOut {...ICON} />
                             Sign out
                         </button>
@@ -50,36 +50,36 @@ export function SignedIn({
     const who = (
         <>
             <Avatar person={person} size={26} />
-            <span className="k-admin-signed-in">
+            <span className="k-sidebar__person">
                 <span className="k-ellipsis">{person.name}</span>
-                {roleLabel === undefined ? null : <span className="k-admin-role k-ellipsis">{roleLabel}</span>}
+                {roleLabel === undefined ? null : <span className="k-sidebar__role k-ellipsis">{roleLabel}</span>}
             </span>
         </>
     );
-    if (signOutPath === null) return <div className="k-admin-nav-foot">{who}</div>;
+    if (signOutPath === null) return <div className="k-sidebar__foot">{who}</div>;
     return (
         <>
             {form}
             <Menu.Root>
-                <Menu.Trigger className="k-admin-nav-foot k-admin-account">
+                <Menu.Trigger className="k-sidebar__foot k-sidebar__account">
                     {who}
-                    <ChevronsUpDown {...ICON} className="k-admin-account-chevron" />
+                    <ChevronsUpDown {...ICON} className="k-sidebar__account-chevron" />
                 </Menu.Trigger>
                 <Menu.Portal>
                     <Menu.Positioner side="top" align="start" sideOffset={6} className="k-positioner">
-                        <Menu.Popup className="k-popup k-menu k-admin-account-menu">
-                            <div className="k-admin-account-head">
-                                <span className="k-admin-account-name">{person.name}</span>
-                                {roleLabel === undefined ? null : <span className="k-admin-role">{roleLabel}</span>}
+                        <Menu.Popup className="k-popup k-menu k-account-menu">
+                            <div className="k-account-menu__head">
+                                <span className="k-account-menu__name">{person.name}</span>
+                                {roleLabel === undefined ? null : <span className="k-sidebar__role">{roleLabel}</span>}
                             </div>
-                            <Menu.Separator className="k-admin-account-separator" />
+                            <Menu.Separator className="k-account-menu__separator" />
                             {signOutMethod === 'GET' ? (
-                                <Menu.LinkItem className="k-menu-item" href={signOutPath}>
+                                <Menu.LinkItem className="k-menu__item" href={signOutPath}>
                                     <LogOut {...ICON} />
                                     Sign out
                                 </Menu.LinkItem>
                             ) : (
-                                <Menu.Item className="k-menu-item" onClick={() => signOutForm.current?.requestSubmit()}>
+                                <Menu.Item className="k-menu__item" onClick={() => signOutForm.current?.requestSubmit()}>
                                     <LogOut {...ICON} />
                                     Sign out
                                 </Menu.Item>

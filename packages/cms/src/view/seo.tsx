@@ -62,7 +62,7 @@ function Meter({ length, goal, label }: { length: number; goal: Goal; label: str
     return (
         <div className="k-meter" data-state={result.state}>
             <div
-                className="k-meter-track"
+                className="k-meter__track"
                 role="meter"
                 aria-label={`${label} length`}
                 aria-valuemin={0}
@@ -70,13 +70,13 @@ function Meter({ length, goal, label }: { length: number; goal: Goal; label: str
                 aria-valuenow={Math.min(length, goal.max)}
                 aria-valuetext={result.text}>
                 <span
-                    className="k-meter-fill"
+                    className="k-meter__fill"
                     style={{
                         width: `${Math.min(100, (length / goal.max) * 100)}%`,
                     }}
                 />
             </div>
-            <div className="k-meter-text">
+            <div className="k-meter__text">
                 <span>{result.text}</span>
                 <span className="k-counter">
                     {length} / {goal.min}–{goal.max}
@@ -108,18 +108,18 @@ export function SeoControl({ schema, value, onChange, disabled }: ControlProps) 
         <div className="k-seo">
             <div className="k-serp" aria-label="As a search result">
                 {address !== undefined ? (
-                    <span className="k-serp-url">
+                    <span className="k-serp__url">
                         {address.host}
                         {address.pathname === '/' ? '' : address.pathname.split('/').join(' › ')}
                     </span>
                 ) : null}
-                <span className="k-serp-title">{title === '' ? 'Page title' : clip(title, goals.title.max)}</span>
-                <span className="k-serp-description">
+                <span className="k-serp__title">{title === '' ? 'Page title' : clip(title, goals.title.max)}</span>
+                <span className="k-serp__description">
                     {description === '' ? 'A sentence or two about the page.' : clip(description, goals.description.max)}
                 </span>
             </div>
-            <div className="k-seo-field">
-                <label className="k-row-label" htmlFor="seo-title">
+            <div className="k-seo__field">
+                <label className="k-row__label" htmlFor="seo-title">
                     Title
                 </label>
                 <input
@@ -132,13 +132,13 @@ export function SeoControl({ schema, value, onChange, disabled }: ControlProps) 
                 />
                 <Meter length={title.length} goal={goals.title} label="Title" />
             </div>
-            <div className="k-seo-field">
-                <label className="k-row-label" htmlFor="seo-description">
+            <div className="k-seo__field">
+                <label className="k-row__label" htmlFor="seo-description">
                     Description
                 </label>
                 <textarea
                     id="seo-description"
-                    className="k-input k-textarea k-seo-textarea"
+                    className="k-input k-textarea k-seo__textarea"
                     value={description}
                     rows={3}
                     disabled={disabled}

@@ -44,7 +44,10 @@ function Chip({
             items={items}
             value={value ?? ANY}
             onValueChange={(next) => onChange(next === null || next === ANY ? undefined : next)}>
-            <Select.Trigger className="k-admin-chip" data-active={picked === undefined ? undefined : ''} aria-label={`Filter by ${label}`}>
+            <Select.Trigger
+                className="k-filters__chip"
+                data-active={picked === undefined ? undefined : ''}
+                aria-label={`Filter by ${label}`}>
                 <span>{label}</span>
                 {picked === undefined ? null : <b className="k-ellipsis">{picked.label}</b>}
                 <ChevronDown {...ICON} />
@@ -53,9 +56,9 @@ function Chip({
                 <Select.Positioner sideOffset={6} alignItemWithTrigger={false} className="k-positioner">
                     <Select.Popup className="k-popup k-menu">
                         {items.map((item) => (
-                            <Select.Item key={item.value} value={item.value} className="k-menu-item">
+                            <Select.Item key={item.value} value={item.value} className="k-menu__item">
                                 <Select.ItemText>{item.label}</Select.ItemText>
-                                <Select.ItemIndicator className="k-menu-check">
+                                <Select.ItemIndicator className="k-menu__check">
                                     <Check {...ICON} />
                                 </Select.ItemIndicator>
                             </Select.Item>
@@ -140,7 +143,7 @@ function FieldChip({
             {filter.nested === true && current !== undefined ? (
                 <button
                     type="button"
-                    className="k-admin-chip"
+                    className="k-filters__chip"
                     aria-pressed={current.descendants}
                     data-active={current.descendants ? '' : undefined}
                     onClick={() =>
@@ -174,7 +177,7 @@ export function FilterChips({
     onChange: (filters: Filters) => void;
 }) {
     return (
-        <div className="k-admin-chips" role="group" aria-label="Filters">
+        <div className="k-filters" role="group" aria-label="Filters">
             <Chip
                 label="Status"
                 choices={STATUS_CHOICES}
@@ -190,7 +193,7 @@ export function FilterChips({
                 <FieldChip key={filter.field} connection={connection} filter={filter} filters={value} onChange={onChange} />
             ))}
             {isFiltering(value) ? (
-                <button type="button" className="k-admin-chip k-admin-chip-clear" onClick={() => onChange(NO_FILTERS)}>
+                <button type="button" className="k-filters__chip k-filters__clear" onClick={() => onChange(NO_FILTERS)}>
                     <X {...ICON} />
                     Clear
                 </button>

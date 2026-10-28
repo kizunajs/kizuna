@@ -8,7 +8,6 @@ import {
     placeBars,
     positionOf,
     scaleOf,
-    sparklineOf,
     type ChartBar,
 } from './chart-geometry.js';
 
@@ -23,9 +22,6 @@ const TICK_CHARACTER = 6.2;
  * so charts side by side start their plots at the same place.
  */
 const AXIS_WIDTH = 48;
-
-const SPARKLINE_WIDTH = 72;
-const SPARKLINE_HEIGHT = 28;
 
 const WHOLE = new Intl.NumberFormat();
 const COMPACT = new Intl.NumberFormat(undefined, {
@@ -52,21 +48,16 @@ const useWidth = (element: RefObject<HTMLElement | null>, fallback: number): num
 };
 
 /**
- * A small line of a stat's recent values, with a faint area under it. Fewer
- * than two values draw nothing.
+ * The mark a series is drawn with, small, for the legend and the tooltip:
+ * this period a full line or bar, the period before a dotted line or a paler
+ * bar.
  */
-export function Sparkline({ values }: { values: readonly number[] }) {
-    const sparkline = sparklineOf(values, SPARKLINE_WIDTH, SPARKLINE_HEIGHT);
-    if (sparkline === undefined) return null;
+function Swatch({ style, previous }: { style: 'bar' | 'line'; previous: boolean }) {
+    if (style === 'bar')
+        return <span className={previous ? 'k-chart__swatch k-chart__swatch--previous' : 'k-chart__swatch'} aria-hidden="true" />;
     return (
-        <svg
-            className="k-admin-sparkline"
-            width={SPARKLINE_WIDTH}
-            height={SPARKLINE_HEIGHT}
-            viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
-            aria-hidden="true">
-            <path className="k-admin-chart-area" d={sparkline.area} />
-            <path className="k-admin-chart-line" d={sparkline.line} />
+        <svg className="k-chart__swatch-line" width="16" height="6" aria-hidden="true">
+            <line className={previous ? 'k-chart__line k-chart__line--previous' : 'k-chart__line'} x1="1" x2="15" y1="3" y2="3" />
         </svg>
     );
 }
@@ -76,22 +67,14 @@ export function Sparkline({ values }: { values: readonly number[] }) {
  * that compares them.
  */
 export function Legend({ style }: { style: 'bar' | 'line' }) {
-    const swatch = (previous: boolean) =>
-        style === 'line' ? (
-            <svg width="18" height="8" aria-hidden="true">
-                <line className={previous ? 'k-admin-chart-previous-line' : 'k-admin-chart-line'} x1="1" x2="17" y1="4" y2="4" />
-            </svg>
-        ) : (
-            <span className="k-admin-legend-bar" data-previous={previous ? '' : undefined} aria-hidden="true" />
-        );
     return (
-        <div className="k-admin-legend">
-            <span className="k-admin-legend-entry">
-                {swatch(false)}
+        <div className="k-chart__legend">
+            <span className="k-chart__legend-entry">
+                <Swatch style={style} previous={false} />
                 This period
             </span>
-            <span className="k-admin-legend-entry">
-                {swatch(true)}
+            <span className="k-chart__legend-entry">
+                <Swatch style={style} previous />
                 Previous period
             </span>
         </div>
@@ -162,10 +145,10 @@ export function Chart({ label, style, data }: { label: string; style: 'bar' | 'l
     };
 
     return (
-        <div ref={frame} className="k-admin-chart-frame">
-            <div className="k-admin-chart-stage">
+        <div ref={frame} className="k-chart__frame">
+            <div className="k-chart__stage">
                 <svg
-                    className="k-admin-chart-plot"
+                    className="k-chart__plot"
                     width={width}
                     height={HEIGHT}
                     role="img"
@@ -179,14 +162,8 @@ export function Chart({ label, style, data }: { label: string; style: 'bar' | 'l
                         const y = positionOf(scale, tick, TOP, bottom);
                         return (
                             <g key={tick}>
-                                <line
-                                    className={tick === 0 ? 'k-admin-chart-baseline' : 'k-admin-chart-grid'}
-                                    x1={left}
-                                    x2={width}
-                                    y1={y}
-                                    y2={y}
-                                />
-                                <text className="k-admin-chart-axis" x={left - TICK_GAP} y={y + 3.5} textAnchor="end">
+                                <line className={tick === 0 ? 'k-chart__baseline' : 'k-chart__grid'} x1={left} x2={width} y1={y} y2={y} />
+                                <text className="k-chart__axis" x={left - TICK_GAP} y={y + 3.5} textAnchor="end">
                                     {tickLabels[index]}
                                 </text>
                             </g>
@@ -196,21 +173,21 @@ export function Chart({ label, style, data }: { label: string; style: 'bar' | 'l
                         <>
                             {shown === undefined ? null : (
                                 <line
-                                    className="k-admin-chart-crosshair"
+                                    className="k-chart__crosshair"
                                     x1={shown.slotX + shown.slotWidth / 2}
                                     x2={shown.slotX + shown.slotWidth / 2}
                                     y1={TOP}
                                     y2={bottom}
                                 />
                             )}
-                            <path className="k-admin-chart-area" d={areaPath(points, baseline)} />
-                            {compares ? <path className="k-admin-chart-previous-line" d={linePath(previousPoints)} /> : null}
-                            <path className="k-admin-chart-line" d={linePath(points)} />
+                            <path className="k-chart__area" d={areaPath(points, baseline)} />
+                            {compares ? <path className="k-chart__line k-chart__line--previous" d={linePath(previousPoints)} /> : null}
+                            <path className="k-chart__line" d={linePath(points)} />
                             {shownPrevious === undefined ? null : (
-                                <circle className="k-admin-chart-dot" data-previous="" cx={shownPrevious.x} cy={shownPrevious.y} r={3} />
+                                <circle className="k-chart__dot k-chart__dot--previous" cx={shownPrevious.x} cy={shownPrevious.y} r={2.5} />
                             )}
                             {shownValue === undefined ? null : (
-                                <circle className="k-admin-chart-dot" cx={shownValue.x} cy={shownValue.y} r={3.5} />
+                                <circle className="k-chart__dot" cx={shownValue.x} cy={shownValue.y} r={3.5} />
                             )}
                         </>
                     ) : (
@@ -218,20 +195,19 @@ export function Chart({ label, style, data }: { label: string; style: 'bar' | 'l
                             <g key={index}>
                                 {bar.previous === undefined ? null : (
                                     <path
-                                        className="k-admin-chart-bar"
-                                        data-previous=""
+                                        className="k-chart__bar k-chart__bar--previous"
                                         data-active={index === active}
                                         d={bar.previous.path}
                                     />
                                 )}
-                                <path className="k-admin-chart-bar" data-active={index === active} d={bar.path} />
+                                <path className="k-chart__bar" data-active={index === active} d={bar.path} />
                             </g>
                         ))
                     )}
                     {bars.map((bar, index) => (
                         <g key={index}>
                             {labelled.has(index) ? (
-                                <text className="k-admin-chart-axis" x={bar.slotX + bar.slotWidth / 2} y={bottom + 16} textAnchor="middle">
+                                <text className="k-chart__axis" x={bar.slotX + bar.slotWidth / 2} y={bottom + 16} textAnchor="middle">
                                     {data[index]?.label}
                                 </text>
                             ) : null}
@@ -245,13 +221,11 @@ export function Chart({ label, style, data }: { label: string; style: 'bar' | 'l
                             />
                         </g>
                     ))}
-                    {scale.minimum < 0 ? (
-                        <line className="k-admin-chart-baseline" x1={left} x2={width} y1={baseline} y2={baseline} />
-                    ) : null}
+                    {scale.minimum < 0 ? <line className="k-chart__baseline" x1={left} x2={width} y1={baseline} y2={baseline} /> : null}
                 </svg>
                 {shown === undefined || shownPoint === undefined || active === undefined ? null : (
                     <div
-                        className="k-popup k-admin-chart-tip"
+                        className="k-popup k-chart__tooltip"
                         data-align={active === 0 ? 'start' : active === data.length - 1 ? 'end' : 'middle'}
                         style={{
                             left:
@@ -263,13 +237,23 @@ export function Chart({ label, style, data }: { label: string; style: 'bar' | 'l
                             top: shownTop,
                         }}
                         aria-hidden="true">
-                        <span>{shownPoint.label}</span>
-                        <strong>{WHOLE.format(shownPoint.value)}</strong>
-                        {shownPoint.previous === undefined ? null : <span>Previous {WHOLE.format(shownPoint.previous)}</span>}
+                        <span className="k-chart__tooltip-label">{shownPoint.label}</span>
+                        <span className="k-chart__tooltip-row">
+                            {compares ? <Swatch style={style} previous={false} /> : null}
+                            {compares ? <span>This period</span> : null}
+                            <strong>{WHOLE.format(shownPoint.value)}</strong>
+                        </span>
+                        {shownPoint.previous === undefined ? null : (
+                            <span className="k-chart__tooltip-row">
+                                <Swatch style={style} previous />
+                                <span>Previous period</span>
+                                <strong>{WHOLE.format(shownPoint.previous)}</strong>
+                            </span>
+                        )}
                     </div>
                 )}
             </div>
-            <table className="k-admin-visually-hidden">
+            <table className="k-visually-hidden">
                 <caption>{label}</caption>
                 <thead>
                     <tr>

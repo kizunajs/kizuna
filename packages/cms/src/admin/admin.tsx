@@ -156,7 +156,7 @@ export function Admin({ config }: { config: AdminConfig }) {
             const collection = collections?.find((candidate) => candidate.name === screen.name);
             if (collection === undefined) {
                 return (
-                    <div className="k-admin-body">
+                    <div className="k-admin__body">
                         <Loading problem={collections === undefined ? problem : `There is no collection named ${screen.name}.`} />
                     </div>
                 );
@@ -192,7 +192,7 @@ export function Admin({ config }: { config: AdminConfig }) {
             const view = views?.find((candidate) => candidate.name === name);
             if (view === undefined) {
                 return (
-                    <div className="k-admin-body">
+                    <div className="k-admin__body">
                         <Loading problem={views === undefined ? undefined : `There is no view named ${name}.`} />
                     </div>
                 );
@@ -216,9 +216,9 @@ export function Admin({ config }: { config: AdminConfig }) {
     return (
         <EditorContext.Provider value={editorContext}>
             <div className="k-admin">
-                <nav className="k-admin-nav" aria-label="Admin">
+                <nav className="k-sidebar" aria-label="Admin">
                     <a
-                        className="k-admin-brand"
+                        className="k-sidebar__brand"
                         href={hrefOf({
                             kind: 'dashboard',
                         })}
@@ -226,29 +226,29 @@ export function Admin({ config }: { config: AdminConfig }) {
                         <Logo />
                     </a>
                     <CommandPalette connection={connection} sections={sections} collections={collections} />
-                    <div className="k-admin-nav-groups">
-                        <div className="k-admin-nav-group">
+                    <div className="k-sidebar__groups">
+                        <div className="k-sidebar__group">
                             <a
-                                className="k-admin-nav-item"
+                                className="k-sidebar__item"
                                 href={hrefOf({
                                     kind: 'dashboard',
                                 })}
                                 aria-current={screen.kind === 'dashboard' ? 'page' : undefined}>
                                 <span className="k-ellipsis">Dashboard</span>
                                 {waiting !== undefined && waiting.length > 0 ? (
-                                    <span className="k-admin-count" aria-label={`${waiting.length} waiting for your review`}>
+                                    <span className="k-sidebar__count" aria-label={`${waiting.length} waiting for your review`}>
                                         {waiting.length}
                                     </span>
                                 ) : null}
                             </a>
                         </div>
                         {sections.map((section) => (
-                            <div key={section.label} className="k-admin-nav-group">
-                                <h2 className="k-admin-heading">{section.label}</h2>
+                            <div key={section.label} className="k-sidebar__group">
+                                <h2 className="k-heading">{section.label}</h2>
                                 {section.entries.map((entry) => (
                                     <a
                                         key={hrefOf(entry.screen)}
-                                        className="k-admin-nav-item"
+                                        className="k-sidebar__item"
                                         href={hrefOf(entry.screen)}
                                         aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
                                         <span className="k-ellipsis">{entry.label}</span>
@@ -264,7 +264,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                         signOutMethod={config.signOutMethod ?? 'GET'}
                     />
                 </nav>
-                <main className="k-admin-main">{shown}</main>
+                <main className="k-admin__main">{shown}</main>
             </div>
         </EditorContext.Provider>
     );

@@ -10,12 +10,12 @@ export function Toasts() {
     const { toasts } = Toast.useToastManager();
     return (
         <Toast.Portal>
-            <Toast.Viewport className="k-admin-toasts">
+            <Toast.Viewport className="k-toasts">
                 {toasts.map((toast) => (
-                    <Toast.Root key={toast.id} toast={toast} className="k-popup k-admin-toast">
-                        <Toast.Content className="k-admin-toast-content">
-                            <Toast.Description className="k-admin-toast-text" />
-                            <Toast.Close className="k-icon-button k-admin-toast-close" aria-label="Dismiss">
+                    <Toast.Root key={toast.id} toast={toast} className="k-popup k-toast">
+                        <Toast.Content className="k-toast__content">
+                            <Toast.Description className="k-toast__text" />
+                            <Toast.Close className="k-icon-button k-toast__close" aria-label="Dismiss">
                                 <X {...ICON} />
                             </Toast.Close>
                         </Toast.Content>

@@ -20,9 +20,10 @@ export interface ChartScale {
 }
 
 /**
- * The most intervals an axis is split into, so the grid stays a few lines.
+ * The most intervals an axis is split into, so the grid stays three or four
+ * lines.
  */
-const MOST_INTERVALS = 4;
+const MOST_INTERVALS = 3;
 
 const ROUND_MULTIPLES = [1, 2, 5];
 
@@ -34,7 +35,7 @@ const tidy = (value: number): number => Number(value.toPrecision(12));
 /**
  * The axis for a chart's values: it always includes zero, and its ticks fall
  * on a round step, 1, 2 or 5 times a power of ten, the smallest that keeps
- * the grid to four intervals.
+ * the grid to three intervals.
  */
 export const scaleOf = (values: readonly number[]): ChartScale => {
     const low = Math.min(0, ...values);
@@ -292,25 +293,6 @@ export const areaPath = (points: ReadonlyArray<LinePoint | undefined>, baseline:
         .join(' ');
 
 /**
- * The line and the area under it for a small trend beside a number, scaled
- * to its own lowest and highest values. Fewer than two values draw nothing.
- */
-export const sparklineOf = (values: readonly number[], width: number, height: number): { line: string; area: string } | undefined => {
-    if (values.length < 2) return undefined;
-    const low = Math.min(...values);
-    const high = Math.max(...values);
-    const inset = 2;
-    const points = values.map((value, index) => ({
-        x: (index / (values.length - 1)) * width,
-        y: high === low ? height / 2 : inset + ((high - value) / (high - low)) * (height - inset * 2),
-    }));
-    return {
-        line: linePath(points),
-        area: areaPath(points, height),
-    };
-};
-
-/**
  * Roughly how wide a character of an axis label is, in pixels.
  */
 const CHARACTER_WIDTH = 6.5;
@@ -318,12 +300,19 @@ const CHARACTER_WIDTH = 6.5;
 const LABEL_SPACE = 10;
 
 /**
- * Which bars carry a label under the axis: every one while the labels fit,
- * otherwise every nth, counted back from the latest so it is always labelled.
+ * The most labels under the axis, however wide the chart is.
+ */
+const MOST_LABELS = 6;
+
+/**
+ * Which bars carry a label under the axis: every one while the labels fit and
+ * number six or fewer, otherwise every nth, counted back from the latest so it
+ * is always labelled.
  */
 export const labelledBars = (data: readonly ChartBar[], slotWidth: number): Set<number> => {
     const longest = Math.max(0, ...data.map((bar) => bar.label.length));
-    const every = slotWidth <= 0 ? data.length : Math.max(1, Math.ceil((longest * CHARACTER_WIDTH + LABEL_SPACE) / slotWidth));
+    const fitting = slotWidth <= 0 ? data.length : Math.ceil((longest * CHARACTER_WIDTH + LABEL_SPACE) / slotWidth);
+    const every = Math.max(1, fitting, Math.ceil((data.length - 1) / (MOST_LABELS - 1)));
     return new Set(data.flatMap((_, index) => ((data.length - 1 - index) % every === 0 ? [index] : [])));
 };
 

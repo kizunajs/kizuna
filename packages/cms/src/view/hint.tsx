@@ -11,7 +11,7 @@ export function Hint({ label, children }: { label: string; children: ReactElemen
         <Tooltip.Root>
             <Tooltip.Trigger render={children} />
             <Tooltip.Portal>
-                <Tooltip.Positioner sideOffset={6} className="k-tooltip-positioner">
+                <Tooltip.Positioner sideOffset={6} className="k-tooltip__positioner">
                     <Tooltip.Popup className="k-popup k-tooltip">{label}</Tooltip.Popup>
                 </Tooltip.Positioner>
             </Tooltip.Portal>

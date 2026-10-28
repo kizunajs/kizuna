@@ -11,7 +11,8 @@ import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
 import { ItemActions } from './action-buttons.js';
 import { hrefOf } from './navigation.js';
-import { Loading, SaveIndicator, Status, Topbar, problemOf } from './parts.js';
+import { DocumentHeader, Loading, SaveIndicator, Status, problemOf } from './parts.js';
+import { relativeTimeOf } from './time.js';
 import { AdminPreview } from './preview-pane.js';
 import { Versions } from './versions.js';
 import type { WaitingReview } from './dashboard.js';
@@ -110,6 +111,20 @@ const crumbOf = (ref: string, collectionLabel: (name: string) => string | undefi
 };
 
 /**
+ * How often "Updated 4 min ago" is worked out again.
+ */
+const CLOCK_MS = 30_000;
+
+const useNow = (): Date => {
+    const [now, setNow] = useState(() => new Date());
+    useEffect(() => {
+        const timer = window.setInterval(() => setNow(new Date()), CLOCK_MS);
+        return () => window.clearInterval(timer);
+    }, []);
+    return now;
+};
+
+/**
  * One document's fields in the editor's form, saved to its draft as the
  * person types, with its owner, its review and Publish in the bar above. Its
  * tabs put the site in draft mode beside the fields, and list its versions.
@@ -141,6 +156,8 @@ export function DocumentScreen({
     // The preview stays loaded once opened, so going back to it shows the page where it was.
     const [previewOpened, setPreviewOpened] = useState(false);
     const [pointed, setPointed] = useState<string | undefined>();
+    const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+    const now = useNow();
     const form = useRef<FieldFormHandle>(null);
     const seen = useRef<string | null>(null);
     const busy = useRef(false);
@@ -172,6 +189,7 @@ export function DocumentScreen({
     useEffect(() => {
         setDocument(undefined);
         setSaveState('idle');
+        setUpdatedAt(null);
         void describe(documentRef);
     }, [describe, documentRef]);
 
@@ -188,6 +206,7 @@ export function DocumentScreen({
             });
             if (answer.status !== 200 || saves.current !== savesBefore || busy.current || typing.current) return;
             const marker = answer.body.updatedAt;
+            setUpdatedAt(marker);
             if (seen.current === null) {
                 seen.current = marker;
                 return;
@@ -263,6 +282,7 @@ export function DocumentScreen({
                 }
                 if (stillOpen) {
                     seen.current = answer.body.updatedAt;
+                    setUpdatedAt(answer.body.updatedAt);
                     setDocument({
                         ...current,
                         status: answer.body.status,
@@ -350,13 +370,12 @@ export function DocumentScreen({
     };
 
     const crumb = crumbOf(documentRef, collectionLabel);
-    const crumbNode = crumb.href === undefined ? crumb.label : <a href={crumb.href}>{crumb.label}</a>;
 
     if (document === undefined) {
         return (
             <>
-                <Topbar crumb={crumbNode} title="" />
-                <div className="k-admin-body">
+                <DocumentHeader crumb={crumb} title="" />
+                <div className="k-admin__body">
                     <Loading problem={loadProblem} />
                 </div>
             </>
@@ -374,58 +393,66 @@ export function DocumentScreen({
     };
     return (
         <EditorContext.Provider value={editorContext}>
-            <Topbar crumb={crumbNode} title={title}>
-                <Status status={document.status} />
-                {document.review !== null ? <ReviewBadge review={document.review} me={people?.me} /> : null}
-                <SaveIndicator state={saveState} />
-                <span className="k-admin-spacer" />
-                <div className="k-header-actions">
-                    <OwnerControl
-                        owner={document.owner}
-                        people={people}
-                        title={title}
-                        onChange={async (owner) => {
-                            const tools = toolsFor(document.ref);
-                            if (tools === undefined) return;
-                            await connection.call(`${tools.prefix}_set_owner`, {
-                                params: tools.params,
-                                body: {
-                                    owner,
-                                },
-                            });
-                            await describe(document.ref);
-                        }}
-                    />
-                    {siteUrl !== null && document.path !== null ? (
-                        <button type="button" className="k-link" onClick={() => void openOnSite(document.path!)}>
-                            <span className="k-ellipsis">{document.path}</span>
-                            <ExternalLink {...ICON} />
+            <DocumentHeader
+                crumb={crumb}
+                title={title}
+                meta={
+                    <>
+                        {updatedAt === null ? null : <span>Updated {relativeTimeOf(updatedAt, now)}</span>}
+                        <Status status={document.status} />
+                        {document.review !== null ? <ReviewBadge review={document.review} me={people?.me} /> : null}
+                        <SaveIndicator state={saveState} />
+                    </>
+                }
+                actions={
+                    <>
+                        <OwnerControl
+                            owner={document.owner}
+                            people={people}
+                            title={title}
+                            onChange={async (owner) => {
+                                const tools = toolsFor(document.ref);
+                                if (tools === undefined) return;
+                                await connection.call(`${tools.prefix}_set_owner`, {
+                                    params: tools.params,
+                                    body: {
+                                        owner,
+                                    },
+                                });
+                                await describe(document.ref);
+                            }}
+                        />
+                        {siteUrl !== null && document.path !== null ? (
+                            <button type="button" className="k-link" onClick={() => void openOnSite(document.path!)}>
+                                <span className="k-ellipsis">{document.path}</span>
+                                <ExternalLink {...ICON} />
+                            </button>
+                        ) : null}
+                        <button
+                            type="button"
+                            className="k-button k-button--secondary"
+                            disabled={saveState !== 'pending'}
+                            onClick={() => void form.current?.flush()}>
+                            Save draft
                         </button>
-                    ) : null}
-                </div>
-                <button
-                    type="button"
-                    className="k-button k-button-secondary"
-                    disabled={saveState !== 'pending'}
-                    onClick={() => void form.current?.flush()}>
-                    Save draft
-                </button>
-                <PublishReview
-                    connection={connection}
-                    candidates={reviewCandidates}
-                    people={people}
-                    waiting={waiting.length}
-                    everywhere={document.usedOn.everywhere}
-                    disabled={saveState === 'pending' || saveState === 'saving' || saveState === 'failed'}
-                    onChanged={(refs) => {
-                        onReviewsChanged();
-                        if (refs.includes(document.ref)) void describe(document.ref);
-                    }}
-                    onPublished={() => undefined}
-                />
-            </Topbar>
-            <Tabs.Root value={shownTab} onValueChange={(key: DocumentTab) => showTab(key)} className="k-admin-body">
-                <Tabs.List className="k-tab-bar k-admin-document-tabs" aria-label="Document">
+                        <PublishReview
+                            connection={connection}
+                            candidates={reviewCandidates}
+                            people={people}
+                            waiting={waiting.length}
+                            everywhere={document.usedOn.everywhere}
+                            disabled={saveState === 'pending' || saveState === 'saving' || saveState === 'failed'}
+                            onChanged={(refs) => {
+                                onReviewsChanged();
+                                if (refs.includes(document.ref)) void describe(document.ref);
+                            }}
+                            onPublished={() => undefined}
+                        />
+                    </>
+                }
+            />
+            <Tabs.Root value={shownTab} onValueChange={(key: DocumentTab) => showTab(key)} className="k-admin__body">
+                <Tabs.List className="k-tab-bar k-editing__tabs" aria-label="Document">
                     {TABS.map((entry) =>
                         entry.key === 'preview' && previewPath === null ? null : (
                             <Tabs.Tab key={entry.key} value={entry.key} className="k-tab">
@@ -440,8 +467,8 @@ export function DocumentScreen({
                     </p>
                 )}
                 {/* One panel serves every tab, since Live preview shows the fields beside the site. */}
-                <Tabs.Panel value={shownTab} className="k-admin-editing" data-tab={shownTab}>
-                    <div className="k-admin-editing-fields" hidden={shownTab === 'versions'}>
+                <Tabs.Panel value={shownTab} className="k-editing" data-tab={shownTab}>
+                    <div className="k-editing__fields" hidden={shownTab === 'versions'}>
                         {document.usedOn.everywhere ? <p className="k-note">This shows on every page.</p> : null}
                         {!document.complete && document.missing.length > 0 ? (
                             <p className="k-note">Fill in {document.missing.join(', ')} before publishing.</p>
@@ -474,7 +501,7 @@ export function DocumentScreen({
                         ) : null}
                     </div>
                     {previewOpened && siteUrl !== null && previewPath !== null ? (
-                        <div className="k-admin-preview" hidden={shownTab !== 'preview'}>
+                        <div className="k-editing__preview" hidden={shownTab !== 'preview'}>
                             <AdminPreview connection={connection} siteUrl={siteUrl} path={previewPath} onPoint={pointAt} />
                         </div>
                     ) : null}

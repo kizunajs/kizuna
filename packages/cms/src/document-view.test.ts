@@ -1,106 +1,41 @@
-import { afterAll, describe, expect, it } from 'vitest';
-import { z } from 'zod';
-import { PGlite } from '@electric-sql/pglite';
-import { drizzle } from 'drizzle-orm/pglite';
-import { defineConfig, Kizuna } from 'kizunajs';
-import { expressAdapter } from '@kizunajs/express';
-import { createMcpServer } from '@kizunajs/mcp';
-import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
-import { cms } from './provider.js';
-import { DOCUMENT_VIEW_URI } from './document-view.js';
+import { describe, expect, it } from 'vitest';
+import { documentViewFor, STYLESHEET_PLACEHOLDER, withStylesheet } from './document-view.js';
 
-const k = new Kizuna();
-const editor = k.identity
-    .bearer({
-        context: z.object({
-            userId: z.string(),
-        }),
-    })
-    .guard(() => ({
-        userId: 'ada',
-    }));
-
-const pglite = new PGlite();
-const config = defineConfig({
-    adapter: expressAdapter(),
-    auth: {
-        identities: {
-            editor,
-        },
-    },
-    content: cms({
-        db: drizzle(pglite),
-        pages: {},
-        auth: {
-            identity: 'editor',
-        },
-        preview: {
-            url: 'https://site.example/',
-        },
-    }),
-});
-
-afterAll(async () => {
-    await pglite.close();
-});
-
-const connect = async () => {
-    const server = createMcpServer(config.api as never);
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const client = new Client({
-        name: 'test-client',
-        version: '1.0.0',
-    });
-    await server.connect(serverTransport);
-    await client.connect(clientTransport);
-    return client;
-};
-
-describe('the editor over MCP', () => {
-    it('opens from the draft and describe tools, and keeps the preview link from the model', async () => {
-        const client = await connect();
-        const { tools } = await client.listTools();
-        const meta = Object.fromEntries(tools.map((tool) => [tool.name, tool._meta]));
-        expect(meta['editing_describe']).toEqual({
-            ui: {
-                resourceUri: DOCUMENT_VIEW_URI,
-            },
-        });
-        expect(meta['editing_globals_get_draft']).toEqual({
-            ui: {
-                resourceUri: DOCUMENT_VIEW_URI,
-            },
-        });
-        expect(meta['editing_create_preview']).toEqual({
-            ui: {
-                visibility: ['app'],
-            },
-        });
-        expect(meta['editing_pages_update_draft']).toBeUndefined();
+describe('adminCss', () => {
+    it('links the stylesheet where the page takes it, after its own styles', () => {
+        expect(withStylesheet(`<style></style>${STYLESHEET_PLACEHOLDER}`, '/cms-admin.css')).toBe(
+            '<style></style><link rel="stylesheet" href="/cms-admin.css">'
+        );
     });
 
-    it('serves the built editor, told where the site is and allowed to reach it', async () => {
-        const client = await connect();
-        const { resources } = await client.listResources();
-        expect(resources.map((resource) => resource.uri)).toEqual([DOCUMENT_VIEW_URI]);
-        expect(resources[0]?._meta).toEqual({
-            ui: {
-                csp: {
-                    frameDomains: ['https://site.example'],
-                    connectDomains: ['https://site.example'],
-                    baseUriDomains: ['https://site.example'],
-                    resourceDomains: ['https://site.example'],
-                },
-                prefersBorder: true,
-            },
-        });
+    it('leaves no trace without one', () => {
+        expect(withStylesheet(`<style></style>${STYLESHEET_PLACEHOLDER}`, undefined)).toBe('<style></style>');
+    });
 
-        const { contents } = await client.readResource({
-            uri: DOCUMENT_VIEW_URI,
+    it('escapes the address as an attribute', () => {
+        expect(withStylesheet(STYLESHEET_PLACEHOLDER, '/admin.css?a=1&b="2"')).toBe(
+            '<link rel="stylesheet" href="/admin.css?a=1&amp;b=&quot;2&quot;">'
+        );
+    });
+
+    it('loads a path from the site in the editor a chat host renders', async () => {
+        const view = documentViewFor({
+            preview: {
+                url: 'https://site.example/blog',
+            },
+            adminCss: '/cms-admin.css',
         });
-        const html = (contents[0] as { text: string }).text;
-        expect(html).toContain('<div id="root"></div>');
-        expect(html).toContain('{"siteUrl":"https://site.example"}');
-        expect(html).not.toContain('__KIZUNA_CMS_VIEW_CONFIG__');
+        expect(await view.html()).toContain('<link rel="stylesheet" href="https://site.example/cms-admin.css">');
+        expect(view.csp?.resourceDomains).toContain('https://site.example');
+    });
+
+    it('lets the host load a stylesheet on another origin', () => {
+        const view = documentViewFor({
+            preview: {
+                url: 'https://site.example',
+            },
+            adminCss: 'https://cdn.example/cms-admin.css',
+        });
+        expect(view.csp?.resourceDomains).toEqual(['https://site.example', 'https://cdn.example']);
     });
 });

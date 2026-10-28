@@ -1,31 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { watchPage } from './page-events.js';
-import { ExternalLink, Hand, Monitor, MousePointerClick, Smartphone, Tablet, X } from 'lucide-react';
+import { ExternalLink, Hand, MousePointerClick, X } from 'lucide-react';
 import { ICON } from './context.js';
-
-/**
- * The widths the site renders at, scaled down to the pane.
- */
-const DEVICES = [
-    {
-        key: 'desktop',
-        label: 'Desktop',
-        width: 1280,
-        Icon: Monitor,
-    },
-    {
-        key: 'tablet',
-        label: 'Tablet',
-        width: 768,
-        Icon: Tablet,
-    },
-    {
-        key: 'phone',
-        label: 'Phone',
-        width: 390,
-        Icon: Smartphone,
-    },
-];
+import { DeviceSelect, frameStyleOf, type DeviceKey } from './devices.js';
 
 const useSize = (element: RefObject<HTMLElement | null>): { width: number; height: number } => {
     const [size, setSize] = useState({
@@ -166,7 +143,7 @@ function SnapshotFrame(props: {
             title="Draft preview"
             srcDoc={props.html}
             sandbox="allow-same-origin"
-            className="k-frame"
+            className="k-preview__frame"
             style={props.style}
             onLoad={attach}
         />
@@ -179,10 +156,9 @@ function SnapshotFrame(props: {
  */
 export function PreviewPane(props: PreviewPaneProps & { siteUrl: string }) {
     const { url, snapshot, problem, frame, selecting, onSelecting, ready, loading } = props;
-    const [device, setDevice] = useState(DEVICES[0]!);
+    const [device, setDevice] = useState<DeviceKey>('desktop');
     const stage = useRef<HTMLDivElement>(null);
     const size = useSize(stage);
-    const scale = size.width === 0 ? 1 : Math.min(1, size.width / device.width);
     // A snapshot is ready once its document loads and the editor listens to it.
     const [attached, setAttached] = useState<string | undefined>();
     const shown = url === undefined ? snapshot !== undefined && attached === snapshot : ready;
@@ -192,16 +168,13 @@ export function PreviewPane(props: PreviewPaneProps & { siteUrl: string }) {
         if (shown) setEverShown(true);
     }, [shown]);
     const frameStyle: CSSProperties = {
+        ...frameStyleOf(device, size),
         visibility: everShown || shown ? 'visible' : 'hidden',
-        width: device.width,
-        height: scale === 0 ? 0 : size.height / scale,
-        transform: `scale(${scale})`,
-        left: Math.max(0, (size.width - device.width * scale) / 2),
     };
     return (
         <div className="k-preview">
-            <div className="k-preview-bar">
-                <div className="k-devices" role="radiogroup" aria-label="What a click does">
+            <div className="k-preview__bar">
+                <div className="k-preview__modes" role="radiogroup" aria-label="What a click does">
                     <button type="button" role="radio" aria-checked={selecting} className="k-tab" onClick={() => onSelecting(true)}>
                         <MousePointerClick {...ICON} />
                         Point
@@ -211,20 +184,7 @@ export function PreviewPane(props: PreviewPaneProps & { siteUrl: string }) {
                         Browse
                     </button>
                 </div>
-                <div className="k-devices" role="radiogroup" aria-label="Preview width">
-                    {DEVICES.map((candidate) => (
-                        <button
-                            key={candidate.key}
-                            type="button"
-                            role="radio"
-                            aria-checked={candidate.key === device.key}
-                            className="k-tab"
-                            onClick={() => setDevice(candidate)}>
-                            <candidate.Icon {...ICON} />
-                            {candidate.label}
-                        </button>
-                    ))}
-                </div>
+                <DeviceSelect value={device} onChange={setDevice} />
             </div>
             {props.notice !== undefined ? (
                 <div className="k-notice" role="status">
@@ -234,7 +194,7 @@ export function PreviewPane(props: PreviewPaneProps & { siteUrl: string }) {
                     </span>
                     <button
                         type="button"
-                        className="k-button k-button-secondary k-button-small"
+                        className="k-button k-button--secondary k-button--small"
                         onClick={() => props.onOpenLink(new URL(props.notice!.path, props.siteUrl).toString())}>
                         <ExternalLink {...ICON} />
                         Open in a tab
@@ -244,13 +204,13 @@ export function PreviewPane(props: PreviewPaneProps & { siteUrl: string }) {
                     </button>
                 </div>
             ) : null}
-            <div ref={stage} className="k-stage" data-ready={shown} data-loading={loading && everShown} aria-busy={loading}>
+            <div ref={stage} className="k-preview__stage" data-ready={shown} data-loading={loading && everShown} aria-busy={loading}>
                 {loading && snapshot !== undefined ? (
                     <div className="k-progress" role="progressbar" aria-label="Loading the draft" />
                 ) : null}
-                {problem !== undefined ? <p className="k-help k-stage-message">{problem}</p> : null}
+                {problem !== undefined ? <p className="k-help k-preview__message">{problem}</p> : null}
                 {problem === undefined && !everShown && !shown ? (
-                    <div className="k-loading" role="status" aria-label="Loading the draft">
+                    <div className="k-preview__loading" role="status" aria-label="Loading the draft">
                         <div
                             className="k-skeleton"
                             style={{
@@ -288,7 +248,9 @@ export function PreviewPane(props: PreviewPaneProps & { siteUrl: string }) {
                         />
                     </div>
                 ) : null}
-                {url !== undefined ? <iframe ref={frame} title="Draft preview" src={url} className="k-frame" style={frameStyle} /> : null}
+                {url !== undefined ? (
+                    <iframe ref={frame} title="Draft preview" src={url} className="k-preview__frame" style={frameStyle} />
+                ) : null}
                 {url === undefined && snapshot !== undefined ? (
                     <SnapshotFrame
                         html={snapshot}

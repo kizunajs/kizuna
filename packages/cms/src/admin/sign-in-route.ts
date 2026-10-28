@@ -3,7 +3,7 @@ import { route, type PluginApi } from 'kizunajs/plugin';
 import { rawResponse } from 'kizunajs/adapter';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
 import type { CmsService } from '../cms.js';
-import { CONFIG_PLACEHOLDER, readBuilt } from '../document-view.js';
+import { CONFIG_PLACEHOLDER, readBuilt, withStylesheet } from '../document-view.js';
 import type { ResolvedCmsOptions } from '../options.js';
 import { PREVIEW_COOKIE } from '../preview-token.js';
 import { adminPathOf, adminRoutePathOf, editorOf, embedded, sessionPathOf, signInLocationOf } from './route.js';
@@ -118,7 +118,10 @@ export const signInScreenRoute = (service: CmsService, options: ResolvedCmsOptio
             next,
             noAccess: signedIn !== undefined,
         };
-        const page = (await readBuilt('sign-in.html')).replace(CONFIG_PLACEHOLDER, () => embedded(config));
+        const page = withStylesheet(
+            (await readBuilt('sign-in.html')).replace(CONFIG_PLACEHOLDER, () => embedded(config)),
+            options.adminCss
+        );
         return rawResponse(
             new Response(page, {
                 status: 200,

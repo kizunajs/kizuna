@@ -54,27 +54,27 @@ export function SignIn({ config }: { config: SignInConfig }) {
     return (
         <main className="k-sign-in">
             <Form
-                className="k-sign-in-form"
-                aria-labelledby="k-sign-in-title"
+                className="k-sign-in__form"
+                aria-labelledby="k-sign-in__title"
                 onFormSubmit={(values: { email: string; password: string }) => void signIn(values)}>
                 <Logo />
-                <h1 id="k-sign-in-title" className="k-sign-in-title">
+                <h1 id="k-sign-in__title" className="k-sign-in__title">
                     Sign in
                 </h1>
-                <Field.Root name="email" className="k-sign-in-field">
-                    <Field.Label className="k-sign-in-label">Email</Field.Label>
+                <Field.Root name="email" className="k-sign-in__field">
+                    <Field.Label className="k-sign-in__label">Email</Field.Label>
                     <Field.Control className="k-input" type="email" autoComplete="username" required autoFocus />
-                    <Field.Error className="k-sign-in-hint" />
+                    <Field.Error className="k-sign-in__hint" />
                 </Field.Root>
-                <Field.Root name="password" className="k-sign-in-field">
-                    <Field.Label className="k-sign-in-label">Password</Field.Label>
+                <Field.Root name="password" className="k-sign-in__field">
+                    <Field.Label className="k-sign-in__label">Password</Field.Label>
                     <Field.Control className="k-input" type="password" autoComplete="current-password" required />
-                    <Field.Error className="k-sign-in-hint" />
+                    <Field.Error className="k-sign-in__hint" />
                 </Field.Root>
-                <p className="k-sign-in-error" role="alert">
+                <p className="k-sign-in__error" role="alert">
                     {error}
                 </p>
-                <Button type="submit" className="k-button k-button-primary" disabled={pending}>
+                <Button type="submit" className="k-button k-button--primary" disabled={pending}>
                     {pending ? 'Signing in…' : 'Sign in'}
                 </Button>
             </Form>

@@ -126,9 +126,9 @@ export function PeoplePicker({
                     aria-pressed={selected.has(person.id)}
                     onClick={() => onToggle(person.id)}>
                     <Avatar person={person} size={28} />
-                    <span className="k-person-name">{person.name}</span>
-                    {person.id === owner ? <span className="k-review-tag">Owner</span> : null}
-                    <span className="k-person-check">{selected.has(person.id) ? <Check {...ICON} /> : null}</span>
+                    <span className="k-person__name">{person.name}</span>
+                    {person.id === owner ? <span className="k-review__tag">Owner</span> : null}
+                    <span className="k-person__check">{selected.has(person.id) ? <Check {...ICON} /> : null}</span>
                 </button>
             ))}
         </div>
@@ -163,31 +163,31 @@ export function OwnerControl({
         <Dialog.Root open={open} onOpenChange={setOpen}>
             <Dialog.Trigger className="k-owner" aria-label={owner === null ? 'Name an owner' : `Owner: ${owner.name}`}>
                 {owner === null ? (
-                    <span className="k-avatar k-avatar-empty">
+                    <span className="k-avatar k-avatar--empty">
                         <UserRound {...ICON} />
                     </span>
                 ) : (
                     <Avatar person={owner} />
                 )}
-                <span className="k-owner-name">{owner === null ? 'No owner' : owner.name.split(' ')[0]}</span>
+                <span className="k-owner__name">{owner === null ? 'No owner' : owner.name.split(' ')[0]}</span>
             </Dialog.Trigger>
             <Dialog.Portal>
                 <Dialog.Backdrop className="k-backdrop" />
                 <Dialog.Popup className="k-dialog">
-                    <Dialog.Title className="k-dialog-title">Who looks after {title}?</Dialog.Title>
+                    <Dialog.Title className="k-dialog__title">Who looks after {title}?</Dialog.Title>
                     <Dialog.Description className="k-help">They are suggested first when someone asks for a review.</Dialog.Description>
                     <PeoplePicker
                         people={people.people}
                         selected={new Set(owner === null ? [] : [owner.id])}
                         onToggle={(id) => void pick(id === owner?.id ? null : id)}
                     />
-                    <div className="k-dialog-actions">
+                    <div className="k-dialog__actions">
                         {owner !== null ? (
-                            <button type="button" className="k-button k-button-secondary" disabled={busy} onClick={() => void pick(null)}>
+                            <button type="button" className="k-button k-button--secondary" disabled={busy} onClick={() => void pick(null)}>
                                 Remove owner
                             </button>
                         ) : null}
-                        <Dialog.Close className="k-button k-button-secondary">Done</Dialog.Close>
+                        <Dialog.Close className="k-button k-button--secondary">Done</Dialog.Close>
                     </div>
                 </Dialog.Popup>
             </Dialog.Portal>

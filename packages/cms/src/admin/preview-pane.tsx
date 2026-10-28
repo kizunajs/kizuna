@@ -1,27 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { LoaderCircle, Monitor, Smartphone } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 import { envelope, openEnvelope, type EditorMessage, type PreviewMessage } from '../preview-messages.js';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
+import { DeviceSelect, frameStyleOf, type DeviceKey } from '../view/devices.js';
 import { problemOf } from './parts.js';
-
-/**
- * The widths the site renders at, scaled down to the pane.
- */
-const DEVICES = [
-    {
-        key: 'desktop',
-        label: 'Desktop',
-        width: 1280,
-        Icon: Monitor,
-    },
-    {
-        key: 'phone',
-        label: 'Phone',
-        width: 390,
-        Icon: Smartphone,
-    },
-];
 
 const useSize = (element: RefObject<HTMLElement | null>): { width: number; height: number } => {
     const [size, setSize] = useState({
@@ -72,12 +55,11 @@ export function AdminPreview({
     const [url, setUrl] = useState<string | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
     const [loaded, setLoaded] = useState(false);
-    const [device, setDevice] = useState(DEVICES[0]!);
+    const [device, setDevice] = useState<DeviceKey>('desktop');
     const frame = useRef<HTMLIFrameElement>(null);
     const framed = useRef<string | undefined>(undefined);
     const stage = useRef<HTMLDivElement>(null);
     const size = useSize(stage);
-    const scale = size.width === 0 ? 1 : Math.min(1, size.width / device.width);
     const latestPoint = useRef(onPoint);
     latestPoint.current = onPoint;
 
@@ -148,28 +130,15 @@ export function AdminPreview({
     }, [siteUrl, mint, tell, path]);
 
     return (
-        <div className="k-preview k-admin-preview-pane">
-            <div className="k-preview-bar">
+        <div className="k-preview k-preview--admin">
+            <div className="k-preview__bar">
                 <span className="k-help">Your site, in draft mode</span>
-                <div className="k-devices" role="radiogroup" aria-label="Preview width">
-                    {DEVICES.map((candidate) => (
-                        <button
-                            key={candidate.key}
-                            type="button"
-                            role="radio"
-                            aria-checked={candidate.key === device.key}
-                            className="k-tab"
-                            onClick={() => setDevice(candidate)}>
-                            <candidate.Icon {...ICON} />
-                            {candidate.label}
-                        </button>
-                    ))}
-                </div>
+                <DeviceSelect value={device} onChange={setDevice} />
             </div>
-            <div ref={stage} className="k-stage" aria-busy={!loaded}>
-                {problem !== undefined ? <p className="k-help k-stage-message">{problem}</p> : null}
+            <div ref={stage} className="k-preview__stage" aria-busy={!loaded}>
+                {problem !== undefined ? <p className="k-help k-preview__message">{problem}</p> : null}
                 {problem === undefined && !loaded ? (
-                    <div className="k-stage-message" role="status" aria-label="Loading the draft">
+                    <div className="k-preview__message" role="status" aria-label="Loading the draft">
                         <LoaderCircle {...ICON} className="k-spin" />
                     </div>
                 ) : null}
@@ -178,14 +147,11 @@ export function AdminPreview({
                         ref={frame}
                         title="Draft preview"
                         src={url}
-                        className="k-frame"
+                        className="k-preview__frame"
                         onLoad={() => setLoaded(true)}
                         style={{
+                            ...frameStyleOf(device, size),
                             visibility: loaded ? 'visible' : 'hidden',
-                            width: device.width,
-                            height: scale === 0 ? 0 : size.height / scale,
-                            transform: `scale(${scale})`,
-                            left: Math.max(0, (size.width - device.width * scale) / 2),
                         }}
                     />
                 ) : null}

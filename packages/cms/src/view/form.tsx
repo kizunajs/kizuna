@@ -14,7 +14,7 @@ import { Tabs } from '@base-ui/react/tabs';
 import { ChevronRight, CircleAlert } from 'lucide-react';
 import { arrange, inSidebar, tabSets, type Arranged } from './arrange.js';
 import { ICON } from './context.js';
-import { Control, Row } from './controls.js';
+import { Control, foldsItems, Row } from './controls.js';
 import { labelOf, valueAt, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
@@ -210,10 +210,13 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
     const errorFor = (path: string): string | undefined =>
         Object.entries(fieldErrors).find(([errorPath]) => errorPath === path || errorPath.startsWith(`${path}.`))?.[1];
 
-    const control = (field: DescribedField, writable: boolean): ReactNode => (
+    const control = (field: DescribedField, writable: boolean, heading?: ReactNode): ReactNode => (
         <>
             <Control
                 id={domId(field.path) + '-input'}
+                name={field.name}
+                label={labelOf(field)}
+                heading={heading}
                 schema={field.schema}
                 root={field.schema}
                 value={valueOf(field.path)}
@@ -244,22 +247,30 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
 
     const section = (field: DescribedField): ReactNode => {
         const children = fields.filter((candidate) => candidate.parent === field.path);
+        // A list whose items fold draws the label itself, with Collapse all and Expand all beside it.
+        const folds = children.length === 0 && foldsItems(field.schema, field.schema);
+        const label = (
+            <label className="k-field__label" htmlFor={children.length === 0 && !folds ? domId(field.path) + '-input' : undefined}>
+                {labelOf(field)}
+            </label>
+        );
         return (
-            <section key={field.path} id={domId(field.path)} className="k-section">
-                <label className="k-section-title" htmlFor={children.length === 0 ? domId(field.path) + '-input' : undefined}>
-                    {labelOf(field)}
-                </label>
+            <section key={field.path} id={domId(field.path)} className="k-field">
+                {folds ? null : label}
                 {children.length === 0 ? (
-                    <div className="k-field" data-changed={isMarked(field.path, changed)} data-pointed={isMarked(field.path, pointed)}>
-                        {control(field, field.writable)}
+                    <div
+                        className="k-field__control"
+                        data-changed={isMarked(field.path, changed)}
+                        data-pointed={isMarked(field.path, pointed)}>
+                        {control(field, field.writable, folds ? label : undefined)}
                     </div>
                 ) : (
-                    <div className="k-group">
-                        {shown(arranged.blocks.get(field.path) ?? [], 'k-group', (child) => (
+                    <div className="k-fields">
+                        {shown(arranged.blocks.get(field.path) ?? [], 'k-fields', (child) => (
                             <div
                                 key={child.path}
                                 id={domId(child.path)}
-                                className="k-field"
+                                className="k-field__control"
                                 data-changed={isMarked(child.path, changed)}
                                 data-pointed={isMarked(child.path, pointed)}>
                                 <Row label={labelOf(child)} htmlFor={domId(child.path) + '-input'}>
@@ -288,7 +299,7 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                             return (
                                 <div
                                     key={inner.kind === 'field' ? inner.field.path : inner.kind === 'tabs' ? inner.id : inner.item.id}
-                                    className="k-layout-cell"
+                                    className="k-layout-row__cell"
                                     data-width={width !== undefined}
                                     style={
                                         width === undefined
@@ -320,11 +331,11 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                                 return next;
                             })
                         }>
-                        <Collapsible.Trigger className="k-collapsible-summary">
+                        <Collapsible.Trigger className="k-collapsible__trigger">
                             <ChevronRight {...ICON} />
                             {entry.item.label}
                         </Collapsible.Trigger>
-                        <Collapsible.Panel keepMounted className={`k-collapsible-panel ${stack}`}>
+                        <Collapsible.Panel keepMounted className={`k-collapsible__panel ${stack}`}>
                             {shown(entry.content, stack, leaf)}
                         </Collapsible.Panel>
                     </Collapsible.Root>
@@ -360,10 +371,10 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
 
     return (
         <div className="k-form">
-            <div className="k-form-columns" data-sidebar={arranged.sidebar.length > 0}>
-                <div className="k-form-main k-stack">{shown(arranged.main, 'k-stack', section)}</div>
+            <div className="k-form__columns" data-sidebar={arranged.sidebar.length > 0}>
+                <div className="k-form__main k-stack">{shown(arranged.main, 'k-stack', section)}</div>
                 {arranged.sidebar.length > 0 ? (
-                    <aside className="k-form-sidebar k-stack">{shown(arranged.sidebar, 'k-stack', section)}</aside>
+                    <aside className="k-form__sidebar k-stack">{shown(arranged.sidebar, 'k-stack', section)}</aside>
                 ) : null}
             </div>
             {problem !== undefined ? (

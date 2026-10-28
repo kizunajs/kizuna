@@ -53,7 +53,7 @@ const Articles = defineCollection({
 });
 
 const pglite = new PGlite();
-const configWith = (adminPath?: `/${string}`) =>
+const configWith = (adminPath?: `/${string}`, adminCss?: string) =>
     defineConfig({
         adapter: expressAdapter(),
         auth: {
@@ -73,6 +73,7 @@ const configWith = (adminPath?: `/${string}`) =>
             signOutPath: '/logout',
             apiPath: '/cms-api',
             adminPath,
+            adminCss,
             preview: {
                 url: 'https://site.example/blog',
             },
@@ -171,5 +172,20 @@ describe('adminPath', () => {
         const signedOut = await request(served).get('/editor');
         expect(signedOut.status).toBe(307);
         expect(signedOut.headers['location']).toBe(`/login?next=${encodeURIComponent('/editor')}`);
+    });
+});
+
+describe('adminCss', () => {
+    it("links the app's stylesheet after the admin's own", async () => {
+        const styled = express();
+        configWith(undefined, '/cms-admin.css').api.mount(styled);
+        const response = await request(styled).get('/admin').set('authorization', 'Bearer editor-token');
+        expect(response.text).toMatch(/<\/style>\s*<link rel="stylesheet" href="\/cms-admin.css">/);
+    });
+
+    it('links nothing without one', async () => {
+        const response = await request(app).get('/admin').set('authorization', 'Bearer editor-token');
+        expect(response.text).not.toContain('<link rel="stylesheet"');
+        expect(response.text).not.toContain('kizuna-cms-stylesheet');
     });
 });

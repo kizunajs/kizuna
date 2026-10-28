@@ -44,15 +44,15 @@ export function BulkBar({
     if (count === 0 && failed === undefined) return null;
 
     return (
-        <div className="k-admin-actions">
+        <div className="k-actions">
             {count === 0 ? null : (
-                <div className="k-admin-bulk" role="toolbar" aria-label="Ticked items">
+                <div className="k-bulk-bar" role="toolbar" aria-label="Ticked items">
                     <b>{count} selected</b>
                     {actions.map((action) => (
                         <button
                             key={action}
                             type="button"
-                            className="k-button k-button-small k-button-secondary"
+                            className="k-button k-button--small k-button--secondary"
                             disabled={running !== undefined}
                             aria-haspopup="dialog"
                             onClick={() => {
@@ -63,10 +63,10 @@ export function BulkBar({
                             {bulkLabelOf(action)}
                         </button>
                     ))}
-                    <span className="k-admin-spacer" />
+                    <span className="k-spacer" />
                     <button
                         type="button"
-                        className="k-button k-button-small k-button-secondary"
+                        className="k-button k-button--small k-button--secondary"
                         disabled={running !== undefined}
                         onClick={onClear}>
                         Clear
@@ -88,7 +88,7 @@ export function BulkBar({
                 onCancel={() => setConfirming(undefined)}
             />
             {failed === undefined ? null : (
-                <div className="k-admin-bulk-failures" role="alert">
+                <div className="k-bulk-bar__failures" role="alert">
                     <p className="k-error">
                         <CircleAlert {...ICON} />
                         {failed.message}

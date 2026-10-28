@@ -4,7 +4,8 @@ import { Check, ChevronDown, ChevronRight, Minus } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import { treeLinesOf, type TreePlace } from './list-tree.js';
 import { hrefOf } from './navigation.js';
-import { Status, dayOf } from './parts.js';
+import { Status } from './parts.js';
+import { dayOf } from './time.js';
 
 export interface ListRow {
     ref: string;
@@ -60,7 +61,7 @@ function Tick({
             checked={checked}
             indeterminate={indeterminate}
             onCheckedChange={(next) => onChange(next)}>
-            <Checkbox.Indicator className="k-check-indicator">
+            <Checkbox.Indicator className="k-check__indicator">
                 {indeterminate ? <Minus {...ICON} /> : <Check {...ICON} />}
             </Checkbox.Indicator>
         </Checkbox.Root>
@@ -70,7 +71,7 @@ function Tick({
 function Head({ rows, selection }: { rows: readonly ListRow[]; selection: Selection | undefined }) {
     const ticked = rows.filter((row) => selection?.selected.has(row.ref)).length;
     return (
-        <div className="k-admin-row k-admin-row-head" role="row">
+        <div className="k-list__row k-list__row--head" role="row">
             {selection === undefined ? null : (
                 <span role="columnheader">
                     <Tick
@@ -91,7 +92,7 @@ function Head({ rows, selection }: { rows: readonly ListRow[]; selection: Select
             )}
             <span role="columnheader">Title</span>
             <span role="columnheader">Status</span>
-            <span role="columnheader" className="k-admin-hide">
+            <span role="columnheader" className="k-list__optional">
                 Updated
             </span>
         </div>
@@ -120,7 +121,7 @@ interface LineProps {
 function Line({ row, title, selection, lead, depth, drop }: LineProps) {
     return (
         <div
-            className="k-admin-row"
+            className="k-list__row"
             role="row"
             data-linked=""
             data-over={drop?.over === true ? '' : undefined}
@@ -150,23 +151,23 @@ function Line({ row, title, selection, lead, depth, drop }: LineProps) {
                     />
                 </span>
             )}
-            <span role="cell" className="k-admin-row-title" data-tree={lead === undefined ? undefined : ''}>
+            <span role="cell" className="k-list__title" data-tree={lead === undefined ? undefined : ''}>
                 {lead}
                 <a
-                    className="k-admin-row-link"
+                    className="k-list__link"
                     draggable={false}
                     href={hrefOf({
                         kind: 'document',
                         ref: row.ref,
                     })}>
                     <span className="k-ellipsis">{lead === undefined ? row.title : (row.tree?.label ?? row.title)}</span>
-                    {row.detail === undefined ? null : <span className="k-admin-row-detail">{row.detail}</span>}
+                    {row.detail === undefined ? null : <span className="k-list__detail">{row.detail}</span>}
                 </a>
             </span>
             <span role="cell">
                 <Status status={row.status} />
             </span>
-            <span role="cell" className="k-admin-date k-admin-hide">
+            <span role="cell" className="k-list__date k-list__optional">
                 {dayOf(row.updatedAt)}
             </span>
         </div>
@@ -178,7 +179,7 @@ function Line({ row, title, selection, lead, depth, drop }: LineProps) {
  */
 export function FlatRows({ label, rows, selection }: { label: string; rows: readonly ListRow[]; selection?: Selection | undefined }) {
     return (
-        <div className="k-admin-rows" role="table" aria-label={label} data-selectable={selection === undefined ? undefined : ''}>
+        <div className="k-list" role="table" aria-label={label} data-selectable={selection === undefined ? undefined : ''}>
             <Head rows={rows} selection={selection} />
             {rows.map((row) => (
                 <Line key={row.ref} row={row} title={row.title} selection={selection} />
@@ -224,11 +225,11 @@ export function TreeRows({
     };
 
     return (
-        <div className="k-admin-rows" role="table" aria-label={label} data-selectable={selection === undefined ? undefined : ''}>
+        <div className="k-list" role="table" aria-label={label} data-selectable={selection === undefined ? undefined : ''}>
             <Head rows={lines.map((line) => line.row)} selection={selection} />
             {dragged === undefined ? null : (
                 <div
-                    className="k-admin-drop-top"
+                    className="k-list__drop-top"
                     data-over={over === null ? '' : undefined}
                     onDragOver={(event) => {
                         event.preventDefault();
@@ -253,7 +254,7 @@ export function TreeRows({
                             line.hasChildren ? (
                                 <button
                                     type="button"
-                                    className="k-icon-button k-admin-caret"
+                                    className="k-icon-button k-list__caret"
                                     aria-expanded={line.expanded}
                                     aria-label={line.expanded ? `Hide what is under ${place.label}` : `Show what is under ${place.label}`}
                                     onClick={() => {
@@ -265,7 +266,7 @@ export function TreeRows({
                                     {line.expanded ? <ChevronDown {...ICON} /> : <ChevronRight {...ICON} />}
                                 </button>
                             ) : (
-                                <span className="k-admin-caret" aria-hidden="true" />
+                                <span className="k-list__caret" aria-hidden="true" />
                             )
                         }
                         drop={{

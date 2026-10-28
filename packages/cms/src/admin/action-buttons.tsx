@@ -48,14 +48,14 @@ export function ActionBar({ buttons, onRun }: { buttons: readonly ActionButton[]
     if (buttons.length === 0 && problem === undefined) return null;
 
     return (
-        <div className="k-admin-actions">
+        <div className="k-actions">
             {buttons.length === 0 ? null : (
-                <div className="k-admin-action-row">
+                <div className="k-actions__row">
                     {buttons.map((button) => (
                         <button
                             key={button.name}
                             type="button"
-                            className={`k-button k-button-small ${button.primary === true ? 'k-button-primary' : 'k-button-secondary'}`}
+                            className={`k-button k-button--small ${button.primary === true ? 'k-button--primary' : 'k-button--secondary'}`}
                             disabled={button.disabled === true || running !== undefined}
                             aria-haspopup={button.confirm === undefined ? undefined : 'dialog'}
                             onClick={() => {

@@ -34,11 +34,11 @@ export function ConfirmDialog({
             <AlertDialog.Portal>
                 <AlertDialog.Backdrop className="k-backdrop" />
                 <AlertDialog.Popup className="k-dialog" initialFocus={proceed}>
-                    <AlertDialog.Title className="k-dialog-title">{confirming?.label}</AlertDialog.Title>
+                    <AlertDialog.Title className="k-dialog__title">{confirming?.label}</AlertDialog.Title>
                     <AlertDialog.Description className="k-help">{confirming?.question}</AlertDialog.Description>
-                    <div className="k-dialog-actions">
-                        <AlertDialog.Close className="k-button k-button-secondary">Cancel</AlertDialog.Close>
-                        <button ref={proceed} type="button" className="k-button k-button-primary" onClick={onConfirm}>
+                    <div className="k-dialog__actions">
+                        <AlertDialog.Close className="k-button k-button--secondary">Cancel</AlertDialog.Close>
+                        <button ref={proceed} type="button" className="k-button k-button--primary" onClick={onConfirm}>
                             {confirming?.label}
                         </button>
                     </div>

@@ -96,17 +96,17 @@ export function CommandPalette({
 
     return (
         <Dialog.Root open={open} onOpenChange={change}>
-            <Dialog.Trigger className="k-admin-nav-search">
+            <Dialog.Trigger className="k-sidebar__search">
                 <Search {...ICON} />
-                <span className="k-admin-nav-search-label">Search</span>
-                <kbd className="k-admin-kbd" aria-hidden="true">
+                <span className="k-sidebar__search-label">Search</span>
+                <kbd className="k-sidebar__shortcut" aria-hidden="true">
                     {onApple() ? '⌘K' : 'Ctrl K'}
                 </kbd>
             </Dialog.Trigger>
             <Dialog.Portal>
                 <Dialog.Backdrop className="k-backdrop" />
-                <Dialog.Popup className="k-admin-palette" initialFocus={input}>
-                    <Dialog.Title className="k-admin-visually-hidden">Search the admin</Dialog.Title>
+                <Dialog.Popup className="k-palette" initialFocus={input}>
+                    <Dialog.Title className="k-visually-hidden">Search the admin</Dialog.Title>
                     <Autocomplete.Root
                         open
                         inline
@@ -119,7 +119,7 @@ export function CommandPalette({
                         onValueChange={(next, details) => {
                             if (details.reason !== 'item-press') setQuery(next);
                         }}>
-                        <label className="k-admin-palette-field">
+                        <label className="k-palette__field">
                             <Search {...ICON} />
                             <Autocomplete.Input
                                 ref={input}
@@ -128,26 +128,26 @@ export function CommandPalette({
                                 spellCheck={false}
                             />
                         </label>
-                        <div className="k-admin-palette-results">
+                        <div className="k-palette__results">
                             <Autocomplete.Empty>
-                                <p className="k-admin-palette-empty">
+                                <p className="k-palette__empty">
                                     {searching && documents === undefined ? 'Searching…' : 'Nothing matches'}
                                 </p>
                             </Autocomplete.Empty>
-                            <Autocomplete.List className="k-admin-palette-list" aria-label="Results">
+                            <Autocomplete.List className="k-palette__list" aria-label="Results">
                                 {(group: ResultGroup) => (
-                                    <Autocomplete.Group key={group.label} items={group.items} className="k-admin-palette-group">
-                                        <Autocomplete.GroupLabel className="k-admin-palette-heading">{group.label}</Autocomplete.GroupLabel>
+                                    <Autocomplete.Group key={group.label} items={group.items} className="k-palette__group">
+                                        <Autocomplete.GroupLabel className="k-palette__heading">{group.label}</Autocomplete.GroupLabel>
                                         <Autocomplete.Collection>
                                             {(result: SearchResult) => (
                                                 <Autocomplete.Item
                                                     key={hrefOf(result.screen)}
                                                     value={result}
-                                                    className="k-admin-palette-option"
+                                                    className="k-palette__option"
                                                     onClick={() => pick(result)}>
                                                     <span className="k-ellipsis">{result.label}</span>
                                                     {result.detail === '' ? null : (
-                                                        <span className="k-admin-palette-detail k-ellipsis">{result.detail}</span>
+                                                        <span className="k-palette__detail k-ellipsis">{result.detail}</span>
                                                     )}
                                                 </Autocomplete.Item>
                                             )}

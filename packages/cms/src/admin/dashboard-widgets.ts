@@ -1,6 +1,89 @@
 import type { ChartBar } from './chart-geometry.js';
 import { CONTENT_GROUP } from './navigation.js';
 
+/**
+ * The periods the dashboard counts over, in the order the picker lists them.
+ */
+export const PERIODS = [
+    {
+        key: '24h',
+        label: 'Last 24 hours',
+    },
+    {
+        key: '7d',
+        label: 'Last 7 days',
+    },
+    {
+        key: '30d',
+        label: 'Last 30 days',
+    },
+    {
+        key: '90d',
+        label: 'Last 90 days',
+    },
+] satisfies ReadonlyArray<{ key: string; label: string }>;
+
+export type PeriodKey = (typeof PERIODS)[number]['key'];
+
+/**
+ * The period the dashboard opens on.
+ */
+export const DEFAULT_PERIOD: PeriodKey = '7d';
+
+/**
+ * The period the address names after `#period=`, or the default for none or
+ * one the dashboard does not know.
+ */
+export const periodOfHash = (hash: string): PeriodKey => {
+    const named = /^#?period=([^&]*)/.exec(hash)?.[1];
+    return PERIODS.find((period) => period.key === named)?.key ?? DEFAULT_PERIOD;
+};
+
+/**
+ * The period the numbers count over, as `GET /editing/dashboard` sends it.
+ */
+export interface DashboardPeriod {
+    key: PeriodKey;
+    from: string;
+    to: string;
+    previous: {
+        from: string;
+        to: string;
+    };
+}
+
+/**
+ * Under two days, a range names the hour as well as the day.
+ */
+const HOURS_SHOWN = 2 * 24 * 60 * 60 * 1000;
+
+/**
+ * A period as the dashboard names it beside the picker: its first and last
+ * day, with the time for a period shorter than two days, and the year once
+ * it is not this one.
+ */
+export const rangeOf = (period: { from: string; to: string }, locale?: string, now: Date = new Date()): string => {
+    const from = new Date(period.from);
+    const to = new Date(period.to);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return '';
+    const format = new Intl.DateTimeFormat(locale, {
+        day: 'numeric',
+        month: 'short',
+        ...(from.getFullYear() === now.getFullYear() && to.getFullYear() === now.getFullYear()
+            ? {}
+            : {
+                  year: 'numeric',
+              }),
+        ...(to.getTime() - from.getTime() < HOURS_SHOWN
+            ? {
+                  hour: '2-digit',
+                  minute: '2-digit',
+              }
+            : {}),
+    });
+    return `${format.format(from)} – ${format.format(to)}`;
+};
+
 export interface WaitingReview {
     ref: string;
     label: string;

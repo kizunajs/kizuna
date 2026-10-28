@@ -22,10 +22,10 @@ const render = (signOutPath: string | null, signOutMethod: 'GET' | 'POST' = 'GET
 describe('SignedIn', () => {
     it('opens a menu from the whole row, the name and the role a line each', () => {
         const html = render('/logout');
-        const trigger = html.match(/<button[^>]*k-admin-account[^>]*>(.*)<\/button>/)?.[1];
+        const trigger = html.match(/<button[^>]*k-sidebar__account[^>]*>(.*)<\/button>/)?.[1];
         expect(html).toContain('aria-haspopup="menu"');
         expect(trigger).toContain(`<span class="k-ellipsis">${LONG_NAME}</span>`);
-        expect(trigger).toContain('<span class="k-admin-role k-ellipsis">Content editor</span>');
+        expect(trigger).toContain('<span class="k-sidebar__role k-ellipsis">Content editor</span>');
     });
 
     it('signs out with a form the menu sends, when the CMS signs out by POST', () => {

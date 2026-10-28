@@ -42,7 +42,7 @@ export function MediaPicker({
     }, [open, connection]);
     return (
         <Popover.Root open={open} onOpenChange={setOpen}>
-            <Popover.Trigger className="k-button k-button-secondary k-button-small" disabled={disabled}>
+            <Popover.Trigger className="k-button k-button--secondary k-button--small" disabled={disabled}>
                 <ImageIcon {...ICON} />
                 {label ?? (current === undefined ? 'Choose image' : 'Replace')}
             </Popover.Trigger>
@@ -52,12 +52,12 @@ export function MediaPicker({
                         {media === undefined ? <p className="k-help">Loading</p> : null}
                         {failed ? <p className="k-help">The images could not be listed. Close this and try again.</p> : null}
                         {media?.length === 0 && !failed ? <p className="k-help">Nothing uploaded yet</p> : null}
-                        <div className="k-media-grid">
+                        <div className="k-media__grid">
                             {media?.map((record) => (
                                 <button
                                     key={record.id}
                                     type="button"
-                                    className="k-media-tile"
+                                    className="k-media__tile"
                                     aria-pressed={record.id === current}
                                     title={record.filename}
                                     onClick={() => {

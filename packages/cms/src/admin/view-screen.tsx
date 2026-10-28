@@ -6,7 +6,7 @@ import { FieldForm, type SaveState } from '../view/form.js';
 import { ActionBar, type ActionButton } from './action-buttons.js';
 import { outcomeOf, shownActions, type Outcome } from './actions.js';
 import { hrefOf } from './navigation.js';
-import { Loading, Topbar, problemOf } from './parts.js';
+import { DocumentHeader, Loading, Topbar, problemOf } from './parts.js';
 import {
     cellText,
     columnLabel,
@@ -68,8 +68,8 @@ export function ViewList({ connection, view, group }: { connection: Connection; 
                 {rows === undefined ? null : <span className="k-status">{rows.length}</span>}
                 {view.readOnly ? <span className="k-status">Read only</span> : null}
             </Topbar>
-            <div className="k-admin-body">
-                <label className="k-admin-search">
+            <div className="k-admin__body">
+                <label className="k-list__search">
                     <Search {...ICON} />
                     <input
                         type="search"
@@ -90,13 +90,13 @@ export function ViewList({ connection, view, group }: { connection: Connection; 
                         )}
                         {rows.length === 0 ? (
                             <div className="k-empty-state">
-                                <p className="k-empty-title">
+                                <p className="k-empty-state__title">
                                     {query.trim() === '' ? `Nothing in ${view.label.toLowerCase()}` : 'Nothing matches'}
                                 </p>
                             </div>
                         ) : (
-                            <div className="k-admin-rows" role="table" aria-label={view.label}>
-                                <div className="k-admin-row k-admin-row-head" role="row" data-columns style={grid}>
+                            <div className="k-list" role="table" aria-label={view.label}>
+                                <div className="k-list__row k-list__row--head" role="row" data-columns style={grid}>
                                     {columns.map((column) => (
                                         <span key={column} role="columnheader">
                                             {columnLabel(column)}
@@ -106,7 +106,7 @@ export function ViewList({ connection, view, group }: { connection: Connection; 
                                 {rows.map((row) => (
                                     <a
                                         key={row.id}
-                                        className="k-admin-row"
+                                        className="k-list__row"
                                         role="row"
                                         data-columns
                                         style={grid}
@@ -116,7 +116,7 @@ export function ViewList({ connection, view, group }: { connection: Connection; 
                                             id: row.id,
                                         })}>
                                         {columns.map((column, index) => (
-                                            <span key={column} role="cell" className={index === 0 ? 'k-admin-row-title' : 'k-admin-cell'}>
+                                            <span key={column} role="cell" className={index === 0 ? 'k-list__title' : 'k-list__cell'}>
                                                 <span className="k-ellipsis">{index === 0 ? row.title : cellText(row.values[column])}</span>
                                             </span>
                                         ))}
@@ -223,21 +223,19 @@ export function RecordScreen({
         return outcomeOf(answer, label);
     };
 
-    const crumb = (
-        <a
-            href={hrefOf({
-                kind: 'view',
-                name: viewName,
-            })}>
-            {viewLabel}
-        </a>
-    );
+    const crumb = {
+        label: viewLabel,
+        href: hrefOf({
+            kind: 'view',
+            name: viewName,
+        }),
+    };
 
     if (record === undefined) {
         return (
             <>
-                <Topbar crumb={crumb} title="" />
-                <div className="k-admin-body">
+                <DocumentHeader crumb={crumb} title="" />
+                <div className="k-admin__body">
                     <Loading problem={loadProblem} />
                 </div>
             </>
@@ -261,16 +259,24 @@ export function RecordScreen({
 
     return (
         <>
-            <Topbar crumb={crumb} title={record.title}>
-                {record.readOnly ? <span className="k-status">Read only</span> : null}
-                {changed && !gone ? <span className="k-save">Unsaved changes</span> : null}
-            </Topbar>
-            <div className="k-admin-body">
+            <DocumentHeader
+                crumb={crumb}
+                title={record.title}
+                meta={
+                    record.readOnly || (changed && !gone) ? (
+                        <>
+                            {record.readOnly ? <span className="k-status">Read only</span> : null}
+                            {changed && !gone ? <span className="k-save">Unsaved changes</span> : null}
+                        </>
+                    ) : undefined
+                }
+            />
+            <div className="k-admin__body">
                 {gone ? (
                     <p className="k-note">
                         This record is gone.{' '}
                         <a
-                            className="k-admin-inline-link"
+                            className="k-inline-link"
                             href={hrefOf({
                                 kind: 'view',
                                 name: viewName,

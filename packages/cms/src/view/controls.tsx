@@ -5,7 +5,22 @@ import { Dialog } from '@base-ui/react/dialog';
 import { NumberField } from '@base-ui/react/number-field';
 import { Select } from '@base-ui/react/select';
 import { Switch } from '@base-ui/react/switch';
-import { Check, ChevronRight, ChevronsUpDown, GripVertical, Pencil, Plus, Search, X } from 'lucide-react';
+import { Menu } from '@base-ui/react/menu';
+import {
+    Check,
+    ChevronDown,
+    ChevronRight,
+    ChevronsUpDown,
+    Ellipsis,
+    GripVertical,
+    Lock,
+    LockOpen,
+    Pencil,
+    Plus,
+    Search,
+    X,
+} from 'lucide-react';
+import { indexLabelOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './array-rows.js';
 import { ICON, useEditorContext } from './context.js';
 import { Hint } from './hint.js';
 import { MediaPicker, type MediaRecord } from './media.js';
@@ -28,6 +43,21 @@ export interface ControlProps {
     labels?: Record<string, string>;
     required?: boolean;
     id?: string;
+    /**
+     * The property or field's own name, which a field called `slug` locks
+     * behind Unlock.
+     */
+    name?: string;
+    /**
+     * What the field is called, which a list's Add button names one item
+     * after.
+     */
+    label?: string;
+    /**
+     * The field's label, drawn by a list whose items fold, so Collapse all and
+     * Expand all sit beside it.
+     */
+    heading?: ReactNode;
 }
 
 function SelectControl(props: {
@@ -51,7 +81,7 @@ function SelectControl(props: {
             disabled={props.disabled}>
             <Select.Trigger className="k-input k-select" id={props.id}>
                 <Select.Value placeholder="Choose" />
-                <Select.Icon className="k-select-icon">
+                <Select.Icon className="k-select__icon">
                     <ChevronsUpDown {...ICON} />
                 </Select.Icon>
             </Select.Trigger>
@@ -59,9 +89,9 @@ function SelectControl(props: {
                 <Select.Positioner sideOffset={6} alignItemWithTrigger={false} className="k-positioner">
                     <Select.Popup className="k-popup k-menu">
                         {items.map((item) => (
-                            <Select.Item key={item.value} value={item.value} className="k-menu-item">
+                            <Select.Item key={item.value} value={item.value} className="k-menu__item">
                                 <Select.ItemText>{item.label}</Select.ItemText>
-                                <Select.ItemIndicator className="k-menu-check">
+                                <Select.ItemIndicator className="k-menu__check">
                                     <Check {...ICON} />
                                 </Select.ItemIndicator>
                             </Select.Item>
@@ -84,7 +114,36 @@ const localDateTime = (iso: string): string => {
     return shifted.toISOString().slice(0, 16);
 };
 
-function StringControl({ schema, labels, value, onChange, disabled, required, id }: ControlProps) {
+/**
+ * A slug, shown muted and locked until the person unlocks it, since changing
+ * one moves the page it names.
+ */
+function SlugControl({ value, onChange, disabled, required, id }: ControlProps) {
+    const text = typeof value === 'string' ? value : '';
+    const [locked, setLocked] = useState(text !== '');
+    return (
+        <div className="k-slug" data-locked={locked}>
+            <input
+                id={id}
+                className="k-input k-slug__input"
+                type="text"
+                value={text}
+                disabled={disabled}
+                readOnly={locked}
+                onChange={(event) => onChange(event.target.value === '' && required !== true ? undefined : event.target.value)}
+            />
+            {disabled ? null : (
+                <button type="button" className="k-text-button k-slug__toggle" onClick={() => setLocked(!locked)}>
+                    {locked ? <LockOpen {...ICON} /> : <Lock {...ICON} />}
+                    {locked ? 'Unlock' : 'Lock'}
+                </button>
+            )}
+        </div>
+    );
+}
+
+function StringControl(props: ControlProps) {
+    const { schema, labels, value, onChange, disabled, required, id } = props;
     const text = typeof value === 'string' ? value : '';
     const set = (next: string): void => onChange(next === '' && required !== true ? undefined : next);
     if (schema.enum !== undefined) {
@@ -131,9 +190,10 @@ function StringControl({ schema, labels, value, onChange, disabled, required, id
         );
     }
     const input = stringInputOf(schema);
+    if (props.name === 'slug' && input === 'text') return <SlugControl {...props} />;
     const over = schema.maxLength !== undefined && text.length > schema.maxLength;
     return (
-        <div className="k-text">
+        <div className="k-text-field">
             {input === 'textarea' ? (
                 <textarea
                     id={id}
@@ -186,7 +246,7 @@ function BooleanControl({ value, onChange, disabled, id }: ControlProps) {
             checked={value === true}
             onCheckedChange={(checked) => onChange(checked)}
             disabled={disabled}>
-            <Switch.Thumb className="k-switch-thumb" />
+            <Switch.Thumb className="k-switch__thumb" />
         </Switch.Root>
     );
 }
@@ -263,30 +323,28 @@ function ReferenceControl({ value, onChange, brand, disabled, id }: ControlProps
             }}
             disabled={disabled}>
             <Combobox.Trigger className="k-input k-select" id={id}>
-                <span className="k-select-value">
-                    {chosen?.image !== undefined ? <img className="k-thumb-small" src={resolveUrl(chosen.image)} alt="" /> : null}
+                <span className="k-select__value">
+                    {chosen?.image !== undefined ? <img className="k-thumb" src={resolveUrl(chosen.image)} alt="" /> : null}
                     {chosen?.label ?? (current === '' ? <span className="k-placeholder">Choose</span> : current)}
                 </span>
-                <ChevronsUpDown {...ICON} className="k-select-icon" />
+                <ChevronsUpDown {...ICON} className="k-select__icon" />
             </Combobox.Trigger>
             <Combobox.Portal>
                 <Combobox.Positioner sideOffset={6} align="start" className="k-positioner">
                     <Combobox.Popup className="k-popup k-picker">
-                        <label className="k-search">
+                        <label className="k-picker__search">
                             <Search {...ICON} />
                             <Combobox.Input placeholder="Search" aria-label="Search" />
                         </label>
                         <Combobox.Empty>
                             <p className="k-help">Nothing found</p>
                         </Combobox.Empty>
-                        <Combobox.List className="k-picker-list">
+                        <Combobox.List className="k-picker__list">
                             {(result: SearchResult) => (
-                                <Combobox.Item key={result.id} value={result} className="k-menu-item">
-                                    {result.image !== undefined ? (
-                                        <img className="k-thumb-small" src={resolveUrl(result.image)} alt="" />
-                                    ) : null}
+                                <Combobox.Item key={result.id} value={result} className="k-menu__item">
+                                    {result.image !== undefined ? <img className="k-thumb" src={resolveUrl(result.image)} alt="" /> : null}
                                     <span className="k-ellipsis">{result.label}</span>
-                                    <Combobox.ItemIndicator className="k-menu-check">
+                                    <Combobox.ItemIndicator className="k-menu__check">
                                         <Check {...ICON} />
                                     </Combobox.ItemIndicator>
                                 </Combobox.Item>
@@ -377,21 +435,21 @@ function ImageControl({ value, onChange, disabled }: ControlProps) {
     const source = record === undefined ? undefined : resolveUrl(record.url);
     const title = image.alt === undefined || image.alt === '' ? (record?.filename ?? 'Image') : image.alt;
     return (
-        <div className="k-image-row">
+        <div className="k-image">
             {record === undefined ? (
-                <span className="k-image-thumb" aria-hidden="true" />
+                <span className="k-image__thumb" aria-hidden="true" />
             ) : (
-                <img className="k-image-thumb" src={resolveUrl(`${record.url}?w=120`)} alt="" />
+                <img className="k-image__thumb" src={resolveUrl(`${record.url}?w=120`)} alt="" />
             )}
-            <span className="k-image-name">
-                <span className="k-image-title">{title}</span>
+            <span className="k-image__name">
+                <span className="k-image__title">{title}</span>
                 {record === undefined ? null : (
-                    <span className="k-image-size">
+                    <span className="k-image__size">
                         {record.width} × {record.height}
                     </span>
                 )}
             </span>
-            <span className="k-image-buttons">
+            <span className="k-image__buttons">
                 <Dialog.Root open={editing} onOpenChange={setEditing}>
                     <Hint label="Edit image">
                         <Dialog.Trigger className="k-icon-button" aria-label="Edit image">
@@ -401,8 +459,8 @@ function ImageControl({ value, onChange, disabled }: ControlProps) {
                     <Dialog.Portal>
                         <Dialog.Backdrop className="k-backdrop" />
                         <Dialog.Popup className="k-sheet">
-                            <div className="k-sheet-head">
-                                <Dialog.Title className="k-dialog-title k-ellipsis">{record?.filename ?? 'Image'}</Dialog.Title>
+                            <div className="k-sheet__head">
+                                <Dialog.Title className="k-dialog__title k-ellipsis">{record?.filename ?? 'Image'}</Dialog.Title>
                                 <Dialog.Close className="k-icon-button" aria-label="Close">
                                     <X {...ICON} />
                                 </Dialog.Close>
@@ -426,7 +484,7 @@ function ImageControl({ value, onChange, disabled }: ControlProps) {
                                     />
                                     {image.focalPoint !== undefined ? (
                                         <span
-                                            className="k-focal"
+                                            className="k-image-frame__focal"
                                             style={{
                                                 left: `${image.focalPoint.x * 100}%`,
                                                 top: `${image.focalPoint.y * 100}%`,
@@ -436,13 +494,13 @@ function ImageControl({ value, onChange, disabled }: ControlProps) {
                                 </div>
                             )}
                             {disabled ? null : (
-                                <div className="k-sheet-actions">
+                                <div className="k-sheet__actions">
                                     <MediaPicker current={image.id} disabled={disabled} onPick={pick} />
                                     <span className="k-help">Click the image to set its focus.</span>
                                 </div>
                             )}
-                            <label className="k-sheet-field">
-                                <span className="k-sheet-label">Alt text</span>
+                            <label className="k-sheet__field">
+                                <span className="k-sheet__label">Alt text</span>
                                 <input
                                     className="k-input"
                                     type="text"
@@ -458,11 +516,11 @@ function ImageControl({ value, onChange, disabled }: ControlProps) {
                             </label>
                             {disabled ? null : (
                                 <Collapsible.Root className="k-collapsible">
-                                    <Collapsible.Trigger className="k-collapsible-summary">
+                                    <Collapsible.Trigger className="k-collapsible__trigger">
                                         <ChevronRight {...ICON} />
                                         Crop
                                     </Collapsible.Trigger>
-                                    <Collapsible.Panel className="k-collapsible-panel">
+                                    <Collapsible.Panel className="k-collapsible__panel">
                                         <div className="k-crop">
                                             {CROP_EDGES.map((edge) => (
                                                 <NumberField.Root
@@ -485,8 +543,10 @@ function ImageControl({ value, onChange, disabled }: ControlProps) {
                                                             },
                                                         })
                                                     }>
-                                                    <NumberField.Group className="k-crop-edge">
-                                                        <span>{edge.label}</span>
+                                                    <NumberField.Group className="k-crop__edge">
+                                                        <span className="k-sheet__label" aria-hidden="true">
+                                                            {edge.label}
+                                                        </span>
                                                         <NumberField.Input className="k-input" aria-label={`Crop ${edge.key}`} />
                                                     </NumberField.Group>
                                                 </NumberField.Root>
@@ -539,22 +599,27 @@ const shiftFor = (index: number, drag: Drag | undefined): number => {
     return 0;
 };
 
-function ArrayControl(props: ControlProps) {
-    const { schema, root, value, onChange, disabled } = props;
-    const items = Array.isArray(value) ? value : [];
-    const itemSchema = schema.items ?? {};
-    const resolvedItem = resolveRef(itemSchema, root);
-    const oneRow = typeOf(resolvedItem) === 'object' && fitsOneRow(resolvedItem, root);
-    const max = schema.maxItems;
-    const min = schema.minItems ?? 0;
-    // Editors like rich text read their value once, so a move or a removal remounts every item.
-    const [generation, setGeneration] = useState(0);
+/**
+ * Whether a list's items are objects too large for one row, so each one folds
+ * to a row of its own with its fields under it.
+ */
+export const foldsItems = (schema: JsonSchema, root: JsonSchema): boolean => {
+    const resolved = resolveRef(schema, root);
+    if (isRichText(schema) || isRichText(resolved) || typeOf(resolved) !== 'array') return false;
+    const itemSchema = resolved.items ?? {};
+    const item = resolveRef(itemSchema, root);
+    return typeOf(item) === 'object' && !isImage(itemSchema, root) && !isRichText(item) && !isSeo(item) && !fitsOneRow(item, root);
+};
+
+/**
+ * Follows the pointer while an item is dragged by its handle, moving the
+ * others aside, and hands back where it landed.
+ */
+const useDrag = (disabled: boolean, onDrop: (from: number, to: number) => void) => {
     const [drag, setDrag] = useState<Drag | undefined>();
-    const rows = useRef<Array<HTMLDivElement | null>>([]);
-    const reorder = (next: unknown[]): void => {
-        setGeneration((current) => current + 1);
-        onChange(next);
-    };
+    const rows = useRef<Array<HTMLElement | null>>([]);
+    const latestDrop = useRef(onDrop);
+    latestDrop.current = onDrop;
 
     const startDrag = (index: number, event: React.PointerEvent<HTMLButtonElement>): void => {
         if (disabled || event.button !== 0) return;
@@ -564,13 +629,14 @@ function ArrayControl(props: ControlProps) {
         const boxes = rows.current.map((row) => row?.getBoundingClientRect());
         const own = boxes[index];
         if (own === undefined) return;
-        const step = own.height + 8;
+        const list = rows.current[index]?.parentElement;
+        const gap = list === null || list === undefined ? 0 : Number.parseFloat(window.getComputedStyle(list).rowGap) || 0;
         const startY = event.clientY;
         let current: Drag = {
             from: index,
             to: index,
             offset: 0,
-            step,
+            step: own.height + gap,
         };
         setDrag(current);
         const move = (moved: PointerEvent): void => {
@@ -595,46 +661,238 @@ function ArrayControl(props: ControlProps) {
             handle.removeEventListener('pointerup', end);
             handle.removeEventListener('pointercancel', end);
             setDrag(undefined);
-            if (current.to !== current.from) reorder(moveItem(items, current.from, current.to));
+            if (current.to !== current.from) latestDrop.current(current.from, current.to);
         };
         handle.addEventListener('pointermove', move);
         handle.addEventListener('pointerup', end);
         handle.addEventListener('pointercancel', end);
     };
 
+    return {
+        drag,
+        rows,
+        startDrag,
+    };
+};
+
+function ArrayControl(props: ControlProps) {
+    const { schema, root, value, onChange, disabled } = props;
+    const items = Array.isArray(value) ? value : [];
+    const itemSchema = schema.items ?? {};
+    const resolvedItem = resolveRef(itemSchema, root);
+    const oneRow = typeOf(resolvedItem) === 'object' && fitsOneRow(resolvedItem, root);
+    const folds = foldsItems(schema, root);
+    const max = schema.maxItems;
+    const min = schema.minItems ?? 0;
+    const singular = singularOf(props.label ?? 'Item');
+    // Editors like rich text read their value once, so a move or a removal remounts every item.
+    const [generation, setGeneration] = useState(0);
+    const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set());
+    const reorder = (next: unknown[], remap: (index: number) => number | undefined): void => {
+        setGeneration((current) => current + 1);
+        setOpen((previous) => remapOpen(previous, remap));
+        onChange(next);
+    };
+    const moveTo = (from: number, to: number): void => reorder(moveItem(items, from, to), (index) => movedIndex(index, from, to));
+    const remove = (at: number): void =>
+        reorder(
+            items.filter((_, index) => index !== at),
+            (index) => (index === at ? undefined : index > at ? index - 1 : index)
+        );
+    const duplicate = (at: number): void => {
+        reorder([...items.slice(0, at + 1), structuredClone(items[at]), ...items.slice(at + 1)], (index) =>
+            index > at ? index + 1 : index
+        );
+        setOpen((previous) => new Set([...previous, at + 1]));
+    };
+    const add = (): void => {
+        onChange([...items, emptyFor(itemSchema, root)]);
+        if (folds) setOpen((previous) => new Set([...previous, items.length]));
+    };
+    const { drag, rows, startDrag } = useDrag(disabled, moveTo);
+
     const keyMove = (index: number, event: React.KeyboardEvent<HTMLButtonElement>): void => {
         const to = event.key === 'ArrowUp' ? index - 1 : event.key === 'ArrowDown' ? index + 1 : undefined;
         if (to === undefined || to < 0 || to >= items.length) return;
         event.preventDefault();
-        reorder(moveItem(items, index, to));
-        window.requestAnimationFrame(() => rows.current[to]?.querySelector<HTMLButtonElement>('.k-grip')?.focus());
+        moveTo(index, to);
+        window.requestAnimationFrame(() => rows.current[to]?.querySelector<HTMLButtonElement>('.k-array__grip')?.focus());
     };
 
+    const changeItem = (at: number, next: unknown): void => onChange(items.map((existing, index) => (index === at ? next : existing)));
+
+    const grip = (index: number) =>
+        disabled ? null : (
+            <button
+                type="button"
+                className="k-array__grip"
+                aria-label={`Move ${singular.toLowerCase()} ${index + 1}. Drag, or use the arrow keys.`}
+                onPointerDown={(event) => startDrag(index, event)}
+                onKeyDown={(event) => keyMove(index, event)}>
+                <GripVertical {...ICON} />
+            </button>
+        );
+
+    const footer = (
+        <div className="k-array__footer">
+            {disabled ? (
+                <span />
+            ) : (
+                <button type="button" className="k-text-button" disabled={max !== undefined && items.length >= max} onClick={add}>
+                    <Plus {...ICON} />
+                    {folds ? `Add ${singular.toLowerCase()}` : 'Add'}
+                </button>
+            )}
+            <span className="k-counter">
+                {items.length}
+                {max !== undefined ? `/${max}` : ''}
+            </span>
+        </div>
+    );
+
+    if (folds) {
+        const allOpen = items.length > 0 && items.every((_, index) => open.has(index));
+        return (
+            <div className="k-array k-array--folds" data-dragging={drag !== undefined}>
+                <div className="k-array__head">
+                    {props.heading ?? <span />}
+                    {items.length === 0 ? null : (
+                        <span className="k-array__toggles">
+                            <button type="button" className="k-text-button" disabled={open.size === 0} onClick={() => setOpen(new Set())}>
+                                Collapse all
+                            </button>
+                            <button
+                                type="button"
+                                className="k-text-button"
+                                disabled={allOpen}
+                                onClick={() => setOpen(new Set(items.map((_, index) => index)))}>
+                                Expand all
+                            </button>
+                        </span>
+                    )}
+                </div>
+                {items.length === 0 ? null : (
+                    <div className="k-array__items">
+                        {items.map((item, index) => {
+                            const { title, tag } = rowLabelsOf(resolvedItem, root, item);
+                            const isOpen = open.has(index);
+                            return (
+                                <Collapsible.Root
+                                    key={`${generation}:${index}`}
+                                    ref={(row: HTMLDivElement | null) => {
+                                        rows.current[index] = row;
+                                    }}
+                                    className="k-array__item"
+                                    open={isOpen}
+                                    onOpenChange={(next) =>
+                                        setOpen((previous) => {
+                                            const updated = new Set(previous);
+                                            if (next) updated.add(index);
+                                            else updated.delete(index);
+                                            return updated;
+                                        })
+                                    }
+                                    data-dragged={drag?.from === index}
+                                    style={{
+                                        transform: `translateY(${shiftFor(index, drag)}px)`,
+                                    }}>
+                                    <div className="k-array__row">
+                                        {grip(index)}
+                                        <Collapsible.Trigger className="k-array__summary">
+                                            <span className="k-array__index">{indexLabelOf(index)}</span>
+                                            {tag === undefined ? null : <span className="k-array__tag">{tag}</span>}
+                                            <span className="k-array__title" data-empty={title === undefined}>
+                                                {title ?? 'Untitled'}
+                                            </span>
+                                        </Collapsible.Trigger>
+                                        {disabled ? null : (
+                                            <Menu.Root>
+                                                <Menu.Trigger
+                                                    className="k-icon-button"
+                                                    aria-label={`More for ${singular.toLowerCase()} ${index + 1}`}>
+                                                    <Ellipsis {...ICON} />
+                                                </Menu.Trigger>
+                                                <Menu.Portal>
+                                                    <Menu.Positioner sideOffset={4} align="end" className="k-positioner">
+                                                        <Menu.Popup className="k-popup k-menu">
+                                                            <Menu.Item
+                                                                className="k-menu__item"
+                                                                disabled={max !== undefined && items.length >= max}
+                                                                onClick={() => duplicate(index)}>
+                                                                Duplicate
+                                                            </Menu.Item>
+                                                            <Menu.Item
+                                                                className="k-menu__item"
+                                                                disabled={index === 0}
+                                                                onClick={() => moveTo(index, index - 1)}>
+                                                                Move up
+                                                            </Menu.Item>
+                                                            <Menu.Item
+                                                                className="k-menu__item"
+                                                                disabled={index === items.length - 1}
+                                                                onClick={() => moveTo(index, index + 1)}>
+                                                                Move down
+                                                            </Menu.Item>
+                                                            <Menu.Item
+                                                                className="k-menu__item"
+                                                                disabled={items.length <= min}
+                                                                onClick={() => remove(index)}>
+                                                                Remove
+                                                            </Menu.Item>
+                                                        </Menu.Popup>
+                                                    </Menu.Positioner>
+                                                </Menu.Portal>
+                                            </Menu.Root>
+                                        )}
+                                        <Collapsible.Trigger
+                                            className="k-icon-button k-array__chevron"
+                                            aria-label={
+                                                isOpen
+                                                    ? `Collapse ${singular.toLowerCase()} ${index + 1}`
+                                                    : `Expand ${singular.toLowerCase()} ${index + 1}`
+                                            }>
+                                            <ChevronDown {...ICON} />
+                                        </Collapsible.Trigger>
+                                    </div>
+                                    <Collapsible.Panel keepMounted className="k-array__panel">
+                                        <ObjectControl
+                                            {...props}
+                                            id={undefined}
+                                            heading={undefined}
+                                            label={undefined}
+                                            schema={resolvedItem}
+                                            root={root}
+                                            value={item}
+                                            required
+                                            onChange={(next) => changeItem(index, next)}
+                                        />
+                                    </Collapsible.Panel>
+                                </Collapsible.Root>
+                            );
+                        })}
+                    </div>
+                )}
+                {footer}
+            </div>
+        );
+    }
+
     return (
-        <div className="k-list" data-dragging={drag !== undefined}>
+        <div className="k-array" data-dragging={drag !== undefined}>
             {items.map((item, index) => (
                 <div
                     key={`${generation}:${index}`}
                     ref={(row) => {
                         rows.current[index] = row;
                     }}
-                    className="k-list-item"
+                    className="k-array__item"
                     data-one-row={oneRow}
                     data-dragged={drag?.from === index}
                     style={{
                         transform: `translateY(${shiftFor(index, drag)}px)`,
                     }}>
-                    {disabled ? null : (
-                        <button
-                            type="button"
-                            className="k-grip"
-                            aria-label={`Move item ${index + 1}. Drag, or use the arrow keys.`}
-                            onPointerDown={(event) => startDrag(index, event)}
-                            onKeyDown={(event) => keyMove(index, event)}>
-                            <GripVertical {...ICON} />
-                        </button>
-                    )}
-                    <div className="k-list-body">
+                    {grip(index)}
+                    <div className="k-array__body">
                         {oneRow ? (
                             <InlineObjectControl
                                 {...props}
@@ -643,17 +901,20 @@ function ArrayControl(props: ControlProps) {
                                 root={root}
                                 value={item}
                                 required
-                                onChange={(next) => onChange(items.map((existing, at) => (at === index ? next : existing)))}
+                                onChange={(next) => changeItem(index, next)}
                             />
                         ) : (
                             <Control
                                 {...props}
                                 id={undefined}
+                                name={undefined}
+                                label={undefined}
+                                heading={undefined}
                                 schema={itemSchema}
                                 root={root}
                                 value={item}
                                 required
-                                onChange={(next) => onChange(items.map((existing, at) => (at === index ? next : existing)))}
+                                onChange={(next) => changeItem(index, next)}
                             />
                         )}
                     </div>
@@ -662,45 +923,40 @@ function ArrayControl(props: ControlProps) {
                             type="button"
                             className="k-icon-button"
                             disabled={items.length <= min}
-                            onClick={() => reorder(items.filter((_, at) => at !== index))}
+                            onClick={() => remove(index)}
                             aria-label={`Remove item ${index + 1}`}>
                             <X {...ICON} />
                         </button>
                     )}
                 </div>
             ))}
-            <div className="k-list-footer">
-                {disabled ? (
-                    <span />
-                ) : (
-                    <button
-                        type="button"
-                        className="k-button k-button-secondary k-button-small"
-                        disabled={max !== undefined && items.length >= max}
-                        onClick={() => onChange([...items, emptyFor(itemSchema, root)])}>
-                        <Plus {...ICON} />
-                        Add
-                    </button>
-                )}
-                <span className="k-counter">
-                    {items.length}
-                    {max !== undefined ? `/${max}` : ''}
-                </span>
-            </div>
+            {footer}
         </div>
     );
 }
 
 /**
- * A label beside its input.
+ * The mark a required field's label carries.
  */
-export function Row({ label, htmlFor, children }: { label: string; htmlFor?: string; children: ReactNode }) {
+export function Required() {
+    return (
+        <span className="k-required" aria-hidden="true">
+            *
+        </span>
+    );
+}
+
+/**
+ * A label above its input.
+ */
+export function Row({ label, htmlFor, required, children }: { label: string; htmlFor?: string; required?: boolean; children: ReactNode }) {
     return (
         <div className="k-row">
-            <label className="k-row-label" htmlFor={htmlFor} title={label}>
+            <label className="k-row__label" htmlFor={htmlFor} title={label}>
                 {label}
+                {required === true ? <Required /> : null}
             </label>
-            <div className="k-row-input">{children}</div>
+            <div className="k-row__input">{children}</div>
         </div>
     );
 }
@@ -739,6 +995,9 @@ function PropertyControl({ props, name, property, id }: { props: ControlProps; n
             brand={undefined}
             searchTool={undefined}
             labels={undefined}
+            name={name}
+            label={humanize(name)}
+            heading={undefined}
             value={current[name]}
             required={props.schema.required?.includes(name)}
             onChange={(next) => {
@@ -757,11 +1016,12 @@ function PropertyControl({ props, name, property, id }: { props: ControlProps; n
  * An object's properties, a row each, editing the object as a whole.
  */
 function ObjectControl(props: ControlProps) {
+    const base = useId();
     return (
-        <div className="k-group">
+        <div className="k-fields">
             {Object.entries(props.schema.properties ?? {}).map(([name, property]) => (
-                <Row key={name} label={humanize(name)}>
-                    <PropertyControl props={props} name={name} property={property} />
+                <Row key={name} label={humanize(name)} htmlFor={`${base}-${name}`} required={props.schema.required?.includes(name)}>
+                    <PropertyControl props={props} name={name} property={property} id={`${base}-${name}`} />
                 </Row>
             ))}
         </div>
@@ -777,9 +1037,10 @@ function InlineObjectControl(props: ControlProps) {
     return (
         <div className="k-inline-fields">
             {Object.entries(props.schema.properties ?? {}).map(([name, property]) => (
-                <div key={name} className="k-inline-field">
-                    <label className="k-inline-label" htmlFor={`${base}-${name}`}>
+                <div key={name} className="k-inline-fields__field">
+                    <label className="k-inline-fields__label" htmlFor={`${base}-${name}`}>
                         {humanize(name)}
+                        {props.schema.required?.includes(name) === true ? <Required /> : null}
                     </label>
                     <PropertyControl props={props} name={name} property={property} id={`${base}-${name}`} />
                 </div>

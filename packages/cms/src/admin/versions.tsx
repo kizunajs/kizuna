@@ -112,17 +112,17 @@ export function Versions({
     const changes: FieldChange[] = compared === undefined ? [] : fieldChanges(fields, compared.content, draft);
 
     return (
-        <div className="k-admin-versions">
+        <div className="k-versions">
             {problem === undefined ? null : (
                 <p className="k-error" role="alert">
                     {problem}
                 </p>
             )}
             {versions.map((entry, index) => (
-                <div key={entry.version} className="k-admin-version-entry">
-                    <div className="k-admin-version">
-                        <b className="k-admin-version-date">{savedAtOf(entry.createdAt)}</b>
-                        <span className="k-admin-version-detail">
+                <div key={entry.version} className="k-versions__entry">
+                    <div className="k-versions__version">
+                        <b className="k-versions__date">{savedAtOf(entry.createdAt)}</b>
+                        <span className="k-versions__detail">
                             <span className="k-ellipsis">
                                 {entry.summary ?? 'Saved'} by {nameOf(entry.createdBy)}
                             </span>
@@ -131,11 +131,11 @@ export function Versions({
                         {index === 0 ? (
                             <span className="k-help">Current draft</span>
                         ) : (
-                            <span className="k-admin-version-actions">
+                            <span className="k-versions__actions">
                                 {working === entry.version ? <LoaderCircle {...ICON} className="k-spin" /> : null}
                                 <button
                                     type="button"
-                                    className="k-button k-button-secondary k-button-small"
+                                    className="k-button k-button--secondary k-button--small"
                                     aria-expanded={compared?.version === entry.version}
                                     disabled={working !== undefined}
                                     onClick={() => void compare(entry.version)}>
@@ -143,7 +143,7 @@ export function Versions({
                                 </button>
                                 <button
                                     type="button"
-                                    className="k-button k-button-secondary k-button-small"
+                                    className="k-button k-button--secondary k-button--small"
                                     disabled={working !== undefined || disabled}
                                     onClick={() => void restore(entry.version)}>
                                     Restore
@@ -153,18 +153,18 @@ export function Versions({
                     </div>
                     {compared?.version === entry.version ? (
                         changes.length === 0 ? (
-                            <p className="k-help k-admin-compare-empty">This version holds what the draft holds.</p>
+                            <p className="k-help k-compare__empty">This version holds what the draft holds.</p>
                         ) : (
-                            <div className="k-admin-compare" role="table" aria-label={`Version ${entry.version} against the draft`}>
-                                <div className="k-admin-compare-row k-admin-row-head" role="row">
+                            <div className="k-compare" role="table" aria-label={`Version ${entry.version} against the draft`}>
+                                <div className="k-compare__row k-compare__row--head" role="row">
                                     <span role="columnheader">Field</span>
                                     <span role="columnheader">This version</span>
                                     <span role="columnheader">The draft</span>
                                 </div>
                                 {changes.map((change) => (
-                                    <div key={change.path} className="k-admin-compare-row" role="row">
+                                    <div key={change.path} className="k-compare__row" role="row">
                                         <span role="cell">{change.label}</span>
-                                        <span role="cell" className="k-admin-compare-then">
+                                        <span role="cell" className="k-compare__then">
                                             {change.then}
                                         </span>
                                         <span role="cell">{change.now}</span>

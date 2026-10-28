@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Check, CircleAlert, LoaderCircle } from 'lucide-react';
 import { ICON } from '../view/context.js';
+import { hrefOf } from './navigation.js';
 import type { SaveState } from '../view/form.js';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -23,17 +24,73 @@ export function Status({ status }: { status: string }) {
  */
 export function Topbar({ crumb, title, children }: { crumb?: ReactNode; title: ReactNode; children?: ReactNode }) {
     return (
-        <header className="k-admin-topbar">
+        <header className="k-topbar">
             {crumb === undefined ? null : (
                 <>
-                    <span className="k-admin-crumb">{crumb}</span>
-                    <span className="k-crumb-separator" aria-hidden="true">
+                    <span className="k-topbar__crumb">{crumb}</span>
+                    <span className="k-topbar__separator" aria-hidden="true">
                         /
                     </span>
                 </>
             )}
-            <h1 className="k-title-name">{title}</h1>
+            <h1 className="k-topbar__title">{title}</h1>
             {children}
+        </header>
+    );
+}
+
+/**
+ * A document's header: the trail back to the dashboard and its list, its
+ * title, a line of when it last changed and where it stands, and its actions
+ * on the right.
+ */
+export function DocumentHeader({
+    crumb,
+    title,
+    meta,
+    actions,
+}: {
+    crumb: { label: string; href?: string };
+    title: string;
+    meta?: ReactNode;
+    actions?: ReactNode;
+}) {
+    return (
+        <header className="k-document-header">
+            <div className="k-document-header__main">
+                <nav className="k-breadcrumb" aria-label="Breadcrumb">
+                    <a
+                        className="k-breadcrumb__link"
+                        href={hrefOf({
+                            kind: 'dashboard',
+                        })}>
+                        Dashboard
+                    </a>
+                    <span className="k-breadcrumb__separator" aria-hidden="true">
+                        /
+                    </span>
+                    {crumb.href === undefined ? (
+                        <span className="k-breadcrumb__link">{crumb.label}</span>
+                    ) : (
+                        <a className="k-breadcrumb__link" href={crumb.href}>
+                            {crumb.label}
+                        </a>
+                    )}
+                    {title === '' ? null : (
+                        <>
+                            <span className="k-breadcrumb__separator" aria-hidden="true">
+                                /
+                            </span>
+                            <span className="k-breadcrumb__current k-ellipsis" aria-current="page">
+                                {title}
+                            </span>
+                        </>
+                    )}
+                </nav>
+                <h1 className="k-document-header__title">{title}</h1>
+                {meta === undefined ? null : <div className="k-document-header__meta">{meta}</div>}
+            </div>
+            {actions === undefined ? null : <div className="k-document-header__actions">{actions}</div>}
         </header>
     );
 }
@@ -64,28 +121,6 @@ export function Loading({ problem }: { problem?: string | undefined }) {
         </div>
     );
 }
-
-const DAY = new Intl.DateTimeFormat(undefined, {
-    day: 'numeric',
-    month: 'short',
-});
-
-const DAY_OF_YEAR = new Intl.DateTimeFormat(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-});
-
-/**
- * When something last changed, as a day, with the year once it is not this
- * one.
- */
-export const dayOf = (iso: string | null): string => {
-    if (iso === null) return '';
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return '';
-    return (date.getFullYear() === new Date().getFullYear() ? DAY : DAY_OF_YEAR).format(date);
-};
 
 /**
  * What a problem answer says, or a sentence naming its status.

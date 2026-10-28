@@ -26,6 +26,7 @@ content: cms({
     signInPath,
     signOutPath,
     adminPath,
+    adminCss,
     apiPath,
     path,
     revalidate,
@@ -56,6 +57,7 @@ content: cms({
 | `signInPath`    | Where a signed-out editor is sent when they sign in elsewhere, in place of `auth.signIn`                            |
 | `signOutPath`   | Where the admin's Sign out link goes, in place of `auth.signOut`                                                    |
 | `adminPath`     | Where the admin is served, default `/admin` under `apiPath` and `path`, with its sign-in screen at `login` under it |
+| `adminCss`      | A stylesheet the admin loads after its own, a path on your site or a full URL                                       |
 | `apiPath`       | Where the config is mounted, default `/api`                                                                         |
 | `path`          | Where the CMS routes sit under it, default `/cms`                                                                   |
 | `revalidate`    | A function that revalidates tags, when the site runs elsewhere                                                      |

@@ -107,7 +107,7 @@ function RichTextImage(props: BlockObjectRenderProps) {
             });
     }, [connection, resolveUrl, image.id]);
     return (
-        <div {...props.attributes} className="k-rich-image" data-selected={props.selected}>
+        <div {...props.attributes} className="k-rich__image" data-selected={props.selected}>
             {props.children}
             <div contentEditable={false}>
                 {source !== undefined ? <img src={source} alt="" /> : null}
@@ -172,7 +172,7 @@ const RICH_TEXT_NODES = [
     }),
     defineAnnotation({
         type: 'link',
-        render: ({ children }) => <span className="k-rich-link">{children}</span>,
+        render: ({ children }) => <span className="k-rich__link">{children}</span>,
     }),
     defineBlockObject({
         type: 'image',
@@ -185,7 +185,7 @@ function ToolbarButton(props: { label: string; active: boolean; onPress: () => v
         <Hint label={props.label}>
             <button
                 type="button"
-                className="k-tool"
+                className="k-rich__tool"
                 aria-label={props.label}
                 aria-pressed={props.active}
                 onMouseDown={(event) => event.preventDefault()}
@@ -258,8 +258,8 @@ function Toolbar() {
     };
 
     return (
-        <div className="k-rich-toolbar">
-            <div className="k-rich-tools">
+        <div className="k-rich__toolbar">
+            <div className="k-rich__tools">
                 <ToolbarButton label="Paragraph" active={!h2 && !h3 && !quote} onPress={style('normal')}>
                     <Pilcrow {...ICON} />
                 </ToolbarButton>
@@ -272,7 +272,7 @@ function Toolbar() {
                 <ToolbarButton label="Quote" active={quote} onPress={style('blockquote')}>
                     <Quote {...ICON} />
                 </ToolbarButton>
-                <span className="k-rich-divider" />
+                <span className="k-rich__divider" />
                 <ToolbarButton label="Bold" active={strong} onPress={decorator('strong')}>
                     <Bold {...ICON} />
                 </ToolbarButton>
@@ -285,14 +285,14 @@ function Toolbar() {
                 <ToolbarButton label="Code" active={code} onPress={decorator('code')}>
                     <Code {...ICON} />
                 </ToolbarButton>
-                <span className="k-rich-divider" />
+                <span className="k-rich__divider" />
                 <ToolbarButton label="Bulleted list" active={bullet} onPress={list('bullet')}>
                     <List {...ICON} />
                 </ToolbarButton>
                 <ToolbarButton label="Numbered list" active={number} onPress={list('number')}>
                     <ListOrdered {...ICON} />
                 </ToolbarButton>
-                <span className="k-rich-divider" />
+                <span className="k-rich__divider" />
                 {linked ? (
                     <ToolbarButton
                         label="Remove link"
@@ -377,7 +377,7 @@ export function RichTextControl({ value, onChange, disabled }: ControlProps) {
             <NodePlugin nodes={RICH_TEXT_NODES} />
             <div className="k-rich">
                 {disabled ? null : <Toolbar />}
-                <PortableTextEditable className="k-rich-editable" />
+                <PortableTextEditable className="k-rich__editable" />
             </div>
         </EditorProvider>
     );

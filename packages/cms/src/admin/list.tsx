@@ -85,11 +85,11 @@ export function ListScreen({
         <>
             <Topbar crumb={crumb} title={title}>
                 {rows === undefined ? null : <span className="k-status">{rows.length}</span>}
-                <span className="k-admin-spacer" />
+                <span className="k-spacer" />
                 {actions}
             </Topbar>
-            <div className="k-admin-body">
-                <label className="k-admin-search">
+            <div className="k-admin__body">
+                <label className="k-list__search">
                     <Search {...ICON} />
                     <input
                         type="search"
@@ -107,7 +107,7 @@ export function ListScreen({
                     <Loading problem={problem} />
                 ) : matching.length === 0 ? (
                     <div className="k-empty-state">
-                        <p className="k-empty-title">
+                        <p className="k-empty-state__title">
                             {rows.length === 0 && !filtering ? `Nothing in ${title.toLowerCase()} yet` : 'Nothing matches'}
                         </p>
                     </div>
@@ -117,11 +117,11 @@ export function ListScreen({
                     <FlatRows label={title} rows={shown} selection={selection} />
                 )}
                 {nested === undefined && matching.length > PAGE_SIZE ? (
-                    <nav className="k-admin-pager" aria-label="Pages of the list">
+                    <nav className="k-pager" aria-label="Pages of the list">
                         <span>
                             {shownPage * PAGE_SIZE + 1} to {Math.min((shownPage + 1) * PAGE_SIZE, matching.length)} of {matching.length}
                         </span>
-                        <span className="k-admin-pager-pages">
+                        <span className="k-pager__pages">
                             <Hint label="Previous page">
                                 <button
                                     type="button"
@@ -134,7 +134,7 @@ export function ListScreen({
                             </Hint>
                             {pagesAround(shownPage, pageCount).map((number, index) =>
                                 number === null ? (
-                                    <span key={`gap-${index}`} className="k-admin-pager-gap">
+                                    <span key={`gap-${index}`} className="k-pager__gap">
                                         …
                                     </span>
                                 ) : (
@@ -407,7 +407,7 @@ export function CollectionList({
                 actions={
                     <button
                         type="button"
-                        className="k-button k-button-primary k-button-small"
+                        className="k-button k-button--primary k-button--small"
                         disabled={creating}
                         onClick={() => void create()}>
                         <Plus {...ICON} />
@@ -416,7 +416,7 @@ export function CollectionList({
                 }
             />
             {rows !== undefined && problem !== undefined ? (
-                <p className="k-error k-admin-body" role="alert">
+                <p className="k-error k-admin__body" role="alert">
                     {problem}
                 </p>
             ) : null}

@@ -28,6 +28,22 @@ export interface DocumentViewConfig {
 export const CONFIG_PLACEHOLDER = '"__KIZUNA_CMS_VIEW_CONFIG__"';
 
 /**
+ * Where the built page takes the app's own stylesheet, after its own styles.
+ */
+export const STYLESHEET_PLACEHOLDER = '<!--kizuna-cms-stylesheet-->';
+
+const attribute = (value: string): string =>
+    value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+
+/**
+ * The page with a link to `adminCss` where its placeholder is, or without one.
+ * Its rules sit outside the `kizuna` layer the page's own styles are in, so
+ * they win.
+ */
+export const withStylesheet = (page: string, href: string | undefined): string =>
+    page.replace(STYLESHEET_PLACEHOLDER, () => (href === undefined ? '' : `<link rel="stylesheet" href="${attribute(href)}">`));
+
+/**
  * A file the package build writes to `dist/views`: beside this module in
  * `dist`, beside `src` when the tests run the source, or wherever the package
  * resolves from the app.
@@ -64,12 +80,26 @@ const originOf = (url: string | undefined): string | undefined => {
 };
 
 /**
+ * `adminCss` as an address the host can load: a path resolved against the
+ * site, which a path cannot reach without.
+ */
+const stylesheetOn = (href: string | undefined, site: string | undefined): string | undefined => {
+    if (href === undefined) return undefined;
+    try {
+        return new URL(href, site).toString();
+    } catch {
+        return undefined;
+    }
+};
+
+/**
  * The editor a host renders a draft in, framing the site at `preview.url` and
  * loading images from it, the media bucket, and the origins relationships
  * name for their thumbnails.
  */
 export const documentViewFor = (options: {
     preview?: ResolvedCmsOptions['preview'];
+    adminCss?: string;
     media?: ResolvedCmsOptions['media'];
     relationships?: readonly { imageOrigins?: readonly string[] }[];
     auth?: {
@@ -82,7 +112,13 @@ export const documentViewFor = (options: {
     const bucket = originOf(options.media?.publicPath);
     const thumbnails = (options.relationships ?? []).flatMap((relationship) => relationship.imageOrigins ?? []);
     const faces = options.auth?.people?.imageOrigins ?? [];
-    const images = [...new Set([site, bucket, ...thumbnails, ...faces].filter((origin): origin is string => origin !== undefined))];
+    // The host serves the view from an origin of its own, so a stylesheet on the site loads from the site's.
+    const stylesheet = stylesheetOn(options.adminCss, site);
+    const images = [
+        ...new Set(
+            [site, bucket, ...thumbnails, ...faces, originOf(stylesheet)].filter((origin): origin is string => origin !== undefined)
+        ),
+    ];
     const config: DocumentViewConfig = {
         siteUrl: site ?? null,
     };
@@ -90,7 +126,7 @@ export const documentViewFor = (options: {
         uri: DOCUMENT_VIEW_URI,
         name: 'Content editor',
         description: "A document's fields as a form, with the site's draft beside it.",
-        html: async () => (await builtPage()).replace(CONFIG_PLACEHOLDER, JSON.stringify(config)),
+        html: async () => withStylesheet((await builtPage()).replace(CONFIG_PLACEHOLDER, JSON.stringify(config)), stylesheet),
         csp: {
             ...(site === undefined
                 ? {}

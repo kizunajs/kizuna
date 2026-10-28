@@ -3,7 +3,7 @@ import { route, type PluginApi } from 'kizunajs/plugin';
 import { adapterContextOf, authenticate, flattenRoutes, rawResponse } from 'kizunajs/adapter';
 import { toToolName } from 'kizunajs/generator';
 import type { CmsService } from '../cms.js';
-import { CONFIG_PLACEHOLDER, readBuilt } from '../document-view.js';
+import { CONFIG_PLACEHOLDER, readBuilt, withStylesheet } from '../document-view.js';
 import type { ResolvedCmsOptions } from '../options.js';
 import type { AdminConfig, AdminRoute } from './config.js';
 import { listOptionsOf } from './list-options.js';
@@ -182,8 +182,11 @@ export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api
                 })
             );
         }
-        const page = (await readBuilt('admin.html')).replace(CONFIG_PLACEHOLDER, () =>
-            embedded(adminConfigFor(options, api, base, editingRoleOf(signedIn?.['role'], service.roles)))
+        const page = withStylesheet(
+            (await readBuilt('admin.html')).replace(CONFIG_PLACEHOLDER, () =>
+                embedded(adminConfigFor(options, api, base, editingRoleOf(signedIn?.['role'], service.roles)))
+            ),
+            options.adminCss
         );
         return rawResponse(
             new Response(page, {

@@ -138,15 +138,15 @@ export function Switcher({ connection, current, title, onOpen }: SwitcherProps) 
 
     return (
         <Dialog.Root open={open} onOpenChange={setOpen}>
-            <Dialog.Trigger className="k-switch-trigger" aria-label={`${title}, open another page or item`}>
-                <span className="k-title-name">{title}</span>
+            <Dialog.Trigger className="k-header__switcher" aria-label={`${title}, open another page or item`}>
+                <span className="k-header__name">{title}</span>
                 <ChevronDown {...ICON} />
             </Dialog.Trigger>
             <Dialog.Portal>
                 <Dialog.Backdrop className="k-backdrop" />
                 <Dialog.Popup className="k-dialog k-switcher">
-                    <Dialog.Title className="k-dialog-title">Open</Dialog.Title>
-                    <label className="k-switcher-search">
+                    <Dialog.Title className="k-dialog__title">Open</Dialog.Title>
+                    <label className="k-switcher__search">
                         <Search {...ICON} />
                         <input
                             type="search"
@@ -156,7 +156,7 @@ export function Switcher({ connection, current, title, onOpen }: SwitcherProps) 
                             onChange={(event) => setQuery(event.target.value)}
                         />
                     </label>
-                    <div className="k-switcher-list">
+                    <div className="k-switcher__list">
                         {pages === undefined || collections === undefined || globals === undefined ? (
                             <p className="k-help">
                                 <LoaderCircle {...ICON} className="k-spin" /> Listing the content
@@ -164,13 +164,13 @@ export function Switcher({ connection, current, title, onOpen }: SwitcherProps) 
                         ) : (
                             <>
                                 {shownPages.length > 0 ? (
-                                    <section className="k-switcher-group">
-                                        <h3 className="k-switcher-heading">Pages</h3>
+                                    <section className="k-switcher__group">
+                                        <h3 className="k-switcher__heading">Pages</h3>
                                         {shownPages.map((page) => (
                                             <button
                                                 key={page.ref}
                                                 type="button"
-                                                className="k-switcher-row"
+                                                className="k-switcher__row"
                                                 aria-current={page.ref === current}
                                                 onClick={() =>
                                                     go({
@@ -178,21 +178,21 @@ export function Switcher({ connection, current, title, onOpen }: SwitcherProps) 
                                                         path: page.path,
                                                     })
                                                 }>
-                                                <span className="k-switcher-name">{page.label ?? written(page.name)}</span>
-                                                <span className="k-switcher-path">{page.path}</span>
-                                                <span className="k-switcher-status">{STATUS[page.status] ?? page.status}</span>
+                                                <span className="k-switcher__name">{page.label ?? written(page.name)}</span>
+                                                <span className="k-switcher__path">{page.path}</span>
+                                                <span className="k-switcher__status">{STATUS[page.status] ?? page.status}</span>
                                             </button>
                                         ))}
                                     </section>
                                 ) : null}
                                 {shownGlobals.length > 0 ? (
-                                    <section className="k-switcher-group">
-                                        <h3 className="k-switcher-heading">On every page</h3>
+                                    <section className="k-switcher__group">
+                                        <h3 className="k-switcher__heading">On every page</h3>
                                         {shownGlobals.map((global) => (
                                             <button
                                                 key={global.name}
                                                 type="button"
-                                                className="k-switcher-row"
+                                                className="k-switcher__row"
                                                 aria-current={`global:${global.name}` === current}
                                                 onClick={() =>
                                                     go({
@@ -200,8 +200,8 @@ export function Switcher({ connection, current, title, onOpen }: SwitcherProps) 
                                                         path: null,
                                                     })
                                                 }>
-                                                <span className="k-switcher-name">{global.label ?? written(global.name)}</span>
-                                                <span className="k-switcher-status">{STATUS[global.status] ?? global.status}</span>
+                                                <span className="k-switcher__name">{global.label ?? written(global.name)}</span>
+                                                <span className="k-switcher__status">{STATUS[global.status] ?? global.status}</span>
                                             </button>
                                         ))}
                                     </section>
@@ -210,14 +210,14 @@ export function Switcher({ connection, current, title, onOpen }: SwitcherProps) 
                                     const items = (collection.items ?? []).filter((item) => matches(search, item.label, item.path));
                                     if (search !== '' && items.length === 0) return null;
                                     return (
-                                        <section key={collection.name} className="k-switcher-group">
-                                            <div className="k-switcher-heading-row">
-                                                <h3 className="k-switcher-heading">
+                                        <section key={collection.name} className="k-switcher__group">
+                                            <div className="k-switcher__heading-row">
+                                                <h3 className="k-switcher__heading">
                                                     {collection.label} · {collection.count}
                                                 </h3>
                                                 <button
                                                     type="button"
-                                                    className="k-button k-button-secondary k-button-small"
+                                                    className="k-button k-button--secondary k-button--small"
                                                     disabled={creating !== undefined}
                                                     onClick={() => void create(collection)}>
                                                     {creating === collection.name ? (
@@ -232,7 +232,7 @@ export function Switcher({ connection, current, title, onOpen }: SwitcherProps) 
                                                 <button
                                                     key={item.ref}
                                                     type="button"
-                                                    className="k-switcher-row"
+                                                    className="k-switcher__row"
                                                     aria-current={item.ref === current}
                                                     onClick={() =>
                                                         go({
@@ -240,8 +240,8 @@ export function Switcher({ connection, current, title, onOpen }: SwitcherProps) 
                                                             path: item.path,
                                                         })
                                                     }>
-                                                    <span className="k-switcher-name">{item.label}</span>
-                                                    <span className="k-switcher-status">{STATUS[item.status] ?? item.status}</span>
+                                                    <span className="k-switcher__name">{item.label}</span>
+                                                    <span className="k-switcher__status">{STATUS[item.status] ?? item.status}</span>
                                                 </button>
                                             ))}
                                             {items.length === 0 ? <p className="k-help">No items yet.</p> : null}

@@ -763,9 +763,9 @@ export function DocumentView({ app, events, siteUrl }: DocumentViewProps) {
 
     const form =
         unmanaged !== undefined ? (
-            <div className="k-pane">
+            <div className="k-shell__pane">
                 <div className="k-empty-state">
-                    <p className="k-empty-title">Nothing to edit on {unmanaged}</p>
+                    <p className="k-empty-state__title">Nothing to edit on {unmanaged}</p>
                     <p className="k-help">
                         This page has no content in the CMS. Its text comes from the site's code. Click shared content on it, such as the
                         footer, to edit that, or browse to another page.
@@ -773,7 +773,7 @@ export function DocumentView({ app, events, siteUrl }: DocumentViewProps) {
                 </div>
             </div>
         ) : (
-            <div className="k-pane">
+            <div className="k-shell__pane">
                 {document.usedOn.everywhere ? <p className="k-note">This shows on every page.</p> : null}
                 {!document.complete && document.missing.length > 0 ? (
                     <p className="k-note">Fill in {document.missing.join(', ')} before publishing.</p>
@@ -798,11 +798,11 @@ export function DocumentView({ app, events, siteUrl }: DocumentViewProps) {
         <EditorContext.Provider value={editorContext}>
             <div className="k-shell" data-fullscreen={fullscreen}>
                 <Header>
-                    <div className="k-title">
+                    <div className="k-header__title">
                         {trail.length > 0 && unmanaged === undefined ? (
                             <button
                                 type="button"
-                                className="k-back"
+                                className="k-header__back"
                                 aria-label={`Back to ${trail.at(-1)!.title}`}
                                 onClick={() => {
                                     const back = trail.at(-1)!;
@@ -815,7 +815,7 @@ export function DocumentView({ app, events, siteUrl }: DocumentViewProps) {
                             </button>
                         ) : null}
                         {trail.length > 0 && unmanaged === undefined ? (
-                            <span className="k-crumb-separator" aria-hidden="true">
+                            <span className="k-header__separator" aria-hidden="true">
                                 /
                             </span>
                         ) : null}
@@ -836,7 +836,7 @@ export function DocumentView({ app, events, siteUrl }: DocumentViewProps) {
                                 }}
                             />
                         ) : (
-                            <span className="k-title-name">{unmanaged}</span>
+                            <span className="k-header__name">{unmanaged}</span>
                         )}
                         {unmanaged === undefined ? (
                             <span className="k-status" data-status={document.status}>
@@ -848,7 +848,7 @@ export function DocumentView({ app, events, siteUrl }: DocumentViewProps) {
                         ) : null}
                         <SaveIndicator state={saveState} />
                     </div>
-                    <div className="k-header-actions">
+                    <div className="k-header__actions">
                         {unmanaged === undefined ? (
                             <OwnerControl
                                 owner={document.owner}
@@ -888,7 +888,7 @@ export function DocumentView({ app, events, siteUrl }: DocumentViewProps) {
                 </Header>
                 {fullscreen ? (
                     <div className="k-split">
-                        <div className="k-split-form">{form}</div>
+                        <div className="k-split__form">{form}</div>
                         <PreviewPane
                             siteUrl={siteUrl ?? ''}
                             url={live ? previewUrl : undefined}
@@ -915,9 +915,9 @@ export function DocumentView({ app, events, siteUrl }: DocumentViewProps) {
                 ) : (
                     form
                 )}
-                <footer className="k-footer">
+                <footer className="k-shell__footer">
                     {!fullscreen && canFullscreen && siteUrl !== null ? (
-                        <button type="button" className="k-button k-button-secondary" onClick={toggleFullscreen}>
+                        <button type="button" className="k-button k-button--secondary" onClick={toggleFullscreen}>
                             Open preview
                         </button>
                     ) : (

@@ -10,7 +10,6 @@ import {
     placeBars,
     positionOf,
     scaleOf,
-    sparklineOf,
     WIDEST_BAR,
 } from './chart-geometry.js';
 
@@ -29,14 +28,14 @@ describe('the chart scale', () => {
         });
     });
 
-    it('takes the smallest round step that keeps the grid to four intervals', () => {
-        expect(scaleOf([7]).ticks).toEqual([0, 2, 4, 6, 8]);
+    it('takes the smallest round step that keeps the grid to three intervals', () => {
+        expect(scaleOf([7]).ticks).toEqual([0, 5, 10]);
         expect(scaleOf([100]).ticks).toEqual([0, 50, 100]);
         expect(scaleOf([48290]).ticks).toEqual([0, 20000, 40000, 60000]);
     });
 
     it('steps below one without float noise', () => {
-        expect(scaleOf([0.7]).ticks).toEqual([0, 0.2, 0.4, 0.6, 0.8]);
+        expect(scaleOf([0.7]).ticks).toEqual([0, 0.5, 1]);
         expect(scaleOf([0.3]).ticks).toEqual([0, 0.1, 0.2, 0.3]);
     });
 
@@ -157,6 +156,18 @@ describe('the labels under a chart', () => {
         expect([...labelledBars(days([1, 2, 3, 4, 5]), 36)]).toEqual([0, 2, 4]);
         expect([...labelledBars(days([1, 2, 3, 4]), 36)]).toEqual([1, 3]);
     });
+
+    it('labels six at most, however wide the chart is', () => {
+        const month = days(
+            Array.from(
+                {
+                    length: 30,
+                },
+                (_, index) => index
+            )
+        );
+        expect([...labelledBars(month, 200)]).toEqual([5, 11, 17, 23, 29]);
+    });
 });
 
 describe('the chart summary', () => {
@@ -215,22 +226,6 @@ describe('comparing periods', () => {
 
     it('closes the area under a line on the baseline', () => {
         expect(areaPath(linePointsOf([10, 12], plot), 100)).toMatch(/V100 H25 Z$/);
-    });
-});
-
-describe('a sparkline', () => {
-    it('needs two values', () => {
-        expect(sparklineOf([4], 60, 20)).toBeUndefined();
-    });
-
-    it('spans its own lowest and highest values', () => {
-        const sparkline = sparklineOf([10, 30, 20], 60, 20);
-        expect(sparkline?.line).toMatch(/^M0,18 /);
-        expect(sparkline?.line).toContain('30,2');
-    });
-
-    it('draws a flat trend through the middle', () => {
-        expect(sparklineOf([5, 5], 60, 20)?.line).toMatch(/^M0,10 /);
     });
 });
 

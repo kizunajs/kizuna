@@ -38,7 +38,7 @@ const page = async ({ name, entry, stylesheets, title = 'Kizuna CMS' }) => {
         .join('\n')
         .replace('__PLUS_JAKARTA_SANS__', font.toString('base64'));
 
-    // The server swaps the placeholder for the site's address when it serves the page.
+    // The server swaps the placeholders for the site's address and the app's own stylesheet when it serves the page.
     const html = `<!doctype html>
 <html lang="en">
 <head>
@@ -46,6 +46,7 @@ const page = async ({ name, entry, stylesheets, title = 'Kizuna CMS' }) => {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
 <style>${styles}</style>
+<!--kizuna-cms-stylesheet-->
 <script id="kizuna-cms-config" type="application/json">"__KIZUNA_CMS_VIEW_CONFIG__"</script>
 </head>
 <body>

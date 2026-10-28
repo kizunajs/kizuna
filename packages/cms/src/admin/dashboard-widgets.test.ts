@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { changeOf, groupsOf, runsOf, tileColumnsOf, type DashboardCollection, type DashboardWidgetBody } from './dashboard-widgets.js';
+import {
+    changeOf,
+    groupsOf,
+    periodOfHash,
+    rangeOf,
+    runsOf,
+    tileColumnsOf,
+    type DashboardCollection,
+    type DashboardWidgetBody,
+} from './dashboard-widgets.js';
 
 const revenue: DashboardWidgetBody = {
     type: 'stat',
@@ -120,5 +129,57 @@ describe('tileColumnsOf', () => {
 
     it('keeps four columns when there are no tiles', () => {
         expect(tileColumnsOf(0)).toBe(4);
+    });
+});
+
+describe('the dashboard period', () => {
+    it('reads the period the address names', () => {
+        expect(periodOfHash('#period=30d')).toBe('30d');
+        expect(periodOfHash('#period=24h')).toBe('24h');
+    });
+
+    it('opens on the last 7 days without one, or with one it does not know', () => {
+        expect(periodOfHash('')).toBe('7d');
+        expect(periodOfHash('#/')).toBe('7d');
+        expect(periodOfHash('#period=1y')).toBe('7d');
+    });
+
+    it('names a week by its first and last day', () => {
+        expect(
+            rangeOf(
+                {
+                    from: '2026-10-21T12:00:00.000Z',
+                    to: '2026-10-28T12:00:00.000Z',
+                },
+                'en-GB',
+                new Date('2026-10-28T12:00:00.000Z')
+            )
+        ).toBe('21 Oct – 28 Oct');
+    });
+
+    it('adds the year once the range is not this one', () => {
+        expect(
+            rangeOf(
+                {
+                    from: '2026-12-01T12:00:00.000Z',
+                    to: '2026-12-31T12:00:00.000Z',
+                },
+                'en-GB',
+                new Date('2027-01-02T12:00:00.000Z')
+            )
+        ).toBe('1 Dec 2026 – 31 Dec 2026');
+    });
+
+    it('names the hour for the last 24 hours', () => {
+        expect(
+            rangeOf(
+                {
+                    from: '2026-10-27T12:00:00.000Z',
+                    to: '2026-10-28T12:00:00.000Z',
+                },
+                'en-GB',
+                new Date('2026-10-28T12:00:00.000Z')
+            )
+        ).toMatch(/^27 Oct.*\d\d:\d\d – 28 Oct.*\d\d:\d\d$/);
     });
 });

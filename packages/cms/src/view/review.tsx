@@ -117,7 +117,7 @@ function Thumbnail({ image }: { image: { id: string } }) {
                 if (answer.status === 200) setSource(resolveUrl(`${answer.body.url}?w=240`));
             });
     }, [connection, resolveUrl, image.id]);
-    return source === undefined ? <span className="k-review-thumb" /> : <img className="k-review-thumb" src={source} alt="" />;
+    return source === undefined ? <span className="k-review__thumb" /> : <img className="k-review__thumb" src={source} alt="" />;
 }
 
 type ImageValue = {
@@ -154,12 +154,12 @@ const brief = (value: unknown): string => {
  * What one change does, shown the way its value reads.
  */
 function ChangeValue({ change }: { change: DraftChange }) {
-    if (change.after === undefined) return <p className="k-review-note">Cleared</p>;
+    if (change.after === undefined) return <p className="k-review__note">Cleared</p>;
     if (isImage(change.before) && isImage(change.after) && change.before.id === change.after.id) {
         return (
-            <div className="k-review-images">
+            <div className="k-review__images">
                 <Thumbnail image={change.after} />
-                <ul className="k-review-facts">
+                <ul className="k-review__facts">
                     {imageFacts(change.before, change.after).map((fact) => (
                         <li key={fact}>{fact}</li>
                     ))}
@@ -169,10 +169,10 @@ function ChangeValue({ change }: { change: DraftChange }) {
     }
     if (isImage(change.before) || isImage(change.after)) {
         return (
-            <div className="k-review-images">
-                {isImage(change.before) ? <Thumbnail image={change.before} /> : <span className="k-review-note">No image</span>}
-                <span className="k-review-arrow">→</span>
-                {isImage(change.after) ? <Thumbnail image={change.after} /> : <span className="k-review-note">No image</span>}
+            <div className="k-review__images">
+                {isImage(change.before) ? <Thumbnail image={change.before} /> : <span className="k-review__note">No image</span>}
+                <span className="k-review__arrow">→</span>
+                {isImage(change.after) ? <Thumbnail image={change.after} /> : <span className="k-review__note">No image</span>}
             </div>
         );
     }
@@ -182,7 +182,7 @@ function ChangeValue({ change }: { change: DraftChange }) {
         const pieces = wordDiff(before, after);
         if (pieces !== undefined) {
             return (
-                <p className="k-review-text">
+                <p className="k-review__text">
                     {pieces.map((piece, index) =>
                         piece.kind === 'same' ? (
                             <span key={index}>{piece.text}</span>
@@ -197,7 +197,7 @@ function ChangeValue({ change }: { change: DraftChange }) {
         }
     }
     return (
-        <div className="k-review-json">
+        <div className="k-review__json">
             {change.before === undefined ? null : <del>{brief(change.before)}</del>}
             <ins>{brief(change.after)}</ins>
         </div>
@@ -477,13 +477,13 @@ export function PublishReview({
 
     return (
         <AlertDialog.Root open={open} onOpenChange={setOpen}>
-            <AlertDialog.Trigger className="k-button k-button-primary" disabled={disabled}>
+            <AlertDialog.Trigger className="k-button k-button--primary" disabled={disabled}>
                 {waiting > 0 ? `Review ${waiting}` : 'Publish'}
             </AlertDialog.Trigger>
             <AlertDialog.Portal>
                 <AlertDialog.Backdrop className="k-backdrop" />
                 <AlertDialog.Popup className="k-dialog k-review">
-                    <AlertDialog.Title className="k-dialog-title">
+                    <AlertDialog.Title className="k-dialog__title">
                         {step === 'ask'
                             ? `Who should review ${selected.length === 1 ? selected[0]!.title : `${selected.length} documents`}?`
                             : step === 'requestChanges'
@@ -510,7 +510,7 @@ export function PublishReview({
                                   : `${count} ${count === 1 ? 'change goes' : 'changes go'} live for visitors when you publish.`}
                     </AlertDialog.Description>
                     {step === 'ask' ? (
-                        <div className="k-review-panel">
+                        <div className="k-review__panel">
                             <PeoplePicker
                                 people={people?.people ?? []}
                                 exclude={me}
@@ -534,7 +534,7 @@ export function PublishReview({
                         </div>
                     ) : null}
                     {step === 'requestChanges' ? (
-                        <div className="k-review-panel">
+                        <div className="k-review__panel">
                             <textarea
                                 className="k-input k-textarea"
                                 placeholder="What to change"
@@ -544,7 +544,7 @@ export function PublishReview({
                             />
                         </div>
                     ) : null}
-                    <div className="k-review-list" hidden={step !== 'changes'}>
+                    <div className="k-review__list" hidden={step !== 'changes'}>
                         {pending === undefined ? (
                             <p className="k-help">
                                 <LoaderCircle {...ICON} className="k-spin" /> Listing the changes
@@ -553,36 +553,36 @@ export function PublishReview({
                             <p className="k-help">Nothing changed since the last publish.</p>
                         ) : (
                             pending.map((document) => (
-                                <section key={document.ref} className="k-review-group" data-skipped={skipped.has(document.ref)}>
+                                <section key={document.ref} className="k-review__group" data-skipped={skipped.has(document.ref)}>
                                     {several || document.review !== null ? (
-                                        <div className="k-review-heading">
+                                        <div className="k-review__heading">
                                             {several ? (
                                                 <Checkbox.Root
                                                     className="k-check"
                                                     aria-label={`Include ${document.title}`}
                                                     checked={!skipped.has(document.ref)}
                                                     onCheckedChange={() => toggle(document.ref)}>
-                                                    <Checkbox.Indicator className="k-check-indicator">
+                                                    <Checkbox.Indicator className="k-check__indicator">
                                                         <Check {...ICON} />
                                                     </Checkbox.Indicator>
                                                 </Checkbox.Root>
                                             ) : null}
-                                            <h3 className="k-review-document">{document.title}</h3>
+                                            <h3 className="k-review__document">{document.title}</h3>
                                             {document.review !== null ? <ReviewBadge review={document.review} me={me} /> : null}
                                         </div>
                                     ) : null}
                                     {document.review?.note !== null &&
                                     document.review?.note !== undefined &&
                                     document.review.status === 'open' ? (
-                                        <p className="k-review-quote">{document.review.note}</p>
+                                        <p className="k-review__quote">{document.review.note}</p>
                                     ) : null}
                                     {document.review?.decisionNote !== null &&
                                     document.review?.decisionNote !== undefined &&
                                     document.review.status !== 'open' ? (
-                                        <p className="k-review-quote">{document.review.decisionNote}</p>
+                                        <p className="k-review__quote">{document.review.decisionNote}</p>
                                     ) : null}
                                     {heldBack(document) !== undefined && document.review?.status !== 'open' ? (
-                                        <p className="k-review-blocked">{heldBack(document)}</p>
+                                        <p className="k-review__blocked">{heldBack(document)}</p>
                                     ) : null}
                                     {document.problem !== undefined ? (
                                         <p className="k-error" role="alert">
@@ -591,17 +591,17 @@ export function PublishReview({
                                         </p>
                                     ) : null}
                                     {document.changes.map((change) => (
-                                        <div key={change.path} className="k-review-row">
-                                            <div className="k-review-body">
-                                                <p className="k-review-label">
+                                        <div key={change.path} className="k-review__row">
+                                            <div className="k-review__body">
+                                                <p className="k-review__label">
                                                     {change.label}
-                                                    {change.before === undefined ? <span className="k-review-tag">New</span> : null}
+                                                    {change.before === undefined ? <span className="k-review__tag">New</span> : null}
                                                 </p>
                                                 <ChangeValue change={change} />
                                             </div>
                                             <button
                                                 type="button"
-                                                className="k-button k-button-secondary k-button-small"
+                                                className="k-button k-button--secondary k-button--small"
                                                 disabled={!change.writable || busy !== undefined}
                                                 title={
                                                     change.writable
@@ -638,23 +638,23 @@ export function PublishReview({
                             {problem}
                         </p>
                     ) : null}
-                    <div className="k-dialog-actions k-review-actions">
+                    <div className="k-dialog__actions k-review__actions">
                         {step === 'changes' ? (
                             <>
                                 <button
                                     type="button"
-                                    className="k-button k-button-secondary"
+                                    className="k-button k-button--secondary"
                                     disabled={writable.length === 0 || busy !== undefined}
                                     onClick={() => void revert(writable, 'all')}>
                                     Revert all
                                 </button>
-                                <span className="k-review-spacer" />
-                                <AlertDialog.Close className="k-button k-button-secondary">Cancel</AlertDialog.Close>
+                                <span className="k-review__spacer" />
+                                <AlertDialog.Close className="k-button k-button--secondary">Cancel</AlertDialog.Close>
                                 {mine.length > 0 ? (
                                     <>
                                         <button
                                             type="button"
-                                            className="k-button k-button-secondary"
+                                            className="k-button k-button--secondary"
                                             disabled={busy !== undefined}
                                             onClick={() => {
                                                 setNote('');
@@ -664,7 +664,7 @@ export function PublishReview({
                                         </button>
                                         <button
                                             type="button"
-                                            className="k-button k-button-primary"
+                                            className="k-button k-button--primary"
                                             disabled={busy !== undefined}
                                             onClick={() => void decide('approve')}>
                                             {busy === 'approve' ? 'Approving' : mine.length > 1 ? 'Approve all' : 'Approve'}
@@ -675,7 +675,7 @@ export function PublishReview({
                                         {people !== undefined && people.people.some((person) => person.id !== me) ? (
                                             <button
                                                 type="button"
-                                                className="k-button k-button-secondary"
+                                                className="k-button k-button--secondary"
                                                 disabled={busy !== undefined || selected.length === 0}
                                                 onClick={startAsking}>
                                                 Ask for review
@@ -683,7 +683,7 @@ export function PublishReview({
                                         ) : null}
                                         <button
                                             type="button"
-                                            className="k-button k-button-primary"
+                                            className="k-button k-button--primary"
                                             disabled={busy !== undefined || publishable.length === 0}
                                             onClick={() => void publish()}>
                                             {busy === 'publish'
@@ -697,10 +697,10 @@ export function PublishReview({
                             </>
                         ) : (
                             <>
-                                <span className="k-review-spacer" />
+                                <span className="k-review__spacer" />
                                 <button
                                     type="button"
-                                    className="k-button k-button-secondary"
+                                    className="k-button k-button--secondary"
                                     disabled={busy !== undefined}
                                     onClick={() => setStep('changes')}>
                                     Back
@@ -708,7 +708,7 @@ export function PublishReview({
                                 {step === 'ask' ? (
                                     <button
                                         type="button"
-                                        className="k-button k-button-primary"
+                                        className="k-button k-button--primary"
                                         disabled={busy !== undefined || reviewers.size === 0}
                                         onClick={() => void ask()}>
                                         {busy === 'ask' ? 'Sending' : 'Send request'}
@@ -716,7 +716,7 @@ export function PublishReview({
                                 ) : (
                                     <button
                                         type="button"
-                                        className="k-button k-button-primary"
+                                        className="k-button k-button--primary"
                                         disabled={busy !== undefined || note.trim() === ''}
                                         onClick={() => void decide('requestChanges')}>
                                         {busy === 'requestChanges' ? 'Sending' : 'Send back'}

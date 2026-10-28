@@ -364,6 +364,18 @@ export interface CmsPluginOptions<
      */
     adminPath?: `/${string}`;
     /**
+     * A stylesheet of your app's that the admin, its sign-in screen and the
+     * editor in the chat load after their own: a path on your site, or a full
+     * URL. The admin's styles sit in the `kizuna` cascade layer, so any rule
+     * here wins over them.
+     *
+     * @example
+     * ```ts
+     * adminCss: '/cms-admin.css',
+     * ```
+     */
+    adminCss?: string;
+    /**
      * Where the site is, so the editor can show its draft beside the form.
      *
      * @example
@@ -513,6 +525,12 @@ export const CmsPluginOptionsSchema = z
         signInPath: z.string().optional(),
         signOutPath: z.string().optional(),
         adminPath: RoutePathSchema.optional(),
+        adminCss: z
+            .string()
+            .refine((href) => href.startsWith('/') || /^https?:\/\//.test(href), {
+                error: 'takes a path on your site, like `/cms-admin.css`, or a full http or https URL',
+            })
+            .optional(),
         preview: z
             .object({
                 url: z.url(),
