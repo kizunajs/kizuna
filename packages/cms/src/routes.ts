@@ -6,6 +6,7 @@ import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { addressOf, CmsHttpError, type CmsService, type DraftState } from './cms.js';
 import { DEFAULT_SITE, routePrefix, sitesOf, type CmsPluginOptions, type PageMap } from './options.js';
 import type { ContentDefinition } from './definitions.js';
+import { dataFields } from './field.js';
 import { servesCollection } from './page.js';
 import { addressFieldsOf } from './dynamic.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
@@ -239,7 +240,7 @@ const searchInput = (args: Args): { query?: string; ids?: string[]; headers: Rec
 const listQueryOf = (definition: ContentDefinition, indexes: readonly string[]) => {
     const shape: Record<string, z.ZodType> = {};
     for (const index of indexes) {
-        const field = definition.fields.find((candidate) => candidate.name === index)!;
+        const field = dataFields(definition.fields).find((candidate) => candidate.name === index)!;
         const inner = unwrapOptionalWrappers(field.schema).inner as z.ZodType;
         const type = readDef(inner).type;
         shape[index] = (
@@ -865,7 +866,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         // A param naming no field is refused when the config assembles, with the field it lacks.
                         ...Object.values(sites)
                             .flatMap((declared) => addressFieldsOf(definition.name, declared.pages))
-                            .filter((field) => definition.fields.some((candidate) => candidate.name === field)),
+                            .filter((field) => dataFields(definition.fields).some((candidate) => candidate.name === field)),
                         ...(definition.indexes ?? []),
                     ]),
                 ],
@@ -1234,6 +1235,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     complete: state.complete,
                     missing: state.missing,
                     fields: cms.describe(ref, draft, cms.caller(args.auth)),
+                    layout: cms.describeLayout(ref),
                     draft,
                     ...(await reviewFields(cms, state)),
                 },

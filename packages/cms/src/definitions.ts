@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { readMetaBrand } from 'kizunajs/generator';
-import { assertFields, shapeOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
+import { assertFields, dataFields, shapeOf, type DataFieldOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
 import type { PageMigration } from './page.js';
 
 /**
@@ -84,7 +84,7 @@ export interface CollectionDefinition<Name extends string, Fields extends FieldL
      * The fields `list()` may filter and sort by. Each becomes an index in the
      * migration `kizuna cms migrate` writes.
      */
-    indexes?: ReadonlyArray<Fields[number]['name']>;
+    indexes?: ReadonlyArray<DataFieldOf<Fields>['name']>;
 }
 
 /**
@@ -165,7 +165,7 @@ export const defineCollection = <const Name extends string, const Fields extends
     if (readMetaBrand(definition.id) === undefined) {
         throw new Error(`${owner} needs an \`id\` made with Kizuna.brand, such as Kizuna.brand('EmployeeId', z.string()).`);
     }
-    const names = new Set(definition.fields.map((field) => field.name));
+    const names = new Set(dataFields(definition.fields).map((field) => field.name));
     for (const index of definition.indexes ?? []) {
         if (!names.has(index)) throw new Error(`${owner} indexes '${index}', which is not one of its fields.`);
     }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { CmsHttpError, type CmsService, type DraftState } from './cms.js';
+import { dataFields } from './field.js';
 import type { Person } from './options.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
 import type { ReviewRow } from './storage/store.js';
@@ -47,7 +48,9 @@ export const documentLabel = (state: DraftState): string => {
     if (ref.type === 'item') {
         const content = state.row?.draft ?? state.row?.published ?? {};
         // The first text field, as the item list names items.
-        const labelField = definition.fields.find((field) => readDef(unwrapOptionalWrappers(field.schema).inner).type === 'string')?.name;
+        const labelField = dataFields(definition.fields).find(
+            (field) => readDef(unwrapOptionalWrappers(field.schema).inner).type === 'string'
+        )?.name;
         const label = labelField === undefined ? undefined : content[labelField];
         return typeof label === 'string' && label !== '' ? label : 'Untitled';
     }

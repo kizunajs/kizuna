@@ -1,4 +1,5 @@
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
+import { dataFields } from './field.js';
 import type { Page } from './page.js';
 import type { PageMap } from './options.js';
 
@@ -134,7 +135,7 @@ export const routeProblems = (path: string, page: Page): string[] => {
             problems.push(`${path} has the catch-all segment [${param}]. A content route takes one field per segment, like [slug].`);
             continue;
         }
-        const field = page.collection.fields.find((candidate) => candidate.name === param);
+        const field = dataFields(page.collection.fields).find((candidate) => candidate.name === param);
         if (field === undefined) {
             problems.push(
                 `${path} has the param [${param}], but the ${page.collection.name} collection has no field named '${param}'. Each route param reads the field it names.`

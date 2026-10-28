@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { defineBlock, readBlock } from './block.js';
+import { dataFields } from './field.js';
 import { ImageSchema } from './image.js';
 
 const HeroBlockSchema = defineBlock({
@@ -44,7 +45,7 @@ describe('block', () => {
 
     it('reads the block back off its schema, through .optional()', () => {
         expect(readBlock(HeroBlockSchema)?.name).toBe('hero');
-        expect(readBlock(HeroBlockSchema.optional())?.fields.map((field) => field.name)).toEqual(['heading', 'image']);
+        expect(dataFields(readBlock(HeroBlockSchema.optional())?.fields ?? []).map((field) => field.name)).toEqual(['heading', 'image']);
         expect(readBlock(z.object({}))).toBeUndefined();
     });
 

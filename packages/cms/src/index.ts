@@ -17,13 +17,20 @@ export {
 export { formatRef, parseRef, type DocumentRef } from './refs.js';
 export { resolvedSchema, ResolvedImageSchema } from './content-schema.js';
 export {
+    dataFields,
     fieldDescription,
+    isLayoutItem,
     undeclaredFieldRoles,
+    type Collapsible,
+    type DataFieldOf,
     type Field,
     type FieldAuth,
     type FieldList,
     type FieldsCheck,
+    type LayoutItem,
+    type Row,
     type ShapeOf,
+    type Tab,
     type UndeclaredFieldRole,
 } from './field.js';
 export { isImageSchema, type ImageRef, type ResolvedImage } from './image.js';
@@ -73,6 +80,6 @@ export { DocumentStore, VersionConflictError, type CmsDatabase, type DocumentRow
 export { CMS_MIGRATION_SQL, indexSql, type IndexedField, type IndexType } from './storage/migration.js';
 export { discoverPages, renderPagesModule, findAppDir, defaultPagesOutput, routePathOf, type DiscoveredPage } from './discovery.js';
 export { inStoredOrder } from './in-order.js';
-export { describeFields, refsOf, missingFields, type DescribedField } from './content.js';
+export { describeFields, describeLayout, refsOf, missingFields, type DescribedField, type DescribedLayout } from './content.js';
 export { signPreviewToken, verifyPreviewToken, previewSecret, PREVIEW_COOKIE } from './preview-token.js';
 export { withSourcePath, decodePath, decodeSource, stripPaths, encodeSourcePaths, type Source } from './source-path.js';

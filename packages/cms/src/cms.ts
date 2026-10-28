@@ -6,6 +6,7 @@ import { encodeForWire, readDef, readMetaBrand, toToolName, unwrapOptionalWrappe
 import type { RouteDefinition, Roles } from 'kizunajs';
 import {
     describeFields,
+    describeLayout,
     getAtPath,
     latestMigration,
     migrateContent,
@@ -16,6 +17,7 @@ import {
     type DescribedField,
 } from './content.js';
 import { fieldChain } from './content.js';
+import { dataFields } from './field.js';
 import { randomBytes } from 'node:crypto';
 import type { ContentDefinition, Collection, Global } from './definitions.js';
 import { servesCollection } from './page.js';
@@ -756,7 +758,7 @@ export class CmsService {
                 detail: `'${field}' is not an index of '${listing.name}'. Lists filter and sort by ${[...listing.indexes, 'publishedAt', 'updatedAt'].join(', ')}.`,
             });
         }
-        const schema = listing.definition.fields.find((candidate) => candidate.name === field)!.schema;
+        const schema = dataFields(listing.definition.fields).find((candidate) => candidate.name === field)!.schema;
         const type = readDef(unwrapOptionalWrappers(schema).inner).type;
         const indexType: IndexType = type === 'number' || type === 'int' ? 'numeric' : type === 'boolean' ? 'boolean' : 'text';
         return {
@@ -889,7 +891,9 @@ export class CmsService {
         const listing = this.listing(name);
         const definition = listing.definition;
         const rows = await this.store.list('item');
-        const labelField = definition.fields.find((field) => readDef(unwrapOptionalWrappers(field.schema).inner).type === 'string')?.name;
+        const labelField = dataFields(definition.fields).find(
+            (field) => readDef(unwrapOptionalWrappers(field.schema).inner).type === 'string'
+        )?.name;
         const items = [];
         for (const stored of rows) {
             if (!stored.key.startsWith(listing.keyPrefix)) continue;
@@ -1125,6 +1129,21 @@ export class CmsService {
                 ...(help === '' ? {} : { help }),
                 ...(field.block === undefined ? {} : { block: field.block }),
                 ...(parent === undefined ? {} : { parent }),
+                ...(field.position === undefined
+                    ? {}
+                    : {
+                          position: field.position,
+                      }),
+                ...(field.width === undefined
+                    ? {}
+                    : {
+                          width: field.width,
+                      }),
+                ...(field.layout.length === 0
+                    ? {}
+                    : {
+                          layout: field.layout,
+                      }),
                 readOnly: field.readOnly,
                 writable: pathRefusal(definition.fields, field.path, caller) === undefined,
                 ...(roles === undefined ? {} : { roles }),
@@ -1144,6 +1163,25 @@ export class CmsService {
         return described;
     }
 
+    /**
+     * The tabs, rows and collapsibles that arrange a document's fields.
+     */
+    describeLayout(ref: DocumentRef): z.output<typeof import('./wire.js').DescribedLayoutSchema>[] {
+        return describeLayout(this.target(ref).definition).map((item) => ({
+            id: item.id,
+            type: item.type,
+            ...(item.label === undefined
+                ? {}
+                : {
+                      label: item.label,
+                  }),
+            ...(item.position === undefined
+                ? {}
+                : {
+                      position: item.position,
+                  }),
+        }));
+    }
 
     /**
      * Where else a document appears, for the warning shown before a shared

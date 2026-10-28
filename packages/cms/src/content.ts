@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { readMetaBrand, readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { readBlock } from './block.js';
-import { fieldDescription, type Field, type FieldAuth, type FieldList } from './field.js';
+import { dataFields, fieldDescription, isLayoutItem, type Field, type FieldAuth, type FieldList, type LayoutItem } from './field.js';
 import type { ContentDefinition } from './definitions.js';
 import type { Ref } from './storage/store.js';
 
@@ -21,6 +21,12 @@ export interface DescribedField {
     auth: FieldAuth | undefined;
     readOnly: boolean;
     schema: z.ZodType;
+    position: 'sidebar' | undefined;
+    width: string | undefined;
+    /**
+     * The ids of the layout items the field sits in, outermost first.
+     */
+    layout: string[];
     /**
      * The block this field is, when its schema is one.
      */
@@ -28,7 +34,36 @@ export interface DescribedField {
     fields: DescribedField[] | undefined;
 }
 
-const describe = (field: Field, parentPath: string): DescribedField => {
+/**
+ * One tab, row or collapsible of a document. The fields inside it name its
+ * `id` in their `layout`.
+ */
+export interface DescribedLayout {
+    id: string;
+    type: LayoutItem['type'];
+    label: string | undefined;
+    position: 'sidebar' | undefined;
+}
+
+/**
+ * Describes the fields of a list in the order they are shown, recording each
+ * layout item on the way. A layout item's id is where it sits: its index under
+ * the item or block field that holds it, as `/0/1` or `hero/0`.
+ */
+const describeList = (items: FieldList, parentPath: string, within: readonly string[], layout: DescribedLayout[]): DescribedField[] =>
+    items.flatMap((item, index) => {
+        if (!isLayoutItem(item)) return [describe(item, parentPath, within, layout)];
+        const id = `${within.at(-1) ?? parentPath}/${index}`;
+        layout.push({
+            id,
+            type: item.type,
+            label: item.type === 'row' ? undefined : item.label,
+            position: item.type === 'collapsible' ? item.position : undefined,
+        });
+        return describeList(item.fields, parentPath, [...within, id], layout);
+    });
+
+const describe = (field: Field, parentPath: string, within: readonly string[], layout: DescribedLayout[]): DescribedField => {
     const path = parentPath === '' ? field.name : `${parentPath}.${field.name}`;
     const block = readBlock(field.schema);
     return {
@@ -40,15 +75,29 @@ const describe = (field: Field, parentPath: string): DescribedField => {
         auth: field.auth,
         readOnly: field.readOnly === true,
         schema: field.schema,
+        position: field.position,
+        width: field.width,
+        layout: [...within],
         block: block?.name,
-        fields: block === undefined ? undefined : block.fields.map((inner) => describe(inner, path)),
+        fields: block === undefined ? undefined : describeList(block.fields, path, [], layout),
     };
 };
 
 /**
- * Every field of a page, with the fields of each block inside it.
+ * Every field of a page, with the fields of each block inside it. A field in
+ * a tab, a row or a collapsible is listed in its place.
  */
-export const describeFields = (page: ContentDefinition): DescribedField[] => page.fields.map((field) => describe(field, ''));
+export const describeFields = (page: ContentDefinition): DescribedField[] => describeList(page.fields, '', [], []);
+
+/**
+ * Every tab, row and collapsible of a page and of the blocks inside it, in
+ * the order they are shown.
+ */
+export const describeLayout = (page: ContentDefinition): DescribedLayout[] => {
+    const layout: DescribedLayout[] = [];
+    describeList(page.fields, '', [], layout);
+    return layout;
+};
 
 /**
  * The chain of fields a dotted path crosses, from the page's own field down
@@ -62,7 +111,7 @@ export const fieldChain = (fields: FieldList, path: string): Field[] | undefined
     let current: FieldList | undefined = fields;
     for (const segment of segments) {
         if (current === undefined) return chain.length === 0 ? undefined : chain;
-        const field: Field | undefined = current.find((candidate) => candidate.name === segment);
+        const field: Field | undefined = dataFields(current).find((candidate) => candidate.name === segment);
         if (field === undefined) return chain.length === 0 ? undefined : chain;
         chain.push(field);
         current = readBlock(field.schema)?.fields;
@@ -149,7 +198,7 @@ const collectRefs = (schema: z.core.$ZodType, value: unknown, path: string, into
  */
 export const refsOf = (page: ContentDefinition, content: Record<string, unknown>): Ref[] => {
     const refs: Ref[] = [];
-    for (const field of page.fields) collectRefs(field.schema, content[field.name], field.name, refs);
+    for (const field of dataFields(page.fields)) collectRefs(field.schema, content[field.name], field.name, refs);
     return refs;
 };
 
@@ -195,5 +244,7 @@ export const missingFields = (page: ContentDefinition, draft: Record<string, unk
         const [first] = issue.path;
         if (typeof first === 'string') missing.add(first);
     }
-    return page.fields.map((field) => field.name).filter((name) => missing.has(name));
+    return dataFields(page.fields)
+        .map((field) => field.name)
+        .filter((name) => missing.has(name));
 };

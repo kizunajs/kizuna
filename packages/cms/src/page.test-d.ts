@@ -5,6 +5,7 @@ import { Kizuna } from 'kizunajs';
 import { defineBlock } from './block.js';
 import { ImageSchema } from './image.js';
 import { definePage } from './page.js';
+import { defineCollection } from './definitions.js';
 import type { Output } from './output.js';
 
 const ProductId = Kizuna.brand('ProductId', z.string());
@@ -132,5 +133,191 @@ test('a field option outside the five is rejected', () => {
                 initial: 'Hello',
             },
         ],
+    });
+});
+
+const ArticlePage = definePage({
+    name: 'articlePage',
+    fields: [
+        {
+            type: 'tab',
+            label: 'Content',
+            fields: [
+                {
+                    name: 'title',
+                    schema: z.string().max(80),
+                },
+                {
+                    type: 'row',
+                    fields: [
+                        {
+                            name: 'image',
+                            schema: ImageSchema,
+                            width: '50%',
+                        },
+                        {
+                            name: 'summary',
+                            schema: z.string().max(160).optional(),
+                            width: '50%',
+                        },
+                    ],
+                },
+            ],
+        },
+        {
+            type: 'collapsible',
+            label: 'Publishing',
+            position: 'sidebar',
+            fields: [
+                {
+                    name: 'category',
+                    schema: z.enum(['news', 'guide']),
+                },
+            ],
+        },
+    ],
+});
+
+test('a field inside a tab, a row or a collapsible reads at the top level', () => {
+    expectTypeOf<keyof z.output<typeof ArticlePage.schema>>().toEqualTypeOf<'title' | 'image' | 'summary' | 'category'>();
+    expectTypeOf<Output<typeof ArticlePage>['title']>().toEqualTypeOf<string>();
+    expectTypeOf<Output<typeof ArticlePage>['summary']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<Output<typeof ArticlePage>['image']['url']>().toEqualTypeOf<string>();
+    expectTypeOf<Output<typeof ArticlePage>['category']>().toEqualTypeOf<'news' | 'guide'>();
+});
+
+test('a block arranged in a row reads flat too', () => {
+    const CardBlockSchema = defineBlock({
+        name: 'card',
+        fields: [
+            {
+                type: 'row',
+                fields: [
+                    {
+                        name: 'heading',
+                        schema: z.string(),
+                    },
+                    {
+                        name: 'image',
+                        schema: ImageSchema,
+                    },
+                ],
+            },
+        ],
+    });
+    expectTypeOf<keyof z.output<typeof CardBlockSchema>>().toEqualTypeOf<'heading' | 'image'>();
+});
+
+test('a field listed inside a tab and outside it fails to compile', () => {
+    definePage({
+        name: 'aboutPage',
+        // @ts-expect-error heading is listed twice
+        fields: [
+            {
+                type: 'tab',
+                label: 'Content',
+                fields: [
+                    {
+                        name: 'heading',
+                        schema: z.string(),
+                    },
+                ],
+            },
+            {
+                name: 'heading',
+                schema: z.string(),
+            },
+        ],
+    });
+});
+
+test('a field listed in two tabs fails to compile', () => {
+    definePage({
+        name: 'aboutPage',
+        // @ts-expect-error heading is listed twice
+        fields: [
+            {
+                type: 'tab',
+                label: 'Content',
+                fields: [
+                    {
+                        name: 'heading',
+                        schema: z.string(),
+                    },
+                ],
+            },
+            {
+                type: 'tab',
+                label: 'Card',
+                fields: [
+                    {
+                        type: 'row',
+                        fields: [
+                            {
+                                name: 'heading',
+                                schema: z.string(),
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    });
+});
+
+test('a row takes no label', () => {
+    definePage({
+        name: 'aboutPage',
+        // @ts-expect-error a row has no label
+        fields: [
+            {
+                type: 'row',
+                label: 'Card',
+                fields: [
+                    {
+                        name: 'heading',
+                        schema: z.string(),
+                    },
+                ],
+            },
+        ],
+    });
+});
+
+test('a collection indexes a field inside a tab', () => {
+    defineCollection({
+        name: 'articles',
+        id: Kizuna.brand('ArticleId', z.string()),
+        fields: [
+            {
+                type: 'tab',
+                label: 'Content',
+                fields: [
+                    {
+                        name: 'slug',
+                        schema: z.string(),
+                    },
+                ],
+            },
+        ],
+        indexes: ['slug'],
+    });
+    defineCollection({
+        name: 'articles',
+        id: Kizuna.brand('ArticleId', z.string()),
+        fields: [
+            {
+                type: 'tab',
+                label: 'Content',
+                fields: [
+                    {
+                        name: 'slug',
+                        schema: z.string(),
+                    },
+                ],
+            },
+        ],
+        // @ts-expect-error there is no title field
+        indexes: ['title'],
     });
 });

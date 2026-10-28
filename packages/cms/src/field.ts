@@ -65,19 +65,122 @@ export interface Field<Name extends string = string, Schema extends z.ZodType = 
      * },
      */
     options?: Readonly<Record<string, string>>;
+    /**
+     * `'sidebar'` shows the field beside the main column.
+     */
+    position?: 'sidebar';
+    /**
+     * How much of a row the field takes, like `'50%'`.
+     */
+    width?: string;
 }
 
 /**
- * The fields of a block or a page, in the order they are shown.
+ * Shows its fields under a tab. Tabs listed one after another share a tab bar.
  */
-export type FieldList = readonly Field[];
+export interface Tab {
+    type: 'tab';
+    /**
+     * What the tab reads.
+     */
+    label: string;
+    fields: FieldList;
+}
+
+/**
+ * Shows its fields side by side.
+ */
+export interface Row {
+    type: 'row';
+    fields: FieldList;
+}
+
+/**
+ * Shows its fields in a section that folds.
+ */
+export interface Collapsible {
+    type: 'collapsible';
+    /**
+     * What the section's heading reads.
+     */
+    label: string;
+    /**
+     * `'sidebar'` shows the section beside the main column.
+     */
+    position?: 'sidebar';
+    fields: FieldList;
+}
+
+/**
+ * An item that arranges fields on the editor's screen. It holds fields of its
+ * own, and never shapes the content: its fields read as if listed in its place.
+ */
+export type LayoutItem = Tab | Row | Collapsible;
+
+/**
+ * The fields of a block or a page, in the order they are shown, with the
+ * layout items that arrange them.
+ */
+export type FieldList = readonly (Field | LayoutItem)[];
+
+/**
+ * Whether an item of a field list arranges fields rather than holding content.
+ */
+export const isLayoutItem = (item: Field | LayoutItem): item is LayoutItem => 'type' in item;
+
+/**
+ * The fields a list holds, with those inside its layout items read in their
+ * place, as the content stores them.
+ */
+export const dataFields = (fields: FieldList): Field[] => fields.flatMap((item) => (isLayoutItem(item) ? dataFields(item.fields) : [item]));
+
+type LayoutType = LayoutItem['type'];
+
+/**
+ * A field list as one tuple of its items, layout items included, with the
+ * items inside each layout item following it.
+ */
+type FlatItems<Items extends readonly unknown[]> = Items extends readonly [infer Head, ...infer Rest]
+    ? Head extends {
+          type: LayoutType;
+          fields: infer Inner extends readonly unknown[];
+      }
+        ? [Head, ...FlatItems<Inner>, ...FlatItems<Rest>]
+        : [Head, ...FlatItems<Rest>]
+    : [];
+
+// The plain `FieldList` holds itself, so the depth stops the walk where no declared list reaches.
+type DataFieldUnion<Item, Depth extends unknown[] = []> = Item extends {
+    type: LayoutType;
+    fields: readonly (infer Inner)[];
+}
+    ? Depth['length'] extends 8
+        ? never
+        : DataFieldUnion<Inner, [...Depth, unknown]>
+    : Item extends Field
+      ? Item
+      : never;
+
+/**
+ * Every field a list holds, those inside its layout items included.
+ */
+export type DataFieldOf<Fields extends FieldList> = DataFieldUnion<Fields[number]>;
 
 /**
  * The object shape a field list builds: each field's name to its schema.
+ * Layout items add nothing of their own.
  */
 export type ShapeOf<Fields extends FieldList> = {
-    [Each in Fields[number] as Each['name']]: Each['schema'];
+    [Each in DataFieldOf<Fields> as Each['name']]: Each['schema'];
 };
+
+type DataFieldTuple<Items extends readonly unknown[]> = Items extends readonly [infer Head, ...infer Rest]
+    ? Head extends {
+          name: string;
+      }
+        ? [Head, ...DataFieldTuple<Rest>]
+        : DataFieldTuple<Rest>
+    : [];
 
 type DuplicateFieldNames<Fields extends readonly { name: string }[]> = Fields extends readonly [
     infer Head extends { name: string },
@@ -88,28 +191,84 @@ type DuplicateFieldNames<Fields extends readonly { name: string }[]> = Fields ex
 
 type FieldOption = keyof Field;
 
-type UnknownFieldOptions<Fields extends readonly object[]> = {
-    [Index in keyof Fields]: Exclude<keyof Fields[Index], FieldOption> & string;
+type ItemOption<Item> = Item extends {
+    type: 'tab';
+}
+    ? keyof Tab
+    : Item extends {
+            type: 'row';
+        }
+      ? keyof Row
+      : Item extends {
+              type: 'collapsible';
+          }
+        ? keyof Collapsible
+        : FieldOption;
+
+type UnknownFieldOptions<Items extends readonly object[]> = {
+    [Index in keyof Items]: Exclude<keyof Items[Index], ItemOption<Items[Index]>> & string;
 }[number];
 
 /**
- * Rejects a field list that names a field twice, or gives a field an option it
- * does not take. Intersect it with the definition
- * (`definition: Definition & FieldsCheck<Fields>`): a sound list gives
- * `unknown`, leaving the definition untouched, and anything else resolves
- * `fields` to a message.
+ * Rejects a field list that names a field twice, inside its layout items or
+ * out, or gives an item an option it does not take. Intersect it with the
+ * definition (`definition: Definition & FieldsCheck<Fields>`): a sound list
+ * gives `unknown`, leaving the definition untouched, and anything else
+ * resolves `fields` to a message.
  */
-export type FieldsCheck<Fields extends readonly { name: string }[]> = [DuplicateFieldNames<Fields>] extends [never]
-    ? [UnknownFieldOptions<Fields>] extends [never]
+export type FieldsCheck<Fields extends FieldList> = [DuplicateFieldNames<DataFieldTuple<FlatItems<Fields>>>] extends [never]
+    ? [UnknownFieldOptions<FlatItems<Fields>>] extends [never]
         ? unknown
         : {
-              fields: `kizuna: "${UnknownFieldOptions<Fields>}" is not a field option. A field takes name, schema, description, auth and readOnly`;
+              fields: `kizuna: "${UnknownFieldOptions<FlatItems<Fields>>}" is not an option there. A field takes name, label, schema, description, auth, readOnly, options, position and width, and a layout item takes type, label, fields and, on a collapsible, position`;
           }
     : {
-          fields: `kizuna: the field "${DuplicateFieldNames<Fields>}" is listed twice`;
+          fields: `kizuna: the field "${DuplicateFieldNames<DataFieldTuple<FlatItems<Fields>>>}" is listed twice`;
       };
 
 const FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+const LAYOUT_TYPES: readonly string[] = ['tab', 'row', 'collapsible'];
+
+/**
+ * Checks the layout items of a list and the lists inside them. Only an item of
+ * the outermost list sits in the sidebar, since the sidebar is beside the
+ * whole form.
+ */
+const assertLayout = (fields: FieldList, owner: string, nested: boolean): void => {
+    for (const item of fields) {
+        if (!isLayoutItem(item)) {
+            if (nested && item.position !== undefined) {
+                throw new Error(
+                    `${owner} puts the field '${String(item.name)}' in the sidebar from inside a layout item. Only an outermost item sits there.`
+                );
+            }
+            continue;
+        }
+        if (!LAYOUT_TYPES.includes(item.type)) {
+            throw new Error(`${owner} has a layout item of type '${String(item.type)}'. A layout item is a tab, a row or a collapsible.`);
+        }
+        if (item.type !== 'row' && (typeof item.label !== 'string' || item.label === '')) {
+            throw new Error(`${owner} has a ${item.type} with no label. A ${item.type} needs one for editors to read.`);
+        }
+        if (!Array.isArray(item.fields) || item.fields.length === 0) {
+            throw new Error(`${owner} has a ${item.type} that holds no fields.`);
+        }
+        if (item.type === 'collapsible' && item.position !== undefined) {
+            if (item.position !== 'sidebar') {
+                throw new Error(
+                    `${owner} gives the collapsible '${item.label}' the position '${String(item.position)}'. The one position is 'sidebar'.`
+                );
+            }
+            if (nested) {
+                throw new Error(
+                    `${owner} puts the collapsible '${item.label}' in the sidebar from inside a layout item. Only an outermost item sits there.`
+                );
+            }
+        }
+        assertLayout(item.fields, owner, true);
+    }
+};
 
 /**
  * Checks a field list the way `block` and `page` do, and throws naming the owner
@@ -119,8 +278,9 @@ export const assertFields = (fields: FieldList, owner: string): void => {
     if (!Array.isArray(fields) || fields.length === 0) {
         throw new Error(`${owner} lists no fields. Every block and page declares the fields editors may change.`);
     }
+    assertLayout(fields, owner, false);
     const seen = new Set<string>();
-    for (const field of fields) {
+    for (const field of dataFields(fields)) {
         if (typeof field.name !== 'string' || !FIELD_NAME.test(field.name)) {
             throw new Error(
                 `${owner} has a field named '${String(field.name)}'. A field name is an identifier, like 'heading' or 'cta_text'.`
@@ -144,6 +304,14 @@ export const assertFields = (fields: FieldList, owner: string): void => {
                 }
             }
         }
+        if (field.position !== undefined && field.position !== 'sidebar') {
+            throw new Error(
+                `${owner} gives the field '${field.name}' the position '${String(field.position)}'. The one position is 'sidebar'.`
+            );
+        }
+        if (field.width !== undefined && (typeof field.width !== 'string' || field.width === '')) {
+            throw new Error(`${owner} gives the field '${field.name}' a width that is no CSS length, like '50%'.`);
+        }
     }
 };
 
@@ -161,7 +329,7 @@ const enumValuesOf = (schema: z.ZodType): string[] | undefined => {
  */
 export const shapeOf = <Fields extends FieldList>(fields: Fields): ShapeOf<Fields> => {
     const shape: Record<string, z.ZodType> = {};
-    for (const field of fields) shape[field.name] = field.schema;
+    for (const field of dataFields(fields)) shape[field.name] = field.schema;
     return shape as ShapeOf<Fields>;
 };
 
@@ -190,7 +358,7 @@ const toList = (roles: string | readonly string[]): readonly string[] => (typeof
  */
 export const undeclaredFieldRoles = (fields: FieldList, declared: readonly string[]): UndeclaredFieldRole[] => {
     const undeclared: UndeclaredFieldRole[] = [];
-    for (const field of fields) {
+    for (const field of dataFields(fields)) {
         for (const role of toList(field.auth?.roles ?? [])) {
             if (!declared.includes(role)) {
                 undeclared.push({

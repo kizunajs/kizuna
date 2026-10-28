@@ -3,6 +3,7 @@ import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { optionOf } from '../union.js';
 import { isImageSchema, type ImageRef, type ResolvedImage } from '../image.js';
 import type { ContentDefinition } from '../definitions.js';
+import { dataFields } from '../field.js';
 import type { MediaRecord } from './media.js';
 
 /**
@@ -61,7 +62,7 @@ export const mediaIdsOf = (page: ContentDefinition, content: Record<string, unkn
             for (const option of def.options) walk(option, value);
         }
     };
-    for (const field of page.fields) walk(field.schema, content[field.name]);
+    for (const field of dataFields(page.fields)) walk(field.schema, content[field.name]);
     return [...ids];
 };
 
@@ -99,6 +100,6 @@ export const resolveContent = (
         return value;
     };
     const resolved: Record<string, unknown> = {};
-    for (const field of page.fields) resolved[field.name] = walk(field.schema, content[field.name]);
+    for (const field of dataFields(page.fields)) resolved[field.name] = walk(field.schema, content[field.name]);
     return resolved;
 };

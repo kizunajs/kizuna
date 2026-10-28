@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { unwrapOptionalWrappers } from 'kizunajs/generator';
-import { assertFields, shapeOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
+import { assertFields, isLayoutItem, shapeOf, type FieldList, type FieldsCheck, type ShapeOf } from './field.js';
 
 /**
  * What {@link defineBlock} takes.
@@ -62,6 +62,12 @@ export const defineBlock = <const Name extends string, const Fields extends Fiel
     }
     const owner = `defineBlock('${definition.name}')`;
     assertFields(definition.fields, owner);
+    for (const item of definition.fields) {
+        if ('position' in item && item.position !== undefined) {
+            const named = isLayoutItem(item) ? `the collapsible '${item.label}'` : `the field '${item.name}'`;
+            throw new Error(`${owner} puts ${named} in the sidebar. A block shows inside the field that holds it, beside no sidebar.`);
+        }
+    }
     const schema = z.object(shapeOf(definition.fields));
     blocks.set(schema, {
         name: definition.name,

@@ -107,6 +107,12 @@ export const DescribedFieldSchema = Kizuna.model({
         help: z.string().optional().describe('What an editor reads under the field: the description, without the guidance for agents.'),
         block: z.string().optional().describe('The block name, when the field is a block.'),
         parent: z.string().optional().describe('The path of the block field this one sits in.'),
+        position: z.enum(['sidebar']).optional().describe('Where the editor shows it, when beside the main column.'),
+        width: z.string().optional().describe('How much of a row it takes, like 50%.'),
+        layout: z
+            .array(z.string())
+            .optional()
+            .describe('The ids of the tabs, rows and collapsibles it sits in, outermost first, from the layout list.'),
         readOnly: z.boolean(),
         writable: z.boolean().describe('Whether the caller may write this field.'),
         roles: z.array(z.string()).optional().describe('The roles that may write it, when narrowed.'),
@@ -114,6 +120,16 @@ export const DescribedFieldSchema = Kizuna.model({
         searchTool: z.string().optional().describe('The tool that finds ids for the brand.'),
         schema: z.record(z.string(), z.unknown()).describe('The JSON Schema of the value.'),
         value: z.unknown().optional().describe('The current draft value.'),
+    }),
+});
+
+export const DescribedLayoutSchema = Kizuna.model({
+    title: 'CmsLayout',
+    schema: z.object({
+        id: z.string().describe('What the fields inside it name in their layout.'),
+        type: z.enum(['tab', 'row', 'collapsible']),
+        label: z.string().optional().describe('What a tab or a collapsible reads.'),
+        position: z.enum(['sidebar']).optional().describe('Where the editor shows a collapsible, when beside the main column.'),
     }),
 });
 
@@ -179,6 +195,11 @@ export const DescribedPageSchema = Kizuna.model({
         complete: z.boolean(),
         missing: z.array(z.string()),
         fields: z.array(DescribedFieldSchema),
+        layout: z
+            .array(DescribedLayoutSchema)
+            .describe(
+                'The tabs, rows and collapsibles that arrange the fields, in the order they are shown. Empty when the fields are listed plainly.'
+            ),
         draft: z.record(z.string(), z.unknown()).nullable(),
         ...ReviewFields,
     }),

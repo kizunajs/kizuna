@@ -4,6 +4,7 @@ import { readDef, readMetaBrand, unwrapOptionalWrappers } from 'kizunajs/generat
 import { isImageSchema } from './image.js';
 import { optionOf } from './union.js';
 import type { ContentDefinition } from './definitions.js';
+import { dataFields } from './field.js';
 import { decodeSource, IMAGE_MARKER, SOURCE_ORIGIN, type SourcePayload } from './source-marks.js';
 
 export { decodeImageSource, decodeSource, IMAGE_MARKER, type Source } from './source-marks.js';
@@ -90,7 +91,7 @@ export const encodeSourcePaths = (
     const encoded: Record<string, unknown> = {
         ...content,
     };
-    for (const field of page.fields) {
+    for (const field of dataFields(page.fields)) {
         encoded[field.name] = plain.includes(field.name) ? content[field.name] : walk(field.schema, content[field.name], field.name);
     }
     return encoded;
