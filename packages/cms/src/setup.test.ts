@@ -583,6 +583,40 @@ describe('publishing', () => {
         expect(none.body.changes).toEqual([]);
     });
 
+    it('unpublishes a page, keeping its draft and versions, and revalidates it', async () => {
+        await asAdmin(request(app).patch('/editing/pages/frontPage/draft')).send({
+            changes: validDraft,
+        });
+        await asEditor(request(app).post('/editing/pages/frontPage/publish'));
+        revalidated.length = 0;
+        const unpublished = await asEditor(request(app).post('/editing/pages/frontPage/unpublish')).send({});
+        expect(unpublished.status).toBe(200);
+        expect(unpublished.body).toMatchObject({
+            status: 'draft',
+            version: 1,
+            publishedVersion: null,
+            content: {
+                hero: {
+                    heading: 'Spring is here',
+                },
+            },
+        });
+        expect(revalidated).toEqual([['kizuna-cms:page:frontPage']]);
+        expect((await request(app).get('/content/pages/frontPage')).status).toBe(404);
+        const history = await asEditor(request(app).get('/editing/pages/frontPage/versions'));
+        expect(history.body.versions).toMatchObject([
+            {
+                version: 1,
+                published: false,
+            },
+        ]);
+        expect((await asEditor(request(app).post('/editing/pages/frontPage/unpublish'))).status).toBe(409);
+        expect((await request(app).post('/editing/pages/frontPage/unpublish')).status).toBe(401);
+
+        expect((await asEditor(request(app).post('/editing/pages/frontPage/publish'))).body.status).toBe('published');
+        expect((await request(app).get('/content/pages/frontPage')).body.content.hero.heading).toBe('Spring is here');
+    });
+
     it('refuses to publish an incomplete draft', async () => {
         const response = await asEditor(request(app).post('/editing/pages/frontPage/publish'));
         expect(response.status).toBe(409);
@@ -612,7 +646,7 @@ describe('publishing', () => {
         expect(history.body.versions[0].summary).toBe('Restored version 1');
     });
 
-    it('marks publish, deleting and writes to globals as needing approval, and lets a model restore a version as a draft', () => {
+    it('marks publish, unpublish, deleting and writes to globals as needing approval, and lets a model restore a version as a draft', () => {
         const { editing } = cmsContent({
             db: {
                 select: () => undefined,
@@ -624,6 +658,14 @@ describe('publishing', () => {
         }).routes;
         expect(editing.pages.publish.tool).toMatchObject({
             needsApproval: true,
+        });
+        expect(editing.pages.unpublish.tool).toMatchObject({
+            needsApproval: true,
+            destructiveHint: true,
+        });
+        expect(editing.collections.unpublish.tool).toMatchObject({
+            needsApproval: true,
+            destructiveHint: true,
         });
         expect(editing.pages.rollback.tool).not.toMatchObject({
             needsApproval: true,

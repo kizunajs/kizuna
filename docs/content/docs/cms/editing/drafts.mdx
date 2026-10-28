@@ -1,6 +1,6 @@
 ---
 title: Drafts and versions
-description: 'How drafts are saved, versioned, protected from overwriting, and rolled back.'
+description: 'How drafts are saved, versioned, protected from overwriting, rolled back and unpublished.'
 ---
 
 - Every save is a version with its author.
@@ -8,3 +8,11 @@ description: 'How drafts are saved, versioned, protected from overwriting, and r
 - A save that sends `null` for an optional field empties it. A field whose schema accepts `null` stores `null`.
 - Two people cannot overwrite each other: a write behind the latest version answers `409`.
 - Rollback restores an earlier version as a new draft, which you publish separately.
+
+## Unpublishing
+
+Unpublishing withdraws the published copy of a page, a global or an item. The `content` routes stop answering it, and its cache tags revalidate, so the site drops it on the next request. The draft and every version stay, and publishing again brings it back.
+
+An unpublished page reads as not found. An unpublished global sends every page that reads it to `not-found.tsx`, and an unpublished item leaves its collection's lists.
+
+It takes the same permission as publishing, and asks first like publishing does. In the admin, tick items in a collection and press **Unpublish**. A model calls `editing_pages_unpublish`, `editing_globals_unpublish` or `editing_collections_unpublish`.

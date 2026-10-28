@@ -30,6 +30,7 @@ import {
     MissingFieldsSchema,
     PageSummarySchema,
     PublishBodySchema,
+    UnpublishBodySchema,
     RollbackBodySchema,
     StoredContentSchema,
     UpdateDraftBodySchema,
@@ -612,6 +613,32 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     body: draftBody(await cms.publish(ref, authorOf(cms, args))),
                 };
             }) as never
+        ),
+
+        unpublish: route({
+            method: 'POST',
+            path: `${editingBase}${scope.prefix}/unpublish`,
+            auth: editor,
+            summary: `Unpublish ${scope.noun}`,
+            description:
+                'Withdraws the published copy, so visitors stop seeing it and the site drops it. The draft and every version stay, and publishing again brings it back. The person confirms before this runs.',
+            tool: {
+                needsApproval: true,
+                destructiveHint: true,
+                idempotentHint: true,
+            },
+            pathParams: scope.params,
+            body: UnpublishBodySchema,
+            responses: {
+                200: DraftPageSchema,
+                404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
+            },
+        }).handler(
+            guarded(async (cms, args) => ({
+                status: 200,
+                body: draftBody(await cms.unpublish(scope.refOf(args.params), authorOf(cms, args))),
+            })) as never
         ),
 
         setOwner: route({

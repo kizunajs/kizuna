@@ -1522,6 +1522,26 @@ export class CmsService {
     }
 
     /**
+     * Withdraws the published copy and drops the same cached reads publishing
+     * does. The draft and every version stay.
+     */
+    async unpublish(ref: DocumentRef, author: string): Promise<DraftState> {
+        const { target, row } = await this.document(ref);
+        if (row === undefined && ref.type === 'item') {
+            throw new CmsHttpError(404, {
+                detail: `There is no item '${ref.id}' in '${ref.collection}'.`,
+            });
+        }
+        if ((await this.store.unpublish(target.kind, target.key, author, target.site)) === undefined) {
+            throw new CmsHttpError(409, {
+                detail: `'${formatRef(ref)}' is not published.`,
+            });
+        }
+        await this.revalidateDocument(ref);
+        return this.draftState(ref);
+    }
+
+    /**
      * An earlier version's content, migrated to the current schema.
      */
     async versionContent(

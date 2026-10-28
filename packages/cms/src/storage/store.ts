@@ -510,6 +510,36 @@ export class DocumentStore {
     }
 
     /**
+     * Clears the published copy and keeps the draft and every version, so
+     * publishing again brings it back. Answers `undefined` when nothing was
+     * published.
+     */
+    async unpublish(kind: DocumentKind, key: string, author: string, site = SITE): Promise<DocumentRow | undefined> {
+        return this.db.transaction(async (tx) => {
+            const [existing] = await tx
+                .select()
+                .from(cmsDocuments)
+                .where(identity(kind, key, site))
+                .for('update');
+            if (existing === undefined || existing.published === null) return undefined;
+            const now = new Date();
+            await tx
+                .update(cmsDocuments)
+                .set({
+                    draft: existing.draft ?? existing.published,
+                    published: null,
+                    publishedVersion: null,
+                    publishedAt: null,
+                    updatedAt: now,
+                    updatedBy: author,
+                })
+                .where(eq(cmsDocuments.id, existing.id));
+            const [row] = await tx.select().from(cmsDocuments).where(eq(cmsDocuments.id, existing.id)).limit(1);
+            return toRow(row!);
+        });
+    }
+
+    /**
      * Rewrites both stored copies at a definition's latest migration step, in
      * place: no version is added and nothing is published, since the content
      * means what it meant. Answers whether the document was behind.

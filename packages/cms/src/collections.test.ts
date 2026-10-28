@@ -336,6 +336,43 @@ describe('collections', () => {
         ]);
     });
 
+    it('unpublishes an item, dropping it from lists and the pages that reference it', async () => {
+        const id = await createEmployee('Ada', 'Engineering', 1);
+        await asEditor(request(app).patch('/editing/pages/contactPage/draft')).send({
+            changes: {
+                contacts: [id],
+            },
+        });
+        revalidated.length = 0;
+        const unpublished = await asEditor(request(app).post(`/editing/collections/employees/items/${id}/unpublish`)).send({});
+        expect(unpublished.status).toBe(200);
+        expect(unpublished.body.status).toBe('draft');
+        expect(revalidated).toEqual([
+            [`kizuna-cms:item:employees:${id}`, 'kizuna-cms:collection:employees', 'kizuna-cms:page:contactPage'],
+        ]);
+        expect((await request(app).get(`/content/collections/employees/${id}`)).status).toBe(404);
+        expect((await request(app).get('/content/collections/employees')).body.items).toEqual([]);
+        const draft = await asEditor(request(app).get(`/editing/collections/employees/items/${id}/draft`));
+        expect(draft.body.content).toMatchObject({
+            name: 'Ada',
+        });
+        expect((await asEditor(request(app).post(`/editing/collections/employees/items/${id}/unpublish`)).send({})).status).toBe(409);
+        expect((await asEditor(request(app).post('/editing/collections/employees/items/nobody/unpublish')).send({})).status).toBe(404);
+    });
+
+    it('unpublishes a global', async () => {
+        await asEditor(request(app).patch('/editing/globals/site/draft')).send({
+            changes: {
+                footer: 'Made in Oslo',
+            },
+        });
+        await asEditor(request(app).post('/editing/globals/site/publish')).send({});
+        revalidated.length = 0;
+        expect((await asEditor(request(app).post('/editing/globals/site/unpublish')).send({})).status).toBe(200);
+        expect(revalidated).toEqual([['kizuna-cms:global:site']]);
+        expect((await request(app).get('/content/globals/site')).status).toBe(404);
+    });
+
     it('deletes an item with its history', async () => {
         const id = await createEmployee('Ada', 'Engineering', 1);
         expect((await asEditor(request(app).delete(`/editing/collections/employees/items/${id}`))).status).toBe(204);

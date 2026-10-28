@@ -342,6 +342,11 @@ export const PublishBodySchema = z
     })
     .optional();
 
+/**
+ * Unpublishing takes nothing: `{}` or no body.
+ */
+export const UnpublishBodySchema = z.object({}).strict().optional();
+
 export const RollbackBodySchema = Kizuna.model({
     title: 'CMS.Rollback',
     schema: z.object({
