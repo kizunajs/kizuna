@@ -1,13 +1,14 @@
 import { expect, type FrameLocator, type Page } from '@playwright/test';
 
 /**
- * Signs in through the login form, as the demo editor unless told otherwise,
- * and returns the session token `/cms` shows for connecting an MCP host.
+ * Signs in through the admin's sign-in screen, as the demo editor unless told
+ * otherwise, and returns the session token `/cms` shows for connecting an MCP
+ * host.
  */
 export const signIn = async (page: Page, email = 'editor@example.com'): Promise<string> => {
-    await page.goto('/login?next=/cms');
-    await page.getByPlaceholder('Email').fill(email);
-    await page.getByPlaceholder('Password').fill('kizuna-demo');
+    await page.goto('/admin/login?next=/cms');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill('kizuna-demo');
     await page
         .getByRole('button', {
             name: 'Sign in',

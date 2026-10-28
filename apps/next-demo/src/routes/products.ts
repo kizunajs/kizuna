@@ -3,6 +3,7 @@ import { Kizuna } from 'kizunajs';
 import { k } from '../k';
 import { ProductId } from '../models';
 import { cmsClient } from '../lib/cms-client';
+import { catalogue as shopCatalogue } from '../lib/catalogue';
 
 const ProductSchema = Kizuna.model({
     title: 'Product',
@@ -17,21 +18,13 @@ const ProductSchema = Kizuna.model({
 type Product = z.output<typeof ProductSchema>;
 
 const catalogue = new Map<string, Product>(
-    [
-        ['prod_fern', 'Boston fern', 249],
-        ['prod_snake_plant', 'Snake plant', 329],
-        ['prod_pothos', 'Golden pothos', 199],
-        ['prod_tulips', 'Tulip bulbs, 20', 149],
-        ['prod_daffodils', 'Daffodil bulbs, 15', 119],
-        ['prod_hyacinth', 'Hyacinth in a clay pot', 179],
-        ['prod_seeds', 'Wildflower seed mix', 59],
-    ].map(([id, name, price]) => [
-        String(id),
+    shopCatalogue.map((entry) => [
+        entry.id,
         {
-            id: String(id) as Product['id'],
-            name: String(name),
-            price: Number(price),
-            imageUrl: `https://picsum.photos/seed/${id}/400/300`,
+            id: entry.id as Product['id'],
+            name: entry.name,
+            price: entry.price,
+            imageUrl: `https://picsum.photos/seed/${entry.id}/400/300`,
         },
     ])
 );

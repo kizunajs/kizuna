@@ -13,6 +13,7 @@ import { db } from './src/db';
 import { editors } from './src/cms/people';
 import { AppUsers } from './src/cms/app-users';
 import { dashboard } from './src/cms/dashboard';
+import { auth } from './src/auth';
 
 /**
  * The CMS API: editors, the content they change, and an MCP endpoint of its
@@ -42,6 +43,20 @@ export default defineConfig({
             identity: 'editor',
             roles: ['editor', 'admin'],
             invalidate: 'app',
+            signIn: ({ email, password, headers }) =>
+                auth.api.signInEmail({
+                    body: {
+                        email,
+                        password,
+                    },
+                    headers,
+                    asResponse: true,
+                }),
+            signOut: ({ headers }) =>
+                auth.api.signOut({
+                    headers,
+                    asResponse: true,
+                }),
             people: {
                 list: editors,
                 imageOrigins: ['https://picsum.photos', 'https://fastly.picsum.photos'],
@@ -57,8 +72,6 @@ export default defineConfig({
         },
         media: process.env.CMS_S3_BUCKET === undefined ? { storage: localMediaStorage } : undefined,
         apiPath: '/cms-api',
-        signInPath: '/login',
-        signOutPath: '/logout',
         adminPath: '/admin',
         preview: {
             url: process.env.BETTER_AUTH_URL ?? 'http://localhost:3030',

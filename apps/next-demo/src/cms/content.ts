@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { defineCollection, defineGlobal } from '@kizunajs/cms';
-import { ImageSchema, RichTextSchema } from '@kizunajs/cms/schemas';
+import { ImageSchema, RichTextSchema, SeoSchema } from '@kizunajs/cms/schemas';
 import { ArticleId, EmployeeId } from '../models';
 import { HeadingSchema, LinkSchema } from './schemas';
 
@@ -8,25 +8,20 @@ import { HeadingSchema, LinkSchema } from './schemas';
  * What editors and visitors see for each department.
  */
 export const departments = {
-    design: 'Design',
-    engineering: 'Engineering',
-    sales: 'Sales',
-    support: 'Plant care',
+    shop: 'In the shop',
+    care: 'Plant care',
+    offices: 'Office plants',
+    online: 'Online and delivery',
 };
 
 /**
  * What editors and visitors see for each topic.
  */
 export const topics = {
-    news: 'News',
-    guides: 'Guides',
-    stories: 'Stories',
+    care: 'Plant care',
+    season: 'In season',
+    growers: 'Growers',
 };
-
-/**
- * Stored values from before the enums were lowercase.
- */
-const lowercase = (value: unknown): unknown => (typeof value === 'string' ? value.toLowerCase() : value);
 
 /**
  * The people on the team. Editors add and remove them; the team page lists
@@ -51,21 +46,32 @@ export const Employees = defineCollection({
             ],
         },
         {
-            type: 'row',
-            fields: [
-                {
-                    name: 'email',
-                    schema: z.email().optional(),
-                },
-                {
-                    name: 'phone',
-                    schema: z.string().max(20).optional(),
-                },
-            ],
-        },
-        {
             name: 'bio',
             schema: z.string().max(280).optional().describe('Two sentences at most.'),
+        },
+        {
+            name: 'favouritePlant',
+            label: 'Favourite plant',
+            schema: z.string().max(60).optional().describe('Its Latin name, which the team page sets in italics.'),
+        },
+        {
+            type: 'collapsible',
+            label: 'Contact',
+            fields: [
+                {
+                    type: 'row',
+                    fields: [
+                        {
+                            name: 'email',
+                            schema: z.email().optional(),
+                        },
+                        {
+                            name: 'phone',
+                            schema: z.string().max(20).optional(),
+                        },
+                    ],
+                },
+            ],
         },
         {
             name: 'photo',
@@ -74,7 +80,7 @@ export const Employees = defineCollection({
         },
         {
             name: 'department',
-            schema: z.enum(['design', 'engineering', 'sales', 'support']),
+            schema: z.enum(['shop', 'care', 'offices', 'online']),
             options: departments,
             position: 'sidebar',
         },
@@ -85,12 +91,6 @@ export const Employees = defineCollection({
             position: 'sidebar',
         },
     ],
-    migrate: {
-        1: (document) => ({
-            ...document,
-            department: lowercase(document['department']),
-        }),
-    },
     indexes: ['department', 'order', 'name'],
     preview: {
         url: () => '/team',
@@ -115,20 +115,35 @@ export const Header = defineGlobal({
             label: 'Announcement',
             fields: [
                 {
-                    name: 'announcement',
-                    schema: z
-                        .string()
-                        .max(90)
-                        .optional()
-                        .describe('One line above the menu, like a delivery cut-off. Leave empty to hide.'),
+                    type: 'row',
+                    fields: [
+                        {
+                            name: 'announcement',
+                            schema: z
+                                .string()
+                                .max(90)
+                                .optional()
+                                .describe('One line in a green band above the menu, like a delivery cut-off.'),
+                        },
+                        {
+                            name: 'announcementLink',
+                            label: 'Link',
+                            schema: LinkSchema.optional(),
+                        },
+                    ],
                 },
             ],
+        },
+        {
+            name: 'showAnnouncement',
+            schema: z.boolean().default(true).describe('Show the green band above the menu.'),
+            position: 'sidebar',
         },
     ],
 });
 
 /**
- * The links and contact details at the bottom of every page.
+ * The newsletter, links and shop details at the bottom of every page.
  */
 export const Footer = defineGlobal({
     name: 'footer',
@@ -144,42 +159,72 @@ export const Footer = defineGlobal({
             schema: z.array(LinkSchema).max(8),
         },
         {
-            type: 'row',
+            type: 'collapsible',
+            label: 'Newsletter',
             fields: [
                 {
-                    name: 'contactEmail',
-                    schema: z.email(),
+                    name: 'newsletterHeading',
+                    label: 'Heading',
+                    schema: HeadingSchema.optional(),
                 },
                 {
-                    name: 'phone',
-                    schema: z.string().min(1).max(20),
+                    name: 'newsletterText',
+                    label: 'Text',
+                    schema: z.string().max(160).optional(),
                 },
             ],
         },
         {
-            type: 'row',
+            type: 'collapsible',
+            label: 'The shop',
             fields: [
+                {
+                    type: 'row',
+                    fields: [
+                        {
+                            name: 'contactEmail',
+                            schema: z.email(),
+                        },
+                        {
+                            name: 'phone',
+                            schema: z.string().min(1).max(20),
+                        },
+                    ],
+                },
                 {
                     name: 'address',
                     schema: z.string().min(1).max(120),
                 },
                 {
                     name: 'openingHours',
-                    schema: z.string().min(1).max(120).describe('When the shop is open, like Mon to Fri 10 to 18.'),
+                    schema: z
+                        .array(
+                            z.object({
+                                days: z.string().min(1).max(30).describe('Like Monday to Friday.'),
+                                hours: z.string().min(1).max(30).describe('Like 10 to 18, or Closed.'),
+                            })
+                        )
+                        .max(7)
+                        .default([]),
                 },
             ],
+        },
+        {
+            name: 'showNewsletter',
+            schema: z.boolean().default(true).describe('Show the newsletter sign-up above the links.'),
+            position: 'sidebar',
         },
     ],
 });
 
 /**
- * The blog's articles. `app/blog/[slug]` shows each one at its slug, and the
- * front page features a few by id.
+ * The journal's articles. `app/blog/[slug]` shows each one at its slug, and
+ * the front page features a few by id.
  */
 export const Articles = defineCollection({
     name: 'articles',
     id: ArticleId,
-    group: 'Blog',
+    group: 'Journal',
     fields: [
         {
             type: 'tab',
@@ -190,6 +235,10 @@ export const Articles = defineCollection({
                     schema: HeadingSchema,
                 },
                 {
+                    name: 'excerpt',
+                    schema: z.string().max(200).describe('One or two sentences, under the title and in lists.'),
+                },
+                {
                     name: 'body',
                     schema: RichTextSchema,
                 },
@@ -197,24 +246,26 @@ export const Articles = defineCollection({
         },
         {
             type: 'tab',
-            label: 'Meta',
+            label: 'SEO',
             fields: [
                 {
-                    name: 'excerpt',
-                    schema: z.string().max(200).describe('One or two sentences for the blog index and search results.'),
-                },
-                {
-                    name: 'related',
-                    label: 'Related articles',
-                    schema: z.array(ArticleId).max(3).default([]),
-                    description: 'Shown under the article. Up to three; none shows the latest of the same topic.',
+                    name: 'seo',
+                    label: 'SEO',
+                    schema: SeoSchema.optional(),
+                    description: 'Leave empty to use the title and excerpt.',
                 },
             ],
         },
         {
             name: 'cover',
-            label: 'Cover image',
+            label: 'Cover photo',
             schema: ImageSchema,
+            position: 'sidebar',
+        },
+        {
+            name: 'coverCaption',
+            label: 'Cover caption',
+            schema: z.string().max(80).optional().describe('A few words under the photo, like where it was taken.'),
             position: 'sidebar',
         },
         {
@@ -224,18 +275,18 @@ export const Articles = defineCollection({
                 .min(1)
                 .max(60)
                 .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
-                .describe('Lowercase words joined by dashes, like plant-now-for-april.'),
+                .describe('Lowercase words joined by dashes, like plant-bulbs-before-the-frost.'),
             position: 'sidebar',
         },
         {
             name: 'publishedOn',
             label: 'Date',
-            schema: z.iso.date().optional().describe('The date the blog shows. Lists sort by it, newest first.'),
+            schema: z.iso.date().optional().describe('The date the journal shows. Lists sort by it, newest first.'),
             position: 'sidebar',
         },
         {
             name: 'topic',
-            schema: z.enum(['news', 'guides', 'stories']),
+            schema: z.enum(['care', 'season', 'growers']),
             options: topics,
             position: 'sidebar',
         },
@@ -244,13 +295,20 @@ export const Articles = defineCollection({
             schema: EmployeeId.optional(),
             position: 'sidebar',
         },
+        {
+            type: 'collapsible',
+            label: 'Related articles',
+            position: 'sidebar',
+            fields: [
+                {
+                    name: 'related',
+                    label: 'Articles',
+                    schema: z.array(ArticleId).max(3).default([]),
+                    description: 'Shown under the article. Up to three; none shows the latest of the same topic.',
+                },
+            ],
+        },
     ],
-    migrate: {
-        1: (document) => ({
-            ...document,
-            topic: lowercase(document['topic']),
-        }),
-    },
     indexes: ['topic', 'publishedOn'],
     actions: {
         announce: {

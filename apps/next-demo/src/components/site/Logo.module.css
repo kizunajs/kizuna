@@ -1,0 +1,18 @@
+.logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--serif);
+    font-size: 1.625rem;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    text-decoration: none;
+}
+
+.mark {
+    width: 19px;
+    height: 19px;
+    flex: none;
+    transform: translateY(1px);
+}

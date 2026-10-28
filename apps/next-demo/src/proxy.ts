@@ -7,7 +7,7 @@ import { getSessionCookie } from 'better-auth/cookies';
  */
 export function proxy(request: NextRequest): NextResponse {
     if (getSessionCookie(request) !== null) return NextResponse.next();
-    const login = new URL('/login', request.url);
+    const login = new URL('/admin/login', request.url);
     login.searchParams.set('next', request.nextUrl.pathname);
     return NextResponse.redirect(login);
 }

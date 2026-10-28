@@ -1,0 +1,117 @@
+.section {
+    width: var(--page);
+    margin: var(--section) auto 0;
+}
+
+.header {
+    display: grid;
+    justify-items: start;
+    gap: 20px;
+    margin-bottom: 48px;
+}
+
+.heading {
+    max-width: 22ch;
+    font-family: var(--sans);
+    font-size: var(--display-m);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+}
+
+.heading em {
+    font-family: var(--serif);
+    font-weight: 400;
+    text-transform: none;
+}
+
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    list-style: none;
+}
+
+.link {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    border-radius: var(--radius);
+    color: var(--on-photo);
+    text-decoration: none;
+}
+
+.link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgb(8 14 10 / 0.55), rgb(8 14 10 / 0) 45%);
+}
+
+.image {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    transition: transform 600ms ease;
+}
+
+.label {
+    position: absolute;
+    inset: auto 24px 22px;
+    z-index: 1;
+    display: grid;
+    gap: 8px;
+}
+
+.name {
+    font-family: var(--serif);
+    font-size: var(--display-m);
+    line-height: 1;
+    letter-spacing: -0.03em;
+}
+
+.discover {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+@media (hover: hover) {
+    .link:hover .image {
+        transform: scale(1.03);
+    }
+}
+
+@media (max-width: 767px) {
+    .header {
+        margin-bottom: 32px;
+    }
+
+    .tiles {
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: 78%;
+        gap: 10px;
+        width: calc(100% + 2 * var(--gutter));
+        margin-inline: calc(-1 * var(--gutter));
+        overflow-x: auto;
+        padding-inline: var(--gutter);
+        scroll-padding-inline: var(--gutter);
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+    }
+
+    .tiles::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tile {
+        scroll-snap-align: start;
+    }
+
+    .label {
+        inset: auto 18px 18px;
+    }
+}

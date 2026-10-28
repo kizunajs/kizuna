@@ -1,44 +1,50 @@
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { formatRef, type CmsService, type DocumentRef } from '@kizunajs/cms';
-import { richTextFromPlain } from '@kizunajs/cms/schemas';
 
 const AUTHOR = 'seed';
 const PHOTOS = join(process.cwd(), 'seed/photos');
 
 /**
- * Photos from Unsplash, free to use under the Unsplash License.
+ * Photos from Unsplash, free to use under the Unsplash License. The cropped
+ * ones are details of the photo they name.
  */
 const library = [
     {
-        file: 'team-at-laptops.jpg',
-        alt: 'Four people working at laptops around a wooden table',
-        source: 'https://unsplash.com/photos/1522071820081-009f0129c71c',
-    },
-    {
-        file: 'poppies.jpg',
-        alt: 'Orange poppies against a blue sky',
-        source: 'https://unsplash.com/photos/1490750967868-88aa4486c946',
-    },
-    {
-        file: 'cherry-blossom.jpg',
-        alt: 'Pink cherry blossom on a branch',
-        source: 'https://unsplash.com/photos/1522383225653-ed111181a951',
-    },
-    {
-        file: 'ferns.jpg',
-        alt: 'Green fern leaves filling the frame',
-        source: 'https://unsplash.com/photos/1497250681960-ef046c08a56e',
-    },
-    {
         file: 'forest-path.jpg',
-        alt: 'A path through a sunlit forest',
+        alt: 'Morning sun on a path through spruce forest, ferns on either side',
         source: 'https://unsplash.com/photos/1441974231531-c6227db76b6e',
     },
     {
-        file: 'office-corridor.jpg',
-        alt: 'An empty office corridor with glass walls',
-        source: 'https://unsplash.com/photos/1497366216548-37526070297c',
+        file: 'forest-floor.jpg',
+        alt: 'Young ferns in the sun along a forest path',
+        source: 'A crop of forest-path.jpg',
+    },
+    {
+        file: 'forest-trunks.jpg',
+        alt: 'Tall spruce trunks above a green understorey',
+        source: 'A crop of forest-path.jpg',
+    },
+    {
+        file: 'ferns.jpg',
+        alt: 'Lady fern fronds, Athyrium filix-femina, filling the frame in deep shade',
+        source: 'https://unsplash.com/photos/1497250681960-ef046c08a56e',
+    },
+    {
+        file: 'fern-fronds.jpg',
+        alt: 'Close up of fern fronds unfurled in the shade',
+        source: 'A crop of ferns.jpg',
+    },
+    {
+        file: 'cherry-blossom.jpg',
+        alt: 'Japanese cherry in flower, Prunus serrulata, against an April sky',
+        source: 'https://unsplash.com/photos/1522383225653-ed111181a951',
+    },
+    {
+        file: 'cherry-branch.jpg',
+        alt: 'A cluster of pale pink cherry blossom close up',
+        source: 'A crop of cherry-blossom.jpg',
     },
 ];
 
@@ -48,34 +54,11 @@ const people = [
         source: 'https://unsplash.com/photos/1438761681033-6461ffad8d80',
         values: {
             name: 'Ingrid Solberg',
-            role: 'Design lead',
-            department: 'design',
-            email: 'ingrid@example.com',
-            bio: 'Ingrid decides how the shop looks, from the shelves in the shop to the care cards in every box.',
-            order: 0,
-        },
-    },
-    {
-        file: 'aiko-tanaka.jpg',
-        source: 'https://unsplash.com/photos/1534528741775-53994a69daeb',
-        values: {
-            name: 'Aiko Tanaka',
-            role: 'Product designer',
-            department: 'design',
-            email: 'aiko@example.com',
-            bio: 'Aiko designs the online shop and photographs every plant we sell.',
-            order: 1,
-        },
-    },
-    {
-        file: 'daniel-moreau.jpg',
-        source: 'https://unsplash.com/photos/1500648767791-00dcc994a43e',
-        values: {
-            name: 'Daniel Moreau',
-            role: 'Staff engineer',
-            department: 'engineering',
-            email: 'daniel@example.com',
-            bio: 'Daniel built the online shop and keeps the stock count honest.',
+            role: 'Founder and buyer',
+            department: 'shop',
+            email: 'ingrid@hagenplanter.no',
+            bio: 'Ingrid opened Hagen in 2019 after ten years at a nursery in Hurdal. She still chooses every plant we sell, usually in person.',
+            favouritePlant: 'Asplenium nidus',
             order: 0,
         },
     },
@@ -84,45 +67,11 @@ const people = [
         source: 'https://unsplash.com/photos/1544005313-94ddf0286df2',
         values: {
             name: 'Sara Lindqvist',
-            role: 'Frontend engineer',
-            department: 'engineering',
-            email: 'sara@example.com',
-            bio: 'Sara works on checkout, and on the wildflower beds behind the shop at weekends.',
-            order: 1,
-        },
-    },
-    {
-        file: 'jonas-berg.jpg',
-        source: 'https://unsplash.com/photos/1506794778202-cad84cf45f1d',
-        values: {
-            name: 'Jonas Berg',
-            role: 'Backend engineer',
-            department: 'engineering',
-            order: 2,
-        },
-    },
-    {
-        file: 'marco-reyes.jpg',
-        source: 'https://unsplash.com/photos/1507003211169-0a1dd7228f2d',
-        values: {
-            name: 'Marco Reyes',
-            role: 'Head of sales',
-            department: 'sales',
-            email: 'marco@example.com',
-            phone: '+47 22 41 08 12',
-            bio: 'Marco looks after the offices we keep in plants, and visits each one before it signs up.',
-            order: 0,
-        },
-    },
-    {
-        file: 'lucia-romero.jpg',
-        source: 'https://unsplash.com/photos/1494790108377-be9c29b29330',
-        values: {
-            name: 'Lucía Romero',
-            role: 'Account manager',
-            department: 'sales',
-            email: 'lucia@example.com',
-            phone: '+47 22 41 08 14',
+            role: 'Shop gardener',
+            department: 'shop',
+            email: 'sara@hagenplanter.no',
+            bio: 'Sara runs the shop floor and the courtyard beds behind it. Ask her which pot to buy and she will ask about your window first.',
+            favouritePlant: 'Hydrangea paniculata',
             order: 1,
         },
     },
@@ -132,9 +81,10 @@ const people = [
         values: {
             name: 'Martin Hale',
             role: 'Head of plant care',
-            department: 'support',
-            email: 'care@example.com',
-            bio: 'Send Martin a photo of a struggling plant and he will tell you what it needs, usually less water.',
+            department: 'care',
+            email: 'pleie@hagenplanter.no',
+            bio: 'Send Martin a photo of a plant that is struggling and he replies the same day. Nine times in ten, the answer is less water.',
+            favouritePlant: 'Dracaena trifasciata',
             order: 0,
         },
     },
@@ -143,99 +93,308 @@ const people = [
         source: 'https://unsplash.com/photos/1539571696357-5a69c17a67c6',
         values: {
             name: 'Felix Lund',
-            role: 'Plant care advisor',
-            department: 'support',
+            role: 'Plant doctor',
+            department: 'care',
+            bio: 'Felix makes house calls for plants too big to carry in, and repots anything taller than he is.',
+            favouritePlant: 'Monstera deliciosa',
             order: 1,
+        },
+    },
+    {
+        file: 'marco-reyes.jpg',
+        source: 'https://unsplash.com/photos/1507003211169-0a1dd7228f2d',
+        values: {
+            name: 'Marco Reyes',
+            role: 'Office plants lead',
+            department: 'offices',
+            email: 'marco@hagenplanter.no',
+            phone: '+47 22 41 08 12',
+            bio: 'Marco looks after the plants in forty Oslo offices, and walks through every new one before it signs up.',
+            favouritePlant: 'Ficus lyrata',
+            order: 0,
+        },
+    },
+    {
+        file: 'lucia-romero.jpg',
+        source: 'https://unsplash.com/photos/1494790108377-be9c29b29330',
+        values: {
+            name: 'Lucía Romero',
+            role: 'Office plant carer',
+            department: 'offices',
+            phone: '+47 22 41 08 14',
+            bio: 'Lucía waters, feeds and turns office plants on a two-week round, by cargo bike whenever the weather allows.',
+            favouritePlant: 'Epipremnum aureum',
+            order: 1,
+        },
+    },
+    {
+        file: 'aiko-tanaka.jpg',
+        source: 'https://unsplash.com/photos/1534528741775-53994a69daeb',
+        values: {
+            name: 'Aiko Tanaka',
+            role: 'Photographer and web shop',
+            department: 'online',
+            email: 'aiko@hagenplanter.no',
+            bio: 'Aiko photographs every plant we sell, in daylight, in the back room of the shop.',
+            favouritePlant: 'Adiantum raddianum',
+            order: 0,
+        },
+    },
+    {
+        file: 'daniel-moreau.jpg',
+        source: 'https://unsplash.com/photos/1500648767791-00dcc994a43e',
+        values: {
+            name: 'Daniel Moreau',
+            role: 'Web shop and stock',
+            department: 'online',
+            bio: 'Daniel keeps the stock count honest, so the plant you order is the one on the shelf.',
+            favouritePlant: 'Zamioculcas zamiifolia',
+            order: 1,
+        },
+    },
+    {
+        file: 'jonas-berg.jpg',
+        source: 'https://unsplash.com/photos/1506794778202-cad84cf45f1d',
+        values: {
+            name: 'Jonas Berg',
+            role: 'Delivery',
+            department: 'online',
+            bio: 'Jonas drives the electric van, and knows which stairwells in Oslo a two-metre palm will fit up.',
+            favouritePlant: 'Howea forsteriana',
+            order: 2,
         },
     },
 ];
 
 const articleSeeds = [
     {
-        cover: 'ferns.jpg',
+        cover: 'forest-path.jpg',
         author: 'Felix Lund',
         values: {
-            title: 'Bringing plants in for winter',
-            slug: 'bringing-plants-in-for-winter',
-            topic: 'guides',
+            title: 'Bring the balcony in before the *first frost*',
+            slug: 'bring-the-balcony-in-before-the-first-frost',
+            topic: 'season',
             publishedOn: '2026-10-26',
-            excerpt: 'Balcony plants want to come inside before the first frost. Check them for pests first.',
-            body: 'Most balcony plants survive a cold night, but not a frost. Bring them in once the forecast drops below five degrees at night.\n\nLook under every leaf before a plant comes inside, and rinse it with the shower if you find anything. Then give it the brightest window you have, and water about half as often as you did in summer.',
+            coverCaption: 'Morning light at the forest edge in Hurdal, late October',
+            excerpt: 'Most balcony plants survive a cold night but not a frost. Here is when to bring them in, and what to check first.',
+            body: `Oslo usually sees its first night frost in the last week of October. A *Pelargonium* or a lemon tree that has spent the summer outside will cope with five degrees, but not with minus one.
+
+## Check before it comes inside
+
+Look under every leaf and along the stems. Aphids and spider mites that the wind kept down outside will spread fast in a warm living room.
+
+- Rinse the whole plant in the shower, soil covered with a plastic bag.
+- Pull off yellow leaves and anything soft at the base.
+- Leave it in the hallway for a few days before it joins the others.
+
+## Then let it rest
+
+Give it the brightest window you have, away from the radiator, and water about half as often as you did in July. Growth slows down in winter, and so does thirst.
+
+> A plant that comes in clean in October is the one still standing in March.`,
+        },
+    },
+    {
+        cover: 'cherry-branch.jpg',
+        author: 'Ingrid Solberg',
+        values: {
+            title: 'Plant bulbs now, *thank yourself* in April',
+            slug: 'plant-bulbs-now',
+            topic: 'season',
+            publishedOn: '2026-10-19',
+            coverCaption: 'Cherry blossom on Grünerløkka in late April',
+            excerpt: 'Tulips, daffodils and hyacinths need a cold winter in the ground. October and November are the months to plant them.',
+            body: `Bulbs need a long cold spell to flower, which is why they go in now and not in spring. As long as you can push a trowel into the soil, it is not too late.
+
+## How deep, how far apart
+
+Plant each bulb about three times as deep as it is tall, pointed end up. Tulips go in at 15 cm, crocuses at 8. Space them a bulb's width apart for a full look in a pot, twice that in a bed.
+
+## Pots on a balcony
+
+A pot freezes right through in a cold January, which bulbs in the ground never face. Wrap the pot in hessian or move it against the wall, and use a mix with grit so the bulbs never sit wet.
+
+This year we have twelve kinds of *Tulipa*, six daffodils and hyacinths in white, blue and pale pink. Buy twenty or more and we pack them with a planting card.`,
+        },
+    },
+    {
+        cover: 'ferns.jpg',
+        author: 'Martin Hale',
+        values: {
+            title: 'Five ferns for a *north-facing* window',
+            slug: 'five-ferns-for-a-north-facing-window',
+            topic: 'care',
+            publishedOn: '2026-10-12',
+            coverCaption: 'Athyrium filix-femina in deep shade',
+            excerpt: 'Ferns grew up under trees. A window that never sees the sun suits them better than it suits almost anything else.',
+            body: `A north-facing window gets even, soft light all day, which is exactly what a forest floor gives. These five do well in it.
+
+- *Nephrolepis exaltata*, the Boston fern, for a shelf where its fronds can hang.
+- *Asplenium nidus*, the bird's nest fern, with glossy leaves that forgive dry air.
+- *Adiantum raddianum*, the maidenhair, for a bathroom with a window.
+- *Phlebodium aureum*, blue and leathery, the toughest of the five.
+- *Davallia fejeensis*, whose furry rhizomes creep over the edge of the pot.
+
+## Water and air
+
+Keep the soil damp but never wet, which in a heated flat means a little water twice a week. Stand the pot on a tray of wet gravel through the winter, when radiators dry the air.
+
+Brown tips mean the air is too dry. Yellow fronds from the base mean the soil is too wet.`,
+        },
+    },
+    {
+        cover: 'forest-trunks.jpg',
+        author: 'Aiko Tanaka',
+        values: {
+            title: 'A morning at the nursery in *Hurdal*',
+            slug: 'a-morning-at-the-nursery-in-hurdal',
+            topic: 'growers',
+            publishedOn: '2026-10-02',
+            coverCaption: 'Spruce above the fern beds in Hurdal',
+            excerpt: 'Where our ferns start out: a family nursery an hour north of Oslo, at the edge of the forest.',
+            body: `Most of our ferns come from one nursery in Hurdal, run by the same family for three generations. They grow them outdoors, in the shade of a spruce wood, for their whole first year.
+
+## Why outdoors matters
+
+A fern raised in a greenhouse has never felt wind or a dry week. One raised under trees has, and it arrives with thicker fronds and roots that forgive a missed watering.
+
+We spent a September morning walking the beds with Ingrid, choosing this autumn's *Athyrium* and *Dryopteris* plant by plant. The photos in the shop this season are from that morning.
+
+> Every fern on our shelves has spent a summer outside under real trees.`,
+        },
+    },
+    {
+        cover: 'fern-fronds.jpg',
+        author: 'Martin Hale',
+        values: {
+            title: 'Why are the leaves turning *yellow*?',
+            slug: 'why-are-the-leaves-turning-yellow',
+            topic: 'care',
+            publishedOn: '2026-09-21',
+            coverCaption: 'New fronds on a Boston fern',
+            excerpt: 'It is the question the plant care desk hears most. The answer is usually the watering can.',
+            body: `About half the questions we get each week are some version of this one. Before you move the plant or feed it, check the soil.
+
+## Push a finger in
+
+If the soil is wet two centimetres down, the plant has had too much water. Roots in wet soil cannot breathe, and the oldest leaves yellow first. Let it dry out, and water only when the top of the soil is dry.
+
+If the soil is dry and the yellow leaves are crisp, it has had too little. Stand the pot in a bowl of water for half an hour, then let it drain.
+
+## Send us a photo
+
+A photo of the whole plant, the soil and the window it stands by tells us more than any description. Send one to the plant care desk and we reply the same day.`,
         },
     },
     {
         cover: 'cherry-blossom.jpg',
-        author: 'Marco Reyes',
-        values: {
-            title: 'Plant now for April',
-            slug: 'plant-now-for-april',
-            topic: 'news',
-            publishedOn: '2026-10-19',
-            excerpt: 'The autumn bulbs are in: tulips, daffodils and hyacinths, ready to go in the ground before it freezes.',
-            body: 'Bulbs need a cold winter in the soil to flower in spring, so October and November are the months to plant them. This year we have twelve kinds of tulip, six daffodils and hyacinths in white, blue and pink.\n\nPlant each bulb twice as deep as it is tall, pointed end up. Buy twenty or more and we pack them with a planting guide.',
-        },
-    },
-    {
-        cover: 'office-corridor.jpg',
-        author: 'Marco Reyes',
-        values: {
-            title: 'Plant care for offices',
-            slug: 'plant-care-for-offices',
-            topic: 'news',
-            publishedOn: '2026-10-05',
-            excerpt: 'We now choose, deliver and look after the plants in your office, with a visit every two weeks.',
-            body: 'An office full of plants is easy to start and hard to keep. Our new office service does the keeping: we choose plants for your light, deliver them in pots that fit the room, and visit every two weeks to water, feed and turn them.\n\nAnything that does not thrive, we replace at no charge. Marco visits every office before it signs up, so write to him for a walk-through.',
-        },
-    },
-    {
-        cover: 'ferns.jpg',
-        author: 'Ingrid Solberg',
-        values: {
-            title: 'Plants for a dark office',
-            slug: 'plants-for-dark-offices',
-            topic: 'guides',
-            publishedOn: '2026-09-21',
-            excerpt: 'Five plants that do well far from a window, and how often to water them.',
-            body: 'Ferns, snake plants, pothos, ZZ plants and peace lilies all cope with little light. Water them when the top of the soil is dry, which in a heated office is about once a week.\n\nTurn the pots a quarter turn now and then, so they grow evenly instead of leaning toward the one window.',
-        },
-    },
-    {
-        cover: 'forest-path.jpg',
-        author: 'Aiko Tanaka',
-        values: {
-            title: 'A morning at the nursery',
-            slug: 'a-morning-at-the-nursery',
-            topic: 'stories',
-            publishedOn: '2026-09-07',
-            excerpt: 'Where our ferns start out: a family nursery an hour north of town, at the edge of the forest.',
-            body: "Most of our ferns come from one nursery, run by the same family for three generations. They grow them outdoors in the shade of the forest for their first year, which makes them tougher than greenhouse ferns.\n\nWe spent a morning there choosing this autumn's plants, and Aiko came back with the photos you see in the shop.",
-        },
-    },
-    {
-        cover: 'poppies.jpg',
         author: 'Sara Lindqvist',
         values: {
-            title: 'Sowing wildflowers',
-            slug: 'sowing-wildflowers',
-            topic: 'guides',
-            publishedOn: '2026-08-24',
-            excerpt: 'Poppies, cornflowers and oxeye daisies from one packet, and why poor soil suits them best.',
-            body: 'Wildflowers flower best in soil that has not been fed, so skip the compost. Clear the grass, rake the ground to a fine surface and scatter the seed in late summer or early spring.\n\nPress it down with a board, water once, and leave it alone. Poppies come first, in about ten weeks.',
+            title: 'Planting a cherry tree in *Oslo clay*',
+            slug: 'planting-a-cherry-tree-in-oslo-clay',
+            topic: 'care',
+            publishedOn: '2026-09-07',
+            coverCaption: 'A Kanzan cherry in flower, the variety we sell bare root',
+            excerpt: 'Most gardens in Oslo sit on heavy clay. A cherry will grow in it, if the hole is dug the right way.',
+            body: `Bare-root cherries arrive from November, while the trees are dormant. Plant one as soon as it comes, on a day the ground is not frozen.
+
+## Dig wide, not deep
+
+Clay holds water like a bowl. Dig the hole three times as wide as the roots but no deeper than they need, and break up the sides with a fork so roots can find their way out.
+
+- Mix a bucket of compost into the soil you dug out, not into the bottom of the hole.
+- Set the tree at the depth it grew at the nursery. The mark is on the trunk.
+- Stake it on the side the wind comes from, low on the trunk.
+
+Water it in well, then leave it until spring. A *Prunus serrulata* planted this way flowers in its second April.`,
         },
     },
     {
-        cover: 'team-at-laptops.jpg',
-        author: 'Martin Hale',
+        cover: 'forest-floor.jpg',
+        author: 'Lucía Romero',
         values: {
-            title: 'Ask us about your plants',
-            slug: 'ask-us-about-your-plants',
-            topic: 'stories',
+            title: 'Repotting without the *mess*',
+            slug: 'repotting-without-the-mess',
+            topic: 'care',
+            publishedOn: '2026-08-24',
+            coverCaption: 'Young ferns at the edge of the path',
+            excerpt: 'How to tell a plant needs a bigger pot, and how to move it on a kitchen table without soil in every corner.',
+            body: `Roots coming out of the drainage hole, or water running straight through, mean it is time. Spring and late summer are the best months, while the plant is still growing.
+
+## On the kitchen table
+
+Lay a sheet of newspaper, or an old shower curtain for anything large. Water the plant the day before so the root ball holds together.
+
+- Choose a pot only one size up, two to four centimetres wider.
+- Tip the plant out on its side, never pull it by the stem.
+- Loosen the outer roots with your fingers and set it at the same depth as before.
+
+Water once, then leave it out of direct sun for a week while the roots settle.`,
+        },
+    },
+    {
+        cover: 'cherry-blossom.jpg',
+        author: 'Ingrid Solberg',
+        values: {
+            title: 'Where our cherry trees *come from*',
+            slug: 'where-our-cherry-trees-come-from',
+            topic: 'growers',
             publishedOn: '2026-08-10',
-            excerpt: 'What the plant care team answers most, and how a photo saves a plant.',
-            body: 'The plant care team answers about forty questions a week. Half of them are the same question: why are the leaves turning yellow? The answer is usually too much water.\n\nA photo of the whole plant, the soil and the window it stands by tells us more than any description. Send one to care@example.com and we reply the same day.',
+            coverCaption: 'Cherry in flower at our grower outside Lier',
+            excerpt: 'Our ornamental cherries grow for four years at a tree nursery in Lier before they come to Oslo.',
+            body: `Every cherry we sell is grafted and grown on by a tree nursery in Lier, half an hour west of Oslo. They lift them in November, when the trees are bare, and we collect them the same week.
+
+## Four years in a field
+
+A young *Prunus* spends four summers in the field, pruned each winter so the crown grows open and even. By the time it reaches us it stands about 120 cm and has flowered once already.
+
+Buying bare root keeps the price down and the roots healthy, since the tree never sat in a plastic pot. It also means cherries are only in the shop from November to March.`,
         },
     },
 ];
+
+/**
+ * A few words of plain markup as rich text: blank lines between blocks,
+ * `## ` for a heading, `- ` for a list item, `> ` for a quote, and
+ * `*asterisks*` for italics.
+ */
+const richText = (source: string) => {
+    const key = (): string => randomUUID().replace(/-/g, '').slice(0, 12);
+    const spans = (line: string) =>
+        line
+            .split(/\*([^*]+)\*/)
+            .map((text, index) => ({
+                _type: 'span',
+                _key: key(),
+                text,
+                marks: index % 2 === 1 ? ['em'] : [],
+            }))
+            .filter((span) => span.text !== '');
+    const block = (line: string, style: string, listItem?: string) => ({
+        _type: 'block',
+        _key: key(),
+        style,
+        markDefs: [],
+        children: spans(line),
+        ...(listItem === undefined
+            ? {}
+            : {
+                  listItem,
+                  level: 1,
+              }),
+    });
+    return source
+        .split(/\n\s*\n/)
+        .map((chunk) => chunk.trim())
+        .filter((chunk) => chunk !== '')
+        .flatMap((chunk) => {
+            const lines = chunk.split('\n');
+            if (lines.every((line) => line.startsWith('- '))) return lines.map((line) => block(line.slice(2), 'normal', 'bullet'));
+            if (chunk.startsWith('## ')) return [block(chunk.slice(3), 'h2')];
+            if (chunk.startsWith('> ')) return [block(chunk.slice(2), 'blockquote')];
+            return [block(lines.join(' '), 'normal')];
+        });
+};
 
 /**
  * Fills in what the demo database is missing: the photos, the header and
@@ -290,6 +449,11 @@ export const seedContent = async (service: CmsService): Promise<void> => {
 
     const photos = new Map<string, { id: string; alt: string }>();
     for (const photo of library) photos.set(photo.file, await upload(photo.file, photo.alt));
+    const photo = (file: string): { id: string; alt: string } => {
+        const found = photos.get(file);
+        if (found === undefined) throw new Error(`The seed has no photo '${file}'.`);
+        return found;
+    };
 
     await fill(
         {
@@ -299,11 +463,15 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         {
             navItems: [
                 {
-                    label: 'Plant care',
-                    href: '/blog?topic=guides',
+                    label: 'Shop',
+                    href: '/#shop',
                 },
                 {
-                    label: 'Blog',
+                    label: 'Plant care',
+                    href: '/blog?topic=care',
+                },
+                {
+                    label: 'Journal',
                     href: '/blog',
                 },
                 {
@@ -315,7 +483,12 @@ export const seedContent = async (service: CmsService): Promise<void> => {
                     href: '/contact',
                 },
             ],
-            announcement: 'Order before 14:00 for next-day delivery in Oslo.',
+            announcement: 'Order by 14:00 for next-day delivery in Oslo.',
+            announcementLink: {
+                label: 'Delivery details',
+                href: '/contact',
+            },
+            showAnnouncement: true,
         }
     );
 
@@ -325,15 +498,19 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             name: 'footer',
         },
         {
-            tagline: 'Houseplants, bulbs and seeds from growers we know, with help for as long as you keep them.',
+            tagline: 'A plant shop on Grünerløkka. Houseplants, ferns and trees from growers we know, and help for as long as you keep them.',
             navItems: [
                 {
                     label: 'Plant care guides',
-                    href: '/blog?topic=guides',
+                    href: '/blog?topic=care',
                 },
                 {
-                    label: 'News',
-                    href: '/blog?topic=news',
+                    label: 'In season',
+                    href: '/blog?topic=season',
+                },
+                {
+                    label: 'From the growers',
+                    href: '/blog?topic=growers',
                 },
                 {
                     label: 'Team',
@@ -344,21 +521,37 @@ export const seedContent = async (service: CmsService): Promise<void> => {
                     href: '/contact',
                 },
             ],
-            contactEmail: 'hello@example.com',
+            newsletterHeading: 'A letter when the *season turns*',
+            newsletterText: 'One email a month: what to plant, what to bring inside, and what just arrived from the nursery.',
+            showNewsletter: true,
+            contactEmail: 'hei@hagenplanter.no',
             phone: '+47 22 41 08 00',
-            address: 'Plantegata 4, 0550 Oslo',
-            openingHours: 'Mon to Fri 10 to 18, Sat 10 to 16',
+            address: 'Markveien 38, 0554 Oslo',
+            openingHours: [
+                {
+                    days: 'Monday to Friday',
+                    hours: '10 to 18',
+                },
+                {
+                    days: 'Saturday',
+                    hours: '10 to 16',
+                },
+                {
+                    days: 'Sunday',
+                    hours: 'Closed',
+                },
+            ],
         }
     );
 
     if ((await service.editorItems('employees')).length === 0) {
         for (const person of people) {
-            const photo = await upload(person.file, `Portrait of ${person.values.name}`);
+            const portrait = await upload(person.file, `Portrait of ${person.values.name}`);
             const created = await service.createItem(
                 'employees',
                 {
                     ...person.values,
-                    photo,
+                    photo: portrait,
                 },
                 caller,
                 AUTHOR
@@ -369,7 +562,7 @@ export const seedContent = async (service: CmsService): Promise<void> => {
     }
 
     const staff = await service.editorItems('employees');
-    const idOf = (name: string): string | undefined => staff.find((person) => person.label === name)?.id;
+    const personId = (name: string): string | undefined => staff.find((person) => person.label === name)?.id;
 
     if ((await service.editorItems('articles')).length === 0) {
         for (const article of articleSeeds) {
@@ -377,9 +570,9 @@ export const seedContent = async (service: CmsService): Promise<void> => {
                 'articles',
                 {
                     ...article.values,
-                    body: richTextFromPlain(article.values.body),
-                    cover: photos.get(article.cover),
-                    author: idOf(article.author),
+                    body: richText(article.values.body),
+                    cover: photo(article.cover),
+                    author: personId(article.author),
                 },
                 caller,
                 AUTHOR
@@ -389,15 +582,29 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         console.log(`[demo] seeded ${articleSeeds.length} articles`);
     }
 
+    const articles = await service.editorItems('articles');
+    const articleId = (title: string): string | undefined => articles.find((article) => article.label === title)?.id;
+    const picked = (...titles: string[]): string[] => titles.map(articleId).filter((id) => id !== undefined);
+
     await fill(
         {
             type: 'page',
             name: 'teamPage',
         },
         {
-            heading: 'The people behind the shop',
-            intro: 'Nine of us across design, engineering, sales and plant care, in the shop and online.',
-            photo: photos.get('team-at-laptops.jpg'),
+            eyebrow: 'Team',
+            heading: 'The people who *keep it green*',
+            intro: 'Nine of us between the shop on Grünerløkka, the plant care desk, the office rounds and the van.',
+            photo: photo('forest-path.jpg'),
+            caption: 'The spruce wood at our grower in Hurdal, where the team goes every September',
+            photoLayout: 'wide',
+            hiringHeading: 'Want to work *with plants*?',
+            hiringText: 'We hire for the spring rush every February. Write to Ingrid with a few lines about the plants you have kept alive.',
+            hiringEmail: 'jobb@hagenplanter.no',
+            seo: {
+                title: 'The team behind Hagen',
+                description: 'Meet the nine people who run Hagen, a plant shop on Grünerløkka in Oslo: the shop, plant care, office plants and delivery.',
+            },
         }
     );
 
@@ -407,8 +614,14 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             name: 'blogIndexPage',
         },
         {
-            heading: 'Notes from the shop',
-            intro: 'Plant care guides, news from the shop, and stories from the growers we buy from.',
+            eyebrow: 'Journal',
+            heading: 'Notes on keeping plants *alive*',
+            intro: 'Care guides from the plant care desk, what to plant this month, and visits to the growers we buy from.',
+            featured: articleId('Bring the balcony in before the *first frost*'),
+            seo: {
+                title: 'Journal: plant care, seasons and growers',
+                description: 'Plant care guides, what to plant in Oslo this month, and stories from the nurseries Hagen buys from.',
+            },
         }
     );
 
@@ -418,11 +631,18 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             name: 'contactPage',
         },
         {
-            heading: 'Ask us anything about plants',
-            intro: 'Questions about an order, a plant that is struggling, or plants for your office. We answer every weekday.',
+            eyebrow: 'Contact',
+            heading: 'Ask us about *any plant*',
+            intro: 'Questions about an order, a plant that is struggling, or plants for your office. We answer every weekday, usually within the hour.',
+            subjects: ['An order', 'A plant that is struggling', 'Plants for an office', 'Something else'],
             buttonLabel: 'Send message',
-            thanks: 'Thanks. We will be in touch within a working day.',
-            contacts: [idOf('Martin Hale'), idOf('Marco Reyes')].filter((id) => id !== undefined),
+            thanks: 'We reply within a working day, usually much sooner. If a plant is struggling, a photo of it helps.',
+            directions: 'On the corner of Markveien and Grüners gate. Trams 11, 12 and 13 stop at Olaf Ryes plass, two minutes away.',
+            contacts: [personId('Martin Hale'), personId('Marco Reyes'), personId('Ingrid Solberg')].filter((id) => id !== undefined),
+            seo: {
+                title: 'Contact and opening hours',
+                description: 'Visit Hagen at Markveien 38 on Grünerløkka, or ask the plant care desk about any plant. We answer every weekday.',
+            },
         }
     );
 
@@ -433,73 +653,123 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         },
         {
             hero: {
-                impact: 'high',
-                heading: 'Plants for every room',
-                subheading: 'Houseplants, bulbs and seeds from growers we know, delivered across Oslo the next day.',
-                image: photos.get('poppies.jpg'),
+                eyebrow: 'Plant shop, Grünerløkka',
+                heading: 'Plants that *stay* with you',
+                subheading: 'Houseplants, ferns and trees from growers we know, delivered across Oslo the next day.',
+                image: photo('forest-path.jpg'),
+                caption: 'Spruce and lady fern at our grower in Hurdal, September',
                 links: [
                     {
-                        label: 'Shop the season',
+                        label: 'Shop this week',
                         href: '/#shop',
                     },
                     {
                         label: 'Plant care guides',
-                        href: '/blog?topic=guides',
+                        href: '/blog?topic=care',
                     },
                 ],
             },
-            intro: {
+            statement: {
+                eyebrow: 'Since 2019',
+                text: 'A small shop in Oslo for people who want their plants *alive and well in March*.',
+                images: [photo('fern-fronds.jpg'), photo('cherry-branch.jpg'), photo('forest-floor.jpg'), photo('ferns.jpg')],
+                link: {
+                    label: 'How we choose',
+                    href: '/blog/a-morning-at-the-nursery-in-hurdal',
+                },
+            },
+            categories: {
+                eyebrow: 'Shop by light',
+                heading: 'A plant for the window *you have*',
+                categories: [
+                    {
+                        name: 'Shade lovers',
+                        image: photo('ferns.jpg'),
+                        href: '/blog/five-ferns-for-a-north-facing-window',
+                    },
+                    {
+                        name: 'Trees for spring',
+                        image: photo('cherry-blossom.jpg'),
+                        href: '/blog/planting-a-cherry-tree-in-oslo-clay',
+                    },
+                    {
+                        name: 'The forest floor',
+                        image: photo('forest-floor.jpg'),
+                        href: '/blog?topic=growers',
+                    },
+                ],
+            },
+            products: {
+                eyebrow: 'New in',
+                heading: 'In the shop *this week*',
+                products: ['prod_boston_fern', 'prod_japanese_cherry', 'prod_lady_fern', 'prod_woodland_ferns'],
+                link: {
+                    label: 'Ask about stock',
+                    href: '/contact',
+                },
+            },
+            photo: {
+                image: photo('ferns.jpg'),
+                caption: 'Lady fern, Athyrium filix-femina, in the shade beds in August',
+                heading: 'Every fern we sell spends its first summer *outside, under real trees*',
+                body: 'Our grower in Hurdal raises them in the shade of a spruce wood, not a greenhouse. They arrive tougher, and forgive a missed watering.',
+            },
+            columns: {
+                eyebrow: 'How we work',
+                heading: 'A small shop, and *help that lasts*',
                 columns: [
                     {
                         heading: 'Grown nearby',
-                        body: richTextFromPlain(
-                            'Most of what we sell comes from three nurseries within a day of the shop. We visit each of them every season and choose the plants ourselves.'
+                        body: richText(
+                            'Our ferns come from Hurdal and our cherries from Lier, both within an hour of the shop. We visit each grower every season and choose the plants ourselves.'
                         ),
                     },
                     {
-                        heading: 'Help that lasts',
-                        body: richTextFromPlain(
-                            'Every plant comes with a care card. If it struggles anyway, send us a photo and the plant care team will tell you what it needs.'
+                        heading: 'A care card in every pot',
+                        body: richText(
+                            'Each plant leaves with a card for its light, water and feeding. If it struggles anyway, send the plant care desk a photo and we reply the same day.'
                         ),
                     },
                     {
-                        heading: 'Delivered in a day',
-                        body: richTextFromPlain(
-                            'Order before two and we deliver across Oslo the next day, wrapped in paper and packed so nothing breaks.'
+                        heading: 'Next day across Oslo',
+                        body: richText(
+                            'Order before 14:00 and Jonas brings it the next day in the electric van, wrapped in paper. Delivery is 89 kr, and free over 800 kr.'
                         ),
                     },
                 ],
             },
-            shop: {
-                heading: 'In the shop this week',
-                products: ['prod_fern', 'prod_snake_plant', 'prod_pothos', 'prod_tulips', 'prod_hyacinth', 'prod_seeds'],
-            },
-            media: {
-                image: photos.get('forest-path.jpg'),
-                caption: 'The forest edge at the nursery where our ferns spend their first year.',
-            },
-            latest: {
-                heading: 'From the blog',
-                articles: [],
+            articles: {
+                eyebrow: 'Journal',
+                heading: 'From the *journal*',
+                articles: picked(
+                    'Five ferns for a *north-facing* window',
+                    'Plant bulbs now, *thank yourself* in April',
+                    'A morning at the nursery in *Hurdal*'
+                ),
             },
             callToAction: {
-                heading: 'Plants for your office',
-                body: 'We choose, deliver and look after the plants in your office, with a visit every two weeks.',
+                eyebrow: 'For offices',
+                heading: 'We keep the plants in *forty Oslo offices* green',
+                body: 'We choose plants for your light, deliver them in pots that suit the room, and come back every two weeks to water, feed and turn them.',
                 links: [
                     {
                         label: 'Talk to Marco',
                         href: '/contact',
                     },
                     {
-                        label: 'How it works',
-                        href: '/blog/plant-care-for-offices',
+                        label: 'Meet the team',
+                        href: '/team',
                     },
                 ],
             },
+            heroImpact: 'high',
+            sections: ['statement', 'categories', 'products', 'photo', 'columns', 'articles', 'callToAction'],
+            photoTone: 'sage',
+            callToActionTone: 'forest',
             seo: {
-                title: 'Hagen, houseplants, bulbs and seeds in Oslo',
+                title: 'Hagen, a plant shop in Oslo',
                 description:
-                    'Houseplants, bulbs and seeds from growers we know, delivered across Oslo the next day, with plant care help for as long as you keep them.',
+                    'Houseplants, ferns and trees from growers we know, delivered across Oslo the next day, with plant care help for as long as you keep them.',
             },
         }
     );

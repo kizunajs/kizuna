@@ -1,122 +1,154 @@
-import type { ChartBar, DashboardWidget, StatValue } from '@kizunajs/cms';
+import type { ChartBar, DashboardContext, DashboardPeriod, DashboardWidget, StatValue } from '@kizunajs/cms';
 import { formatKroner } from '../lib/format';
-import { daysBefore, daysUpTo, ordersOn, ordersToday, revenueForWeek, subscribersOn, visitorsOn } from '../lib/shop-numbers';
+import {
+    type Bucket,
+    daysBetween,
+    hoursBetween,
+    newSubscribersIn,
+    ordersIn,
+    revenueIn,
+    runningTotal,
+    subscribersAt,
+    total,
+    visitorsIn,
+} from '../lib/shop-numbers';
 
 const dayLabel = new Intl.DateTimeFormat('en-GB', {
-    weekday: 'short',
     day: 'numeric',
-    timeZone: 'UTC',
+    month: 'short',
+    timeZone: 'Europe/Oslo',
 });
 
-const change = (current: number, previous: number, period: string): string => {
-    const percent = Math.round(((current - previous) / previous) * 100);
-    if (percent === 0) return `Level with ${period}`;
-    return `${percent > 0 ? 'Up' : 'Down'} ${Math.abs(percent)}% on ${period}`;
-};
+const hourLabel = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Oslo',
+});
 
-export const ordersSoFarToday = (): StatValue => {
-    const now = new Date();
+const count = new Intl.NumberFormat('en-GB');
+
+/**
+ * The window's buckets: hours over the last 24 hours, days over anything
+ * longer.
+ */
+const bucketsOf = (key: DashboardPeriod['key'], window: { from: Date; to: Date }): Bucket[] =>
+    key === '24h' ? hoursBetween(window.from, window.to) : daysBetween(window.from, window.to);
+
+const labelOf = (bucket: Bucket): string => (bucket.unit === 'hour' ? hourLabel.format(bucket.start) : dayLabel.format(bucket.start));
+
+/**
+ * A metric over the period and the period before it, as a stat: the total,
+ * how far it moved, and a line of its buckets.
+ */
+const statOf = (period: DashboardPeriod, metric: (bucket: Bucket) => number) => {
+    const current = bucketsOf(period.key, period);
+    const before = total(bucketsOf(period.key, period.previous), metric);
+    const sum = total(current, metric);
     return {
-        value: ordersToday(now),
-        detail: `${ordersOn(daysBefore(now, 1))} yesterday`,
+        sum,
+        change: (sum - before) / before,
+        trend: current.map((bucket) => Math.round(metric(bucket))),
     };
 };
 
-export const revenueThisWeek = (): StatValue => {
-    const now = new Date();
-    const current = revenueForWeek(now);
+export const revenue = ({ period }: DashboardContext): StatValue => {
+    const { sum, change, trend } = statOf(period, revenueIn);
     return {
-        value: formatKroner(current),
-        detail: change(current, revenueForWeek(daysBefore(now, 7)), 'last week'),
+        value: formatKroner(sum),
+        change,
+        trend,
     };
 };
 
-export const newsletterSubscribers = (): StatValue => {
-    const now = new Date();
-    const current = subscribersOn(now);
+export const orders = ({ period }: DashboardContext): StatValue => {
+    const { sum, change, trend } = statOf(period, ordersIn);
+    const revenueSum = total(bucketsOf(period.key, period), revenueIn);
     return {
-        value: current.toLocaleString('en-GB'),
-        detail: `${current - subscribersOn(daysBefore(now, 7))} joined this week`,
+        value: count.format(Math.round(sum)),
+        detail: `${formatKroner(revenueSum / sum)} average order`,
+        change,
+        trend,
+    };
+};
+
+export const visitors = ({ period }: DashboardContext): StatValue => {
+    const { sum, change, trend } = statOf(period, visitorsIn);
+    return {
+        value: count.format(Math.round(sum)),
+        change,
+        trend,
+    };
+};
+
+export const newSubscribers = ({ period }: DashboardContext): StatValue => {
+    const { sum, change, trend } = statOf(period, newSubscribersIn);
+    return {
+        value: count.format(Math.round(sum)),
+        detail: `${count.format(subscribersAt(period.to))} on the list`,
+        change,
+        trend,
     };
 };
 
 /**
- * Counted from the CMS itself. The config imports this file, so the reader is
- * imported when the dashboard opens rather than when the config loads.
+ * Revenue added up across the period, beside the same running total for the
+ * period before, point for point.
  */
-export const publishedArticles = async (): Promise<StatValue> => {
-    const { default: kizuna } = await import('../../kizuna.cms.config');
-    let count = 0;
-    let latest: string | undefined;
-    let cursor: string | undefined;
-    do {
-        const page = await kizuna.content.collections.articles.list({
-            orderBy: 'publishedOn',
-            direction: 'desc',
-            limit: 50,
-            ...(cursor === undefined
-                ? {}
-                : {
-                      cursor,
-                  }),
-        });
-        latest ??= page.items[0]?.title;
-        count += page.items.length;
-        cursor = page.next;
-    } while (cursor !== undefined);
-    return {
-        value: count,
-        detail: latest === undefined ? 'None yet' : `Latest: ${latest}`,
-    };
+export const salesOverTime = ({ period }: DashboardContext): ChartBar[] => {
+    const current = bucketsOf(period.key, period);
+    const before = runningTotal(bucketsOf(period.key, period.previous), revenueIn);
+    return runningTotal(current, revenueIn).map((value, index) => ({
+        label: labelOf(current[index]!),
+        value: Math.round(value),
+        previous: Math.round(before[index] ?? 0),
+    }));
 };
 
-const perDay = (count: (date: Date) => number): ChartBar[] =>
-    daysUpTo(new Date(), 14).map((date) => ({
-        label: dayLabel.format(date),
-        value: count(date),
+export const ordersPerDay = ({ period }: DashboardContext): ChartBar[] =>
+    bucketsOf(period.key, period).map((bucket) => ({
+        label: labelOf(bucket),
+        value: Math.round(ordersIn(bucket)),
     }));
 
-export const ordersPerDay = (): ChartBar[] => perDay(ordersOn);
-
-export const visitorsPerDay = (): ChartBar[] => perDay(visitorsOn);
-
 /**
- * The admin's first page: how the shop is doing, then the reviews waiting on
- * whoever signed in, then every collection.
+ * The admin's first page: how the shop is doing over the period the editor
+ * picks, then the reviews waiting on whoever signed in, then every collection.
  */
 export const dashboard: DashboardWidget[] = [
     {
         type: 'stat',
-        label: 'Orders today',
-        value: ordersSoFarToday,
-    },
-    {
-        type: 'stat',
-        label: 'Revenue this week',
-        value: revenueThisWeek,
+        label: 'Revenue',
+        value: revenue,
         auth: {
             roles: 'admin',
         },
     },
     {
         type: 'stat',
-        label: 'Newsletter subscribers',
-        value: newsletterSubscribers,
+        label: 'Orders',
+        value: orders,
     },
     {
         type: 'stat',
-        label: 'Published articles',
-        value: publishedArticles,
+        label: 'Visitors',
+        value: visitors,
+    },
+    {
+        type: 'stat',
+        label: 'New subscribers',
+        value: newSubscribers,
+    },
+    {
+        type: 'chart',
+        label: 'Sales over time',
+        description: 'Succeeded orders · NOK',
+        style: 'line',
+        data: salesOverTime,
     },
     {
         type: 'chart',
         label: 'Orders per day',
         data: ordersPerDay,
-    },
-    {
-        type: 'chart',
-        label: 'Visitors per day',
-        data: visitorsPerDay,
     },
     {
         type: 'reviews',

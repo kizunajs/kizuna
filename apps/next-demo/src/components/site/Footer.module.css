@@ -1,0 +1,152 @@
+.footer {
+    margin-top: var(--section);
+    font-size: 0.9375rem;
+}
+
+.newsletter {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 32px var(--gutter);
+    align-items: end;
+    width: var(--page);
+    margin-inline: auto;
+    padding-bottom: 112px;
+}
+
+.newsletterHeading {
+    grid-column: 1 / span 7;
+    font-size: var(--display-l);
+}
+
+.newsletterBody {
+    display: grid;
+    grid-column: 9 / span 4;
+    gap: 28px;
+}
+
+.newsletterText {
+    color: var(--ink-muted);
+}
+
+.main {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 40px var(--gutter);
+    width: var(--page);
+    margin-inline: auto;
+    padding-block: 56px 72px;
+    border-top: 1px solid var(--rule);
+}
+
+.brand {
+    display: grid;
+    grid-column: 1 / span 4;
+    align-content: start;
+    gap: 18px;
+}
+
+.tagline {
+    max-width: 30ch;
+    color: var(--ink-muted);
+}
+
+.column {
+    display: grid;
+    grid-column: span 2;
+    align-content: start;
+    gap: 6px;
+}
+
+.column:nth-child(2) {
+    grid-column: 6 / span 3;
+}
+
+.columnTitle {
+    margin-bottom: 10px;
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.hours {
+    display: grid;
+    gap: 2px;
+    margin: 10px 0 0;
+}
+
+.hoursRow {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 260px;
+}
+
+.hoursRow dd {
+    margin: 0;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.link {
+    width: fit-content;
+    text-decoration: none;
+    text-underline-offset: 4px;
+}
+
+@media (hover: hover) {
+    .link:hover {
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+    }
+}
+
+.meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px 32px;
+    width: var(--page);
+    margin-inline: auto;
+    padding-bottom: 40px;
+    color: var(--ink-faint);
+    font-size: 0.8125rem;
+}
+
+.demo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+}
+
+@media (max-width: 1023px) {
+    .newsletterHeading,
+    .newsletterBody {
+        grid-column: 1 / -1;
+    }
+
+    .brand {
+        grid-column: 1 / -1;
+    }
+
+    .column,
+    .column:nth-child(2) {
+        grid-column: span 4;
+    }
+}
+
+@media (max-width: 767px) {
+    .newsletter {
+        padding-bottom: 80px;
+    }
+
+    .main {
+        padding-block: 48px 56px;
+    }
+
+    .column,
+    .column:nth-child(2) {
+        grid-column: 1 / -1;
+    }
+}

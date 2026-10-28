@@ -30,7 +30,7 @@ export default defineConfig({
     ],
     webServer: {
         command: 'pnpm run e2e:server',
-        url: `http://localhost:${PORT}/login`,
+        url: `http://localhost:${PORT}/admin/login`,
         timeout: 300_000,
         reuseExistingServer: !process.env.CI,
         env: {

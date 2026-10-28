@@ -1,145 +1,166 @@
-.hero {
-    position: relative;
-    width: 100%;
-    max-width: var(--max-width);
-    margin: 0 auto;
-    padding: 64px var(--gutter) 0;
-}
-
-.text {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    max-width: 720px;
-}
-
-.eyebrow {
-    margin: 0 0 16px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--muted);
-}
-
-.eyebrow a {
-    text-decoration: none;
-}
-
 .heading {
-    font-size: clamp(2.25rem, 5.6vw, 4rem);
-    font-weight: 700;
-    line-height: 1.04;
-    letter-spacing: -0.035em;
+    max-width: 15ch;
+    font-size: var(--display-xl);
+    line-height: 0.98;
+    letter-spacing: -0.022em;
 }
 
 .subheading {
-    max-width: 48ch;
-    margin: 20px 0 0;
-    font-size: 1.1875rem;
+    max-width: 40ch;
+    font-size: 1.125rem;
     line-height: 1.55;
-    color: var(--muted);
 }
 
-.links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 32px;
+/* High: the photo fills the window and carries the menu. */
+.high {
+    position: relative;
+    display: grid;
+    align-items: end;
+    min-height: min(100svh - 38px, 920px);
+    overflow: hidden;
+    color: var(--on-photo);
+    --button: var(--on-photo);
+    --button-ink: var(--sage-ink);
 }
 
-.image {
+.high::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(to bottom, rgb(8 14 10 / 0.45), rgb(8 14 10 / 0) 22%),
+        linear-gradient(to top, rgb(8 14 10 / 0.62), rgb(8 14 10 / 0) 58%);
+}
+
+.highImage {
+    position: absolute;
+    inset: 0;
     width: 100%;
+    height: 100%;
     object-fit: cover;
 }
 
-/* High: the heading over the image, which runs the full width of the window. */
-
-.high:not(.plain) {
-    display: grid;
-    max-width: none;
-    min-height: min(78vh, 760px);
-    padding: 0;
-}
-
-.high:not(.plain) > * {
-    grid-area: 1 / 1;
-}
-
-.high:not(.plain) .image {
-    height: 100%;
-}
-
-.high:not(.plain)::after {
-    content: '';
-    grid-area: 1 / 1;
-    background: linear-gradient(to top, var(--scrim), transparent 70%);
-}
-
-.high:not(.plain) .text {
+.highText {
+    position: relative;
     z-index: 1;
-    align-self: end;
-    justify-self: center;
-    width: 100%;
-    max-width: var(--max-width);
-    padding: 0 var(--gutter) 64px;
-    color: #ffffff;
-}
-
-.high:not(.plain) .heading {
-    max-width: 14ch;
-    color: #ffffff;
-}
-
-.high:not(.plain) .subheading,
-.high:not(.plain) .eyebrow {
-    color: rgb(255 255 255 / 0.82);
-}
-
-/* Medium: the heading beside the image. */
-
-.medium:not(.plain) {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: center;
-    gap: 56px;
+    justify-items: start;
+    gap: 26px;
+    width: var(--page);
+    margin-inline: auto;
+    padding-block: 160px 72px;
 }
 
-.medium:not(.plain) .image {
-    order: 1;
-    aspect-ratio: 4 / 3;
-    border-radius: var(--radius-image);
+.highCaption {
+    position: absolute;
+    right: var(--gutter);
+    bottom: 26px;
+    z-index: 1;
+    max-width: 28ch;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    text-align: right;
+    opacity: 0.86;
+}
+
+/* Medium: the heading beside a tall photo. */
+.medium {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 40px var(--gutter);
+    align-items: end;
+    width: var(--page);
+    margin-inline: auto;
+    padding-top: 56px;
+}
+
+.mediumText {
+    display: grid;
+    grid-column: 1 / span 6;
+    justify-items: start;
+    gap: 26px;
+    padding-bottom: 8px;
+}
+
+.mediumText .subheading {
+    color: var(--ink-muted);
+}
+
+.mediumFigure {
+    grid-column: 8 / span 5;
+}
+
+.mediumImage {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    border-radius: var(--radius);
+    object-fit: cover;
+}
+
+.mediumCaption {
+    margin-top: 12px;
+    color: var(--ink-faint);
+    font-size: 0.75rem;
 }
 
 /* Low: the heading alone. */
+.low {
+    width: var(--page);
+    margin-inline: auto;
+    padding-top: 96px;
+}
 
-.low .heading,
-.plain .heading {
-    font-size: clamp(2rem, 4.6vw, 3.25rem);
+.lowText {
+    display: grid;
+    justify-items: start;
+    gap: 26px;
+}
+
+.lowText .heading {
+    max-width: 18ch;
+}
+
+.lowText .subheading {
+    color: var(--ink-muted);
+}
+
+@media (max-width: 1023px) {
+    .mediumText,
+    .mediumFigure {
+        grid-column: 1 / -1;
+    }
 }
 
 @media (max-width: 767px) {
-    .hero {
-        padding-top: 40px;
+    .heading {
+        font-size: clamp(2.75rem, 12.5vw, 3.5rem);
     }
 
-    .high:not(.plain) {
-        min-height: 560px;
+    .high {
+        min-height: min(100svh - 38px, 760px);
     }
 
-    .high:not(.plain) .text {
-        padding-bottom: 40px;
+    .highText {
+        gap: 20px;
+        padding-block: 180px 92px;
     }
 
-    .medium:not(.plain) {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 28px;
+    .highCaption {
+        right: auto;
+        left: var(--gutter);
+        bottom: 22px;
+        text-align: left;
     }
 
-    .subheading {
-        font-size: 1.0625rem;
+    .medium {
+        padding-top: 32px;
     }
 
-    .links {
-        align-items: center;
-        gap: 16px 24px;
+    .low {
+        padding-top: 48px;
+    }
+
+    .lowText {
+        gap: 20px;
     }
 }

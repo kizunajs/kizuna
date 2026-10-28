@@ -1,23 +1,35 @@
 import type { Output } from '@kizunajs/cms';
 import type { ContentBlockSchema } from '../../cms/blocks';
+import { Emphasis } from '../Emphasis';
+import { Eyebrow } from '../Eyebrow';
 import { Prose } from '../Prose';
-import { Section } from '../Section';
 import styles from './Content.module.css';
 
 /**
- * Text in columns: one runs full width, two split the row, three make thirds.
+ * Columns of text, numbered, under an optional heading.
  */
-export function Content({ columns }: Output<typeof ContentBlockSchema>) {
+export function Content({ eyebrow, heading, columns }: Output<typeof ContentBlockSchema>) {
     return (
-        <Section>
-            <div className={styles.columns} data-count={columns.length}>
+        <section className={styles.section}>
+            {eyebrow === undefined && heading === undefined ? null : (
+                <div className={styles.header}>
+                    <Eyebrow text={eyebrow} />
+                    {heading === undefined ? null : (
+                        <h2 className={styles.heading}>
+                            <Emphasis text={heading} />
+                        </h2>
+                    )}
+                </div>
+            )}
+            <ol className={styles.columns} data-count={columns.length}>
                 {columns.map((column, index) => (
-                    <div key={index} className={styles.column}>
-                        {column.heading === undefined ? null : <h2 className={styles.heading}>{column.heading}</h2>}
-                        <Prose value={column.body} />
-                    </div>
+                    <li key={index} className={styles.column}>
+                        {columns.length === 1 ? null : <span className={styles.number}>{String(index + 1).padStart(2, '0')}</span>}
+                        {column.heading === undefined ? null : <h3 className={styles.columnHeading}>{column.heading}</h3>}
+                        <Prose value={column.body} size={columns.length === 1 ? 'large' : 'small'} />
+                    </li>
                 ))}
-            </div>
-        </Section>
+            </ol>
+        </section>
     );
 }

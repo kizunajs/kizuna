@@ -1,0 +1,103 @@
+.top {
+    position: relative;
+    z-index: 3;
+}
+
+.announcement {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 4px 16px;
+    min-height: 38px;
+    background-color: var(--forest);
+    padding: 9px var(--gutter);
+    color: var(--forest-ink);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.announcementLink {
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+}
+
+.announcementLink::after {
+    content: ' →';
+}
+
+.header {
+    color: var(--ink);
+}
+
+/* A page that opens on a full photo carries the menu on it. */
+:global(body:has(main > [data-hero='high']:first-child)) .header {
+    position: absolute;
+    inset-inline: 0;
+    color: var(--on-photo);
+    --logo-vein: transparent;
+}
+
+.inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    width: var(--page);
+    min-height: 80px;
+    margin-inline: auto;
+}
+
+.nav {
+    display: flex;
+    gap: 36px;
+}
+
+.link {
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    text-underline-offset: 6px;
+    white-space: nowrap;
+}
+
+@media (hover: hover) {
+    .link:hover {
+        text-decoration: underline;
+        text-decoration-thickness: 1px;
+    }
+}
+
+@media (max-width: 767px) {
+    .announcement {
+        display: block;
+        font-size: 0.75rem;
+    }
+
+    .announcementLink {
+        margin-left: 8px;
+    }
+
+    .inner {
+        flex-wrap: wrap;
+        gap: 0;
+        min-height: 0;
+        padding-top: 16px;
+    }
+
+    .nav {
+        width: calc(100% + 2 * var(--gutter));
+        margin-inline: calc(-1 * var(--gutter));
+        gap: 22px;
+        overflow-x: auto;
+        padding: 14px var(--gutter);
+        scrollbar-width: none;
+    }
+
+    .nav::-webkit-scrollbar {
+        display: none;
+    }
+}

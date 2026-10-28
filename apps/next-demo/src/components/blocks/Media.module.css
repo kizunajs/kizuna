@@ -1,22 +1,59 @@
-.figure {
-    margin: 0;
+.section {
+    margin-top: var(--section);
+}
+
+.forest,
+.sage {
+    display: grid;
+    justify-items: center;
+    gap: 28px;
+    padding: 136px var(--gutter);
+    text-align: center;
+}
+
+.forest {
+    background-color: var(--forest);
+    color: var(--forest-ink);
+}
+
+.sage {
+    background-color: var(--sage);
+    color: var(--sage-ink);
+}
+
+.heading {
+    max-width: 22ch;
+    font-size: var(--display-l);
+    line-height: 1.06;
+}
+
+.body {
+    max-width: 46ch;
+    font-size: 1.0625rem;
 }
 
 .image {
     width: 100%;
-    aspect-ratio: 2 / 1;
+    height: clamp(360px, 52vw, 780px);
     object-fit: cover;
-    border-radius: var(--radius-image);
 }
 
 .caption {
-    margin-top: 14px;
-    font-size: 0.875rem;
-    color: var(--muted);
+    width: var(--page);
+    margin: 14px auto 0;
+    color: var(--ink-faint);
+    font-size: 0.75rem;
 }
 
 @media (max-width: 767px) {
+    .forest,
+    .sage {
+        gap: 20px;
+        padding-block: 88px;
+    }
+
     .image {
-        aspect-ratio: 4 / 3;
+        height: auto;
+        aspect-ratio: 4 / 5;
     }
 }

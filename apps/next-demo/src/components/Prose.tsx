@@ -4,9 +4,9 @@ import styles from './Prose.module.css';
 /**
  * Rich text from the CMS, set for reading.
  */
-export function Prose({ value }: { value: RichTextContent }) {
+export function Prose({ value, size = 'large' }: { value: RichTextContent; size?: 'large' | 'small' }) {
     return (
-        <div className={styles.prose}>
+        <div className={size === 'large' ? styles.large : styles.small}>
             <RichText value={value} />
         </div>
     );

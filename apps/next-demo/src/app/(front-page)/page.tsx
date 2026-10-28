@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
+import { Fragment, type ReactNode } from 'react';
 import { inStoredOrder } from '@kizunajs/cms/next';
 import kizuna from '@kizuna-config';
 import { apiClient } from '../../lib/api-client';
 import { Hero } from '../../components/blocks/Hero';
-import { Content } from '../../components/blocks/Content';
+import { Statement } from '../../components/blocks/Statement';
+import { Categories } from '../../components/blocks/Categories';
 import { Products } from '../../components/blocks/Products';
 import { Media } from '../../components/blocks/Media';
+import { Content } from '../../components/blocks/Content';
 import { Archive } from '../../components/blocks/Archive';
 import { CallToAction } from '../../components/blocks/CallToAction';
 
@@ -39,16 +42,25 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function FrontPage() {
     const content = await kizuna.content.pages.frontPage.get();
-    const products = inStoredOrder(content.shop.products, await listProducts(), (product) => product.id);
+    const products = content.products === undefined ? [] : inStoredOrder(content.products.products, await listProducts(), (product) => product.id);
+
+    // Each section the sidebar lists, once, in its order. A section with no content shows nothing.
+    const render: Record<(typeof content.sections)[number], () => ReactNode> = {
+        statement: () => (content.statement === undefined ? null : <Statement {...content.statement} />),
+        categories: () => (content.categories === undefined ? null : <Categories {...content.categories} />),
+        products: () => (content.products === undefined ? null : <Products {...content.products} products={products} />),
+        photo: () => (content.photo === undefined ? null : <Media {...content.photo} tone={content.photoTone} />),
+        columns: () => (content.columns === undefined ? null : <Content {...content.columns} />),
+        articles: () => (content.articles === undefined ? null : <Archive {...content.articles} />),
+        callToAction: () => (content.callToAction === undefined ? null : <CallToAction {...content.callToAction} tone={content.callToActionTone} />),
+    };
 
     return (
         <main>
-            <Hero {...content.hero} />
-            {content.intro === undefined ? null : <Content {...content.intro} />}
-            <Products heading={content.shop.heading} products={products} />
-            {content.media === undefined ? null : <Media {...content.media} />}
-            <Archive {...content.latest} />
-            {content.callToAction === undefined ? null : <CallToAction {...content.callToAction} />}
+            <Hero {...content.hero} impact={content.heroImpact} />
+            {[...new Set(content.sections)].map((section) => (
+                <Fragment key={section}>{render[section]()}</Fragment>
+            ))}
         </main>
     );
 }

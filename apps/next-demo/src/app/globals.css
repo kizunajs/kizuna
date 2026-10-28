@@ -1,41 +1,65 @@
 /*
- * The shop's tokens, in grey levels only, and the few resets every page
- * shares. Each component styles itself in a module beside it. Nothing sits in
- * a box: whitespace, type and the grey of the text make the structure.
+ * Hagen's tokens and the resets every page shares. Each component styles
+ * itself in a module beside it. Nothing sits in a box: whitespace, the type
+ * scale and full-width green bands make the structure.
  */
 :root {
-    --canvas: #ffffff;
-    --ink: #0c0c0c;
-    --muted: #6b6b6b;
-    --subtle: #a3a3a3;
-    --field: rgb(0 0 0 / 0.03);
-    --button-fill: #0c0c0c;
-    --button-ink: #ffffff;
-    --scrim: rgb(0 0 0 / 0.55);
+    --paper: #f7f8f6;
+    --ink: #13201a;
+    --ink-muted: #4a5750;
+    --ink-faint: #858f89;
+    --rule: rgb(19 32 26 / 0.14);
 
-    --max-width: 1200px;
-    --narrow-width: 720px;
-    --gutter: 20px;
-    --section-gap: 120px;
-    --header-height: 72px;
-    --radius-image: 8px;
-    --radius-control: 6px;
-    --control-height: 44px;
+    /* Bottle green for the announcement, bands and buttons, sage beside it. */
+    --forest: #1c3a2a;
+    --forest-ink: #eef3ec;
+    --forest-muted: #a6bea9;
+    --sage: #c5d5c1;
+    --sage-ink: #13201a;
+    --sage-muted: #3d5244;
+
+    --on-photo: #f6f8f4;
+    --button: var(--forest);
+    --button-ink: #f7f8f6;
+    --placeholder: #dfe6dc;
+
+    --serif: var(--font-serif), 'Iowan Old Style', Georgia, serif;
+    --sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
     --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+
+    --display-xl: clamp(3rem, 7vw, 6.75rem);
+    --display-l: clamp(2.25rem, 4.9vw, 4.5rem);
+    --display-m: clamp(1.875rem, 3.3vw, 3rem);
+    --display-s: clamp(1.25rem, 1.7vw, 1.625rem);
+
+    --max: 1280px;
+    --narrow: 680px;
+    --gutter: 40px;
+    --page: min(100% - 2 * var(--gutter), var(--max));
+    --section: 152px;
+    --radius: 4px;
 
     color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
-        --canvas: #0c0c0c;
-        --ink: #ffffff;
-        --muted: #9a9a9a;
-        --subtle: #5c5c5c;
-        --field: rgb(255 255 255 / 0.04);
-        --button-fill: #ffffff;
-        --button-ink: #0c0c0c;
-        --scrim: rgb(0 0 0 / 0.6);
+        --paper: #171818;
+        --ink: #eceeeb;
+        --ink-muted: #a4aaa6;
+        --ink-faint: #6e7471;
+        --rule: rgb(236 238 235 / 0.14);
+
+        --forest: #1f412f;
+        --forest-ink: #edf3eb;
+        --forest-muted: #9cb7a0;
+        --sage: #9fb69c;
+        --sage-ink: #13201a;
+        --sage-muted: #2f4537;
+
+        --button: #b4cbb0;
+        --button-ink: #13201a;
+        --placeholder: #222524;
 
         color-scheme: dark;
     }
@@ -44,8 +68,7 @@
 @media (max-width: 767px) {
     :root {
         --gutter: 16px;
-        --section-gap: 80px;
-        --header-height: 64px;
+        --section: 96px;
     }
 }
 
@@ -65,9 +88,9 @@ body {
     min-height: 100dvh;
     margin: 0;
     overflow-x: clip;
-    background-color: var(--canvas);
+    background-color: var(--paper);
     color: var(--ink);
-    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--sans);
     font-size: 1rem;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
@@ -89,13 +112,34 @@ a {
 
 :where(h1, h2, h3, h4) {
     margin: 0;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
+    font-family: var(--serif);
+    font-weight: 400;
+    line-height: 1.04;
+    letter-spacing: -0.025em;
     text-wrap: balance;
+}
+
+:where(h1, h2, h3, h4) em {
+    padding-right: 0.06em;
+    font-style: italic;
+    font-variation-settings: 'SOFT' 100;
+}
+
+:where(p) {
+    margin: 0;
 }
 
 :where(p, li, figcaption) {
     text-wrap: pretty;
+}
+
+:where(ul, ol) {
+    margin: 0;
+    padding: 0;
+}
+
+:where(figure) {
+    margin: 0;
 }
 
 :where(button, input, textarea, select) {
@@ -104,6 +148,6 @@ a {
 }
 
 :focus-visible {
-    outline: 2px solid var(--ink);
-    outline-offset: 2px;
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
 }

@@ -34,7 +34,7 @@ test.describe('the editor in a host', () => {
 
         const visitor = await browser.newPage();
         await visitor.goto('/team');
-        await expect(heading(visitor)).toHaveText('The people behind the shop');
+        await expect(heading(visitor)).toHaveText('The people who keep it green');
         await visitor.close();
     });
 
@@ -67,7 +67,7 @@ test.describe('the editor in a host', () => {
             .first()
             .click();
         await expect(editor.locator('.k-title-name')).toHaveText('Team');
-        await expect(heading(site)).toContainText(/Meet the team|The people behind the shop/);
+        await expect(heading(site)).toContainText(/Meet the team|The people who keep it green/);
     });
 
     test('a page with no content in the CMS says there is nothing to edit there', async ({ page }) => {

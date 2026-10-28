@@ -3,7 +3,7 @@ import { heading, previewBar, signIn } from './cms';
 
 test('a visitor reads the published team page without the preview', async ({ page }) => {
     await page.goto('/team');
-    await expect(heading(page)).toHaveText('The people behind the shop');
+    await expect(heading(page)).toHaveText('The people who keep it green');
     await expect(page.getByText('Ingrid Solberg')).toBeVisible();
     await expect(previewBar(page)).toHaveCount(0);
 });

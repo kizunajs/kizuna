@@ -1,8 +1,122 @@
+.photo {
+    width: var(--page);
+    margin: 80px auto 0;
+}
+
+.photoImage {
+    width: 100%;
+    aspect-ratio: 12 / 5;
+    border-radius: var(--radius);
+    object-fit: cover;
+}
+
+.caption {
+    margin-top: 12px;
+    color: var(--ink-faint);
+    font-size: 0.75rem;
+}
+
+.department {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 32px var(--gutter);
+    width: var(--page);
+    margin: 128px auto 0;
+}
+
+.departmentHeader {
+    display: flex;
+    grid-column: 1 / span 3;
+    align-items: baseline;
+    align-self: start;
+    gap: 16px;
+    position: sticky;
+    top: 32px;
+}
+
+.count {
+    font-family: var(--serif);
+    font-size: 1.125rem;
+    font-style: italic;
+    color: var(--ink-faint);
+}
+
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-    gap: 48px 32px;
-    margin: 0;
-    padding: 0;
+    grid-column: 4 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 56px var(--gutter);
     list-style: none;
+}
+
+.hiring {
+    margin-top: var(--section);
+    background-color: var(--sage);
+    padding-block: 112px;
+    color: var(--sage-ink);
+    --button: var(--forest);
+    --button-ink: var(--forest-ink);
+}
+
+.hiringInner {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 32px var(--gutter);
+    align-items: end;
+    width: var(--page);
+    margin-inline: auto;
+}
+
+.hiringHeading {
+    grid-column: 1 / span 7;
+    max-width: 16ch;
+    font-size: var(--display-l);
+}
+
+.hiringAction {
+    display: grid;
+    grid-column: 9 / -1;
+    justify-items: start;
+    gap: 24px;
+    font-size: 1.0625rem;
+}
+
+@media (max-width: 1023px) {
+    .departmentHeader {
+        position: static;
+        grid-column: 1 / -1;
+    }
+
+    .grid {
+        grid-column: 1 / -1;
+    }
+
+    .hiringHeading,
+    .hiringAction {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 767px) {
+    .photo {
+        margin-top: 48px;
+    }
+
+    .photoImage {
+        aspect-ratio: 4 / 3;
+    }
+
+    .department {
+        gap: 28px var(--gutter);
+        margin-top: 80px;
+    }
+
+    .grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 40px;
+    }
+
+    .hiring {
+        padding-block: 80px;
+    }
 }

@@ -1,0 +1,55 @@
+.section {
+    display: grid;
+    justify-items: start;
+    gap: 36px;
+    width: var(--page);
+    margin: var(--section) auto 0;
+}
+
+.text {
+    max-width: 21ch;
+    font-size: var(--display-l);
+    line-height: 1.06;
+}
+
+.footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.images {
+    display: flex;
+    gap: 12px;
+    list-style: none;
+}
+
+.image {
+    width: 128px;
+    aspect-ratio: 4 / 5;
+    border-radius: var(--radius);
+    object-fit: cover;
+}
+
+@media (max-width: 767px) {
+    .section {
+        gap: 24px;
+    }
+
+    .images {
+        width: 100%;
+        gap: 8px;
+    }
+
+    .images li {
+        flex: 1;
+    }
+
+    .image {
+        width: 100%;
+    }
+}
