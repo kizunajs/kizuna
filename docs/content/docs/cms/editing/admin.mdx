@@ -131,20 +131,20 @@ A view's list shows its `title` and `columns`, and the search box asks its `list
 
 ## Editing
 
-A document opens with its title large, a line saying when it last changed, where it stands and who saved it, and its actions on the right: **Save draft**, **Publish**, and a `…` menu. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
+A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Under the title a line says where it stands, when it last changed and who saved it, and who owns it, where you can pick another owner. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
 
 The draft saves a moment after you stop typing, and the header says when it last did. **Save draft** saves at once, and **Publish** lists every change and asks you to confirm. While a required field is empty, Publish waits and says which field it waits for, like "Fill in Department before publishing". A click on that line takes you to the field, which says it is needed.
 
-Under the title, **Edit** shows the fields and **Versions** counts the saved versions:
+Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live preview** puts the site beside the fields and **Info** lists the document's status, owner, page, and when it was created, last updated and last published.
 
-- **Edit** lays the fields out in a main column, with their [layout](/docs/cms/fields#layout): tabs over the fields, rows side by side, collapsible sections, and the fields marked `position: 'sidebar'` in a column on the right. Under them the sidebar lists the document's status, its owner, its page, and when it was created, last updated and last published.
-- **Versions** lists every saved version, newest first, with where it stood and who saved it. **Compare** shows what changed against the current draft, and **Restore** makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual.
+- **Edit** lays the fields out with their [layout](/docs/cms/fields#layout): tabs over the fields, rows side by side, collapsible sections, and the fields marked `position: 'sidebar'` in a column on the right. A document with no sidebar fields gives the main column the full width.
+- **Versions** lists every saved version, newest first and eight to a page, with where it stood and who saved it. **Compare** shows what changed against the current draft, and **Restore** makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual.
 
 **Live preview** puts your site in [draft mode](/docs/cms/next#draft-mode) beside the fields, with the sidebar's fields moved under the main ones, at the Desktop, Tablet or Mobile width the select above it picks. What you type shows on the page as you type it, through [live updates](/docs/cms/next#live-updates). A page opens at its own path, and an item at the page its collection's [`preview`](/docs/cms/collections#live-preview) names, its own page, or the first page that holds it. An item no page shows has no Live preview.
 
 Each field has its label above it, with an asterisk when the document needs it before it can publish, and its help text under it. A field the server refuses shows why at its top right.
 
-A field made of other fields, like a page's hero block, shows them under its name as a heading. A list of larger items, like a page's sections, folds each one to a row: its number, its block as a tag, and its first text as the title. Click the row to open its fields, drag it by the handle or move it with the arrow keys, and its menu duplicates, moves or removes it. **Collapse all** and **Expand all** sit beside the list's label. A list of short items, up to four fields that each fit on one line, keeps them side by side, captioned once above the first row.
+A field made of other fields, like a page's hero block, shows them under its name as a heading, or under its tab when a tab holds it alone. A list shows each item as a row: drag it by the handle or move it with the arrow keys, open it with the chevron to edit its fields, and remove it with the ×. A row shows the item's first text as its title, and a block's name before it. **Collapse all** and **Expand all** sit beside the list's label, and the add button under the rows names the item, like **Add link** for a list labelled Links.
 
 An image shows its file name and size, and in the sidebar the image itself, large. An empty one takes an image from the library, or a file dropped on it. Edit opens the image at size: click it to set the focus a crop keeps in view, write its alt text, and trim pixels from its edges under **Crop**. **Apply** keeps the changes.
 

@@ -94,9 +94,9 @@ describe('itemNounOf', () => {
         ).toBe('opening hours');
     });
 
-    it('falls back to the singular of a plural label, then to "item"', () => {
+    it('falls back to the label, then to "item"', () => {
         expect(itemNounOf(contact, contact, 'Links')).toBe('link');
-        expect(itemNounOf(contact, contact, 'Menu')).toBe('item');
+        expect(itemNounOf(contact, contact, 'Menu')).toBe('menu item');
         expect(itemNounOf(contact, contact, undefined)).toBe('item');
     });
 });

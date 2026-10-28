@@ -60,6 +60,10 @@ export interface ControlProps {
      * Expand all sit beside it.
      */
     heading?: ReactNode;
+    /**
+     * The field's help, which a list shows beside its Add button.
+     */
+    help?: string | undefined;
 }
 
 function SelectControl(props: {
@@ -734,6 +738,15 @@ export const foldsItems = (schema: JsonSchema, root: JsonSchema): boolean => {
 };
 
 /**
+ * Whether a schema edits as a list of items, rather than as rich text, which
+ * stores a list too.
+ */
+export const listsItems = (schema: JsonSchema): boolean => {
+    const resolved = resolveRef(schema, schema);
+    return typeOf(resolved) === 'array' && !isRichText(schema) && !isRichText(resolved);
+};
+
+/**
  * Follows the pointer while an item is dragged by its handle, moving the
  * others aside, and hands back where it landed.
  */
@@ -848,16 +861,22 @@ function ArrayControl(props: ControlProps) {
             </button>
         );
 
-    const footer = disabled ? null : (
-        <button
-            type="button"
-            className="k-button k-button--secondary k-button--small k-array__add"
-            disabled={max !== undefined && items.length >= max}
-            onClick={add}>
-            <Plus {...ICON} />
-            Add {noun}
-        </button>
-    );
+    const footer =
+        disabled && props.help === undefined ? null : (
+            <div className="k-array__foot">
+                {props.help === undefined ? <span /> : <p className="k-help">{props.help}</p>}
+                {disabled ? null : (
+                    <button
+                        type="button"
+                        className="k-button k-button--secondary k-button--small k-array__add"
+                        disabled={max !== undefined && items.length >= max}
+                        onClick={add}>
+                        <Plus {...ICON} />
+                        Add {noun}
+                    </button>
+                )}
+            </div>
+        );
 
     if (folds) {
         const allOpen = items.length > 0 && items.every((_, index) => open.has(index));
@@ -934,6 +953,7 @@ function ArrayControl(props: ControlProps) {
                                             {...props}
                                             id={undefined}
                                             heading={undefined}
+                                            help={undefined}
                                             label={undefined}
                                             schema={resolvedItem}
                                             root={root}
@@ -975,6 +995,7 @@ function ArrayControl(props: ControlProps) {
                             name={undefined}
                             label={undefined}
                             heading={undefined}
+                            help={undefined}
                             schema={itemSchema}
                             root={root}
                             value={item}
@@ -1041,6 +1062,7 @@ function PropertyControl({ props, name, property, id }: { props: ControlProps; n
             name={name}
             label={humanize(name)}
             heading={undefined}
+            help={undefined}
             value={current[name]}
             required={props.schema.required?.includes(name)}
             onChange={(next) => {

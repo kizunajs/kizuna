@@ -109,3 +109,29 @@ export const savedAtOf = (iso: string, today: Date = new Date()): string => {
     if (Number.isNaN(date.getTime())) return '';
     return (date.getFullYear() === today.getFullYear() ? SAVED_AT : SAVED_AT_IN_YEAR).format(date);
 };
+
+/**
+ * How many versions the Versions tab lists to a page.
+ */
+export const VERSIONS_PER_PAGE = 8;
+
+/**
+ * The versions one page of the tab lists, and the line under them: "1 to 8
+ * of 23 versions".
+ */
+export const versionPageOf = <Version>(
+    versions: readonly Version[],
+    page: number,
+    size: number = VERSIONS_PER_PAGE
+): { shown: Version[]; pages: number; summary: string } => {
+    const pages = Math.max(1, Math.ceil(versions.length / size));
+    const current = Math.min(Math.max(1, page), pages);
+    const start = (current - 1) * size;
+    const shown = versions.slice(start, start + size);
+    const noun = versions.length === 1 ? 'version' : 'versions';
+    return {
+        shown,
+        pages,
+        summary: versions.length === 0 ? 'No versions' : `${start + 1} to ${start + shown.length} of ${versions.length} ${noun}`,
+    };
+};

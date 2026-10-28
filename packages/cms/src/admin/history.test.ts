@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DescribedField } from '../view/schema.js';
-import { fieldChanges, savedAtOf, shownValue } from './history.js';
+import { fieldChanges, savedAtOf, shownValue, versionPageOf } from './history.js';
 
 const field = (path: string, extra: Partial<DescribedField> = {}): DescribedField => ({
     path,
@@ -182,5 +182,28 @@ describe('when a version was saved', () => {
         expect(savedAtOf('2026-10-24T09:12:00Z', today)).not.toMatch(/2026/);
         expect(savedAtOf('2025-10-24T09:12:00Z', today)).toMatch(/2025/);
         expect(savedAtOf('not a date', today)).toBe('');
+    });
+});
+
+describe('versionPageOf', () => {
+    const versions = Array.from(
+        {
+            length: 23,
+        },
+        (_, index) => index + 1
+    );
+
+    it('lists eight to a page and says which', () => {
+        expect(versionPageOf(versions, 1)).toEqual({
+            shown: [1, 2, 3, 4, 5, 6, 7, 8],
+            pages: 3,
+            summary: '1 to 8 of 23 versions',
+        });
+        expect(versionPageOf(versions, 3).summary).toBe('17 to 23 of 23 versions');
+    });
+
+    it('keeps a page past the end on the last one', () => {
+        expect(versionPageOf(versions, 9).summary).toBe('17 to 23 of 23 versions');
+        expect(versionPageOf([1], 1).summary).toBe('1 to 1 of 1 version');
     });
 });

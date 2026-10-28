@@ -891,13 +891,19 @@
         width: 32px;
     }
 
-    .k-array__add {
-        align-self: flex-start;
-        padding: 0 12px 0 10px;
+    /* Under the items: the list's help, and Add at the right. */
+    .k-array__foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 4px;
     }
 
-    .k-array > .k-array__add {
-        margin-top: 4px;
+    .k-array__add {
+        flex-shrink: 0;
+        align-self: flex-start;
+        padding: 0 12px 0 10px;
     }
 
     .k-array__body {

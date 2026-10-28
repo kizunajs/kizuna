@@ -4,7 +4,7 @@ import { toolsFor, type Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { Avatar, type People } from '../view/people.js';
 import type { DescribedField, PersonView } from '../view/schema.js';
-import { fieldChanges, savedAtOf, type FieldChange, type VersionSummary } from './history.js';
+import { fieldChanges, savedAtOf, versionPageOf, type FieldChange, type VersionSummary } from './history.js';
 import { Loading, Status, problemOf } from './parts.js';
 
 /**
@@ -47,6 +47,7 @@ export function Versions({
     const [problem, setProblem] = useState<string | undefined>();
     const [compared, setCompared] = useState<{ version: number; content: Record<string, unknown> } | undefined>();
     const [working, setWorking] = useState<number | undefined>();
+    const [page, setPage] = useState(1);
     const tools = useMemo(() => toolsFor(documentRef), [documentRef]);
 
     const load = useCallback(async (): Promise<void> => {
@@ -121,10 +122,11 @@ export function Versions({
         };
     const changes: FieldChange[] = compared === undefined ? [] : fieldChanges(fields, compared.content, draft);
     const live = versions.find((entry) => entry.published)?.version;
+    const listed = versionPageOf(versions, page);
 
     return (
         <div className="k-versions">
-            <p className="k-help">Every save, newest first. Compare shows what changed against the current draft.</p>
+            <p className="k-versions__intro">Every save, newest first. Compare shows what changed against the current draft.</p>
             {problem === undefined ? null : (
                 <p className="k-error" role="alert">
                     {problem}
@@ -139,13 +141,14 @@ export function Versions({
                         Actions
                     </span>
                 </div>
-                {versions.map((entry, index) => {
+                {listed.shown.map((entry) => {
+                    const index = versions.indexOf(entry);
                     const author = personOf(entry.createdBy);
                     return (
                         <div key={entry.version} className="k-versions__entry" role="rowgroup">
-                            <div className="k-versions__row" role="row" data-current={index === 0}>
+                            <div className="k-versions__row" role="row">
                                 <span className="k-versions__saved" role="cell">
-                                    <span>{savedAtOf(entry.createdAt)}</span>
+                                    <span className="k-versions__date">{savedAtOf(entry.createdAt)}</span>
                                     {index === 0 ? (
                                         <span className="k-versions__note">Current draft</span>
                                     ) : entry.version === live ? (
@@ -169,7 +172,7 @@ export function Versions({
                                         <>
                                             <button
                                                 type="button"
-                                                className="k-button k-button--secondary"
+                                                className="k-versions__quiet"
                                                 aria-expanded={compared?.version === entry.version}
                                                 disabled={working !== undefined}
                                                 onClick={() => void compare(entry.version)}>
@@ -177,7 +180,7 @@ export function Versions({
                                             </button>
                                             <button
                                                 type="button"
-                                                className="k-versions__quiet"
+                                                className="k-button k-button--secondary"
                                                 disabled={working !== undefined || disabled}
                                                 onClick={() => void restore(entry.version)}>
                                                 Restore
@@ -211,6 +214,29 @@ export function Versions({
                         </div>
                     );
                 })}
+            </div>
+            <div className="k-versions__pager">
+                <span>{listed.summary}</span>
+                {listed.pages === 1 ? null : (
+                    <nav className="k-versions__pages" aria-label="Pages">
+                        {Array.from(
+                            {
+                                length: listed.pages,
+                            },
+                            (_, at) => at + 1
+                        ).map((number) => (
+                            <button
+                                key={number}
+                                type="button"
+                                className="k-tab"
+                                aria-current={number === page ? 'page' : undefined}
+                                aria-selected={number === page}
+                                onClick={() => setPage(number)}>
+                                {number}
+                            </button>
+                        ))}
+                    </nav>
+                )}
             </div>
         </div>
     );

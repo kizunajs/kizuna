@@ -14,7 +14,7 @@ import { Tabs } from '@base-ui/react/tabs';
 import { ChevronDown, CircleAlert } from 'lucide-react';
 import { arrange, inSidebar, tabSets, type Arranged } from './arrange.js';
 import { ICON } from './context.js';
-import { Control, foldsItems, Required } from './controls.js';
+import { Control, foldsItems, listsItems, Required } from './controls.js';
 import { labelOf, valueAt, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
@@ -220,6 +220,8 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
 
     const control = (field: DescribedField, writable: boolean, heading?: ReactNode): ReactNode => {
         const error = errorFor(field.path);
+        // A list shows its help beside its Add button.
+        const list = listsItems(field.schema);
         return (
             <>
                 <div className="k-field__input" data-invalid={error !== undefined}>
@@ -242,10 +244,11 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                         brand={field.brand}
                         searchTool={field.searchTool}
                         labels={field.options}
+                        help={list ? field.help : undefined}
                         required
                     />
                 </div>
-                {field.help !== undefined ? <p className="k-help">{field.help}</p> : null}
+                {field.help !== undefined && !list ? <p className="k-help">{field.help}</p> : null}
                 {writable ? null : <p className="k-help">{refusalFor(field)}</p>}
             </>
         );

@@ -13,15 +13,16 @@ export const singularOf = (label: string): string => {
 
 /**
  * What one item of a list is called, in lower case: the name its schema
- * gives, "image" for `CMS.Image`, or else the singular of a plural label, or
- * else "item".
+ * gives, "image" for `CMS.Image`, or else the singular of a plural label,
+ * "link" for "Links", or an item of a singular one, "menu item" for "Menu",
+ * or else "item".
  */
 export const itemNounOf = (itemSchema: JsonSchema, root: JsonSchema, label: string | undefined): string => {
     const resolved = resolveRef(itemSchema, root);
     const named = typeof resolved.title === 'string' ? resolved.title : itemSchema.$ref?.split('/').at(-1);
     if (named !== undefined && named !== '') return humanize(named.split('.').at(-1)!).toLowerCase();
-    if (label !== undefined && singularOf(label) !== label) return singularOf(label).toLowerCase();
-    return 'item';
+    if (label === undefined || label === '') return 'item';
+    return singularOf(label) === label ? `${label.toLowerCase()} item` : singularOf(label).toLowerCase();
 };
 
 /**
