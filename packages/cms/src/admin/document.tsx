@@ -10,6 +10,7 @@ import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
 import { hrefOf } from './navigation.js';
 import { Loading, SaveIndicator, Status, Topbar, problemOf } from './parts.js';
+import { ItemActions } from './action-buttons.js';
 import type { WaitingReview } from './dashboard.js';
 
 /**
@@ -374,6 +375,18 @@ export function DocumentScreen({
                     changed={changed}
                     pointed={undefined}
                 />
+                {document.kind === 'item' ? (
+                    <ItemActions
+                        connection={connection}
+                        documentRef={document.ref}
+                        actions={document.actions}
+                        onRan={() =>
+                            void describe(document.ref, {
+                                remount: false,
+                            })
+                        }
+                    />
+                ) : null}
             </div>
         </EditorContext.Provider>
     );

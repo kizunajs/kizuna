@@ -326,6 +326,61 @@ a.k-admin-row:hover {
     text-align: center;
 }
 
+/* Views and actions */
+
+.k-admin-row[data-columns] {
+    grid-template-columns: repeat(var(--k-columns), minmax(0, 1fr));
+}
+
+.k-admin-cell {
+    display: flex;
+    min-width: 0;
+    color: var(--k-muted);
+}
+
+.k-admin-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.k-admin-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.k-admin-confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--k-radius-control);
+    background: var(--k-surface);
+    box-shadow: var(--k-elevation);
+}
+
+.k-admin-confirm p {
+    margin: 0;
+    font-size: 13.5px;
+}
+
+.k-admin-inline-link {
+    color: var(--k-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+@media (max-width: 860px) {
+    .k-admin-row[data-columns] {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .k-admin-row[data-columns] > :nth-child(n + 3) {
+        display: none;
+    }
+}
+
 @media (max-width: 860px) {
     .k-admin {
         grid-template-columns: minmax(0, 1fr);

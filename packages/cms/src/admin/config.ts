@@ -24,7 +24,7 @@ export interface AdminConfig {
      */
     routes: Record<string, AdminRoute>;
     /**
-     * The `group` each collection declares, by its name.
+     * The `group` each collection and view declares, by its name.
      */
     groups: Record<string, string>;
 }

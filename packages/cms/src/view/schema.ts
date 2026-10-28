@@ -88,6 +88,15 @@ export interface Description {
     owner: PersonView | null;
     review: ReviewState | null;
     requireReview: boolean;
+    /**
+     * For an item, the buttons its collection's actions show the editor.
+     */
+    actions?: Array<{
+        name: string;
+        label: string;
+        confirm?: string;
+        available: boolean;
+    }>;
 }
 
 /**

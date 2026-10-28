@@ -42,7 +42,9 @@ export const adminConfigFor = (options: ResolvedCmsOptions, api: PluginApi): Adm
     apiPath: options.apiPath ?? '/api',
     routes: editingRoutesOf(api),
     groups: Object.fromEntries(
-        (options.collections ?? []).flatMap((collection) => (collection.group === undefined ? [] : [[collection.name, collection.group]]))
+        [...(options.collections ?? []), ...(options.views ?? [])].flatMap((definition) =>
+            definition.group === undefined ? [] : [[definition.name, definition.group]]
+        )
     ),
 });
 

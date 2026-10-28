@@ -18,6 +18,8 @@ import {
     type Screen,
 } from './navigation.js';
 import { Loading } from './parts.js';
+import { RecordScreen, ViewList } from './view-screen.js';
+import type { ViewSummary } from './views.js';
 
 /**
  * The screen the address names, following it as it changes.
@@ -63,6 +65,7 @@ export function Admin({ config }: { config: AdminConfig }) {
     const [globals, setGlobals] = useState<GlobalSummary[] | undefined>();
     const [collections, setCollections] = useState<CollectionSummary[] | undefined>();
     const [waiting, setWaiting] = useState<WaitingReview[] | undefined>();
+    const [views, setViews] = useState<ViewSummary[] | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
 
     const loadLists = useCallback(async (): Promise<void> => {
@@ -93,6 +96,17 @@ export function Admin({ config }: { config: AdminConfig }) {
         void loadWaiting();
     }, [loadLists, loadWaiting]);
 
+    // The route answers only the views the editor may open, and exists only when there are views.
+    useEffect(() => {
+        if (config.routes['editing_list_views'] === undefined) {
+            setViews([]);
+            return;
+        }
+        void connection
+            .call<{ views: ViewSummary[] }>('editing_list_views')
+            .then((answer) => setViews(answer.status === 200 ? answer.body.views : []));
+    }, [connection, config.routes]);
+
     // A list or a count may have changed while the person was on another screen.
     useEffect(() => {
         if (screen.kind !== 'document') void loadLists();
@@ -103,9 +117,10 @@ export function Admin({ config }: { config: AdminConfig }) {
             navigationOf({
                 globals: globals ?? [],
                 collections: collections ?? [],
+                views: views ?? [],
                 groups: config.groups,
             }),
-        [globals, collections, config.groups]
+        [globals, collections, views, config.groups]
     );
 
     const groupOf = (name: string): string => config.groups[name] ?? CONTENT_GROUP;
@@ -167,6 +182,29 @@ export function Admin({ config }: { config: AdminConfig }) {
                     onReviewsChanged={() => void loadWaiting()}
                 />
             );
+        }
+        if (screen.kind === 'view' || screen.kind === 'record') {
+            const name = screen.kind === 'view' ? screen.name : screen.view;
+            const view = views?.find((candidate) => candidate.name === name);
+            if (view === undefined) {
+                return (
+                    <div className="k-admin-body">
+                        <Loading problem={views === undefined ? undefined : `There is no view named ${name}.`} />
+                    </div>
+                );
+            }
+            if (screen.kind === 'record') {
+                return (
+                    <RecordScreen
+                        key={`${view.name}:${screen.id}`}
+                        connection={connection}
+                        viewName={view.name}
+                        viewLabel={view.label}
+                        id={screen.id}
+                    />
+                );
+            }
+            return <ViewList key={view.name} connection={connection} view={view} group={groupOf(view.name)} />;
         }
         return <Dashboard connection={connection} waiting={waiting} collections={collections} sections={sections} onOpen={openDocument} />;
     })();
