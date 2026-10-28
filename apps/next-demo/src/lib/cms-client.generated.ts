@@ -41,11 +41,23 @@ export namespace API {
             type: "chart";
             label: string;
             /**
-             * The bars, oldest first.
+             * What the numbers count, like "Succeeded orders · NOK".
+             */
+            description?: string;
+            /**
+             * Bars, or a line through the points.
+             */
+            style: "bar" | "line";
+            /**
+             * The points, oldest first.
              */
             data: Array<{
                 label: string;
                 value: number;
+                /**
+                 * The same point in the period before.
+                 */
+                previous?: number;
             }>;
         };
 
@@ -76,6 +88,21 @@ export namespace API {
         };
 
         export type Dashboard = {
+            /**
+             * The period the numbers count over, ending now.
+             */
+            period: {
+                key: "24h" | "7d" | "30d" | "90d";
+                from: string;
+                to: string;
+                /**
+                 * The period of the same length just before.
+                 */
+                previous: {
+                    from: string;
+                    to: string;
+                };
+            };
             /**
              * The widgets the person may see, in the order listed.
              */
@@ -506,9 +533,17 @@ export namespace API {
              */
             value: string;
             /**
-             * A line under the number, like "Up 12% on last week".
+             * A line under the number, like "48 orders".
              */
             detail?: string;
+            /**
+             * How far the number moved since the period before, as a signed fraction: 0.081 is up 8.1%.
+             */
+            change?: number;
+            /**
+             * Values for a small line beside the number, oldest first.
+             */
+            trend?: Array<number>;
         };
 
         export type StoredContent = {
@@ -723,15 +758,12 @@ export namespace API {
                 updatedAt: string;
                 content: {
                     hero: {
-                        impact: "high" | "medium" | "low";
+                        eyebrow?: string;
                         /**
-                         * Under 8 words.
+                         * Under 8 words. Wrap a word in *asterisks* to set it in italics.
                          */
                         heading: string;
-                        /**
-                         * One sentence under the heading.
-                         */
-                        subheading: string;
+                        subheading?: string;
                         image?: {
                             id: string;
                             url: string;
@@ -739,6 +771,7 @@ export namespace API {
                             width: number;
                             height: number;
                         };
+                        caption?: string;
                         links: Array<{
                             /**
                              * Two or three words.
@@ -750,7 +783,84 @@ export namespace API {
                             href: string;
                         }>;
                     };
-                    intro?: {
+                    statement?: {
+                        eyebrow?: string;
+                        /**
+                         * One or two sentences. Wrap the words to lean on in *asterisks* to set them in italics.
+                         */
+                        text: string;
+                        images: Array<{
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        }>;
+                        link?: {
+                            /**
+                             * Two or three words.
+                             */
+                            label: string;
+                            /**
+                             * A page on this site, like /blog, or an https address.
+                             */
+                            href: string;
+                        };
+                    };
+                    categories?: {
+                        eyebrow?: string;
+                        /**
+                         * Under 8 words. Wrap a word in *asterisks* to set it in italics.
+                         */
+                        heading: string;
+                        categories: Array<{
+                            name: string;
+                            image: {
+                                id: string;
+                                url: string;
+                                alt: string;
+                                width: number;
+                                height: number;
+                            };
+                            /**
+                             * A page on this site, like /blog, or an https address.
+                             */
+                            href: string;
+                        }>;
+                    };
+                    products?: {
+                        eyebrow?: string;
+                        /**
+                         * Under 8 words. Wrap a word in *asterisks* to set it in italics.
+                         */
+                        heading: string;
+                        products: Array<ProductId>;
+                        link?: {
+                            /**
+                             * Two or three words.
+                             */
+                            label: string;
+                            /**
+                             * A page on this site, like /blog, or an https address.
+                             */
+                            href: string;
+                        };
+                    };
+                    photo?: {
+                        image: {
+                            id: string;
+                            url: string;
+                            alt: string;
+                            width: number;
+                            height: number;
+                        };
+                        caption?: string;
+                        heading?: string;
+                        body?: string;
+                    };
+                    columns?: {
+                        eyebrow?: string;
+                        heading?: string;
                         columns: Array<{
                             heading?: string;
                             body: Array<{
@@ -786,40 +896,22 @@ export namespace API {
                             }>;
                         }>;
                     };
-                    shop: {
+                    articles?: {
+                        eyebrow?: string;
                         /**
-                         * Under 8 words.
+                         * Under 8 words. Wrap a word in *asterisks* to set it in italics.
                          */
                         heading: string;
-                        products: Array<ProductId>;
-                    };
-                    media?: {
-                        image: {
-                            id: string;
-                            url: string;
-                            alt: string;
-                            width: number;
-                            height: number;
-                        };
-                        caption?: string;
-                    };
-                    latest: {
-                        /**
-                         * Under 8 words.
-                         */
-                        heading: string;
-                        topic?: "news" | "guides" | "stories";
+                        topic?: "care" | "season" | "growers";
                         articles: Array<ArticleId>;
                     };
                     callToAction?: {
+                        eyebrow?: string;
                         /**
-                         * Under 8 words.
+                         * One or two sentences. Wrap the words to lean on in *asterisks* to set them in italics.
                          */
                         heading: string;
-                        /**
-                         * Why they should, in a sentence or two.
-                         */
-                        body: string;
+                        body?: string;
                         links: Array<{
                             /**
                              * Two or three words.
@@ -841,6 +933,10 @@ export namespace API {
                          */
                         description: string;
                     };
+                    heroImpact: "high" | "medium" | "low";
+                    sections: Array<"statement" | "categories" | "products" | "photo" | "columns" | "articles" | "callToAction">;
+                    photoTone: "forest" | "sage";
+                    callToActionTone: "forest" | "sage";
                 };
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
@@ -852,14 +948,26 @@ export namespace API {
                 version: number;
                 updatedAt: string;
                 content: {
+                    eyebrow?: string;
                     /**
-                     * Under 8 words.
+                     * Under 8 words. Wrap a word in *asterisks* to set it in italics.
                      */
                     heading: string;
                     /**
-                     * What the blog is about, in a sentence or two.
+                     * What the journal is about, in a sentence or two.
                      */
                     intro: string;
+                    seo?: {
+                        /**
+                         * What search results show as the title. 30 to 60 characters show in full.
+                         */
+                        title: string;
+                        /**
+                         * One or two sentences under the title. 70 to 160 characters show in full.
+                         */
+                        description: string;
+                    };
+                    featured?: ArticleId;
                 };
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
@@ -871,19 +979,32 @@ export namespace API {
                 version: number;
                 updatedAt: string;
                 content: {
+                    eyebrow?: string;
                     /**
-                     * Under 8 words.
+                     * Under 8 words. Wrap a word in *asterisks* to set it in italics.
                      */
                     heading: string;
                     /**
                      * Why someone should write, in a sentence or two.
                      */
                     intro: string;
+                    subjects: Array<string>;
                     buttonLabel: string;
                     /**
                      * Shown after the form is sent.
                      */
                     thanks: string;
+                    directions?: string;
+                    seo?: {
+                        /**
+                         * What search results show as the title. 30 to 60 characters show in full.
+                         */
+                        title: string;
+                        /**
+                         * One or two sentences under the title. 70 to 160 characters show in full.
+                         */
+                        description: string;
+                    };
                     contacts: Array<EmployeeId>;
                 };
             }; headers: Record<string, string> }
@@ -896,8 +1017,9 @@ export namespace API {
                 version: number;
                 updatedAt: string;
                 content: {
+                    eyebrow?: string;
                     /**
-                     * Under 8 words.
+                     * Under 8 words. Wrap a word in *asterisks* to set it in italics.
                      */
                     heading: string;
                     /**
@@ -911,6 +1033,21 @@ export namespace API {
                         width: number;
                         height: number;
                     };
+                    caption?: string;
+                    hiringHeading?: string;
+                    hiringText?: string;
+                    hiringEmail?: string;
+                    seo?: {
+                        /**
+                         * What search results show as the title. 30 to 60 characters show in full.
+                         */
+                        title: string;
+                        /**
+                         * One or two sentences under the title. 70 to 160 characters show in full.
+                         */
+                        description: string;
+                    };
+                    photoLayout: "wide" | "beside";
                 };
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
@@ -933,6 +1070,17 @@ export namespace API {
                         href: string;
                     }>;
                     announcement?: string;
+                    announcementLink?: {
+                        /**
+                         * Two or three words.
+                         */
+                        label: string;
+                        /**
+                         * A page on this site, like /blog, or an https address.
+                         */
+                        href: string;
+                    };
+                    showAnnouncement: boolean;
                 };
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
@@ -958,13 +1106,22 @@ export namespace API {
                          */
                         href: string;
                     }>;
+                    newsletterHeading?: string;
+                    newsletterText?: string;
                     contactEmail: string;
                     phone: string;
                     address: string;
-                    /**
-                     * When the shop is open, like Mon to Fri 10 to 18.
-                     */
-                    openingHours: string;
+                    openingHours: Array<{
+                        /**
+                         * Like Monday to Friday.
+                         */
+                        days: string;
+                        /**
+                         * Like 10 to 18, or Closed.
+                         */
+                        hours: string;
+                    }>;
+                    showNewsletter: boolean;
                 };
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
@@ -972,7 +1129,7 @@ export namespace API {
 
     export namespace ContentCollectionsEmployeesList {
         export type Query = {
-            department?: "design" | "engineering" | "sales" | "support";
+            department?: "shop" | "care" | "offices" | "online";
             order?: number;
             name?: string;
             orderBy?: "department" | "order" | "name" | "publishedAt" | "updatedAt";
@@ -992,9 +1149,10 @@ export namespace API {
                      * Their title, as on a business card.
                      */
                     role: string;
+                    bio?: string;
+                    favouritePlant?: string;
                     email?: string;
                     phone?: string;
-                    bio?: string;
                     photo?: {
                         id: string;
                         url: string;
@@ -1002,7 +1160,7 @@ export namespace API {
                         width: number;
                         height: number;
                     };
-                    department: "design" | "engineering" | "sales" | "support";
+                    department: "shop" | "care" | "offices" | "online";
                     order: number;
                     id: string;
                 }>;
@@ -1023,9 +1181,10 @@ export namespace API {
                  * Their title, as on a business card.
                  */
                 role: string;
+                bio?: string;
+                favouritePlant?: string;
                 email?: string;
                 phone?: string;
-                bio?: string;
                 photo?: {
                     id: string;
                     url: string;
@@ -1033,7 +1192,7 @@ export namespace API {
                     width: number;
                     height: number;
                 };
-                department: "design" | "engineering" | "sales" | "support";
+                department: "shop" | "care" | "offices" | "online";
                 order: number;
                 id: string;
             }; headers: Record<string, string> }
@@ -1043,7 +1202,7 @@ export namespace API {
     export namespace ContentCollectionsArticlesList {
         export type Query = {
             slug?: string;
-            topic?: "news" | "guides" | "stories";
+            topic?: "care" | "season" | "growers";
             publishedOn?: string;
             orderBy?: "slug" | "topic" | "publishedOn" | "publishedAt" | "updatedAt";
             direction?: "asc" | "desc";
@@ -1058,9 +1217,13 @@ export namespace API {
             | { status: 200; body: {
                 items: Array<{
                     /**
-                     * Under 8 words.
+                     * Under 8 words. Wrap a word in *asterisks* to set it in italics.
                      */
                     title: string;
+                    /**
+                     * One or two sentences, under the title and in lists.
+                     */
+                    excerpt: string;
                     body: Array<{
                         _type: "block";
                         _key: string;
@@ -1092,11 +1255,16 @@ export namespace API {
                             height: number;
                         };
                     }>;
-                    /**
-                     * One or two sentences for the blog index and search results.
-                     */
-                    excerpt: string;
-                    related: Array<ArticleId>;
+                    seo?: {
+                        /**
+                         * What search results show as the title. 30 to 60 characters show in full.
+                         */
+                        title: string;
+                        /**
+                         * One or two sentences under the title. 70 to 160 characters show in full.
+                         */
+                        description: string;
+                    };
                     cover: {
                         id: string;
                         url: string;
@@ -1104,13 +1272,15 @@ export namespace API {
                         width: number;
                         height: number;
                     };
+                    coverCaption?: string;
                     /**
-                     * Lowercase words joined by dashes, like plant-now-for-april.
+                     * Lowercase words joined by dashes, like plant-bulbs-before-the-frost.
                      */
                     slug: string;
                     publishedOn?: string;
-                    topic: "news" | "guides" | "stories";
+                    topic: "care" | "season" | "growers";
                     author?: EmployeeId;
+                    related: Array<ArticleId>;
                     id: string;
                 }>;
                 next: string | null;
@@ -1126,9 +1296,13 @@ export namespace API {
         export type Result =
             | { status: 200; body: {
                 /**
-                 * Under 8 words.
+                 * Under 8 words. Wrap a word in *asterisks* to set it in italics.
                  */
                 title: string;
+                /**
+                 * One or two sentences, under the title and in lists.
+                 */
+                excerpt: string;
                 body: Array<{
                     _type: "block";
                     _key: string;
@@ -1160,11 +1334,16 @@ export namespace API {
                         height: number;
                     };
                 }>;
-                /**
-                 * One or two sentences for the blog index and search results.
-                 */
-                excerpt: string;
-                related: Array<ArticleId>;
+                seo?: {
+                    /**
+                     * What search results show as the title. 30 to 60 characters show in full.
+                     */
+                    title: string;
+                    /**
+                     * One or two sentences under the title. 70 to 160 characters show in full.
+                     */
+                    description: string;
+                };
                 cover: {
                     id: string;
                     url: string;
@@ -1172,13 +1351,15 @@ export namespace API {
                     width: number;
                     height: number;
                 };
+                coverCaption?: string;
                 /**
-                 * Lowercase words joined by dashes, like plant-now-for-april.
+                 * Lowercase words joined by dashes, like plant-bulbs-before-the-frost.
                  */
                 slug: string;
                 publishedOn?: string;
-                topic: "news" | "guides" | "stories";
+                topic: "care" | "season" | "growers";
                 author?: EmployeeId;
+                related: Array<ArticleId>;
                 id: string;
             }; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> };
@@ -1398,6 +1579,24 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace EditingPagesUnpublish {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = Record<string, never>;
+
+        export type Result =
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace EditingPagesSetOwner {
         export type Params = {
             name: string;
@@ -1594,6 +1793,24 @@ export namespace API {
         export type Body = {
             summary?: string;
         };
+
+        export type Result =
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingGlobalsUnpublish {
+        export type Params = {
+            name: string;
+        };
+
+        export type Body = Record<string, never>;
 
         export type Result =
             | { status: 200; body: CMS.Draft; headers: Record<string, string> }
@@ -1891,6 +2108,25 @@ export namespace API {
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
+    export namespace EditingCollectionsUnpublish {
+        export type Params = {
+            name: string;
+            id: string;
+        };
+
+        export type Body = Record<string, never>;
+
+        export type Result =
+            | { status: 200; body: CMS.Draft; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
     export namespace EditingCollectionsSetOwner {
         export type Params = {
             name: string;
@@ -2112,12 +2348,20 @@ export namespace API {
     }
 
     export namespace EditingDashboard {
+        export type Query = {
+            /**
+             * The period the numbers count over, ending now: the last 24 hours, 7, 30 or 90 days.
+             */
+            period?: "24h" | "7d" | "30d" | "90d";
+        };
+
         export type Result =
             | { status: 200; body: CMS.Dashboard; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
-            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingWhereUsed {
@@ -2605,6 +2849,25 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingPagesPublish.Result>;
             /**
+             * Unpublish a page
+             *
+             * Withdraws the published copy, so visitors stop seeing it and the site drops it. The draft and every version stay, and publishing again brings it back. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.pages.unpublish({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {},
+             * });
+             */
+            unpublish: ClientMethod<'POST', false, {
+                params: API.EditingPagesUnpublish.Params;
+                body: API.EditingPagesUnpublish.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingPagesUnpublish.Result>;
+            /**
              * Name the person who looks after a page
              *
              * The owner is suggested first when someone asks for a review. Pass null for nobody.
@@ -2816,6 +3079,25 @@ export interface Client {
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingGlobalsPublish.Result>;
+            /**
+             * Unpublish a global, which every page may show
+             *
+             * Withdraws the published copy, so visitors stop seeing it and the site drops it. The draft and every version stay, and publishing again brings it back. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.globals.unpublish({
+             *     params: {
+             *         name: 'string',
+             *     },
+             *     body: {},
+             * });
+             */
+            unpublish: ClientMethod<'POST', false, {
+                params: API.EditingGlobalsUnpublish.Params;
+                body: API.EditingGlobalsUnpublish.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingGlobalsUnpublish.Result>;
             /**
              * Name the person who looks after a global, which every page may show
              *
@@ -3089,6 +3371,26 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingCollectionsPublish.Result>;
             /**
+             * Unpublish an item of a collection
+             *
+             * Withdraws the published copy, so visitors stop seeing it and the site drops it. The draft and every version stay, and publishing again brings it back. The person confirms before this runs.
+             *
+             * @example
+             * const result = await client.editing.collections.unpublish({
+             *     params: {
+             *         name: 'string',
+             *         id: '1',
+             *     },
+             *     body: {},
+             * });
+             */
+            unpublish: ClientMethod<'POST', false, {
+                params: API.EditingCollectionsUnpublish.Params;
+                body: API.EditingCollectionsUnpublish.Body;
+                headers?: Record<string, string>;
+                fetchOptions?: RequestInit;
+            }, API.EditingCollectionsUnpublish.Result>;
+            /**
              * Name the person who looks after an item of a collection
              *
              * The owner is suggested first when someone asks for a review. Pass null for nobody.
@@ -3331,6 +3633,7 @@ export interface Client {
          * const result = await client.editing.dashboard();
          */
         dashboard: ClientMethod<'GET', false, {
+            query?: API.EditingDashboard.Query;
             headers?: Record<string, string>;
             fetchOptions?: RequestInit;
         }, API.EditingDashboard.Result>;
@@ -3694,6 +3997,18 @@ const routes: GeneratedRoutes = {
                     400: {},
                 },
             },
+            unpublish: {
+                method: 'POST',
+                path: '/editing/pages/:name/unpublish',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
             setOwner: {
                 method: 'PUT',
                 path: '/editing/pages/:name/owner',
@@ -3818,6 +4133,18 @@ const routes: GeneratedRoutes = {
             publish: {
                 method: 'POST',
                 path: '/editing/globals/:name/publish',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            unpublish: {
+                method: 'POST',
+                path: '/editing/globals/:name/unpublish',
                 responses: {
                     200: {},
                     401: {},
@@ -3985,6 +4312,18 @@ const routes: GeneratedRoutes = {
             publish: {
                 method: 'POST',
                 path: '/editing/collections/:name/items/:id/publish',
+                responses: {
+                    200: {},
+                    401: {},
+                    403: {},
+                    404: {},
+                    409: {},
+                    400: {},
+                },
+            },
+            unpublish: {
+                method: 'POST',
+                path: '/editing/collections/:name/items/:id/unpublish',
                 responses: {
                     200: {},
                     401: {},
@@ -4166,6 +4505,7 @@ const routes: GeneratedRoutes = {
                 200: {},
                 401: {},
                 403: {},
+                400: {},
             },
         },
         whereUsed: {
