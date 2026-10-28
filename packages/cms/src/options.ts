@@ -120,6 +120,64 @@ export interface CmsAuthOptions {
      * it changed. Editors when left out.
      */
     invalidate?: RouteAuth;
+    /**
+     * Signs an editor in with your app's own auth, and gives the admin a
+     * sign-in screen of its own at `${adminPath}/login`. Return the
+     * response your auth answers with: its cookies reach the browser, and a
+     * status outside 2xx means the email or password was wrong.
+     *
+     * @example
+     * ```ts
+     * signIn: ({ email, password, headers }) =>
+     *     auth.api.signInEmail({
+     *         body: {
+     *             email,
+     *             password,
+     *         },
+     *         headers,
+     *         asResponse: true,
+     *     }),
+     * ```
+     */
+    signIn?: (attempt: SignInAttempt) => Response | Promise<Response>;
+    /**
+     * Ends the editor's session, for the admin's Sign out. Its response's
+     * cookies reach the browser, which lands on the sign-in screen.
+     *
+     * @example
+     * ```ts
+     * signOut: ({ headers }) =>
+     *     auth.api.signOut({
+     *         headers,
+     *         asResponse: true,
+     *     }),
+     * ```
+     */
+    signOut?: (request: SignOutRequest) => Response | Promise<Response>;
+}
+
+/**
+ * What an editor typed into the admin's sign-in screen, as `signIn` receives
+ * it.
+ */
+export interface SignInAttempt {
+    email: string;
+    password: string;
+    /**
+     * The request's headers, with the cookies and client address your auth
+     * reads.
+     */
+    headers: Headers;
+}
+
+/**
+ * The admin's Sign out, as `signOut` receives it.
+ */
+export interface SignOutRequest {
+    /**
+     * The request's headers, with the session cookie to end.
+     */
+    headers: Headers;
 }
 
 /**
@@ -279,13 +337,17 @@ export interface CmsPluginOptions<
      */
     revalidate?: (tags: readonly string[]) => void | Promise<void>;
     /**
-     * Where a signed-out editor who opens draft mode is sent, with `next`
-     * naming where they were going.
+     * Where a signed-out editor who opens the admin or draft mode is sent,
+     * with `next` naming where they were going: a sign-in page of your app,
+     * such as one that hands off to SSO. Takes the place of `auth.signIn`,
+     * so name one of them.
      */
     signInPath?: string;
     /**
      * Where the admin's Sign out link goes: a page or route of your app that
-     * ends the editor's session. Without one, the admin shows no link.
+     * ends the editor's session and answers `GET`. Takes the place of
+     * `auth.signOut`, so name one of them. Without either, the admin shows no
+     * Sign out.
      */
     signOutPath?: string;
     /**
@@ -409,6 +471,8 @@ export const CmsPluginOptionsSchema = z
                 })
                 .optional(),
             invalidate: RouteAuthSchema.optional(),
+            signIn: z.custom<CmsAuthOptions['signIn']>(isFunction).optional(),
+            signOut: z.custom<CmsAuthOptions['signOut']>(isFunction).optional(),
         }),
         relationships: z
             .array(
@@ -472,6 +536,14 @@ export const CmsPluginOptionsSchema = z
     .refine((options) => options.pages === undefined || options.sites === undefined, {
         error: 'takes `pages` for one app, or `sites` for several, not both',
         path: ['sites'],
+    })
+    .refine((options) => options.auth.signIn === undefined || options.signInPath === undefined, {
+        error: "takes `auth.signIn` for the admin's own sign-in screen, or `signInPath` for a page of your app, not both",
+        path: ['signInPath'],
+    })
+    .refine((options) => options.auth.signOut === undefined || options.signOutPath === undefined, {
+        error: "takes `auth.signOut` for the admin's own Sign out, or `signOutPath` for a route of your app, not both",
+        path: ['signOutPath'],
     });
 
 export type ResolvedCmsOptions = z.output<typeof CmsPluginOptionsSchema>;

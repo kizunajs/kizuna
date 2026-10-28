@@ -7,52 +7,80 @@ Some work needs room. Tagging forty articles, finding last week's orders, or rea
 
 ## Signing in
 
-The admin is at `/admin` under the CMS's routes, so `/api/admin` with the default `apiPath`. Editors sign in the way they sign in to your app, as the editor identity under `auth` on `cms()`. A signed-out editor is sent to your `signInPath` and comes back to the admin once they are in. Kizuna keeps no accounts and stores no passwords.
+The admin is at `/admin` under the CMS's routes, so `/api/admin` with the default `apiPath`. Editors sign in as the editor identity under `auth` on `cms()`, through your app's own auth. Kizuna keeps no accounts and stores no passwords, so you hand it the call that signs an editor in, and the admin draws its own sign-in screen at `/admin/login`. Here `auth` is a [Better Auth](https://better-auth.com) instance:
 
 ```ts title="kizuna.config.ts"
 content: cms({
     auth: {
         identity: 'editor',
+        signIn: ({ email, password, headers }) =>
+            auth.api.signInEmail({
+                body: {
+                    email,
+                    password,
+                },
+                headers,
+                asResponse: true,
+            }),
     },
-    signInPath: '/login',
 }),
 ```
 
-The foot of the sidebar shows who is signed in, with their role. Signing out belongs to your app too. Name the route that ends an editor's session as `signOutPath`, and a **Sign out** link sits beside their name. It is a link, so the route answers `GET`.
+`signIn` returns the response your auth answers with. Its cookies reach the browser, and any status outside 2xx tells the editor their email or password is wrong, in the same words whichever one it was. A signed-out editor who opens the admin or draft mode lands on the screen, and comes back to where they were going once they are in. The CMS checks that the form was sent from a page of your site, so a form on another site cannot sign an editor in to an account of its choosing.
+
+The foot of the sidebar shows who is signed in, with their role. Give `signOut` the call that ends a session, and their name opens a menu with **Sign out**, which ends the session, closes draft mode, and returns to the sign-in screen:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    auth: {
+        identity: 'editor',
+        signOut: ({ headers }) =>
+            auth.api.signOut({
+                headers,
+                asResponse: true,
+            }),
+    },
+}),
+```
+
+### Signing in elsewhere
+
+When editors sign in somewhere else, like your company's single sign-on, name that page as `signInPath`. A signed-out editor goes there with `next` naming where they were going. Name the route that ends a session as `signOutPath`, and **Sign out** links to it, so it answers `GET`:
 
 ```ts title="kizuna.config.ts"
 content: cms({
     auth: {
         identity: 'editor',
     },
-    signInPath: '/login',
+    signInPath: '/sso',
     signOutPath: '/logout',
 }),
 ```
 
+Each pair takes one or the other. `cms()` throws when given both `signIn` and `signInPath`, or both `signOut` and `signOutPath`.
+
 ## Its address
 
-Editors bookmark the admin, so give it an address they remember. `adminPath` is the path from your site's root:
+Editors bookmark the admin, so give it an address they remember. `adminPath` is the path from your site's root, and the sign-in screen sits under it, at `/admin/login`:
 
 ```ts title="kizuna.config.ts"
 content: cms({
     auth: {
         identity: 'editor',
     },
-    signInPath: '/login',
     adminPath: '/admin',
 }),
 ```
 
-A path under `apiPath` is served by the mount you already have. Anywhere else, like `/admin` above, mount the config a second time at the site's root, from a route file at the admin's path:
+A path under `apiPath` is served by the mount you already have. Anywhere else, like `/admin` above, mount the config a second time at the site's root, from an optional catch-all route at the admin's path:
 
-```ts title="src/app/admin/route.ts"
+```ts title="src/app/admin/[[...admin]]/route.ts"
 import kizuna from '@kizuna-config';
 
 export const { GET, HEAD } = kizuna.api.mount();
 ```
 
-With no `basePath`, the route matches the path as the browser sent it, and Next sends this file nothing but `/admin`. The admin calls the CMS's routes at `apiPath` wherever it is served, and an editor who signs in comes back to `adminPath`.
+With no `basePath`, the route matches the path as the browser sent it, so this file serves `/admin` and `/admin/login`. The admin calls the CMS's routes at `apiPath` wherever it is served, signing in and out among them, and an editor who signs in comes back to `adminPath`.
 
 ## The sidebar
 

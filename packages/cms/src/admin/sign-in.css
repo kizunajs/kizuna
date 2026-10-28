@@ -1,0 +1,59 @@
+/* The admin's sign-in screen, in the editor's tokens. A page of its own, so it draws its own canvas. */
+
+html,
+body {
+    min-height: 100%;
+    background: var(--k-canvas);
+}
+
+.k-sign-in {
+    display: grid;
+    place-items: center;
+    min-height: 100vh;
+    padding: 48px 16px;
+}
+
+.k-sign-in-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: 320px;
+}
+
+.k-sign-in-title {
+    margin: 20px 0 8px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.k-sign-in-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.k-sign-in-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--k-muted);
+}
+
+.k-sign-in-hint {
+    font-size: 13px;
+    color: var(--k-muted);
+}
+
+/* The line keeps its height while empty, so the button stays put when a message comes and goes. */
+.k-sign-in-error {
+    min-height: 1.45em;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--k-ink);
+}
+
+.k-sign-in-form .k-button {
+    width: 100%;
+}

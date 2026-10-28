@@ -92,6 +92,8 @@ export {
     type Person,
     type ReviewOptions,
     type ReviewRequest,
+    type SignInAttempt,
+    type SignOutRequest,
     type PageEntry,
     type PageMap,
     definePages,

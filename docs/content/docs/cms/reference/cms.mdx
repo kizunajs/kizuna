@@ -33,33 +33,33 @@ content: cms({
 }),
 ```
 
-| Option          | What it is                                                                                |
-| --------------- | ----------------------------------------------------------------------------------------- |
-| `db`            | The Drizzle database the `cms_` tables live in                                            |
-| `pages`         | The pages module `kizuna generate` writes, or one per site under `sites`                  |
-| `sites`         | `declareSites(Site, { ... })`, or a `defineSite` for admin-created sites                  |
-| `site`          | Which site this deployment is: `() => process.env.KIZUNA_SITE`, or `({ request }) => ...` |
-| `locales`       | The languages, the first being the source                                                 |
-| `fallback`      | Per locale, what to show when a translation is missing                                    |
-| `globals`       | `defineGlobal` results, shared by every site                                              |
-| `collections`   | `defineCollection` results, shared by every site                                          |
-| `relationships` | `defineRelationship` results                                                              |
-| `views`         | `defineView` results: data the CMS shows but does not store                               |
-| `dashboard`     | The admin's first page: `stat`, `chart`, `reviews` and `collections` widgets              |
-| `auth`          | `identity`, `roles`, `sites`, `publish`, `people`, `invalidate`                           |
-| `reviews`       | `roles` that may approve, `onReviewRequested`                                             |
-| `media`         | S3 settings or a `storage`, `publicPath`, `maxBytes`                                      |
-| `metadata`      | `title` and `og.title` joins for search results                                           |
-| `paths`         | `rewrite: true` to serve localized addresses                                              |
-| `on`            | `published`, `unpublished`, `deleted` for every document                                  |
-| `preview`       | `url` of the site, for the editor's preview                                               |
-| `signInPath`    | Where a signed-out editor is sent                                                         |
-| `signOutPath`   | Where the admin's Sign out link goes, a route of your app that ends the session           |
-| `adminPath`     | Where the admin is served, default `/admin` under `apiPath` and `path`                    |
-| `apiPath`       | Where the config is mounted, default `/api`                                               |
-| `path`          | Where the CMS routes sit under it, default `/cms`                                         |
-| `revalidate`    | A function that revalidates tags, when the site runs elsewhere                            |
-| `environments`  | Named environments for `kizuna cms push` and `pull`                                       |
+| Option          | What it is                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `db`            | The Drizzle database the `cms_` tables live in                                                                      |
+| `pages`         | The pages module `kizuna generate` writes, or one per site under `sites`                                            |
+| `sites`         | `declareSites(Site, { ... })`, or a `defineSite` for admin-created sites                                            |
+| `site`          | Which site this deployment is: `() => process.env.KIZUNA_SITE`, or `({ request }) => ...`                           |
+| `locales`       | The languages, the first being the source                                                                           |
+| `fallback`      | Per locale, what to show when a translation is missing                                                              |
+| `globals`       | `defineGlobal` results, shared by every site                                                                        |
+| `collections`   | `defineCollection` results, shared by every site                                                                    |
+| `relationships` | `defineRelationship` results                                                                                        |
+| `views`         | `defineView` results: data the CMS shows but does not store                                                         |
+| `dashboard`     | The admin's first page: `stat`, `chart`, `reviews` and `collections` widgets                                        |
+| `auth`          | `identity`, `roles`, `sites`, `publish`, `people`, `invalidate`, `signIn`, `signOut`                                |
+| `reviews`       | `roles` that may approve, `onReviewRequested`                                                                       |
+| `media`         | S3 settings or a `storage`, `publicPath`, `maxBytes`                                                                |
+| `metadata`      | `title` and `og.title` joins for search results                                                                     |
+| `paths`         | `rewrite: true` to serve localized addresses                                                                        |
+| `on`            | `published`, `unpublished`, `deleted` for every document                                                            |
+| `preview`       | `url` of the site, for the editor's preview                                                                         |
+| `signInPath`    | Where a signed-out editor is sent when they sign in elsewhere, in place of `auth.signIn`                            |
+| `signOutPath`   | Where the admin's Sign out link goes, in place of `auth.signOut`                                                    |
+| `adminPath`     | Where the admin is served, default `/admin` under `apiPath` and `path`, with its sign-in screen at `login` under it |
+| `apiPath`       | Where the config is mounted, default `/api`                                                                         |
+| `path`          | Where the CMS routes sit under it, default `/cms`                                                                   |
+| `revalidate`    | A function that revalidates tags, when the site runs elsewhere                                                      |
+| `environments`  | Named environments for `kizuna cms push` and `pull`                                                                 |
 
 ## A site
 

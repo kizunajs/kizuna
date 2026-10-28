@@ -96,7 +96,7 @@ The editor opens the site in draft mode, at `/api/draft`, which the CMS serves. 
 
 Drafts show only while that link's cookie verifies. The open editor renews it every few minutes, so closing the editor stops the drafts showing soon after. The cookies are set for a cross-site frame, since the site's draft runs inside the editor in your chat.
 
-`/api/draft` opened directly, with no link, still works for a signed-in editor. A signed-out editor goes to the `signInPath` on `cms()` first.
+`/api/draft` opened directly, with no link, still works for a signed-in editor. A signed-out editor [signs in](/docs/cms/editing/admin#signing-in) first, on the admin's sign-in screen or at your `signInPath`.
 
 ## The preview
 

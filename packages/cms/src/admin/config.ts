@@ -24,9 +24,16 @@ export interface AdminConfig {
      */
     role: string | null;
     /**
-     * Where Sign out goes, from `signOutPath` on `cms()`.
+     * Where Sign out goes: `signOutPath` on `cms()`, or the CMS's own
+     * sign-out route when `auth.signOut` is set.
      */
     signOutPath: string | null;
+    /**
+     * How Sign out reaches `signOutPath`: `GET`, a link to your app's route,
+     * or `POST`, a form sent to the CMS's sign-out route, which answers with
+     * a redirect to the sign-in screen.
+     */
+    signOutMethod?: 'GET' | 'POST';
     /**
      * The editing routes, by the tool name the editor calls them by.
      */

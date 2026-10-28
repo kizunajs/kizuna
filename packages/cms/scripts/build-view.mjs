@@ -1,5 +1,5 @@
-// Builds the editor a host renders over MCP Apps, and the admin the CMS serves
-// itself: each one HTML file with its script, styles and font inlined, since a
+// Builds the editor a host renders over MCP Apps, and the admin and its sign-in
+// screen the CMS serves itself: each one HTML file with its script, styles and font inlined, since a
 // host serves a view as one document.
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +8,7 @@ import { build } from 'tsdown';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const scratch = `${root}dist/view-build`;
 
-const page = async ({ name, entry, stylesheets }) => {
+const page = async ({ name, entry, stylesheets, title = 'Kizuna CMS' }) => {
     await build({
         config: false,
         entry: {
@@ -44,7 +44,7 @@ const page = async ({ name, entry, stylesheets }) => {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kizuna CMS</title>
+<title>${title}</title>
 <style>${styles}</style>
 <script id="kizuna-cms-config" type="application/json">"__KIZUNA_CMS_VIEW_CONFIG__"</script>
 </head>
@@ -75,4 +75,10 @@ await page({
     name: 'admin',
     entry: 'src/admin/main.tsx',
     stylesheets: ['src/view/view.css', 'src/admin/admin.css'],
+});
+await page({
+    name: 'sign-in',
+    entry: 'src/admin/sign-in-main.tsx',
+    stylesheets: ['src/view/view.css', 'src/admin/sign-in.css'],
+    title: 'Sign in · Kizuna CMS',
 });

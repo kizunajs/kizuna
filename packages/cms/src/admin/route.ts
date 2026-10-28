@@ -21,6 +21,28 @@ export const adminPathOf = (options: ResolvedCmsOptions, base: '' | `/${string}`
     options.adminPath ?? `${options.apiPath ?? '/api'}${base}${ADMIN_PATH}`;
 
 /**
+ * Where the browser opens the admin's sign-in screen, from the site's root.
+ */
+export const signInScreenOf = (options: ResolvedCmsOptions, base: '' | `/${string}`): string =>
+    `${adminPathOf(options, base).replace(/\/+$/, '')}/login`;
+
+/**
+ * Where a signed-out editor on their way to `next` is sent: the admin's own
+ * sign-in screen when `auth.signIn` is set, then `signInPath`, or nowhere.
+ */
+export const signInLocationOf = (options: ResolvedCmsOptions, base: '' | `/${string}`, next: string): string | undefined => {
+    const signIn = options.auth.signIn === undefined ? options.signInPath : signInScreenOf(options, base);
+    return signIn === undefined ? undefined : `${signIn}?next=${encodeURIComponent(next)}`;
+};
+
+/**
+ * Where the CMS's sign-in and sign-out routes are served, from the site's
+ * root.
+ */
+export const sessionPathOf = (options: ResolvedCmsOptions, base: '' | `/${string}`, action: 'sign-in' | 'sign-out'): string =>
+    `${options.apiPath ?? '/api'}${base}/${action}`;
+
+/**
  * The admin route's path: within the API when `adminPath` is under `apiPath`,
  * and the whole of it otherwise, for a mount at the site's root.
  */
@@ -65,11 +87,17 @@ export const editingRoleOf = (role: unknown, editingRoles: readonly string[] | u
     return held.find((candidate) => editingRoles === undefined || editingRoles.includes(candidate)) ?? null;
 };
 
-export const adminConfigFor = (options: ResolvedCmsOptions, api: PluginApi, role: string | null = null): AdminConfig => ({
+export const adminConfigFor = (
+    options: ResolvedCmsOptions,
+    api: PluginApi,
+    base: '' | `/${string}`,
+    role: string | null = null
+): AdminConfig => ({
     siteUrl: originOf(options.preview?.url),
     apiPath: options.apiPath ?? '/api',
     role,
-    signOutPath: options.signOutPath ?? null,
+    signOutPath: options.auth.signOut === undefined ? (options.signOutPath ?? null) : sessionPathOf(options, base, 'sign-out'),
+    signOutMethod: options.auth.signOut === undefined ? 'GET' : 'POST',
     routes: editingRoutesOf(api),
     groups: Object.fromEntries(
         [...(options.collections ?? []), ...(options.views ?? [])].flatMap((definition) =>
@@ -83,11 +111,46 @@ export const adminConfigFor = (options: ResolvedCmsOptions, api: PluginApi, role
  * The config as the page's JSON script holds it, with `<` escaped so no value
  * can close the script.
  */
-const embedded = (config: AdminConfig): string => JSON.stringify(config).replaceAll('<', '\\u003c');
+export const embedded = (config: unknown): string => JSON.stringify(config).replaceAll('<', '\\u003c');
+
+/**
+ * Who sent the request, as the editor identity sees them, and whether they
+ * hold a role that edits.
+ */
+export const editorOf = async (
+    service: CmsService,
+    options: ResolvedCmsOptions,
+    api: PluginApi,
+    args: {
+        headers: unknown;
+        query?: unknown;
+    }
+): Promise<{
+    signedIn: Record<string, unknown> | undefined;
+    allowed: boolean;
+}> => {
+    const signedIn = await authenticate(
+        api,
+        options.auth.identity,
+        {
+            headers: args.headers as Record<string, string | string[] | undefined>,
+            query: args.query,
+        },
+        adapterContextOf(args as unknown as Record<string, unknown>)
+    );
+    const role = signedIn?.['role'];
+    const allowed =
+        signedIn !== undefined &&
+        (service.roles === undefined || (Array.isArray(role) ? role : [role]).some((held) => service.roles!.includes(held as string)));
+    return {
+        signedIn,
+        allowed,
+    };
+};
 
 /**
  * `GET /admin`, or `adminPath`: the CMS in a browser tab, for an editor signed
- * in as the editor identity. Anyone else goes to `signInPath`, and comes back
+ * in as the editor identity. Anyone else goes to sign in, and comes back
  * after.
  */
 export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api: PluginApi, base: '' | `/${string}`) =>
@@ -100,21 +163,10 @@ export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api
             200: z.unknown(),
         },
     }).handler(async (args) => {
-        const signedIn = await authenticate(
-            api,
-            options.auth.identity,
-            {
-                headers: args.headers as Record<string, string | string[] | undefined>,
-                query: args.query,
-            },
-            adapterContextOf(args as unknown as Record<string, unknown>)
-        );
-        const role = signedIn?.['role'];
-        const allowed =
-            signedIn !== undefined &&
-            (service.roles === undefined || (Array.isArray(role) ? role : [role]).some((held) => service.roles!.includes(held as string)));
+        const { signedIn, allowed } = await editorOf(service, options, api, args);
         if (!allowed) {
-            if (options.signInPath === undefined) {
+            const location = signInLocationOf(options, base, adminPathOf(options, base));
+            if (location === undefined) {
                 return rawResponse(
                     new Response('Sign in as an editor first.', {
                         status: 401,
@@ -125,13 +177,13 @@ export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api
                 new Response(null, {
                     status: 307,
                     headers: {
-                        location: `${options.signInPath}?next=${encodeURIComponent(adminPathOf(options, base))}`,
+                        location,
                     },
                 })
             );
         }
         const page = (await readBuilt('admin.html')).replace(CONFIG_PLACEHOLDER, () =>
-            embedded(adminConfigFor(options, api, editingRoleOf(role, service.roles)))
+            embedded(adminConfigFor(options, api, base, editingRoleOf(signedIn?.['role'], service.roles)))
         );
         return rawResponse(
             new Response(page, {

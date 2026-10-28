@@ -20,7 +20,8 @@ import { defaultPagesOutput, discoverPages, findAppDir, renderPagesModule } from
 import { PREVIEW_COOKIE, PREVIEW_TTL_SECONDS } from './preview-token.js';
 import { PREVIEW_PROXY_PATH, PROXY_CORS, previewProxyUrl, proxyToSite } from './preview-proxy.js';
 import { draftEventsRoute } from './draft-events.js';
-import { adminRoute } from './admin/route.js';
+import { adminRoute, signInLocationOf } from './admin/route.js';
+import { signInRoute, signInScreenRoute, signOutRoute } from './admin/sign-in-route.js';
 import { routePrefix } from './options.js';
 import { assertActionAccess, resolveActions } from './action.js';
 import { assertViews } from './view-routes.js';
@@ -268,6 +269,17 @@ const definition = definePlugin({
                 previewProxy: previewProxyRoute(service, options, base),
                 previewProxyPreflight: previewProxyPreflightRoute(base),
                 admin: adminRoute(service, options, api, base),
+                ...(options.auth.signIn === undefined
+                    ? {}
+                    : {
+                          signInScreen: signInScreenRoute(service, options, api, base),
+                          signIn: signInRoute(options, base),
+                      }),
+                ...(options.auth.signOut === undefined
+                    ? {}
+                    : {
+                          signOut: signOutRoute(service, options, base),
+                      }),
             },
             validate: () => validate(service, options, api),
         };
@@ -295,7 +307,7 @@ const safeRedirect = (value: unknown): string =>
 /**
  * `GET /draft`: opens draft mode for a signed-in editor, or for anyone holding
  * a link the editor minted, and lands them on `redirect`. A signed-out editor
- * with no link goes to `signInPath` first. `renew` swaps in a fresh preview
+ * with no link goes to sign in first. `renew` swaps in a fresh preview
  * cookie for the preview, and `disable` leaves.
  */
 const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: PluginApi, base: '' | `/${string}`) =>
@@ -371,15 +383,19 @@ const draftRoute = (service: CmsService, options: ResolvedCmsOptions, api: Plugi
                     )
                 );
             }
-            if (options.signInPath === undefined) {
+            const location = signInLocationOf(
+                options,
+                base,
+                `${options.apiPath ?? '/api'}${base}/draft?redirect=${encodeURIComponent(target)}`
+            );
+            if (location === undefined) {
                 return rawResponse(
                     new Response('Sign in as an editor first.', {
                         status: 401,
                     })
                 );
             }
-            const back = `${options.apiPath ?? '/api'}${base}/draft?redirect=${encodeURIComponent(target)}`;
-            return rawResponse(redirect(`${options.signInPath}?next=${encodeURIComponent(back)}`));
+            return rawResponse(redirect(location));
         }
         const held = jar.get(PREVIEW_COOKIE);
         draft.enable();
