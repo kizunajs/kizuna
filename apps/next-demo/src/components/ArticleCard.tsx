@@ -1,44 +1,36 @@
 import type { Output } from '@kizunajs/cms';
 import { topics, type Articles } from '../cms/content';
+import { formatDate } from '../lib/format';
+import { sizedImage } from '../lib/image';
+import styles from './ArticleCard.module.css';
+
+const WIDTH = 720;
+const HEIGHT = 480;
 
 export function ArticleCard({ article }: { article: Output<typeof Articles> }) {
     return (
-        <a
-            href={`/blog/${article.slug}`}
-            style={{
-                display: 'block',
-                color: 'inherit',
-                textDecoration: 'none',
-            }}>
+        <article className={styles.card}>
             <img
-                src={article.cover.url}
+                className={styles.cover}
+                src={sizedImage(article.cover.url, WIDTH, HEIGHT)}
                 alt={article.cover.alt}
-                width={article.cover.width}
-                height={article.cover.height}
-                style={{
-                    width: '100%',
-                    height: 'auto',
-                    aspectRatio: '3 / 2',
-                    objectFit: 'cover',
-                    borderRadius: '0.75rem',
-                }}
+                width={WIDTH}
+                height={HEIGHT}
             />
-            <span
-                style={{
-                    display: 'block',
-                    color: '#555',
-                    marginTop: '0.5rem',
-                }}>
-                {topics[article.topic]}
-            </span>
-            <strong>{article.title}</strong>
-            <p
-                style={{
-                    color: '#555',
-                    margin: '0.25rem 0 0',
-                }}>
-                {article.excerpt}
-            </p>
-        </a>
+            <div className={styles.body}>
+                <p className={styles.meta}>
+                    <span className={styles.topic}>{topics[article.topic]}</span>
+                    {article.publishedOn === undefined ? null : (
+                        <time dateTime={article.publishedOn}>{formatDate(article.publishedOn)}</time>
+                    )}
+                </p>
+                <h3 className={styles.title}>
+                    <a href={`/blog/${article.slug}`} className={styles.link}>
+                        {article.title}
+                    </a>
+                </h3>
+                <p className={styles.excerpt}>{article.excerpt}</p>
+            </div>
+        </article>
     );
 }

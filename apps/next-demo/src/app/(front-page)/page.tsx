@@ -2,10 +2,12 @@ import type { Metadata } from 'next';
 import { inStoredOrder } from '@kizunajs/cms/next';
 import kizuna from '@kizuna-config';
 import { apiClient } from '../../lib/api-client';
-import { Hero } from '../../components/Hero';
-import { BrowseRange } from '../../components/BrowseRange';
-import { ProductGrid } from '../../components/ProductGrid';
-import { ArticleCard } from '../../components/ArticleCard';
+import { Hero } from '../../components/blocks/Hero';
+import { Content } from '../../components/blocks/Content';
+import { Products } from '../../components/blocks/Products';
+import { Media } from '../../components/blocks/Media';
+import { Archive } from '../../components/blocks/Archive';
+import { CallToAction } from '../../components/blocks/CallToAction';
 
 /**
  * The product grid comes from this app's own API, which `next build` cannot
@@ -28,65 +30,25 @@ const listProducts = async () => {
 export async function generateMetadata(): Promise<Metadata> {
     const content = await kizuna.content.pages.frontPage.get();
     return {
-        title: content.seo.title,
+        title: {
+            absolute: content.seo.title,
+        },
         description: content.seo.description,
     };
 }
 
 export default async function FrontPage() {
     const content = await kizuna.content.pages.frontPage.get();
-    const featured = inStoredOrder(content.featured, await listProducts(), (product) => product.id);
-    const articles =
-        content.articles.length > 0
-            ? await kizuna.content.collections.articles.getMany({
-                  ids: content.articles,
-              })
-            : (
-                  await kizuna.content.collections.articles.list({
-                      limit: 3,
-                  })
-              ).items;
+    const products = inStoredOrder(content.shop.products, await listProducts(), (product) => product.id);
 
     return (
-        <main
-            style={{
-                padding: '2rem',
-                maxWidth: '56rem',
-                margin: '0 auto',
-            }}>
-            <nav
-                style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    marginBottom: '2rem',
-                }}>
-                <a href="/blog">Blog</a>
-                <a href="/team">Team</a>
-                <a href="/contact">Contact</a>
-                <a href="/cms-api/admin">Edit content</a>
-                <a href="/demo">API demo</a>
-            </nav>
+        <main>
             <Hero {...content.hero} />
-            <ProductGrid products={featured} />
-            <BrowseRange />
-            {articles.length > 0 ? (
-                <section
-                    style={{
-                        marginTop: '3rem',
-                    }}>
-                    <h2>From the blog</h2>
-                    <div
-                        style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(14rem, 1fr))',
-                            gap: '1.5rem',
-                        }}>
-                        {articles.map((article) => (
-                            <ArticleCard key={article.id} article={article} />
-                        ))}
-                    </div>
-                </section>
-            ) : null}
+            {content.intro === undefined ? null : <Content {...content.intro} />}
+            <Products heading={content.shop.heading} products={products} />
+            {content.media === undefined ? null : <Media {...content.media} />}
+            <Archive {...content.latest} />
+            {content.callToAction === undefined ? null : <CallToAction {...content.callToAction} />}
         </main>
     );
 }

@@ -1,0 +1,38 @@
+.page {
+    --width: 760px;
+}
+
+.account {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 40px;
+    font-size: 0.9375rem;
+    color: var(--muted);
+}
+
+.account strong {
+    color: var(--ink);
+}
+
+.command {
+    margin: 32px 0 0;
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.admin {
+    margin: 32px 0 0;
+    color: var(--muted);
+}
+
+.admin a {
+    color: var(--ink);
+    font-weight: 600;
+    text-underline-offset: 3px;
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import styles from './BrowseRange.module.css';
 
 interface Product {
     id: string;
@@ -20,29 +21,22 @@ export function BrowseRange() {
             .then((body) => setProducts(body.products));
     }, []);
     return (
-        <section
-            style={{
-                marginTop: '1.5rem',
-            }}>
+        <div className={styles.range}>
             <button
                 type="button"
+                className={styles.toggle}
                 onClick={() => setOpen(!open)}
-                style={{
-                    padding: '0.5rem 0.9rem',
-                    border: '1px solid #ccc',
-                    borderRadius: '0.4rem',
-                    background: '#fff',
-                    cursor: 'pointer',
-                }}>
+                aria-expanded={open}
+                disabled={products === undefined}>
                 {products === undefined ? 'Loading the range' : `${open ? 'Hide' : 'Browse'} all ${products.length} products`}
             </button>
             {open && products !== undefined ? (
-                <ul data-testid="range">
+                <ul data-testid="range" className={styles.list}>
                     {products.map((product) => (
                         <li key={product.id}>{product.name}</li>
                     ))}
                 </ul>
             ) : null}
-        </section>
+        </div>
     );
 }

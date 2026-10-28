@@ -1,0 +1,22 @@
+.figure {
+    margin: 0;
+}
+
+.image {
+    width: 100%;
+    aspect-ratio: 2 / 1;
+    object-fit: cover;
+    border-radius: var(--radius-image);
+}
+
+.caption {
+    margin-top: 14px;
+    font-size: 0.875rem;
+    color: var(--muted);
+}
+
+@media (max-width: 767px) {
+    .image {
+        aspect-ratio: 4 / 3;
+    }
+}

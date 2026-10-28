@@ -1,0 +1,6 @@
+.more {
+    display: inline-block;
+    margin-top: 24px;
+    font-weight: 500;
+    text-underline-offset: 3px;
+}

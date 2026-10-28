@@ -1,0 +1,47 @@
+.topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-bottom: 40px;
+}
+
+.topic {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+@media (hover: hover) {
+    .topic:hover {
+        color: var(--ink);
+    }
+}
+
+.topic[aria-current='page'] {
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.empty {
+    color: var(--muted);
+}
+
+.pages {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 64px;
+    font-weight: 600;
+}
+
+.pages a {
+    text-decoration: none;
+}
+
+@media (hover: hover) {
+    .pages a:hover {
+        color: var(--muted);
+    }
+}

@@ -1,0 +1,21 @@
+.section {
+    width: 100%;
+    max-width: var(--max-width);
+    margin: var(--section-gap) auto 0;
+    padding-inline: var(--gutter);
+    scroll-margin-top: calc(var(--header-height) + 16px);
+}
+
+.narrow {
+    max-width: calc(var(--narrow-width) + 2 * var(--gutter));
+}
+
+.tight {
+    margin-top: 48px;
+}
+
+.heading {
+    margin-bottom: 28px;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 600;
+}

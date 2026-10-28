@@ -7,7 +7,7 @@ import { auth } from '../../auth';
 
 const safeNext = (value: FormDataEntryValue | null): Route => {
     const next = typeof value === 'string' ? value : '';
-    return (next.startsWith('/') && !next.startsWith('//') ? next : '/cms-api/admin') as Route;
+    return (next.startsWith('/') && !next.startsWith('//') ? next : '/admin') as Route;
 };
 
 export const signIn = async (formData: FormData): Promise<void> => {

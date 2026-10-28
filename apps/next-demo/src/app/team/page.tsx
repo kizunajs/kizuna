@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import kizuna from '@kizuna-config';
 import { departments } from '../../cms/content';
+import { Hero } from '../../components/blocks/Hero';
+import { Section } from '../../components/Section';
 import { EmployeeCard } from '../../components/EmployeeCard';
+import styles from './page.module.css';
 
 export const metadata: Metadata = {
     title: 'Team',
@@ -14,46 +17,15 @@ export default async function TeamPage() {
         direction: 'asc',
         limit: 100,
     });
-    const shown = [...new Set(items.map((employee) => employee.department))];
+    const present = new Set<string>(items.map((employee) => employee.department));
+    const shown = Object.entries(departments).filter(([department]) => present.has(department));
 
     return (
-        <main
-            style={{
-                padding: '2rem',
-                maxWidth: '56rem',
-                margin: '0 auto',
-            }}>
-            <h1>{content.heading}</h1>
-            <p
-                style={{
-                    color: '#555',
-                }}>
-                {content.intro}
-            </p>
-            {content.photo !== undefined ? (
-                <img
-                    src={content.photo.url}
-                    alt={content.photo.alt}
-                    width={content.photo.width}
-                    height={content.photo.height}
-                    style={{
-                        width: '100%',
-                        height: 'auto',
-                        borderRadius: '0.75rem',
-                    }}
-                />
-            ) : null}
-            {shown.map((department) => (
-                <section key={department}>
-                    <h2>{departments[department]}</h2>
-                    <ul
-                        style={{
-                            listStyle: 'none',
-                            padding: 0,
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(14rem, 1fr))',
-                            gap: '1rem',
-                        }}>
+        <main>
+            <Hero impact="medium" heading={content.heading} subheading={content.intro} image={content.photo} />
+            {shown.map(([department, label]) => (
+                <Section key={department} heading={label}>
+                    <ul className={styles.grid}>
                         {items
                             .filter((employee) => employee.department === department)
                             .map((employee) => (
@@ -62,7 +34,7 @@ export default async function TeamPage() {
                                 </li>
                             ))}
                     </ul>
-                </section>
+                </Section>
             ))}
         </main>
     );

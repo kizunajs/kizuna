@@ -1,0 +1,145 @@
+.hero {
+    position: relative;
+    width: 100%;
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 64px var(--gutter) 0;
+}
+
+.text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    max-width: 720px;
+}
+
+.eyebrow {
+    margin: 0 0 16px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--muted);
+}
+
+.eyebrow a {
+    text-decoration: none;
+}
+
+.heading {
+    font-size: clamp(2.25rem, 5.6vw, 4rem);
+    font-weight: 700;
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+}
+
+.subheading {
+    max-width: 48ch;
+    margin: 20px 0 0;
+    font-size: 1.1875rem;
+    line-height: 1.55;
+    color: var(--muted);
+}
+
+.links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 32px;
+}
+
+.image {
+    width: 100%;
+    object-fit: cover;
+}
+
+/* High: the heading over the image, which runs the full width of the window. */
+
+.high:not(.plain) {
+    display: grid;
+    max-width: none;
+    min-height: min(78vh, 760px);
+    padding: 0;
+}
+
+.high:not(.plain) > * {
+    grid-area: 1 / 1;
+}
+
+.high:not(.plain) .image {
+    height: 100%;
+}
+
+.high:not(.plain)::after {
+    content: '';
+    grid-area: 1 / 1;
+    background: linear-gradient(to top, var(--scrim), transparent 70%);
+}
+
+.high:not(.plain) .text {
+    z-index: 1;
+    align-self: end;
+    justify-self: center;
+    width: 100%;
+    max-width: var(--max-width);
+    padding: 0 var(--gutter) 64px;
+    color: #ffffff;
+}
+
+.high:not(.plain) .heading {
+    max-width: 14ch;
+    color: #ffffff;
+}
+
+.high:not(.plain) .subheading,
+.high:not(.plain) .eyebrow {
+    color: rgb(255 255 255 / 0.82);
+}
+
+/* Medium: the heading beside the image. */
+
+.medium:not(.plain) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 56px;
+}
+
+.medium:not(.plain) .image {
+    order: 1;
+    aspect-ratio: 4 / 3;
+    border-radius: var(--radius-image);
+}
+
+/* Low: the heading alone. */
+
+.low .heading,
+.plain .heading {
+    font-size: clamp(2rem, 4.6vw, 3.25rem);
+}
+
+@media (max-width: 767px) {
+    .hero {
+        padding-top: 40px;
+    }
+
+    .high:not(.plain) {
+        min-height: 560px;
+    }
+
+    .high:not(.plain) .text {
+        padding-bottom: 40px;
+    }
+
+    .medium:not(.plain) {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 28px;
+    }
+
+    .subheading {
+        font-size: 1.0625rem;
+    }
+
+    .links {
+        align-items: center;
+        gap: 16px 24px;
+    }
+}

@@ -1,0 +1,62 @@
+.page {
+    --width: 720px;
+}
+
+.links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin: 24px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.links a {
+    text-decoration: none;
+}
+
+@media (hover: hover) {
+    .links a:hover {
+        color: var(--muted);
+    }
+}
+
+.heading {
+    margin-top: 64px;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.addForm {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.users {
+    margin: 32px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.user {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    overflow-wrap: anywhere;
+}
+
+.email {
+    color: var(--muted);
+}
+
+@media (max-width: 599px) {
+    .addForm {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

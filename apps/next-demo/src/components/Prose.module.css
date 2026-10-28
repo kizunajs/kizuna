@@ -1,0 +1,55 @@
+.prose {
+    font-size: 1.0625rem;
+    line-height: 1.7;
+}
+
+.prose > :first-child {
+    margin-top: 0;
+}
+
+.prose > :last-child {
+    margin-bottom: 0;
+}
+
+.prose p,
+.prose ul,
+.prose ol {
+    margin: 0 0 1.1em;
+}
+
+.prose h2,
+.prose h3 {
+    margin: 1.8em 0 0.6em;
+}
+
+.prose h2 {
+    font-size: 1.5rem;
+}
+
+.prose h3 {
+    font-size: 1.25rem;
+}
+
+.prose a {
+    text-underline-offset: 3px;
+}
+
+.prose blockquote {
+    margin: 1.4em 0;
+    padding-left: 1.2em;
+    font-size: 1.1875rem;
+    color: var(--muted);
+}
+
+.prose code {
+    font-family: var(--mono);
+    font-size: 0.9em;
+}
+
+.prose figure {
+    margin: 1.6em 0;
+}
+
+.prose figure img {
+    border-radius: var(--radius-image);
+}

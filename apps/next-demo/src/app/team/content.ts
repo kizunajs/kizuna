@@ -18,7 +18,8 @@ export default definePage({
         {
             name: 'photo',
             schema: ImageSchema.optional(),
-            description: 'The whole team, shown wide above the list.',
+            description: 'The whole team, shown beside the heading.',
+            position: 'sidebar',
         },
     ],
 });

@@ -1,0 +1,39 @@
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--control-height);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: opacity 0.15s ease;
+}
+
+.primary {
+    border-radius: var(--radius-control);
+    background-color: var(--button-fill);
+    padding-inline: 20px;
+    color: var(--button-ink);
+}
+
+.secondary {
+    gap: 6px;
+    padding-inline: 4px;
+    color: inherit;
+}
+
+.secondary::after {
+    content: '\2192';
+    transition: transform 0.15s ease;
+}
+
+@media (hover: hover) {
+    .primary:hover {
+        opacity: 0.86;
+    }
+
+    .secondary:hover::after {
+        transform: translateX(2px);
+    }
+}

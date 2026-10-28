@@ -1,11 +1,18 @@
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { auth } from '../../auth';
 import { signOut } from '../login/actions';
+import panel from '../../components/Panel.module.css';
+import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ContentPage() {
+export const metadata: Metadata = {
+    title: 'Edit in your chat',
+};
+
+export default async function ChatEditingPage() {
     const found = await auth.api.getSession({
         headers: await headers(),
     });
@@ -13,52 +20,30 @@ export default async function ContentPage() {
     const origin = process.env.BETTER_AUTH_URL ?? 'http://localhost:3030';
 
     return (
-        <>
-            <header
-                style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    maxWidth: '64rem',
-                    margin: '0 auto',
-                    padding: '1rem',
-                    fontFamily: 'system-ui, sans-serif',
-                    borderBottom: '1px solid #e5e5e5',
-                }}>
+        <main className={`${panel.page} ${styles.page}`}>
+            <div className={styles.account}>
                 <span>
-                    {found.user.name} · {String(found.user.role)}
+                    Signed in as <strong>{found.user.name}</strong>, {String(found.user.role)}
                 </span>
                 <form action={signOut}>
-                    <button type="submit">Sign out</button>
+                    <button type="submit" className={panel.secondary}>
+                        Sign out
+                    </button>
                 </form>
-            </header>
-            <section
-                style={{
-                    maxWidth: '64rem',
-                    margin: '0 auto',
-                    padding: '0 1rem 3rem',
-                    fontFamily: 'system-ui, sans-serif',
-                }}>
-                <h2
-                    style={{
-                        fontSize: '1.1rem',
-                    }}>
-                    Edit in your chat
-                </h2>
-                <p>
-                    Add the endpoint below to Claude, or another host that shows MCP Apps, with your session as the bearer. Ask it to change
-                    a page, and the editor opens beside the answer. It edits as you, with your role.
+            </div>
+            <div className={panel.card}>
+                <h1 className={panel.title}>Edit in your chat</h1>
+                <p className={panel.lead}>
+                    Add the MCP server below to Claude, or another host that shows MCP Apps, with your session as the bearer. Ask it to
+                    change a page, and the editor opens beside the answer. It edits as you, with your role.
                 </p>
-                <pre
-                    style={{
-                        background: '#f4f4f4',
-                        padding: '0.75rem',
-                        overflow: 'auto',
-                        fontSize: '0.8rem',
-                    }}>
+                <pre className={styles.command}>
                     {`claude mcp add --transport http kizuna-demo ${origin}/cms-api/mcp --header "Authorization: Bearer ${found.session.token}"`}
                 </pre>
-            </section>
-        </>
+                <p className={styles.admin}>
+                    Or edit in the browser, in the <a href="/admin">admin</a>.
+                </p>
+            </div>
+        </main>
     );
 }

@@ -1,9 +1,16 @@
+import type { Metadata } from 'next';
 import { apiClient } from '../../lib/api-client';
 import { createUserAction, deleteUserAction } from './actions';
+import panel from '../../components/Panel.module.css';
+import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Home() {
+export const metadata: Metadata = {
+    title: 'API demo',
+};
+
+export default async function ApiDemoPage() {
     const result = await apiClient.users.listUsers({
         query: {
             page: 1,
@@ -13,70 +20,63 @@ export default async function Home() {
     const users = result.status === 200 ? result.body.users : [];
 
     return (
-        <main
-            style={{
-                padding: '2rem',
-                maxWidth: '40rem',
-                margin: '0 auto',
-            }}>
-            <h1>Kizuna demos</h1>
-            <p>The same shared routes power both demos. This page is a server component fetching via the typed client.</p>
-            <nav
-                style={{
-                    display: 'flex',
-                    gap: '1rem',
-                    marginBottom: '1.5rem',
-                    padding: '0.75rem 1rem',
-                    background: '#f4f4f4',
-                    borderRadius: '0.5rem',
-                }}>
-                <a href="http://localhost:8000/users" target="_blank" rel="noreferrer">
-                    Express API (:8000/users) →
-                </a>
-                <a href="/api/users" target="_blank" rel="noreferrer">
-                    Next.js API (:3030/api/users) →
-                </a>
-                <a href="http://localhost:8000/" target="_blank" rel="noreferrer">
-                    Express demo page (:8000) →
-                </a>
-                <a href="/cms-api/admin">Admin (sign in) →</a>
-                <a href="/">Shop home →</a>
-            </nav>
-
-            <h2>Users</h2>
-            <form
-                action={createUserAction}
-                style={{
-                    display: 'flex',
-                    gap: '0.5rem',
-                    marginBottom: '1rem',
-                }}>
-                <input name="name" placeholder="Name" required />
-                <input name="email" type="email" placeholder="Email" required />
-                <button type="submit">Add user</button>
-            </form>
-
-            <ul>
-                {users.map((user) => (
-                    <li
-                        key={user.id}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            marginBottom: '0.25rem',
-                        }}>
-                        <span>
-                            {user.name} ({user.email})
-                        </span>
-                        <form action={deleteUserAction}>
-                            <input type="hidden" name="id" value={user.id} />
-                            <button type="submit">Delete</button>
-                        </form>
+        <main className={`${panel.page} ${styles.page}`}>
+            <div className={panel.card}>
+                <h1 className={panel.title}>API demo</h1>
+                <p className={panel.lead}>
+                    The same shared routes power the Express and Next.js demos. This page is a server component calling them through the
+                    typed client.
+                </p>
+                <ul className={styles.links}>
+                    <li>
+                        <a href="http://localhost:8000/users" target="_blank" rel="noreferrer">
+                            Express API (:8000/users)
+                        </a>
                     </li>
-                ))}
-                {users.length === 0 && <li>No users yet.</li>}
-            </ul>
+                    <li>
+                        <a href="/api/users" target="_blank" rel="noreferrer">
+                            Next.js API (:3030/api/users)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="http://localhost:8000/" target="_blank" rel="noreferrer">
+                            Express demo page (:8000)
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/admin">Admin (sign in)</a>
+                    </li>
+                    <li>
+                        <a href="/">Shop home</a>
+                    </li>
+                </ul>
+
+                <h2 className={styles.heading}>Users</h2>
+                <form action={createUserAction} className={styles.addForm}>
+                    <input name="name" placeholder="Name" aria-label="Name" required className={panel.input} />
+                    <input name="email" type="email" placeholder="Email" aria-label="Email" required className={panel.input} />
+                    <button type="submit" className={panel.primary}>
+                        Add user
+                    </button>
+                </form>
+
+                <ul className={styles.users}>
+                    {users.map((user) => (
+                        <li key={user.id} className={styles.user}>
+                            <span>
+                                {user.name} <span className={styles.email}>{user.email}</span>
+                            </span>
+                            <form action={deleteUserAction}>
+                                <input type="hidden" name="id" value={user.id} />
+                                <button type="submit" className={panel.secondary}>
+                                    Delete
+                                </button>
+                            </form>
+                        </li>
+                    ))}
+                    {users.length === 0 && <li className={styles.email}>No users yet.</li>}
+                </ul>
+            </div>
         </main>
     );
 }

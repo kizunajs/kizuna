@@ -32,8 +32,9 @@ test('an editor names an owner and asks her to review, and she approves it so it
             name: 'Publish',
         })
         .click();
+    // The group lists the fields this test changed, which no other draft has.
     const contact = editor.locator('.k-review-group', {
-        hasText: 'Contact',
+        hasText: 'Button label',
     });
     await expect(contact.getByText('Needs an approval before it goes live.')).toBeVisible();
     await editor
@@ -70,7 +71,7 @@ test('an editor names an owner and asks her to review, and she approves it so it
     await expect(
         editor
             .locator('.k-review-group', {
-                hasText: 'Contact',
+                hasText: 'Button label',
             })
             .locator('.k-review-badge')
     ).toHaveText('Approved by Kari');

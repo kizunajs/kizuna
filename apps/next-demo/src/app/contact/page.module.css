@@ -1,0 +1,109 @@
+.layout {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+    gap: 48px 80px;
+}
+
+.form {
+    display: grid;
+    gap: 24px;
+}
+
+.field {
+    display: grid;
+    gap: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.input {
+    width: 100%;
+    min-height: var(--control-height);
+    border: none;
+    border-radius: var(--radius-control);
+    background-color: var(--field);
+    padding: 10px 12px;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+.input::placeholder {
+    color: transparent;
+}
+
+.input:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 0;
+}
+
+textarea.input {
+    resize: vertical;
+}
+
+.submit {
+    justify-self: start;
+    height: var(--control-height);
+    border: none;
+    border-radius: var(--radius-control);
+    background-color: var(--button-fill);
+    padding-inline: 22px;
+    color: var(--button-ink);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+@media (hover: hover) {
+    .submit:hover {
+        opacity: 0.86;
+    }
+}
+
+.thanks {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.details {
+    display: grid;
+    gap: 24px;
+    margin: 0;
+}
+
+.details dt {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--subtle);
+}
+
+.details dd {
+    margin: 6px 0 0;
+    font-size: 1.0625rem;
+    overflow-wrap: anywhere;
+}
+
+.details a {
+    text-underline-offset: 3px;
+}
+
+.contacts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+    gap: 48px 32px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+@media (max-width: 767px) {
+    .layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .submit {
+        justify-self: stretch;
+    }
+}

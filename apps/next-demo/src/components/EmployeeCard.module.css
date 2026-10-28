@@ -1,0 +1,48 @@
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+}
+
+.photo {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius-image);
+    object-fit: cover;
+    background-color: var(--field);
+}
+
+.name {
+    font-size: 1.0625rem;
+    font-weight: 600;
+}
+
+.role {
+    margin: 2px 0 0;
+    font-size: 0.9375rem;
+    color: var(--muted);
+}
+
+.bio {
+    max-width: 40ch;
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--muted);
+}
+
+.contact {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+}
+
+.contact a {
+    color: var(--ink);
+    text-underline-offset: 3px;
+}

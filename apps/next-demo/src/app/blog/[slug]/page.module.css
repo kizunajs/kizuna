@@ -1,0 +1,21 @@
+.byline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 20px 0 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+}
+
+.author {
+    margin-top: 80px;
+}
+
+.authorHeading {
+    margin-bottom: 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--subtle);
+}

@@ -1,0 +1,12 @@
+.page {
+    --width: 560px;
+
+    padding-block: 48px;
+    text-align: center;
+}
+
+.actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 28px;
+}

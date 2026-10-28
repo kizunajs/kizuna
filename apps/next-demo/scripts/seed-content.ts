@@ -51,7 +51,7 @@ const people = [
             role: 'Design lead',
             department: 'design',
             email: 'ingrid@example.com',
-            bio: 'Ingrid shapes how the shop looks and reads. She has run the design team since the first storefront.',
+            bio: 'Ingrid decides how the shop looks, from the shelves in the shop to the care cards in every box.',
             order: 0,
         },
     },
@@ -63,7 +63,7 @@ const people = [
             role: 'Product designer',
             department: 'design',
             email: 'aiko@example.com',
-            bio: 'Aiko designs checkout and the account pages.',
+            bio: 'Aiko designs the online shop and photographs every plant we sell.',
             order: 1,
         },
     },
@@ -75,7 +75,7 @@ const people = [
             role: 'Staff engineer',
             department: 'engineering',
             email: 'daniel@example.com',
-            bio: 'Daniel looks after the API and everything that calls it.',
+            bio: 'Daniel built the online shop and keeps the stock count honest.',
             order: 0,
         },
     },
@@ -87,6 +87,7 @@ const people = [
             role: 'Frontend engineer',
             department: 'engineering',
             email: 'sara@example.com',
+            bio: 'Sara works on checkout, and on the wildflower beds behind the shop at weekends.',
             order: 1,
         },
     },
@@ -108,7 +109,8 @@ const people = [
             role: 'Head of sales',
             department: 'sales',
             email: 'marco@example.com',
-            bio: 'Marco talks to every new wholesale customer at least once.',
+            phone: '+47 22 41 08 12',
+            bio: 'Marco looks after the offices we keep in plants, and visits each one before it signs up.',
             order: 0,
         },
     },
@@ -117,9 +119,10 @@ const people = [
         source: 'https://unsplash.com/photos/1494790108377-be9c29b29330',
         values: {
             name: 'Lucía Romero',
-            role: 'Account executive',
+            role: 'Account manager',
             department: 'sales',
             email: 'lucia@example.com',
+            phone: '+47 22 41 08 14',
             order: 1,
         },
     },
@@ -128,10 +131,10 @@ const people = [
         source: 'https://unsplash.com/photos/1472099645785-5658abf4ff4e',
         values: {
             name: 'Martin Hale',
-            role: 'Support lead',
+            role: 'Head of plant care',
             department: 'support',
-            email: 'support@example.com',
-            bio: 'Martin answers the hard questions, and writes the help pages so fewer people have to ask them.',
+            email: 'care@example.com',
+            bio: 'Send Martin a photo of a struggling plant and he will tell you what it needs, usually less water.',
             order: 0,
         },
     },
@@ -140,7 +143,7 @@ const people = [
         source: 'https://unsplash.com/photos/1539571696357-5a69c17a67c6',
         values: {
             name: 'Felix Lund',
-            role: 'Support engineer',
+            role: 'Plant care advisor',
             department: 'support',
             order: 1,
         },
@@ -149,14 +152,39 @@ const people = [
 
 const articleSeeds = [
     {
+        cover: 'ferns.jpg',
+        author: 'Felix Lund',
+        values: {
+            title: 'Bringing plants in for winter',
+            slug: 'bringing-plants-in-for-winter',
+            topic: 'guides',
+            publishedOn: '2026-10-26',
+            excerpt: 'Balcony plants want to come inside before the first frost. Check them for pests first.',
+            body: 'Most balcony plants survive a cold night, but not a frost. Bring them in once the forecast drops below five degrees at night.\n\nLook under every leaf before a plant comes inside, and rinse it with the shower if you find anything. Then give it the brightest window you have, and water about half as often as you did in summer.',
+        },
+    },
+    {
         cover: 'cherry-blossom.jpg',
         author: 'Marco Reyes',
         values: {
-            title: 'Spring sale starts Monday',
-            slug: 'spring-sale',
+            title: 'Plant now for April',
+            slug: 'plant-now-for-april',
             topic: 'news',
-            excerpt: 'Everything in the garden range is twenty percent off for one week.',
-            body: 'From Monday morning until Sunday night, everything in the garden range is twenty percent off, in the shop and online.\n\nWholesale customers get the same discount on orders placed that week. Marco and Lucía are on hand if you want to plan a bigger order.',
+            publishedOn: '2026-10-19',
+            excerpt: 'The autumn bulbs are in: tulips, daffodils and hyacinths, ready to go in the ground before it freezes.',
+            body: 'Bulbs need a cold winter in the soil to flower in spring, so October and November are the months to plant them. This year we have twelve kinds of tulip, six daffodils and hyacinths in white, blue and pink.\n\nPlant each bulb twice as deep as it is tall, pointed end up. Buy twenty or more and we pack them with a planting guide.',
+        },
+    },
+    {
+        cover: 'office-corridor.jpg',
+        author: 'Marco Reyes',
+        values: {
+            title: 'Plant care for offices',
+            slug: 'plant-care-for-offices',
+            topic: 'news',
+            publishedOn: '2026-10-05',
+            excerpt: 'We now choose, deliver and look after the plants in your office, with a visit every two weeks.',
+            body: 'An office full of plants is easy to start and hard to keep. Our new office service does the keeping: we choose plants for your light, deliver them in pots that fit the room, and visit every two weeks to water, feed and turn them.\n\nAnything that does not thrive, we replace at no charge. Marco visits every office before it signs up, so write to him for a walk-through.',
         },
     },
     {
@@ -166,38 +194,53 @@ const articleSeeds = [
             title: 'Plants for a dark office',
             slug: 'plants-for-dark-offices',
             topic: 'guides',
+            publishedOn: '2026-09-21',
             excerpt: 'Five plants that do well far from a window, and how often to water them.',
-            body: 'Ferns, snake plants and pothos all cope with little light. Water them when the top of the soil is dry, which in a heated office is about once a week.\n\nTurn the pots a quarter turn now and then, so they grow evenly instead of leaning toward the one window.',
+            body: 'Ferns, snake plants, pothos, ZZ plants and peace lilies all cope with little light. Water them when the top of the soil is dry, which in a heated office is about once a week.\n\nTurn the pots a quarter turn now and then, so they grow evenly instead of leaning toward the one window.',
         },
     },
     {
         cover: 'forest-path.jpg',
-        author: 'Martin Hale',
+        author: 'Aiko Tanaka',
         values: {
-            title: 'A day out with the support team',
-            slug: 'support-team-day-out',
+            title: 'A morning at the nursery',
+            slug: 'a-morning-at-the-nursery',
             topic: 'stories',
-            excerpt: 'Why the support team closed the inbox for a day and went for a walk.',
-            body: 'Once a year the support team takes a day away from the inbox. This year it was a long walk through the forest north of town.\n\nMost of the conversation was about the questions customers ask most, and which help pages would answer them before anyone has to write in.',
+            publishedOn: '2026-09-07',
+            excerpt: 'Where our ferns start out: a family nursery an hour north of town, at the edge of the forest.',
+            body: "Most of our ferns come from one nursery, run by the same family for three generations. They grow them outdoors in the shade of the forest for their first year, which makes them tougher than greenhouse ferns.\n\nWe spent a morning there choosing this autumn's plants, and Aiko came back with the photos you see in the shop.",
         },
     },
     {
-        cover: 'office-corridor.jpg',
-        author: 'Daniel Moreau',
+        cover: 'poppies.jpg',
+        author: 'Sara Lindqvist',
         values: {
-            title: 'New office, same people',
-            slug: 'new-office',
-            topic: 'news',
-            excerpt: 'We moved two streets over. The address changed; the phone number did not.',
-            body: 'The new office has room for the whole team on one floor, and a proper workshop for photographing products.\n\nVisitors are welcome as before. Ring the bell marked Kizuna on the ground floor.',
+            title: 'Sowing wildflowers',
+            slug: 'sowing-wildflowers',
+            topic: 'guides',
+            publishedOn: '2026-08-24',
+            excerpt: 'Poppies, cornflowers and oxeye daisies from one packet, and why poor soil suits them best.',
+            body: 'Wildflowers flower best in soil that has not been fed, so skip the compost. Clear the grass, rake the ground to a fine surface and scatter the seed in late summer or early spring.\n\nPress it down with a board, water once, and leave it alone. Poppies come first, in about ten weeks.',
+        },
+    },
+    {
+        cover: 'team-at-laptops.jpg',
+        author: 'Martin Hale',
+        values: {
+            title: 'Ask us about your plants',
+            slug: 'ask-us-about-your-plants',
+            topic: 'stories',
+            publishedOn: '2026-08-10',
+            excerpt: 'What the plant care team answers most, and how a photo saves a plant.',
+            body: 'The plant care team answers about forty questions a week. Half of them are the same question: why are the leaves turning yellow? The answer is usually too much water.\n\nA photo of the whole plant, the soil and the window it stands by tells us more than any description. Send one to care@example.com and we reply the same day.',
         },
     },
 ];
 
 /**
- * Fills in what the demo database is missing: the photos, the people, the
- * articles, the home, blog and team pages, and the footer. Content already there is left alone,
- * so an editor's changes survive a restart.
+ * Fills in what the demo database is missing: the photos, the header and
+ * footer, the people, the articles, and every page. Content already there is
+ * left alone, so an editor's changes survive a restart.
  */
 export const seedContent = async (service: CmsService): Promise<void> => {
     const caller = service.caller({
@@ -251,34 +294,60 @@ export const seedContent = async (service: CmsService): Promise<void> => {
     await fill(
         {
             type: 'global',
-            name: 'site',
+            name: 'header',
         },
         {
-            footerText: 'Kizuna demo shop. Content edited in your chat, over MCP.',
+            navItems: [
+                {
+                    label: 'Plant care',
+                    href: '/blog?topic=guides',
+                },
+                {
+                    label: 'Blog',
+                    href: '/blog',
+                },
+                {
+                    label: 'Team',
+                    href: '/team',
+                },
+                {
+                    label: 'Contact',
+                    href: '/contact',
+                },
+            ],
+            announcement: 'Order before 14:00 for next-day delivery in Oslo.',
+        }
+    );
+
+    await fill(
+        {
+            type: 'global',
+            name: 'footer',
+        },
+        {
+            tagline: 'Houseplants, bulbs and seeds from growers we know, with help for as long as you keep them.',
+            navItems: [
+                {
+                    label: 'Plant care guides',
+                    href: '/blog?topic=guides',
+                },
+                {
+                    label: 'News',
+                    href: '/blog?topic=news',
+                },
+                {
+                    label: 'Team',
+                    href: '/team',
+                },
+                {
+                    label: 'Contact',
+                    href: '/contact',
+                },
+            ],
             contactEmail: 'hello@example.com',
-        }
-    );
-
-    await fill(
-        {
-            type: 'page',
-            name: 'teamPage',
-        },
-        {
-            heading: 'The people behind the shop',
-            intro: 'Nine of us across design, engineering, sales and support.',
-            photo: photos.get('team-at-laptops.jpg'),
-        }
-    );
-
-    await fill(
-        {
-            type: 'page',
-            name: 'blogIndexPage',
-        },
-        {
-            heading: 'From the shop',
-            intro: 'News, guides and the odd story from the people who run the shop.',
+            phone: '+47 22 41 08 00',
+            address: 'Plantegata 4, 0550 Oslo',
+            openingHours: 'Mon to Fri 10 to 18, Sat 10 to 16',
         }
     );
 
@@ -299,8 +368,10 @@ export const seedContent = async (service: CmsService): Promise<void> => {
         console.log(`[demo] seeded ${people.length} employees`);
     }
 
+    const staff = await service.editorItems('employees');
+    const idOf = (name: string): string | undefined => staff.find((person) => person.label === name)?.id;
+
     if ((await service.editorItems('articles')).length === 0) {
-        const staff = await service.editorItems('employees');
         for (const article of articleSeeds) {
             const created = await service.createItem(
                 'articles',
@@ -308,7 +379,7 @@ export const seedContent = async (service: CmsService): Promise<void> => {
                     ...article.values,
                     body: richTextFromPlain(article.values.body),
                     cover: photos.get(article.cover),
-                    author: staff.find((person) => person.label === article.author)?.id,
+                    author: idOf(article.author),
                 },
                 caller,
                 AUTHOR
@@ -321,23 +392,114 @@ export const seedContent = async (service: CmsService): Promise<void> => {
     await fill(
         {
             type: 'page',
+            name: 'teamPage',
+        },
+        {
+            heading: 'The people behind the shop',
+            intro: 'Nine of us across design, engineering, sales and plant care, in the shop and online.',
+            photo: photos.get('team-at-laptops.jpg'),
+        }
+    );
+
+    await fill(
+        {
+            type: 'page',
+            name: 'blogIndexPage',
+        },
+        {
+            heading: 'Notes from the shop',
+            intro: 'Plant care guides, news from the shop, and stories from the growers we buy from.',
+        }
+    );
+
+    await fill(
+        {
+            type: 'page',
+            name: 'contactPage',
+        },
+        {
+            heading: 'Ask us anything about plants',
+            intro: 'Questions about an order, a plant that is struggling, or plants for your office. We answer every weekday.',
+            buttonLabel: 'Send message',
+            thanks: 'Thanks. We will be in touch within a working day.',
+            contacts: [idOf('Martin Hale'), idOf('Marco Reyes')].filter((id) => id !== undefined),
+        }
+    );
+
+    await fill(
+        {
+            type: 'page',
             name: 'frontPage',
         },
         {
             hero: {
+                impact: 'high',
                 heading: 'Plants for every room',
-                subheading: 'Bulbs, seeds and potted plants, picked by people who keep them alive.',
+                subheading: 'Houseplants, bulbs and seeds from growers we know, delivered across Oslo the next day.',
                 image: photos.get('poppies.jpg'),
-                cta: {
-                    label: 'Read the blog',
-                    href: 'https://example.com/blog',
-                },
+                links: [
+                    {
+                        label: 'Shop the season',
+                        href: '/#shop',
+                    },
+                    {
+                        label: 'Plant care guides',
+                        href: '/blog?topic=guides',
+                    },
+                ],
             },
-            featured: ['prod_tulips', 'prod_hyacinth', 'prod_seeds'],
-            articles: [],
+            intro: {
+                columns: [
+                    {
+                        heading: 'Grown nearby',
+                        body: richTextFromPlain(
+                            'Most of what we sell comes from three nurseries within a day of the shop. We visit each of them every season and choose the plants ourselves.'
+                        ),
+                    },
+                    {
+                        heading: 'Help that lasts',
+                        body: richTextFromPlain(
+                            'Every plant comes with a care card. If it struggles anyway, send us a photo and the plant care team will tell you what it needs.'
+                        ),
+                    },
+                    {
+                        heading: 'Delivered in a day',
+                        body: richTextFromPlain(
+                            'Order before two and we deliver across Oslo the next day, wrapped in paper and packed so nothing breaks.'
+                        ),
+                    },
+                ],
+            },
+            shop: {
+                heading: 'In the shop this week',
+                products: ['prod_fern', 'prod_snake_plant', 'prod_pothos', 'prod_tulips', 'prod_hyacinth', 'prod_seeds'],
+            },
+            media: {
+                image: photos.get('forest-path.jpg'),
+                caption: 'The forest edge at the nursery where our ferns spend their first year.',
+            },
+            latest: {
+                heading: 'From the blog',
+                articles: [],
+            },
+            callToAction: {
+                heading: 'Plants for your office',
+                body: 'We choose, deliver and look after the plants in your office, with a visit every two weeks.',
+                links: [
+                    {
+                        label: 'Talk to Marco',
+                        href: '/contact',
+                    },
+                    {
+                        label: 'How it works',
+                        href: '/blog/plant-care-for-offices',
+                    },
+                ],
+            },
             seo: {
-                title: 'Kizuna demo shop',
-                description: 'Bulbs, seeds and potted plants, with guides on keeping them alive.',
+                title: 'Hagen, houseplants, bulbs and seeds in Oslo',
+                description:
+                    'Houseplants, bulbs and seeds from growers we know, delivered across Oslo the next day, with plant care help for as long as you keep them.',
             },
         }
     );

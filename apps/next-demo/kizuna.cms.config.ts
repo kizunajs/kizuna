@@ -5,13 +5,14 @@ import { mcpPlugin } from '@kizunajs/mcp';
 import { openApiPlugin } from '@kizunajs/openapi';
 import { cms } from '@kizunajs/cms';
 import { app, editor } from './src/cms/identities';
-import { Articles, Employees, Site } from './src/cms/content';
+import { Articles, Employees, Footer, Header } from './src/cms/content';
 import { Products } from './src/cms/relationships';
 import { localMediaStorage } from './src/cms/media-storage';
 import { pages } from './src/cms.pages';
 import { db } from './src/db';
 import { editors } from './src/cms/people';
 import { AppUsers } from './src/cms/app-users';
+import { dashboard } from './src/cms/dashboard';
 
 /**
  * The CMS API: editors, the content they change, and an MCP endpoint of its
@@ -32,10 +33,11 @@ export default defineConfig({
     content: cms({
         db,
         pages,
-        globals: [Site],
+        globals: [Header, Footer],
         collections: [Employees, Articles],
         relationships: [Products],
         views: [AppUsers],
+        dashboard,
         auth: {
             identity: 'editor',
             roles: ['editor', 'admin'],
@@ -57,6 +59,7 @@ export default defineConfig({
         apiPath: '/cms-api',
         signInPath: '/login',
         signOutPath: '/logout',
+        adminPath: '/admin',
         preview: {
             url: process.env.BETTER_AUTH_URL ?? 'http://localhost:3030',
         },
