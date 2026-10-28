@@ -20,434 +20,420 @@ export namespace API {
      */
     export type ArticleId = string & KizunaBrand<"ArticleId">;
 
-    export type CmsCreateUpload = {
-        filename: string;
-        contentType: string;
-        size: number;
-    };
-
-    export type CmsDecideReview = {
-        /**
-         * The reviews to answer, from the waiting list.
-         */
-        ids: Array<string>;
-        decision: "approve" | "requestChanges";
-        /**
-         * Why, or what to change.
-         */
-        note?: string;
-    };
-
-    export type CmsDescribed = {
-        ref: string;
-        kind: "page" | "global" | "item";
-        name: string;
-        /**
-         * What editors call it. For an item, what they call its collection.
-         */
-        label?: string;
-        path: string | null;
-        /**
-         * Where else the document appears, to say before changing shared content.
-         */
-        usedOn: {
+    export namespace Cms {
+        export type Action = {
             /**
-             * A global, which every page may show.
+             * The key the action runs under.
              */
-            everywhere: boolean;
-            pages: Array<{
-                name: string;
-                path: string;
-            }>;
-        };
-        status: "empty" | "draft" | "published" | "changed";
-        version: number;
-        complete: boolean;
-        missing: Array<string>;
-        fields: Array<CmsField>;
-        draft: Record<string, unknown> | null;
-        /**
-         * The person who looks after it, if anyone does.
-         */
-        owner: CmsPerson | null;
-        /**
-         * Its latest review since it was last published.
-         */
-        review: CmsReviewState | null;
-        /**
-         * Whether publishing waits for an approval.
-         */
-        requireReview: boolean;
-    };
-
-    export type CmsDraft = {
-        /**
-         * The document: page:<name>, page:<site>:<name>, global:<name> or item:<collection>:<id>.
-         */
-        ref: string;
-        name: string;
-        /**
-         * Where it is served: a page's path, or an item's address on the page that shows it. Null otherwise.
-         */
-        path: string | null;
-        status: "empty" | "draft" | "published" | "changed";
-        version: number;
-        publishedVersion: number | null;
-        content: Record<string, unknown> | null;
-        /**
-         * Whether the draft passes the page schema and may be rendered.
-         */
-        complete: boolean;
-        /**
-         * The fields the draft is missing or fails.
-         */
-        missing: Array<string>;
-        updatedAt: string | null;
-        updatedBy: string | null;
-    };
-
-    export type CmsDraftChanges = {
-        ref: string;
-        /**
-         * What editors call the document.
-         */
-        label: string;
-        path: string | null;
-        /**
-         * Whether anything is published yet. When not, every filled field is a change.
-         */
-        published: boolean;
-        /**
-         * The person who looks after it, if anyone does.
-         */
-        owner: CmsPerson | null;
-        /**
-         * Its latest review since it was last published.
-         */
-        review: CmsReviewState | null;
-        /**
-         * Whether publishing waits for an approval.
-         */
-        requireReview: boolean;
-        /**
-         * One entry per field the draft changes, in the order the fields are shown.
-         */
-        changes: Array<{
-            /**
-             * The field, as a change to it is keyed.
-             */
-            path: string;
+            name: string;
             label: string;
             /**
-             * What visitors see now. Absent when the field is not published.
+             * A question the editor answers before the action runs.
              */
-            before?: unknown;
+            confirm?: string;
             /**
-             * What publishing makes them see. Absent when the draft clears the field.
+             * Whether the action applies to this item as it stands.
              */
-            after?: unknown;
+            available: boolean;
+        };
+
+        export type ChartWidget = {
+            type: "chart";
+            label: string;
             /**
-             * Whether the caller may revert it.
+             * The bars, oldest first.
+             */
+            data: Array<{
+                label: string;
+                value: number;
+            }>;
+        };
+
+        export type CollectionsWidget = {
+            type: "collections";
+            /**
+             * Every collection and view the person may open.
+             */
+            collections: Array<{
+                kind: "collection" | "view";
+                name: string;
+                label: string;
+                /**
+                 * The heading it is listed under.
+                 */
+                group: string | null;
+                /**
+                 * How many items a collection holds. Null for a view, whose records live in the app.
+                 */
+                count: number | null;
+            }>;
+        };
+
+        export type CreateUpload = {
+            filename: string;
+            contentType: string;
+            size: number;
+        };
+
+        export type Dashboard = {
+            /**
+             * The widgets the person may see, in the order listed.
+             */
+            widgets: Array<Cms.StatWidget | Cms.ChartWidget | Cms.ReviewsWidget | Cms.CollectionsWidget>;
+        };
+
+        export type DecideReview = {
+            /**
+             * The reviews to answer, from the waiting list.
+             */
+            ids: Array<string>;
+            decision: "approve" | "requestChanges";
+            /**
+             * Why, or what to change.
+             */
+            note?: string;
+        };
+
+        export type Described = {
+            ref: string;
+            kind: "page" | "global" | "item";
+            name: string;
+            /**
+             * What editors call it. For an item, what they call its collection.
+             */
+            label?: string;
+            path: string | null;
+            /**
+             * Where else the document appears, to say before changing shared content.
+             */
+            usedOn: {
+                /**
+                 * A global, which every page may show.
+                 */
+                everywhere: boolean;
+                pages: Array<{
+                    name: string;
+                    path: string;
+                }>;
+            };
+            status: "empty" | "draft" | "published" | "changed";
+            version: number;
+            complete: boolean;
+            missing: Array<string>;
+            fields: Array<Cms.Field>;
+            /**
+             * The tabs, rows and collapsibles that arrange the fields, in the order they are shown. Empty when the fields are listed plainly.
+             */
+            layout: Array<Cms.Layout>;
+            draft: Record<string, unknown> | null;
+            /**
+             * For an item, the buttons its collection's actions show the caller.
+             */
+            actions?: Array<Cms.Action>;
+            /**
+             * The person who looks after it, if anyone does.
+             */
+            owner: Cms.Person | null;
+            /**
+             * Its latest review since it was last published.
+             */
+            review: Cms.ReviewState | null;
+            /**
+             * Whether publishing waits for an approval.
+             */
+            requireReview: boolean;
+        };
+
+        export type Draft = {
+            /**
+             * The document: page:<name>, page:<site>:<name>, global:<name> or item:<collection>:<id>.
+             */
+            ref: string;
+            name: string;
+            /**
+             * Where it is served: a page's path, or an item's address on the page that shows it. Null otherwise.
+             */
+            path: string | null;
+            status: "empty" | "draft" | "published" | "changed";
+            version: number;
+            publishedVersion: number | null;
+            content: Record<string, unknown> | null;
+            /**
+             * Whether the draft passes the page schema and may be rendered.
+             */
+            complete: boolean;
+            /**
+             * The fields the draft is missing or fails.
+             */
+            missing: Array<string>;
+            updatedAt: string | null;
+            updatedBy: string | null;
+        };
+
+        export type DraftChanges = {
+            ref: string;
+            /**
+             * What editors call the document.
+             */
+            label: string;
+            path: string | null;
+            /**
+             * Whether anything is published yet. When not, every filled field is a change.
+             */
+            published: boolean;
+            /**
+             * The person who looks after it, if anyone does.
+             */
+            owner: Cms.Person | null;
+            /**
+             * Its latest review since it was last published.
+             */
+            review: Cms.ReviewState | null;
+            /**
+             * Whether publishing waits for an approval.
+             */
+            requireReview: boolean;
+            /**
+             * One entry per field the draft changes, in the order the fields are shown.
+             */
+            changes: Array<{
+                /**
+                 * The field, as a change to it is keyed.
+                 */
+                path: string;
+                label: string;
+                /**
+                 * What visitors see now. Absent when the field is not published.
+                 */
+                before?: unknown;
+                /**
+                 * What publishing makes them see. Absent when the draft clears the field.
+                 */
+                after?: unknown;
+                /**
+                 * Whether the caller may revert it.
+                 */
+                writable: boolean;
+            }>;
+        };
+
+        export type EditorItem = {
+            id: string;
+            ref: string;
+            /**
+             * The first text field of the item, or Untitled.
+             */
+            label: string;
+            /**
+             * Where a page shows the item, once its address fields are filled; null when no page does.
+             */
+            path: string | null;
+            status: "empty" | "draft" | "published" | "changed";
+            complete: boolean;
+            updatedAt: string;
+            updatedBy: string;
+            /**
+             * The id of the item it sits under, null at the top. Only in a collection with a tree.
+             */
+            parent?: string | null;
+            /**
+             * Its label after the labels of the items above it, like "Lighting / Workshop". Only in a collection with a tree.
+             */
+            treeLabel?: string;
+        };
+
+        export type Field = {
+            /**
+             * The dotted path a change is keyed by.
+             */
+            path: string;
+            name: string;
+            label?: string;
+            /**
+             * For an enum, the label editors see for each value.
+             */
+            options?: Record<string, string>;
+            description?: string;
+            /**
+             * What an editor reads under the field: the description, without the guidance for agents.
+             */
+            help?: string;
+            /**
+             * The block name, when the field is a block.
+             */
+            block?: string;
+            /**
+             * The path of the block field this one sits in.
+             */
+            parent?: string;
+            /**
+             * Where the editor shows it, when beside the main column.
+             */
+            position?: "sidebar";
+            /**
+             * How much of a row it takes, like 50%.
+             */
+            width?: string;
+            /**
+             * The ids of the tabs, rows and collapsibles it sits in, outermost first, from the layout list.
+             */
+            layout?: Array<string>;
+            readOnly: boolean;
+            /**
+             * Whether the caller may write this field.
              */
             writable: boolean;
-        }>;
-    };
-
-    export type CmsEditorItem = {
-        id: string;
-        ref: string;
-        /**
-         * The first text field of the item, or Untitled.
-         */
-        label: string;
-        /**
-         * Where a page shows the item, once its address fields are filled; null when no page does.
-         */
-        path: string | null;
-        status: "empty" | "draft" | "published" | "changed";
-        complete: boolean;
-        updatedAt: string;
-        updatedBy: string;
-    };
-
-    export type CmsField = {
-        /**
-         * The dotted path a change is keyed by.
-         */
-        path: string;
-        name: string;
-        label?: string;
-        /**
-         * For an enum, the label editors see for each value.
-         */
-        options?: Record<string, string>;
-        description?: string;
-        /**
-         * What an editor reads under the field: the description, without the guidance for agents.
-         */
-        help?: string;
-        /**
-         * The block name, when the field is a block.
-         */
-        block?: string;
-        /**
-         * The path of the block field this one sits in.
-         */
-        parent?: string;
-        readOnly: boolean;
-        /**
-         * Whether the caller may write this field.
-         */
-        writable: boolean;
-        /**
-         * The roles that may write it, when narrowed.
-         */
-        roles?: Array<string>;
-        /**
-         * The brand of the ids this field holds.
-         */
-        brand?: string;
-        /**
-         * The tool that finds ids for the brand.
-         */
-        searchTool?: string;
-        /**
-         * The JSON Schema of the value.
-         */
-        schema: Record<string, unknown>;
-        /**
-         * The current draft value.
-         */
-        value?: unknown;
-    };
-
-    export type CmsMedia = {
-        id: string;
-        url: string;
-        contentType: string;
-        size: number;
-        width: number;
-        height: number;
-        filename: string;
-        /**
-         * The default alt text, used where a field sets none.
-         */
-        alt: string;
-        focalPoint?: {
             /**
-             * Across, from the left edge, as a fraction of the width.
+             * The roles that may write it, when narrowed.
              */
-            x: number;
+            roles?: Array<string>;
             /**
-             * Down, from the top edge, as a fraction of the height.
+             * The brand of the ids this field holds, when a collection or relationship holds them.
              */
-            y: number;
+            brand?: string;
+            /**
+             * The tool that finds ids for the brand.
+             */
+            searchTool?: string;
+            /**
+             * The JSON Schema of the value.
+             */
+            schema: Record<string, unknown>;
+            /**
+             * The current draft value.
+             */
+            value?: unknown;
         };
-        uploadedAt: string;
-        uploadedBy: string;
-    };
 
-    export type CmsMediaList = {
-        media: Array<CmsMedia>;
-    };
-
-    export type CmsMissingFields = {
-        name: string;
-        complete: boolean;
-        missing: Array<string>;
-        /**
-         * Something to ask an agent, like "Fill in the front page."
-         */
-        prompt: string;
-    };
-
-    export type CmsPageSummary = {
-        name: string;
-        /**
-         * The site the page belongs to, default unless several apps share the CMS.
-         */
-        site: string;
-        /**
-         * page:<name>, page:<site>:<name> on a site of its own, or item:<collection>:<id> for an item a page shows at its address.
-         */
-        ref: string;
-        /**
-         * What editors call the page, when it declares a label.
-         */
-        label: string | null;
-        path: string;
-        status: "empty" | "draft" | "published" | "changed";
-        group: string | null;
-        /**
-         * The latest version saved, 0 before the first.
-         */
-        version: number;
-        publishedVersion: number | null;
-        updatedAt: string | null;
-        updatedBy: string | null;
-    };
-
-    export type CmsPeople = {
-        /**
-         * The caller, by their id.
-         */
-        me: string;
-        /**
-         * Everyone who edits, to name as an owner or a reviewer.
-         */
-        people: Array<CmsPerson>;
-    };
-
-    export type CmsPerson = {
-        id: string;
-        name: string;
-        /**
-         * A picture of them, as a URL.
-         */
-        image?: string;
-    };
-
-    export type CmsRequestReview = {
-        /**
-         * The documents to review, like page:frontPage. They are reviewed as one request.
-         */
-        refs: Array<string>;
-        /**
-         * The ids of the people to ask, from the people list.
-         */
-        reviewers: Array<string>;
-        /**
-         * Something for the reviewers to know.
-         */
-        note?: string;
-    };
-
-    export type CmsRevert = {
-        /**
-         * The fields to set back to what is published, from the changes list.
-         */
-        paths: Array<string>;
-    };
-
-    export type CmsReviews = {
-        reviews: Array<CmsReviewState>;
-    };
-
-    export type CmsReviewState = {
-        id: string;
-        /**
-         * Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.
-         */
-        status: "open" | "approved" | "changes" | "outdated";
-        /**
-         * The draft version it was asked about, or the one the reviewer answered.
-         */
-        version: number;
-        reviewers: Array<CmsPerson>;
-        requestedBy: CmsPerson;
-        note: string | null;
-        createdAt: string;
-        decidedBy: CmsPerson | null;
-        decisionNote: string | null;
-        decidedAt: string | null;
-    };
-
-    export type CmsRollback = {
-        /**
-         * The version to restore as a new draft.
-         */
-        version: number;
-    };
-
-    export type CmsSetOwner = {
-        /**
-         * The id of the person who looks after it, from the people list, or null for nobody.
-         */
-        owner: string | null;
-    };
-
-    export type CmsStoredContent = {
-        ref: string;
-        version: number;
-        updatedAt: string;
-        /**
-         * The content as stored: images are references with their crop and focal point.
-         */
-        content: Record<string, unknown>;
-    };
-
-    export type CmsUpdateDraft = {
-        /**
-         * New values keyed by field path, like "hero.heading". Only fields the caller may write.
-         */
-        changes: Record<string, unknown>;
-        /**
-         * What changed, in a sentence, for the history.
-         */
-        summary?: string;
-        /**
-         * Fold into your own recent unpublished version instead of adding one, as the live preview does while you type.
-         */
-        autosave?: boolean;
-    };
-
-    export type CmsUpdateMedia = {
-        alt?: string;
-        focalPoint?: {
+        export type Layout = {
             /**
-             * Across, from the left edge, as a fraction of the width.
+             * What the fields inside it name in their layout.
              */
-            x: number;
+            id: string;
+            type: "tab" | "row" | "collapsible";
             /**
-             * Down, from the top edge, as a fraction of the height.
+             * What a tab or a collapsible reads.
              */
-            y: number;
+            label?: string;
+            /**
+             * Where the editor shows a collapsible, when beside the main column.
+             */
+            position?: "sidebar";
         };
-    };
 
-    export type CmsUpload = {
-        uploadId: string;
-        /**
-         * Where the browser sends the file with PUT.
-         */
-        url: string;
-        /**
-         * Headers the PUT has to carry.
-         */
-        headers: Record<string, string>;
-        maxBytes: number;
-    };
+        export type Media = {
+            id: string;
+            url: string;
+            contentType: string;
+            size: number;
+            width: number;
+            height: number;
+            filename: string;
+            /**
+             * The default alt text, used where a field sets none.
+             */
+            alt: string;
+            focalPoint?: {
+                /**
+                 * Across, from the left edge, as a fraction of the width.
+                 */
+                x: number;
+                /**
+                 * Down, from the top edge, as a fraction of the height.
+                 */
+                y: number;
+            };
+            uploadedAt: string;
+            uploadedBy: string;
+        };
 
-    export type CmsVersion = {
-        version: number;
-        summary: string | null;
-        createdAt: string;
-        createdBy: string;
-        /**
-         * Whether this is the version readers see.
-         */
-        published: boolean;
-    };
+        export type MediaList = {
+            media: Array<Cms.Media>;
+        };
 
-    export type CmsVersionContent = {
-        ref: string;
-        version: number;
-        summary: string | null;
-        createdAt: string;
-        createdBy: string;
-        /**
-         * The content as that version saved it, migrated to the current schema.
-         */
-        content: Record<string, unknown>;
-    };
+        export type MissingFields = {
+            name: string;
+            complete: boolean;
+            missing: Array<string>;
+            /**
+             * Something to ask an agent, like "Fill in the front page."
+             */
+            prompt: string;
+        };
 
-    export type CmsVersionList = {
-        name: string;
-        versions: Array<CmsVersion>;
-    };
+        export type PageSummary = {
+            name: string;
+            /**
+             * The site the page belongs to, default unless several apps share the CMS.
+             */
+            site: string;
+            /**
+             * page:<name>, page:<site>:<name> on a site of its own, or item:<collection>:<id> for an item a page shows at its address.
+             */
+            ref: string;
+            /**
+             * What editors call the page, when it declares a label.
+             */
+            label: string | null;
+            path: string;
+            status: "empty" | "draft" | "published" | "changed";
+            group: string | null;
+            /**
+             * The latest version saved, 0 before the first.
+             */
+            version: number;
+            publishedVersion: number | null;
+            updatedAt: string | null;
+            updatedBy: string | null;
+        };
 
-    export type CmsWaitingReviews = {
-        reviews: Array<{
+        export type People = {
+            /**
+             * The caller, by their id.
+             */
+            me: string;
+            /**
+             * Everyone who edits, to name as an owner or a reviewer.
+             */
+            people: Array<Cms.Person>;
+        };
+
+        export type Person = {
+            id: string;
+            name: string;
+            /**
+             * A picture of them, as a URL.
+             */
+            image?: string;
+        };
+
+        export type RequestReview = {
+            /**
+             * The documents to review, like page:frontPage. They are reviewed as one request.
+             */
+            refs: Array<string>;
+            /**
+             * The ids of the people to ask, from the people list.
+             */
+            reviewers: Array<string>;
+            /**
+             * Something for the reviewers to know.
+             */
+            note?: string;
+        };
+
+        export type Revert = {
+            /**
+             * The fields to set back to what is published, from the changes list.
+             */
+            paths: Array<string>;
+        };
+
+        export type Reviews = {
+            reviews: Array<Cms.ReviewState>;
+        };
+
+        export type ReviewState = {
             id: string;
             /**
              * Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.
@@ -457,29 +443,239 @@ export namespace API {
              * The draft version it was asked about, or the one the reviewer answered.
              */
             version: number;
-            reviewers: Array<CmsPerson>;
-            requestedBy: CmsPerson;
+            reviewers: Array<Cms.Person>;
+            requestedBy: Cms.Person;
             note: string | null;
             createdAt: string;
-            decidedBy: CmsPerson | null;
+            decidedBy: Cms.Person | null;
             decisionNote: string | null;
             decidedAt: string | null;
-            ref: string;
-            label: string;
-            path: string | null;
-        }>;
-    };
+        };
 
-    export type CmsWhereUsed = {
-        brand: string;
-        id: string;
-        pages: Array<{
+        export type ReviewsWidget = {
+            type: "reviews";
+            /**
+             * The reviews waiting on the person signed in.
+             */
+            reviews: Array<{
+                id: string;
+                /**
+                 * Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.
+                 */
+                status: "open" | "approved" | "changes" | "outdated";
+                /**
+                 * The draft version it was asked about, or the one the reviewer answered.
+                 */
+                version: number;
+                reviewers: Array<Cms.Person>;
+                requestedBy: Cms.Person;
+                note: string | null;
+                createdAt: string;
+                decidedBy: Cms.Person | null;
+                decisionNote: string | null;
+                decidedAt: string | null;
+                ref: string;
+                label: string;
+                path: string | null;
+            }>;
+        };
+
+        export type Rollback = {
+            /**
+             * The version to restore as a new draft.
+             */
+            version: number;
+        };
+
+        export type SetOwner = {
+            /**
+             * The id of the person who looks after it, from the people list, or null for nobody.
+             */
+            owner: string | null;
+        };
+
+        export type StatWidget = {
+            type: "stat";
+            label: string;
+            /**
+             * What the stat shows, as your function wrote it.
+             */
+            value: string;
+            /**
+             * A line under the number, like "Up 12% on last week".
+             */
+            detail?: string;
+        };
+
+        export type StoredContent = {
+            ref: string;
+            version: number;
+            updatedAt: string;
+            /**
+             * The content as stored: images are references with their crop and focal point.
+             */
+            content: Record<string, unknown>;
+        };
+
+        export type UpdateDraft = {
+            /**
+             * New values keyed by field path, like "hero.heading". Only fields the caller may write. null empties an optional field.
+             */
+            changes: Record<string, unknown>;
+            /**
+             * What changed, in a sentence, for the history.
+             */
+            summary?: string;
+            /**
+             * Fold into your own recent unpublished version instead of adding one, as the live preview does while you type.
+             */
+            autosave?: boolean;
+        };
+
+        export type UpdateMedia = {
+            alt?: string;
+            focalPoint?: {
+                /**
+                 * Across, from the left edge, as a fraction of the width.
+                 */
+                x: number;
+                /**
+                 * Down, from the top edge, as a fraction of the height.
+                 */
+                y: number;
+            };
+        };
+
+        export type Upload = {
+            uploadId: string;
+            /**
+             * Where the browser sends the file with PUT.
+             */
+            url: string;
+            /**
+             * Headers the PUT has to carry.
+             */
+            headers: Record<string, string>;
+            maxBytes: number;
+        };
+
+        export type Version = {
+            version: number;
+            summary: string | null;
+            createdAt: string;
+            createdBy: string;
+            /**
+             * Whether this is the version readers see.
+             */
+            published: boolean;
+        };
+
+        export type VersionContent = {
+            ref: string;
+            version: number;
+            summary: string | null;
+            createdAt: string;
+            createdBy: string;
+            /**
+             * The content as that version saved it, migrated to the current schema.
+             */
+            content: Record<string, unknown>;
+        };
+
+        export type VersionList = {
             name: string;
-            site: string;
-            path: string;
-            fieldPaths: Array<string>;
-        }>;
-    };
+            versions: Array<Cms.Version>;
+        };
+
+        export type View = {
+            name: string;
+            label: string;
+            /**
+             * The heading the sidebar lists it under.
+             */
+            group: string | null;
+            /**
+             * The field that names each record in the list.
+             */
+            title: string;
+            /**
+             * The fields the list shows.
+             */
+            columns: Array<string>;
+            /**
+             * The fields the search box looks in.
+             */
+            search: Array<string>;
+            /**
+             * Whether the caller may save nothing in it.
+             */
+            readOnly: boolean;
+        };
+
+        export type ViewRecord = {
+            view: string;
+            id: string;
+            title: string;
+            /**
+             * Whether the caller may save nothing in it.
+             */
+            readOnly: boolean;
+            fields: Array<Cms.Field>;
+            layout: Array<Cms.Layout>;
+            /**
+             * The buttons beside save the caller may press.
+             */
+            actions: Array<Cms.Action>;
+            /**
+             * The record, as its fields show it.
+             */
+            item: Record<string, unknown>;
+        };
+
+        export type ViewRow = {
+            id: string;
+            title: string;
+            /**
+             * The list's columns, keyed by field.
+             */
+            values: Record<string, unknown>;
+        };
+
+        export type WaitingReviews = {
+            reviews: Array<{
+                id: string;
+                /**
+                 * Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.
+                 */
+                status: "open" | "approved" | "changes" | "outdated";
+                /**
+                 * The draft version it was asked about, or the one the reviewer answered.
+                 */
+                version: number;
+                reviewers: Array<Cms.Person>;
+                requestedBy: Cms.Person;
+                note: string | null;
+                createdAt: string;
+                decidedBy: Cms.Person | null;
+                decisionNote: string | null;
+                decidedAt: string | null;
+                ref: string;
+                label: string;
+                path: string | null;
+            }>;
+        };
+
+        export type WhereUsed = {
+            brand: string;
+            id: string;
+            pages: Array<{
+                name: string;
+                site: string;
+                path: string;
+                fieldPaths: Array<string>;
+            }>;
+        };
+    }
 
     /**
      * A branded `string`. Responses hand one back, and `toEmployeeId` makes one from a plain value.
@@ -737,22 +933,6 @@ export namespace API {
                      * Under 8 words.
                      */
                     title: string;
-                    /**
-                     * Lowercase words joined by dashes, like spring-sale.
-                     */
-                    slug: string;
-                    topic: "news" | "guides" | "stories";
-                    /**
-                     * One or two sentences for the blog index.
-                     */
-                    excerpt: string;
-                    cover: {
-                        id: string;
-                        url: string;
-                        alt: string;
-                        width: number;
-                        height: number;
-                    };
                     body: Array<{
                         _type: "block";
                         _key: string;
@@ -784,6 +964,22 @@ export namespace API {
                             height: number;
                         };
                     }>;
+                    /**
+                     * One or two sentences for the blog index.
+                     */
+                    excerpt: string;
+                    cover: {
+                        id: string;
+                        url: string;
+                        alt: string;
+                        width: number;
+                        height: number;
+                    };
+                    /**
+                     * Lowercase words joined by dashes, like spring-sale.
+                     */
+                    slug: string;
+                    topic: "news" | "guides" | "stories";
                     author?: EmployeeId;
                     id: string;
                 }>;
@@ -803,22 +999,6 @@ export namespace API {
                  * Under 8 words.
                  */
                 title: string;
-                /**
-                 * Lowercase words joined by dashes, like spring-sale.
-                 */
-                slug: string;
-                topic: "news" | "guides" | "stories";
-                /**
-                 * One or two sentences for the blog index.
-                 */
-                excerpt: string;
-                cover: {
-                    id: string;
-                    url: string;
-                    alt: string;
-                    width: number;
-                    height: number;
-                };
                 body: Array<{
                     _type: "block";
                     _key: string;
@@ -850,6 +1030,22 @@ export namespace API {
                         height: number;
                     };
                 }>;
+                /**
+                 * One or two sentences for the blog index.
+                 */
+                excerpt: string;
+                cover: {
+                    id: string;
+                    url: string;
+                    alt: string;
+                    width: number;
+                    height: number;
+                };
+                /**
+                 * Lowercase words joined by dashes, like spring-sale.
+                 */
+                slug: string;
+                topic: "news" | "guides" | "stories";
                 author?: EmployeeId;
                 id: string;
             }; headers: Record<string, string> }
@@ -897,7 +1093,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDescribed; headers: Record<string, string> }
+            | { status: 200; body: Cms.Described; headers: Record<string, string> }
             | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -909,7 +1105,7 @@ export namespace API {
     export namespace EditingPagesList {
         export type Result =
             | { status: 200; body: {
-                pages: Array<CmsPageSummary>;
+                pages: Array<Cms.PageSummary>;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -923,7 +1119,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: {
+            | { status: 200; body: Cms.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -938,7 +1134,7 @@ export namespace API {
             name: string;
         };
 
-        export type Body = CmsUpdateDraft;
+        export type Body = Cms.UpdateDraft;
 
         export type Headers = {
             /**
@@ -948,7 +1144,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: {
+            | { status: 200; body: Cms.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -967,7 +1163,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsMissingFields; headers: Record<string, string> }
+            | { status: 200; body: Cms.MissingFields; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -981,7 +1177,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsStoredContent; headers: Record<string, string> }
+            | { status: 200; body: Cms.StoredContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -995,7 +1191,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsVersionList; headers: Record<string, string> }
+            | { status: 200; body: Cms.VersionList; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1010,7 +1206,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsVersionContent; headers: Record<string, string> }
+            | { status: 200; body: Cms.VersionContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1024,7 +1220,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraftChanges; headers: Record<string, string> }
+            | { status: 200; body: Cms.DraftChanges; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1037,10 +1233,10 @@ export namespace API {
             name: string;
         };
 
-        export type Body = CmsRevert;
+        export type Body = Cms.Revert;
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1060,7 +1256,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1075,7 +1271,7 @@ export namespace API {
             name: string;
         };
 
-        export type Body = CmsSetOwner;
+        export type Body = Cms.SetOwner;
 
         export type Result =
             | { status: 204; body: undefined; headers: Record<string, string> }
@@ -1094,15 +1290,16 @@ export namespace API {
             name: string;
         };
 
-        export type Body = CmsRollback;
+        export type Body = Cms.Rollback;
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
@@ -1130,7 +1327,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: {
+            | { status: 200; body: Cms.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1145,7 +1342,7 @@ export namespace API {
             name: string;
         };
 
-        export type Body = CmsUpdateDraft;
+        export type Body = Cms.UpdateDraft;
 
         export type Headers = {
             /**
@@ -1155,7 +1352,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: {
+            | { status: 200; body: Cms.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1174,7 +1371,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsMissingFields; headers: Record<string, string> }
+            | { status: 200; body: Cms.MissingFields; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1188,7 +1385,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsStoredContent; headers: Record<string, string> }
+            | { status: 200; body: Cms.StoredContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1202,7 +1399,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsVersionList; headers: Record<string, string> }
+            | { status: 200; body: Cms.VersionList; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1217,7 +1414,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsVersionContent; headers: Record<string, string> }
+            | { status: 200; body: Cms.VersionContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1231,7 +1428,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraftChanges; headers: Record<string, string> }
+            | { status: 200; body: Cms.DraftChanges; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1244,10 +1441,10 @@ export namespace API {
             name: string;
         };
 
-        export type Body = CmsRevert;
+        export type Body = Cms.Revert;
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1267,7 +1464,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1282,7 +1479,7 @@ export namespace API {
             name: string;
         };
 
-        export type Body = CmsSetOwner;
+        export type Body = Cms.SetOwner;
 
         export type Result =
             | { status: 204; body: undefined; headers: Record<string, string> }
@@ -1301,15 +1498,16 @@ export namespace API {
             name: string;
         };
 
-        export type Body = CmsRollback;
+        export type Body = Cms.Rollback;
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
@@ -1333,10 +1531,26 @@ export namespace API {
             name: string;
         };
 
+        export type Query = {
+            /**
+             * Keep only the items whose field, by name, holds `value`, or holds it in a list.
+             */
+            field?: string;
+            /**
+             * What `field` holds, like an id.
+             */
+            value?: string;
+            /**
+             * Also keep the items holding an item under `value`, when `field` holds ids of a collection with a tree.
+             */
+            descendants?: boolean;
+        };
+
         export type Result =
             | { status: 200; body: {
-                items: Array<CmsEditorItem>;
+                items: Array<Cms.EditorItem>;
             }; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1357,7 +1571,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 201; body: CmsDraft; headers: Record<string, string> }
+            | { status: 201; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1390,7 +1604,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: {
+            | { status: 200; body: Cms.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1406,7 +1620,7 @@ export namespace API {
             id: string;
         };
 
-        export type Body = CmsUpdateDraft;
+        export type Body = Cms.UpdateDraft;
 
         export type Headers = {
             /**
@@ -1416,7 +1630,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: {
+            | { status: 200; body: Cms.Draft; headers: {
                 etag: string;
             } }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1436,7 +1650,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsMissingFields; headers: Record<string, string> }
+            | { status: 200; body: Cms.MissingFields; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1451,7 +1665,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsStoredContent; headers: Record<string, string> }
+            | { status: 200; body: Cms.StoredContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1466,7 +1680,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsVersionList; headers: Record<string, string> }
+            | { status: 200; body: Cms.VersionList; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1482,7 +1696,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsVersionContent; headers: Record<string, string> }
+            | { status: 200; body: Cms.VersionContent; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1497,7 +1711,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraftChanges; headers: Record<string, string> }
+            | { status: 200; body: Cms.DraftChanges; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1511,10 +1725,10 @@ export namespace API {
             id: string;
         };
 
-        export type Body = CmsRevert;
+        export type Body = Cms.Revert;
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1535,7 +1749,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1551,7 +1765,7 @@ export namespace API {
             id: string;
         };
 
-        export type Body = CmsSetOwner;
+        export type Body = Cms.SetOwner;
 
         export type Result =
             | { status: 204; body: undefined; headers: Record<string, string> }
@@ -1571,21 +1785,22 @@ export namespace API {
             id: string;
         };
 
-        export type Body = CmsRollback;
+        export type Body = Cms.Rollback;
 
         export type Result =
-            | { status: 200; body: CmsDraft; headers: Record<string, string> }
+            | { status: 200; body: Cms.Draft; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
             | { status: 400; body: ValidationError; headers: Record<string, string> };
     }
 
     export namespace EditingMediaList {
         export type Result =
-            | { status: 200; body: CmsMediaList; headers: Record<string, string> }
+            | { status: 200; body: Cms.MediaList; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1598,7 +1813,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsMedia; headers: Record<string, string> }
+            | { status: 200; body: Cms.Media; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1625,10 +1840,10 @@ export namespace API {
             id: string;
         };
 
-        export type Body = CmsUpdateMedia;
+        export type Body = Cms.UpdateMedia;
 
         export type Result =
-            | { status: 200; body: CmsMedia; headers: Record<string, string> }
+            | { status: 200; body: Cms.Media; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1638,10 +1853,10 @@ export namespace API {
     }
 
     export namespace EditingMediaCreateUpload {
-        export type Body = CmsCreateUpload;
+        export type Body = Cms.CreateUpload;
 
         export type Result =
-            | { status: 201; body: CmsUpload; headers: Record<string, string> }
+            | { status: 201; body: Cms.Upload; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1656,12 +1871,121 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 201; body: CmsMedia; headers: Record<string, string> }
+            | { status: 201; body: Cms.Media; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
             | { status: 403; body: ProblemDetails; headers: Record<string, string> }
             | { status: 422; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingActionsArticlesAnnounce {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingListViews {
+        export type Result =
+            | { status: 200; body: {
+                views: Array<Cms.View>;
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingViewsAppUsersList {
+        export type Query = {
+            /**
+             * What to search for, in name, email.
+             */
+            q?: string;
+        };
+
+        export type Result =
+            | { status: 200; body: {
+                items: Array<Cms.ViewRow>;
+            }; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingViewsAppUsersGet {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: Cms.ViewRecord; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingViewsAppUsersSave {
+        export type Params = {
+            id: string;
+        };
+
+        export type Body = {
+            /**
+             * The fields to save, keyed by name. Read the record first to learn the fields and which you may write.
+             */
+            data: Record<string, unknown>;
+        };
+
+        export type Result =
+            | { status: 200; body: Cms.ViewRecord; headers: Record<string, string> }
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 422; body: ValidationError; headers: Record<string, string> }
+            | { status: 400; body: ValidationError; headers: Record<string, string> };
+    }
+
+    export namespace EditingViewsAppUsersActionsSignOutEverywhere {
+        export type Params = {
+            id: string;
+        };
+
+        export type Result =
+            | { status: 200; body: Cms.ViewRecord; headers: Record<string, string> }
+            | { status: 204; body: undefined; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
+            | { status: 404; body: ProblemDetails; headers: Record<string, string> }
+            | { status: 409; body: ProblemDetails; headers: Record<string, string> };
+    }
+
+    export namespace EditingDashboard {
+        export type Result =
+            | { status: 200; body: Cms.Dashboard; headers: Record<string, string> }
+            | { status: 401; body: ProblemDetails; headers: {
+                "www-authenticate": string;
+            } }
+            | { status: 403; body: ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingWhereUsed {
@@ -1671,7 +1995,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsWhereUsed; headers: Record<string, string> }
+            | { status: 200; body: Cms.WhereUsed; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1697,6 +2021,14 @@ export namespace API {
                     id: string;
                     label: string;
                     image?: string;
+                    /**
+                     * The id of the item it sits under, null at the top. Only in a collection with a tree.
+                     */
+                    parent?: string | null;
+                    /**
+                     * Its label after the labels of the items above it, like "Lighting / Workshop". Only in a collection with a tree.
+                     */
+                    treeLabel?: string;
                 }>;
             }; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
@@ -1739,7 +2071,7 @@ export namespace API {
 
     export namespace EditingPeopleList {
         export type Result =
-            | { status: 200; body: CmsPeople; headers: Record<string, string> }
+            | { status: 200; body: Cms.People; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1755,7 +2087,7 @@ export namespace API {
         };
 
         export type Result =
-            | { status: 200; body: CmsWaitingReviews; headers: Record<string, string> }
+            | { status: 200; body: Cms.WaitingReviews; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -1764,10 +2096,10 @@ export namespace API {
     }
 
     export namespace EditingReviewsRequest {
-        export type Body = CmsRequestReview;
+        export type Body = Cms.RequestReview;
 
         export type Result =
-            | { status: 201; body: CmsReviews; headers: Record<string, string> }
+            | { status: 201; body: Cms.Reviews; headers: Record<string, string> }
             | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
@@ -1779,10 +2111,10 @@ export namespace API {
     }
 
     export namespace EditingReviewsDecide {
-        export type Body = CmsDecideReview;
+        export type Body = Cms.DecideReview;
 
         export type Result =
-            | { status: 200; body: CmsReviews; headers: Record<string, string> }
+            | { status: 200; body: Cms.Reviews; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
@@ -2408,6 +2740,7 @@ export interface Client {
              */
             listItems: ClientMethod<'GET', false, {
                 params: API.EditingCollectionsListItems.Params;
+                query?: API.EditingCollectionsListItems.Query;
                 headers?: Record<string, string>;
                 fetchOptions?: RequestInit;
             }, API.EditingCollectionsListItems.Result>;
@@ -2748,6 +3081,117 @@ export interface Client {
                 fetchOptions?: RequestInit;
             }, API.EditingMediaCompleteUpload.Result>;
         };
+        actions: {
+            articles: {
+                /**
+                 * Run "Announce to the team" on a published item of articles
+                 *
+                 * Asks first: "Post this article to the team channel?"
+                 *
+                 * @example
+                 * const result = await client.editing.actions.articles.announce({
+                 *     params: {
+                 *         id: '1',
+                 *     },
+                 * });
+                 */
+                announce: ClientMethod<'POST', false, {
+                    params: API.EditingActionsArticlesAnnounce.Params;
+                    headers?: Record<string, string>;
+                    fetchOptions?: RequestInit;
+                }, API.EditingActionsArticlesAnnounce.Result>;
+            };
+        };
+        /**
+         * List the views of data the CMS does not store, like the app users, that the caller may open
+         *
+         * @example
+         * const result = await client.editing.listViews();
+         */
+        listViews: ClientMethod<'GET', false, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingListViews.Result>;
+        views: {
+            appUsers: {
+                /**
+                 * List the records of app users that match a search
+                 *
+                 * @example
+                 * const result = await client.editing.views.appUsers.list();
+                 */
+                list: ClientMethod<'GET', false, {
+                    query?: API.EditingViewsAppUsersList.Query;
+                    headers?: Record<string, string>;
+                    fetchOptions?: RequestInit;
+                }, API.EditingViewsAppUsersList.Result>;
+                /**
+                 * Read one record of app users: its fields, which the caller may write, and its buttons
+                 *
+                 * @example
+                 * const result = await client.editing.views.appUsers.get({
+                 *     params: {
+                 *         id: '1',
+                 *     },
+                 * });
+                 */
+                get: ClientMethod<'GET', false, {
+                    params: API.EditingViewsAppUsersGet.Params;
+                    headers?: Record<string, string>;
+                    fetchOptions?: RequestInit;
+                }, API.EditingViewsAppUsersGet.Result>;
+                /**
+                 * Save fields of one record of app users
+                 *
+                 * Sends the fields to save, keyed by name. A field the caller may not write is refused when its value changes. Read the record first.
+                 *
+                 * @example
+                 * const result = await client.editing.views.appUsers.save({
+                 *     params: {
+                 *         id: '1',
+                 *     },
+                 *     body: {
+                 *         data: {},
+                 *     },
+                 * });
+                 */
+                save: ClientMethod<'PATCH', false, {
+                    params: API.EditingViewsAppUsersSave.Params;
+                    body: API.EditingViewsAppUsersSave.Body;
+                    headers?: Record<string, string>;
+                    fetchOptions?: RequestInit;
+                }, API.EditingViewsAppUsersSave.Result>;
+                actions: {
+                    /**
+                     * Run "Sign out everywhere" on one record of app users
+                     *
+                     * Asks first: "Sign this person out on every device? They sign in again with their password."
+                     *
+                     * @example
+                     * const result = await client.editing.views.appUsers.actions.signOutEverywhere({
+                     *     params: {
+                     *         id: '1',
+                     *     },
+                     * });
+                     */
+                    signOutEverywhere: ClientMethod<'POST', false, {
+                        params: API.EditingViewsAppUsersActionsSignOutEverywhere.Params;
+                        headers?: Record<string, string>;
+                        fetchOptions?: RequestInit;
+                    }, API.EditingViewsAppUsersActionsSignOutEverywhere.Result>;
+                };
+            };
+        };
+        /**
+         * Read the admin's dashboard: its numbers, the reviews waiting on you, and the collections you may open
+         *
+         * @example
+         * const result = await client.editing.dashboard();
+         */
+        dashboard: ClientMethod<'GET', false, {
+            headers?: Record<string, string>;
+            fetchOptions?: RequestInit;
+        }, API.EditingDashboard.Result>;
         /**
          * List the pages that hold one branded id
          *
@@ -3121,6 +3565,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    409: {},
                     400: {},
                 },
             },
@@ -3253,6 +3698,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    409: {},
                     400: {},
                 },
             },
@@ -3272,6 +3718,7 @@ const routes: GeneratedRoutes = {
                 path: '/editing/collections/:name/items',
                 responses: {
                     200: {},
+                    400: {},
                     401: {},
                     403: {},
                     404: {},
@@ -3418,6 +3865,7 @@ const routes: GeneratedRoutes = {
                     401: {},
                     403: {},
                     404: {},
+                    409: {},
                     400: {},
                 },
             },
@@ -3483,6 +3931,91 @@ const routes: GeneratedRoutes = {
                     403: {},
                     422: {},
                 },
+            },
+        },
+        actions: {
+            articles: {
+                announce: {
+                    method: 'POST',
+                    path: '/editing/collections/articles/items/:id/actions/announce',
+                    responses: {
+                        204: {},
+                        401: {},
+                        403: {},
+                        404: {},
+                        409: {},
+                    },
+                },
+            },
+        },
+        listViews: {
+            method: 'GET',
+            path: '/editing/views',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
+            },
+        },
+        views: {
+            appUsers: {
+                list: {
+                    method: 'GET',
+                    path: '/editing/views/appUsers/items',
+                    responses: {
+                        200: {},
+                        401: {},
+                        403: {},
+                        400: {},
+                    },
+                },
+                get: {
+                    method: 'GET',
+                    path: '/editing/views/appUsers/items/:id',
+                    responses: {
+                        200: {},
+                        401: {},
+                        403: {},
+                        404: {},
+                    },
+                },
+                save: {
+                    method: 'PATCH',
+                    path: '/editing/views/appUsers/items/:id',
+                    responses: {
+                        200: {},
+                        204: {},
+                        401: {},
+                        403: {},
+                        404: {},
+                        409: {},
+                        422: {},
+                        400: {},
+                    },
+                },
+                actions: {
+                    signOutEverywhere: {
+                        method: 'POST',
+                        path: '/editing/views/appUsers/items/:id/actions/signOutEverywhere',
+                        responses: {
+                            200: {},
+                            204: {},
+                            401: {},
+                            403: {},
+                            404: {},
+                            409: {},
+                        },
+                    },
+                },
+            },
+        },
+        dashboard: {
+            method: 'GET',
+            path: '/editing/dashboard',
+            responses: {
+                200: {},
+                401: {},
+                403: {},
             },
         },
         whereUsed: {
