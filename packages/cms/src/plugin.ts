@@ -22,6 +22,7 @@ import { PREVIEW_PROXY_PATH, PROXY_CORS, previewProxyUrl, proxyToSite } from './
 import { draftEventsRoute } from './draft-events.js';
 import { adminRoute } from './admin/route.js';
 import { routePrefix } from './options.js';
+import { assertTree } from './tree.js';
 import { resolve } from 'node:path';
 
 /**
@@ -163,6 +164,9 @@ const validate = (service: CmsService, options: ResolvedCmsOptions, api: PluginA
         }
         owners.set(brand, definition.name);
         brandSchemas.set(brand, brandShape(definition.id));
+    }
+    for (const definition of options.collections ?? []) {
+        assertTree(definition);
     }
     for (const entry of allPages) {
         const served = entry.page.collection;

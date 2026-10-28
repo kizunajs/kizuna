@@ -24,6 +24,7 @@ import {
     DraftHeadersSchema,
     DraftPageSchema,
     EditorItemSchema,
+    TreePlacementShape,
     MediaListSchema,
     MediaSchema,
     MissingFieldsSchema,
@@ -654,6 +655,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             responses: {
                 200: DraftPageSchema,
                 404: ProblemDetailsSchema,
+                409: ProblemDetailsSchema,
             },
         }).handler(
             guarded(async (cms, args) => ({
@@ -961,19 +963,49 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             pathParams: z.object({
                 name: z.string(),
             }),
+            query: z.object({
+                field: z.string().optional().describe('Keep only the items whose field, by name, holds `value`, or holds it in a list.'),
+                value: z.string().optional().describe('What `field` holds, like an id.'),
+                descendants: z
+                    .boolean()
+                    .optional()
+                    .describe('Also keep the items holding an item under `value`, when `field` holds ids of a collection with a tree.'),
+            }),
             responses: {
                 200: z.object({
                     items: z.array(EditorItemSchema),
                 }),
+                400: ProblemDetailsSchema,
                 404: ProblemDetailsSchema,
             },
         }).handler(
-            guarded(async (cms, args) => ({
-                status: 200,
-                body: {
-                    items: await cms.editorItems(args.params['name']!),
-                },
-            })) as never
+            guarded(async (cms, args) => {
+                const { field, value, descendants } = (args.query ?? {}) as {
+                    field?: string;
+                    value?: string;
+                    descendants?: boolean;
+                };
+                if ((field === undefined) !== (value === undefined)) {
+                    throw new CmsHttpError(400, {
+                        detail: 'A filter names both `field` and `value`.',
+                    });
+                }
+                return {
+                    status: 200,
+                    body: {
+                        items: await cms.editorItems(
+                            args.params['name']!,
+                            field === undefined || value === undefined
+                                ? undefined
+                                : {
+                                      field,
+                                      value,
+                                      descendants,
+                                  }
+                        ),
+                    },
+                };
+            }) as never
         ),
 
         createItem: route({
@@ -1523,6 +1555,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         id: z.string(),
                         label: z.string(),
                         image: z.string().optional(),
+                        ...TreePlacementShape,
                     })
                 ),
             }),

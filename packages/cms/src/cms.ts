@@ -40,6 +40,7 @@ import {
 } from './storage/store.js';
 import { previewSecret, signPreviewToken, verifyPreviewToken } from './preview-token.js';
 import { DraftNotices } from './draft-notices.js';
+import { descendantsOf, holdsAny, loadParents, loopRefusal, parentIn, placeInTree, type ItemFilter } from './tree.js';
 import type { PageStatusSchema } from './wire.js';
 import type { CmsRelationship, RelationshipOption } from './relationships.js';
 
@@ -492,7 +493,7 @@ export class CmsService {
      * migration step, in memory. Reads never write: a save stores the result,
      * and `kizuna cms migrate-content` stores it for every document.
      */
-    private migrated(target: Target, found: DocumentRow | undefined): DocumentRow | undefined {
+    migrated(target: Target, found: DocumentRow | undefined): DocumentRow | undefined {
         if (found === undefined || pendingMigrations(target.definition, found.migrationVersion).length === 0) return found;
         const migration = migrationOf(target.definition);
         return {
@@ -876,7 +877,10 @@ export class CmsService {
         });
     }
 
-    async editorItems(name: string): Promise<
+    async editorItems(
+        name: string,
+        filter?: ItemFilter
+    ): Promise<
         Array<{
             id: string;
             ref: string;
@@ -886,6 +890,8 @@ export class CmsService {
             complete: boolean;
             updatedAt: string;
             updatedBy: string;
+            parent?: string | null;
+            treeLabel?: string;
         }>
     > {
         const listing = this.listing(name);
@@ -895,12 +901,14 @@ export class CmsService {
             (field) => readDef(unwrapOptionalWrappers(field.schema).inner).type === 'string'
         )?.name;
         const items = [];
+        const contents = new Map<string, Record<string, unknown>>();
         for (const stored of rows) {
             if (!stored.key.startsWith(listing.keyPrefix)) continue;
             const id = stored.key.slice(listing.keyPrefix.length);
             const row = this.migrated(this.target(listing.refOf(id)), stored)!;
             const version = await this.store.latestVersion(row.id);
             const content = row.draft ?? row.published ?? {};
+            contents.set(id, content);
             const label = labelField === undefined ? undefined : content[labelField];
             items.push({
                 id,
@@ -913,7 +921,37 @@ export class CmsService {
                 updatedBy: row.updatedBy,
             });
         }
-        return items.sort((left, right) => left.label.localeCompare(right.label));
+        const tree = definition.tree;
+        const placed =
+            tree === undefined ? items : placeInTree(items, new Map([...contents].map(([id, content]) => [id, parentIn(content, tree)])));
+        const matches = filter === undefined ? undefined : await this.itemMatcher(definition, filter);
+        return placed
+            .filter((item) => matches === undefined || matches(contents.get(item.id)!))
+            .sort((left, right) => left.label.localeCompare(right.label));
+    }
+
+    /**
+     * What a filter on the editing list keeps: the items whose field holds
+     * the value, and with `descendants`, the items holding one under it in
+     * its collection's tree.
+     */
+    private async itemMatcher(definition: Collection, filter: ItemFilter): Promise<(content: Record<string, unknown>) => boolean> {
+        const field = dataFields(definition.fields).find((candidate) => candidate.name === filter.field);
+        if (field === undefined) {
+            throw new CmsHttpError(400, {
+                detail: `The ${definition.name} collection has no field '${filter.field}' to filter by.`,
+            });
+        }
+        if (filter.descendants !== true) return (content) => holdsAny(content[filter.field], new Set([filter.value]));
+        const brand = brandOf(field.schema);
+        const held = brand === undefined ? undefined : this.listingFor(brand);
+        if (held?.definition.tree === undefined) {
+            throw new CmsHttpError(400, {
+                detail: `The ${filter.field} field holds no ids of a collection with a tree, so nothing sits under '${filter.value}'.`,
+            });
+        }
+        const values = descendantsOf(await loadParents(this, held, 'latest'), filter.value);
+        return (content) => holdsAny(content[filter.field], values);
     }
 
     /**
@@ -1050,19 +1088,27 @@ export class CmsService {
             ids?: readonly string[];
             headers: Record<string, string>;
         }
-    ): Promise<RelationshipOption[]> {
+    ): Promise<Array<RelationshipOption & { parent?: string | null; treeLabel?: string }>> {
         const owned = this.listingFor(brand);
         if (owned !== undefined) {
             const items = await this.editorItems(owned.name);
             const term = (input.query ?? '').toLowerCase();
             return items
                 .filter((item) =>
-                    input.ids === undefined ? term === '' || item.label.toLowerCase().includes(term) : input.ids.includes(item.id)
+                    input.ids === undefined
+                        ? term === '' || (item.treeLabel ?? item.label).toLowerCase().includes(term)
+                        : input.ids.includes(item.id)
                 )
                 .slice(0, 50)
                 .map((item) => ({
                     id: item.id,
                     label: item.label,
+                    ...(item.treeLabel === undefined
+                        ? {}
+                        : {
+                              parent: item.parent ?? null,
+                              treeLabel: item.treeLabel,
+                          }),
                 }));
         }
         const relationship = this.relationshipFor(brand);
@@ -1292,6 +1338,9 @@ export class CmsService {
         if (listing !== undefined && paths.some((path) => listing.pathFields.includes(path.split('.')[0]!))) {
             await this.assertFreeAddress(listing, target.key, stored);
         }
+        if (listing?.definition.tree !== undefined && paths.includes(listing.definition.tree)) {
+            await this.assertNoLoop(input.ref, stored, 'latest');
+        }
         try {
             await this.store.saveDraft({
                 kind: target.kind,
@@ -1355,6 +1404,26 @@ export class CmsService {
         }
     }
 
+    /**
+     * Refuses a parent that is the item itself or sits under it, in a
+     * collection with a `tree`, among each item's latest or published copy.
+     */
+    private async assertNoLoop(
+        ref: DocumentRef,
+        content: Record<string, unknown> | null | undefined,
+        copy: 'latest' | 'published'
+    ): Promise<void> {
+        const listing = this.listingOf(ref);
+        const tree = listing?.definition.tree;
+        if (listing === undefined || tree === undefined || ref.type !== 'item') return;
+        const refusal = loopRefusal(listing, await loadParents(this, listing, copy), ref.id, parentIn(content, tree));
+        if (refusal !== undefined) {
+            throw new CmsHttpError(409, {
+                detail: refusal,
+            });
+        }
+    }
+
     async publish(ref: DocumentRef, author: string): Promise<DraftState> {
         const state = await this.draftState(ref);
         if (!state.complete) {
@@ -1363,6 +1432,7 @@ export class CmsService {
                 missing: state.missing,
             });
         }
+        await this.assertNoLoop(ref, state.row?.draft, 'published');
         await this.store.publish(state.target.kind, state.target.key, author, state.target.site);
         await this.revalidateDocument(ref);
         return this.draftState(ref);
@@ -1390,6 +1460,7 @@ export class CmsService {
     async rollback(ref: DocumentRef, version: number, author: string): Promise<DraftState> {
         const { target } = await this.document(ref);
         const migrated = (await this.versionContent(ref, version)).content;
+        await this.assertNoLoop(ref, migrated, 'latest');
         await this.store.saveDraft({
             kind: target.kind,
             key: target.key,

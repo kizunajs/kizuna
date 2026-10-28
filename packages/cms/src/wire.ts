@@ -29,6 +29,22 @@ export const PageSummarySchema = Kizuna.model({
     }),
 });
 
+/**
+ * Where an item sits in a collection with a `tree`, as the editing list and
+ * the picker answer it.
+ */
+export const TreePlacementShape = {
+    parent: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('The id of the item it sits under, null at the top. Only in a collection with a tree.'),
+    treeLabel: z
+        .string()
+        .optional()
+        .describe('Its label after the labels of the items above it, like "Lighting / Workshop". Only in a collection with a tree.'),
+};
+
 export const EditorItemSchema = Kizuna.model({
     title: 'CmsEditorItem',
     schema: z.object({
@@ -40,6 +56,7 @@ export const EditorItemSchema = Kizuna.model({
         complete: z.boolean(),
         updatedAt: z.string(),
         updatedBy: z.string(),
+        ...TreePlacementShape,
     }),
 });
 

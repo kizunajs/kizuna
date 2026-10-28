@@ -85,6 +85,15 @@ export interface CollectionDefinition<Name extends string, Fields extends FieldL
      * migration `kizuna cms migrate` writes.
      */
     indexes?: ReadonlyArray<DataFieldOf<Fields>['name']>;
+    /**
+     * The field holding the id of the item above, which nests the items into
+     * a tree. Its schema is the collection's own id, optional, and an item
+     * without one is at the top.
+     *
+     * @example
+     * tree: 'parent',
+     */
+    tree?: DataFieldOf<Fields>['name'];
 }
 
 /**
