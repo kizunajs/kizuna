@@ -1063,6 +1063,15 @@
         background: none;
     }
 
+    /* The select's chevron sits close to the remove button after it. */
+    .k-array__item--value .k-array__body .k-select {
+        padding-right: 0;
+    }
+
+    .k-array__item--value > .k-icon-button {
+        margin-left: -4px;
+    }
+
     .k-array__tag {
         flex-shrink: 0;
         font-size: 11px;
