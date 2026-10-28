@@ -92,8 +92,8 @@ function SelectControl(props: {
                 </Select.Icon>
             </Select.Trigger>
             <Select.Portal>
-                <Select.Positioner sideOffset={6} alignItemWithTrigger={false} className="k-positioner">
-                    <Select.Popup className="k-popup k-menu">
+                <Select.Positioner sideOffset={6} align="start" alignItemWithTrigger={false} className="k-positioner">
+                    <Select.Popup className="k-popup k-menu k-menu--select">
                         {items.map((item) => (
                             <Select.Item key={item.value} value={item.value} className="k-menu__item">
                                 <Select.ItemText>{item.label}</Select.ItemText>
