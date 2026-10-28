@@ -274,6 +274,104 @@ textarea {
     gap: 18px;
 }
 
+/* Layout: tabs, rows, collapsibles and the sidebar arrange the sections without adding surfaces of their own. */
+.k-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.k-form-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+}
+
+.k-form-main,
+.k-form-sidebar {
+    min-width: 0;
+    container-type: inline-size;
+}
+
+/* The sidebar sits beside the main column when the form has room for both, and below it otherwise. */
+@container (min-width: 720px) {
+    .k-form-columns[data-sidebar='true'] {
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+    }
+}
+
+.k-tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+[role='tabpanel'][hidden] {
+    display: none;
+}
+
+.k-tab-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+}
+
+/* A row's cells sit side by side, and wrap to stack once one would be narrower than 180px. */
+.k-layout-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+    gap: 14px;
+}
+
+.k-layout-cell {
+    flex: 1 1 0;
+    min-width: min(100%, 180px);
+}
+
+.k-layout-cell[data-width='true'] {
+    flex: 1 1 calc(var(--k-width) - 14px);
+}
+
+.k-collapsible {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.k-collapsible-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    height: 28px;
+    padding: 0 10px 0 6px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--k-muted);
+    list-style: none;
+    cursor: pointer;
+}
+
+.k-collapsible-summary::-webkit-details-marker {
+    display: none;
+}
+
+.k-collapsible-summary:hover {
+    background: var(--k-tint);
+    color: var(--k-ink);
+}
+
+.k-collapsible-summary svg {
+    transition: transform 0.15s ease;
+}
+
+.k-collapsible[open] > .k-collapsible-summary svg {
+    transform: rotate(90deg);
+}
+
 .k-row {
     display: grid;
     grid-template-columns: 112px minmax(0, 1fr);
@@ -986,7 +1084,7 @@ textarea {
     color: var(--k-ink);
 }
 
-.k-tab[aria-checked='true'] {
+.k-tab:is([aria-checked='true'], [aria-selected='true']) {
     background: var(--k-control);
     box-shadow: var(--k-control-elevation);
     color: var(--k-ink);

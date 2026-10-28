@@ -35,6 +35,12 @@ export interface DescribedField {
     help?: string;
     block?: string;
     parent?: string;
+    position?: 'sidebar';
+    width?: string;
+    /**
+     * The ids of the tabs, rows and collapsibles it sits in, outermost first.
+     */
+    layout?: string[];
     readOnly: boolean;
     writable: boolean;
     roles?: string[];
@@ -42,6 +48,16 @@ export interface DescribedField {
     searchTool?: string;
     schema: JsonSchema;
     value?: unknown;
+}
+
+/**
+ * One tab, row or collapsible as `describe` answers it.
+ */
+export interface DescribedLayout {
+    id: string;
+    type: 'tab' | 'row' | 'collapsible';
+    label?: string;
+    position?: 'sidebar';
 }
 
 export type DocumentStatus = 'empty' | 'draft' | 'published' | 'changed';
@@ -67,6 +83,7 @@ export interface Description {
     complete: boolean;
     missing: string[];
     fields: DescribedField[];
+    layout: DescribedLayout[];
     draft: Record<string, unknown> | null;
     owner: PersonView | null;
     review: ReviewState | null;

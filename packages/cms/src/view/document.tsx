@@ -781,6 +781,7 @@ export function DocumentView({ app, events, siteUrl }: DocumentViewProps) {
                 <FieldForm
                     key={`${document.ref}:${formKey}`}
                     fields={document.fields}
+                    layout={document.layout}
                     draft={document.draft}
                     onSave={(changes) => save(document.ref, document.fields, changes)}
                     onState={(state) => {

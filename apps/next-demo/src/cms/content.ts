@@ -105,8 +105,33 @@ export const Articles = defineCollection({
     group: 'Blog',
     fields: [
         {
-            name: 'title',
-            schema: HeadingSchema,
+            type: 'tab',
+            label: 'Content',
+            fields: [
+                {
+                    name: 'title',
+                    schema: HeadingSchema,
+                },
+                {
+                    name: 'body',
+                    schema: RichTextSchema,
+                },
+            ],
+        },
+        {
+            type: 'tab',
+            label: 'Card',
+            fields: [
+                {
+                    name: 'excerpt',
+                    schema: z.string().max(200).describe('One or two sentences for the blog index.'),
+                },
+                {
+                    name: 'cover',
+                    label: 'Cover image',
+                    schema: ImageSchema,
+                },
+            ],
         },
         {
             name: 'slug',
@@ -116,28 +141,18 @@ export const Articles = defineCollection({
                 .max(60)
                 .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
                 .describe('Lowercase words joined by dashes, like spring-sale.'),
+            position: 'sidebar',
         },
         {
             name: 'topic',
             schema: z.enum(['news', 'guides', 'stories']),
             options: topics,
-        },
-        {
-            name: 'excerpt',
-            schema: z.string().max(200).describe('One or two sentences for the blog index.'),
-        },
-        {
-            name: 'cover',
-            label: 'Cover image',
-            schema: ImageSchema,
-        },
-        {
-            name: 'body',
-            schema: RichTextSchema,
+            position: 'sidebar',
         },
         {
             name: 'author',
             schema: EmployeeId.optional(),
+            position: 'sidebar',
         },
     ],
     migrate: {
