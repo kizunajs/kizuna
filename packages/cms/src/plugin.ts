@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { definePlugin, route, type PluginDeclaration, type PluginApi } from 'kizunajs/plugin';
 import { adapterContextOf, authenticate, rawResponse } from 'kizunajs/adapter';
-import { defineGenerator, readDef, readMetaBrand, unwrapOptionalWrappers } from 'kizunajs/generator';
+import { defineGenerator, encodeForWire, readDef, readMetaBrand, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { CmsService } from './cms.js';
 import { brandOf } from './cms.js';
 import { routeProblems } from './dynamic.js';
@@ -106,6 +106,7 @@ const brandShape = (schema: z.core.$ZodType): string =>
         z.toJSONSchema(schema as z.ZodType, {
             unrepresentable: 'any',
             io: 'input',
+            override: encodeForWire,
         })
     ).replace(/"description":"[^"]*",?/g, '');
 

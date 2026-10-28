@@ -329,3 +329,43 @@ describe('page checks', () => {
         expect(() => assemble('/blog/[slug]', ArticlePage, [])).toThrow('which cms() is not given');
     });
 });
+
+describe('brand checks', () => {
+    it('tells a date from a bigint under one brand', () => {
+        const SalePage = definePage({
+            name: 'salePage',
+            fields: [
+                {
+                    name: 'endsAt',
+                    schema: Kizuna.brand('SaleMoment', z.date()),
+                },
+                {
+                    name: 'stock',
+                    schema: Kizuna.brand('SaleMoment', z.bigint()),
+                },
+            ],
+        });
+        expect(() =>
+            defineConfig({
+                auth: {
+                    identities: {
+                        editor,
+                    },
+                },
+                content: cms({
+                    db,
+                    pages: {
+                        salePage: {
+                            path: '/sale',
+                            page: SalePage,
+                        },
+                    },
+                    auth: {
+                        identity: 'editor',
+                    },
+                    appDir: 'src/__fixtures__/app',
+                }),
+            })
+        ).toThrow("Two different schemas carry the brand 'SaleMoment'");
+    });
+});
