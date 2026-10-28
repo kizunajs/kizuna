@@ -127,6 +127,46 @@ const parseIfMatch = (header: string | string[] | undefined): { version: number;
  */
 const FOLD_WINDOW = 10 * 60 * 1000;
 
+/**
+ * The schema of the object holding the last segment of a dotted path, read
+ * through objects and arrays, or `undefined` when the path leaves them.
+ */
+const containerSchemaAt = (schema: z.core.$ZodType, segments: readonly string[]): z.core.$ZodType | undefined => {
+    let current: z.core.$ZodType | undefined = schema;
+    for (const segment of segments) {
+        const def = readDef(unwrapOptionalWrappers(current).inner);
+        current = def.type === 'object' ? def.shape?.[segment] : def.type === 'array' && /^\d+$/.test(segment) ? def.element : undefined;
+        if (current === undefined) return undefined;
+    }
+    return current;
+};
+
+/**
+ * Whether a `null` sent for a path empties it: the key sits in an object, and
+ * its schema takes the value left out but refuses `null`.
+ */
+const clearsWithNull = (schema: z.core.$ZodType, path: string): boolean => {
+    const segments = path.split('.');
+    const key = segments.pop()!;
+    const container = containerSchemaAt(schema, segments);
+    if (container === undefined) return false;
+    const def = readDef(unwrapOptionalWrappers(container).inner);
+    const field = def.type === 'object' ? def.shape?.[key] : undefined;
+    return field !== undefined && z.safeParse(field, undefined).success && !z.safeParse(field, null).success;
+};
+
+/**
+ * Removes the key at a dotted path from a copy of the content.
+ */
+const unsetAtPath = (content: Record<string, unknown>, path: string): Record<string, unknown> => {
+    const segments = path.split('.');
+    const key = segments.pop()!;
+    const holder = segments.length === 0 ? content : getAtPath(content, segments.join('.'));
+    if (holder === null || typeof holder !== 'object' || Array.isArray(holder)) return content;
+    const { [key]: _, ...rest } = holder as Record<string, unknown>;
+    return segments.length === 0 ? rest : setAtPath(content, segments.join('.'), rest);
+};
+
 const pickAuthor = (context: Record<string, unknown>): string => {
     for (const key of ['userId', 'id', 'email', 'name', 'sub']) {
         const value = context[key];
@@ -1317,7 +1357,12 @@ export class CmsService {
             if (refusal !== undefined) throw new CmsHttpError(403, { detail: refusal });
         }
         let draft: Record<string, unknown> = row?.draft ?? row?.published ?? {};
-        for (const path of paths) draft = setAtPath(draft, path, input.changes[path]);
+        for (const path of paths) {
+            const value = input.changes[path];
+            // JSON has no undefined, so null is how a save empties a field that may be left out.
+            draft =
+                value === null && clearsWithNull(target.definition.schema, path) ? unsetAtPath(draft, path) : setAtPath(draft, path, value);
+        }
         const parsed = target.definition.schema.safeParse(draft);
         // A value that is there and wrong is refused; one not filled in yet leaves the draft incomplete.
         const wrong = parsed.success

@@ -315,7 +315,9 @@ export const UpdateDraftBodySchema = Kizuna.model({
     schema: z.object({
         changes: z
             .record(z.string(), z.unknown())
-            .describe('New values keyed by field path, like "hero.heading". Only fields the caller may write.'),
+            .describe(
+                'New values keyed by field path, like "hero.heading". Only fields the caller may write. null empties an optional field.'
+            ),
         summary: z.string().max(200).optional().describe('What changed, in a sentence, for the history.'),
         autosave: z
             .boolean()

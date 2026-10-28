@@ -244,6 +244,24 @@ describe('a loop', () => {
         expect((await setParent(bench, lighting)).status).toBe(200);
     });
 
+    it('moves a tag to the top when a save sends null for its parent', async () => {
+        const lighting = await create('tags', {
+            name: 'Lighting',
+        });
+        const workshop = await create('tags', {
+            name: 'Workshop',
+            parent: lighting,
+        });
+        const moved = await asEditor(request(app).patch(`/editing/collections/tags/items/${workshop}/draft`)).send({
+            changes: {
+                parent: null,
+            },
+        });
+        expect(moved.status).toBe(200);
+        expect(moved.body.content).not.toHaveProperty('parent');
+        expect((await setParent(lighting, workshop)).status).toBe(200);
+    });
+
     it('refuses a publish that would close a loop among the published tags', async () => {
         const lighting = await create('tags', {
             name: 'Lighting',
