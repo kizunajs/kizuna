@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { LoaderCircle } from 'lucide-react';
+import { ExternalLink, LoaderCircle } from 'lucide-react';
 import { envelope, openEnvelope, type EditorMessage, type PreviewMessage } from '../preview-messages.js';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
-import { DeviceSelect, frameStyleOf, type DeviceKey } from '../view/devices.js';
+import { DeviceSelect, DEVICES, frameStyleOf, type DeviceKey } from '../view/devices.js';
+import { Hint } from '../view/hint.js';
 import { problemOf } from './parts.js';
 
 const useSize = (element: RefObject<HTMLElement | null>): { width: number; height: number } => {
@@ -28,6 +29,16 @@ const useSize = (element: RefObject<HTMLElement | null>): { width: number; heigh
 };
 
 /**
+ * The size the framed site renders at, as the bar reads it: the stage's
+ * width on Desktop, a device's width elsewhere, and the height that fits.
+ */
+export const shownSizeOf = (device: DeviceKey, stage: { width: number; height: number }): string => {
+    const width = DEVICES.find((candidate) => candidate.value === device)?.width ?? stage.width;
+    const scale = width === 0 ? 1 : Math.min(1, stage.width / width);
+    return `${Math.round(width)} × ${Math.round(stage.height / scale)}`;
+};
+
+/**
  * The site in draft mode, framed beside the fields. The site follows the
  * drafts itself through its live updates, so a save shows without the admin
  * telling it. A click on a field in the page points at it in the form.
@@ -37,6 +48,7 @@ export function AdminPreview({
     siteUrl,
     path,
     onPoint,
+    onOpen,
 }: {
     connection: Connection;
     /**
@@ -51,6 +63,10 @@ export function AdminPreview({
      * A click on a field, with the page the frame showed when it came.
      */
     onPoint: (ref: string | null, fieldPath: string, framedPath: string | undefined) => void;
+    /**
+     * Opens the page in a new tab, in draft mode.
+     */
+    onOpen?: () => void;
 }) {
     const [url, setUrl] = useState<string | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
@@ -131,9 +147,18 @@ export function AdminPreview({
 
     return (
         <div className="k-preview k-preview--admin">
-            <div className="k-preview__bar">
-                <span className="k-help">Your site, in draft mode</span>
-                <DeviceSelect value={device} onChange={setDevice} />
+            <div className="k-preview__bar" role="toolbar" aria-label="Preview size">
+                <span className="k-preview__device">
+                    <DeviceSelect value={device} onChange={setDevice} />
+                    {size.width === 0 ? null : <span className="k-preview__size">{shownSizeOf(device, size)}</span>}
+                </span>
+                {onOpen === undefined ? null : (
+                    <Hint label="Open the page in a new tab">
+                        <button type="button" className="k-icon-button" aria-label="Open the page in a new tab" onClick={onOpen}>
+                            <ExternalLink {...ICON} />
+                        </button>
+                    </Hint>
+                )}
             </div>
             <div ref={stage} className="k-preview__stage" aria-busy={!loaded}>
                 {problem !== undefined ? <p className="k-help k-preview__message">{problem}</p> : null}

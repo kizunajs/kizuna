@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Connection, ToolAnswer } from '../view/connection.js';
 import { navigationOf } from './navigation.js';
-import { DOCUMENT_LIMIT, loadDocuments, placesOf, rankOf, searchOf, type SearchResult } from './search.js';
+import { DOCUMENT_LIMIT, groupsOfResults, highlightOf, loadDocuments, placesOf, rankOf, searchOf, type SearchResult } from './search.js';
 
 const sections = navigationOf({
     globals: [
@@ -43,7 +43,8 @@ const sections = navigationOf({
 
 const article = (label: string, id: string): SearchResult => ({
     label,
-    detail: 'Articles',
+    detail: 'Draft',
+    group: 'Articles',
     screen: {
         kind: 'document',
         ref: `item:articles:${id}`,
@@ -157,6 +158,7 @@ describe('the admin search', () => {
                             {
                                 ref: 'item:articles:1',
                                 label: 'Spring sale',
+                                status: 'draft',
                             },
                         ],
                     },
@@ -184,6 +186,7 @@ describe('the admin search', () => {
             {
                 label: 'Front',
                 detail: '/',
+                group: 'Pages',
                 screen: {
                     kind: 'document',
                     ref: 'page:frontPage',
@@ -191,11 +194,68 @@ describe('the admin search', () => {
             },
             {
                 label: 'Spring sale',
-                detail: 'Articles',
+                detail: 'Draft',
+                group: 'Articles',
                 screen: {
                     kind: 'document',
                     ref: 'item:articles:1',
                 },
+            },
+        ]);
+    });
+
+    it('lists the screens first, then the documents under their collection', () => {
+        const page: SearchResult = {
+            label: 'Front page',
+            detail: '/',
+            group: 'Pages',
+            screen: {
+                kind: 'document',
+                ref: 'page:frontPage',
+            },
+        };
+        const groups = groupsOfResults({
+            places: placesOf(sections).slice(0, 1),
+            documents: [page, article('Fresh herbs', '1'), article('First frost', '2')],
+        });
+        expect(groups.map((group) => [group.label, group.items.map((item) => item.label)])).toEqual([
+            ['Go to', ['Dashboard']],
+            ['Pages', ['Front page']],
+            ['Articles', ['Fresh herbs', 'First frost']],
+        ]);
+    });
+
+    it('marks every part of a label the search matched', () => {
+        expect(highlightOf('Bring your plants in before the first frost', 'fr')).toEqual([
+            {
+                text: 'Bring your plants in before the first ',
+                matched: false,
+            },
+            {
+                text: 'fr',
+                matched: true,
+            },
+            {
+                text: 'ost',
+                matched: false,
+            },
+        ]);
+        expect(highlightOf('Front page', 'FR pa')).toEqual([
+            {
+                text: 'Fr',
+                matched: true,
+            },
+            {
+                text: 'ont ',
+                matched: false,
+            },
+            {
+                text: 'pa',
+                matched: true,
+            },
+            {
+                text: 'ge',
+                matched: false,
             },
         ]);
     });

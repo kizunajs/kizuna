@@ -35,6 +35,28 @@ describe('the bulk bar', () => {
         expect(bulkCallOf('publish', 'global:site')).toBeUndefined();
     });
 
+    it('publishes and unpublishes pages, and deletes none', () => {
+        expect(bulkCallOf('unpublish', 'page:frontPage')).toEqual({
+            name: 'editing_pages_unpublish',
+            input: {
+                params: {
+                    name: 'frontPage',
+                },
+                body: {},
+            },
+        });
+        expect(bulkCallOf('delete', 'page:frontPage')).toBeUndefined();
+        expect(
+            offeredActions(
+                {
+                    editing_pages_publish: {},
+                    editing_pages_unpublish: {},
+                },
+                'editing_pages'
+            )
+        ).toEqual(['publish', 'unpublish']);
+    });
+
     it('asks first, counting the items', () => {
         expect(bulkQuestionOf('publish', 1)).toBe('Publish 1 item? Every visitor sees them at once.');
         expect(bulkQuestionOf('delete', 3)).toBe('Delete 3 items, with their history? Pages that show them stop showing them.');

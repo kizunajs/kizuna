@@ -42,13 +42,15 @@ A widget is a plain object with a `type`, the way a [layout](/docs/cms/fields#la
 
 Without `dashboard`, the admin shows `reviews` and `collections`.
 
+Each review waiting names who asked for it and when. Until there is a number to show or a review waiting, the dashboard welcomes the editor above the collections and leaves the period picker out.
+
 ## Numbers from your code
 
 A `stat` or `chart` gets its numbers from your function, which runs on your server when the dashboard opens. Revenue can come from Stripe and orders from your own database, since the CMS never needs to hold them. Each function receives `editor`, `plugins` and `period`.
 
 ### The period
 
-The editor picks the period the dashboard counts over, at its top right: the last 24 hours, the last 7 days, the last 30 days or the last 90 days. The dashboard opens on the last 7 days.
+The editor picks the period the dashboard counts over, at its top right: the last 24 hours, the last 7 days, the last 30 days or the last 90 days. The dashboard opens on the last 7 days, and names the days beside the picker, like "21 Oct to 28 Oct".
 
 Your function receives the period they picked. A widget's label names what it counts, like "Revenue", and the picker says over which days:
 

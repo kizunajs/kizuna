@@ -1,135 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { Search } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Connection } from '../view/connection.js';
-import { ICON } from '../view/context.js';
 import { FieldForm, type SaveState } from '../view/form.js';
 import { ActionBar, type ActionButton } from './action-buttons.js';
 import { outcomeOf, shownActions, type Outcome } from './actions.js';
 import { hrefOf } from './navigation.js';
-import { DocumentHeader, Loading, Topbar, problemOf } from './parts.js';
-import {
-    cellText,
-    columnLabel,
-    columnsOf,
-    searchPlaceholder,
-    viewActionCall,
-    viewListCall,
-    viewSaveCall,
-    viewTool,
-    withEdits,
-    type ViewRecord,
-    type ViewRow,
-    type ViewSummary,
-} from './views.js';
-
-/**
- * How long the search waits after the last key before it asks the view.
- */
-const SEARCH_DELAY = 250;
+import { PageHeader } from './page-header.js';
+import { Loading, problemOf } from './parts.js';
+import { viewActionCall, viewSaveCall, viewTool, withEdits, type ViewRecord } from './views.js';
 
 const NOTHING_CHANGED: ReadonlySet<string> = new Set();
 
-/**
- * A view's records, as its `list` returns them for what the editor searched.
- */
-export function ViewList({ connection, view, group }: { connection: Connection; view: ViewSummary; group: string }) {
-    const [query, setQuery] = useState('');
-    const [rows, setRows] = useState<ViewRow[] | undefined>();
-    const [problem, setProblem] = useState<string | undefined>();
-    const asked = useRef(0);
-    const columns = columnsOf(view);
-
-    useEffect(() => {
-        const ask = async (): Promise<void> => {
-            asked.current += 1;
-            const asking = asked.current;
-            const call = viewListCall(view.name, query);
-            const answer = await connection.call<{ items: ViewRow[] }>(call.name, call.input);
-            // A slower answer to an earlier search must not replace a newer one.
-            if (asking !== asked.current) return;
-            if (answer.status !== 200) {
-                setProblem(problemOf(answer, 'The records did not load'));
-                return;
-            }
-            setProblem(undefined);
-            setRows(answer.body.items);
-        };
-        const timer = window.setTimeout(() => void ask(), query === '' ? 0 : SEARCH_DELAY);
-        return () => window.clearTimeout(timer);
-    }, [connection, view.name, query]);
-
-    const grid = {
-        '--k-columns': columns.length,
-    } as CSSProperties;
-
-    return (
-        <>
-            <Topbar crumb={group} title={view.label}>
-                {rows === undefined ? null : <span className="k-status">{rows.length}</span>}
-                {view.readOnly ? <span className="k-status">Read only</span> : null}
-            </Topbar>
-            <div className="k-admin__body">
-                <label className="k-list__search">
-                    <Search {...ICON} />
-                    <input
-                        type="search"
-                        placeholder={searchPlaceholder(view)}
-                        aria-label={`Search ${view.label.toLowerCase()}`}
-                        value={query}
-                        onChange={(event) => setQuery(event.target.value)}
-                    />
-                </label>
-                {rows === undefined ? (
-                    <Loading problem={problem} />
-                ) : (
-                    <>
-                        {problem === undefined ? null : (
-                            <p className="k-error" role="alert">
-                                {problem}
-                            </p>
-                        )}
-                        {rows.length === 0 ? (
-                            <div className="k-empty-state">
-                                <p className="k-empty-state__title">
-                                    {query.trim() === '' ? `Nothing in ${view.label.toLowerCase()}` : 'Nothing matches'}
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="k-list" role="table" aria-label={view.label}>
-                                <div className="k-list__row k-list__row--head" role="row" data-columns style={grid}>
-                                    {columns.map((column) => (
-                                        <span key={column} role="columnheader">
-                                            {columnLabel(column)}
-                                        </span>
-                                    ))}
-                                </div>
-                                {rows.map((row) => (
-                                    <a
-                                        key={row.id}
-                                        className="k-list__row"
-                                        role="row"
-                                        data-columns
-                                        style={grid}
-                                        href={hrefOf({
-                                            kind: 'record',
-                                            view: view.name,
-                                            id: row.id,
-                                        })}>
-                                        {columns.map((column, index) => (
-                                            <span key={column} role="cell" className={index === 0 ? 'k-list__title' : 'k-list__cell'}>
-                                                <span className="k-ellipsis">{index === 0 ? row.title : cellText(row.values[column])}</span>
-                                            </span>
-                                        ))}
-                                    </a>
-                                ))}
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-        </>
-    );
-}
+export { ViewList } from './list-view.js';
 
 /**
  * One record of a view: its fields in their layout, Save when the editor may
@@ -234,7 +115,7 @@ export function RecordScreen({
     if (record === undefined) {
         return (
             <>
-                <DocumentHeader crumb={crumb} title="" />
+                <PageHeader crumbs={[crumb]} title="" />
                 <div className="k-admin__body">
                     <Loading problem={loadProblem} />
                 </div>
@@ -259,17 +140,10 @@ export function RecordScreen({
 
     return (
         <>
-            <DocumentHeader
-                crumb={crumb}
+            <PageHeader
+                crumbs={[crumb]}
                 title={record.title}
-                meta={
-                    record.readOnly || (changed && !gone) ? (
-                        <>
-                            {record.readOnly ? <span className="k-status">Read only</span> : null}
-                            {changed && !gone ? <span className="k-save">Unsaved changes</span> : null}
-                        </>
-                    ) : undefined
-                }
+                meta={[record.readOnly ? 'Read only' : null, changed && !gone ? 'Unsaved changes' : null]}
             />
             <div className="k-admin__body">
                 {gone ? (

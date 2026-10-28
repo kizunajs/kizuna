@@ -22,6 +22,11 @@
         max-width: 320px;
     }
 
+    /* The logo keeps its own width, at the form's left edge. */
+    .k-sign-in__form > .k-logo {
+        align-self: flex-start;
+    }
+
     .k-sign-in__title {
         margin: 20px 0 8px;
         font-size: 22px;

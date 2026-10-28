@@ -98,22 +98,36 @@ export const Orders = defineView({
 
 Pages sit under Content, and so does anything without a `group`. A view the editor may not see is left out, along with whatever else their [access](/docs/cms/editing/access) keeps from them.
 
-⌘K, or Ctrl+K off a Mac, searches everything in the sidebar and every page and item by its title. The arrow keys move through what it finds, Enter opens it, and Escape closes the search.
+⌘K, or Ctrl+K off a Mac, searches everything in the sidebar and every page and item by its title, with pages and each collection's items under a heading of their own. The arrow keys move through what it finds, Enter opens it, ⌘Enter opens it in a new tab, and Escape closes the search.
+
+On a phone, the sidebar opens as a sheet from the menu button at the top left, with the search beside it on the right.
+
+Every screen opens with the same header: the trail back to the dashboard, the screen's title, a line of facts like a count or when it last changed, and its actions on the right.
 
 ## Lists
 
-A collection or view opens as a list. Its options decide what the list shows:
+Pages, each collection and each view open as a list: a table with the title of every row, its path under it, where it stands, and when it last changed. The header counts the rows and offers **Create new**. The search box finds rows by title or path, and a click on a column's heading sorts by it, as **Sort** does.
 
-| Option    | The list                                                             |
-| --------- | -------------------------------------------------------------------- |
-| `title`   | The field each row is named by                                       |
-| `columns` | The columns it starts with. Each editor can show and hide their own. |
-| `search`  | The fields the search box looks in                                   |
-| `indexes` | The fields it filters and sorts by, beside the item's status         |
+**Filters** builds conditions from the item's status and from the fields of a collection's `indexes` that hold a choice or an id:
 
-Tick rows and a bar offers **Publish**, **Unpublish** and **Delete** for all of them at once, asking first, as a single publish does. A field holding a list of ids, like an article's `tags`, adds **Add tag** to the bar. A long list comes in pages, with the number of items above it.
+```ts title="src/cms/content.ts"
+export const Articles = defineCollection({
+    name: 'articles',
+    id: ArticleId,
+    fields: articleFields,
+    indexes: ['topic', 'author'],
+});
+```
 
-A view's list is what its `list` function returns for the search box.
+Rows joined by **And** must all hold, and **Or** starts another set that may hold instead. A field holding ids of a collection with a `tree` adds **is within** and **is outside**, which take in everything under the item picked as well.
+
+**Columns** shows and hides columns, like who saved each row last, and the admin remembers the choice in that browser. A long list comes in pages, 25 rows to a page until you pick another number.
+
+Tick rows and their actions take the header's place: **Publish**, **Unpublish** and, for items, **Delete**, each asking first, as a single publish does. **Select all** ticks every row the search and filters keep, across pages. An item that refuses stays ticked, with the reason under the header.
+
+A collection with a `tree` lists its items nested under their parents, until you search, filter or sort. Drag a row onto another to move it under that one.
+
+A view's list shows its `title` and `columns`, and the search box asks its `list` function, which looks in the fields `search` names. The app keeps the records, so a view's list has no **Create new** and no tick boxes.
 
 ## Editing
 
@@ -147,27 +161,26 @@ In Next.js, `public/cms-admin.css` is served at that path. The sign-in screen lo
 Every class follows one pattern: a block per component, like `k-card`, its parts after two underscores, `k-card__link`, and a variant after two hyphens, `k-button--primary`. State that changes as the editor works, like the open item of a list or the current page in the sidebar, is an attribute rather than a class, such as `[data-panel-open]` or `[aria-current='page']`. To set a document's title larger:
 
 ```css title="public/cms-admin.css"
-.k-document-header__title {
+.k-page-header__title {
     font-size: 32px;
 }
 ```
 
 The blocks you are most likely to restyle:
 
-| Block               | What it is                                                                         |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| `k-sidebar`         | The sidebar, with `__item`, `__heading`, `__count` and `__account`                 |
-| `k-topbar`          | A list's bar, with `__title`                                                       |
-| `k-document-header` | A document's header, with `__title`, `__meta` and `__actions`, and `k-breadcrumb`  |
-| `k-dashboard`       | The dashboard, with `__tiles`, `__panels` and `__range`                            |
-| `k-stat`            | A stat tile, with `__label`, `__value` and `__detail`, and its `k-change` badge    |
-| `k-chart`           | A chart panel, with `__line`, `__line--previous`, `__bar`, `__legend`, `__tooltip` |
-| `k-card`            | A collection on the dashboard, with `__link`, `__count` and `__add`                |
-| `k-list`            | A collection's list, with `__search`, `__row` and `__title`                        |
-| `k-field`           | One field of a form, with `__label` and `__control`                                |
-| `k-array`           | A list field, with `__row`, `__index`, `__tag`, `__title` and `__panel`            |
-| `k-button`          | A button, with `--primary`, `--secondary` and `--small`                            |
-| `k-input`           | A text input, and the trigger of a select                                          |
+| Block           | What it is                                                                          |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `k-sidebar`     | The sidebar, with `__item`, `__heading`, `__count` and `__account`                  |
+| `k-page-header` | Every screen's header, with `__trail`, `__title`, `__meta`, `__actions` and `__bar` |
+| `k-dashboard`   | The dashboard, with `__tiles`, `__panels` and `__range`                             |
+| `k-stat`        | A stat tile, with `__label`, `__value` and `__detail`, and its `k-change` badge     |
+| `k-chart`       | A chart panel, with `__line`, `__line--previous`, `__bar`, `__legend`, `__tooltip`  |
+| `k-card`        | A collection on the dashboard, with `__link`, `__count` and `__add`                 |
+| `k-list`        | A collection's list, with `__search`, `__row` and `__title`                         |
+| `k-field`       | One field of a form, with `__label` and `__control`                                 |
+| `k-array`       | A list field, with `__row`, `__index`, `__tag`, `__title` and `__panel`             |
+| `k-button`      | A button, with `--primary`, `--secondary` and `--small`                             |
+| `k-input`       | A text input, and the trigger of a select                                           |
 
 Colours and sizes are custom properties on `:root`, like `--k-ink`, `--k-muted`, `--k-surface` and `--k-radius-card`, which the admin sets again under `[data-theme='light']` when the system is light. A stat's change badge is the one place the admin uses colour, through `--k-change-up`, `--k-change-down` and `--k-change-none`, each with a `-surface` for its background.
 

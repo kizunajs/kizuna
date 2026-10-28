@@ -4,7 +4,7 @@ import { ICON } from '../view/context.js';
 
 /**
  * The toasts in the corner, newest at the bottom: what an action said once it
- * ran.
+ * ran, with a button like Undo when the toast was added with `actionProps`.
  */
 export function Toasts() {
     const { toasts } = Toast.useToastManager();
@@ -15,6 +15,7 @@ export function Toasts() {
                     <Toast.Root key={toast.id} toast={toast} className="k-popup k-toast">
                         <Toast.Content className="k-toast__content">
                             <Toast.Description className="k-toast__text" />
+                            <Toast.Action className="k-button k-button--secondary k-button--small k-toast__action" />
                             <Toast.Close className="k-icon-button k-toast__close" aria-label="Dismiss">
                                 <X {...ICON} />
                             </Toast.Close>

@@ -1,82 +1,121 @@
 import { describe, expect, it } from 'vitest';
-import { NO_FILTERS, hasStatus, inEvery, isFiltering, itemQueriesOf, withField } from './list-filters.js';
+import {
+    NO_FILTERS,
+    STATUS_FIELD,
+    filterItems,
+    groupsOf,
+    isFiltering,
+    itemQueriesOf,
+    queryKeyOf,
+    withCondition,
+    type Condition,
+} from './list-filters.js';
+
+const articles = [
+    {
+        ref: 'item:articles:wateringMonstera',
+        status: 'published',
+    },
+    {
+        ref: 'item:articles:repotting',
+        status: 'draft',
+    },
+    {
+        ref: 'item:articles:northWindow',
+        status: 'changed',
+    },
+];
+
+const topicIs = (value: string, join: Condition['join'] = 'and'): Condition => ({
+    join,
+    field: 'topic',
+    operator: 'is',
+    value,
+});
+
+const statusIs = (value: string, join: Condition['join'] = 'and'): Condition => ({
+    join,
+    field: STATUS_FIELD,
+    operator: 'is',
+    value,
+});
 
 describe('the filters above a list', () => {
     it('asks for every item when nothing is filtered', () => {
-        expect(itemQueriesOf({})).toEqual([{}]);
+        expect(itemQueriesOf(NO_FILTERS)).toEqual([{}]);
         expect(isFiltering(NO_FILTERS)).toBe(false);
     });
 
-    it('asks once for each field, with descendants only when picked', () => {
-        const filters = withField(
-            withField(NO_FILTERS, 'topic', {
-                value: 'guides',
-                descendants: false,
-            }),
-            'tags',
-            {
-                value: 'lighting',
-                descendants: true,
-            }
-        );
-        expect(isFiltering(filters)).toBe(true);
-        expect(itemQueriesOf(filters.fields)).toEqual([
+    it('asks once for each field, besides every item, and never for the status', () => {
+        expect(
+            itemQueriesOf([
+                topicIs('care'),
+                statusIs('draft'),
+                topicIs('care', 'or'),
+                {
+                    join: 'and',
+                    field: 'category',
+                    operator: 'outside',
+                    value: 'lighting',
+                },
+            ])
+        ).toEqual([
+            {},
             {
                 field: 'topic',
-                value: 'guides',
+                value: 'care',
             },
             {
-                field: 'tags',
+                field: 'category',
                 value: 'lighting',
                 descendants: true,
             },
         ]);
     });
 
-    it('clears a field with undefined, and keeps the others', () => {
-        const filters = withField(
-            withField(NO_FILTERS, 'topic', {
-                value: 'guides',
-                descendants: false,
-            }),
-            'tags',
+    it('leaves out a row with no value picked', () => {
+        const filters: Condition[] = [
             {
-                value: 'lighting',
-                descendants: false,
-            }
-        );
-        expect(Object.keys(withField(filters, 'topic', undefined).fields)).toEqual(['tags']);
+                join: 'and',
+                field: 'topic',
+                operator: 'is',
+                value: undefined,
+            },
+        ];
+        expect(isFiltering(filters)).toBe(false);
+        expect(itemQueriesOf(filters)).toEqual([{}]);
     });
 
-    it('keeps the items every answer holds, in the order of the first', () => {
-        const article = (ref: string) => ({
-            ref,
-        });
-        expect(
-            inEvery([
-                [article('item:articles:benchLamps'), article('item:articles:ceilingLights'), article('item:articles:polishingBrass')],
-                [article('item:articles:polishingBrass'), article('item:articles:benchLamps')],
-            ]).map((item) => item.ref)
-        ).toEqual(['item:articles:benchLamps', 'item:articles:polishingBrass']);
-        expect(inEvery([])).toEqual([]);
+    it('groups the rows joined by and, and starts a group at each or', () => {
+        expect(groupsOf([statusIs('draft'), topicIs('care'), statusIs('published', 'or')]).map((group) => group.length)).toEqual([2, 1]);
     });
 
-    it('keeps the rows with the status picked, or every row', () => {
+    it('keeps the items every condition of some group holds', () => {
+        const held = new Map([
+            [queryKeyOf(itemQueriesOf([topicIs('care')])[1]!), new Set(['item:articles:repotting', 'item:articles:northWindow'])],
+        ]);
+        const refs = (filters: readonly Condition[]) =>
+            filterItems(articles, filters, (query) => held.get(queryKeyOf(query))).map((item) => item.ref);
+        expect(refs([topicIs('care'), statusIs('draft')])).toEqual(['item:articles:repotting']);
+        expect(refs([statusIs('published'), topicIs('care', 'or')])).toEqual([
+            'item:articles:wateringMonstera',
+            'item:articles:repotting',
+            'item:articles:northWindow',
+        ]);
         expect(
-            hasStatus(
+            refs([
                 {
-                    status: 'draft',
+                    ...topicIs('care'),
+                    operator: 'isNot',
                 },
-                'published'
-            )
-        ).toBe(false);
-        expect(
-            hasStatus(
-                {
-                    status: 'draft',
-                },
-                undefined
-            )
-        ).toBe(true);
+            ])
+        ).toEqual(['item:articles:wateringMonstera']);
+        expect(refs(NO_FILTERS)).toHaveLength(3);
+    });
+
+    it('changes one row, or removes it', () => {
+        const filters = [statusIs('draft'), topicIs('care')];
+        expect(withCondition(filters, 1, topicIs('season'))[1]?.value).toBe('season');
+        expect(withCondition(filters, 0, undefined)).toEqual([topicIs('care')]);
     });
 });

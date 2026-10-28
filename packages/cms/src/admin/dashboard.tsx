@@ -6,9 +6,11 @@ import { Hint } from '../view/hint.js';
 import { parseRef } from '../refs.js';
 import { Chart, Legend } from './chart.js';
 import {
+    askedOf,
     changeOf,
     DEFAULT_PERIOD,
     groupsOf,
+    isNewOf,
     PERIODS,
     periodOfHash,
     rangeOf,
@@ -24,7 +26,8 @@ import {
 } from './dashboard-widgets.js';
 import { createItem } from './list.js';
 import { hrefOf, type CollectionSummary } from './navigation.js';
-import { Loading, problemOf, Topbar } from './parts.js';
+import { PageHeader } from './page-header.js';
+import { Loading, problemOf } from './parts.js';
 import { SelectMenu } from '../view/select-menu.js';
 
 export type { WaitingReview } from './dashboard-widgets.js';
@@ -55,7 +58,12 @@ function StatTile({ widget }: { widget: StatWidgetBody }) {
         <div className="k-stat">
             <span className="k-stat__head">
                 <span className="k-stat__label">{widget.label}</span>
-                {change === undefined ? null : <span className={`k-change k-change--${change.direction}`}>{change.text}</span>}
+                {change === undefined ? null : (
+                    <span className={`k-change k-change--${change.direction}`}>
+                        <span aria-hidden="true">{change.text}</span>
+                        <span className="k-visually-hidden">{change.spoken}</span>
+                    </span>
+                )}
             </span>
             <strong className="k-stat__value">{widget.value}</strong>
             {widget.detail === undefined ? null : <span className="k-stat__detail">{widget.detail}</span>}
@@ -95,20 +103,28 @@ function ReviewsCard({ widget, collections }: { widget: ReviewsWidgetBody; colle
             {widget.reviews.length === 0 ? (
                 <p className="k-help">Nobody is waiting on you.</p>
             ) : (
-                <div className="k-waiting__list">
-                    {widget.reviews.map((review) => (
-                        <a
-                            key={review.ref}
-                            className="k-waiting__row"
-                            href={hrefOf({
-                                kind: 'document',
-                                ref: review.ref,
-                            })}>
-                            <span className="k-ellipsis">{review.label}</span>
-                            <span className="k-help">{kindOf(review.ref, collections)}</span>
-                        </a>
-                    ))}
-                </div>
+                <ul className="k-waiting__list">
+                    {widget.reviews.map((review) => {
+                        const asked = askedOf(review);
+                        return (
+                            <li key={review.ref}>
+                                <a
+                                    className="k-waiting__row"
+                                    href={hrefOf({
+                                        kind: 'document',
+                                        ref: review.ref,
+                                    })}>
+                                    <span className="k-ellipsis">{review.label}</span>
+                                    <span className="k-help k-ellipsis">
+                                        {asked === undefined
+                                            ? kindOf(review.ref, collections)
+                                            : `${kindOf(review.ref, collections)} · ${asked}`}
+                                    </span>
+                                </a>
+                            </li>
+                        );
+                    })}
+                </ul>
             )}
         </section>
     );
@@ -235,6 +251,7 @@ export function Dashboard({
     // The first row of stat tiles sets the columns every row shares.
     const firstStats = runsOf(widgets ?? []).find((run) => run.kind === 'stats');
     const columns = tileColumnsOf(firstStats?.kind === 'stats' ? firstStats.widgets.length : 0);
+    const isNew = widgets !== undefined && isNewOf(widgets);
 
     const body = (() => {
         if (failure !== undefined) {
@@ -251,13 +268,32 @@ export function Dashboard({
             );
         }
         if (widgets === undefined) return <Loading />;
-        if (widgets.length === 0) {
-            return (
-                <div className="k-empty-state">
-                    <p className="k-empty-state__title">Nothing here yet</p>
-                    <p className="k-help">The dashboard shows numbers, reviews and collections once there are some for you.</p>
-                </div>
-            );
+        const welcome = (
+            <div key="welcome" className="k-empty-state">
+                <h2 className="k-empty-state__title">Welcome to Kizuna</h2>
+                <p className="k-help">
+                    {widgets.some((widget) => widget.type === 'collections')
+                        ? 'Numbers and reviews show up here once there are some. Start with a page or an item below.'
+                        : 'Numbers, reviews and collections show up here once there are some for you.'}
+                </p>
+            </div>
+        );
+        if (isNew) {
+            const collectionsWidget = widgets.find((widget) => widget.type === 'collections');
+            return [
+                welcome,
+                collectionsWidget === undefined ? null : (
+                    <div key="collections" className="k-dashboard__groups">
+                        {problem === undefined ? null : (
+                            <p className="k-error" role="alert">
+                                <CircleAlert {...ICON} />
+                                {problem}
+                            </p>
+                        )}
+                        <CollectionCards widget={collectionsWidget} creating={creating} onCreate={(name) => void create(name)} />
+                    </div>
+                ),
+            ];
         }
         return runsOf(widgets).map((run, index) => {
             if (run.kind === 'stats') {
@@ -298,11 +334,17 @@ export function Dashboard({
 
     return (
         <>
-            <Topbar title="Dashboard">
-                <span className="k-spacer" />
-                {counted === undefined ? null : <span className="k-dashboard__range">{rangeOf(counted)}</span>}
-                <SelectMenu items={PERIOD_ITEMS} value={period} onChange={choosePeriod} label="Period" />
-            </Topbar>
+            <PageHeader
+                title="Dashboard"
+                actions={
+                    isNew ? undefined : (
+                        <>
+                            {counted === undefined ? null : <span className="k-dashboard__range">{rangeOf(counted, 'en-GB')}</span>}
+                            <SelectMenu items={PERIOD_ITEMS} value={period} onChange={choosePeriod} label="Period" />
+                        </>
+                    )
+                }
+            />
             <div className="k-admin__body k-dashboard" data-columns={columns} aria-busy={loading}>
                 {body}
             </div>

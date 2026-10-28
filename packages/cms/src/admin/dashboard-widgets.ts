@@ -1,5 +1,6 @@
 import type { ChartBar } from './chart-geometry.js';
 import { CONTENT_GROUP } from './navigation.js';
+import { relativeTimeOf } from './time.js';
 
 /**
  * The periods the dashboard counts over, in the order the picker lists them.
@@ -58,9 +59,9 @@ export interface DashboardPeriod {
 const HOURS_SHOWN = 2 * 24 * 60 * 60 * 1000;
 
 /**
- * A period as the dashboard names it beside the picker: its first and last
- * day, with the time for a period shorter than two days, and the year once
- * it is not this one.
+ * A period as the dashboard names it beside the picker, like "21 Oct to
+ * 28 Oct": its first and last day, with the time for a period shorter than
+ * two days, and the year once it is not this one.
  */
 export const rangeOf = (period: { from: string; to: string }, locale?: string, now: Date = new Date()): string => {
     const from = new Date(period.from);
@@ -81,13 +82,37 @@ export const rangeOf = (period: { from: string; to: string }, locale?: string, n
               }
             : {}),
     });
-    return `${format.format(from)} – ${format.format(to)}`;
+    return `${format.format(from)} to ${format.format(to)}`;
 };
 
 export interface WaitingReview {
     ref: string;
     label: string;
+    /**
+     * Who asked for the review, and when.
+     */
+    requestedBy?: {
+        name: string;
+    };
+    createdAt?: string;
 }
+
+const CLOCK = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+});
+
+/**
+ * Who asked for a review and when, as the dashboard's reviews list says it:
+ * "Ingrid Haugen asked 2 hours ago", with the time for yesterday.
+ */
+export const askedOf = (review: WaitingReview, now: Date = new Date()): string | undefined => {
+    if (review.requestedBy === undefined || review.createdAt === undefined) return undefined;
+    const when = relativeTimeOf(review.createdAt, now);
+    if (when === '') return `${review.requestedBy.name} asked`;
+    const clock = when === 'yesterday' ? ` at ${CLOCK.format(new Date(review.createdAt))}` : '';
+    return `${review.requestedBy.name} asked ${when}${clock}`;
+};
 
 export interface StatWidgetBody {
     type: 'stat';
@@ -214,26 +239,37 @@ export const groupsOf = (collections: readonly DashboardCollection[]): Collectio
 
 /**
  * A change as the stat tile shows it: an arrow and a percentage with at most
- * one decimal, and no arrow when it rounds to nothing.
+ * one decimal, and no arrow when it rounds to nothing. `spoken` says the same
+ * in words for a screen reader.
  */
-export const changeOf = (change: number): { text: string; direction: 'up' | 'down' | 'none' } => {
+export const changeOf = (change: number): { text: string; spoken: string; direction: 'up' | 'down' | 'none' } => {
     const percent = Math.round(Math.abs(change) * 1000) / 10;
     if (percent === 0) {
         return {
             text: '0%',
+            spoken: 'No change',
             direction: 'none',
         };
     }
     return change > 0
         ? {
               text: `↑ ${percent}%`,
+              spoken: `Up ${percent}%`,
               direction: 'up',
           }
         : {
               text: `↓ ${percent}%`,
+              spoken: `Down ${percent}%`,
               direction: 'down',
           };
 };
+
+/**
+ * Whether the dashboard has nothing to count yet: no numbers, no charts and
+ * no review waiting. It then welcomes the editor and leaves out the period.
+ */
+export const isNewOf = (widgets: readonly DashboardWidgetBody[]): boolean =>
+    widgets.every((widget) => widget.type === 'collections' || (widget.type === 'reviews' && widget.reviews.length === 0));
 
 /**
  * The most columns the dashboard's grid has.

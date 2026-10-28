@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { Autocomplete } from '@base-ui/react/autocomplete';
 import { Dialog } from '@base-ui/react/dialog';
 import { Search } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { hrefOf, type CollectionSummary, type NavigationSection } from './navigation.js';
-import { loadDocuments, placesOf, searchOf, type SearchResult } from './search.js';
+import { groupsOfResults, highlightOf, loadDocuments, placesOf, searchOf, type SearchGroup, type SearchResult } from './search.js';
 
 const onApple = (): boolean => /Mac|iPhone|iPad/.test(window.navigator.userAgent);
 
@@ -13,7 +13,7 @@ const onApple = (): boolean => /Mac|iPhone|iPad/.test(window.navigator.userAgent
  * Opens the palette on ⌘K, or Ctrl+K off a Mac, and closes it on a second
  * press.
  */
-const useShortcut = (toggle: () => void): void => {
+export const usePaletteShortcut = (toggle: () => void): void => {
     useEffect(() => {
         const listen = (event: globalThis.KeyboardEvent): void => {
             if (event.key.toLowerCase() !== 'k' || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
@@ -25,31 +25,55 @@ const useShortcut = (toggle: () => void): void => {
     }, [toggle]);
 };
 
-interface ResultGroup {
-    label: string;
-    items: SearchResult[];
+/**
+ * The sidebar's search button, which opens the palette. `compact` is the
+ * phone bar's icon alone.
+ */
+export function SearchButton({ onOpen, compact = false }: { onOpen: () => void; compact?: boolean }) {
+    if (compact) {
+        return (
+            <button type="button" className="k-icon-button k-phone-bar__button" aria-label="Search" aria-haspopup="dialog" onClick={onOpen}>
+                <Search {...ICON} />
+            </button>
+        );
+    }
+    return (
+        <button type="button" className="k-sidebar__search" aria-haspopup="dialog" onClick={onOpen}>
+            <Search {...ICON} />
+            <span className="k-sidebar__search-label">Search</span>
+            <kbd className="k-sidebar__shortcut" aria-hidden="true">
+                {onApple() ? '⌘K' : 'Ctrl K'}
+            </kbd>
+        </button>
+    );
 }
 
 /**
- * The sidebar's search, and the palette it opens: every screen in the
- * sidebar, and every page and item by its title.
+ * The address a result opens at, for a tab of its own.
+ */
+const addressOf = (result: SearchResult): string => `${window.location.pathname}${window.location.search}${hrefOf(result.screen)}`;
+
+/**
+ * The palette the search buttons and ⌘K open: every screen in the sidebar,
+ * and every page and item by its title, under its collection.
  */
 export function CommandPalette({
+    open,
+    onOpenChange,
     connection,
     sections,
     collections,
 }: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
     connection: Connection;
     sections: readonly NavigationSection[];
     collections: readonly CollectionSummary[] | undefined;
 }) {
-    const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [documents, setDocuments] = useState<SearchResult[] | undefined>();
     const input = useRef<HTMLInputElement>(null);
-
-    const toggle = useCallback(() => setOpen((shown) => !shown), []);
-    useShortcut(toggle);
+    const highlighted = useRef<SearchResult | undefined>(undefined);
 
     // Titles change while the palette is closed, so each opening reads them again.
     useEffect(() => {
@@ -64,45 +88,45 @@ export function CommandPalette({
     }, [open, connection, collections]);
 
     const places = useMemo(() => placesOf(sections), [sections]);
-    const groups = useMemo<ResultGroup[]>(() => {
-        const results = searchOf({
-            query,
-            places,
-            documents: documents ?? [],
-        });
-        return [
-            {
-                label: 'Go to',
-                items: results.places,
-            },
-            {
-                label: 'Documents',
-                items: results.documents,
-            },
-        ].filter((group) => group.items.length > 0);
-    }, [query, places, documents]);
+    const groups = useMemo<SearchGroup[]>(
+        () =>
+            groupsOfResults(
+                searchOf({
+                    query,
+                    places,
+                    documents: documents ?? [],
+                })
+            ),
+        [query, places, documents]
+    );
 
     const change = (shown: boolean): void => {
-        setOpen(shown);
+        onOpenChange(shown);
         if (!shown) setQuery('');
     };
 
-    const pick = (result: SearchResult): void => {
+    const pick = (result: SearchResult, inNewTab: boolean): void => {
+        if (inNewTab) {
+            window.open(addressOf(result), '_blank', 'noopener');
+            return;
+        }
         window.location.hash = hrefOf(result.screen);
         change(false);
     };
 
+    // ⌘↵, or Ctrl+↵ off a Mac, opens the highlighted result in a new tab.
+    const openInNewTab = (event: KeyboardEvent<HTMLInputElement>): void => {
+        if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey) || highlighted.current === undefined) return;
+        event.preventDefault();
+        event.stopPropagation();
+        pick(highlighted.current, true);
+    };
+
     const searching = query.trim() !== '';
+    const command = onApple() ? '⌘' : 'Ctrl';
 
     return (
         <Dialog.Root open={open} onOpenChange={change}>
-            <Dialog.Trigger className="k-sidebar__search">
-                <Search {...ICON} />
-                <span className="k-sidebar__search-label">Search</span>
-                <kbd className="k-sidebar__shortcut" aria-hidden="true">
-                    {onApple() ? '⌘K' : 'Ctrl K'}
-                </kbd>
-            </Dialog.Trigger>
             <Dialog.Portal>
                 <Dialog.Backdrop className="k-backdrop" />
                 <Dialog.Popup className="k-palette" initialFocus={input}>
@@ -115,6 +139,9 @@ export function CommandPalette({
                         autoHighlight="always"
                         keepHighlight
                         itemToStringValue={(result: SearchResult) => result.label}
+                        onItemHighlighted={(result: SearchResult | undefined) => {
+                            highlighted.current = result;
+                        }}
                         value={query}
                         onValueChange={(next, details) => {
                             if (details.reason !== 'item-press') setQuery(next);
@@ -126,7 +153,11 @@ export function CommandPalette({
                                 aria-label="Search the admin"
                                 placeholder="Search pages, collections and titles"
                                 spellCheck={false}
+                                onKeyDown={openInNewTab}
                             />
+                            <kbd className="k-kbd k-palette__escape" aria-hidden="true">
+                                esc
+                            </kbd>
                         </label>
                         <div className="k-palette__results">
                             <Autocomplete.Empty>
@@ -135,7 +166,7 @@ export function CommandPalette({
                                 </p>
                             </Autocomplete.Empty>
                             <Autocomplete.List className="k-palette__list" aria-label="Results">
-                                {(group: ResultGroup) => (
+                                {(group: SearchGroup) => (
                                     <Autocomplete.Group key={group.label} items={group.items} className="k-palette__group">
                                         <Autocomplete.GroupLabel className="k-palette__heading">{group.label}</Autocomplete.GroupLabel>
                                         <Autocomplete.Collection>
@@ -144,8 +175,12 @@ export function CommandPalette({
                                                     key={hrefOf(result.screen)}
                                                     value={result}
                                                     className="k-palette__option"
-                                                    onClick={() => pick(result)}>
-                                                    <span className="k-ellipsis">{result.label}</span>
+                                                    onClick={(event: MouseEvent) => pick(result, event.metaKey || event.ctrlKey)}>
+                                                    <span className="k-ellipsis">
+                                                        {highlightOf(result.label, query).map((part, index) =>
+                                                            part.matched ? <strong key={index}>{part.text}</strong> : part.text
+                                                        )}
+                                                    </span>
                                                     {result.detail === '' ? null : (
                                                         <span className="k-palette__detail k-ellipsis">{result.detail}</span>
                                                     )}
@@ -157,6 +192,27 @@ export function CommandPalette({
                             </Autocomplete.List>
                         </div>
                     </Autocomplete.Root>
+                    <div className="k-palette__foot" aria-hidden="true">
+                        <span>
+                            <kbd className="k-kbd">↑</kbd>
+                            <kbd className="k-kbd">↓</kbd>
+                            Move
+                        </span>
+                        <span>
+                            <kbd className="k-kbd">↵</kbd>
+                            Open
+                        </span>
+                        <span>
+                            <kbd className="k-kbd">{command}</kbd>
+                            <kbd className="k-kbd">↵</kbd>
+                            Open in a new tab
+                        </span>
+                        <span className="k-palette__foot-end">
+                            <kbd className="k-kbd">{command}</kbd>
+                            <kbd className="k-kbd">K</kbd>
+                            Close
+                        </span>
+                    </div>
                 </Dialog.Popup>
             </Dialog.Portal>
         </Dialog.Root>

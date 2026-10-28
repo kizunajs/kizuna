@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+    askedOf,
     changeOf,
     groupsOf,
+    isNewOf,
     periodOfHash,
     rangeOf,
     runsOf,
@@ -99,6 +101,7 @@ describe('changeOf', () => {
     it('shows a rise with an up arrow and one decimal', () => {
         expect(changeOf(0.081)).toEqual({
             text: '↑ 8.1%',
+            spoken: 'Up 8.1%',
             direction: 'up',
         });
     });
@@ -106,6 +109,7 @@ describe('changeOf', () => {
     it('shows a fall with a down arrow, dropping a trailing zero', () => {
         expect(changeOf(-0.02)).toEqual({
             text: '↓ 2%',
+            spoken: 'Down 2%',
             direction: 'down',
         });
     });
@@ -113,6 +117,7 @@ describe('changeOf', () => {
     it('shows no arrow for a change that rounds to nothing', () => {
         expect(changeOf(0.0004)).toEqual({
             text: '0%',
+            spoken: 'No change',
             direction: 'none',
         });
     });
@@ -154,7 +159,7 @@ describe('the dashboard period', () => {
                 'en-GB',
                 new Date('2026-10-28T12:00:00.000Z')
             )
-        ).toBe('21 Oct – 28 Oct');
+        ).toBe('21 Oct to 28 Oct');
     });
 
     it('adds the year once the range is not this one', () => {
@@ -167,7 +172,7 @@ describe('the dashboard period', () => {
                 'en-GB',
                 new Date('2027-01-02T12:00:00.000Z')
             )
-        ).toBe('1 Dec 2026 – 31 Dec 2026');
+        ).toBe('1 Dec 2026 to 31 Dec 2026');
     });
 
     it('names the hour for the last 24 hours', () => {
@@ -180,6 +185,88 @@ describe('the dashboard period', () => {
                 'en-GB',
                 new Date('2026-10-28T12:00:00.000Z')
             )
-        ).toMatch(/^27 Oct.*\d\d:\d\d – 28 Oct.*\d\d:\d\d$/);
+        ).toMatch(/^27 Oct.*\d\d:\d\d to 28 Oct.*\d\d:\d\d$/);
+    });
+});
+
+describe('askedOf', () => {
+    const now = new Date('2026-10-28T12:00:00.000Z');
+
+    it('names who asked and how long ago', () => {
+        expect(
+            askedOf(
+                {
+                    ref: 'item:articles:1',
+                    label: 'How often to water a fiddle leaf fig',
+                    requestedBy: {
+                        name: 'Ingrid Haugen',
+                    },
+                    createdAt: '2026-10-28T10:00:00.000Z',
+                },
+                now
+            )
+        ).toBe('Ingrid Haugen asked 2 hours ago');
+    });
+
+    it('adds the time to yesterday', () => {
+        expect(
+            askedOf(
+                {
+                    ref: 'page:contact',
+                    label: 'Contact',
+                    requestedBy: {
+                        name: 'Felix Lund',
+                    },
+                    createdAt: '2026-10-27T10:20:00.000Z',
+                },
+                now
+            )
+        ).toMatch(/^Felix Lund asked yesterday at \d\d:\d\d$/);
+    });
+
+    it('says nothing without who asked', () => {
+        expect(
+            askedOf(
+                {
+                    ref: 'page:contact',
+                    label: 'Contact',
+                },
+                now
+            )
+        ).toBeUndefined();
+    });
+});
+
+describe('isNewOf', () => {
+    it('is new with only collections and no review waiting', () => {
+        expect(
+            isNewOf([
+                {
+                    type: 'reviews',
+                    reviews: [],
+                },
+                {
+                    type: 'collections',
+                    collections: [],
+                },
+            ])
+        ).toBe(true);
+    });
+
+    it('is not new once there is a number or a review waiting', () => {
+        expect(isNewOf([revenue])).toBe(false);
+        expect(
+            isNewOf([
+                {
+                    type: 'reviews',
+                    reviews: [
+                        {
+                            ref: 'page:contact',
+                            label: 'Contact',
+                        },
+                    ],
+                },
+            ])
+        ).toBe(false);
     });
 });

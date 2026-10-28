@@ -1,5 +1,5 @@
 import { parseRef } from '../refs.js';
-import type { ToolAnswer } from '../view/connection.js';
+import { toolsFor, type ToolAnswer } from '../view/connection.js';
 import { outcomeOf, type AdminCall } from './actions.js';
 
 export type BulkAction = 'publish' | 'unpublish' | 'delete';
@@ -28,21 +28,27 @@ const WORDS: Record<BulkAction, BulkWords> = {
     },
 };
 
-const TOOLS: Record<BulkAction, string> = {
-    publish: 'editing_collections_publish',
-    unpublish: 'editing_collections_unpublish',
-    delete: 'editing_collections_delete_item',
+const SUFFIXES: Record<BulkAction, string> = {
+    publish: 'publish',
+    unpublish: 'unpublish',
+    delete: 'delete_item',
 };
+
+/**
+ * The tool prefix of what a list holds: items of a collection, or pages.
+ */
+export type BulkTargets = 'editing_collections' | 'editing_pages';
 
 export const BULK_ACTIONS: readonly BulkAction[] = ['publish', 'unpublish', 'delete'];
 
 export const bulkLabelOf = (action: BulkAction): string => WORDS[action].label;
 
 /**
- * The actions the bar offers: those the CMS has a route for.
+ * The actions the bar offers: those the CMS has a route for. Pages come
+ * from code, so none is deleted.
  */
-export const offeredActions = (routes: Readonly<Record<string, unknown>>): BulkAction[] =>
-    BULK_ACTIONS.filter((action) => routes[TOOLS[action]] !== undefined);
+export const offeredActions = (routes: Readonly<Record<string, unknown>>, targets: BulkTargets = 'editing_collections'): BulkAction[] =>
+    BULK_ACTIONS.filter((action) => routes[`${targets}_${SUFFIXES[action]}`] !== undefined);
 
 const itemsOf = (count: number): string => (count === 1 ? '1 item' : `${count} items`);
 
@@ -52,18 +58,17 @@ const itemsOf = (count: number): string => (count === 1 ? '1 item' : `${count} i
 export const bulkQuestionOf = (action: BulkAction, count: number): string => WORDS[action].question(itemsOf(count));
 
 /**
- * The call that runs an action on one item, or `undefined` when the ref
- * names no item.
+ * The call that runs an action on one item or page, or `undefined` when the
+ * ref names neither, or names a page to delete.
  */
 export const bulkCallOf = (action: BulkAction, ref: string): AdminCall | undefined => {
     const parsed = parseRef(ref);
-    if (parsed?.type !== 'item') return undefined;
-    const params = {
-        name: parsed.collection,
-        id: parsed.id,
-    };
+    if (parsed === undefined || parsed.type === 'global' || (parsed.type === 'page' && action === 'delete')) return undefined;
+    const tools = toolsFor(ref);
+    if (tools === undefined) return undefined;
+    const params = tools.params;
     return {
-        name: TOOLS[action],
+        name: `${tools.prefix}_${SUFFIXES[action]}`,
         input:
             action === 'delete'
                 ? {
@@ -103,7 +108,7 @@ export const runBulk = async (
         if (planned === undefined) {
             results.push({
                 ...target,
-                problem: `${target.title} is not an item of a collection.`,
+                problem: `${WORDS[action].label} does not run on ${target.title}.`,
             });
             continue;
         }

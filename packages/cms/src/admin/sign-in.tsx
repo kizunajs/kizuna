@@ -51,6 +51,15 @@ export function SignIn({ config }: { config: SignInConfig }) {
         setPending(false);
     };
 
+    // While the server turns the editor away, both fields point at why.
+    const refused =
+        error === null
+            ? {}
+            : {
+                  'aria-invalid': true,
+                  'aria-describedby': 'k-sign-in__error',
+              };
+
     return (
         <main className="k-sign-in">
             <Form
@@ -63,15 +72,15 @@ export function SignIn({ config }: { config: SignInConfig }) {
                 </h1>
                 <Field.Root name="email" className="k-sign-in__field">
                     <Field.Label className="k-sign-in__label">Email</Field.Label>
-                    <Field.Control className="k-input" type="email" autoComplete="username" required autoFocus />
+                    <Field.Control className="k-input" type="email" autoComplete="username" required autoFocus {...refused} />
                     <Field.Error className="k-sign-in__hint" />
                 </Field.Root>
                 <Field.Root name="password" className="k-sign-in__field">
                     <Field.Label className="k-sign-in__label">Password</Field.Label>
-                    <Field.Control className="k-input" type="password" autoComplete="current-password" required />
+                    <Field.Control className="k-input" type="password" autoComplete="current-password" required {...refused} />
                     <Field.Error className="k-sign-in__hint" />
                 </Field.Root>
-                <p className="k-sign-in__error" role="alert">
+                <p id="k-sign-in__error" className="k-sign-in__error" role="alert">
                     {error}
                 </p>
                 <Button type="submit" className="k-button k-button--primary" disabled={pending}>

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { EditorContext, type EditorContextValue } from '../view/context.js';
+import { Dialog } from '@base-ui/react/dialog';
+import { Menu as MenuIcon, X } from 'lucide-react';
+import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { Logo } from '../view/logo.js';
 import { usePeople } from '../view/people.js';
-import { CommandPalette } from './command-palette.js';
+import { CommandPalette, SearchButton, usePaletteShortcut } from './command-palette.js';
 import type { AdminConfig } from './config.js';
 import { connectOverHttp } from './connection.js';
 import { Dashboard, type WaitingReview } from './dashboard.js';
@@ -51,19 +53,54 @@ const useSystemTheme = (): void => {
     }, []);
 };
 
+/**
+ * The width under which the sidebar folds behind the phone bar's menu button.
+ */
+const PHONE = '(max-width: 860px)';
+
+/**
+ * Whether the window is as narrow as a phone, following it as it changes.
+ */
+const usePhone = (): boolean => {
+    const [phone, setPhone] = useState(() => window.matchMedia(PHONE).matches);
+    useEffect(() => {
+        const query = window.matchMedia(PHONE);
+        const follow = (): void => setPhone(query.matches);
+        follow();
+        query.addEventListener('change', follow);
+        return () => query.removeEventListener('change', follow);
+    }, []);
+    return phone;
+};
+
 const open = (screen: Screen): void => {
     window.location.hash = hrefOf(screen);
 };
 
 /**
  * The admin: a sidebar of everything the editor may open, and the screen the
- * address names beside it.
+ * address names beside it. On a phone the sidebar opens as a sheet from the
+ * bar's menu button.
  */
 export function Admin({ config }: { config: AdminConfig }) {
     useSystemTheme();
     const connection = useMemo(() => connectOverHttp(config), [config]);
     const people = usePeople(connection);
     const screen = useScreen();
+    const phone = usePhone();
+    const [searching, setSearching] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
+    usePaletteShortcut(useCallback(() => setSearching((shown) => !shown), []));
+
+    // Opening a screen from the sheet closes it.
+    useEffect(() => {
+        setMenuOpen(false);
+    }, [screen]);
+
+    const openSearch = (): void => {
+        setMenuOpen(false);
+        setSearching(true);
+    };
     const [globals, setGlobals] = useState<GlobalSummary[] | undefined>();
     const [collections, setCollections] = useState<CollectionSummary[] | undefined>();
     const [waiting, setWaiting] = useState<WaitingReview[] | undefined>();
@@ -208,64 +245,98 @@ export function Admin({ config }: { config: AdminConfig }) {
                     />
                 );
             }
-            return <ViewList key={view.name} connection={connection} view={view} group={groupOf(view.name)} />;
+            return <ViewList key={view.name} connection={connection} view={view} />;
         }
         return <Dashboard connection={connection} collections={collections} onOpen={openDocument} />;
     })();
 
+    const dashboardHref = hrefOf({
+        kind: 'dashboard',
+    });
+    const brand = (
+        <a className="k-sidebar__brand" href={dashboardHref} aria-label="Dashboard">
+            <Logo />
+        </a>
+    );
+    const groups = (
+        <div className="k-sidebar__groups">
+            <div className="k-sidebar__group">
+                <a className="k-sidebar__item" href={dashboardHref} aria-current={screen.kind === 'dashboard' ? 'page' : undefined}>
+                    <span className="k-ellipsis">Dashboard</span>
+                    {waiting !== undefined && waiting.length > 0 ? (
+                        <span className="k-sidebar__count" aria-label={`${waiting.length} waiting for your review`}>
+                            {waiting.length}
+                        </span>
+                    ) : null}
+                </a>
+            </div>
+            {sections.map((section) => (
+                <div key={section.label} className="k-sidebar__group">
+                    <h2 className="k-heading">{section.label}</h2>
+                    {section.entries.map((entry) => (
+                        <a
+                            key={hrefOf(entry.screen)}
+                            className="k-sidebar__item"
+                            href={hrefOf(entry.screen)}
+                            aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
+                            <span className="k-ellipsis">{entry.label}</span>
+                        </a>
+                    ))}
+                </div>
+            ))}
+        </div>
+    );
+    const signedIn = (
+        <SignedIn person={me} role={config.role} signOutPath={config.signOutPath} signOutMethod={config.signOutMethod ?? 'GET'} />
+    );
+
     return (
         <EditorContext.Provider value={editorContext}>
             <div className="k-admin">
-                <nav className="k-sidebar" aria-label="Admin">
-                    <a
-                        className="k-sidebar__brand"
-                        href={hrefOf({
-                            kind: 'dashboard',
-                        })}
-                        aria-label="Dashboard">
-                        <Logo />
-                    </a>
-                    <CommandPalette connection={connection} sections={sections} collections={collections} />
-                    <div className="k-sidebar__groups">
-                        <div className="k-sidebar__group">
-                            <a
-                                className="k-sidebar__item"
-                                href={hrefOf({
-                                    kind: 'dashboard',
-                                })}
-                                aria-current={screen.kind === 'dashboard' ? 'page' : undefined}>
-                                <span className="k-ellipsis">Dashboard</span>
-                                {waiting !== undefined && waiting.length > 0 ? (
-                                    <span className="k-sidebar__count" aria-label={`${waiting.length} waiting for your review`}>
-                                        {waiting.length}
-                                    </span>
-                                ) : null}
-                            </a>
-                        </div>
-                        {sections.map((section) => (
-                            <div key={section.label} className="k-sidebar__group">
-                                <h2 className="k-heading">{section.label}</h2>
-                                {section.entries.map((entry) => (
-                                    <a
-                                        key={hrefOf(entry.screen)}
-                                        className="k-sidebar__item"
-                                        href={hrefOf(entry.screen)}
-                                        aria-current={isCurrent(entry.screen, screen) ? 'page' : undefined}>
-                                        <span className="k-ellipsis">{entry.label}</span>
-                                    </a>
-                                ))}
-                            </div>
-                        ))}
-                    </div>
-                    <SignedIn
-                        person={me}
-                        role={config.role}
-                        signOutPath={config.signOutPath}
-                        signOutMethod={config.signOutMethod ?? 'GET'}
-                    />
-                </nav>
+                {phone ? (
+                    <header className="k-phone-bar">
+                        <Dialog.Root open={menuOpen} onOpenChange={setMenuOpen}>
+                            <Dialog.Trigger className="k-icon-button k-phone-bar__button" aria-label="Open menu">
+                                <MenuIcon {...ICON} />
+                            </Dialog.Trigger>
+                            <Dialog.Portal>
+                                <Dialog.Backdrop className="k-backdrop" />
+                                <Dialog.Popup className="k-nav-sheet">
+                                    <Dialog.Title className="k-visually-hidden">Menu</Dialog.Title>
+                                    <nav className="k-nav-sheet__nav" aria-label="Admin">
+                                        <div className="k-nav-sheet__head">
+                                            {brand}
+                                            <Dialog.Close className="k-icon-button k-phone-bar__button" aria-label="Close menu">
+                                                <X {...ICON} />
+                                            </Dialog.Close>
+                                        </div>
+                                        <SearchButton onOpen={openSearch} />
+                                        {groups}
+                                        {signedIn}
+                                    </nav>
+                                </Dialog.Popup>
+                            </Dialog.Portal>
+                        </Dialog.Root>
+                        {brand}
+                        <SearchButton onOpen={openSearch} compact />
+                    </header>
+                ) : (
+                    <nav className="k-sidebar" aria-label="Admin">
+                        {brand}
+                        <SearchButton onOpen={openSearch} />
+                        {groups}
+                        {signedIn}
+                    </nav>
+                )}
                 <main className="k-admin__main">{shown}</main>
             </div>
+            <CommandPalette
+                open={searching}
+                onOpenChange={setSearching}
+                connection={connection}
+                sections={sections}
+                collections={collections}
+            />
         </EditorContext.Provider>
     );
 }

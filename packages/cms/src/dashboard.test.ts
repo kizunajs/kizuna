@@ -321,6 +321,10 @@ describe('the dashboard', () => {
             ref: 'page:frontPage',
             label: 'Front Page',
             status: 'open',
+            requestedBy: {
+                id: 'ada',
+            },
+            createdAt: expect.any(String),
         });
         expect(collections).toEqual({
             type: 'collections',
