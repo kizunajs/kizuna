@@ -116,7 +116,7 @@ export const DescribedFieldSchema = Kizuna.model({
         readOnly: z.boolean(),
         writable: z.boolean().describe('Whether the caller may write this field.'),
         roles: z.array(z.string()).optional().describe('The roles that may write it, when narrowed.'),
-        brand: z.string().optional().describe('The brand of the ids this field holds.'),
+        brand: z.string().optional().describe('The brand of the ids this field holds, when a collection or relationship holds them.'),
         searchTool: z.string().optional().describe('The tool that finds ids for the brand.'),
         schema: z.record(z.string(), z.unknown()).describe('The JSON Schema of the value.'),
         value: z.unknown().optional().describe('The current draft value.'),

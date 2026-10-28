@@ -18,6 +18,7 @@ import type { CmsExports } from './plugin.js';
 const k = new Kizuna();
 const roles = Kizuna.roles(['editor', 'admin']);
 const EmployeeId = Kizuna.brand('EmployeeId', z.string());
+const PhoneNumber = Kizuna.brand('PhoneNumber', z.string());
 
 const editor = k.identity
     .bearer({
@@ -66,6 +67,10 @@ const Employees = defineCollection({
         {
             name: 'order',
             schema: z.int().min(0),
+        },
+        {
+            name: 'phone',
+            schema: PhoneNumber.optional(),
         },
     ],
     indexes: ['department', 'order'],
@@ -289,6 +294,27 @@ describe('collections', () => {
         const contacts = (await asEditor(request(app).get('/editing/describe').query({ url: '/contact' }))).body.fields[0];
         expect(contacts.brand).toBe('EmployeeId');
         expect(contacts.description).toContain('employees collection');
+        expect(contacts.searchTool).toBe('editing_search_items');
+        expect(contacts.schema.items.brand).toBe('EmployeeId');
+    });
+
+    it('describes a branded value no collection or relationship holds without a picker', async () => {
+        const id = await createEmployee('Ada', 'Engineering', 1);
+        const described = await asEditor(
+            request(app)
+                .get('/editing/describe')
+                .query({
+                    ref: `item:employees:${id}`,
+                })
+        );
+        const phone = described.body.fields.find((field: { path: string }) => field.path === 'phone');
+        expect(phone).not.toHaveProperty('brand');
+        expect(phone).not.toHaveProperty('searchTool');
+        expect(phone).not.toHaveProperty('description');
+        expect(phone.schema).toEqual({
+            $schema: 'https://json-schema.org/draft/2020-12/schema',
+            type: 'string',
+        });
     });
 
     it('drops the item, its collection and the pages that reference it when it publishes', async () => {

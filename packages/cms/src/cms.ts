@@ -994,6 +994,38 @@ export class CmsService {
     }
 
     /**
+     * The brand of a field's ids when a collection or relationship holds
+     * them, which is what the editor's picker searches. A brand on a plain
+     * value, like a `PhoneNumber`, answers `undefined`.
+     */
+    referenceBrandOf(schema: z.core.$ZodType): string | undefined {
+        const brand = brandOf(schema);
+        return brand !== undefined && this.holdsIds(brand) ? brand : undefined;
+    }
+
+    private holdsIds(brand: string): boolean {
+        return this.listingFor(brand) !== undefined || this.relationshipFor(brand) !== undefined;
+    }
+
+    /**
+     * A field's JSON Schema as `describe` hands it out. It keeps `brand` only
+     * where a collection or relationship holds the ids, so the editor offers a
+     * picker there and an ordinary input everywhere else.
+     */
+    fieldJsonSchema(schema: z.core.$ZodType): Record<string, unknown> {
+        return z.toJSONSchema(schema as z.ZodType, {
+            unrepresentable: 'any',
+            reused: 'inline',
+            io: 'input',
+            override: (context) => {
+                encodeForWire(context);
+                const brand = context.jsonSchema.brand;
+                if (typeof brand === 'string' && !this.holdsIds(brand)) delete context.jsonSchema.brand;
+            },
+        }) as Record<string, unknown>;
+    }
+
+    /**
      * The relationship with a name, for `invalidate`.
      */
     relationship(name: string): CmsRelationship {
@@ -1097,7 +1129,7 @@ export class CmsService {
         const listing = this.listingOf(ref);
         const described: z.output<typeof import('./wire.js').DescribedFieldSchema>[] = [];
         const push = (field: DescribedField, parent: string | undefined): void => {
-            const brand = brandOf(field.schema);
+            const brand = this.referenceBrandOf(field.schema);
             const isList = readDef(unwrapOptionalWrappers(field.schema).inner).type === 'array';
             const roles =
                 field.auth?.roles === undefined
@@ -1119,7 +1151,6 @@ export class CmsService {
             ]
                 .filter(Boolean)
                 .join(' ');
-            const searchable = brand !== undefined && (this.listingFor(brand) !== undefined || this.relationshipFor(brand) !== undefined);
             described.push({
                 path: field.path,
                 name: field.name,
@@ -1148,13 +1179,8 @@ export class CmsService {
                 writable: pathRefusal(definition.fields, field.path, caller) === undefined,
                 ...(roles === undefined ? {} : { roles }),
                 ...(brand === undefined ? {} : { brand }),
-                ...(searchable ? { searchTool: this.ownSearchTool() ?? `editing.searchItems` } : {}),
-                schema: z.toJSONSchema(field.schema as z.ZodType, {
-                    unrepresentable: 'any',
-                    reused: 'inline',
-                    io: 'input',
-                    override: encodeForWire,
-                }) as Record<string, unknown>,
+                ...(brand === undefined ? {} : { searchTool: this.ownSearchTool() ?? `editing.searchItems` }),
+                schema: this.fieldJsonSchema(field.schema),
                 ...(draft === null ? {} : { value: getAtPath(draft, field.path) }),
             });
             for (const inner of field.fields ?? []) push(inner, field.path);
