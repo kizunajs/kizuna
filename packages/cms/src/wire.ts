@@ -58,7 +58,10 @@ export const EditorItemSchema = Kizuna.model({
         updatedAt: z.string(),
         updatedBy: z.string(),
         ...TreePlacementShape,
-        values: z.record(z.string(), z.unknown()).optional().describe('The fields `fields` names, as stored. Only when the list is asked for fields.'),
+        values: z
+            .record(z.string(), z.unknown())
+            .optional()
+            .describe('The fields `fields` names, as stored. Only when the list is asked for fields.'),
         labels: z
             .record(z.string(), z.string())
             .optional()

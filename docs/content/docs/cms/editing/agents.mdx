@@ -11,14 +11,14 @@ Every `editing` route is an MCP tool, so the model can do what the form does. `e
 
 `editing_collections_list_items` lists the items of one collection, drafts included, as the [admin](/docs/cms/editing/admin#lists) does. Each item comes with its title, address, status and when it last changed, and `total` counts every item that matches.
 
-| Parameter         | What it does                                                                                  |
-| ----------------- | --------------------------------------------------------------------------------------------- |
-| `q`               | Keeps the items whose title or address holds the text                                         |
-| `filter`          | Conditions, each written `field:operator:value`                                               |
-| `orderBy`         | `title`, `status`, `updatedAt` or a field of `indexes`. `title` until you name another        |
-| `direction`       | `asc` or `desc`. Ascending until you name one, and for `updatedAt` newest first               |
-| `limit`, `offset` | One page, of up to 200 items, after skipping `offset`. Without `limit`, every item that holds |
-| `fields`          | The fields each item carries under `values`, from `indexes` and `columns`, like `topic,author` |
+| Parameter         | What it does                                                                                    |
+| ----------------- | ----------------------------------------------------------------------------------------------- |
+| `q`               | Keeps the items whose title or address holds the text                                           |
+| `filter`          | Conditions, each written `field:operator:value`                                                 |
+| `orderBy`         | `title`, `status`, `updatedAt` or a field of `indexes`. `title` until you name another          |
+| `direction`       | `asc` or `desc`. Ascending until you name one, and for `updatedAt` newest first                 |
+| `limit`, `offset` | One page, of up to 200 items, after skipping `offset`. Without `limit`, every item that matches |
+| `fields`          | The fields each item carries under `values`, from `indexes` and `columns`, like `topic,author`  |
 
 A condition names `status` or a field of the collection's `indexes`, the fields the store keeps an index for, and the route answers any other field with `400`. `status` is `empty`, `draft`, `changed` or `published`. `is` and `isNot` compare a field with the value, or look for it in a list of ids, and a field holding ids of a collection with a [tree](/docs/cms/collections#trees) also takes `within` and `outside`, which count every item under the value as well.
 
@@ -29,6 +29,30 @@ GET /api/editing/collections/articles/items?filter=topic:is:care&filter=status:i
 ```
 
 `values` holds what is stored, and `labels` what an editor reads for a choice or an id, so `topic` is `care` in one and `Plant care` in the other. Since `status` and `updatedAt` name the item's own status and time, an index cannot take either name.
+
+## Connecting a chat
+
+**Edit in your chat**, in the account menu at the foot of the admin's sidebar, shows an editor how to connect Claude to the CMS's MCP route as themselves. The admin finds the route that `mcpPlugin()` serves, and names the server after the plugin's `name`.
+
+For Claude Code, the dialog writes the `claude mcp add` command with the editor's token, hidden until they press **Show token**, and **Copy** copies it whole. `chatToken` under `auth` hands the admin that token. Return one your editor identity accepts as a bearer, like the session's own:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    auth: {
+        identity: 'editor',
+        chatToken: async ({ headers }) => {
+            const found = await auth.api.getSession({
+                headers,
+            });
+            return found?.session.token;
+        },
+    },
+}),
+```
+
+Without `chatToken`, the command shows `<token>` where the token goes.
+
+For Claude desktop and claude.ai, the dialog gives the route's address to add as a custom connector. A connector signs in through OAuth, so the route needs [`oauth`](/docs/mcp#oauth) on `mcpPlugin()` for it to work. Without it, the dialog says so and points the editor to Claude Code.
 
 ## What holds
 

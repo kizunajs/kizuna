@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Menu } from '@base-ui/react/menu';
-import { ChevronsUpDown, LogOut } from 'lucide-react';
+import { ChevronsUpDown, LogOut, MessageSquare } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import { Avatar } from '../view/people.js';
 import { humanize, type PersonView } from '../view/schema.js';
@@ -9,7 +9,8 @@ import { THEME_CHOICES, type ThemeChoice } from './theme.js';
 /**
  * The editor signed in, at the foot of the sidebar. The row opens a menu
  * as wide as itself, with their full name, the theme as one row of three
- * choices, and Sign out when the app names where signing out happens. The
+ * choices, Edit in your chat when the API serves MCP, and Sign out when the
+ * app names where signing out happens. The
  * row keeps the name and the role to a line each, however long. Sign out is
  * a link for `GET`, and sends a form for `POST`.
  */
@@ -20,6 +21,7 @@ export function SignedIn({
     signOutMethod,
     theme,
     onThemeChange,
+    onEditInChat,
 }: {
     person: PersonView | undefined;
     role: string | null;
@@ -27,6 +29,10 @@ export function SignedIn({
     signOutMethod: 'GET' | 'POST';
     theme: ThemeChoice;
     onThemeChange: (theme: ThemeChoice) => void;
+    /**
+     * Opens Edit in your chat, when the API serves an MCP route.
+     */
+    onEditInChat?: () => void;
 }) {
     const signOutForm = useRef<HTMLFormElement>(null);
     const form =
@@ -90,6 +96,15 @@ export function SignedIn({
                                     ))}
                                 </Menu.RadioGroup>
                             </Menu.Group>
+                            {onEditInChat === undefined ? null : (
+                                <>
+                                    <Menu.Separator className="k-account-menu__separator" />
+                                    <Menu.Item className="k-menu__item" onClick={onEditInChat}>
+                                        <MessageSquare {...ICON} />
+                                        Edit in your chat
+                                    </Menu.Item>
+                                </>
+                            )}
                             {signOutPath === null ? null : (
                                 <>
                                     <Menu.Separator className="k-account-menu__separator" />

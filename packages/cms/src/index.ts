@@ -108,6 +108,7 @@ export {
     type ReviewRequest,
     type SignInAttempt,
     type SignOutRequest,
+    type ChatTokenRequest,
     type PageEntry,
     type PageMap,
     definePages,

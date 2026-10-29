@@ -1111,6 +1111,94 @@
         gap: 8px;
     }
 
+    /* Edit in your chat: a tab for each way to chat, each a pair of numbered steps. */
+    .k-dialog.k-chat {
+        gap: 16px;
+        width: min(600px, calc(100vw - 32px));
+        max-height: calc(100vh - 48px);
+        padding: 24px;
+        overflow-y: auto;
+    }
+
+    .k-chat__intro {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .k-chat__intro .k-dialog__title {
+        font-size: 17px;
+        letter-spacing: -0.01em;
+    }
+
+    .k-chat__intro .k-dialog__detail {
+        line-height: 1.5;
+    }
+
+    .k-chat__hosts {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .k-chat__steps {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .k-chat__step {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .k-chat__step-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .k-chat__step-title {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .k-chat__code {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 12px 12px 14px;
+        border-radius: var(--k-radius-control);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+    }
+
+    .k-chat__code code {
+        flex: 1;
+        min-width: 0;
+        font-family: var(--k-mono);
+        font-size: 12.5px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    .k-chat__copy {
+        flex-shrink: 0;
+    }
+
+    .k-chat__example {
+        margin: 0;
+        padding: 10px 14px;
+        border-radius: var(--k-radius-control);
+        background: var(--k-surface);
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
     .k-document__body {
         display: flex;
         flex: 1;

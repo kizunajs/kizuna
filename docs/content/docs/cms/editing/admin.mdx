@@ -28,7 +28,7 @@ content: cms({
 
 `signIn` returns the response your auth answers with. Its cookies reach the browser, and any status outside 2xx tells the editor their email or password is wrong, in the same words whichever one it was. A signed-out editor who opens the admin or draft mode lands on the screen, and comes back to where they were going once they are in. The CMS checks that the form was sent from a page of your site, so a form on another site cannot sign an editor in to an account of its choosing.
 
-The foot of the sidebar shows who is signed in, with their role. Give `signOut` the call that ends a session, and their name opens a menu with **Sign out**, which ends the session, closes draft mode, and returns to the sign-in screen:
+The foot of the sidebar shows who is signed in, with their role. Their name opens a menu with the theme and, when the API serves MCP, **Edit in your chat**, which shows how to connect Claude as them, as in [Agents and tools](/docs/cms/editing/agents#connecting-a-chat). Give `signOut` the call that ends a session, and the menu adds **Sign out**, which ends the session, closes draft mode, and returns to the sign-in screen:
 
 ```ts title="kizuna.config.ts"
 content: cms({
@@ -162,6 +162,10 @@ The library's alt text and focal point are the image's own, and each use can set
 A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, when it last changed and who saved it, and who owns it, where you can pick another owner. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
 
 The draft saves a moment after you stop typing, and the header says when it last did. **Save draft** saves at once, and **Publish** lists every change and asks you to confirm. While a required field is empty, Publish waits and says which field it waits for, like "Fill in Department before publishing". A click on that line takes you to the field, which says it is needed.
+
+When a save does not reach the CMS, **Save draft** reads **Not saved**, with why beside it, and **Offline** shows while the browser has no connection. Your changes stay on the screen. **Retry now** sends them again, and the draft saves on its own once you are back online. Publish waits until it has.
+
+A document your role may not change says so, with the way back to its list, and an address that names no document, like a deleted article, offers its list and the search.
 
 Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live preview** puts the site beside the fields and **Info** lists the document's status, owner, page, and when it was created, last updated and last published.
 

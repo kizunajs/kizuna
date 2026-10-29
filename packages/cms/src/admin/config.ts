@@ -47,6 +47,37 @@ export interface AdminConfig {
      * the collection's name.
      */
     lists: Record<string, ListOptions>;
+    /**
+     * How a chat connects to the CMS's MCP route, for Edit in your chat, or
+     * `null` when the API serves no MCP route.
+     */
+    chat?: ChatConnection | null;
+}
+
+/**
+ * The MCP route a chat connects to, and what the admin's Edit in your chat
+ * puts in its command.
+ */
+export interface ChatConnection {
+    /**
+     * Where the MCP route is, from the site's root.
+     */
+    path: string;
+    /**
+     * The name `claude mcp add` gives the server, from the MCP plugin's
+     * `name`.
+     */
+    name: string;
+    /**
+     * Whether the route signs a chat in with OAuth, which Claude's own
+     * connectors need.
+     */
+    oauth: boolean;
+    /**
+     * The token the chat sends as the editor, from `auth.chatToken`, or
+     * `null` without one.
+     */
+    token: string | null;
 }
 
 /**

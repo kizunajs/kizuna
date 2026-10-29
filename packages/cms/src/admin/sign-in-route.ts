@@ -6,10 +6,18 @@ import type { CmsService } from '../cms.js';
 import { CONFIG_PLACEHOLDER, readBuilt, withStylesheet } from '../document-view.js';
 import type { ResolvedCmsOptions } from '../options.js';
 import { PREVIEW_COOKIE } from '../preview-token.js';
-import { adminPathOf, adminRoutePathOf, editorOf, embedded, sessionPathOf, signInLocationOf } from './route.js';
+import {
+    adminPathOf,
+    adminRoutePathOf,
+    editorOf,
+    embedded,
+    headersOf,
+    sessionPathOf,
+    signInLocationOf,
+    type RequestHeaders,
+} from './route.js';
 import type { SignInConfig } from './sign-in-config.js';
 
-type RequestHeaders = Record<string, string | string[] | undefined>;
 
 const firstOf = (value: string | string[] | undefined): string | undefined => (Array.isArray(value) ? value[0] : value);
 
@@ -29,16 +37,6 @@ export const isSameOrigin = (headers: RequestHeaders): boolean => {
     }
 };
 
-/**
- * The request's headers as the app's auth reads them.
- */
-const headersOf = (headers: RequestHeaders): Headers => {
-    const converted = new Headers();
-    for (const [name, value] of Object.entries(headers)) {
-        for (const each of Array.isArray(value) ? value : value === undefined ? [] : [value]) converted.append(name, each);
-    }
-    return converted;
-};
 
 /**
  * `response`, carrying every cookie the app's auth set.

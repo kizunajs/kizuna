@@ -57,6 +57,12 @@ export default defineConfig({
                     headers,
                     asResponse: true,
                 }),
+            chatToken: async ({ headers }) => {
+                const found = await auth.api.getSession({
+                    headers,
+                });
+                return found?.session.token;
+            },
             people: {
                 list: editors,
                 imageOrigins: ['https://picsum.photos', 'https://fastly.picsum.photos'],

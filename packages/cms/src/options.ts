@@ -154,6 +154,23 @@ export interface CmsAuthOptions {
      * ```
      */
     signOut?: (request: SignOutRequest) => Response | Promise<Response>;
+    /**
+     * The token a chat signs in with as the editor, for the admin's Edit in
+     * your chat. It goes into the `claude mcp add` command the dialog shows,
+     * so return one your editor identity accepts as a bearer, like the
+     * session's own token. Without it, the command leaves a placeholder.
+     *
+     * @example
+     * ```ts
+     * chatToken: async ({ headers }) => {
+     *     const found = await auth.api.getSession({
+     *         headers,
+     *     });
+     *     return found?.session.token;
+     * },
+     * ```
+     */
+    chatToken?: (request: ChatTokenRequest) => string | null | undefined | Promise<string | null | undefined>;
 }
 
 /**
@@ -176,6 +193,16 @@ export interface SignInAttempt {
 export interface SignOutRequest {
     /**
      * The request's headers, with the session cookie to end.
+     */
+    headers: Headers;
+}
+
+/**
+ * The admin's request, as `chatToken` receives it.
+ */
+export interface ChatTokenRequest {
+    /**
+     * The request's headers, with the session cookie your auth reads.
      */
     headers: Headers;
 }
@@ -485,6 +512,7 @@ export const CmsPluginOptionsSchema = z
             invalidate: RouteAuthSchema.optional(),
             signIn: z.custom<CmsAuthOptions['signIn']>(isFunction).optional(),
             signOut: z.custom<CmsAuthOptions['signOut']>(isFunction).optional(),
+            chatToken: z.custom<CmsAuthOptions['chatToken']>(isFunction).optional(),
         }),
         relationships: z
             .array(

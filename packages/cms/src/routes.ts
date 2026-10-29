@@ -1047,9 +1047,12 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                     .array(z.string())
                     .optional()
                     .describe(
-                        'Conditions, each `field:operator:value`, like `topic:is:care`. `field` is `status` (empty, draft, changed or published) or a field of the collection\'s indexes. `operator` is `is` or `isNot`, which also find the value in a list of ids, or for ids of a collection with a tree `within` or `outside`, which take in every item under the value. The conditions all hold together, and an `or` entry between them starts another set that may hold instead.'
+                        "Conditions, each `field:operator:value`, like `topic:is:care`. `field` is `status` (empty, draft, changed or published) or a field of the collection's indexes. `operator` is `is` or `isNot`, which also find the value in a list of ids, or for ids of a collection with a tree `within` or `outside`, which take in every item under the value. The conditions all hold together, and an `or` entry between them starts another set that may hold instead."
                     ),
-                orderBy: z.string().optional().describe('`title`, `status`, `updatedAt` or a field of the collection\'s indexes. `title` when left out.'),
+                orderBy: z
+                    .string()
+                    .optional()
+                    .describe("`title`, `status`, `updatedAt` or a field of the collection's indexes. `title` when left out."),
                 direction: z.enum(['asc', 'desc']).optional().describe('Ascending when left out, newest first for `updatedAt`.'),
                 limit: z.int().min(1).max(200).optional().describe('How many items a page holds. Without it, every item that matches.'),
                 offset: z.int().min(0).optional().describe('How many matching items to skip, for the pages after the first.'),

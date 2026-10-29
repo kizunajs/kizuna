@@ -6,6 +6,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { defineConfig, Kizuna } from 'kizunajs';
 import { expressAdapter } from '@kizunajs/express';
+import { mcpPlugin } from '@kizunajs/mcp';
 import { defineCollection } from '../definitions.js';
 import { cms } from '../provider.js';
 import type { AdminConfig } from './config.js';
@@ -172,6 +173,49 @@ describe('adminPath', () => {
         const signedOut = await request(served).get('/editor');
         expect(signedOut.status).toBe(307);
         expect(signedOut.headers['location']).toBe(`/login?next=${encodeURIComponent('/editor')}`);
+    });
+});
+
+describe('Edit in your chat', () => {
+    it("tells the admin where the MCP route is, its name, and the editor's token", async () => {
+        const connected = express();
+        defineConfig({
+            adapter: expressAdapter(),
+            auth: {
+                identities: {
+                    editor,
+                },
+            },
+            content: cms({
+                db: drizzle(pglite),
+                pages: {},
+                collections: [Articles],
+                auth: {
+                    identity: 'editor',
+                    roles: ['editor'],
+                    chatToken: ({ headers }) => headers.get('authorization')?.replace(/^Bearer /, ''),
+                },
+                signInPath: '/login',
+                apiPath: '/cms-api',
+            }),
+            plugins: [
+                mcpPlugin({
+                    name: 'Plant shop content',
+                }),
+            ],
+        }).api.mount(connected);
+        const response = await request(connected).get('/admin').set('authorization', 'Bearer editor-token');
+        expect(configOf(response.text).chat).toEqual({
+            path: '/cms-api/mcp',
+            name: 'plant-shop-content',
+            oauth: false,
+            token: 'editor-token',
+        });
+    });
+
+    it('offers no chat when the API serves no MCP route', async () => {
+        const response = await request(app).get('/admin').set('authorization', 'Bearer editor-token');
+        expect(configOf(response.text).chat).toBeNull();
     });
 });
 

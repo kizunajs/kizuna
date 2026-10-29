@@ -9,6 +9,7 @@ import type { AdminConfig } from './config.js';
 import { connectOverHttp } from './connection.js';
 import { Dashboard, type WaitingReview } from './dashboard.js';
 import { DocumentScreen } from './document.js';
+import { EditInChat } from './edit-in-chat.js';
 import { CollectionList, PagesList } from './list.js';
 import { MediaLibrary } from './media.js';
 import {
@@ -79,6 +80,7 @@ export function Admin({ config }: { config: AdminConfig }) {
     const phone = usePhone();
     const [searching, setSearching] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [chatOpen, setChatOpen] = useState(false);
     usePaletteShortcut(useCallback(() => setSearching((shown) => !shown), []));
 
     // Opening a screen from the sheet closes it.
@@ -318,6 +320,14 @@ export function Admin({ config }: { config: AdminConfig }) {
             signOutMethod={config.signOutMethod ?? 'GET'}
             theme={theme}
             onThemeChange={chooseTheme}
+            onEditInChat={
+                config.chat === undefined || config.chat === null
+                    ? undefined
+                    : () => {
+                          setMenuOpen(false);
+                          setChatOpen(true);
+                      }
+            }
         />
     );
 
@@ -361,6 +371,9 @@ export function Admin({ config }: { config: AdminConfig }) {
                 )}
                 <main className="k-admin__main">{shown}</main>
             </div>
+            {config.chat === undefined || config.chat === null ? null : (
+                <EditInChat open={chatOpen} onOpenChange={setChatOpen} chat={config.chat} editorName={me?.name} />
+            )}
             <CommandPalette
                 open={searching}
                 onOpenChange={setSearching}

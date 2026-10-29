@@ -5,7 +5,8 @@ import { toToolName } from 'kizunajs/generator';
 import type { CmsService } from '../cms.js';
 import { CONFIG_PLACEHOLDER, readBuilt, withStylesheet } from '../document-view.js';
 import type { ResolvedCmsOptions } from '../options.js';
-import type { AdminConfig, AdminRoute } from './config.js';
+import { mcpRouteOf } from './chat.js';
+import type { AdminConfig, AdminRoute, ChatConnection } from './config.js';
 import { listOptionsOf } from './list-options.js';
 
 /**
@@ -62,6 +63,19 @@ const originOf = (url: string | undefined): string | null => {
     }
 };
 
+export type RequestHeaders = Record<string, string | string[] | undefined>;
+
+/**
+ * The request's headers as the app's auth reads them.
+ */
+export const headersOf = (headers: RequestHeaders): Headers => {
+    const converted = new Headers();
+    for (const [name, value] of Object.entries(headers)) {
+        for (const each of Array.isArray(value) ? value : value === undefined ? [] : [value]) converted.append(name, each);
+    }
+    return converted;
+};
+
 /**
  * Every editing route, by the tool name the editor's components call it by.
  */
@@ -91,7 +105,8 @@ export const adminConfigFor = (
     options: ResolvedCmsOptions,
     api: PluginApi,
     base: '' | `/${string}`,
-    role: string | null = null
+    role: string | null = null,
+    chatToken: string | null = null
 ): AdminConfig => ({
     siteUrl: originOf(options.preview?.url),
     apiPath: options.apiPath ?? '/api',
@@ -105,7 +120,18 @@ export const adminConfigFor = (
         )
     ),
     lists: listOptionsOf(options.collections ?? []),
+    chat: chatOf(api, options.apiPath ?? '/api', chatToken),
 });
+
+const chatOf = (api: PluginApi, apiPath: string, token: string | null): ChatConnection | null => {
+    const route = mcpRouteOf(api, apiPath);
+    return route === undefined
+        ? null
+        : {
+              ...route,
+              token,
+          };
+};
 
 /**
  * The config as the page's JSON script holds it, with `<` escaped so no value
@@ -182,9 +208,13 @@ export const adminRoute = (service: CmsService, options: ResolvedCmsOptions, api
                 })
             );
         }
+        const chatToken =
+            (await options.auth.chatToken?.({
+                headers: headersOf(args.headers as RequestHeaders),
+            })) ?? null;
         const page = withStylesheet(
             (await readBuilt('admin.html')).replace(CONFIG_PLACEHOLDER, () =>
-                embedded(adminConfigFor(options, api, base, editingRoleOf(signedIn?.['role'], service.roles)))
+                embedded(adminConfigFor(options, api, base, editingRoleOf(signedIn?.['role'], service.roles), chatToken))
             ),
             options.adminCss
         );

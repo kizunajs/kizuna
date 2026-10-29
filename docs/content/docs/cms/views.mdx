@@ -74,7 +74,7 @@ content: cms({
 
 ## Actions
 
-Each action is a button, and its handler is your code. `save` is the main button, and saves the fields the editor changed. A view without `save` is read only. Every other action becomes a button beside it, named after its key: `resetPassword` reads "Reset password".
+Each action is a button, and its handler is your code. `save` is the main button, and saves the fields the editor changed. A view without `save` is read only. Every other action becomes a button beside it at the top of the record, named after its key: `resetPassword` reads "Reset password". Once it runs, a message says so.
 
 An action written as an object says more about its button:
 
@@ -120,7 +120,7 @@ Access is written the way a [route's `auth`](/docs/access-control) is: `roles`, 
 | A field   | Who may change it. Everyone else sees it greyed out. |
 | An action | Who sees its button and may run it                   |
 
-`readOnly: true` on a field shows it to everyone and lets nobody change it. The server checks all of it: a `save` that changes a field the editor may not write is answered `403`, the same answer the model gets, and the handler never runs.
+`readOnly: true` on a field shows it to everyone and lets nobody change it. The admin shows its value as text, and so does every field of a view without `save`. The server checks all of it: a `save` that changes a field the editor may not write is answered `403`, the same answer the model gets, and the handler never runs.
 
 ```ts
 actions: {

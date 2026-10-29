@@ -1178,7 +1178,8 @@ export class CmsService {
                 negate,
             };
         }
-        const value = list || field.type === 'text' ? condition.value : field.type === 'numeric' ? Number(condition.value) : condition.value;
+        const value =
+            list || field.type === 'text' ? condition.value : field.type === 'numeric' ? Number(condition.value) : condition.value;
         if (
             (!list && field.type === 'numeric' && (condition.value.trim() === '' || !Number.isFinite(value))) ||
             (!list && field.type === 'boolean' && condition.value !== 'true' && condition.value !== 'false')
