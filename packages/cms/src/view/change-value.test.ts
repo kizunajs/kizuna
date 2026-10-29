@@ -223,6 +223,29 @@ describe('referencesOf', () => {
 });
 
 describe('listDiff', () => {
+    it('matches block items whose keys come back in another order', () => {
+        expect(
+            listDiff(
+                [
+                    {
+                        block: 'statement',
+                        text: 'Plants for every room',
+                    },
+                ],
+                [
+                    {
+                        text: 'Plants for every room',
+                        block: 'statement',
+                    },
+                ]
+            )
+        ).toEqual({
+            added: [false],
+            removed: [],
+            reordered: false,
+        });
+    });
+
     it('says the kept items moved', () => {
         expect(listDiff(['statement', 'categories', 'products'], ['products', 'statement', 'categories'])).toEqual({
             added: [false, false, false],

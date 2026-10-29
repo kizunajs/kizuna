@@ -366,6 +366,17 @@ export const imageFacts = (before: ImageValue, after: ImageValue): string[] => {
 };
 
 /**
+ * A value as JSON with every object's keys sorted, so two values that differ
+ * only in key order compare equal.
+ */
+const sortedJson = (value: unknown): string =>
+    JSON.stringify(value, (_, inner: unknown) =>
+        inner !== null && typeof inner === 'object' && !Array.isArray(inner)
+            ? Object.fromEntries(Object.entries(inner).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)))
+            : inner
+    ) ?? '';
+
+/**
  * How a list changed: which items are new, which went, and whether the ones
  * it kept moved.
  */
@@ -373,7 +384,7 @@ export const listDiff = (
     before: readonly unknown[],
     after: readonly unknown[]
 ): { added: boolean[]; removed: number[]; reordered: boolean } => {
-    const keyOf = (item: unknown): string => JSON.stringify(item) ?? '';
+    const keyOf = (item: unknown): string => sortedJson(item);
     const left = before.map(keyOf);
     const right = after.map(keyOf);
     const unmatched = new Map<string, number>();
@@ -405,7 +416,7 @@ export const listDiff = (
     };
 };
 
-const sameValue = (left: unknown, right: unknown): boolean => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+const sameValue = (left: unknown, right: unknown): boolean => sortedJson(left ?? null) === sortedJson(right ?? null);
 
 /**
  * A change as the publish review shows it: words added and removed in free
