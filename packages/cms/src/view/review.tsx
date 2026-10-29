@@ -6,8 +6,8 @@ import { toolsFor, type Connection } from './connection.js';
 import { ICON, useEditorContext } from './context.js';
 import type { MediaRecord } from './media.js';
 import { PeoplePicker, ReviewBadge, type People } from './people.js';
-import { changeView, referencesOf, textOf, type ChangeView, type Shown, type ValueShape } from './change-value.js';
-import type { Description, PersonView, ReviewState } from './schema.js';
+import { changeView, referencesOf, textOf, type ChangeView, type ReferenceLabel, type Shown, type ValueShape } from './change-value.js';
+import type { DescribedField, Description, PersonView, ReviewState } from './schema.js';
 
 /**
  * One field the draft changes, as the changes route lists it.
@@ -20,7 +20,11 @@ export interface DraftChange {
     writable: boolean;
 }
 
-interface Changes {
+/**
+ * What a document's draft changes from what is published, as the changes
+ * route answers it.
+ */
+export interface Changes {
     label: string;
     published: boolean;
     changes: DraftChange[];
@@ -217,41 +221,33 @@ const publishPastQuestion = (document: Pending): string => {
 };
 
 /**
- * How each change's value reads, from the fields `describe` lists and the
- * labels of the items its ids name. A field it cannot find, or a label it
- * cannot look up, shows the stored value plainly.
+ * How a value a field holds reads, from the field as `describe` lists it. A
+ * field it cannot find reads plainly.
  */
-const changeViewsOf = async (
+export const shapeOfField = (field: DescribedField | undefined): ValueShape =>
+    field === undefined
+        ? {
+              schema: {},
+              root: {},
+          }
+        : {
+              schema: field.schema,
+              root: field.schema,
+              options: field.options,
+              brand: field.brand,
+          };
+
+/**
+ * The labels of the items the values name, looked up once for all of them. A
+ * label it cannot look up is left out, so the stored id shows instead.
+ */
+export const referenceLabelsOf = async (
     connection: Connection,
-    ref: string,
-    changes: readonly DraftChange[]
-): Promise<Array<DraftChange & { view: ChangeView }>> => {
-    const described = await connection.call<Description>('editing_describe', {
-        query: {
-            ref,
-        },
-    });
-    const fields = described.status === 200 ? described.body.fields : [];
-    const shapeOf = (path: string): ValueShape => {
-        const field = fields.find((candidate) => candidate.path === path);
-        return field === undefined
-            ? {
-                  schema: {},
-                  root: {},
-              }
-            : {
-                  schema: field.schema,
-                  root: field.schema,
-                  options: field.options,
-                  brand: field.brand,
-              };
-    };
+    values: ReadonlyArray<{ value: unknown; shape: ValueShape }>
+): Promise<ReferenceLabel> => {
     const wanted = new Map<string, Set<string>>();
-    for (const change of changes) {
-        for (const { brand, id } of [
-            ...referencesOf(change.before, shapeOf(change.path)),
-            ...referencesOf(change.after, shapeOf(change.path)),
-        ]) {
+    for (const { value, shape } of values) {
+        for (const { brand, id } of referencesOf(value, shape)) {
             wanted.set(brand, (wanted.get(brand) ?? new Set()).add(id));
         }
     }
@@ -270,7 +266,44 @@ const changeViewsOf = async (
             for (const item of answer.body.items) labels.set(`${brand}\n${item.id}`, item.label);
         })
     );
-    const labelOf = (brand: string, id: string): string | undefined => labels.get(`${brand}\n${id}`);
+    return (brand, id) => labels.get(`${brand}\n${id}`);
+};
+
+/**
+ * How each change's value reads, from the fields `describe` lists and the
+ * labels of the items its ids name. A field it cannot find, or a label it
+ * cannot look up, shows the stored value plainly. Fields already described
+ * are passed in, and otherwise they are asked for.
+ */
+export const changeViewsOf = async (
+    connection: Connection,
+    ref: string,
+    changes: readonly DraftChange[],
+    described?: readonly DescribedField[]
+): Promise<Array<DraftChange & { view: ChangeView }>> => {
+    let fields = described;
+    if (fields === undefined) {
+        const answer = await connection.call<Description>('editing_describe', {
+            query: {
+                ref,
+            },
+        });
+        fields = answer.status === 200 ? answer.body.fields : [];
+    }
+    const shapeOf = (path: string): ValueShape => shapeOfField(fields.find((candidate) => candidate.path === path));
+    const labelOf = await referenceLabelsOf(
+        connection,
+        changes.flatMap((change) => [
+            {
+                value: change.before,
+                shape: shapeOf(change.path),
+            },
+            {
+                value: change.after,
+                shape: shapeOf(change.path),
+            },
+        ])
+    );
     return changes.map((change) => ({
         ...change,
         view: changeView(change.before, change.after, shapeOf(change.path), labelOf),
@@ -297,6 +330,10 @@ export interface PublishReviewProps {
     waiting: number;
     everywhere: boolean;
     disabled: boolean;
+    /**
+     * Shows the button as a secondary one, when another action leads.
+     */
+    secondary?: boolean;
     /**
      * The id of what says why the button is disabled.
      */
@@ -332,6 +369,7 @@ export function PublishReview({
     waiting,
     everywhere,
     disabled,
+    secondary = false,
     describedBy,
     onChanged,
     onPublished,
@@ -598,7 +636,7 @@ export function PublishReview({
     return (
         <AlertDialog.Root open={open} onOpenChange={setOpen}>
             <AlertDialog.Trigger
-                className="k-button k-button--primary k-review__trigger"
+                className={`k-button ${secondary ? 'k-button--secondary' : 'k-button--primary'} k-review__trigger`}
                 disabled={disabled}
                 aria-describedby={describedBy}>
                 {waiting > 0 ? `Review ${waiting}` : 'Publish'}

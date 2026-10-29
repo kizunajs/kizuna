@@ -88,6 +88,14 @@ export type ChangeView =
               added: boolean;
           }>;
           removed: Shown[];
+          /**
+           * The list as it was, in its old order, with the items it lost
+           * marked, for showing it beside the list it becomes.
+           */
+          before: Array<{
+              value: Shown;
+              removed: boolean;
+          }>;
           summary: string | undefined;
       }
     | {
@@ -426,6 +434,7 @@ export const changeView = (before: unknown, after: unknown, shape: ValueShape, l
                     added: false,
                 })),
                 removed: [],
+                before: [],
                 summary: undefined,
             };
         }
@@ -444,6 +453,10 @@ export const changeView = (before: unknown, after: unknown, shape: ValueShape, l
                 added: diff.added[index] ?? false,
             })),
             removed: diff.removed.map((index) => shownBefore.items[index] ?? EMPTY),
+            before: shownBefore.items.map((value, index) => ({
+                value,
+                removed: diff.removed.includes(index),
+            })),
             summary: summary === '' ? undefined : summary.replace(/^./, (first) => first.toUpperCase()),
         };
     }

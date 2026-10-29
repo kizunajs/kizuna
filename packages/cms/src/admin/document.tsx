@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Tabs } from '@base-ui/react/tabs';
-import { CircleAlert, ExternalLink, Info, PanelRight } from 'lucide-react';
+import { Toast } from '@base-ui/react/toast';
+import { Check, CircleAlert, ExternalLink, Info, PanelRight, RotateCcw } from 'lucide-react';
 import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.js';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
-import { OwnerControl, ReviewBadge, type People } from '../view/people.js';
-import { PublishReview, type PublishReviewHandle } from '../view/review.js';
+import { OwnerControl, type People } from '../view/people.js';
+import { PublishReview, changeViewsOf, type Changes } from '../view/review.js';
 import { documentTitle, valueAt, type Description, type Draft } from '../view/schema.js';
 import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
+import { ConfirmDialog } from './confirm.js';
 import { blockerOf, documentDatesOf } from './document-menu.js';
 import { DocumentMore } from './document-more.js';
 import { savedAtOf, type VersionSummary } from './history.js';
@@ -18,6 +20,9 @@ import { PageHeader, type Crumb } from './page-header.js';
 import { Loading, SaveIndicator, Status, problemOf } from './parts.js';
 import { relativeTimeOf } from './time.js';
 import { AdminPreview } from './preview-pane.js';
+import { AskForReview } from './review-ask.js';
+import { DecisionCard, RequestChanges, ReviewScreen, type ViewedChange } from './review-screen.js';
+import { askAgainLabelOf, askAgainOf, gateNoteOf, reviewStatusOf, waitsForMe } from './review-state.js';
 import { Versions } from './versions.js';
 import type { WaitingReview } from './dashboard.js';
 
@@ -37,7 +42,7 @@ const CHANGED_MS = 4000;
  */
 const POINTED_MS = 1600;
 
-type DocumentView = 'edit' | 'versions';
+type DocumentView = 'edit' | 'versions' | 'review';
 
 /**
  * Where a document stands, as the header's line says it.
@@ -160,7 +165,15 @@ export function DocumentScreen({
     const [previewOpened, setPreviewOpened] = useState(false);
     const [versions, setVersions] = useState<VersionSummary[] | undefined>();
     const [updatedBy, setUpdatedBy] = useState<string | null>(null);
-    const review = useRef<PublishReviewHandle>(null);
+    const [askOpen, setAskOpen] = useState(false);
+    // The version shown beside the draft under Versions, and the one about to be restored.
+    const [compared, setCompared] = useState<number | undefined>();
+    const [restoring, setRestoring] = useState<number | undefined>();
+    const [deciding, setDeciding] = useState(false);
+    const [draftChanges, setDraftChanges] = useState<{ changes: Changes; views: ViewedChange[] } | undefined>();
+    // The document the screen last opened, so a review waiting for the person opens on its tab once.
+    const opened = useRef<string | undefined>(undefined);
+    const toasts = Toast.useToastManager();
     const [pointed, setPointed] = useState<string | undefined>();
     const [updatedAt, setUpdatedAt] = useState<string | null>(null);
     const now = useNow();
@@ -198,8 +211,18 @@ export function DocumentScreen({
         setUpdatedAt(null);
         setUpdatedBy(null);
         setVersions(undefined);
+        setCompared(undefined);
+        setDraftChanges(undefined);
+        setView('edit');
         void describe(documentRef);
     }, [describe, documentRef]);
+
+    // A review waiting for the person opens the document on its Review tab.
+    useEffect(() => {
+        if (document === undefined || people === undefined || opened.current === document.ref) return;
+        opened.current = document.ref;
+        if (waitsForMe(document.review, people.me)) setView('review');
+    }, [document, people]);
 
     // Picks up what a model, or another editor, saves while this one is open.
     useEffect(() => {
@@ -250,6 +273,31 @@ export function DocumentScreen({
             current = false;
         };
     }, [connection, documentRef, documentVersion]);
+
+    // What the draft changes from what is live, for the Review tab and the request.
+    const reviewKey = `${document?.review?.id ?? ''}:${document?.review?.status ?? ''}`;
+    useEffect(() => {
+        const tools = toolsFor(documentRef);
+        const fields = latest.current?.fields;
+        if (tools === undefined || documentVersion === undefined || fields === undefined) return;
+        let current = true;
+        void (async () => {
+            const answer = await connection.call<Changes>(`${tools.prefix}_changes`, {
+                params: tools.params,
+            });
+            if (!current || answer.status !== 200) return;
+            const views = await changeViewsOf(connection, documentRef, answer.body.changes, fields);
+            if (current) {
+                setDraftChanges({
+                    changes: answer.body,
+                    views,
+                });
+            }
+        })();
+        return () => {
+            current = false;
+        };
+    }, [connection, documentRef, documentVersion, reviewKey]);
 
     useEffect(() => {
         if (changed.size === 0) return;
@@ -399,6 +447,99 @@ export function DocumentScreen({
 
     const crumbs = crumbsOf(documentRef, collectionLabel);
 
+    /**
+     * Approves the review waiting for the person, or sends it back with a
+     * note. Says whether the answer went through.
+     */
+    const decide = async (decision: 'approve' | 'requestChanges', note: string | undefined): Promise<boolean> => {
+        const current = latest.current;
+        if (current?.review === null || current?.review === undefined) return false;
+        setDeciding(true);
+        setLinkProblem(undefined);
+        // The person answered on the Review tab, so the route runs without asking again.
+        const answer = await connection.call(
+            'editing_reviews_decide',
+            {
+                body: {
+                    ids: [current.review.id],
+                    decision,
+                    ...(note === undefined
+                        ? {}
+                        : {
+                              note,
+                          }),
+                },
+            },
+            {
+                approved: true,
+            }
+        );
+        setDeciding(false);
+        if (answer.status !== 200) {
+            setLinkProblem(problemOf(answer, 'The answer did not save'));
+            return false;
+        }
+        onReviewsChanged();
+        await describe(current.ref, {
+            remount: false,
+        });
+        return true;
+    };
+
+    /**
+     * Sends the draft back to whoever asked for changes, once they are made.
+     */
+    const askAgain = async (person: { id: string; name: string }): Promise<void> => {
+        const current = latest.current;
+        if (current === undefined) return;
+        await form.current?.flush();
+        setDeciding(true);
+        setLinkProblem(undefined);
+        const answer = await connection.call('editing_reviews_request', {
+            body: {
+                refs: [current.ref],
+                reviewers: [person.id],
+            },
+        });
+        setDeciding(false);
+        if (answer.status !== 201) {
+            setLinkProblem(problemOf(answer, 'The request was not sent'));
+            return;
+        }
+        toasts.add({
+            description: `Sent to ${person.name.split(' ')[0]}.`,
+        });
+        onReviewsChanged();
+        await describe(current.ref, {
+            remount: false,
+        });
+    };
+
+    /**
+     * Makes an earlier version the draft, once the person confirmed.
+     */
+    const restore = async (version: number): Promise<void> => {
+        setRestoring(undefined);
+        const tools = toolsFor(documentRef);
+        if (tools === undefined) return;
+        setLinkProblem(undefined);
+        const answer = await connection.call(`${tools.prefix}_rollback`, {
+            params: tools.params,
+            body: {
+                version,
+            },
+        });
+        if (answer.status !== 200) {
+            setLinkProblem(problemOf(answer, 'The version was not restored'));
+            return;
+        }
+        setCompared(undefined);
+        toasts.add({
+            description: `Restored version ${version} as the draft.`,
+        });
+        await describe(documentRef);
+    };
+
     if (document === undefined) {
         return (
             <div className="k-document">
@@ -411,9 +552,18 @@ export function DocumentScreen({
     }
 
     const title = documentTitle(document);
+    const me = people?.me;
+    // A review that went away, once its draft was published, takes its tab with it.
+    const shownView: DocumentView = view === 'review' && document.review === null ? 'edit' : view;
+    const comparing = shownView === 'versions' && compared !== undefined;
+    const answering = shownView === 'review' && waitsForMe(document.review, me);
+    const sentBackBy = askAgainOf(document.review, me);
+    // The reviewer who sent it back already knows what Publish waits for.
+    const gateNote = document.review?.decidedBy?.id === me ? undefined : gateNoteOf(document.requireReview, document.review);
+    const canPublishPast = draftChanges?.changes.canPublishPastReview ?? false;
     const previewPath = siteUrl === null ? null : document.previewPath;
     // A document that stops showing on a page, after a change or a reload, loses the preview.
-    const previewShown = previewOn && previewPath !== null && view === 'edit';
+    const previewShown = previewOn && previewPath !== null && shownView === 'edit';
     const unsaved = saveState === 'pending' || saveState === 'saving';
     const blocker = document.complete ? undefined : blockerOf(document.missing, document.fields);
     const askable = people !== undefined && people.people.some((person) => person.id !== people.me);
@@ -511,23 +661,65 @@ export function DocumentScreen({
         </Popover.Root>
     );
 
+    const more = (
+        <DocumentMore
+            connection={connection}
+            document={document}
+            title={title}
+            askable={askable}
+            onAsk={() => {
+                void form.current?.flush().then(() => setAskOpen(true));
+            }}
+            onChanged={() =>
+                void describe(document.ref, {
+                    remount: false,
+                })
+            }
+            onProblem={setLinkProblem}
+        />
+    );
+
+    // The note of whoever sent the draft back, at the top of the sidebar while the changes are made.
+    const reviewAside =
+        document.review?.status === 'changes' && document.review.decisionNote !== null ? (
+            <section className="k-review-aside" aria-label="Review">
+                <h2 className="k-review-screen__heading">Review</h2>
+                <DecisionCard review={document.review} me={me} now={now} />
+            </section>
+        ) : undefined;
+
     return (
         <EditorContext.Provider value={editorContext}>
-            <Tabs.Root value={view} onValueChange={(key: DocumentView) => setView(key)} className="k-document" data-preview={previewShown}>
+            <Tabs.Root
+                value={shownView}
+                onValueChange={(key: DocumentView) => {
+                    setView(key);
+                    if (key !== 'versions') setCompared(undefined);
+                }}
+                className="k-document"
+                data-preview={previewShown}>
                 <PageHeader
                     crumbs={crumbs}
                     title={title}
                     meta={[
                         {
                             label: 'Status',
-                            value: STATUS_FACT[document.status] ?? document.status,
+                            value:
+                                document.review === null
+                                    ? (STATUS_FACT[document.status] ?? document.status)
+                                    : reviewStatusOf(document.review, me),
                         },
-                        updatedAt === null
-                            ? null
-                            : {
-                                  label: 'Updated',
-                                  value: `${relativeTimeOf(updatedAt, now)}${updatedByName === undefined ? '' : ` by ${updatedByName}`}`,
-                              },
+                        shownView === 'review' && document.review !== null
+                            ? {
+                                  label: 'Requested',
+                                  value: `${relativeTimeOf(document.review.createdAt, now)} by ${document.review.requestedBy.name}`,
+                              }
+                            : updatedAt === null
+                              ? null
+                              : {
+                                    label: 'Updated',
+                                    value: `${relativeTimeOf(updatedAt, now)}${updatedByName === undefined ? '' : ` by ${updatedByName}`}`,
+                                },
                         owner === null
                             ? null
                             : {
@@ -540,12 +732,6 @@ export function DocumentScreen({
                                   value: 'every page',
                               }
                             : null,
-                        document.review === null
-                            ? null
-                            : {
-                                  label: 'Review',
-                                  value: <ReviewBadge review={document.review} me={people?.me} />,
-                              },
                     ]}
                     tabs={
                         <>
@@ -559,6 +745,14 @@ export function DocumentScreen({
                                         <span className="k-tab__count">{versions.length}</span>
                                     )}
                                 </Tabs.Tab>
+                                {document.review === null ? null : (
+                                    <Tabs.Tab value="review" className="k-tab">
+                                        Review
+                                        {draftChanges === undefined || draftChanges.views.length === 0 ? null : (
+                                            <span className="k-tab__count">{draftChanges.views.length}</span>
+                                        )}
+                                    </Tabs.Tab>
+                                )}
                             </Tabs.List>
                             <span className="k-document__spacer" />
                             {previewPath === null ? null : (
@@ -580,50 +774,85 @@ export function DocumentScreen({
                         </>
                     }
                     actions={
-                        <>
-                            <SaveIndicator state={saveState} />
-                            {blocker === undefined ? null : (
-                                <button type="button" className="k-document__blocker" id="k-document-blocker" onClick={showBlocker}>
-                                    <CircleAlert {...ICON} />
-                                    {blocker}
+                        comparing ? (
+                            <>
+                                <button
+                                    type="button"
+                                    className="k-button k-button--primary"
+                                    disabled={unsaved}
+                                    onClick={() => setRestoring(compared)}>
+                                    <RotateCcw {...ICON} />
+                                    Restore this version
                                 </button>
-                            )}
-                            <button
-                                type="button"
-                                className="k-button k-button--secondary k-button--small"
-                                disabled={saveState !== 'pending'}
-                                onClick={() => void form.current?.flush()}>
-                                Save draft
-                            </button>
-                            <PublishReview
-                                ref={review}
-                                connection={connection}
-                                candidates={reviewCandidates}
-                                people={people}
-                                waiting={waiting.length}
-                                everywhere={document.usedOn.everywhere}
-                                disabled={unsaved || saveState === 'failed' || (blocker !== undefined && waiting.length === 0)}
-                                describedBy={blocker === undefined ? undefined : 'k-document-blocker'}
-                                onChanged={(refs) => {
-                                    onReviewsChanged();
-                                    if (refs.includes(document.ref)) void describe(document.ref);
-                                }}
-                                onPublished={() => undefined}
-                            />
-                            <DocumentMore
-                                connection={connection}
-                                document={document}
-                                title={title}
-                                askable={askable}
-                                onAsk={() => review.current?.ask()}
-                                onChanged={() =>
-                                    void describe(document.ref, {
-                                        remount: false,
-                                    })
-                                }
-                                onProblem={setLinkProblem}
-                            />
-                        </>
+                                {more}
+                            </>
+                        ) : answering && document.review !== null ? (
+                            <>
+                                <RequestChanges
+                                    review={document.review}
+                                    busy={deciding}
+                                    onSend={(note) => decide('requestChanges', note)}
+                                />
+                                <button
+                                    type="button"
+                                    className="k-button k-button--primary"
+                                    disabled={deciding}
+                                    onClick={() => void decide('approve', undefined)}>
+                                    <Check {...ICON} />
+                                    {deciding ? 'Approving' : 'Approve'}
+                                </button>
+                                {more}
+                            </>
+                        ) : (
+                            <>
+                                <SaveIndicator state={saveState} />
+                                {blocker === undefined ? null : (
+                                    <button type="button" className="k-document__blocker" id="k-document-blocker" onClick={showBlocker}>
+                                        <CircleAlert {...ICON} />
+                                        {blocker}
+                                    </button>
+                                )}
+                                {blocker !== undefined || gateNote === undefined ? null : (
+                                    <span className="k-document__gate">{gateNote}</span>
+                                )}
+                                {shownView === 'review' ? null : (
+                                    <button
+                                        type="button"
+                                        className="k-button k-button--secondary k-button--small"
+                                        disabled={saveState !== 'pending'}
+                                        onClick={() => void form.current?.flush()}>
+                                        Save draft
+                                    </button>
+                                )}
+                                {sentBackBy === undefined ? null : (
+                                    <button
+                                        type="button"
+                                        className="k-button k-button--primary"
+                                        disabled={deciding || unsaved || saveState === 'failed'}
+                                        onClick={() => void askAgain(sentBackBy)}>
+                                        {askAgainLabelOf(sentBackBy)}
+                                    </button>
+                                )}
+                                {sentBackBy !== undefined && document.requireReview && !canPublishPast ? null : (
+                                    <PublishReview
+                                        connection={connection}
+                                        candidates={reviewCandidates}
+                                        people={people}
+                                        waiting={waiting.length}
+                                        everywhere={document.usedOn.everywhere}
+                                        secondary={sentBackBy !== undefined}
+                                        disabled={unsaved || saveState === 'failed' || (blocker !== undefined && waiting.length === 0)}
+                                        describedBy={blocker === undefined ? undefined : 'k-document-blocker'}
+                                        onChanged={(refs) => {
+                                            onReviewsChanged();
+                                            if (refs.includes(document.ref)) void describe(document.ref);
+                                        }}
+                                        onPublished={() => undefined}
+                                    />
+                                )}
+                                {more}
+                            </>
+                        )
                     }
                 />
                 {linkProblem === undefined ? null : (
@@ -648,6 +877,7 @@ export function DocumentScreen({
                             changed={changed}
                             pointed={pointed}
                             missing={document.complete ? [] : document.missing}
+                            aside={reviewAside}
                         />
                     </div>
                     {previewOpened && siteUrl !== null && previewPath !== null ? (
@@ -662,21 +892,66 @@ export function DocumentScreen({
                         </div>
                     ) : null}
                 </Tabs.Panel>
-                <Tabs.Panel value="versions" className="k-document__versions">
+                <Tabs.Panel value="versions" className="k-document__versions" data-comparing={comparing || undefined}>
                     <Versions
                         connection={connection}
                         documentRef={document.ref}
                         version={document.version}
                         fields={document.fields}
+                        layout={document.layout}
                         draft={document.draft}
                         people={people}
                         disabled={unsaved}
-                        onRestored={async () => {
-                            await describe(document.ref);
-                        }}
+                        compared={compared}
+                        onCompare={setCompared}
+                        onRestore={setRestoring}
                         onOpen={() => setView('edit')}
                     />
                 </Tabs.Panel>
+                {document.review === null ? null : (
+                    <Tabs.Panel value="review" className="k-document__review">
+                        <ReviewScreen
+                            review={document.review}
+                            changes={draftChanges?.views}
+                            fields={document.fields}
+                            layout={document.layout}
+                            me={me}
+                            now={now}
+                            savedAt={updatedAt}
+                            liveSince={dates.published}
+                            onOpenOnSite={siteUrl === null || document.path === null ? undefined : () => void openOnSite(document.path!)}
+                        />
+                    </Tabs.Panel>
+                )}
+                <AskForReview
+                    open={askOpen}
+                    onOpenChange={setAskOpen}
+                    connection={connection}
+                    documentRef={document.ref}
+                    owner={document.owner}
+                    people={people}
+                    changeCount={draftChanges?.views.length}
+                    onSent={() => {
+                        onReviewsChanged();
+                        void describe(document.ref, {
+                            remount: false,
+                        });
+                    }}
+                />
+                <ConfirmDialog
+                    confirming={
+                        restoring === undefined
+                            ? undefined
+                            : {
+                                  label: 'Restore as draft',
+                                  question: `Restore version ${restoring}? Its content replaces the current draft. The live page stays as it is until someone publishes, and the draft you have now is kept under Versions.`,
+                              }
+                    }
+                    onConfirm={() => {
+                        if (restoring !== undefined) void restore(restoring);
+                    }}
+                    onCancel={() => setRestoring(undefined)}
+                />
             </Tabs.Root>
         </EditorContext.Provider>
     );

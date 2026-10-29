@@ -7,21 +7,23 @@ description: 'Asking someone to look before a change goes live, approving it, an
 
 <Tab value="Asking">
 
-Beside Publish, the editor offers **Ask for review**. Pick one or more people, add a note:
+**Ask for review** sits in the `…` menu beside Publish. Pick one or more people, with the page's owner first, and add a note for them. Send request waits until someone is picked:
 
 <EditorFigure kind="ask" />
 
-The reviewer sees it in the editor, in their chat, and wherever you send it with `onReviewRequested`.
+The status then reads "Waiting for review by Kari Nordmann". The reviewer sees the request in the editor, in their chat, and wherever you send it with `onReviewRequested`.
 
 </Tab>
 
 <Tab value="Reviewing">
 
-The reviewer sees every change, approves, or asks for changes with a note:
+The reviewer opens the page on its **Review** tab. Each change is listed under the tab it sits in, with what is live now beside the draft and the words added or removed marked. They **Approve**, or **Request changes** with a note for the person who asked:
 
 <EditorFigure kind="review" />
 
-An approval covers the draft as it was. A save after it marks the approval outdated.
+Once it is approved, **Publish** sends it live. An approval covers the draft as it was, and a save after it marks the approval outdated.
+
+When changes are requested, the status says who asked for them, and the Review tab shows their note. **Ask Kari again** sends the draft back to them once it is fixed. A review holds one note from each side, the request's and the answer's.
 
 </Tab>
 

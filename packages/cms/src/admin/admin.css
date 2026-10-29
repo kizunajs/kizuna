@@ -459,13 +459,6 @@
         color: var(--k-muted);
     }
 
-    .k-compare__row--head {
-        min-height: 0;
-        padding-block: 4px;
-        font-size: 12px;
-        color: var(--k-muted);
-    }
-
     /* Views and actions */
 
     .k-actions {
@@ -1337,40 +1330,6 @@
         justify-content: center;
         min-width: 30px;
         height: 30px;
-    }
-
-    .k-compare {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        margin: 2px 0 10px;
-        padding: 8px 10px;
-        border-radius: var(--k-radius-card);
-        background: var(--k-surface);
-        box-shadow: var(--k-elevation);
-    }
-
-    .k-compare__row {
-        display: grid;
-        grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1fr) minmax(0, 1fr);
-        gap: 12px;
-        padding: 6px 4px;
-        font-size: 13px;
-        overflow-wrap: anywhere;
-    }
-
-    .k-compare__row--head {
-        padding-block: 4px;
-        font-size: 12px;
-        color: var(--k-muted);
-    }
-
-    .k-compare__then {
-        color: var(--k-muted);
-    }
-
-    .k-compare__empty {
-        margin: 0 10px 10px;
     }
 
     @media (max-width: 860px) {
@@ -2754,6 +2713,1046 @@
 
         .k-page-header__actions .k-select-menu {
             height: 44px;
+        }
+    }
+
+    /* Media: the library's images on the left, the one open on the right, and uploads dropped anywhere on the images. */
+
+    .k-media-library {
+        display: flex;
+        flex: 1;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+
+    .k-media-library__files {
+        display: flex;
+        flex: 999 1 560px;
+        flex-direction: column;
+        gap: 20px;
+        min-width: 0;
+        padding: 24px var(--k-gutter) 64px;
+    }
+
+    .k-media-library__scopes {
+        display: flex;
+        gap: 2px;
+    }
+
+    .k-media-library__scopes .k-tab {
+        height: 32px;
+        border-radius: 8px;
+        font-size: 13.5px;
+        font-weight: 400;
+    }
+
+    .k-media-library__scopes .k-tab[aria-checked='true'] {
+        font-weight: 500;
+    }
+
+    .k-media-library__menu-label {
+        color: var(--k-muted);
+    }
+
+    .k-media-library__problems {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    /* The drop zone is a card of its own, and lights up while files are held over the images. */
+    .k-media-drop {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        min-height: 96px;
+        padding: 16px 20px;
+        border-radius: var(--k-radius-card);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+    }
+
+    .k-media-library__files[data-over] .k-media-drop {
+        background: var(--k-control-hover);
+    }
+
+    .k-media-drop__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
+        color: var(--k-muted);
+    }
+
+    .k-media-drop__text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .k-media-drop__title {
+        margin: 0;
+        font-size: 13.5px;
+        font-weight: 500;
+    }
+
+    .k-media-drop__choose {
+        padding: 0;
+        border: 0;
+        background: none;
+        font: inherit;
+        font-weight: 600;
+        color: var(--k-ink);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        cursor: pointer;
+    }
+
+    .k-media-drop__hint {
+        margin: 0;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-media-library__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(168px, 100%), 1fr));
+        gap: 16px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    /* Each image is a card: the picture, then its name, size and how many pages use it. The open one wears a ring in the ink. */
+    .k-media-tile {
+        display: flex;
+        flex-direction: column;
+        padding: 6px;
+        border-radius: var(--k-radius-card);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+    }
+
+    .k-media-tile:hover {
+        background: var(--k-tint);
+    }
+
+    .k-media-tile[aria-current='true'] {
+        box-shadow: 0 0 0 2px var(--k-ink);
+    }
+
+    .k-media-tile__thumb {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        border-radius: 10px;
+        background: var(--k-control);
+        object-fit: cover;
+    }
+
+    .k-media-tile__text {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        min-width: 0;
+        padding: 8px 6px 4px;
+    }
+
+    .k-media-tile__name {
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .k-media-tile__detail {
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-media-table__name {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+        color: var(--k-ink);
+    }
+
+    .k-media-table__thumb {
+        flex: 0 0 36px;
+        width: 36px;
+        height: 28px;
+        border-radius: 6px;
+        background: var(--k-control);
+        object-fit: cover;
+    }
+
+    /* The open image keeps to 400px beside the images and stays in view as they scroll, a hairline the full height between them. */
+    .k-media-library[data-details] .k-media-library__files {
+        box-shadow: inset -1px 0 0 var(--k-line);
+    }
+
+    .k-media-details {
+        position: sticky;
+        top: 0;
+        display: flex;
+        flex: 1 0 400px;
+        flex-direction: column;
+        align-self: flex-start;
+        gap: 24px;
+        min-width: 0;
+        max-height: 100vh;
+        padding: 24px 24px 48px;
+        overflow-y: auto;
+    }
+
+    .k-media-details__head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .k-media-details__title {
+        flex: 1;
+        min-width: 0;
+        margin: 0;
+        overflow: hidden;
+        font-size: 15px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .k-media-details__group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .k-media-details__preview {
+        display: flex;
+        justify-content: center;
+        padding: 12px;
+        border-radius: 12px;
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+    }
+
+    /* The button is as large as the picture, so a click's place in it is the focal point. */
+    .k-media-details__frame {
+        position: relative;
+        display: inline-flex;
+        max-width: 100%;
+        padding: 0;
+        border: 0;
+        border-radius: 8px;
+        background: none;
+        cursor: crosshair;
+    }
+
+    .k-media-details__frame img {
+        display: block;
+        max-width: 100%;
+        max-height: 360px;
+        width: auto;
+        height: auto;
+        border-radius: 8px;
+    }
+
+    .k-media-details__uses {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .k-media-details__use {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 40px;
+        padding: 4px 8px 4px 12px;
+        border-radius: 10px;
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+        color: var(--k-muted);
+    }
+
+    .k-media-details__use:hover {
+        background: var(--k-tint);
+        color: var(--k-ink);
+    }
+
+    .k-media-details__use-text {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .k-media-details__use-title {
+        font-size: 13.5px;
+        color: var(--k-ink);
+    }
+
+    .k-media-details__use-detail {
+        font-size: 12px;
+    }
+
+    .k-media-details__facts {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px 16px;
+        margin: 0;
+        font-size: 13px;
+    }
+
+    .k-media-details__facts dt {
+        color: var(--k-muted);
+    }
+
+    .k-media-details__facts dd {
+        justify-self: end;
+        margin: 0;
+        text-align: right;
+    }
+
+    .k-media-details__actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .k-media-details__hint {
+        margin-left: auto;
+        padding-left: 16px;
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    @media (max-width: 860px) {
+        .k-media-details {
+            padding: 20px var(--k-gutter) 24px;
+        }
+    }
+
+    /* Too narrow for both side by side, the open image comes first, above the images, a hairline under it. */
+    @media (max-width: 1219px) {
+        .k-media-library[data-details] .k-media-library__files {
+            box-shadow: none;
+        }
+
+        .k-media-details {
+            position: static;
+            flex-basis: 100%;
+            order: -1;
+            max-height: none;
+            box-shadow: inset 0 -1px 0 var(--k-line);
+        }
+    }
+
+    /* Reviews and comparing versions: what was beside what it becomes, words that went struck through and words that came marked, in greys. */
+
+    :root,
+    :root[data-theme='dark'] {
+        --k-diff-added: rgb(255 255 255 / 0.14);
+        --k-diff-removed: rgb(255 255 255 / 0.06);
+        --k-diff-strike: rgb(255 255 255 / 0.5);
+    }
+
+    :root[data-theme='light'] {
+        --k-diff-added: rgb(0 0 0 / 0.1);
+        --k-diff-removed: rgb(0 0 0 / 0.05);
+        --k-diff-strike: rgb(0 0 0 / 0.45);
+    }
+
+    .k-diff {
+        display: flex;
+        flex-direction: column;
+        gap: 32px;
+    }
+
+    .k-diff__columns,
+    .k-diff__sides {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .k-diff__columns {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--k-muted);
+    }
+
+    .k-diff__section {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .k-diff__title {
+        margin: 0 0 4px;
+        font-size: 15px;
+        font-weight: 600;
+    }
+
+    .k-diff__row {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 16px 0;
+        box-shadow: inset 0 -1px 0 var(--k-line);
+    }
+
+    .k-diff__head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+    }
+
+    .k-diff__label {
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .k-diff__note {
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-diff__sides,
+    .k-diff__inline {
+        font-size: 14px;
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+    }
+
+    .k-diff__inline {
+        line-height: 1.7;
+    }
+
+    .k-diff__before,
+    .k-diff__row[data-unchanged] :is(.k-diff__after, .k-diff__inline) {
+        color: var(--k-muted);
+    }
+
+    .k-diff__before,
+    .k-diff__after {
+        min-width: 0;
+    }
+
+    .k-diff__prose {
+        margin: 0;
+        white-space: pre-wrap;
+    }
+
+    .k-diff del,
+    .k-diff ins {
+        padding: 1px 2px;
+        border-radius: 4px;
+    }
+
+    .k-diff del {
+        background: var(--k-diff-removed);
+        color: var(--k-muted);
+        text-decoration: line-through;
+        text-decoration-color: var(--k-diff-strike);
+    }
+
+    .k-diff ins {
+        background: var(--k-diff-added);
+        font-weight: 500;
+        color: var(--k-ink);
+        text-decoration: none;
+    }
+
+    /* A whole value marked, like an image or a choice, keeps its own layout inside the mark. */
+    .k-diff :is(del, ins).k-diff__whole {
+        display: inline-flex;
+        max-width: 100%;
+    }
+
+    .k-diff__swap {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 8px;
+    }
+
+    .k-diff__empty {
+        font-size: 13px;
+        color: var(--k-muted);
+    }
+
+    .k-diff__image {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .k-diff__thumb {
+        flex: 0 0 72px;
+        width: 72px;
+        height: 48px;
+        border-radius: 8px;
+        background: var(--k-control);
+        object-fit: cover;
+    }
+
+    .k-diff__file {
+        min-width: 0;
+        font-size: 13px;
+        overflow-wrap: anywhere;
+    }
+
+    .k-diff__settings {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .k-diff__facts {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        font-size: 13px;
+    }
+
+    .k-diff__items {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .k-diff__item {
+        display: flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 4px 10px;
+        border-radius: 8px;
+        background: var(--k-surface);
+        font-size: 13.5px;
+        line-height: 1.4;
+    }
+
+    .k-diff__item[data-change='removed'] {
+        color: var(--k-muted);
+        text-decoration: line-through;
+        text-decoration-color: var(--k-diff-strike);
+    }
+
+    .k-diff__item[data-change='added'] {
+        background: var(--k-control-hover);
+        font-weight: 500;
+        color: var(--k-ink);
+    }
+
+    .k-diff__fields {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 0;
+    }
+
+    .k-diff__field dt {
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-diff__field dd {
+        margin: 2px 0 0;
+    }
+
+    /* The Review tab and a comparison: the changes in the main column, and a column of their own beside them. */
+    .k-review-screen,
+    .k-compare-view {
+        display: flex;
+        flex: 1;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+
+    .k-review-screen__changes,
+    .k-compare-view__main {
+        display: flex;
+        flex: 999 1 560px;
+        flex-direction: column;
+        gap: 28px;
+        min-width: 0;
+        padding: 28px var(--k-gutter) 64px;
+    }
+
+    .k-compare-view__main {
+        padding-top: 20px;
+    }
+
+    .k-review-screen__aside,
+    .k-compare-view__aside {
+        display: flex;
+        flex: 1 0 400px;
+        flex-direction: column;
+        gap: 24px;
+        min-width: 0;
+        padding: 28px var(--k-gutter) 48px 24px;
+        box-shadow: inset 1px 0 0 var(--k-line);
+    }
+
+    .k-compare-view__aside {
+        gap: 10px;
+        padding-top: 24px;
+    }
+
+    .k-review-screen__block {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .k-review-screen__heading {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 18px;
+    }
+
+    .k-review-card {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 14px 16px;
+        border-radius: var(--k-radius-card);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+    }
+
+    .k-review-card__head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .k-review-card__title {
+        flex: 1;
+        min-width: 0;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .k-review-card__when {
+        flex-shrink: 0;
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-review-card__text {
+        margin: 0;
+        font-size: 13.5px;
+        line-height: 1.55;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+    }
+
+    .k-review-screen__reviewer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 40px;
+        padding: 0 12px 0 8px;
+        border-radius: var(--k-radius-control);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+    }
+
+    .k-review-screen__name {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        font-size: 13.5px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .k-review-screen__verdict {
+        flex-shrink: 0;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-review-screen__facts {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px 16px;
+        margin: 0;
+        font-size: 13px;
+    }
+
+    .k-review-screen__facts dt {
+        color: var(--k-muted);
+    }
+
+    .k-review-screen__facts dd {
+        justify-self: end;
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+        text-align: right;
+    }
+
+    .k-review-screen__open {
+        justify-content: center;
+        gap: 7px;
+        font-weight: 500;
+    }
+
+    /* The reviewer's note at the top of the sidebar while the changes are made. */
+    .k-review-aside {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* Why Publish waits, beside the header's buttons. */
+    .k-document__gate {
+        margin-right: 4px;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    .k-document__versions[data-comparing] {
+        display: flex;
+        padding: 0;
+    }
+
+    .k-document__review {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+    }
+
+    /* Request changes: the note, in a popup under the button. */
+    .k-send-back {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: min(360px, calc(100vw - 32px));
+        padding: 16px;
+        border-radius: var(--k-radius-card);
+    }
+
+    .k-send-back__label,
+    .k-ask__label {
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 18px;
+    }
+
+    .k-send-back__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    /* Ask for review: the people to tick, a note, and the count beside Send. */
+    .k-dialog.k-ask {
+        gap: 0;
+        width: min(520px, calc(100vw - 32px));
+        padding: 0;
+        border-radius: var(--k-radius-card);
+    }
+
+    .k-ask__head {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 20px 20px 0 24px;
+    }
+
+    .k-ask__heading {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .k-ask .k-dialog__title {
+        font-size: 17px;
+        letter-spacing: -0.01em;
+    }
+
+    .k-ask__detail {
+        font-size: 13px;
+        line-height: 19px;
+    }
+
+    .k-ask .k-dialog__close {
+        margin: 0;
+    }
+
+    .k-ask__body {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        padding: 20px 24px 24px;
+    }
+
+    .k-ask__group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .k-ask__people {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 264px;
+        overflow-y: auto;
+    }
+
+    .k-ask__person {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+        padding: 0 12px 0 8px;
+        border: 0;
+        border-radius: var(--k-radius-control);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+        font: inherit;
+        text-align: left;
+        color: var(--k-ink);
+        cursor: pointer;
+    }
+
+    .k-ask__person:hover {
+        background: var(--k-tint);
+    }
+
+    .k-ask__who {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .k-ask__name {
+        overflow: hidden;
+        font-size: 13.5px;
+        font-weight: 500;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .k-ask__role {
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-ask__box {
+        display: inline-flex;
+        flex: 0 0 18px;
+        align-items: center;
+        justify-content: center;
+        height: 18px;
+        border-radius: 5px;
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
+    }
+
+    .k-ask__person[aria-checked='true'] .k-ask__box {
+        background: var(--k-ink);
+        box-shadow: none;
+        color: var(--k-canvas);
+    }
+
+    .k-ask__box svg {
+        width: 13px;
+        height: 13px;
+        stroke-width: 2.6;
+    }
+
+    .k-ask__foot {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 14px 20px 16px 24px;
+        box-shadow: inset 0 1px 0 var(--k-line);
+    }
+
+    .k-ask__count {
+        margin-right: auto;
+        font-size: 12.5px;
+        color: var(--k-muted);
+    }
+
+    /* A comparison's bar: back to the list, what it compares, the layout and the filter. */
+    .k-compare-view__bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 16px;
+    }
+
+    .k-compare-view__back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-left: -10px;
+    }
+
+    .k-compare-view__what {
+        flex: 1 1 280px;
+        margin: 0;
+        font-size: 13.5px;
+        color: var(--k-muted);
+    }
+
+    .k-compare-view__what strong {
+        font-weight: 500;
+        color: var(--k-ink);
+    }
+
+    .k-segmented {
+        display: flex;
+        gap: 2px;
+        padding: 2px;
+        border-radius: var(--k-radius-control);
+        background: var(--k-control);
+    }
+
+    .k-segmented .k-tab {
+        height: 28px;
+        border-radius: 8px;
+        font-size: 12.5px;
+        font-weight: 400;
+    }
+
+    .k-segmented .k-tab[aria-checked='true'] {
+        background: var(--k-control-hover);
+        font-weight: 500;
+    }
+
+    .k-compare-view__only {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .k-compare-view__versions {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .k-compare-view__version {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 48px;
+        padding: 6px 12px;
+        border: 0;
+        border-radius: var(--k-radius-control);
+        background: none;
+        font: inherit;
+        color: var(--k-ink);
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .k-compare-view__version:hover {
+        background: var(--k-tint);
+    }
+
+    .k-compare-view__version[aria-pressed='true'] {
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
+    }
+
+    .k-compare-view__version-text {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .k-compare-view__version-title {
+        font-size: 13.5px;
+        font-weight: 500;
+    }
+
+    .k-compare-view__version-when {
+        overflow: hidden;
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--k-muted);
+    }
+
+    .k-compare-view__version-state {
+        flex-shrink: 0;
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-compare-view__more {
+        align-self: flex-start;
+    }
+
+    @media (max-width: 860px) {
+        .k-review-screen__aside,
+        .k-compare-view__aside {
+            flex-basis: 100%;
+            padding-left: var(--k-gutter);
+            box-shadow: inset 0 1px 0 var(--k-line);
+        }
+    }
+
+    /* On a phone the two sides stack, what it was over what it becomes. */
+    @media (max-width: 640px) {
+        .k-diff__columns {
+            display: none;
+        }
+
+        .k-diff__sides {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 8px;
+        }
+
+        .k-review-screen__changes,
+        .k-compare-view__main {
+            padding: 24px var(--k-gutter) 32px;
+        }
+
+        .k-ask__person,
+        .k-compare-view__version {
+            min-height: 48px;
         }
     }
 }

@@ -274,6 +274,30 @@ describe('changeView', () => {
         expect(view.removed.map(textOf)).toEqual(['Categories']);
     });
 
+    it('keeps the old list in its order with what it lost marked', () => {
+        const view = changeView(['statement', 'categories', 'articles'], ['statement', 'products'], sections, noLabels);
+        if (view.kind !== 'list') throw new Error('Expected a list change.');
+        expect(
+            view.before.map((item) => ({
+                text: textOf(item.value),
+                removed: item.removed,
+            }))
+        ).toEqual([
+            {
+                text: 'Statement',
+                removed: false,
+            },
+            {
+                text: 'Categories',
+                removed: true,
+            },
+            {
+                text: 'Journal',
+                removed: true,
+            },
+        ]);
+    });
+
     it('lists a new list without marking each item added', () => {
         const view = changeView(undefined, ['prod_wildflower_seeds'], productList, products);
         if (view.kind !== 'list') throw new Error('Expected a list change.');
