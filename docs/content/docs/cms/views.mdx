@@ -152,9 +152,58 @@ export const Orders = defineView({
 });
 ```
 
-A column holding a choice shows the label of its option, so a `role` of `admin` reads Admin. `list` receives the search alone, so the list shows the records in the order `list` returns them until an editor sorts it, and the admin sorts and pages what came back.
+A column holding a choice shows the label of its option, so a `role` of `admin` reads Admin. Until the view names `filters` or `sorts`, `list` receives the search alone, and the admin sorts and pages the records it returns.
 
 The page arranges its fields with the same [layout](/docs/cms/fields#layout) as a collection: tabs, rows, collapsible sections and the sidebar.
+
+## Filtering, sorting and paging
+
+A view over thousands of users should read one page of them at a time. `filters` names the fields the list filters by, and `sorts` the fields it sorts by. With either, `list` receives the editor's filters, sort and page, and answers with that page and how many records match in all:
+
+```ts title="src/cms/app-users.ts"
+export const AppUsers = defineView({
+    name: 'appUsers',
+    label: 'App users',
+    title: 'name',
+    columns: ['name', 'email', 'role', 'signedUpAt'],
+    search: ['name', 'email'],
+    filters: ['role'],
+    sorts: ['name', 'signedUpAt'],
+    fields: appUserFields,
+    list: async ({ query, filters, orderBy, direction, limit, offset }) => {
+        const where = and(matchesSearch(query), matchesFilters(filters));
+        const [{ total }] = await db.select({ total: count() }).from(user).where(where);
+        const items = await db
+            .select()
+            .from(user)
+            .where(where)
+            .orderBy(direction === 'desc' ? desc(user[orderBy ?? 'name']) : asc(user[orderBy ?? 'name']))
+            .limit(limit ?? total)
+            .offset(offset);
+        return {
+            items,
+            total,
+        };
+    },
+    get: getAppUser,
+});
+```
+
+| `list` receives | What it is                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------------- |
+| `query`         | What the editor typed in the search box, or `''`                                              |
+| `filters`       | Sets of conditions. A record matches when every condition of one set holds. `[]` filters none |
+| `orderBy`       | A field of `sorts`, or `undefined` to keep the order `list` chooses                           |
+| `direction`     | `'asc'` or `'desc'`                                                                           |
+| `limit`         | How many records the page holds, or `undefined` for every match                               |
+| `offset`        | How many matching records come before the page                                                |
+| `editor`        | The signed-in editor                                                                          |
+
+A condition is `{ field, operator, value }`, like `{ field: 'role', operator: 'is', value: 'admin' }`. `operator` is `is` or `isNot`, and on a field holding a list, `is` means the list holds the value. `value` has the field's own type, so a role is `'editor'` or `'admin'`, and the server checks every condition before `list` runs: a field `filters` does not name, or a role of `owner`, is answered `400` with what the list takes.
+
+`list` may return a plain array instead. The CMS reads it as every record that matches, takes the page out of it and counts the total itself, which suits an API that has no paging of its own.
+
+The admin then gives the view the toolbar a collection's list has: **Filters** for the fields of `filters` that hold a choice, true or false, or an id, **Sort** and the column headings for the fields of `sorts`, and the pager, each asking `list` again. A model's list tool takes the same `filter`, `orderBy`, `direction`, `limit` and `offset` as a [collection's](/docs/cms/editing/agents#listing-items), and its description names the fields and the values each takes.
 
 ## Moderating product reviews
 

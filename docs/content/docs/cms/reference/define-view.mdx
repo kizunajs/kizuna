@@ -14,10 +14,14 @@ defineView(definition: ViewDefinition): View
 | `group`                      | `string`                         | A heading it is listed under in the admin                               |
 | `auth`                       | `{ roles?, requires? }`          | Who sees the view at all                                                |
 | `fields`                     | `Field[]`                        | What editors see of each record, with [layout](/docs/cms/fields#layout) |
-| `list`                       | `({ query, editor }) => items`   | The records matching the search box                                     |
+| `list`                       | `(input) => items`               | The records matching the search box, filters, sort and page             |
 | `get`                        | `({ id, editor }) => item`       | One record by id                                                        |
 | `actions`                    | `Record<string, Action>`         | Buttons. `save` is the main one. Without it, the view is read only      |
 | `title`, `columns`, `search` | `string`, `string[]`, `string[]` | The list: each record's title, its columns, and what search looks in    |
+| `filters`                    | `string[]`                       | Fields the list filters by, which `list` then receives conditions on    |
+| `sorts`                      | `string[]`                       | Fields the list sorts by, which `list` then receives as `orderBy`       |
+
+`list` receives `query`, `filters`, `orderBy`, `direction`, `limit`, `offset` and `editor`, and returns `{ items, total }`, or a plain array of every match for the CMS to page. Without `filters` or `sorts` it receives no conditions and no sort. `filters` holds sets of conditions, each `{ field, operator, value }` with `operator` `is` or `isNot`, and a record matches when every condition of one set holds.
 
 An action is a handler, or `{ label, confirm, when, auth, handler }`. Every handler receives `id`, `item`, `editor`, `jobs` and `plugins`, and `save` also receives `data`.
 
@@ -34,9 +38,29 @@ export const AppUsers = defineView({
             name: 'email',
             schema: z.email(),
         },
+        {
+            name: 'role',
+            schema: z.enum(['editor', 'admin']),
+        },
+        {
+            name: 'signedUpAt',
+            label: 'Signed up',
+            schema: z.iso.datetime(),
+            readOnly: true,
+        },
     ],
-    list: async ({ query }) => {
-        return searchAppUsers(query);
+    columns: ['name', 'email', 'role', 'signedUpAt'],
+    filters: ['role'],
+    sorts: ['name', 'signedUpAt'],
+    list: async ({ query, filters, orderBy, direction, limit, offset }) => {
+        return searchAppUsers({
+            query,
+            filters,
+            orderBy,
+            direction,
+            limit,
+            offset,
+        });
     },
     get: async ({ id }) => {
         return getAppUser(id);

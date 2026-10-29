@@ -7,7 +7,7 @@ import { drizzle } from 'drizzle-orm/pglite';
 import { defineConfig, Kizuna } from 'kizunajs';
 import { expressAdapter } from '@kizunajs/express';
 import { defineCollection } from './definitions.js';
-import { defineView } from './view-definition.js';
+import { defineView, type ViewListInput } from './view-definition.js';
 import { cms } from './provider.js';
 import { DocumentStore } from './storage/store.js';
 
@@ -164,12 +164,110 @@ const ProductReviews = defineView({
     },
 });
 
+interface Member {
+    id: string;
+    name: string;
+    plan: 'free' | 'pro';
+    active: boolean;
+    tags: Array<'beta' | 'staff'>;
+    joinedOn: string;
+}
+
+const members: Member[] = [
+    {
+        id: 'member_1',
+        name: 'Grace Hopper',
+        plan: 'pro',
+        active: true,
+        tags: ['staff'],
+        joinedOn: '2026-02-11',
+    },
+    {
+        id: 'member_2',
+        name: 'Ada Lovelace',
+        plan: 'free',
+        active: true,
+        tags: ['beta', 'staff'],
+        joinedOn: '2026-01-04',
+    },
+    {
+        id: 'member_3',
+        name: 'Alan Turing',
+        plan: 'free',
+        active: false,
+        tags: [],
+        joinedOn: '2026-03-20',
+    },
+];
+
+const asked: ViewListInput[] = [];
+
+const holds = (member: Member, condition: ViewListInput['filters'][number][number]): boolean => {
+    const held = member[condition.field as keyof Member];
+    const found = Array.isArray(held) ? (held as unknown[]).includes(condition.value) : held === condition.value;
+    return condition.operator === 'is' ? found : !found;
+};
+
+const Members = defineView({
+    name: 'members',
+    auth: {
+        roles: 'admin',
+    },
+    fields: [
+        {
+            name: 'name',
+            schema: z.string(),
+        },
+        {
+            name: 'plan',
+            label: 'Plan',
+            schema: z.enum(['free', 'pro']),
+            options: {
+                free: 'Free',
+                pro: 'Pro',
+            },
+        },
+        {
+            name: 'active',
+            schema: z.boolean(),
+        },
+        {
+            name: 'tags',
+            schema: z.array(z.enum(['beta', 'staff'])),
+        },
+        {
+            name: 'joinedOn',
+            schema: z.iso.date(),
+        },
+    ],
+    columns: ['name', 'plan'],
+    filters: ['plan', 'active', 'tags'],
+    sorts: ['name', 'joinedOn'],
+    list: (input) => {
+        asked.push(input);
+        const matching = members.filter(
+            (member) =>
+                input.filters.length === 0 || input.filters.some((conditions) => conditions.every((condition) => holds(member, condition)))
+        );
+        const field = input.orderBy;
+        const sorted =
+            field === undefined
+                ? matching
+                : [...matching].sort((left, right) => left[field].localeCompare(right[field]) * (input.direction === 'desc' ? -1 : 1));
+        return {
+            items: sorted.slice(input.offset, input.limit === undefined ? undefined : input.offset + input.limit),
+            total: sorted.length,
+        };
+    },
+    get: ({ id }) => members.find((member) => member.id === id),
+});
+
 const pglite = new PGlite();
 const db = drizzle(pglite);
 const content = cms({
     db,
     pages: {},
-    views: [AppUsers, ProductReviews],
+    views: [AppUsers, ProductReviews, Members],
     auth: {
         identity: 'editor',
     },
@@ -214,6 +312,7 @@ beforeEach(() => {
     });
     saved.length = 0;
     resets.length = 0;
+    asked.length = 0;
 });
 
 afterAll(async () => {
@@ -237,6 +336,8 @@ describe('listing views', () => {
                     },
                 },
                 search: ['name', 'email'],
+                filters: [],
+                sorts: [],
                 readOnly: false,
             },
         ]);
@@ -249,9 +350,196 @@ describe('listing views', () => {
                 columns: ['text'],
                 options: {},
                 search: [],
+                filters: [],
+                sorts: [],
                 readOnly: true,
             },
         ]);
+    });
+
+    it('describes the fields a view filters and sorts by, with the values a condition may name', async () => {
+        const [, members] = (await as('admin', request(app).get('/editing/views'))).body.views;
+        expect(members.filters).toEqual([
+            {
+                field: 'plan',
+                label: 'Plan',
+                choices: [
+                    {
+                        value: 'free',
+                        label: 'Free',
+                    },
+                    {
+                        value: 'pro',
+                        label: 'Pro',
+                    },
+                ],
+            },
+            {
+                field: 'active',
+                label: null,
+                choices: [
+                    {
+                        value: 'true',
+                        label: 'Yes',
+                    },
+                    {
+                        value: 'false',
+                        label: 'No',
+                    },
+                ],
+            },
+            {
+                field: 'tags',
+                label: null,
+                choices: [
+                    {
+                        value: 'beta',
+                        label: 'beta',
+                    },
+                    {
+                        value: 'staff',
+                        label: 'staff',
+                    },
+                ],
+            },
+        ]);
+        expect(members.sorts).toEqual(['name', 'joinedOn']);
+        expect(members.options).toEqual({
+            plan: {
+                free: 'Free',
+                pro: 'Pro',
+            },
+        });
+    });
+});
+
+describe('filtering, sorting and paging a view', () => {
+    const listMembers = (query: Record<string, unknown>) => as('admin', request(app).get('/editing/views/members/items')).query(query);
+
+    it('hands list the conditions, typed as the fields hold them, and the sort and page', async () => {
+        const response = await listMembers({
+            filter: ['plan:is:free', 'active:is:true', 'or', 'tags:is:staff', 'plan:isNot:free'],
+            orderBy: 'joinedOn',
+            direction: 'desc',
+            limit: 1,
+            offset: 0,
+        });
+        expect(response.status).toBe(200);
+        expect(asked[0]).toMatchObject({
+            query: '',
+            filters: [
+                [
+                    {
+                        field: 'plan',
+                        operator: 'is',
+                        value: 'free',
+                    },
+                    {
+                        field: 'active',
+                        operator: 'is',
+                        value: true,
+                    },
+                ],
+                [
+                    {
+                        field: 'tags',
+                        operator: 'is',
+                        value: 'staff',
+                    },
+                    {
+                        field: 'plan',
+                        operator: 'isNot',
+                        value: 'free',
+                    },
+                ],
+            ],
+            orderBy: 'joinedOn',
+            direction: 'desc',
+            limit: 1,
+            offset: 0,
+        });
+        expect(response.body).toEqual({
+            items: [
+                {
+                    id: 'member_1',
+                    title: 'Grace Hopper',
+                    values: {
+                        name: 'Grace Hopper',
+                        plan: 'pro',
+                        joinedOn: '2026-02-11',
+                    },
+                },
+            ],
+            total: 2,
+        });
+    });
+
+    it('asks with no conditions and no sort until the editor gives some', async () => {
+        await listMembers({});
+        expect(asked[0]).toMatchObject({
+            query: '',
+            filters: [],
+            orderBy: undefined,
+            direction: 'asc',
+            limit: undefined,
+            offset: 0,
+        });
+    });
+
+    it('answers 400 to a field it does not filter by, a value the field cannot hold, or a sort it does not offer, and never asks list', async () => {
+        const unknown = await listMembers({
+            filter: ['name:is:Ada'],
+        });
+        expect(unknown.status).toBe(400);
+        expect(unknown.body.detail).toBe("The list of Members cannot filter by 'name'. It filters by plan, active, tags.");
+        const value = await listMembers({
+            filter: ['plan:is:gold'],
+        });
+        expect(value.status).toBe(400);
+        expect(value.body.detail).toBe("The plan field holds free or pro, not 'gold'.");
+        const flag = await listMembers({
+            filter: ['active:is:yes'],
+        });
+        expect(flag.body.detail).toBe("The active field holds true or false, not 'yes'.");
+        const nested = await listMembers({
+            filter: ['tags:within:beta'],
+        });
+        expect(nested.body.detail).toBe("A filter on Members compares with is or isNot, not 'within'.");
+        expect(
+            (
+                await listMembers({
+                    orderBy: 'plan',
+                })
+            ).status
+        ).toBe(400);
+        expect(asked).toEqual([]);
+    });
+
+    it('pages the plain array a list returns, and counts every record in it', async () => {
+        const response = await as('support', request(app).get('/editing/views/appUsers/items')).query({
+            limit: 1,
+            offset: 1,
+        });
+        expect(response.body.items.map((item: { id: string }) => item.id)).toEqual(['user_2']);
+        expect(response.body.total).toBe(2);
+    });
+
+    it('takes no filter or sort on a view that names none', async () => {
+        const response = await as('support', request(app).get('/editing/views/appUsers/items')).query({
+            filter: ['plan:is:pro'],
+            orderBy: 'name',
+        });
+        expect(response.status).toBe(200);
+        expect(response.body.total).toBe(2);
+    });
+
+    it('tells a model which fields filter and sort, and the values each takes', () => {
+        const route = (
+            config.api.routes as unknown as Record<string, Record<string, Record<string, Record<string, { description?: string }>>>>
+        )['editing']!['views']!['members']!['list']!;
+        expect(route.description).toBe(
+            'Pages with `limit` and `offset`, and counts every record that matches as `total`. Filters by plan (free or pro), active (true or false), tags (beta or staff). Sorts by name or joinedOn.'
+        );
     });
 });
 

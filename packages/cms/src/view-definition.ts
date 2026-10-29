@@ -17,10 +17,83 @@ import { assertActions, type Action, type ActionContext, type Editor } from './a
 export type ViewColumn<Fields extends FieldList> = DataFieldOf<Fields>['name'] | 'id';
 
 /**
- * What `list` returns: the records, or an object holding them under `data`,
- * as Stripe's lists do.
+ * What `list` returns: one page of the records and how many match in all, or
+ * every record that matches, alone or under `data` as Stripe's lists hold
+ * them, for the CMS to page.
  */
-export type ViewRecords = readonly object[] | { data: readonly object[] };
+export type ViewRecords =
+    | {
+          items: readonly object[];
+          total: number;
+      }
+    | readonly object[]
+    | {
+          data: readonly object[];
+      };
+
+/**
+ * How a condition on a view's list compares. On a field holding a list, `is`
+ * means the list holds the value.
+ */
+export type ViewOperator = 'is' | 'isNot';
+
+type FieldSchemaOf<Fields extends FieldList, Name> = Name extends 'id'
+    ? z.ZodString
+    : Extract<
+          DataFieldOf<Fields>,
+          {
+              name: Name;
+          }
+      >['schema'];
+
+/**
+ * The value a condition compares with: what the field holds, or one entry of
+ * a list.
+ */
+type ConditionValueOf<Schema> =
+    NonNullable<z.output<Schema & z.ZodType>> extends readonly (infer Entry)[] ? Entry : NonNullable<z.output<Schema & z.ZodType>>;
+
+/**
+ * One condition on a view's list: a field of its `filters`, how it compares,
+ * and a value of the field's own type.
+ */
+export type ViewCondition<Fields extends FieldList = FieldList, Filter extends string = string> = {
+    [Name in Filter]: {
+        field: Name;
+        operator: ViewOperator;
+        value: ConditionValueOf<FieldSchemaOf<Fields, Name>>;
+    };
+}[Filter];
+
+/**
+ * What `list` receives: the search, sets of conditions of which a record
+ * matches any one whole set, the sort, and the page.
+ */
+export interface ViewListInput<Fields extends FieldList = FieldList, Filter extends string = string, Sort extends string = string> {
+    /**
+     * What the editor typed in the search box, or `''`.
+     */
+    query: string;
+    /**
+     * Sets of conditions on the fields of `filters`. A record matches when
+     * every condition of one set holds, and `[]` filters none.
+     */
+    filters: ReadonlyArray<ReadonlyArray<ViewCondition<Fields, Filter>>>;
+    /**
+     * A field of `sorts`, or `undefined` to keep the order `list` chooses.
+     */
+    orderBy: Sort | undefined;
+    direction: 'asc' | 'desc';
+    /**
+     * How many records the page holds, or `undefined` for every match.
+     */
+    limit: number | undefined;
+    /**
+     * How many matching records come before the page.
+     */
+    offset: number;
+    editor: Editor;
+}
 
 /**
  * The fields a `save` receives: the ones the editor may change.
@@ -46,7 +119,13 @@ export interface ViewActions<Item, Fields extends FieldList> {
 /**
  * What {@link defineView} takes.
  */
-export interface ViewDefinition<Name extends string, Fields extends FieldList, Item extends object> {
+export interface ViewDefinition<
+    Name extends string,
+    Fields extends FieldList,
+    Item extends object,
+    Filter extends ViewColumn<Fields> = never,
+    Sort extends ViewColumn<Fields> = never,
+> {
     /**
      * The view's key, camelCase.
      */
@@ -68,9 +147,11 @@ export interface ViewDefinition<Name extends string, Fields extends FieldList, I
      */
     fields: Fields;
     /**
-     * The records matching what the editor typed in the search box.
+     * The records matching the search box and, once the view names `filters`
+     * or `sorts`, the editor's filters, sort and page. A method, so a view
+     * typed from its own filters fits where any view goes.
      */
-    list: (input: { query: string; editor: Editor }) => ViewRecords | Promise<ViewRecords>;
+    list(input: ViewListInput<Fields, Filter, Sort>): ViewRecords | Promise<ViewRecords>;
     /**
      * One record by its id, or `undefined` when there is none.
      */
@@ -92,6 +173,14 @@ export interface ViewDefinition<Name extends string, Fields extends FieldList, I
      * The fields the search box looks in, so the editor can say so.
      */
     search?: readonly ViewColumn<Fields>[];
+    /**
+     * The fields the list filters by, which `list` receives conditions on.
+     */
+    filters?: readonly Filter[];
+    /**
+     * The fields the list sorts by, which `list` receives as `orderBy`.
+     */
+    sorts?: readonly Sort[];
 }
 
 // Registry-global, like the other definitions, so another copy of this package recognises it.
@@ -104,7 +193,9 @@ export interface View<
     Name extends string = string,
     Fields extends FieldList = FieldList,
     Item extends object = object,
-> extends ViewDefinition<Name, Fields, Item> {
+    Filter extends ViewColumn<Fields> = ViewColumn<Fields>,
+    Sort extends ViewColumn<Fields> = ViewColumn<Fields>,
+> extends ViewDefinition<Name, Fields, Item, Filter, Sort> {
     readonly [VIEW]: true;
     readonly schema: z.ZodObject<ShapeOf<Fields>, z.core.$strip>;
 }
@@ -137,9 +228,15 @@ const NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
  *     },
  * });
  */
-export const defineView = <const Name extends string, const Fields extends FieldList, Item extends object = Record<string, unknown>>(
-    definition: ViewDefinition<Name, Fields, Item> & FieldsCheck<Fields>
-): View<Name, Fields, Item> => {
+export const defineView = <
+    const Name extends string,
+    const Fields extends FieldList,
+    Item extends object = Record<string, unknown>,
+    const Filter extends ViewColumn<Fields> = never,
+    const Sort extends ViewColumn<Fields> = never,
+>(
+    definition: ViewDefinition<Name, Fields, Item, Filter, Sort> & FieldsCheck<Fields>
+): View<Name, Fields, Item, Filter, Sort> => {
     if (typeof definition.name !== 'string' || !NAME.test(definition.name)) {
         throw new Error(`defineView() has the name '${String(definition.name)}'. A name is an identifier, like 'appUsers'.`);
     }
@@ -156,6 +253,8 @@ export const defineView = <const Name extends string, const Fields extends Field
         ['title', definition.title === undefined ? [] : [definition.title]],
         ['columns', definition.columns ?? []],
         ['search', definition.search ?? []],
+        ['filters', definition.filters ?? []],
+        ['sorts', definition.sorts ?? []],
     ];
     for (const [option, listed] of named) {
         for (const name of listed) {
@@ -166,7 +265,7 @@ export const defineView = <const Name extends string, const Fields extends Field
         ...definition,
         [VIEW]: true,
         schema: z.object(shapeOf(definition.fields)),
-    } as View<Name, Fields, Item>;
+    } as View<Name, Fields, Item, Filter, Sort>;
 };
 
 export const isView = (value: unknown): value is View => typeof value === 'object' && value !== null && VIEW in value;

@@ -3,9 +3,10 @@ import { Kizuna, type RouteAuth, type Roles } from 'kizunajs';
 import { route } from 'kizunajs/plugin';
 import { ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
-import { CmsHttpError, type CmsService } from './cms.js';
-import { dataFields } from './field.js';
+import { brandOf, CmsHttpError, type CmsService } from './cms.js';
+import { dataFields, type Field } from './field.js';
 import { blocksForWire, describeFields, describeLayout, getAtPath, type DescribedField } from './content.js';
+import { parseFilter, type ItemCondition } from './item-list.js';
 import { pathRefusal, type Caller } from './rules.js';
 import { sameContent } from './same-content.js';
 import { DescribedFieldSchema, DescribedLayoutSchema } from './wire.js';
@@ -29,7 +30,25 @@ import {
     type EditingArgs,
     type Guarded,
 } from './action-routes.js';
-import type { View } from './view-definition.js';
+import type { View, ViewCondition, ViewOperator, ViewRecords } from './view-definition.js';
+
+export const ViewFilterSchema = Kizuna.model({
+    title: 'CMS.ViewFilter',
+    schema: z.object({
+        field: z.string(),
+        label: z.string().nullable().describe("The field's `label`, or `null` to show its name."),
+        choices: z
+            .array(
+                z.object({
+                    value: z.string(),
+                    label: z.string(),
+                })
+            )
+            .optional()
+            .describe('The values a condition may name, with the label editors see for each.'),
+        brand: z.string().optional().describe('The brand of the ids the field holds, which a condition names one of.'),
+    }),
+});
 
 export const ViewSummarySchema = Kizuna.model({
     title: 'CMS.View',
@@ -43,6 +62,8 @@ export const ViewSummarySchema = Kizuna.model({
             .record(z.string(), z.record(z.string(), z.string()))
             .describe('For each column holding a choice, the label editors see for each value, like Admin for admin.'),
         search: z.array(z.string()).describe('The fields the search box looks in.'),
+        filters: z.array(ViewFilterSchema).describe('The fields the list filters by.'),
+        sorts: z.array(z.string()).describe('The fields the list sorts by.'),
         readOnly: z.boolean().describe('Whether the caller may save nothing in it.'),
     }),
 });
@@ -349,11 +370,183 @@ interface ViewRouteInput {
  */
 const columnOptionsOf = (view: View): Record<string, Record<string, string>> =>
     Object.fromEntries(
-        (view.columns ?? [titleFieldOf(view)]).flatMap((column) => {
+        listedOf(view).flatMap((column) => {
             const options = dataFields(view.fields).find((field) => field.name === column)?.options;
             return options === undefined ? [] : [[column, options]];
         })
     );
+
+const EITHER = new Intl.ListFormat('en', {
+    type: 'disjunction',
+});
+
+const OPERATORS: readonly ViewOperator[] = ['is', 'isNot'];
+
+/**
+ * The schema of what a condition compares with: the field's own, or one
+ * entry of a list.
+ */
+const entrySchemaOf = (schema: z.core.$ZodType): z.core.$ZodType => {
+    const inner = unwrapOptionalWrappers(schema).inner;
+    const element = readDef(inner).element;
+    return readDef(inner).type === 'array' && element !== undefined ? unwrapOptionalWrappers(element).inner : inner;
+};
+
+const fieldOf = (view: View, name: string): Field | undefined => dataFields(view.fields).find((field) => field.name === name);
+
+/**
+ * The values a condition on a field may name, for a choice or true or false.
+ */
+const choicesOf = (field: Field): Array<{ value: string; label: string }> | undefined => {
+    const def = readDef(entrySchemaOf(field.schema));
+    if (def.type === 'enum' && def.entries !== undefined) {
+        return Object.values(def.entries).map((value) => ({
+            value: String(value),
+            label: field.options?.[String(value)] ?? String(value),
+        }));
+    }
+    if (def.type === 'boolean') {
+        return [
+            {
+                value: 'true',
+                label: 'Yes',
+            },
+            {
+                value: 'false',
+                label: 'No',
+            },
+        ];
+    }
+    return undefined;
+};
+
+/**
+ * Each field of a view's `filters`, with the values a condition may name.
+ */
+const filtersOf = (view: View, brandOfField: (schema: z.core.$ZodType) => string | undefined): Array<z.output<typeof ViewFilterSchema>> =>
+    (view.filters ?? []).map((name) => {
+        const field = fieldOf(view, name);
+        const choices = field === undefined ? undefined : choicesOf(field);
+        const brand = field === undefined ? undefined : brandOfField(field.schema);
+        return {
+            field: name,
+            label: field?.label ?? null,
+            ...(choices === undefined
+                ? {}
+                : {
+                      choices,
+                  }),
+            ...(brand === undefined || choices !== undefined
+                ? {}
+                : {
+                      brand,
+                  }),
+        };
+    });
+
+/**
+ * What a condition on one filter may name, in words, like "editor or admin".
+ */
+const takesText = (filter: z.output<typeof ViewFilterSchema>): string =>
+    filter.choices !== undefined
+        ? EITHER.format(filter.choices.map((choice) => choice.value))
+        : filter.brand !== undefined
+          ? `an id of ${filter.brand}`
+          : filter.field === 'id'
+            ? "a record's id"
+            : 'a value of the field';
+
+/**
+ * A condition as `list` receives it, its value read as the field holds it.
+ * Answers `400` for a field the view does not filter by, or a value the
+ * field cannot hold.
+ */
+const conditionOf = (view: View, condition: ItemCondition): ViewCondition => {
+    const filters: readonly string[] = view.filters ?? [];
+    if (!filters.includes(condition.field)) {
+        throw new CmsHttpError(400, {
+            detail: `The list of ${labelOf(view)} cannot filter by '${condition.field}'. It filters by ${filters.length === 0 ? 'no field' : filters.join(', ')}.`,
+        });
+    }
+    if (!OPERATORS.includes(condition.operator as ViewOperator)) {
+        throw new CmsHttpError(400, {
+            detail: `A filter on ${labelOf(view)} compares with is or isNot, not '${condition.operator}'.`,
+        });
+    }
+    const operator = condition.operator as ViewOperator;
+    const field = fieldOf(view, condition.field);
+    if (field === undefined) {
+        return {
+            field: condition.field,
+            operator,
+            value: condition.value,
+        };
+    }
+    const schema = entrySchemaOf(field.schema);
+    const type = readDef(schema).type;
+    const raw = condition.value;
+    const read =
+        type === 'boolean'
+            ? raw === 'true'
+                ? true
+                : raw === 'false'
+                  ? false
+                  : raw
+            : type === 'number' && raw.trim() !== ''
+              ? Number(raw)
+              : type === 'date'
+                ? new Date(raw)
+                : raw;
+    const parsed = z.safeParse(schema, read);
+    if (!parsed.success) {
+        const choices = choicesOf(field);
+        const holds =
+            choices !== undefined
+                ? EITHER.format(choices.map((choice) => choice.value))
+                : type === 'number'
+                  ? 'a number'
+                  : type === 'date'
+                    ? 'a date'
+                    : undefined;
+        throw new CmsHttpError(400, {
+            detail:
+                holds === undefined
+                    ? `The ${condition.field} field cannot hold '${raw}': ${parsed.error.issues[0]?.message ?? 'it does not pass the field'}.`
+                    : `The ${condition.field} field holds ${holds}, not '${raw}'.`,
+        });
+    }
+    return {
+        field: condition.field,
+        operator,
+        value: parsed.data as ViewCondition['value'],
+    };
+};
+
+/**
+ * One page of what `list` returned, and how many match in all. `{ items,
+ * total }` is a page already, and anything else every match, which the
+ * page is taken out of.
+ */
+const pageOfRecords = (result: ViewRecords, limit: number | undefined, offset: number): { records: readonly object[]; total: number } => {
+    if (!Array.isArray(result) && Array.isArray((result as { items?: unknown }).items)) {
+        const page = result as { items: readonly object[]; total?: unknown };
+        return {
+            records: page.items,
+            total: typeof page.total === 'number' ? page.total : page.items.length,
+        };
+    }
+    const every = recordsOf(result);
+    return {
+        records: every.slice(offset, limit === undefined ? undefined : offset + limit),
+        total: every.length,
+    };
+};
+
+/**
+ * The fields each row carries: the title, the columns, and the fields of
+ * `sorts`, which the admin offers as columns too.
+ */
+const listedOf = (view: View): string[] => [...new Set([...(view.columns ?? [titleFieldOf(view)]), ...(view.sorts ?? [])])];
 
 /**
  * `GET /editing/views`: the views the caller may open.
@@ -389,6 +582,8 @@ export const listViewsRoute = (input: ViewRouteInput) =>
                             columns: [...(view.columns ?? [titleFieldOf(view)])],
                             options: columnOptionsOf(view),
                             search: [...(view.search ?? [])],
+                            filters: filtersOf(view, (schema) => cms.referenceBrandOf(schema)),
+                            sorts: [...(view.sorts ?? [])],
                             readOnly: !mayRun(saveOf(view), caller),
                         })),
                 },
@@ -406,12 +601,23 @@ const routesOfView = (view: View, input: ViewRouteInput) => {
         id: z.string(),
     });
 
+    const filters = filtersOf(view, brandOf);
+    const sorts: readonly string[] = view.sorts ?? [];
+    const firstFilter = filters[0];
+    const example = firstFilter === undefined ? undefined : `${firstFilter.field}:is:${firstFilter.choices?.[0]?.value ?? 'value'}`;
     const list = route({
         method: 'GET',
         path: base,
         auth: input.editor,
         summary: `List the records of ${noun} that match a search`,
         tool: true,
+        description: [
+            'Pages with `limit` and `offset`, and counts every record that matches as `total`.',
+            ...(filters.length === 0
+                ? []
+                : [`Filters by ${filters.map((filter) => `${filter.field} (${takesText(filter)})`).join(', ')}.`]),
+            ...(sorts.length === 0 ? [] : [`Sorts by ${EITHER.format(sorts)}.`]),
+        ].join(' '),
         query: z.object({
             q: z
                 .string()
@@ -421,26 +627,71 @@ const routesOfView = (view: View, input: ViewRouteInput) => {
                         ? 'What to search for.'
                         : `What to search for, in ${view.search.join(', ')}.`
                 ),
+            ...(filters.length === 0
+                ? {}
+                : {
+                      filter: z
+                          .array(z.string())
+                          .optional()
+                          .describe(
+                              `Conditions, each \`field:operator:value\`, like \`${example}\`. \`field\` is ${EITHER.format(filters.map((filter) => filter.field))}. \`operator\` is \`is\` or \`isNot\`, and on a field holding a list \`is\` finds the value in it. The conditions all hold together, and an \`or\` entry between them starts another set that may hold instead.`
+                          ),
+                  }),
+            ...(sorts.length === 0
+                ? {}
+                : {
+                      orderBy: z
+                          .enum(sorts as [string, ...string[]])
+                          .optional()
+                          .describe(`${EITHER.format(sorts)}. The order the view lists in when left out.`),
+                      direction: z.enum(['asc', 'desc']).optional().describe('Ascending when left out.'),
+                  }),
+            limit: z.int().min(1).max(200).optional().describe('How many records a page holds. Without it, every record that matches.'),
+            offset: z.int().min(0).optional().describe('How many matching records to skip, for the pages after the first.'),
         }),
         responses: {
             200: {
                 body: z.object({
                     items: z.array(ViewRowSchema),
+                    total: z.int().describe('How many records match, on every page together.'),
                 }),
                 cache: 'no-store',
             },
+            400: ProblemDetailsSchema,
             403: ProblemDetailsSchema,
         },
     }).handler(
         input.guarded(async (cms, args: EditingArgs) => {
             assertSees(view, cms.caller(args.auth));
-            const records = recordsOf(
+            const query = (args.query ?? {}) as {
+                q?: string;
+                filter?: string[];
+                orderBy?: string;
+                direction?: 'asc' | 'desc';
+                limit?: number;
+                offset?: number;
+            };
+            const parsed = parseFilter(query.filter ?? []);
+            if ('problem' in parsed) {
+                throw new CmsHttpError(400, {
+                    detail: parsed.problem,
+                });
+            }
+            const offset = query.offset ?? 0;
+            const { records, total } = pageOfRecords(
                 await view.list({
-                    query: (args.query?.['q'] as string | undefined) ?? '',
+                    query: query.q ?? '',
+                    filters: parsed.groups.map((group) => group.map((condition) => conditionOf(view, condition))),
+                    orderBy: query.orderBy,
+                    direction: query.direction ?? 'asc',
+                    limit: query.limit,
+                    offset,
                     editor: handlerContext(cms, args).editor,
-                })
+                }),
+                query.limit,
+                offset
             );
-            const columns = view.columns ?? [titleFieldOf(view)];
+            const columns = listedOf(view);
             return {
                 status: 200,
                 body: {
@@ -454,6 +705,7 @@ const routesOfView = (view: View, input: ViewRouteInput) => {
                             ])
                         ),
                     })),
+                    total,
                 },
             };
         }) as never
