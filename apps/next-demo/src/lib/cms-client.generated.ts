@@ -225,6 +225,10 @@ export namespace API {
              */
             requireReview: boolean;
             /**
+             * Whether the caller may publish it before its review is approved, with `force`.
+             */
+            canPublishPastReview: boolean;
+            /**
              * One entry per field the draft changes, in the order the fields are shown.
              */
             changes: Array<{
@@ -1570,6 +1574,10 @@ export namespace API {
 
         export type Body = {
             summary?: string;
+            /**
+             * Publish past a review that is not approved. Only someone with a role under `reviews.roles` may; for anyone else it changes nothing.
+             */
+            force?: boolean;
         };
 
         export type Result =
@@ -1796,6 +1804,10 @@ export namespace API {
 
         export type Body = {
             summary?: string;
+            /**
+             * Publish past a review that is not approved. Only someone with a role under `reviews.roles` may; for anyone else it changes nothing.
+             */
+            force?: boolean;
         };
 
         export type Result =
@@ -2099,6 +2111,10 @@ export namespace API {
 
         export type Body = {
             summary?: string;
+            /**
+             * Publish past a review that is not approved. Only someone with a role under `reviews.roles` may; for anyone else it changes nothing.
+             */
+            force?: boolean;
         };
 
         export type Result =
@@ -2836,7 +2852,7 @@ export interface Client {
             /**
              * Publish the draft of a page
              *
-             * Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead.
+             * Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead. Someone with a role under `reviews.roles` may pass `force` to publish before the review is approved.
              *
              * @example
              * const result = await client.editing.pages.publish({
@@ -3067,7 +3083,7 @@ export interface Client {
             /**
              * Publish the draft of a global, which every page may show
              *
-             * Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead.
+             * Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead. Someone with a role under `reviews.roles` may pass `force` to publish before the review is approved.
              *
              * @example
              * const result = await client.editing.globals.publish({
@@ -3357,7 +3373,7 @@ export interface Client {
             /**
              * Publish the draft of an item of a collection
              *
-             * Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead.
+             * Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead. Someone with a role under `reviews.roles` may pass `force` to publish before the review is approved.
              *
              * @example
              * const result = await client.editing.collections.publish({

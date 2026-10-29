@@ -2877,6 +2877,10 @@ routes:
             optional: false
             schema:
               kind: boolean
+          canPublishPastReview:
+            optional: false
+            schema:
+              kind: boolean
           changes:
             optional: false
             schema:
@@ -3154,6 +3158,10 @@ routes:
           optional: true
           schema:
             kind: string
+        force:
+          optional: true
+          schema:
+            kind: boolean
     responses:
       "200":
         kind: object
@@ -4652,6 +4660,10 @@ routes:
             optional: false
             schema:
               kind: boolean
+          canPublishPastReview:
+            optional: false
+            schema:
+              kind: boolean
           changes:
             optional: false
             schema:
@@ -4929,6 +4941,10 @@ routes:
           optional: true
           schema:
             kind: string
+        force:
+          optional: true
+          schema:
+            kind: boolean
     responses:
       "200":
         kind: object
@@ -6829,6 +6845,10 @@ routes:
             optional: false
             schema:
               kind: boolean
+          canPublishPastReview:
+            optional: false
+            schema:
+              kind: boolean
           changes:
             optional: false
             schema:
@@ -7106,6 +7126,10 @@ routes:
           optional: true
           schema:
             kind: string
+        force:
+          optional: true
+          schema:
+            kind: boolean
     responses:
       "200":
         kind: object
