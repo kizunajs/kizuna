@@ -25,16 +25,28 @@ export const itemNounOf = (itemSchema: JsonSchema, root: JsonSchema, label: stri
     return singularOf(label) === label ? `${label.toLowerCase()} item` : singularOf(label).toLowerCase();
 };
 
+const isText = (property: JsonSchema, root: JsonSchema): boolean => {
+    const resolved = resolveRef(property, root);
+    return (
+        typeOf(resolved) === 'string' &&
+        resolved.enum === undefined &&
+        resolved.const === undefined &&
+        resolved.brand === undefined &&
+        resolved.format === undefined
+    );
+};
+
 /**
- * The property that names an item in its row: the first one holding text.
+ * The properties that may name an item in its row: those holding text, the
+ * required ones first, so a heading reads before an optional eyebrow.
  */
-export const titlePropertyOf = (item: JsonSchema, root: JsonSchema): string | undefined =>
-    Object.entries(item.properties ?? {}).find(([, property]) => {
-        const resolved = resolveRef(property, root);
-        return (
-            typeOf(resolved) === 'string' && resolved.enum === undefined && resolved.brand === undefined && resolved.format === undefined
-        );
-    })?.[0];
+export const titlePropertiesOf = (item: JsonSchema, root: JsonSchema): string[] => {
+    const text = Object.entries(item.properties ?? {})
+        .filter(([, property]) => isText(property, root))
+        .map(([name]) => name);
+    const required = item.required ?? [];
+    return [...text.filter((name) => required.includes(name)), ...text.filter((name) => !required.includes(name))];
+};
 
 /**
  * The property whose value tags an item's row: the first one with a fixed
@@ -44,16 +56,18 @@ export const tagPropertyOf = (item: JsonSchema, root: JsonSchema): string | unde
     Object.entries(item.properties ?? {}).find(([, property]) => resolveRef(property, root).enum !== undefined)?.[0];
 
 /**
- * An item's title and tag as its folded row shows them.
+ * An item's title and tag as its folded row shows them: the first text it
+ * holds, and the first choice.
  */
 export const rowLabelsOf = (item: JsonSchema, root: JsonSchema, value: unknown): { title: string | undefined; tag: string | undefined } => {
     const record = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
-    const titleProperty = titlePropertyOf(item, root);
+    const title = titlePropertiesOf(item, root)
+        .map((name) => record[name])
+        .find((value): value is string => typeof value === 'string' && value.trim() !== '');
     const tagProperty = tagPropertyOf(item, root);
-    const title = titleProperty === undefined ? undefined : record[titleProperty];
     const tag = tagProperty === undefined ? undefined : record[tagProperty];
     return {
-        title: typeof title === 'string' && title.trim() !== '' ? title : undefined,
+        title,
         tag: typeof tag === 'string' && tag !== '' ? humanize(tag) : undefined,
     };
 };

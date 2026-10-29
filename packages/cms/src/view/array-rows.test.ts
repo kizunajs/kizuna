@@ -44,6 +44,31 @@ describe('a list item row', () => {
         });
     });
 
+    it('takes its title from required text before optional text', () => {
+        expect(
+            rowLabelsOf(
+                {
+                    ...contact,
+                    required: ['phone'],
+                },
+                contact,
+                {
+                    name: 'Ingrid Solberg',
+                    phone: '22 33 44 55',
+                }
+            ).title
+        ).toBe('22 33 44 55');
+    });
+
+    it('passes over empty text to the next that holds some', () => {
+        expect(
+            rowLabelsOf(contact, contact, {
+                name: '',
+                phone: '22 33 44 55',
+            }).title
+        ).toBe('22 33 44 55');
+    });
+
     it('has no title while the text is empty', () => {
         expect(
             rowLabelsOf(contact, contact, {

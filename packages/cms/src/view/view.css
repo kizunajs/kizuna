@@ -988,20 +988,20 @@
     }
 
     /* Each item is one filled row: its handle, its title that opens it, a chevron and remove. Open, it grows into a card with its fields under the row. */
-    .k-array--folds .k-array__item {
+    .k-array--folds > .k-array__items > .k-array__item {
         flex-direction: column;
         align-items: stretch;
         gap: 0;
     }
 
-    .k-array--folds .k-array__item,
+    .k-array--folds > .k-array__items > .k-array__item,
     .k-array__item--value {
         border-radius: var(--k-radius-control);
         background: var(--k-surface);
         box-shadow: var(--k-elevation);
     }
 
-    .k-array--folds .k-array__item:has(> .k-array__row .k-array__summary[data-panel-open]) {
+    .k-array--folds > .k-array__items > .k-array__item:has(> .k-array__row .k-array__summary[data-panel-open]) {
         border-radius: var(--k-radius-card);
     }
 
@@ -1108,6 +1108,99 @@
 
     .k-array__panel[hidden] {
         display: none;
+    }
+
+    /* A block's field inside an open item: its label and input, with its help under them. */
+    .k-block-field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--k-label-gap);
+        min-width: 0;
+    }
+
+    /* Add on a list of blocks: a card for each block, its label over its description. */
+    .k-dialog.k-block-picker {
+        gap: 16px;
+        width: min(720px, calc(100vw - 32px));
+        max-height: calc(100vh - 64px);
+        padding: 16px 16px 20px 20px;
+        overflow-y: auto;
+    }
+
+    .k-block-picker__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .k-block-picker__head .k-dialog__title {
+        flex: 1 1 auto;
+    }
+
+    .k-block-picker__search {
+        position: relative;
+        display: flex;
+        flex: 0 1 260px;
+        align-items: center;
+        color: var(--k-muted);
+    }
+
+    .k-block-picker__search svg {
+        position: absolute;
+        left: 11px;
+        pointer-events: none;
+    }
+
+    .k-block-picker__search .k-input {
+        height: var(--k-control-height-small);
+        padding-left: 34px;
+        font-size: 13.5px;
+    }
+
+    .k-block-picker__list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .k-block-picker__list > li {
+        display: flex;
+    }
+
+    .k-block-picker__card {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        width: 100%;
+        padding: 12px 14px 14px;
+        border: 0;
+        border-radius: var(--k-radius-card);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+        font: inherit;
+        text-align: left;
+        color: var(--k-ink);
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    .k-block-picker__card:hover {
+        background: var(--k-tint);
+    }
+
+    .k-block-picker__name {
+        font-size: 13.5px;
+        font-weight: 500;
+    }
+
+    .k-block-picker__description {
+        font-size: 12.5px;
+        line-height: 17px;
+        color: var(--k-muted);
     }
 
     /* A text button, for an action that sits beside a label rather than in a toolbar. */

@@ -21,7 +21,30 @@ export type JsonSchema = Record<string, unknown> & {
     $ref?: string;
     $defs?: Record<string, JsonSchema>;
     anyOf?: JsonSchema[];
+    oneOf?: JsonSchema[];
+    const?: unknown;
 };
+
+/**
+ * One block a list of blocks may hold, as `describe` answers it.
+ */
+export interface DescribedBlock {
+    name: string;
+    label?: string;
+    description?: string;
+    fields: Array<{
+        name: string;
+        label?: string;
+        options?: Record<string, string>;
+        description?: string;
+        required: boolean;
+    }>;
+}
+
+/**
+ * The key an item of a list of blocks names its block under.
+ */
+export const BLOCK_KEY = 'block';
 
 /**
  * One field as `describe` answers it.
@@ -34,6 +57,10 @@ export interface DescribedField {
     description?: string;
     help?: string;
     block?: string;
+    /**
+     * For a list of blocks, the blocks an item may be.
+     */
+    blocks?: DescribedBlock[];
     parent?: string;
     position?: 'sidebar';
     width?: string;
@@ -175,7 +202,46 @@ export const typeOf = (schema: JsonSchema): string | undefined => {
     if (Array.isArray(schema.type)) return schema.type.find((candidate) => candidate !== 'null');
     if (schema.type !== undefined) return schema.type;
     if (schema.anyOf !== undefined) return typeOf(schema.anyOf.find((option) => option.type !== 'null') ?? {});
+    if (schema.oneOf !== undefined) return typeOf(schema.oneOf[0] ?? {});
     return undefined;
+};
+
+/**
+ * The block an option of a list's items names under `block`, or `undefined`
+ * for an option that names none.
+ */
+const blockNameOf = (option: JsonSchema, root: JsonSchema): string | undefined => {
+    const tag = resolveRef(option, root).properties?.[BLOCK_KEY]?.const;
+    return typeof tag === 'string' ? tag : undefined;
+};
+
+/**
+ * The options of a list of blocks' items, each with the name it carries, or
+ * `undefined` when the items are no blocks.
+ */
+export const blockOptionsOf = (itemSchema: JsonSchema, root: JsonSchema): Array<{ name: string; schema: JsonSchema }> | undefined => {
+    const options = resolveRef(itemSchema, root).oneOf;
+    if (options === undefined || options.length === 0) return undefined;
+    const named = options.flatMap((option) => {
+        const name = blockNameOf(option, root);
+        return name === undefined
+            ? []
+            : [
+                  {
+                      name,
+                      schema: resolveRef(option, root),
+                  },
+              ];
+    });
+    return named.length === options.length ? named : undefined;
+};
+
+/**
+ * The block an item names, or `undefined`.
+ */
+export const itemBlockName = (value: unknown): string | undefined => {
+    const name = typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[BLOCK_KEY] : undefined;
+    return typeof name === 'string' ? name : undefined;
 };
 
 /**

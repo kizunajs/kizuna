@@ -152,9 +152,9 @@ describe('blocks()', () => {
 
     it('throws on a schema defineBlock did not make', () => {
         expect(() =>
+            // @ts-expect-error a plain object is no block
             blocks([
                 StatementBlockSchema,
-                // @ts-expect-error a plain object is no block
                 z.object({
                     text: z.string(),
                 }),

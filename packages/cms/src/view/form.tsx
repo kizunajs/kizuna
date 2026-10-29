@@ -249,6 +249,7 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                         brand={field.brand}
                         searchTool={field.searchTool}
                         labels={field.options}
+                        blocks={field.blocks}
                         help={list ? field.help : undefined}
                         required
                     />

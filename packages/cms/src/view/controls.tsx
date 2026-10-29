@@ -26,7 +26,19 @@ import { ICON, useEditorContext } from './context.js';
 import { Hint } from './hint.js';
 import { cropOf, edgesOf, type CropEdges } from './crop.js';
 import { MediaPicker, uploadMedia, type MediaRecord } from './media.js';
-import { emptyFor, humanize, isImage, isRichText, resolveRef, typeOf, type JsonSchema } from './schema.js';
+import {
+    BLOCK_KEY,
+    blockOptionsOf,
+    emptyFor,
+    humanize,
+    isImage,
+    isRichText,
+    itemBlockName,
+    resolveRef,
+    typeOf,
+    type DescribedBlock,
+    type JsonSchema,
+} from './schema.js';
 import { RichTextControl } from './rich-text.js';
 import { isSeo, SeoControl } from './seo.js';
 import { counterShown, stringInputOf } from './string-input.js';
@@ -64,6 +76,11 @@ export interface ControlProps {
      * The field's help, which a list shows beside its Add button.
      */
     help?: string | undefined;
+    /**
+     * For a list of blocks, what `describe` says of each block: its label,
+     * description and the labels of its fields.
+     */
+    blocks?: DescribedBlock[] | undefined;
 }
 
 function SelectControl(props: {
@@ -824,6 +841,16 @@ function ArrayControl(props: ControlProps) {
     const max = schema.maxItems;
     const min = schema.minItems ?? 0;
     const noun = itemNounOf(itemSchema, root, props.label);
+    const blockOptions = blockOptionsOf(itemSchema, root);
+    const choices = (blockOptions ?? []).map((option) => {
+        const described = props.blocks?.find((block) => block.name === option.name);
+        return {
+            ...option,
+            described,
+            label: described?.label ?? humanize(option.name),
+        };
+    });
+    const [picking, setPicking] = useState(false);
     // Editors like rich text read their value once, so a move or a removal remounts every item.
     const [generation, setGeneration] = useState(0);
     const [open, setOpen] = useState<ReadonlySet<number>>(() => new Set());
@@ -841,6 +868,17 @@ function ArrayControl(props: ControlProps) {
     const add = (): void => {
         onChange([...items, emptyFor(itemSchema, root)]);
         if (folds) setOpen((previous) => new Set([...previous, items.length]));
+    };
+    // A new block starts as its name alone, so its fields read as not filled in yet rather than as wrong.
+    const addBlock = (name: string): void => {
+        setPicking(false);
+        onChange([
+            ...items,
+            {
+                [BLOCK_KEY]: name,
+            },
+        ]);
+        setOpen((previous) => new Set([...previous, items.length]));
     };
     const { drag, rows, startDrag } = useDrag(disabled, moveTo);
 
@@ -875,7 +913,11 @@ function ArrayControl(props: ControlProps) {
                         type="button"
                         className="k-button k-button--secondary k-button--small k-array__add"
                         disabled={max !== undefined && items.length >= max}
-                        onClick={add}>
+                        onClick={() => {
+                            if (choices.length === 0) add();
+                            else if (choices.length === 1) addBlock(choices[0]!.name);
+                            else setPicking(true);
+                        }}>
                         <Plus {...ICON} />
                         Add {noun}
                     </button>
@@ -907,7 +949,11 @@ function ArrayControl(props: ControlProps) {
                 {items.length === 0 ? null : (
                     <div className="k-array__items">
                         {items.map((item, index) => {
-                            const { title, tag } = rowLabelsOf(resolvedItem, root, item);
+                            const choice =
+                                blockOptions === undefined ? undefined : choices.find((each) => each.name === itemBlockName(item));
+                            const labels = rowLabelsOf(choice?.schema ?? resolvedItem, root, item);
+                            const title = labels.title;
+                            const tag = blockOptions === undefined ? labels.tag : (choice?.label ?? itemBlockName(item));
                             const isOpen = open.has(index);
                             return (
                                 <Collapsible.Root
@@ -954,18 +1000,41 @@ function ArrayControl(props: ControlProps) {
                                         )}
                                     </div>
                                     <Collapsible.Panel keepMounted className="k-array__panel">
-                                        <ObjectControl
-                                            {...props}
-                                            id={undefined}
-                                            heading={undefined}
-                                            help={undefined}
-                                            label={undefined}
-                                            schema={resolvedItem}
-                                            root={root}
-                                            value={item}
-                                            required
-                                            onChange={(next) => changeItem(index, next)}
-                                        />
+                                        {blockOptions === undefined ? (
+                                            <ObjectControl
+                                                {...props}
+                                                id={undefined}
+                                                heading={undefined}
+                                                help={undefined}
+                                                label={undefined}
+                                                schema={resolvedItem}
+                                                root={root}
+                                                value={item}
+                                                required
+                                                onChange={(next) => changeItem(index, next)}
+                                            />
+                                        ) : choice === undefined ? (
+                                            <div className="k-unsupported">
+                                                <pre>{JSON.stringify(item, null, 2)}</pre>
+                                                <p className="k-help">
+                                                    This block is no longer one the list holds. Remove it, or ask the model to.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <BlockFields
+                                                {...props}
+                                                id={undefined}
+                                                heading={undefined}
+                                                help={undefined}
+                                                label={undefined}
+                                                schema={choice.schema}
+                                                root={root}
+                                                value={item}
+                                                described={choice.described}
+                                                required
+                                                onChange={(next) => changeItem(index, next)}
+                                            />
+                                        )}
                                     </Collapsible.Panel>
                                 </Collapsible.Root>
                             );
@@ -973,6 +1042,16 @@ function ArrayControl(props: ControlProps) {
                     </div>
                 )}
                 {footer}
+                {choices.length > 1 ? (
+                    <BlockPicker
+                        open={picking}
+                        onOpenChange={setPicking}
+                        noun={noun}
+                        label={props.label}
+                        choices={choices}
+                        onPick={addBlock}
+                    />
+                ) : null}
             </div>
         );
     }
@@ -1001,6 +1080,7 @@ function ArrayControl(props: ControlProps) {
                             label={undefined}
                             heading={undefined}
                             help={undefined}
+                            blocks={undefined}
                             schema={itemSchema}
                             root={root}
                             value={item}
@@ -1054,7 +1134,21 @@ export function Row({ label, htmlFor, required, children }: { label: string; htm
 /**
  * The control for one property of an object, writing the object as a whole.
  */
-function PropertyControl({ props, name, property, id }: { props: ControlProps; name: string; property: JsonSchema; id?: string }) {
+function PropertyControl({
+    props,
+    name,
+    property,
+    id,
+    label,
+    labels,
+}: {
+    props: ControlProps;
+    name: string;
+    property: JsonSchema;
+    id?: string;
+    label?: string;
+    labels?: Record<string, string>;
+}) {
     const current = (props.value ?? {}) as Record<string, unknown>;
     return (
         <Control
@@ -1063,11 +1157,12 @@ function PropertyControl({ props, name, property, id }: { props: ControlProps; n
             schema={property}
             brand={undefined}
             searchTool={undefined}
-            labels={undefined}
+            labels={labels}
             name={name}
-            label={humanize(name)}
+            label={label ?? humanize(name)}
             heading={undefined}
             help={undefined}
+            blocks={undefined}
             value={current[name]}
             required={props.schema.required?.includes(name)}
             onChange={(next) => {
@@ -1095,6 +1190,123 @@ function ObjectControl(props: ControlProps) {
                 </Row>
             ))}
         </div>
+    );
+}
+
+/**
+ * One item of a list of blocks, open: its block's fields in order, each with
+ * the label and help its block gives it.
+ */
+function BlockFields({ described, ...props }: ControlProps & { described: DescribedBlock | undefined }) {
+    const base = useId();
+    const required = props.schema.required ?? [];
+    return (
+        <div className="k-fields">
+            {Object.entries(props.schema.properties ?? {})
+                .filter(([name]) => name !== BLOCK_KEY)
+                .map(([name, property]) => {
+                    const field = described?.fields.find((candidate) => candidate.name === name);
+                    const label = field?.label ?? humanize(name);
+                    return (
+                        <div key={name} className="k-block-field">
+                            <Row label={label} htmlFor={`${base}-${name}`} required={required.includes(name)}>
+                                <PropertyControl
+                                    props={props}
+                                    name={name}
+                                    property={property}
+                                    id={`${base}-${name}`}
+                                    label={label}
+                                    labels={field?.options}
+                                />
+                            </Row>
+                            {field?.description === undefined ? null : <p className="k-help">{field.description}</p>}
+                        </div>
+                    );
+                })}
+        </div>
+    );
+}
+
+/**
+ * How many blocks a picker lists before it offers a search.
+ */
+const SEARCHED_FROM = 6;
+
+/**
+ * The sheet Add opens on a list of blocks: every block it may hold, by label
+ * and description, with a search once there are more than a few.
+ */
+function BlockPicker({
+    open,
+    onOpenChange,
+    noun,
+    label,
+    choices,
+    onPick,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    noun: string;
+    label: string | undefined;
+    choices: ReadonlyArray<{
+        name: string;
+        label: string;
+        described: DescribedBlock | undefined;
+    }>;
+    onPick: (name: string) => void;
+}) {
+    const [query, setQuery] = useState('');
+    const term = query.trim().toLowerCase();
+    const shown = choices.filter(
+        (choice) => term === '' || `${choice.label} ${choice.described?.description ?? ''}`.toLowerCase().includes(term)
+    );
+    return (
+        <Dialog.Root
+            open={open}
+            onOpenChange={(next) => {
+                onOpenChange(next);
+                if (!next) setQuery('');
+            }}>
+            <Dialog.Portal>
+                <Dialog.Backdrop className="k-backdrop" />
+                <Dialog.Popup className="k-dialog k-block-picker">
+                    <div className="k-block-picker__head">
+                        <Dialog.Title className="k-dialog__title">Add {noun}</Dialog.Title>
+                        {choices.length > SEARCHED_FROM ? (
+                            <label className="k-block-picker__search">
+                                <Search {...ICON} />
+                                <input
+                                    type="search"
+                                    className="k-input"
+                                    placeholder={`Search ${(label ?? 'blocks').toLowerCase()}`}
+                                    value={query}
+                                    onChange={(event) => setQuery(event.target.value)}
+                                />
+                            </label>
+                        ) : null}
+                        <Dialog.Close className="k-icon-button" aria-label="Close">
+                            <X {...ICON} />
+                        </Dialog.Close>
+                    </div>
+                    {shown.length === 0 ? (
+                        <p className="k-help">Nothing matches “{query.trim()}”.</p>
+                    ) : (
+                        <ul className="k-block-picker__list">
+                            {shown.map((choice) => (
+                                <li key={choice.name}>
+                                    <button type="button" className="k-block-picker__card" onClick={() => onPick(choice.name)}>
+                                        <span className="k-block-picker__name">{choice.label}</span>
+                                        {choice.described?.description === undefined ? null : (
+                                            <span className="k-block-picker__description">{choice.described.description}</span>
+                                        )}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </Dialog.Popup>
+            </Dialog.Portal>
+        </Dialog.Root>
     );
 }
 
