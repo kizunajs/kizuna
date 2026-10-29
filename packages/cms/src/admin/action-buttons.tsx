@@ -125,20 +125,20 @@ export function ItemActions({
                 <ActionBar
                     buttons={shown}
                     onProblem={setProblem}
-            onRun={async (name) => {
-                const action = shown.find((candidate) => candidate.name === name);
-                const call = itemActionCall(documentRef, name);
-                const label = action?.label ?? name;
-                if (call === undefined) {
-                    return {
-                        problem: true,
-                        message: `${label} runs on an item of a collection.`,
-                    };
-                }
-                const answer = await connection.call(call.name, call.input);
-                if (answer.status < 300) onRan();
-                return outcomeOf(answer, label);
-            }}
+                    onRun={async (name) => {
+                        const action = shown.find((candidate) => candidate.name === name);
+                        const call = itemActionCall(documentRef, name);
+                        const label = action?.label ?? name;
+                        if (call === undefined) {
+                            return {
+                                problem: true,
+                                message: `${label} runs on an item of a collection.`,
+                            };
+                        }
+                        const answer = await connection.call(call.name, call.input);
+                        if (answer.status < 300) onRan();
+                        return outcomeOf(answer, label);
+                    }}
                 />
             </div>
             <ActionProblem problem={problem} />

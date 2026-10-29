@@ -139,7 +139,9 @@ export function EditInChat({
                                 <p className="k-help">In Claude, open Settings, then Connectors, then Add custom connector.</p>
                             </section>
                             <section className="k-chat__step">
-                                <h3 className="k-chat__step-title">{chat.oauth ? '2. Sign in when Claude asks' : '2. Turn on OAuth first'}</h3>
+                                <h3 className="k-chat__step-title">
+                                    {chat.oauth ? '2. Sign in when Claude asks' : '2. Turn on OAuth first'}
+                                </h3>
                                 <p className="k-help">
                                     {chat.oauth
                                         ? 'Claude sends you here once to sign in, then edits with your access. There is no token to copy.'

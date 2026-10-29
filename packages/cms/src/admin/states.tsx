@@ -11,17 +11,7 @@ export interface Way {
     href: string;
 }
 
-function StateScreen({
-    icon,
-    heading,
-    text,
-    children,
-}: {
-    icon: ReactNode;
-    heading: string;
-    text: string;
-    children: ReactNode;
-}) {
+function StateScreen({ icon, heading, text, children }: { icon: ReactNode; heading: string; text: string; children: ReactNode }) {
     return (
         <section className="k-state" aria-labelledby="k-state-heading">
             <span className="k-state__icon" aria-hidden="true">

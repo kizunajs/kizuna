@@ -640,7 +640,14 @@ export function DocumentScreen({
                             }
                   ),
               };
-    const state = loadStatus === 404 ? 'not-found' : loadStatus === 403 ? 'no-access' : document === undefined ? undefined : documentStateOf(document);
+    const state =
+        loadStatus === 404
+            ? 'not-found'
+            : loadStatus === 403
+              ? 'no-access'
+              : document === undefined
+                ? undefined
+                : documentStateOf(document);
     if (state === 'not-found') {
         const capitalised = `${noun.charAt(0).toUpperCase()}${noun.slice(1)}`;
         return (

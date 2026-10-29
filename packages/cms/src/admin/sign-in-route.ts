@@ -18,7 +18,6 @@ import {
 } from './route.js';
 import type { SignInConfig } from './sign-in-config.js';
 
-
 const firstOf = (value: string | string[] | undefined): string | undefined => (Array.isArray(value) ? value[0] : value);
 
 /**
@@ -36,7 +35,6 @@ export const isSameOrigin = (headers: RequestHeaders): boolean => {
         return false;
     }
 };
-
 
 /**
  * `response`, carrying every cookie the app's auth set.

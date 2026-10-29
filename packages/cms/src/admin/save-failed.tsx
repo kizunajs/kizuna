@@ -114,7 +114,11 @@ export function SaveFailedNotice({
                             <Popover.Description className="k-save-failed__detail">{detail}</Popover.Description>
                         </div>
                         <div className="k-save-failed__actions">
-                            <button type="button" className="k-button k-button--primary k-button--small" disabled={saving} onClick={onRetry}>
+                            <button
+                                type="button"
+                                className="k-button k-button--primary k-button--small"
+                                disabled={saving}
+                                onClick={onRetry}>
                                 {saving ? 'Retrying' : 'Retry now'}
                             </button>
                             <Popover.Close className="k-button k-button--secondary k-button--small">Keep editing</Popover.Close>
