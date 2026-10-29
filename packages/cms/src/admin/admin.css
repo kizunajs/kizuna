@@ -1230,47 +1230,10 @@
         color: var(--k-muted);
     }
 
-    .k-versions__table {
-        display: flex;
-        flex-direction: column;
-        overflow-x: auto;
-    }
-
-    /* A row each, a hairline under it, like a list's table. */
-    .k-versions__row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 200px 200px 200px;
-        gap: 12px;
-        align-items: center;
-        min-width: 720px;
-        min-height: 54px;
-        padding: 0 8px;
-        box-shadow: inset 0 -1px 0 var(--k-line);
-        font-size: 13.5px;
-    }
-
-    .k-versions__row--head {
-        min-height: 40px;
-        font-size: 12.5px;
-        font-weight: 500;
-        color: var(--k-muted);
-    }
-
-    .k-versions__saved {
-        display: flex;
-        flex-direction: column;
-        gap: 1px;
-        min-width: 0;
-    }
-
     .k-versions__date {
         font-weight: 500;
+        color: var(--k-ink);
         font-variant-numeric: tabular-nums;
-    }
-
-    .k-versions__note {
-        font-size: 12px;
-        color: var(--k-muted);
     }
 
     .k-versions__by {
@@ -1280,11 +1243,14 @@
         min-width: 0;
     }
 
-    .k-versions__actions {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        gap: 4px;
+    /* Compare and Restore keep to the right of the row. */
+    .k-table .k-versions__actions {
+        width: 1%;
+        text-align: right;
+    }
+
+    .k-versions__actions > * + * {
+        margin-left: 4px;
     }
 
     .k-versions__actions .k-button {
@@ -1315,27 +1281,6 @@
     .k-versions__quiet:disabled {
         opacity: 0.4;
         cursor: not-allowed;
-    }
-
-    .k-versions__pager {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        font-size: 12.5px;
-        color: var(--k-muted);
-    }
-
-    .k-versions__pages {
-        display: flex;
-        gap: 2px;
-    }
-
-    .k-versions__pages .k-tab {
-        justify-content: center;
-        min-width: 30px;
-        height: 30px;
     }
 
     @media (max-width: 860px) {
@@ -3442,7 +3387,30 @@
 
     .k-document__versions[data-comparing] {
         display: flex;
+        flex: 1;
         padding: 0;
+    }
+
+    /* A fact naming people, their faces before their names, as the Owner fact shows its owner. */
+    .k-fact-people {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    /* Faces overlapping in the header ring in the canvas behind them. */
+    .k-fact-people .k-avatars .k-avatar + .k-avatar {
+        box-shadow:
+            0 0 0 2px var(--k-canvas),
+            var(--k-control-elevation);
+    }
+
+    /* Review, beside Publish, stays lit while the changes show. */
+    .k-document .k-page-header__actions .k-button[aria-pressed='true'] {
+        background: var(--k-control-hover);
+        color: var(--k-ink);
     }
 
     .k-document__review {

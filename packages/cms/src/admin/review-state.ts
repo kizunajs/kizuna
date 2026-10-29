@@ -4,22 +4,66 @@ import { sentenceOf } from './sections.js';
 const firstNameOf = (person: PersonView): string => person.name.split(' ')[0] ?? person.name;
 
 /**
- * Where a review stands, as the header's Status says it: "Waiting for review
- * by Kari Nordmann", "Waiting for your review", "Changes requested by Kari
- * Nordmann".
+ * Where a review stands, as the header's Status says it, in the words before
+ * the people it names, so their faces can sit between: "Waiting for review
+ * by" and Kari, or "Waiting for your review" alone.
  */
-export const reviewStatusOf = (review: ReviewState, me: string | undefined): string => {
+export const reviewStatusPartsOf = (review: ReviewState, me: string | undefined): { lead: string; people: PersonView[] } => {
     const decider = review.decidedBy;
     const byMe = decider !== null && decider.id === me;
+    const deciders = decider === null ? [] : [decider];
     if (review.status === 'open') {
-        if (review.reviewers.some((reviewer) => reviewer.id === me)) return 'Waiting for your review';
-        return review.reviewers.length === 0
-            ? 'Waiting for review'
-            : `Waiting for review by ${sentenceOf(review.reviewers.map((reviewer) => reviewer.name))}`;
+        if (review.reviewers.some((reviewer) => reviewer.id === me)) {
+            return {
+                lead: 'Waiting for your review',
+                people: [],
+            };
+        }
+        return {
+            lead: review.reviewers.length === 0 ? 'Waiting for review' : 'Waiting for review by',
+            people: review.reviewers,
+        };
     }
-    if (review.status === 'approved') return byMe ? 'Approved by you' : `Approved by ${decider?.name ?? 'a reviewer'}`;
-    if (review.status === 'changes') return byMe ? 'Changes requested' : `Changes requested by ${decider?.name ?? 'a reviewer'}`;
-    return byMe ? 'Changed since you approved it' : `Changed since ${decider?.name ?? 'the reviewer'} approved it`;
+    if (review.status === 'approved') {
+        return byMe
+            ? {
+                  lead: 'Approved by you',
+                  people: [],
+              }
+            : {
+                  lead: 'Approved by',
+                  people: deciders,
+              };
+    }
+    if (review.status === 'changes') {
+        return byMe
+            ? {
+                  lead: 'Changes requested',
+                  people: [],
+              }
+            : {
+                  lead: 'Changes requested by',
+                  people: deciders,
+              };
+    }
+    return byMe
+        ? {
+              lead: 'Changed since you approved it',
+              people: [],
+          }
+        : {
+              lead: 'Changed since the approval by',
+              people: deciders,
+          };
+};
+
+/**
+ * Where a review stands in one line: "Waiting for review by Kari Nordmann",
+ * "Waiting for your review", "Changes requested by Kari Nordmann".
+ */
+export const reviewStatusOf = (review: ReviewState, me: string | undefined): string => {
+    const { lead, people } = reviewStatusPartsOf(review, me);
+    return people.length === 0 ? lead : `${lead} ${sentenceOf(people.map((person) => person.name))}`;
 };
 
 /**

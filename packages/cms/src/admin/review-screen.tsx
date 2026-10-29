@@ -3,7 +3,7 @@ import { Popover } from '@base-ui/react/popover';
 import { ExternalLink } from 'lucide-react';
 import { ICON } from '../view/context.js';
 import type { ChangeView } from '../view/change-value.js';
-import { Avatar } from '../view/people.js';
+import { Avatar, Avatars } from '../view/people.js';
 import type { DraftChange } from '../view/review.js';
 import type { DescribedField, DescribedLayout, PersonView, ReviewState } from '../view/schema.js';
 import { DiffSections, type DiffEntry } from './diff.js';
@@ -19,6 +19,25 @@ import { relativeTimeOf } from './time.js';
 export type ViewedChange = DraftChange & {
     view: ChangeView;
 };
+
+/**
+ * A fact in the header that names people, their faces before their names,
+ * as the Owner fact shows its owner: "Waiting for review by", the faces, then
+ * "Kari Nordmann and Ola Berg".
+ */
+export function PeopleFact({ lead, people }: { lead: string; people: readonly PersonView[] }) {
+    return (
+        <span className="k-fact-people">
+            {lead}
+            {people.length === 0 ? null : (
+                <>
+                    {people.length === 1 ? <Avatar person={people[0]!} /> : <Avatars people={people} />}
+                    <span>{sentenceOf(people.map((person) => person.name))}</span>
+                </>
+            )}
+        </span>
+    );
+}
 
 /**
  * One note on a review, on a card: who wrote it and when, and what they

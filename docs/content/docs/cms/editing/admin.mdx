@@ -143,15 +143,14 @@ The library's alt text and focal point are the image's own, and each use can set
 
 ## Editing
 
-A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Under the title a line says where it stands, when it last changed and who saved it, and who owns it, where you can pick another owner. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
+A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, when it last changed and who saved it, and who owns it, where you can pick another owner. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
 
 The draft saves a moment after you stop typing, and the header says when it last did. **Save draft** saves at once, and **Publish** lists every change and asks you to confirm. While a required field is empty, Publish waits and says which field it waits for, like "Fill in Department before publishing". A click on that line takes you to the field, which says it is needed.
 
-Under the title, **Edit** shows the fields, **Versions** counts the saved versions, and **Review** lists the draft's changes once someone asks for a review. At the other end of that row, **Live preview** puts the site beside the fields and **Info** lists the document's status, owner, page, and when it was created, last updated and last published.
+Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live preview** puts the site beside the fields and **Info** lists the document's status, owner, page, and when it was created, last updated and last published.
 
 - **Edit** lays the fields out with their [layout](/docs/cms/fields#layout): tabs over the fields, rows side by side, collapsible sections, and the fields marked `position: 'sidebar'` in a column on the right. A document with no sidebar fields gives the main column the full width.
-- **Versions** lists every saved version, newest first and eight to a page, with where it stood and who saved it. **Compare** opens a version beside the current draft, side by side or inline, and **Only changed fields** hides the fields they share. The other versions are listed beside it to compare with instead. **Restore this version** asks first, then makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual. The draft you had stays under Versions.
-- **Review** puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews).
+- **Versions** lists every saved version, newest first and ten to a page, with where it stood and who saved it. **Compare** opens a version beside the current draft, side by side or inline, and **Only changed fields** hides the fields they share. The other versions are listed beside it to compare with instead. **Restore this version** asks first, then makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual. The draft you had stays under Versions.
 
 **Live preview** puts your site in [draft mode](/docs/cms/next#draft-mode) beside the fields, with the sidebar's fields moved under the main ones, at the Desktop, Tablet or Mobile width the select above it picks. What you type shows on the page as you type it, through [live updates](/docs/cms/next#live-updates). A page opens at its own path, and an item at the page its collection's [`preview`](/docs/cms/collections#live-preview) names, its own page, or the first page that holds it. An item no page shows has no Live preview.
 
@@ -188,21 +187,21 @@ Every class follows one pattern: a block per component, like `k-card`, its parts
 
 The blocks you are most likely to restyle:
 
-| Block           | What it is                                                                          |
-| --------------- | ----------------------------------------------------------------------------------- |
-| `k-sidebar`     | The sidebar, with `__item`, `__heading`, `__count` and `__account`                  |
-| `k-page-header` | Every screen's header, with `__trail`, `__title`, `__meta`, `__actions` and `__bar` |
-| `k-dashboard`   | The dashboard, with `__tiles`, `__panels` and `__range`                             |
-| `k-stat`        | A stat tile, with `__label`, `__value` and `__detail`, and its `k-change` badge     |
-| `k-chart`       | A chart panel, with `__line`, `__line--previous`, `__bar`, `__legend`, `__tooltip`  |
-| `k-card`        | A collection on the dashboard, with `__link`, `__count` and `__add`                 |
-| `k-list`        | A collection's list, with `__search`, `__row` and `__title`                         |
-| `k-media-tile`  | An image in the media library, with `__thumb`, `__name` and `__detail`              |
-| `k-media-details` | The open image beside the library, with `__frame`, `__uses` and `__facts`         |
-| `k-field`       | One field of a form, with `__label` and `__control`                                 |
-| `k-array`       | A list field, with `__row`, `__index`, `__tag`, `__title` and `__panel`             |
-| `k-button`      | A button, with `--primary`, `--secondary` and `--small`                             |
-| `k-input`       | A text input, and the trigger of a select                                           |
+| Block             | What it is                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| `k-sidebar`       | The sidebar, with `__item`, `__heading`, `__count` and `__account`                  |
+| `k-page-header`   | Every screen's header, with `__trail`, `__title`, `__meta`, `__actions` and `__bar` |
+| `k-dashboard`     | The dashboard, with `__tiles`, `__panels` and `__range`                             |
+| `k-stat`          | A stat tile, with `__label`, `__value` and `__detail`, and its `k-change` badge     |
+| `k-chart`         | A chart panel, with `__line`, `__line--previous`, `__bar`, `__legend`, `__tooltip`  |
+| `k-card`          | A collection on the dashboard, with `__link`, `__count` and `__add`                 |
+| `k-list`          | A collection's list, with `__search`, `__row` and `__title`                         |
+| `k-media-tile`    | An image in the media library, with `__thumb`, `__name` and `__detail`              |
+| `k-media-details` | The open image beside the library, with `__frame`, `__uses` and `__facts`           |
+| `k-field`         | One field of a form, with `__label` and `__control`                                 |
+| `k-array`         | A list field, with `__row`, `__index`, `__tag`, `__title` and `__panel`             |
+| `k-button`        | A button, with `--primary`, `--secondary` and `--small`                             |
+| `k-input`         | A text input, and the trigger of a select                                           |
 
 Colours and sizes are custom properties on `:root`, like `--k-ink`, `--k-muted`, `--k-surface` and `--k-radius-card`, which the admin sets again under `[data-theme='light']` when the system is light. A stat's change badge is the one place the admin uses colour, through `--k-change-up`, `--k-change-down` and `--k-change-none`, each with a `-surface` for its background.
 

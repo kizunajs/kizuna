@@ -21,8 +21,8 @@ import { Loading, SaveIndicator, Status, problemOf } from './parts.js';
 import { relativeTimeOf } from './time.js';
 import { AdminPreview } from './preview-pane.js';
 import { AskForReview } from './review-ask.js';
-import { DecisionCard, RequestChanges, ReviewScreen, type ViewedChange } from './review-screen.js';
-import { askAgainLabelOf, askAgainOf, gateNoteOf, reviewStatusOf, waitsForMe } from './review-state.js';
+import { DecisionCard, PeopleFact, RequestChanges, ReviewScreen, type ViewedChange } from './review-screen.js';
+import { askAgainLabelOf, askAgainOf, gateNoteOf, reviewStatusPartsOf, waitsForMe } from './review-state.js';
 import { Versions } from './versions.js';
 import type { WaitingReview } from './dashboard.js';
 
@@ -558,6 +558,9 @@ export function DocumentScreen({
     const comparing = shownView === 'versions' && compared !== undefined;
     const answering = shownView === 'review' && waitsForMe(document.review, me);
     const sentBackBy = askAgainOf(document.review, me);
+    // Someone asked to review it, or who answered, opens the changes from Review beside Publish.
+    const reviewer =
+        document.review !== null && (document.review.reviewers.some((person) => person.id === me) || document.review.decidedBy?.id === me);
     // The reviewer who sent it back already knows what Publish waits for.
     const gateNote = document.review?.decidedBy?.id === me ? undefined : gateNoteOf(document.requireReview, document.review);
     const canPublishPast = draftChanges?.changes.canPublishPastReview ?? false;
@@ -567,7 +570,7 @@ export function DocumentScreen({
     const unsaved = saveState === 'pending' || saveState === 'saving';
     const blocker = document.complete ? undefined : blockerOf(document.missing, document.fields);
     const askable = people !== undefined && people.people.some((person) => person.id !== people.me);
-    const updatedByName = updatedBy === null ? undefined : (people?.people.find((person) => person.id === updatedBy)?.name ?? undefined);
+    const updatedByPerson = updatedBy === null ? undefined : people?.people.find((person) => person.id === updatedBy);
     const dates = documentDatesOf(versions ?? []);
     const showBlocker = (): void => {
         const name = document.missing[0];
@@ -705,20 +708,32 @@ export function DocumentScreen({
                         {
                             label: 'Status',
                             value:
-                                document.review === null
-                                    ? (STATUS_FACT[document.status] ?? document.status)
-                                    : reviewStatusOf(document.review, me),
+                                document.review === null ? (
+                                    (STATUS_FACT[document.status] ?? document.status)
+                                ) : (
+                                    <PeopleFact {...reviewStatusPartsOf(document.review, me)} />
+                                ),
                         },
                         shownView === 'review' && document.review !== null
                             ? {
                                   label: 'Requested',
-                                  value: `${relativeTimeOf(document.review.createdAt, now)} by ${document.review.requestedBy.name}`,
+                                  value: (
+                                      <PeopleFact
+                                          lead={`${relativeTimeOf(document.review.createdAt, now)} by`}
+                                          people={[document.review.requestedBy]}
+                                      />
+                                  ),
                               }
                             : updatedAt === null
                               ? null
                               : {
                                     label: 'Updated',
-                                    value: `${relativeTimeOf(updatedAt, now)}${updatedByName === undefined ? '' : ` by ${updatedByName}`}`,
+                                    value:
+                                        updatedByPerson === undefined ? (
+                                            relativeTimeOf(updatedAt, now)
+                                        ) : (
+                                            <PeopleFact lead={`${relativeTimeOf(updatedAt, now)} by`} people={[updatedByPerson]} />
+                                        ),
                                 },
                         owner === null
                             ? null
@@ -745,14 +760,6 @@ export function DocumentScreen({
                                         <span className="k-tab__count">{versions.length}</span>
                                     )}
                                 </Tabs.Tab>
-                                {document.review === null ? null : (
-                                    <Tabs.Tab value="review" className="k-tab">
-                                        Review
-                                        {draftChanges === undefined || draftChanges.views.length === 0 ? null : (
-                                            <span className="k-tab__count">{draftChanges.views.length}</span>
-                                        )}
-                                    </Tabs.Tab>
-                                )}
                             </Tabs.List>
                             <span className="k-document__spacer" />
                             {previewPath === null ? null : (
@@ -833,12 +840,21 @@ export function DocumentScreen({
                                         {askAgainLabelOf(sentBackBy)}
                                     </button>
                                 )}
+                                {reviewer ? (
+                                    <button
+                                        type="button"
+                                        className="k-button k-button--secondary"
+                                        aria-pressed={shownView === 'review'}
+                                        onClick={() => setView(shownView === 'review' ? 'edit' : 'review')}>
+                                        Review
+                                    </button>
+                                ) : null}
                                 {sentBackBy !== undefined && document.requireReview && !canPublishPast ? null : (
                                     <PublishReview
                                         connection={connection}
                                         candidates={reviewCandidates}
                                         people={people}
-                                        waiting={waiting.length}
+                                        waiting={waiting.filter((entry) => entry.ref !== document.ref).length}
                                         everywhere={document.usedOn.everywhere}
                                         secondary={sentBackBy !== undefined}
                                         disabled={unsaved || saveState === 'failed' || (blocker !== undefined && waiting.length === 0)}
