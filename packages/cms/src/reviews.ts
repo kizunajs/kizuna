@@ -294,13 +294,80 @@ export const waitingReviews = async (
 };
 
 /**
- * Refuses to publish a document whose definition requires a review, until
- * its current draft is approved.
+ * Whether someone may publish a document before its review is approved: they
+ * hold a role under `reviews.roles`.
  */
-export const assertReviewed = async (cms: CmsService, state: DraftState): Promise<void> => {
-    if (state.target.definition.requireReview !== true) return;
+export const mayPublishPastReview = (cms: CmsService, role: string | readonly string[] | undefined): boolean =>
+    hasRole(role, reviewRoles(cms));
+
+/**
+ * A publish that went past its review: the review it went past, and a time
+ * before the publish, which a review recording it is dated with so it stays
+ * one from before the publish.
+ */
+export interface PastReview {
+    review: ReviewState | null;
+    at: Date;
+}
+
+/**
+ * Records on the review that someone published past it, once the publish
+ * went through: the open review is answered in their name, and otherwise a
+ * new one is, so the history shows that nobody approved this draft.
+ */
+export const recordPublishedPast = async (cms: CmsService, state: DraftState, past: PastReview, by: string): Promise<void> => {
+    const people = await peopleOf(cms);
+    const name = people.find((person) => person.id === by)?.name ?? by;
+    const decide = (id: string): Promise<void> =>
+        cms.store.decideReview(id, {
+            status: 'approved',
+            by,
+            note: `Published past the review by ${name}.`,
+            version: state.version,
+        });
+    if (past.review?.status === 'open') {
+        await decide(past.review.id);
+        return;
+    }
+    const [latest] = await cms.store.reviewsOf(state.row!.id);
+    // Newest first is how a document's current review is found, so this one never shares the last one's time.
+    const createdAt =
+        latest !== undefined && latest.createdAt.getTime() >= past.at.getTime() ? new Date(latest.createdAt.getTime() + 1) : past.at;
+    const [added] = await cms.store.addReviews([
+        {
+            requestId: randomUUID(),
+            ref: formatRef(state.target.ref),
+            documentId: state.row!.id,
+            version: state.version,
+            reviewers: [],
+            requestedBy: by,
+            note: null,
+            createdAt,
+        },
+    ]);
+    await decide(added!.id);
+};
+
+/**
+ * Refuses to publish a document whose definition requires a review, until
+ * its current draft is approved. Someone with a role under `reviews.roles`
+ * who asks to `force` it goes past, and gets back what `recordPublishedPast`
+ * records once the publish is done.
+ */
+export const assertReviewed = async (
+    cms: CmsService,
+    state: DraftState,
+    publisher?: { force: boolean; role: string | readonly string[] | undefined }
+): Promise<PastReview | undefined> => {
+    if (state.target.definition.requireReview !== true) return undefined;
     const review = await reviewOf(cms, state);
-    if (review?.status === 'approved') return;
+    if (review?.status === 'approved') return undefined;
+    if (publisher?.force === true && state.row !== undefined && mayPublishPastReview(cms, publisher.role)) {
+        return {
+            review,
+            at: new Date(),
+        };
+    }
     const label = documentLabel(state);
     const detail =
         review === null

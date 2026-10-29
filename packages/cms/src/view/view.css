@@ -2242,16 +2242,22 @@
 
     .k-review__blocker p {
         display: flex;
-        align-items: flex-start;
-        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px 8px;
         margin: 0;
+    }
+
+    .k-review__blocker p > span {
+        flex: 0 1 auto;
+        min-width: 0;
     }
 
     .k-review__blocker svg {
         flex-shrink: 0;
         width: 14px;
         height: 14px;
-        margin-top: 2px;
     }
 
     .k-review__note {

@@ -51,7 +51,18 @@ import {
 import { UploadRejectedError } from './media/media.js';
 import { ImageQuerySchema, InvalidateBodySchema } from './wire.js';
 import { sameContent } from './same-content.js';
-import { assertReviewed, decideReviews, documentLabel, peopleOf, requestReviews, reviewOf, setOwner, waitingReviews } from './reviews.js';
+import {
+    assertReviewed,
+    decideReviews,
+    documentLabel,
+    mayPublishPastReview,
+    peopleOf,
+    recordPublishedPast,
+    requestReviews,
+    reviewOf,
+    setOwner,
+    waitingReviews,
+} from './reviews.js';
 import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
 import { listViewsRoute, viewRoutes } from './view-routes.js';
@@ -174,6 +185,7 @@ const draftChanges = async (cms: CmsService, ref: DocumentRef, caller: ReturnTyp
         published: published !== undefined,
         changes,
         ...(await reviewFields(cms, state)),
+        canPublishPastReview: mayPublishPastReview(cms, caller.role),
     };
 };
 
@@ -591,7 +603,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             auth: editor,
             summary: `Publish the draft of ${scope.noun}`,
             description:
-                'Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead.',
+                'Makes the current draft what every visitor sees. The person confirms before this runs: in a host that cannot ask, such as Claude, they press Publish in the editor instead. Someone with a role under `reviews.roles` may pass `force` to publish before the review is approved.',
             tool: {
                 needsApproval: true,
                 destructiveHint: false,
@@ -607,10 +619,17 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }).handler(
             guarded(async (cms, args) => {
                 const ref = scope.refOf(args.params);
-                await assertReviewed(cms, await cms.draftState(ref));
+                const body = args.body as z.output<typeof PublishBodySchema>;
+                const state = await cms.draftState(ref);
+                const past = await assertReviewed(cms, state, {
+                    force: body?.force === true,
+                    role: cms.caller(args.auth).role,
+                });
+                const published = await cms.publish(ref, authorOf(cms, args));
+                if (past !== undefined) await recordPublishedPast(cms, state, past, authorOf(cms, args));
                 return {
                     status: 200,
-                    body: draftBody(await cms.publish(ref, authorOf(cms, args))),
+                    body: draftBody(published),
                 };
             }) as never
         ),

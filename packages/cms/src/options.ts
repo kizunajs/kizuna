@@ -226,7 +226,7 @@ export interface ReviewRequest {
 export interface ReviewOptions {
     /**
      * Roles that may approve any document without being asked, such as
-     * `admin`.
+     * `admin`, and publish one before its approval comes.
      */
     roles?: string | readonly string[];
     /**

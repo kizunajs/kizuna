@@ -260,6 +260,7 @@ export const DraftChangesSchema = Kizuna.model({
         path: z.string().nullable(),
         published: z.boolean().describe('Whether anything is published yet. When not, every filled field is a change.'),
         ...ReviewFields,
+        canPublishPastReview: z.boolean().describe('Whether the caller may publish it before its review is approved, with `force`.'),
         changes: z
             .array(
                 z.object({
@@ -340,6 +341,12 @@ export const UpdateDraftHeadersSchema = z.object({
 export const PublishBodySchema = z
     .object({
         summary: z.string().max(200).optional(),
+        force: z
+            .boolean()
+            .optional()
+            .describe(
+                'Publish past a review that is not approved. Only someone with a role under `reviews.roles` may; for anyone else it changes nothing.'
+            ),
     })
     .optional();
 

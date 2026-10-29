@@ -27,6 +27,7 @@ interface Changes {
     owner: PersonView | null;
     review: ReviewState | null;
     requireReview: boolean;
+    canPublishPastReview: boolean;
 }
 
 function Thumbnail({ image }: { image: { id: string } }) {
@@ -174,6 +175,10 @@ interface Pending {
     owner: PersonView | null;
     review: ReviewState | null;
     requireReview: boolean;
+    /**
+     * Whether the person may publish it before its review is approved.
+     */
+    canPublishPastReview: boolean;
     problem?: string;
 }
 
@@ -198,6 +203,17 @@ const heldBack = (document: Pending): string | undefined => {
     }
     if (review.status === 'changes') return 'Changes were requested. Ask for a new review once they are made.';
     return 'Changed after the approval. Ask for a new review.';
+};
+
+/**
+ * What the dialog asks before someone publishes past a review.
+ */
+const publishPastQuestion = (document: Pending): string => {
+    const review = document.review;
+    const names = review?.status === 'open' ? review.reviewers.map((reviewer) => reviewer.name.split(' ')[0]!) : [];
+    if (names.length === 1) return `Publish without ${names[0]}'s approval?`;
+    if (names.length > 1) return `Publish without an approval from ${eitherOf(names)}?`;
+    return 'Publish without an approval?';
 };
 
 /**
@@ -265,7 +281,7 @@ const changeViewsOf = async (
  * What the dialog shows: the changes, or a step of asking for or answering a
  * review.
  */
-type Step = 'changes' | 'ask' | 'requestChanges';
+type Step = 'changes' | 'ask' | 'requestChanges' | 'publishPast';
 
 export interface PublishReviewProps {
     connection: Connection;
@@ -333,6 +349,8 @@ export function PublishReview({
     const [reviewers, setReviewers] = useState<ReadonlySet<string>>(new Set());
     const [note, setNote] = useState('');
     const blockerId = useId();
+    // The document someone is about to publish past its review.
+    const [publishingPast, setPublishingPast] = useState<Pending | undefined>();
 
     const load = useCallback(async () => {
         const listed = await candidates();
@@ -353,6 +371,7 @@ export function PublishReview({
                     owner: answer.body.owner,
                     review: answer.body.review,
                     requireReview: answer.body.requireReview,
+                    canPublishPastReview: answer.body.canPublishPastReview,
                 };
             })
         );
@@ -403,18 +422,22 @@ export function PublishReview({
         (document) => document.review?.status === 'open' && document.review.reviewers.some((reviewer) => reviewer.id === me)
     );
 
-    const publish = async (): Promise<void> => {
+    const publish = async (documents: readonly Pending[], force: boolean): Promise<void> => {
         if (pending === undefined) return;
         setBusy('publish');
         setProblem(undefined);
         const failed: Pending[] = [];
-        for (const document of publishable) {
+        for (const document of documents) {
             // The person confirmed in this review, so the route runs without asking again.
             const answer = await connection.call(
                 `${document.tools.prefix}_publish`,
                 {
                     params: document.tools.params,
-                    body: {},
+                    body: force
+                        ? {
+                              force: true,
+                          }
+                        : {},
                 },
                 {
                     approved: true,
@@ -428,8 +451,9 @@ export function PublishReview({
             }
         }
         setBusy(undefined);
-        onChanged(publishable.map((document) => document.ref));
-        const published = publishable.filter((document) => !failed.some((failure) => failure.ref === document.ref));
+        setStep('changes');
+        onChanged(documents.map((document) => document.ref));
+        const published = documents.filter((document) => !failed.some((failure) => failure.ref === document.ref));
         if (published.length > 0) onPublished(published.map((document) => document.title));
         const left = pending.filter((document) => !published.some((done) => done.ref === document.ref));
         if (left.length === 0) {
@@ -540,17 +564,35 @@ export function PublishReview({
     const count = selected.reduce((total, document) => total + document.changes.length, 0);
     const several = (pending ?? []).length > 1;
     // Why Publish leaves something out, or is off: said beside the button, which points at it.
-    const blockers =
+    // Someone with an approver role may publish past a review, which they can do from beside the reason.
+    const blockers: Array<{ text: string; publishPast?: Pending }> =
         pending === undefined
             ? []
             : pending.length === 0
-              ? ['Nothing changed since the last publish.']
+              ? [
+                    {
+                        text: 'Nothing changed since the last publish.',
+                    },
+                ]
               : selected.length === 0
-                ? ['Choose at least one document to publish.']
+                ? [
+                      {
+                          text: 'Choose at least one document to publish.',
+                      },
+                  ]
                 : selected.flatMap((document) => {
                       const reason = heldBack(document);
                       if (reason === undefined) return [];
-                      return [several ? `${document.title}: ${reason}` : reason];
+                      return [
+                          {
+                              text: several ? `${document.title}: ${reason}` : reason,
+                              ...(document.canPublishPastReview
+                                  ? {
+                                        publishPast: document,
+                                    }
+                                  : {}),
+                          },
+                      ];
                   });
 
     return (
@@ -569,26 +611,30 @@ export function PublishReview({
                             ? `Who should review ${selected.length === 1 ? selected[0]!.title : `${selected.length} documents`}?`
                             : step === 'requestChanges'
                               ? 'What should change?'
-                              : pending === undefined
-                                ? 'Publish?'
-                                : mine.length > 0
-                                  ? `Review ${mine.length === 1 ? mine[0]!.title : `${mine.length} documents`}`
-                                  : pending.length <= 1
-                                    ? `Publish ${pending[0]?.title ?? ''}?`
-                                    : selected.length === pending.length
-                                      ? `Publish ${pending.length} documents?`
-                                      : `Publish ${selected.length} of ${pending.length} documents?`}
+                              : step === 'publishPast' && publishingPast !== undefined
+                                ? publishPastQuestion(publishingPast)
+                                : pending === undefined
+                                  ? 'Publish?'
+                                  : mine.length > 0
+                                    ? `Review ${mine.length === 1 ? mine[0]!.title : `${mine.length} documents`}`
+                                    : pending.length <= 1
+                                      ? `Publish ${pending[0]?.title ?? ''}?`
+                                      : selected.length === pending.length
+                                        ? `Publish ${pending.length} documents?`
+                                        : `Publish ${selected.length} of ${pending.length} documents?`}
                     </AlertDialog.Title>
                     <AlertDialog.Description className="k-help">
                         {step === 'ask'
                             ? 'Each of them sees the request in the editor, and when they ask what is waiting for them.'
                             : step === 'requestChanges'
                               ? `${mine[0]?.review?.requestedBy.name.split(' ')[0] ?? 'They'} see${mine.length === 1 ? 's' : ''} your note on the page.`
-                              : pending === undefined
-                                ? 'Listing what changed.'
-                                : everywhere
-                                  ? 'Some of this shows on every page, so every visitor sees it.'
-                                  : `${count} ${count === 1 ? 'change goes' : 'changes go'} live for visitors when you publish.`}
+                              : step === 'publishPast'
+                                ? `${publishingPast?.title ?? 'This'} goes live before anyone approves it. The review records that you published it.`
+                                : pending === undefined
+                                  ? 'Listing what changed.'
+                                  : everywhere
+                                    ? 'Some of this shows on every page, so every visitor sees it.'
+                                    : `${count} ${count === 1 ? 'change goes' : 'changes go'} live for visitors when you publish.`}
                     </AlertDialog.Description>
                     {step === 'ask' ? (
                         <div className="k-review__panel">
@@ -717,9 +763,21 @@ export function PublishReview({
                     {step === 'changes' && mine.length === 0 && blockers.length > 0 ? (
                         <div className="k-review__blocker" id={blockerId}>
                             {blockers.map((blocker) => (
-                                <p key={blocker}>
+                                <p key={blocker.text}>
                                     <CircleAlert {...ICON} />
-                                    {blocker}
+                                    <span>{blocker.text}</span>
+                                    {blocker.publishPast === undefined ? null : (
+                                        <button
+                                            type="button"
+                                            className="k-button k-button--secondary k-button--small"
+                                            disabled={busy !== undefined}
+                                            onClick={() => {
+                                                setPublishingPast(blocker.publishPast);
+                                                setStep('publishPast');
+                                            }}>
+                                            Publish anyway
+                                        </button>
+                                    )}
                                 </p>
                             ))}
                         </div>
@@ -772,7 +830,7 @@ export function PublishReview({
                                             className="k-button k-button--primary"
                                             disabled={busy !== undefined || publishable.length === 0}
                                             aria-describedby={blockers.length > 0 ? blockerId : undefined}
-                                            onClick={() => void publish()}>
+                                            onClick={() => void publish(publishable, false)}>
                                             {busy === 'publish'
                                                 ? 'Publishing'
                                                 : publishable.length > 1
@@ -799,6 +857,16 @@ export function PublishReview({
                                         disabled={busy !== undefined || reviewers.size === 0}
                                         onClick={() => void ask()}>
                                         {busy === 'ask' ? 'Sending' : 'Send request'}
+                                    </button>
+                                ) : step === 'publishPast' ? (
+                                    <button
+                                        type="button"
+                                        className="k-button k-button--primary"
+                                        disabled={busy !== undefined || publishingPast === undefined}
+                                        onClick={() => {
+                                            if (publishingPast !== undefined) void publish([publishingPast], true);
+                                        }}>
+                                        {busy === 'publish' ? 'Publishing' : 'Publish anyway'}
                                     </button>
                                 ) : (
                                     <button

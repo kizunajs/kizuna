@@ -41,6 +41,20 @@ export default definePage({
 
 Publishing waits for an approval from someone other than the person who changed it. Anyone with a role under `reviews.roles` may approve without being asked. The rule holds in the routes, so the model gets the same answer.
 
+## Publishing past a review
+
+Someone with a role under `reviews.roles` can publish before the approval comes. The Publish dialog shows them **Publish anyway** beside the reason Publish is waiting, and asks once more before it goes live:
+
+```ts title="kizuna.cms.config.ts"
+reviews: {
+    roles: 'admin',
+},
+```
+
+The publish route takes `{ force: true }` for the same thing. For anyone without one of those roles, `force` changes nothing and the route still answers `409`.
+
+The review records who published past it, with a note like "Published past the review by Grace Hopper", so it is clear afterwards that nobody approved it.
+
 ## Several pages at once
 
 The Publish dialog lists every page with changes. Tick the ones to publish, or ask for one review of all of them.

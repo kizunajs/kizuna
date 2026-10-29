@@ -328,6 +328,73 @@ describe('reviews', () => {
         expect(twice.status).toBe(409);
     });
 
+    it('lets a role under reviews.roles publish past an open review, and records who did', async () => {
+        await draft('ada', 'investorRelationsPage', 'Results for Q3');
+        const asked = await as('ada', request(app).post('/editing/reviews')).send({
+            refs: ['page:investorRelationsPage'],
+            reviewers: ['kari'],
+        });
+        const changes = await as('grace', request(app).get('/editing/pages/investorRelationsPage/changes'));
+        expect(changes.body.canPublishPastReview).toBe(true);
+
+        const published = await as('grace', request(app).post('/editing/pages/investorRelationsPage/publish')).send({
+            force: true,
+        });
+        expect(published.status).toBe(200);
+        expect(published.body.status).toBe('published');
+        const [record] = await new DocumentStore(drizzle(pglite)).reviews([asked.body.reviews[0].id]);
+        expect(record).toMatchObject({
+            status: 'approved',
+            decidedBy: 'grace',
+            decisionNote: 'Published past the review by Grace Hopper.',
+        });
+        expect((await as('kari', request(app).get('/editing/reviews'))).body.reviews).toEqual([]);
+    });
+
+    it('records a publish past a review nobody asked for', async () => {
+        await draft('ada', 'investorRelationsPage', 'Results for Q3');
+        const published = await as('grace', request(app).post('/editing/pages/investorRelationsPage/publish')).send({
+            force: true,
+        });
+        expect(published.status).toBe(200);
+        const rows = await pglite.query<{ decided_by: string; decision_note: string; status: string }>(
+            'select decided_by, decision_note, status from cms_reviews'
+        );
+        expect(rows.rows).toEqual([
+            {
+                decided_by: 'grace',
+                decision_note: 'Published past the review by Grace Hopper.',
+                status: 'approved',
+            },
+        ]);
+
+        // The next round of changes starts without a review.
+        await draft('ada', 'investorRelationsPage', 'Results for Q4');
+        const next = await as('ada', request(app).get('/editing/describe?ref=page:investorRelationsPage'));
+        expect(next.body.review).toBeNull();
+    });
+
+    it('ignores force from anyone without a role under reviews.roles', async () => {
+        await draft('ada', 'investorRelationsPage', 'Results for Q3');
+        await as('ada', request(app).post('/editing/reviews')).send({
+            refs: ['page:investorRelationsPage'],
+            reviewers: ['grace'],
+        });
+        const changes = await as('kari', request(app).get('/editing/pages/investorRelationsPage/changes'));
+        expect(changes.body.canPublishPastReview).toBe(false);
+        const refused = await as('kari', request(app).post('/editing/pages/investorRelationsPage/publish')).send({
+            force: true,
+        });
+        expect(refused.status).toBe(409);
+        expect(refused.body.detail).toBe('Investor Relations is waiting for Grace Hopper to approve it.');
+        const rows = await pglite.query<{ status: string }>('select status from cms_reviews');
+        expect(rows.rows).toEqual([
+            {
+                status: 'open',
+            },
+        ]);
+    });
+
     it('refuses an editor who was not asked', async () => {
         await draft('ada', 'frontPage', 'Spring is here');
         const asked = await as('ada', request(app).post('/editing/reviews')).send({
