@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { Fragment, type ReactNode } from 'react';
 import { inStoredOrder } from '@kizunajs/cms/next';
 import kizuna from '@kizuna-config';
 import { apiClient } from '../../lib/api-client';
@@ -43,41 +42,36 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function FrontPage() {
     const content = await kizuna.content.pages.frontPage.get();
-    const products =
-        content.products === undefined
-            ? []
-            : inStoredOrder([...listOf(content.products.products)], await listProducts(), (product) => product.id);
-
-    // Each section the sidebar lists, once, in its order. A section with no content shows nothing.
-    const render: Record<(typeof content.sections)[number], () => ReactNode> = {
-        statement: () => (content.statement === undefined ? null : <Statement {...content.statement} />),
-        categories: () => (content.categories === undefined ? null : <Categories {...content.categories} />),
-        products: () => (content.products === undefined ? null : <Products {...content.products} products={products} />),
-        photo: () => (content.photo === undefined ? null : <Media {...content.photo} tone={content.photoTone} />),
-        columns: () => (content.columns === undefined ? null : <Content {...content.columns} />),
-        articles: () => (content.articles === undefined ? null : <Archive {...content.articles} />),
-        callToAction: () =>
-            content.callToAction === undefined ? null : <CallToAction {...content.callToAction} tone={content.callToActionTone} />,
-    };
-
-    // A front page stored before the sidebar listed its sections shows them all, in the usual order.
-    const usual: Array<(typeof content.sections)[number]> = [
-        'statement',
-        'categories',
-        'products',
-        'photo',
-        'columns',
-        'articles',
-        'callToAction',
-    ];
-    const order = listOf(content.sections).length > 0 ? listOf(content.sections) : usual;
+    const sections = listOf(content.sections);
+    const products = sections.some((section) => section.block === 'products') ? await listProducts() : [];
 
     return (
         <main>
             <Hero {...content.hero} impact={content.heroImpact} />
-            {[...new Set(order)].map((section) => (
-                <Fragment key={section}>{render[section]()}</Fragment>
-            ))}
+            {sections.map((section, index) => {
+                switch (section.block) {
+                    case 'statement':
+                        return <Statement key={index} {...section} />;
+                    case 'categories':
+                        return <Categories key={index} {...section} />;
+                    case 'products':
+                        return (
+                            <Products
+                                key={index}
+                                {...section}
+                                products={inStoredOrder([...listOf(section.products)], products, (product) => product.id)}
+                            />
+                        );
+                    case 'media':
+                        return <Media key={index} {...section} />;
+                    case 'content':
+                        return <Content key={index} {...section} />;
+                    case 'archive':
+                        return <Archive key={index} {...section} />;
+                    case 'callToAction':
+                        return <CallToAction key={index} {...section} />;
+                }
+            })}
         </main>
     );
 }

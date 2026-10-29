@@ -3,7 +3,7 @@ import { defineBlock } from '@kizunajs/cms';
 import { ImageSchema, RichTextSchema } from '@kizunajs/cms/schemas';
 import { ArticleId } from '../models';
 import { Products } from './relationships';
-import { EyebrowSchema, HeadingSchema, LinkSchema, StatementSchema } from './schemas';
+import { EyebrowSchema, HeadingSchema, LinkSchema, StatementSchema, ToneSchema, tones } from './schemas';
 import { topics } from './content';
 
 /**
@@ -26,6 +26,8 @@ export const ImpactSchema = z.enum(['high', 'medium', 'low']);
  */
 export const HeroBlockSchema = defineBlock({
     name: 'hero',
+    label: 'Hero',
+    description: 'The heading at the top of a page, over or beside a photo.',
     fields: [
         {
             name: 'eyebrow',
@@ -60,6 +62,8 @@ export const HeroBlockSchema = defineBlock({
  */
 export const StatementBlockSchema = defineBlock({
     name: 'statement',
+    label: 'Statement',
+    description: 'One large sentence, with a row of small photos under it.',
     fields: [
         {
             name: 'eyebrow',
@@ -86,6 +90,8 @@ export const StatementBlockSchema = defineBlock({
  */
 export const ContentBlockSchema = defineBlock({
     name: 'content',
+    label: 'Columns',
+    description: 'Text in one to three columns, side by side.',
     fields: [
         {
             name: 'eyebrow',
@@ -113,10 +119,12 @@ export const ContentBlockSchema = defineBlock({
 
 /**
  * One photo the width of the window. With a heading, a green band above it
- * introduces it, in the tone the page sets.
+ * introduces it.
  */
 export const MediaBlockSchema = defineBlock({
     name: 'media',
+    label: 'Wide photo',
+    description: 'One photo the width of the window, with a coloured band above it.',
     fields: [
         {
             name: 'image',
@@ -135,15 +143,22 @@ export const MediaBlockSchema = defineBlock({
             name: 'body',
             schema: z.string().max(240).optional(),
         },
+        {
+            name: 'tone',
+            label: 'Band colour',
+            schema: ToneSchema.default('sage'),
+            options: tones,
+        },
     ],
 });
 
 /**
- * A full-width green band that asks the reader to do one thing, in the tone
- * the page sets.
+ * A full-width green band that asks the reader to do one thing.
  */
 export const CallToActionBlockSchema = defineBlock({
     name: 'callToAction',
+    label: 'Call to action',
+    description: 'A coloured band that asks the reader to do one thing.',
     fields: [
         {
             name: 'eyebrow',
@@ -162,6 +177,12 @@ export const CallToActionBlockSchema = defineBlock({
             schema: z.array(LinkSchema).min(1).max(2),
             description: 'The first is a button, the second a plain link.',
         },
+        {
+            name: 'tone',
+            label: 'Band colour',
+            schema: ToneSchema.default('forest'),
+            options: tones,
+        },
     ],
 });
 
@@ -170,6 +191,8 @@ export const CallToActionBlockSchema = defineBlock({
  */
 export const ProductsBlockSchema = defineBlock({
     name: 'products',
+    label: 'Products',
+    description: 'Up to eight products from the shop, four to a row.',
     fields: [
         {
             name: 'eyebrow',
@@ -197,6 +220,8 @@ export const ProductsBlockSchema = defineBlock({
  */
 export const ArchiveBlockSchema = defineBlock({
     name: 'archive',
+    label: 'Journal',
+    description: 'Three articles, picked by hand or the latest of a topic.',
     fields: [
         {
             name: 'eyebrow',
@@ -225,6 +250,8 @@ export const ArchiveBlockSchema = defineBlock({
  */
 export const CategoriesBlockSchema = defineBlock({
     name: 'categories',
+    label: 'Categories',
+    description: 'Up to three ways into the shop, each a tall photo.',
     fields: [
         {
             name: 'eyebrow',

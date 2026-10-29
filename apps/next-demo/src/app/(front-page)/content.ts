@@ -1,5 +1,4 @@
-import { z } from 'zod';
-import { definePage } from '@kizunajs/cms';
+import { blocks, definePage } from '@kizunajs/cms';
 import { SeoSchema } from '@kizunajs/cms/schemas';
 import {
     ArchiveBlockSchema,
@@ -13,11 +12,24 @@ import {
     ProductsBlockSchema,
     StatementBlockSchema,
 } from '../../cms/blocks';
-import { ToneSchema, tones } from '../../cms/schemas';
 
 /**
- * The front page, a tab per section. The sidebar picks which sections show
- * and in what order.
+ * The blocks each section of the front page was stored as before it held a
+ * list, in the order they showed when no order was stored.
+ */
+const earlierSections: Readonly<Record<string, string>> = {
+    statement: 'statement',
+    categories: 'categories',
+    products: 'products',
+    photo: 'media',
+    columns: 'content',
+    articles: 'archive',
+    callToAction: 'callToAction',
+};
+
+/**
+ * The front page: its hero, then the sections editors add under it, in the
+ * order they put them.
  */
 export default definePage({
     name: 'frontPage',
@@ -35,74 +47,22 @@ export default definePage({
         },
         {
             type: 'tab',
-            label: 'Statement',
+            label: 'Content',
             fields: [
                 {
-                    name: 'statement',
-                    schema: StatementBlockSchema.optional(),
-                },
-            ],
-        },
-        {
-            type: 'tab',
-            label: 'Categories',
-            fields: [
-                {
-                    name: 'categories',
-                    schema: CategoriesBlockSchema.optional(),
-                },
-            ],
-        },
-        {
-            type: 'tab',
-            label: 'Products',
-            fields: [
-                {
-                    name: 'products',
-                    schema: ProductsBlockSchema.optional(),
-                },
-            ],
-        },
-        {
-            type: 'tab',
-            label: 'Photo',
-            fields: [
-                {
-                    name: 'photo',
-                    label: 'Wide photo',
-                    schema: MediaBlockSchema.optional(),
-                },
-            ],
-        },
-        {
-            type: 'tab',
-            label: 'Columns',
-            fields: [
-                {
-                    name: 'columns',
-                    schema: ContentBlockSchema.optional(),
-                },
-            ],
-        },
-        {
-            type: 'tab',
-            label: 'Journal',
-            fields: [
-                {
-                    name: 'articles',
-                    label: 'Articles',
-                    schema: ArchiveBlockSchema.optional(),
-                },
-            ],
-        },
-        {
-            type: 'tab',
-            label: 'Call to action',
-            fields: [
-                {
-                    name: 'callToAction',
-                    label: 'Call to action',
-                    schema: CallToActionBlockSchema.optional(),
+                    name: 'sections',
+                    schema: blocks([
+                        StatementBlockSchema,
+                        CategoriesBlockSchema,
+                        ProductsBlockSchema,
+                        MediaBlockSchema,
+                        ContentBlockSchema,
+                        ArchiveBlockSchema,
+                        CallToActionBlockSchema,
+                    ])
+                        .max(12)
+                        .default([]),
+                    description: 'The page under the hero, top to bottom.',
                 },
             ],
         },
@@ -124,42 +84,34 @@ export default definePage({
             options: impacts,
             position: 'sidebar',
         },
-        {
-            name: 'sections',
-            schema: z
-                .array(z.enum(['statement', 'categories', 'products', 'photo', 'columns', 'articles', 'callToAction']))
-                .max(7)
-                .default(['statement', 'categories', 'products', 'photo', 'columns', 'articles', 'callToAction']),
-            description: 'The sections under the hero, in this order. Remove one to hide it, or add it again to show it.',
-            options: {
-                statement: 'Statement',
-                categories: 'Categories',
-                products: 'Products',
-                photo: 'Wide photo',
-                columns: 'Columns',
-                articles: 'Journal',
-                callToAction: 'Call to action',
-            },
-            position: 'sidebar',
-        },
-        {
-            type: 'collapsible',
-            label: 'Colours',
-            position: 'sidebar',
-            fields: [
-                {
-                    name: 'photoTone',
-                    label: 'Wide photo band',
-                    schema: ToneSchema.default('sage'),
-                    options: tones,
-                },
-                {
-                    name: 'callToActionTone',
-                    label: 'Call to action band',
-                    schema: ToneSchema.default('forest'),
-                    options: tones,
-                },
-            ],
-        },
     ],
+    migrate: {
+        // A field per section, shown in the order `sections` listed, becomes one list. A section left out of that order showed nowhere, so it is dropped.
+        1: (document) => {
+            const { sections, photoTone, callToActionTone, ...rest } = document;
+            const order = Array.isArray(sections) && sections.length > 0 ? sections.map(String) : Object.keys(earlierSections);
+            const list = [...new Set(order)].flatMap((section) => {
+                const block = earlierSections[section];
+                const stored = document[section];
+                if (block === undefined || typeof stored !== 'object' || stored === null) return [];
+                const tone = block === 'media' ? photoTone : block === 'callToAction' ? callToActionTone : undefined;
+                return [
+                    {
+                        block,
+                        ...stored,
+                        ...(tone === undefined
+                            ? {}
+                            : {
+                                  tone,
+                              }),
+                    },
+                ];
+            });
+            for (const section of Object.keys(earlierSections)) delete rest[section];
+            return {
+                ...rest,
+                sections: list,
+            };
+        },
+    },
 });

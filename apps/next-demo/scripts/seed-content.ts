@@ -673,103 +673,111 @@ export const seedContent = async (service: CmsService): Promise<void> => {
                     },
                 ],
             },
-            statement: {
-                eyebrow: 'Since 2019',
-                text: 'A small shop in Oslo for people who want their plants *alive and well in March*.',
-                images: [photo('fern-fronds.jpg'), photo('cherry-branch.jpg'), photo('forest-floor.jpg'), photo('ferns.jpg')],
-                link: {
-                    label: 'How we choose',
-                    href: '/blog/a-morning-at-the-nursery-in-hurdal',
+            sections: [
+                {
+                    block: 'statement',
+                    eyebrow: 'Since 2019',
+                    text: 'A small shop in Oslo for people who want their plants *alive and well in March*.',
+                    images: [photo('fern-fronds.jpg'), photo('cherry-branch.jpg'), photo('forest-floor.jpg'), photo('ferns.jpg')],
+                    link: {
+                        label: 'How we choose',
+                        href: '/blog/a-morning-at-the-nursery-in-hurdal',
+                    },
                 },
-            },
-            categories: {
-                eyebrow: 'Shop by light',
-                heading: 'A plant for the window *you have*',
-                categories: [
-                    {
-                        name: 'Shade lovers',
-                        image: photo('ferns.jpg'),
-                        href: '/blog/five-ferns-for-a-north-facing-window',
-                    },
-                    {
-                        name: 'Trees for spring',
-                        image: photo('cherry-blossom.jpg'),
-                        href: '/blog/planting-a-cherry-tree-in-oslo-clay',
-                    },
-                    {
-                        name: 'The forest floor',
-                        image: photo('forest-floor.jpg'),
-                        href: '/blog?topic=growers',
-                    },
-                ],
-            },
-            products: {
-                eyebrow: 'New in',
-                heading: 'In the shop *this week*',
-                products: ['prod_boston_fern', 'prod_japanese_cherry', 'prod_lady_fern', 'prod_woodland_ferns'],
-                link: {
-                    label: 'Ask about stock',
-                    href: '/contact',
+                {
+                    block: 'categories',
+                    eyebrow: 'Shop by light',
+                    heading: 'A plant for the window *you have*',
+                    categories: [
+                        {
+                            name: 'Shade lovers',
+                            image: photo('ferns.jpg'),
+                            href: '/blog/five-ferns-for-a-north-facing-window',
+                        },
+                        {
+                            name: 'Trees for spring',
+                            image: photo('cherry-blossom.jpg'),
+                            href: '/blog/planting-a-cherry-tree-in-oslo-clay',
+                        },
+                        {
+                            name: 'The forest floor',
+                            image: photo('forest-floor.jpg'),
+                            href: '/blog?topic=growers',
+                        },
+                    ],
                 },
-            },
-            photo: {
-                image: photo('ferns.jpg'),
-                caption: 'Lady fern, Athyrium filix-femina, in the shade beds in August',
-                heading: 'Every fern we sell spends its first summer *outside, under real trees*',
-                body: 'Our grower in Hurdal raises them in the shade of a spruce wood, not a greenhouse. They arrive tougher, and forgive a missed watering.',
-            },
-            columns: {
-                eyebrow: 'How we work',
-                heading: 'A small shop, and *help that lasts*',
-                columns: [
-                    {
-                        heading: 'Grown nearby',
-                        body: richText(
-                            'Our ferns come from Hurdal and our cherries from Lier, both within an hour of the shop. We visit each grower every season and choose the plants ourselves.'
-                        ),
-                    },
-                    {
-                        heading: 'A care card in every pot',
-                        body: richText(
-                            'Each plant leaves with a card for its light, water and feeding. If it struggles anyway, send the plant care desk a photo and we reply the same day.'
-                        ),
-                    },
-                    {
-                        heading: 'Next day across Oslo',
-                        body: richText(
-                            'Order before 14:00 and Jonas brings it the next day in the electric van, wrapped in paper. Delivery is 89 kr, and free over 800 kr.'
-                        ),
-                    },
-                ],
-            },
-            articles: {
-                eyebrow: 'Journal',
-                heading: 'From the *journal*',
-                articles: picked(
-                    'Five ferns for a *north-facing* window',
-                    'Plant bulbs now, *thank yourself* in April',
-                    'A morning at the nursery in *Hurdal*'
-                ),
-            },
-            callToAction: {
-                eyebrow: 'For offices',
-                heading: 'We keep the plants in *forty Oslo offices* green',
-                body: 'We choose plants for your light, deliver them in pots that suit the room, and come back every two weeks to water, feed and turn them.',
-                links: [
-                    {
-                        label: 'Talk to Marco',
+                {
+                    block: 'products',
+                    eyebrow: 'New in',
+                    heading: 'In the shop *this week*',
+                    products: ['prod_boston_fern', 'prod_japanese_cherry', 'prod_lady_fern', 'prod_woodland_ferns'],
+                    link: {
+                        label: 'Ask about stock',
                         href: '/contact',
                     },
-                    {
-                        label: 'Meet the team',
-                        href: '/team',
-                    },
-                ],
-            },
+                },
+                {
+                    block: 'media',
+                    image: photo('ferns.jpg'),
+                    caption: 'Lady fern, Athyrium filix-femina, in the shade beds in August',
+                    heading: 'Every fern we sell spends its first summer *outside, under real trees*',
+                    body: 'Our grower in Hurdal raises them in the shade of a spruce wood, not a greenhouse. They arrive tougher, and forgive a missed watering.',
+                    tone: 'sage',
+                },
+                {
+                    block: 'content',
+                    eyebrow: 'How we work',
+                    heading: 'A small shop, and *help that lasts*',
+                    columns: [
+                        {
+                            heading: 'Grown nearby',
+                            body: richText(
+                                'Our ferns come from Hurdal and our cherries from Lier, both within an hour of the shop. We visit each grower every season and choose the plants ourselves.'
+                            ),
+                        },
+                        {
+                            heading: 'A care card in every pot',
+                            body: richText(
+                                'Each plant leaves with a card for its light, water and feeding. If it struggles anyway, send the plant care desk a photo and we reply the same day.'
+                            ),
+                        },
+                        {
+                            heading: 'Next day across Oslo',
+                            body: richText(
+                                'Order before 14:00 and Jonas brings it the next day in the electric van, wrapped in paper. Delivery is 89 kr, and free over 800 kr.'
+                            ),
+                        },
+                    ],
+                },
+                {
+                    block: 'archive',
+                    eyebrow: 'Journal',
+                    heading: 'From the *journal*',
+                    articles: picked(
+                        'Five ferns for a *north-facing* window',
+                        'Plant bulbs now, *thank yourself* in April',
+                        'A morning at the nursery in *Hurdal*'
+                    ),
+                },
+                {
+                    block: 'callToAction',
+                    eyebrow: 'For offices',
+                    heading: 'We keep the plants in *forty Oslo offices* green',
+                    body: 'We choose plants for your light, deliver them in pots that suit the room, and come back every two weeks to water, feed and turn them.',
+                    links: [
+                        {
+                            label: 'Talk to Marco',
+                            href: '/contact',
+                        },
+                        {
+                            label: 'Meet the team',
+                            href: '/team',
+                        },
+                    ],
+                    tone: 'forest',
+                },
+            ],
             heroImpact: 'high',
-            sections: ['statement', 'categories', 'products', 'photo', 'columns', 'articles', 'callToAction'],
-            photoTone: 'sage',
-            callToActionTone: 'forest',
             seo: {
                 title: 'Hagen, a plant shop in Oslo',
                 description:
