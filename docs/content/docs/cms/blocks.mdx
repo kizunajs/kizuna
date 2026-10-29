@@ -13,6 +13,8 @@ import { CtaSchema, HeadingSchema } from './schemas';
 
 export const HeroBlockSchema = defineBlock({
     name: 'hero',
+    label: 'Hero',
+    description: 'A heading over a photo, at the top of a page.',
     fields: [
         {
             name: 'heading',
@@ -34,6 +36,8 @@ export const HeroBlockSchema = defineBlock({
 });
 ```
 
+`label` is what editors see the block called, and `description` is what they read when they choose one. Without a label, they see the block's name.
+
 `defineBlock()` returns a Zod object schema, and `Output<T>` is that schema with images resolved, so the component is typed from the block:
 
 ```tsx title="src/components/Hero.tsx"
@@ -48,4 +52,64 @@ export function Hero(props: Output<typeof HeroBlockSchema>) {
         </section>
     );
 }
+```
+
+## Blocks in any order
+
+`blocks()` makes a field editors build a page from: a list holding any of the blocks you name, in the order they put them. Each item stores its block's name under `block`:
+
+```ts title="src/app/(front-page)/content.ts"
+import { blocks, definePage } from '@kizunajs/cms';
+import { CallToActionBlockSchema, ProductsBlockSchema, StatementBlockSchema } from '../../cms/blocks';
+
+export default definePage({
+    name: 'frontPage',
+    fields: [
+        {
+            name: 'sections',
+            schema: blocks([StatementBlockSchema, ProductsBlockSchema, CallToActionBlockSchema]).max(12),
+            description: 'The page under the hero, top to bottom.',
+        },
+    ],
+});
+```
+
+The result is a Zod array, so `.min()` and `.max()` bound how many items it holds, and `.default([])` lets the page start without any. It goes wherever a field takes a schema, in a page, a global, a collection or another block.
+
+`section.block` narrows each item to its block, so a `switch` hands every item to its component:
+
+```tsx title="src/app/(front-page)/page.tsx"
+export default async function FrontPage() {
+    const content = await kizuna.content.pages.frontPage.get();
+
+    return (
+        <main>
+            {content.sections.map((section, index) => {
+                switch (section.block) {
+                    case 'statement':
+                        return <Statement key={index} {...section} />;
+                    case 'products':
+                        return <Products key={index} {...section} />;
+                    case 'callToAction':
+                        return <CallToAction key={index} {...section} />;
+                }
+            })}
+        </main>
+    );
+}
+```
+
+Editors see one row per item, with the block's label and the item's first line of text, and open a row to edit its fields. Add section lists the blocks by label and description. The agent reads the same list from the field: each block's name, label, description and fields, and the `block` key an item it adds carries.
+
+An item saves as a whole, so a block in the list gives none of its fields `auth` or `readOnly`. Put them on the list's own field instead.
+
+A block taken out of the list leaves the items that hold one unreadable. Write a [`migrate` step](/docs/cms/changing-the-shape) that drops or converts them:
+
+```ts
+migrate: {
+    3: (document) => ({
+        ...document,
+        sections: (document['sections'] as Array<{ block: string }>).filter((section) => section.block !== 'statement'),
+    }),
+},
 ```

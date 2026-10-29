@@ -4,6 +4,7 @@
         "cms",
         "define-page",
         "define-block",
+        "blocks",
         "define-global",
         "define-collection",
         "define-view",

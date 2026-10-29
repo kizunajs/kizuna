@@ -4,14 +4,22 @@ description: 'A set of fields several pages share, returned as a Zod object sche
 ---
 
 ```ts
-defineBlock(definition: { name: string; fields: Field[] }): ZodObject
+defineBlock(definition: BlockDefinition): ZodObject
 ```
 
-The result is a Zod object schema, so a page field takes it where it takes any schema. `Output<typeof HeroBlockSchema>` is the type a component receives, with images resolved.
+| Option        | Type      | Description                                                            |
+| ------------- | --------- | ---------------------------------------------------------------------- |
+| `name`        | `string`  | The block's name, camelCase, stored under `block` in a `blocks()` list |
+| `label`       | `string`  | What editors see it called. Without one, its name                      |
+| `description` | `string`  | What editors and the agent read when they choose a block               |
+| `fields`      | `Field[]` | What editors may change, in order                                      |
+
+The result is a Zod object schema, so a page field takes it where it takes any schema, and [`blocks()`](/docs/cms/reference/blocks) takes it as one of the blocks a list may hold. `Output<typeof HeroBlockSchema>` is the type a component receives, with images resolved.
 
 ```ts title="src/cms/blocks.ts"
 export const HeroBlockSchema = defineBlock({
     name: 'hero',
+    label: 'Hero',
     fields: [
         {
             name: 'heading',

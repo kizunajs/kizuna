@@ -91,13 +91,14 @@ An item with `type` arranges the screen, and an item with `name` is content. Lay
 
 A page keeps its design because its fields refuse what would break it. Designers say what they want, and the schema holds it for the editor, the agent and the API alike:
 
-| You want                                   | The schema says                      | The editor sees                          |
-| ------------------------------------------ | ------------------------------------ | ---------------------------------------- |
-| A short heading                            | `z.string().max(60)`                 | A counter that stops at 60 characters    |
-| One of a few looks                         | `z.enum(['light', 'dark'])`          | A select                                 |
-| Two to six products                        | `z.array(products.id).min(2).max(6)` | A sortable list that stops adding at six |
-| A link that is https                       | `z.url({ protocol: /^https$/ })`     | A URL input that says https only         |
-| An image with a crop and alt text          | `ImageSchema`                        | Upload, crop and alt text                |
-| A field only the client's admin may change | `auth: { roles: 'admin' }`           | The field, greyed out                    |
+| You want                                   | The schema says                                               | The editor sees                          |
+| ------------------------------------------ | ------------------------------------------------------------- | ---------------------------------------- |
+| A short heading                            | `z.string().max(60)`                                          | A counter that stops at 60 characters    |
+| One of a few looks                         | `z.enum(['light', 'dark'])`                                   | A select                                 |
+| Two to six products                        | `z.array(products.id).min(2).max(6)`                          | A sortable list that stops adding at six |
+| Sections in any order, up to twelve        | `blocks([StatementBlockSchema, ProductsBlockSchema]).max(12)` | A list editors add sections to by type   |
+| A link that is https                       | `z.url({ protocol: /^https$/ })`                              | A URL input that says https only         |
+| An image with a crop and alt text          | `ImageSchema`                                                 | Upload, crop and alt text                |
+| A field only the client's admin may change | `auth: { roles: 'admin' }`                                    | The field, greyed out                    |
 
 A character limit keeps a heading short, and letters differ in width, so check the design with the longest heading the limit allows. `.describe()` is what the editor and the agent read under the input, so give the reason: `'Under 8 words. No full stop.'`

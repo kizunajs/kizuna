@@ -1,0 +1,23 @@
+---
+title: blocks()
+description: 'A list of blocks of several types, in the order editors put them.'
+---
+
+```ts
+blocks(list: BlockSchema[]): ZodArray
+```
+
+Takes blocks made with [`defineBlock()`](/docs/cms/reference/define-block) and returns a Zod array of them. Each item is one of the blocks, with that block's name under `block`, so `item.block` narrows its type.
+
+An item stored as `{ block: 'statement', text: 'A small shop' }` reads as `Output<typeof StatementBlockSchema>` with `block: 'statement'` beside its fields.
+
+`.min()`, `.max()`, `.default()` and `.optional()` work as on any array. The list throws when it is given no blocks, two blocks of one name, a block with a field named `block`, or a block whose fields declare `auth` or `readOnly`, since an item saves as a whole.
+
+```ts title="src/app/(front-page)/content.ts"
+{
+    name: 'sections',
+    schema: blocks([StatementBlockSchema, ProductsBlockSchema, CallToActionBlockSchema]).max(12),
+},
+```
+
+See [Blocks in any order](/docs/cms/blocks#blocks-in-any-order).
