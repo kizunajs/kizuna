@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { Toast } from '@base-ui/react/toast';
 import { X } from 'lucide-react';
 import { ICON } from '../view/context.js';
@@ -26,3 +27,28 @@ export function Toasts() {
         </Toast.Portal>
     );
 }
+
+/**
+ * Says what just happened in a toast with Undo, which closes the toast and
+ * runs `undo`. Answers what closes the toast, for when the undo stops being
+ * possible.
+ */
+export const useOfferUndo = (): ((message: string, undo: () => void) => () => void) => {
+    const { add, close } = Toast.useToastManager();
+    return useCallback(
+        (message: string, undo: () => void) => {
+            const id: string = add({
+                description: message,
+                actionProps: {
+                    children: 'Undo',
+                    onClick: () => {
+                        close(id);
+                        undo();
+                    },
+                },
+            });
+            return () => close(id);
+        },
+        [add, close]
+    );
+};

@@ -15,6 +15,11 @@ export interface EditorContextValue {
      * Where the open document is on the site, for a control that shows it.
      */
     pageUrl: string | undefined;
+    /**
+     * Says in a toast what a control just did, with Undo, where the editor
+     * shows toasts. Answers what closes the toast.
+     */
+    offerUndo?: (message: string, undo: () => void) => () => void;
 }
 
 export const EditorContext = createContext<EditorContextValue | null>(null);

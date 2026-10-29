@@ -210,3 +210,12 @@ export const isCurrent = (entry: Screen, shown: Screen): boolean => {
     if (entry.kind === 'pages') return shown.kind === 'pages' || (shown.kind === 'document' && shown.ref.startsWith('page:'));
     return shown.kind === 'dashboard';
 };
+
+/**
+ * The browser tab's title: the screen's, then the site's `name`, as in
+ * "Front page · Hagen".
+ */
+export const tabTitleOf = (screenTitle: string | undefined, siteName: string | undefined): string => {
+    const site = siteName ?? 'Kizuna CMS';
+    return screenTitle === undefined || screenTitle === '' ? site : `${screenTitle} · ${site}`;
+};

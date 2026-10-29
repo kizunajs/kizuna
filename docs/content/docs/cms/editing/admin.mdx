@@ -28,7 +28,18 @@ content: cms({
 
 `signIn` returns the response your auth answers with. Its cookies reach the browser, and any status outside 2xx tells the editor their email or password is wrong, in the same words whichever one it was. A signed-out editor who opens the admin or draft mode lands on the screen, and comes back to where they were going once they are in. The CMS checks that the form was sent from a page of your site, so a form on another site cannot sign an editor in to an account of its choosing.
 
-The foot of the sidebar shows who is signed in, with their role. Their name opens a menu with the theme and, when the API serves MCP, **Edit in your chat**, which shows how to connect Claude as them, as in [Agents and tools](/docs/cms/editing/agents#connecting-a-chat). Give `signOut` the call that ends a session, and the menu adds **Sign out**, which ends the session, closes draft mode, and returns to the sign-in screen:
+Give the site its `name`, and the sign-in screen asks the editor to sign in to it, as in **Sign in to Hagen**. Each tab of the admin carries it too, after the screen's title, like Front page · Hagen:
+
+```ts title="kizuna.config.ts"
+content: cms({
+    name: 'Hagen',
+    auth: {
+        identity: 'editor',
+    },
+}),
+```
+
+The foot of the sidebar shows who is signed in, with their role. Their name opens a menu with their email when [`people.list`](/docs/cms/editing/reviews#people) gives one, the theme and, when the API serves MCP, **Edit in your chat**, which shows how to connect Claude as them, as in [Agents and tools](/docs/cms/editing/agents#connecting-a-chat). Give `signOut` the call that ends a session, and the menu adds **Sign out**, which ends the session, closes draft mode, and returns to the sign-in screen:
 
 ```ts title="kizuna.config.ts"
 content: cms({
@@ -100,6 +111,8 @@ Pages sit under Content, and so does anything without a `group`. A view the edit
 
 ⌘K, or Ctrl+K off a Mac, searches everything in the sidebar and every page and item by its title, with pages and each collection's items under a heading of their own. The arrow keys move through what it finds, Enter opens it, ⌘Enter opens it in a new tab, and Escape closes the search.
 
+Under **Actions** it offers what the open document's buttons do: **Publish**, **Save draft**, **Ask for review**, **Open on the site** and the collection's own actions, each where its button would be offered, and asking first where the button asks. On any other screen, Actions creates a new item of each collection, as in **Create new article**.
+
 On a phone, the sidebar opens as a sheet from the menu button at the top left, with the search beside it on the right.
 
 Every screen opens with the same header: the trail back to the dashboard, the screen's title, a line of facts like a count or when it last changed, and its actions on the right.
@@ -143,7 +156,7 @@ Tick rows and their actions take the header's place: **Publish**, **Unpublish** 
 
 A collection with a `tree` lists its items nested under their parents, until you search, filter or sort. Drag a row onto another to move it under that one.
 
-A view's list shows its `title` and `columns`, a choice by the label of its option, and the search box asks its `list` function, which looks in the fields `search` names. `list` takes the search alone, so the admin sorts and pages the records it returns. The app keeps the records, so a view's list has no **Create new** and no tick boxes.
+A view's list shows its `title` and `columns`, a choice by the label of its option, and the search box asks its `list` function, which looks in the fields `search` names. A view that names [`filters` or `sorts`](/docs/cms/views#filtering-sorting-and-paging) gets **Filters**, **Sort** and the pager a collection has, and its `list` filters, sorts and pages on the server. Without them, `list` takes the search alone, and the admin sorts and pages the records it returns. The app keeps the records, so a view's list has no **Create new** and no tick boxes.
 
 ## Media
 
@@ -159,7 +172,7 @@ The library's alt text and focal point are the image's own, and each use can set
 
 ## Editing
 
-A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, when it last changed and who saved it, and who owns it, where you can pick another owner. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
+A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Someone asked to review it also gets **Review**, which puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews). Under the title a line says where it stands, when it last changed and who saved it, and who owns it, where you can pick another owner. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, whose message offers **Undo** to publish it again when the draft held no changes, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
 
 The draft saves a moment after you stop typing, and the header says when it last did. **Save draft** saves at once, and **Publish** lists every change and asks you to confirm. While a required field is empty, Publish waits and says which field it waits for, like "Fill in Department before publishing". A click on that line takes you to the field, which says it is needed.
 
@@ -170,13 +183,13 @@ A document your role may not change says so, with the way back to its list, and 
 Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live preview** puts the site beside the fields and **Info** lists the document's status, owner, page, and when it was created, last updated and last published.
 
 - **Edit** lays the fields out with their [layout](/docs/cms/fields#layout): tabs over the fields, rows side by side, collapsible sections, and the fields marked `position: 'sidebar'` in a column on the right. A document with no sidebar fields gives the main column the full width.
-- **Versions** lists every saved version, newest first and ten to a page, with where it stood and who saved it. **Compare** opens a version beside the current draft, side by side or inline, and **Only changed fields** hides the fields they share. The other versions are listed beside it to compare with instead. **Restore this version** asks first, then makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual. The draft you had stays under Versions.
+- **Versions** lists every saved version, newest first and ten to a page, with where it stood and who saved it. **Compare** opens a version beside the current draft, side by side or inline, and **Only changed fields** hides the fields they share. The other versions are listed beside it to compare with instead. **Restore this version** asks first, then makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual. The draft you had stays under Versions, and **Undo** on the message that follows brings it back until you change the draft again.
 
 **Live preview** puts your site in [draft mode](/docs/cms/next#draft-mode) beside the fields, with the sidebar's fields moved under the main ones, at the Desktop, Tablet or Mobile width the select above it picks. What you type shows on the page as you type it, through [live updates](/docs/cms/next#live-updates). A page opens at its own path, and an item at the page its collection's [`preview`](/docs/cms/collections#live-preview) names, its own page, or the first page that holds it. An item no page shows has no Live preview.
 
 Each field has its label above it, with an asterisk when the document needs it before it can publish, and its help text under it. A field the server refuses shows why at its top right.
 
-A field made of other fields, like a page's hero block, shows them under its name as a heading, or under its tab when a tab holds it alone. A list shows each item as a row: drag it by the handle or move it with the arrow keys, open it with the chevron to edit its fields, and remove it with the ×. A row shows the item's first text as its title, and a block's name before it. **Collapse all** and **Expand all** sit beside the list's label, and the add button under the rows names the item, like **Add link** for a list labelled Links.
+A field made of other fields, like a page's hero block, shows them under its name as a heading, or under its tab when a tab holds it alone. A list shows each item as a row: drag it by the handle or move it with the arrow keys, open it with the chevron to edit its fields, and remove it with the ×, which **Undo** on the message that follows puts back. A row shows the item's first text as its title, and a block's name before it. **Collapse all** and **Expand all** sit beside the list's label, and the add button under the rows names the item, like **Add link** for a list labelled Links.
 
 An image shows its file name and size, and in the sidebar the image itself, large. An empty one takes an image from the library, or a file dropped on it. Edit opens the image at size: click it to set the focus a crop keeps in view, write its alt text, and trim pixels from its edges under **Crop**. **Apply** keeps the changes.
 

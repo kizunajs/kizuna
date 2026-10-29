@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { Connection, ToolAnswer } from '../view/connection.js';
 import { navigationOf } from './navigation.js';
-import { DOCUMENT_LIMIT, groupsOfResults, highlightOf, loadDocuments, placesOf, rankOf, searchOf, type SearchResult } from './search.js';
+import {
+    actionResultsOf,
+    DOCUMENT_LIMIT,
+    groupsOfResults,
+    highlightOf,
+    loadDocuments,
+    placesOf,
+    rankOf,
+    resultKeyOf,
+    searchOf,
+    type SearchResult,
+} from './search.js';
 
 const sections = navigationOf({
     globals: [
@@ -205,7 +216,41 @@ describe('the admin search', () => {
         ]);
     });
 
-    it('lists the screens first, then the documents under their collection', () => {
+    it('offers every action with nothing typed, and those whose label matches once something is', () => {
+        const actions = actionResultsOf([
+            {
+                label: 'Publish',
+                run: () => undefined,
+            },
+            {
+                label: 'Save draft',
+                run: () => undefined,
+            },
+            {
+                label: 'Send to subscribers',
+                run: () => undefined,
+            },
+        ]);
+        expect(
+            searchOf({
+                query: '',
+                places: [],
+                actions,
+                documents: [],
+            }).actions.map((action) => action.label)
+        ).toEqual(['Publish', 'Save draft', 'Send to subscribers']);
+        expect(
+            searchOf({
+                query: 'draft',
+                places: [],
+                actions,
+                documents: [],
+            }).actions.map((action) => action.label)
+        ).toEqual(['Save draft']);
+        expect(actions.map(resultKeyOf)).toEqual(['action:Publish', 'action:Save draft', 'action:Send to subscribers']);
+    });
+
+    it('lists the screens first, then the actions, then the documents under their collection', () => {
         const page: SearchResult = {
             label: 'Front page',
             detail: '/',
@@ -217,10 +262,17 @@ describe('the admin search', () => {
         };
         const groups = groupsOfResults({
             places: placesOf(sections).slice(0, 1),
+            actions: actionResultsOf([
+                {
+                    label: 'Create new article',
+                    run: () => undefined,
+                },
+            ]),
             documents: [page, article('Fresh herbs', '1'), article('First frost', '2')],
         });
         expect(groups.map((group) => [group.label, group.items.map((item) => item.label)])).toEqual([
             ['Go to', ['Dashboard']],
+            ['Actions', ['Create new article']],
             ['Pages', ['Front page']],
             ['Articles', ['Fresh herbs', 'First frost']],
         ]);

@@ -2,15 +2,15 @@ import { useRef } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { ChevronsUpDown, LogOut, MessageSquare } from 'lucide-react';
 import { ICON } from '../view/context.js';
-import { Avatar } from '../view/people.js';
-import { humanize, type PersonView } from '../view/schema.js';
+import { Avatar, type People } from '../view/people.js';
+import { humanize } from '../view/schema.js';
 import { THEME_CHOICES, type ThemeChoice } from './theme.js';
 
 /**
- * The editor signed in, at the foot of the sidebar. The row opens a menu
- * as wide as itself, with their full name, the theme as one row of three
- * choices, Edit in your chat when the API serves MCP, and Sign out when the
- * app names where signing out happens. The
+ * The editor signed in, at the foot of the sidebar. The row opens a menu as
+ * wide as itself, with their full name and their email when the app gives
+ * one, the theme as one row of three choices, Edit in your chat when the API
+ * serves MCP, and Sign out when the app names where signing out happens. The
  * row keeps the name and the role to a line each, however long. Sign out is
  * a link for `GET`, and sends a form for `POST`.
  */
@@ -23,7 +23,7 @@ export function SignedIn({
     onThemeChange,
     onEditInChat,
 }: {
-    person: PersonView | undefined;
+    person: People['people'][number] | undefined;
     role: string | null;
     signOutPath: string | null;
     signOutMethod: 'GET' | 'POST';
@@ -76,6 +76,7 @@ export function SignedIn({
                         <Menu.Popup className="k-popup k-menu k-account-menu">
                             <div className="k-account-menu__head">
                                 <span className="k-account-menu__name">{person.name}</span>
+                                {person.email === undefined ? null : <span className="k-account-menu__email">{person.email}</span>}
                                 {roleLabel === undefined ? null : <span className="k-account-menu__role">{roleLabel}</span>}
                             </div>
                             <Menu.Separator className="k-account-menu__separator" />

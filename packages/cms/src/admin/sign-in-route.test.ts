@@ -126,6 +126,7 @@ const config = defineConfig({
         },
     },
     content: cms({
+        name: 'Hagen',
         db: drizzle(pglite),
         pages: {},
         auth: {
@@ -177,7 +178,7 @@ describe("the admin's sign-in screen", () => {
         );
     });
 
-    it('serves the form, with the route it signs in at and where it goes after', async () => {
+    it("serves the form, with the route it signs in at, where it goes after and the site's name", async () => {
         const response = await request(app).get('/admin/login').query({
             next: '/cms-api/draft?redirect=%2Fblog',
         });
@@ -189,6 +190,7 @@ describe("the admin's sign-in screen", () => {
             signInPath: '/cms-api/sign-in',
             next: '/cms-api/draft?redirect=%2Fblog',
             noAccess: false,
+            siteName: 'Hagen',
         });
     });
 
@@ -299,6 +301,11 @@ describe('signing out', () => {
         const served = configIn<AdminConfig>(response.text);
         expect(served.signOutPath).toBe('/cms-api/sign-out');
         expect(served.signOutMethod).toBe('POST');
+    });
+
+    it("gives the admin the site's name, for its tab titles", async () => {
+        const response = await request(app).get('/admin').set('authorization', 'Bearer editor-token');
+        expect(configIn<AdminConfig>(response.text).siteName).toBe('Hagen');
     });
 });
 

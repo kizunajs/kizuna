@@ -4,8 +4,19 @@ import { Dialog } from '@base-ui/react/dialog';
 import { Search } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
-import { hrefOf, type CollectionSummary, type NavigationSection } from './navigation.js';
-import { groupsOfResults, highlightOf, loadDocuments, placesOf, searchOf, type SearchGroup, type SearchResult } from './search.js';
+import { hrefOf, type CollectionSummary, type NavigationSection, type Screen } from './navigation.js';
+import {
+    actionResultsOf,
+    groupsOfResults,
+    highlightOf,
+    loadDocuments,
+    placesOf,
+    resultKeyOf,
+    searchOf,
+    type PaletteAction,
+    type SearchGroup,
+    type SearchResult,
+} from './search.js';
 
 export const onApple = (): boolean => /Mac|iPhone|iPad/.test(window.navigator.userAgent);
 
@@ -49,13 +60,14 @@ export function SearchButton({ onOpen, compact = false }: { onOpen: () => void; 
 }
 
 /**
- * The address a result opens at, for a tab of its own.
+ * The address a screen opens at, for a tab of its own.
  */
-const addressOf = (result: SearchResult): string => `${window.location.pathname}${window.location.search}${hrefOf(result.screen)}`;
+const addressOf = (screen: Screen): string => `${window.location.pathname}${window.location.search}${hrefOf(screen)}`;
 
 /**
  * The palette the search buttons and ⌘K open: every screen in the sidebar,
- * and every page and item by its title, under its collection.
+ * what the open screen can do under Actions, and every page and item by its
+ * title, under its collection.
  */
 export function CommandPalette({
     open,
@@ -63,12 +75,18 @@ export function CommandPalette({
     connection,
     sections,
     collections,
+    actions,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     connection: Connection;
     sections: readonly NavigationSection[];
     collections: readonly CollectionSummary[] | undefined;
+    /**
+     * What the screen behind the palette offers as it stands, read each time
+     * the palette opens.
+     */
+    actions: () => readonly PaletteAction[];
 }) {
     const [query, setQuery] = useState('');
     const [documents, setDocuments] = useState<SearchResult[] | undefined>();
@@ -87,6 +105,14 @@ export function CommandPalette({
         };
     }, [open, connection, collections]);
 
+    // The screen's actions as they stood when the palette opened, since what they offer changes as the person works.
+    const [offered, setOffered] = useState<SearchResult[]>([]);
+    const readActions = useRef(actions);
+    readActions.current = actions;
+    useEffect(() => {
+        if (open) setOffered(actionResultsOf(readActions.current()));
+    }, [open]);
+
     const places = useMemo(() => placesOf(sections), [sections]);
     const groups = useMemo<SearchGroup[]>(
         () =>
@@ -94,10 +120,11 @@ export function CommandPalette({
                 searchOf({
                     query,
                     places,
+                    actions: offered,
                     documents: documents ?? [],
                 })
             ),
-        [query, places, documents]
+        [query, places, offered, documents]
     );
 
     const change = (shown: boolean): void => {
@@ -106,8 +133,14 @@ export function CommandPalette({
     };
 
     const pick = (result: SearchResult, inNewTab: boolean): void => {
+        if (!('screen' in result)) {
+            change(false);
+            // Once the palette has closed, so a dialog the action opens keeps the focus.
+            window.requestAnimationFrame(result.run);
+            return;
+        }
         if (inNewTab) {
-            window.open(addressOf(result), '_blank', 'noopener');
+            window.open(addressOf(result.screen), '_blank', 'noopener');
             return;
         }
         window.location.hash = hrefOf(result.screen);
@@ -172,7 +205,7 @@ export function CommandPalette({
                                         <Autocomplete.Collection>
                                             {(result: SearchResult) => (
                                                 <Autocomplete.Item
-                                                    key={hrefOf(result.screen)}
+                                                    key={resultKeyOf(result)}
                                                     value={result}
                                                     className="k-palette__option"
                                                     onClick={(event: MouseEvent) => pick(result, event.metaKey || event.ctrlKey)}>

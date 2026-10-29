@@ -557,6 +557,7 @@ export const PeopleSchema = Kizuna.model({
         people: z
             .array(
                 PersonSchema.extend({
+                    email: z.string().optional().describe('Their email, when the app gives one.'),
                     roles: z.array(z.string()).optional().describe('Their roles, as the app gives them.'),
                 })
             )

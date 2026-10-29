@@ -113,6 +113,7 @@ export const signInScreenRoute = (service: CmsService, options: ResolvedCmsOptio
             signInPath: sessionPathOf(options, base, 'sign-in'),
             next,
             noAccess: signedIn !== undefined,
+            siteName: options.name,
         };
         const page = withStylesheet(
             (await readBuilt('sign-in.html')).replace(CONFIG_PLACEHOLDER, () => embedded(config)),

@@ -108,6 +108,7 @@ export const adminConfigFor = (
     role: string | null = null,
     chatToken: string | null = null
 ): AdminConfig => ({
+    siteName: options.name,
     siteUrl: originOf(options.preview?.url),
     apiPath: options.apiPath ?? '/api',
     role,

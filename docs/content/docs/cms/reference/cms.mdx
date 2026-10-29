@@ -5,6 +5,7 @@ description: 'The content provider defineConfig takes under content, and every o
 
 ```ts
 content: cms({
+    name,
     db,
     pages,
     sites,
@@ -36,6 +37,7 @@ content: cms({
 
 | Option          | What it is                                                                                                          |
 | --------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `name`          | What editors call the site, which the sign-in screen and the admin's tab titles show                                |
 | `db`            | The Drizzle database the `cms_` tables live in                                                                      |
 | `pages`         | The pages module `kizuna generate` writes, or one per site under `sites`                                            |
 | `sites`         | `declareSites(Site, { ... })`, or a `defineSite` for admin-created sites                                            |

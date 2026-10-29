@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useImperativeHandle, useState, type Ref } from 'react';
 import { Menu } from '@base-ui/react/menu';
 import { Toast } from '@base-ui/react/toast';
 import { Copy, EyeOff, MessageCircle, Play, Trash2 } from 'lucide-react';
@@ -11,6 +11,7 @@ import { ConfirmDialog, type Confirmation } from './confirm.js';
 import { duplicateValuesOf, menuEntriesOf, type MenuEntry } from './document-menu.js';
 import { hrefOf } from './navigation.js';
 import { problemOf } from './parts.js';
+import { useOfferUndo } from './toasts.js';
 
 const ICONS = {
     ask: MessageCircle,
@@ -45,6 +46,13 @@ const confirmationOf = (entry: MenuEntry, title: string): Confirmation | undefin
     return undefined;
 };
 
+export interface DocumentMoreHandle {
+    /**
+     * Runs an entry as a click on it does, asking first where the menu asks.
+     */
+    choose: (entry: MenuEntry) => void;
+}
+
 /**
  * The `…` menu beside Publish: Ask for review, Unpublish, Duplicate, the
  * collection's actions and Delete, each asking first where it cannot be
@@ -58,6 +66,7 @@ export function DocumentMore({
     onAsk,
     onChanged,
     onProblem,
+    ref,
 }: {
     connection: Connection;
     document: Description;
@@ -69,16 +78,17 @@ export function DocumentMore({
      */
     onChanged: () => void;
     onProblem: (problem: string | undefined) => void;
+    ref?: Ref<DocumentMoreHandle>;
 }) {
     const [confirming, setConfirming] = useState<{ entry: MenuEntry; question: Confirmation } | undefined>();
     const toasts = Toast.useToastManager();
+    const offerUndo = useOfferUndo();
     const entries = menuEntriesOf({
         kind: document.kind,
         status: document.status,
         askable,
         actions: document.actions,
     });
-    if (entries.length === 0) return null;
 
     const run = async (entry: MenuEntry): Promise<void> => {
         setConfirming(undefined);
@@ -90,6 +100,9 @@ export function DocumentMore({
             return;
         }
         if (entry.kind === 'unpublish' && tools !== undefined) {
+            // Publishing again brings back what was live only when the draft held nothing more, and no review stands in its way.
+            const republishes =
+                document.status === 'published' && (!document.requireReview || document.review?.status === 'approved');
             const answer = await connection.call(`${tools.prefix}_unpublish`, {
                 params: tools.params,
             });
@@ -97,9 +110,31 @@ export function DocumentMore({
                 onProblem(problemOf(answer, 'It was not unpublished'));
                 return;
             }
-            toasts.add({
-                description: `Unpublished ${title}.`,
-            });
+            const message = `Unpublished ${title}.`;
+            if (republishes) {
+                offerUndo(message, () => {
+                    // The person pressed Undo, so the route runs without asking again.
+                    void connection
+                        .call(
+                            `${tools.prefix}_publish`,
+                            {
+                                params: tools.params,
+                                body: {},
+                            },
+                            {
+                                approved: true,
+                            }
+                        )
+                        .then((again) => {
+                            if (again.status !== 200) onProblem(problemOf(again, 'It was not published again'));
+                            onChanged();
+                        });
+                });
+            } else {
+                toasts.add({
+                    description: message,
+                });
+            }
             onChanged();
             return;
         }
@@ -168,6 +203,12 @@ export function DocumentMore({
                 question,
             });
     };
+
+    useImperativeHandle(ref, () => ({
+        choose,
+    }));
+
+    if (entries.length === 0) return null;
 
     return (
         <>

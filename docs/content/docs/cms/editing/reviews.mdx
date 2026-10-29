@@ -73,7 +73,7 @@ The Publish dialog lists every page with changes. Tick the ones to publish, or a
 
 ## People
 
-The editor shows people by name and picture, and their roles where you pick reviewers. `people.list` reads them from your own users:
+The editor shows people by name and picture, and their roles where you pick reviewers. The admin's account menu shows your email under your name when the list gives one. `people.list` reads them from your own users:
 
 ```ts title="kizuna.cms.config.ts"
 auth: {
@@ -87,6 +87,7 @@ auth: {
             return editors.map((editor) => ({
                 id: editor.email,
                 name: editor.name,
+                email: editor.email,
                 image: editor.image ?? undefined,
                 roles: [editor.role],
             }));

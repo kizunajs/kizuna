@@ -1876,6 +1876,7 @@
         font-weight: 500;
     }
 
+    .k-account-menu__email,
     .k-account-menu__role {
         font-size: 12px;
         color: var(--k-muted);

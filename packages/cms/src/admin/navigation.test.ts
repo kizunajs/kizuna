@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hrefOf, isCurrent, navigationOf, screenOf, type Screen } from './navigation.js';
+import { hrefOf, isCurrent, navigationOf, screenOf, tabTitleOf, type Screen } from './navigation.js';
 
 describe('the admin navigation', () => {
     it('reads back every screen it writes into the address', () => {
@@ -82,5 +82,11 @@ describe('the admin navigation', () => {
                 ref: 'item:employees:1',
             })
         ).toBe(false);
+    });
+
+    it("names the tab after the screen and the site's name", () => {
+        expect(tabTitleOf('Front page', 'Hagen')).toBe('Front page · Hagen');
+        expect(tabTitleOf(undefined, 'Hagen')).toBe('Hagen');
+        expect(tabTitleOf('Articles', undefined)).toBe('Articles · Kizuna CMS');
     });
 });

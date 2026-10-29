@@ -114,6 +114,7 @@ beforeAll(async () => {
                         {
                             id: 'grace',
                             name: 'Grace Hopper',
+                            email: 'grace@example.com',
                             roles: ['admin'],
                         },
                     ],
@@ -155,7 +156,7 @@ const draft = (who: 'ada' | 'kari' | 'grace', page: string, heading: string) =>
     });
 
 describe('people and owners', () => {
-    it('lists the people who edit, and who is asking', async () => {
+    it('lists the people who edit, with an email where the app gives one, and who is asking', async () => {
         const response = await as('kari', request(app).get('/editing/people'));
         expect(response.status).toBe(200);
         expect(response.body.me).toBe('kari');
@@ -167,6 +168,7 @@ describe('people and owners', () => {
         expect(response.body.people[2]).toEqual({
             id: 'grace',
             name: 'Grace Hopper',
+            email: 'grace@example.com',
             roles: ['admin'],
         });
     });

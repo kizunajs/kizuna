@@ -15,4 +15,9 @@ export interface SignInConfig {
      * The visitor is signed in already, without a role that edits.
      */
     noAccess: boolean;
+    /**
+     * What editors call the site, from `name` on `cms()`, which the screen
+     * asks them to sign in to.
+     */
+    siteName?: string | undefined;
 }

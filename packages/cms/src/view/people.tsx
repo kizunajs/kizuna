@@ -9,6 +9,7 @@ export interface People {
     me: string;
     people: Array<
         PersonView & {
+            email?: string;
             roles?: string[];
         }
     >;

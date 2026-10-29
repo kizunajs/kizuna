@@ -1,13 +1,13 @@
 import type { Connection } from '../view/connection.js';
 import { humanize } from '../view/schema.js';
-import type { CollectionSummary, NavigationSection, Screen } from './navigation.js';
+import { hrefOf, type CollectionSummary, type NavigationSection, type Screen } from './navigation.js';
 import { statusLabelOf } from './parts.js';
 
 /**
- * One thing ⌘K can open: a screen in the sidebar, or a page or item by its
- * title.
+ * One thing ⌘K finds: a screen in the sidebar, a page or item by its title,
+ * which it opens, or an action, which it runs.
  */
-export interface SearchResult {
+export type SearchResult = {
     label: string;
     /**
      * Shown beside the label: the sidebar heading of a screen, the path of a
@@ -15,11 +15,25 @@ export interface SearchResult {
      */
     detail: string;
     /**
-     * The heading the palette lists it under: Go to for a screen, Pages for
-     * a page, and the collection for an item.
+     * The heading the palette lists it under: Go to for a screen, Actions for
+     * an action, Pages for a page, and the collection for an item.
      */
     group: string;
-    screen: Screen;
+} & (
+    | {
+          screen: Screen;
+      }
+    | {
+          run: () => void;
+      }
+);
+
+/**
+ * Something ⌘K runs rather than opens, like Publish on the open document.
+ */
+export interface PaletteAction {
+    label: string;
+    run: () => void;
 }
 
 /**
@@ -27,10 +41,33 @@ export interface SearchResult {
  */
 export const PLACES_GROUP = 'Go to';
 
+/**
+ * The heading the palette lists its actions under.
+ */
+export const ACTIONS_GROUP = 'Actions';
+
 export interface SearchResults {
     places: SearchResult[];
+    actions: SearchResult[];
     documents: SearchResult[];
 }
+
+/**
+ * The actions as the palette lists them, under Actions.
+ */
+export const actionResultsOf = (actions: readonly PaletteAction[]): SearchResult[] =>
+    actions.map((action) => ({
+        label: action.label,
+        detail: '',
+        group: ACTIONS_GROUP,
+        run: action.run,
+    }));
+
+/**
+ * What tells one result from another in the list: the address a screen or
+ * document opens at, or an action's label.
+ */
+export const resultKeyOf = (result: SearchResult): string => ('screen' in result ? hrefOf(result.screen) : `action:${result.label}`);
 
 /**
  * How many documents ⌘K lists for one search.
@@ -85,22 +122,26 @@ const matching = (results: readonly SearchResult[], query: string): SearchResult
         .map((candidate) => candidate.result);
 
 /**
- * What a search finds. With nothing typed it offers the sidebar, and
- * documents only once something matches their titles.
+ * What a search finds. With nothing typed it offers the sidebar and the
+ * actions, and documents only once something matches their titles.
  */
 export const searchOf = (options: {
     query: string;
     places: readonly SearchResult[];
+    actions?: readonly SearchResult[];
     documents: readonly SearchResult[];
 }): SearchResults => {
+    const actions = options.actions ?? [];
     if (options.query.trim() === '') {
         return {
             places: [...options.places],
+            actions: [...actions],
             documents: [],
         };
     }
     return {
         places: matching(options.places, options.query),
+        actions: matching(actions, options.query),
         documents: matching(options.documents, options.query).slice(0, DOCUMENT_LIMIT),
     };
 };
@@ -174,11 +215,12 @@ export interface SearchGroup {
 
 /**
  * What a search found, under the palette's headings: the screens first, then
- * the documents under their group, the group of the best match first.
+ * the actions, then the documents under their group, the group of the best
+ * match first.
  */
 export const groupsOfResults = (results: SearchResults): SearchGroup[] => {
     const groups = new Map<string, SearchResult[]>();
-    for (const result of [...results.places, ...results.documents]) {
+    for (const result of [...results.places, ...results.actions, ...results.documents]) {
         groups.set(result.group, [...(groups.get(result.group) ?? []), result]);
     }
     return [...groups].map(([label, items]) => ({

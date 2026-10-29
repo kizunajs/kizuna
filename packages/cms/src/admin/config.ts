@@ -12,6 +12,11 @@ export interface AdminRoute {
  */
 export interface AdminConfig {
     /**
+     * What editors call the site, from `name` on `cms()`, which each tab's
+     * title ends with.
+     */
+    siteName?: string | undefined;
+    /**
      * The site's origin, which images resolve against.
      */
     siteUrl: string | null;

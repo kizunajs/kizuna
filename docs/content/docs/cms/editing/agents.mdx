@@ -30,6 +30,12 @@ GET /api/editing/collections/articles/items?filter=topic:is:care&filter=status:i
 
 `values` holds what is stored, and `labels` what an editor reads for a choice or an id, so `topic` is `care` in one and `Plant care` in the other. Since `status` and `updatedAt` name the item's own status and time, an index cannot take either name.
 
+A [view's](/docs/cms/views#filtering-sorting-and-paging) list tool, like `editing_views_app_users_list`, takes `q`, `limit` and `offset`, and `total` counts what matches. A view that names `filters` also takes `filter`, with `is` and `isNot` on those fields, and one that names `sorts` takes `orderBy` and `direction`. The tool's description names the fields and the values each takes:
+
+```
+GET /api/editing/views/appUsers/items?filter=role:is:admin&orderBy=signedUpAt&direction=desc&limit=25
+```
+
 ## Connecting a chat
 
 **Edit in your chat**, in the account menu at the foot of the admin's sidebar, shows an editor how to connect Claude to the CMS's MCP route as themselves. The admin finds the route that `mcpPlugin()` serves, and names the server after the plugin's `name`.

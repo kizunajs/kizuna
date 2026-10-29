@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Collapsible } from '@base-ui/react/collapsible';
 import { Combobox } from '@base-ui/react/combobox';
 import { Dialog } from '@base-ui/react/dialog';
@@ -22,7 +22,7 @@ import {
     X,
 } from 'lucide-react';
 import { itemNounOf, movedIndex, remapOpen, rowLabelsOf, singularOf } from './array-rows.js';
-import { ICON, useEditorContext } from './context.js';
+import { EditorContext, ICON, useEditorContext } from './context.js';
 import { Hint } from './hint.js';
 import { cropOf, edgesOf, type CropEdges } from './crop.js';
 import { MediaPicker, uploadMedia, type MediaRecord } from './media.js';
@@ -843,11 +843,39 @@ function ArrayControl(props: ControlProps) {
         onChange(next);
     };
     const moveTo = (from: number, to: number): void => reorder(moveItem(items, from, to), (index) => movedIndex(index, from, to));
-    const remove = (at: number): void =>
+    const offerUndo = useContext(EditorContext)?.offerUndo;
+    // Undo puts a removed item back into the list as it is by then, so it reads the latest.
+    const latest = useRef({
+        items,
+        reorder,
+    });
+    latest.current = {
+        items,
+        reorder,
+    };
+    const undoToasts = useRef(new Set<() => void>());
+    // A list that goes away, with its document, can no longer take an item back.
+    useEffect(() => {
+        const shown = undoToasts.current;
+        return () => {
+            for (const close of shown) close();
+        };
+    }, []);
+    const remove = (at: number): void => {
+        const removed = items[at];
         reorder(
             items.filter((_, index) => index !== at),
             (index) => (index === at ? undefined : index > at ? index - 1 : index)
         );
+        if (offerUndo === undefined) return;
+        const close = offerUndo(`Removed ${noun} ${at + 1}.`, () => {
+            undoToasts.current.delete(close);
+            const now = latest.current.items;
+            const place = Math.min(at, now.length);
+            latest.current.reorder([...now.slice(0, place), removed, ...now.slice(place)], (index) => (index >= place ? index + 1 : index));
+        });
+        undoToasts.current.add(close);
+    };
     const add = (): void => {
         onChange([...items, emptyFor(itemSchema, root)]);
         if (folds) setOpen((previous) => new Set([...previous, items.length]));

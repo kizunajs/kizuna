@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { Tabs } from '@base-ui/react/tabs';
 import { Toast } from '@base-ui/react/toast';
@@ -7,13 +7,13 @@ import { toolsFor, type Connection, type ToolAnswer } from '../view/connection.j
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
 import { OwnerControl, type People } from '../view/people.js';
-import { PublishReview, changeViewsOf, type Changes } from '../view/review.js';
+import { PublishReview, changeViewsOf, type Changes, type PublishReviewHandle } from '../view/review.js';
 import { documentTitle, valueAt, type Description, type Draft, type ReviewState } from '../view/schema.js';
 import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
 import { ConfirmDialog } from './confirm.js';
-import { blockerOf, documentDatesOf } from './document-menu.js';
-import { DocumentMore } from './document-more.js';
+import { blockerOf, documentDatesOf, menuEntriesOf } from './document-menu.js';
+import { DocumentMore, type DocumentMoreHandle } from './document-more.js';
 import { savedAtOf, type VersionSummary } from './history.js';
 import { hrefOf } from './navigation.js';
 import { PageHeader, type Crumb } from './page-header.js';
@@ -28,8 +28,10 @@ import { CommentLinks, FieldComments } from './review-comments.js';
 import { DecisionCard, PeopleFact, RequestChanges, ReviewScreen, type ViewedChange } from './review-screen.js';
 import { askAgainLabelOf, askAgainOf, gateNoteOf, mayUndoApproval, mayWithdraw, reviewStatusPartsOf, waitsForMe } from './review-state.js';
 import { sectionLabelOf } from './sections.js';
+import { useOfferUndo } from './toasts.js';
 import { Versions } from './versions.js';
 import type { WaitingReview } from './dashboard.js';
+import type { PaletteAction } from './search.js';
 
 /**
  * How often the screen checks whether someone else, or a model, changed the
@@ -157,6 +159,8 @@ export function DocumentScreen({
     onReviewsChanged,
     role,
     onSearch,
+    onTitle,
+    paletteActions,
 }: {
     connection: Connection;
     documentRef: string;
@@ -170,6 +174,15 @@ export function DocumentScreen({
      */
     role: string | null;
     onSearch: () => void;
+    /**
+     * Hears the document's title once it loads, for the browser tab.
+     */
+    onTitle?: (title: string | undefined) => void;
+    /**
+     * Where the screen leaves what ⌘K offers while it is open: what its
+     * header's buttons do as the document stands.
+     */
+    paletteActions?: RefObject<(() => PaletteAction[]) | undefined>;
 }) {
     const [document, setDocument] = useState<Description | undefined>();
     const [loadProblem, setLoadProblem] = useState<string | undefined>();
@@ -198,6 +211,10 @@ export function DocumentScreen({
     // The document the screen last opened, so a review waiting for the person opens on its tab once.
     const opened = useRef<string | undefined>(undefined);
     const toasts = Toast.useToastManager();
+    const offerUndo = useOfferUndo();
+    // Undo of a restore puts back this document's draft, so it goes once the document closes.
+    const closeRestoreUndo = useRef<(() => void) | undefined>(undefined);
+    useEffect(() => () => closeRestoreUndo.current?.(), []);
     const [pointed, setPointed] = useState<string | undefined>();
     const [updatedAt, setUpdatedAt] = useState<string | null>(null);
     const now = useNow();
@@ -210,6 +227,17 @@ export function DocumentScreen({
     latest.current = document;
     const failing = useRef<SaveProblem | undefined>(undefined);
     const retry = useCallback(() => void form.current?.flush(), []);
+    const publishButton = useRef<PublishReviewHandle>(null);
+    const moreMenu = useRef<DocumentMoreHandle>(null);
+    // Set as the screen renders, so ⌘K reads the buttons as they stand.
+    const offered = useRef<() => PaletteAction[]>(() => []);
+    useEffect(() => {
+        if (paletteActions === undefined) return;
+        paletteActions.current = () => offered.current();
+        return () => {
+            paletteActions.current = undefined;
+        };
+    }, [paletteActions]);
     useRetry(saveProblem, online, retry);
 
     const describe = useCallback(
@@ -334,6 +362,11 @@ export function DocumentScreen({
         return () => window.clearTimeout(timer);
     }, [changed]);
 
+    const loadedTitle = document === undefined ? undefined : documentTitle(document);
+    useEffect(() => {
+        onTitle?.(loadedTitle);
+    }, [onTitle, loadedTitle]);
+
     useEffect(() => {
         if (pointed === undefined) return;
         const timer = window.setTimeout(() => setPointed(undefined), POINTED_MS);
@@ -456,8 +489,9 @@ export function DocumentScreen({
             connection,
             resolveUrl,
             pageUrl: siteUrl === null || documentPath === undefined ? undefined : new URL(documentPath, siteUrl).toString(),
+            offerUndo,
         }),
-        [connection, resolveUrl, siteUrl, documentPath]
+        [connection, resolveUrl, siteUrl, documentPath, offerUndo]
     );
 
     /**
@@ -594,13 +628,16 @@ export function DocumentScreen({
     };
 
     /**
-     * Makes an earlier version the draft, once the person confirmed.
+     * Makes an earlier version the draft, once the person confirmed. Undo
+     * restores the draft it replaced, which is the latest version, until the
+     * draft changes again.
      */
-    const restore = async (version: number): Promise<void> => {
+    const restore = async (version: number, undoing = false): Promise<void> => {
         setRestoring(undefined);
         const tools = toolsFor(documentRef);
         if (tools === undefined) return;
         setLinkProblem(undefined);
+        const replaced = latest.current?.version;
         const answer = await connection.call(`${tools.prefix}_rollback`, {
             params: tools.params,
             body: {
@@ -608,14 +645,32 @@ export function DocumentScreen({
             },
         });
         if (answer.status !== 200) {
-            setLinkProblem(problemOf(answer, 'The version was not restored'));
+            setLinkProblem(problemOf(answer, undoing ? 'The draft was not put back' : 'The version was not restored'));
             return;
         }
         setCompared(undefined);
-        toasts.add({
-            description: `Restored version ${version} as the draft.`,
+        const restored = await describe(documentRef);
+        if (undoing) {
+            toasts.add({
+                description: 'Put back the draft you had.',
+            });
+            return;
+        }
+        if (replaced === undefined || restored === undefined) {
+            toasts.add({
+                description: `Restored version ${version} as the draft.`,
+            });
+            return;
+        }
+        const savesAtRestore = saves.current;
+        closeRestoreUndo.current = offerUndo(`Restored version ${version} as the draft.`, () => {
+            const current = latest.current;
+            if (current?.ref !== restored.ref || current.version !== restored.version || saves.current !== savesAtRestore) {
+                setLinkProblem(`The draft changed after the restore. Restore version ${replaced} under Versions to go back to it.`);
+                return;
+            }
+            void restore(replaced, true);
         });
-        await describe(documentRef);
     };
 
     const { noun, list } = documentNounOf(documentRef, collectionLabel);
@@ -640,6 +695,7 @@ export function DocumentScreen({
                             }
                   ),
               };
+    offered.current = () => [];
     const state =
         loadStatus === 404
             ? 'not-found'
@@ -815,6 +871,7 @@ export function DocumentScreen({
 
     const more = (
         <DocumentMore
+            ref={moreMenu}
             connection={connection}
             document={document}
             title={title}
@@ -830,6 +887,55 @@ export function DocumentScreen({
             onProblem={setLinkProblem}
         />
     );
+
+    const normalHeader = !comparing && !answering;
+    const publishShown = normalHeader && !(sentBackBy !== undefined && document.requireReview && !canPublishPast);
+    const publishDisabled = !online || unsaved || saveState === 'failed' || (blocker !== undefined && waiting.length === 0);
+    const saveDraftOffered = normalHeader && shownView !== 'review' && saveProblem === undefined && saveState === 'pending';
+    offered.current = () => {
+        const actions: PaletteAction[] = [];
+        if (publishShown && !publishDisabled && blocker === undefined) {
+            actions.push({
+                label: 'Publish',
+                run: () => publishButton.current?.open(),
+            });
+        }
+        if (saveDraftOffered) {
+            actions.push({
+                label: 'Save draft',
+                run: () => void form.current?.flush(),
+            });
+        }
+        // The `…` menu's entries run through the menu, which asks first where it asks.
+        const entries = menuEntriesOf({
+            kind: document.kind,
+            status: document.status,
+            askable,
+            actions: document.actions,
+        });
+        const ask = entries.find((entry) => entry.kind === 'ask');
+        if (ask !== undefined) {
+            actions.push({
+                label: ask.label,
+                run: () => moreMenu.current?.choose(ask),
+            });
+        }
+        if (siteUrl !== null && document.path !== null) {
+            const path = document.path;
+            actions.push({
+                label: 'Open on the site',
+                run: () => void openOnSite(path),
+            });
+        }
+        for (const entry of entries) {
+            if (entry.kind !== 'action') continue;
+            actions.push({
+                label: entry.label,
+                run: () => moreMenu.current?.choose(entry),
+            });
+        }
+        return actions;
+    };
 
     const fieldLabelOf = (path: string): string => sectionLabelOf(document.fields, document.layout, path, path);
     // The note of whoever sent the draft back, and the open comments, at the top of the sidebar while the changes are made.
@@ -1032,17 +1138,16 @@ export function DocumentScreen({
                                         Review
                                     </button>
                                 ) : null}
-                                {sentBackBy !== undefined && document.requireReview && !canPublishPast ? null : (
+                                {!publishShown ? null : (
                                     <PublishReview
+                                        ref={publishButton}
                                         connection={connection}
                                         candidates={reviewCandidates}
                                         people={people}
                                         waiting={waiting.filter((entry) => entry.ref !== document.ref).length}
                                         everywhere={document.usedOn.everywhere}
                                         secondary={sentBackBy !== undefined}
-                                        disabled={
-                                            !online || unsaved || saveState === 'failed' || (blocker !== undefined && waiting.length === 0)
-                                        }
+                                        disabled={publishDisabled}
                                         describedBy={blocker === undefined ? undefined : 'k-document-blocker'}
                                         onChanged={(refs) => {
                                             onReviewsChanged();

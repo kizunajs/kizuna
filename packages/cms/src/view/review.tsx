@@ -352,6 +352,10 @@ export interface PublishReviewProps {
 
 export interface PublishReviewHandle {
     /**
+     * Opens the dialog, as a click on Publish does.
+     */
+    open: () => void;
+    /**
      * Opens the dialog on asking for a review of what changed.
      */
     ask: () => void;
@@ -514,6 +518,7 @@ export function PublishReview({
     useImperativeHandle(
         ref,
         () => ({
+            open: () => setOpen(true),
             ask: () => {
                 askOnLoad.current = true;
                 setOpen(true);

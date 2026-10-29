@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog } from '@base-ui/react/dialog';
+import { Toast } from '@base-ui/react/toast';
 import { Menu as MenuIcon, X } from 'lucide-react';
 import { EditorContext, ICON, type EditorContextValue } from '../view/context.js';
+import { singularOf } from '../view/array-rows.js';
 import { Logo } from '../view/logo.js';
 import { usePeople } from '../view/people.js';
 import { CommandPalette, SearchButton, usePaletteShortcut } from './command-palette.js';
@@ -10,7 +12,7 @@ import { connectOverHttp } from './connection.js';
 import { Dashboard, type WaitingReview } from './dashboard.js';
 import { DocumentScreen } from './document.js';
 import { EditInChat } from './edit-in-chat.js';
-import { CollectionList, PagesList } from './list.js';
+import { CollectionList, PagesList, createItem } from './list.js';
 import { MediaLibrary } from './media.js';
 import {
     CONTENT_GROUP,
@@ -18,6 +20,7 @@ import {
     isCurrent,
     navigationOf,
     screenOf,
+    tabTitleOf,
     type CollectionSummary,
     type GlobalSummary,
     type Screen,
@@ -27,6 +30,8 @@ import { PageHeader } from './page-header.js';
 import { SignedIn } from './signed-in.js';
 import { NotFound, shownAddress } from './states.js';
 import { useTheme } from './theme.js';
+import { useOfferUndo } from './toasts.js';
+import type { PaletteAction } from './search.js';
 import { RecordScreen, ViewList } from './view-screen.js';
 import type { ViewSummary } from './views.js';
 
@@ -97,6 +102,11 @@ export function Admin({ config }: { config: AdminConfig }) {
     const [waiting, setWaiting] = useState<WaitingReview[] | undefined>();
     const [views, setViews] = useState<ViewSummary[] | undefined>();
     const [problem, setProblem] = useState<string | undefined>();
+    const [documentHeading, setDocumentHeading] = useState<string | undefined>();
+    // What the open document offers ⌘K, set by its screen while it is open.
+    const documentActions = useRef<(() => PaletteAction[]) | undefined>(undefined);
+    const toasts = Toast.useToastManager();
+    const offerUndo = useOfferUndo();
 
     const loadLists = useCallback(async (): Promise<void> => {
         const [listedGlobals, listedCollections] = await Promise.all([
@@ -153,6 +163,15 @@ export function Admin({ config }: { config: AdminConfig }) {
         [globals, collections, views, config.groups]
     );
 
+    // The tab is named after the screen: a document by its title, and anything else as the sidebar names it.
+    const screenTitle =
+        screen.kind === 'document'
+            ? documentHeading
+            : sections.flatMap((section) => section.entries).find((entry) => isCurrent(entry.screen, screen))?.label;
+    useEffect(() => {
+        window.document.title = tabTitleOf(screen.kind === 'dashboard' ? 'Dashboard' : screenTitle, config.siteName);
+    }, [screen.kind, screenTitle, config.siteName]);
+
     const groupOf = (name: string): string => config.groups[name] ?? CONTENT_GROUP;
     const collectionLabel = (name: string): string | undefined => collections?.find((collection) => collection.name === name)?.label;
     const openDocument = (ref: string): void =>
@@ -172,11 +191,37 @@ export function Admin({ config }: { config: AdminConfig }) {
                 }
             },
             pageUrl: undefined,
+            offerUndo,
         }),
-        [connection, config.siteUrl]
+        [connection, config.siteUrl, offerUndo]
     );
 
     const me = people === undefined ? undefined : people.people.find((person) => person.id === people.me);
+
+    /**
+     * What ⌘K offers under Actions: the open document's buttons, or a new
+     * item of each collection on any other screen.
+     */
+    const paletteActions = (): PaletteAction[] => {
+        if (screen.kind === 'document') return documentActions.current?.() ?? [];
+        if (config.routes['editing_collections_create_item'] === undefined) return [];
+        return (collections ?? []).map((collection) => {
+            const one = singularOf(collection.label);
+            return {
+                label: `Create new ${one === collection.label ? `${collection.label.toLowerCase()} item` : one.toLowerCase()}`,
+                run: () =>
+                    void createItem(connection, collection.name).then((created) => {
+                        if ('problem' in created) {
+                            toasts.add({
+                                description: created.problem,
+                            });
+                            return;
+                        }
+                        openDocument(created.ref);
+                    }),
+            };
+        });
+    };
 
     // A list the address names that the editor has none of, or may not open.
     const missingList = (
@@ -244,6 +289,8 @@ export function Admin({ config }: { config: AdminConfig }) {
                     onReviewsChanged={() => void loadWaiting()}
                     role={config.role}
                     onSearch={openSearch}
+                    onTitle={setDocumentHeading}
+                    paletteActions={documentActions}
                 />
             );
         }
@@ -380,6 +427,7 @@ export function Admin({ config }: { config: AdminConfig }) {
                 connection={connection}
                 sections={sections}
                 collections={collections}
+                actions={paletteActions}
             />
         </EditorContext.Provider>
     );

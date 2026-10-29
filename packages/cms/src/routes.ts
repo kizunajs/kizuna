@@ -1217,6 +1217,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 people: (await peopleOf(cms)).map((person) => ({
                     id: person.id,
                     name: person.name,
+                    ...(person.email === undefined
+                        ? {}
+                        : {
+                              email: person.email,
+                          }),
                     ...(person.image === undefined
                         ? {}
                         : {

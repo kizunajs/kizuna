@@ -32,6 +32,7 @@ export default defineConfig({
         },
     },
     content: cms({
+        name: 'Hagen',
         db,
         pages,
         globals: [Header, Footer],

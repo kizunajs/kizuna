@@ -296,6 +296,16 @@ export interface CmsPluginOptions<
     Sites extends Record<string, SiteOptions> = Record<string, SiteOptions>,
 > {
     /**
+     * What editors call the site, which the admin's sign-in screen asks them
+     * to sign in to and its tab titles end with.
+     *
+     * @example
+     * ```ts
+     * name: 'Hagen',
+     * ```
+     */
+    name?: string;
+    /**
      * The Drizzle database the three `cms_` tables live in. A dedicated
      * instance on a role limited to those tables keeps a CMS bug away from
      * app data.
@@ -463,6 +473,7 @@ const PageMapSchema = z.custom<PageMap>(
 
 export const CmsPluginOptionsSchema = z
     .object({
+        name: z.string().min(1).optional(),
         db: z.custom<CmsDatabase>((value) => typeof value === 'object' && value !== null && 'select' in value, {
             error: 'must be a Drizzle database',
         }),

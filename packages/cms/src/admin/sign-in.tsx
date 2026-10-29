@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@base-ui/react/button';
 import { Field } from '@base-ui/react/field';
 import { Form } from '@base-ui/react/form';
@@ -21,13 +21,18 @@ const messageFor = (status: number): string => {
 /**
  * The admin's sign-in screen: an email, a password and a Sign in button,
  * sent to the CMS's sign-in route. Once the editor is in, the page goes on
- * to `next`.
+ * to `next`. With the site's name, it asks them to sign in to it.
  */
 export function SignIn({ config }: { config: SignInConfig }) {
     // The screen shows the light or dark the editor chose in the admin.
     useTheme();
     const [error, setError] = useState<string | null>(config.noAccess ? NO_ACCESS : null);
     const [pending, setPending] = useState(false);
+    const heading = config.siteName === undefined ? 'Sign in' : `Sign in to ${config.siteName}`;
+
+    useEffect(() => {
+        if (config.siteName !== undefined) window.document.title = `Sign in · ${config.siteName}`;
+    }, [config.siteName]);
 
     const signIn = async (values: { email: string; password: string }) => {
         setPending(true);
@@ -71,7 +76,7 @@ export function SignIn({ config }: { config: SignInConfig }) {
                 onFormSubmit={(values: { email: string; password: string }) => void signIn(values)}>
                 <Logo />
                 <h1 id="k-sign-in__title" className="k-sign-in__title">
-                    Sign in
+                    {heading}
                 </h1>
                 <Field.Root name="email" className="k-sign-in__field">
                     <Field.Label className="k-sign-in__label">Email</Field.Label>
