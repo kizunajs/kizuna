@@ -172,7 +172,7 @@ export function ReviewScreen({
                         <>
                             <dt>Changed</dt>
                             <dd>
-                                {count === 1 ? '1 field' : `${count} fields`}
+                                {count === 0 ? 'Nothing' : count === 1 ? '1 field' : `${count} fields`}
                                 {titles.length === 0 ? '' : ` in ${sentenceOf(titles)}`}
                             </dd>
                         </>

@@ -248,11 +248,21 @@ export function MediaLibrary({
                         </div>
                         <span className="k-spacer" />
                         <div className="k-media-library__scopes" role="radiogroup" aria-label="Layout">
-                            <button type="button" role="radio" className="k-tab" aria-checked={layout === 'grid'} onClick={() => pickLayout('grid')}>
+                            <button
+                                type="button"
+                                role="radio"
+                                className="k-tab"
+                                aria-checked={layout === 'grid'}
+                                onClick={() => pickLayout('grid')}>
                                 <LayoutGrid {...ICON} />
                                 Grid
                             </button>
-                            <button type="button" role="radio" className="k-tab" aria-checked={layout === 'list'} onClick={() => pickLayout('list')}>
+                            <button
+                                type="button"
+                                role="radio"
+                                className="k-tab"
+                                aria-checked={layout === 'list'}
+                                onClick={() => pickLayout('list')}>
                                 <List {...ICON} />
                                 List
                             </button>
@@ -332,7 +342,11 @@ export function MediaLibrary({
                                         <Menu.Popup className="k-popup k-menu k-sort-menu">
                                             <Menu.RadioGroup value={sort} onValueChange={(next: string) => setSort(next)}>
                                                 {MEDIA_SORTS.map((choice) => (
-                                                    <Menu.RadioItem key={choice.key} value={choice.key} className="k-menu__item" closeOnClick>
+                                                    <Menu.RadioItem
+                                                        key={choice.key}
+                                                        value={choice.key}
+                                                        className="k-menu__item"
+                                                        closeOnClick>
                                                         {choice.label}
                                                         <Menu.RadioItemIndicator className="k-menu__check">
                                                             <Check {...ICON} />
@@ -595,8 +609,7 @@ function MediaDetails({
             .then((answer) => setUses(answer.status === 200 ? answer.body.uses : []));
     }, [connection, item.id]);
 
-    const changed =
-        alt !== item.alt || focal?.x !== item.focalPoint?.x || focal?.y !== item.focalPoint?.y;
+    const changed = alt !== item.alt || focal?.x !== item.focalPoint?.x || focal?.y !== item.focalPoint?.y;
     const useCount = uses?.length ?? item.uses;
     const uploader = people?.people.find((person) => person.id === item.uploadedBy)?.name ?? item.uploadedBy;
     const url = resolveUrl(item.url);
@@ -723,7 +736,9 @@ function MediaDetails({
                     placeholder="What the image shows"
                     onChange={(event) => setAlt(event.target.value)}
                 />
-                <p className="k-help">What the image shows, for someone who cannot see it. A field that picks the image starts with this text.</p>
+                <p className="k-help">
+                    What the image shows, for someone who cannot see it. A field that picks the image starts with this text.
+                </p>
             </div>
             <div className="k-media-details__group" role="group" aria-labelledby="k-media-used">
                 <span id="k-media-used" className="k-row__label">
@@ -772,7 +787,11 @@ function MediaDetails({
                 </p>
             )}
             <div className="k-media-details__actions">
-                <button type="button" className="k-button k-button--primary k-button--small" disabled={!changed || saving} onClick={() => void save()}>
+                <button
+                    type="button"
+                    className="k-button k-button--primary k-button--small"
+                    disabled={!changed || saving}
+                    onClick={() => void save()}>
                     {saving ? <LoaderCircle {...ICON} className="k-spin" /> : null}
                     Save
                 </button>
