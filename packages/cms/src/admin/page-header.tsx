@@ -32,7 +32,8 @@ const isPair = (fact: unknown): fact is MetaPair =>
  * The header every screen opens with: the trail back to it, its title with
  * its actions on the right, a line of facts about it, and its tabs. The
  * trail starts at the dashboard and ends on the title, so a screen passes
- * only the steps between them, and the dashboard itself passes none.
+ * only the steps between them. The dashboard passes no `crumbs` and shows no
+ * trail.
  *
  * Facts given as labelled pairs read "Status Draft changes", spaced apart.
  * Plain facts read in one muted line with dots between them. Tabs take a row
@@ -47,7 +48,7 @@ export function PageHeader({
 }: {
     /**
      * The steps between the dashboard and the title. Left out on the
-     * dashboard, whose trail is its title alone.
+     * dashboard, which has no trail.
      */
     crumbs?: readonly Crumb[];
     title: string;
@@ -58,30 +59,32 @@ export function PageHeader({
     actions?: ReactNode;
     tabs?: ReactNode;
 }) {
-    const trail = crumbs === undefined ? [] : [DASHBOARD_CRUMB, ...crumbs];
+    const trail = crumbs === undefined ? undefined : [DASHBOARD_CRUMB, ...crumbs];
     const facts = (meta ?? []).filter((fact) => fact !== null && fact !== undefined && fact !== false && fact !== '');
     const pairs = facts.length > 0 && facts.every(isPair);
     return (
-        <header className="k-page-header" data-tabs={tabs === undefined ? undefined : ''}>
-            <nav className="k-page-header__nav" aria-label="Breadcrumb">
-                <ol className="k-page-header__trail">
-                    {trail.map((crumb, index) => (
-                        <Fragment key={`${index}:${crumb.label}`}>
-                            <li className="k-page-header__crumb">
-                                {crumb.href === undefined ? crumb.label : <a href={crumb.href}>{crumb.label}</a>}
+        <header className="k-page-header" data-trail={trail === undefined ? undefined : ''} data-tabs={tabs === undefined ? undefined : ''}>
+            {trail === undefined ? null : (
+                <nav className="k-page-header__nav" aria-label="Breadcrumb">
+                    <ol className="k-page-header__trail">
+                        {trail.map((crumb, index) => (
+                            <Fragment key={`${index}:${crumb.label}`}>
+                                <li className="k-page-header__crumb">
+                                    {crumb.href === undefined ? crumb.label : <a href={crumb.href}>{crumb.label}</a>}
+                                </li>
+                                <li className="k-page-header__separator" aria-hidden="true">
+                                    /
+                                </li>
+                            </Fragment>
+                        ))}
+                        {title === '' ? null : (
+                            <li className="k-page-header__current k-ellipsis" aria-current="page">
+                                {title}
                             </li>
-                            <li className="k-page-header__separator" aria-hidden="true">
-                                /
-                            </li>
-                        </Fragment>
-                    ))}
-                    {title === '' ? null : (
-                        <li className="k-page-header__current k-ellipsis" aria-current="page">
-                            {title}
-                        </li>
-                    )}
-                </ol>
-            </nav>
+                        )}
+                    </ol>
+                </nav>
+            )}
             <h1 className="k-page-header__title">{title}</h1>
             {actions === undefined || actions === null ? null : <div className="k-page-header__actions">{actions}</div>}
             {facts.length === 0 ? null : pairs ? (

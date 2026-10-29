@@ -3,26 +3,31 @@ import { CONTENT_GROUP } from './navigation.js';
 import { relativeTimeOf } from './time.js';
 
 /**
- * The periods the dashboard counts over, in the order the picker lists them.
+ * The periods the dashboard counts over, in the order the picker lists them,
+ * each with the words for the period it is compared with.
  */
 export const PERIODS = [
     {
         key: '24h',
         label: 'Last 24 hours',
+        before: 'the 24 hours before',
     },
     {
         key: '7d',
         label: 'Last 7 days',
+        before: 'the 7 days before',
     },
     {
         key: '30d',
         label: 'Last 30 days',
+        before: 'the 30 days before',
     },
     {
         key: '90d',
         label: 'Last 90 days',
+        before: 'the 90 days before',
     },
-] satisfies ReadonlyArray<{ key: string; label: string }>;
+] satisfies ReadonlyArray<{ key: string; label: string; before: string }>;
 
 export type PeriodKey = (typeof PERIODS)[number]['key'];
 

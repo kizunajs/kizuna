@@ -90,7 +90,14 @@ export function ViewList({ connection, view }: { connection: Connection; view: V
                 title: `No ${view.label.toLowerCase()} yet`,
                 description: 'The view lists what the app holds, and the app holds none yet.',
             }}
-            facts={[view.readOnly ? 'Read only' : null]}
+            facts={[
+                view.readOnly
+                    ? {
+                          label: 'Access',
+                          value: 'Read only',
+                      }
+                    : null,
+            ]}
             search={{
                 query,
                 onQuery: setQuery,

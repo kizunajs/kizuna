@@ -29,7 +29,7 @@ import { EmptyTable, FlatRows, TreeRows, type TableOptions, type TreeRow } from 
 import { ColumnsPanel, ListToolbar, SortMenu, type ListPanel } from './list-toolbar.js';
 import { parentAfterDrop, parentChange, type TreePlace } from './list-tree.js';
 import { hrefOf, type CollectionSummary } from './navigation.js';
-import { PageHeader } from './page-header.js';
+import { PageHeader, type MetaPair } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
 
 /**
@@ -55,6 +55,16 @@ interface OwnSearch {
     placeholder: string;
 }
 
+/**
+ * Every page holds at least this many rows, so a list no longer than this has
+ * no page size worth choosing.
+ */
+const FEWEST_PER_PAGE = Math.min(...PER_PAGE_CHOICES);
+
+/**
+ * How far into the rows the page is, the pages to step through when there is
+ * more than one, and how many rows a page holds when that could matter.
+ */
 function Pager({
     page,
     pageCount,
@@ -80,72 +90,76 @@ function Pager({
     }));
     return (
         <div className="k-list-pager">
-            <nav className="k-list-pager__pages" aria-label="Pagination">
-                <Hint label="Previous page">
-                    <button
-                        type="button"
-                        className="k-tab k-list-pager__step"
-                        aria-label="Previous page"
-                        disabled={page === 0}
-                        onClick={() => onPage(page - 1)}>
-                        <ChevronLeft {...ICON} />
-                    </button>
-                </Hint>
-                {pagesAround(page, pageCount).map((number, index) =>
-                    number === null ? (
-                        <span key={`gap-${index}`} className="k-list-pager__gap" aria-hidden="true">
-                            …
-                        </span>
-                    ) : (
-                        <button
-                            key={number}
-                            type="button"
-                            className="k-tab k-list-pager__page"
-                            aria-current={number === page ? 'page' : undefined}
-                            onClick={() => onPage(number)}>
-                            {number + 1}
-                        </button>
-                    )
-                )}
-                <Hint label="Next page">
-                    <button
-                        type="button"
-                        className="k-tab k-list-pager__step"
-                        aria-label="Next page"
-                        disabled={page === pageCount - 1}
-                        onClick={() => onPage(page + 1)}>
-                        <ChevronRight {...ICON} />
-                    </button>
-                </Hint>
-            </nav>
             <span className="k-list-pager__range">
                 {countOf(first)} to {countOf(last)} of {countOf(total)}
             </span>
-            <Select.Root
-                items={choices}
-                value={String(perPage)}
-                onValueChange={(next) => {
-                    if (next !== null) onPerPage(Number(next));
-                }}>
-                <Select.Trigger className="k-tab k-list-pager__per-page" aria-label={`Rows per page, ${perPage}`}>
-                    Per page <b>{perPage}</b>
-                    <ChevronDown {...ICON} />
-                </Select.Trigger>
-                <Select.Portal>
-                    <Select.Positioner sideOffset={6} alignItemWithTrigger={false} className="k-positioner">
-                        <Select.Popup className="k-popup k-menu">
-                            {choices.map((choice) => (
-                                <Select.Item key={choice.value} value={choice.value} className="k-menu__item">
-                                    <Select.ItemText>{choice.label}</Select.ItemText>
-                                    <Select.ItemIndicator className="k-menu__check">
-                                        <Check {...ICON} />
-                                    </Select.ItemIndicator>
-                                </Select.Item>
-                            ))}
-                        </Select.Popup>
-                    </Select.Positioner>
-                </Select.Portal>
-            </Select.Root>
+            {pageCount < 2 ? null : (
+                <nav className="k-list-pager__pages" aria-label="Pagination">
+                    <Hint label="Previous page">
+                        <button
+                            type="button"
+                            className="k-tab k-list-pager__step"
+                            aria-label="Previous page"
+                            disabled={page === 0}
+                            onClick={() => onPage(page - 1)}>
+                            <ChevronLeft {...ICON} />
+                        </button>
+                    </Hint>
+                    {pagesAround(page, pageCount).map((number, index) =>
+                        number === null ? (
+                            <span key={`gap-${index}`} className="k-list-pager__gap" aria-hidden="true">
+                                …
+                            </span>
+                        ) : (
+                            <button
+                                key={number}
+                                type="button"
+                                className="k-tab k-list-pager__page"
+                                aria-current={number === page ? 'page' : undefined}
+                                onClick={() => onPage(number)}>
+                                {number + 1}
+                            </button>
+                        )
+                    )}
+                    <Hint label="Next page">
+                        <button
+                            type="button"
+                            className="k-tab k-list-pager__step"
+                            aria-label="Next page"
+                            disabled={page === pageCount - 1}
+                            onClick={() => onPage(page + 1)}>
+                            <ChevronRight {...ICON} />
+                        </button>
+                    </Hint>
+                </nav>
+            )}
+            {total <= FEWEST_PER_PAGE ? null : (
+                <Select.Root
+                    items={choices}
+                    value={String(perPage)}
+                    onValueChange={(next) => {
+                        if (next !== null) onPerPage(Number(next));
+                    }}>
+                    <Select.Trigger className="k-tab k-list-pager__per-page" aria-label={`Rows per page, ${perPage}`}>
+                        Per page <b>{perPage}</b>
+                        <ChevronDown {...ICON} />
+                    </Select.Trigger>
+                    <Select.Portal>
+                        <Select.Positioner sideOffset={6} alignItemWithTrigger={false} className="k-positioner">
+                            <Select.Popup className="k-popup k-menu">
+                                {choices.map((choice) => (
+                                    <Select.Item key={choice.value} value={choice.value} className="k-menu__item">
+                                        <Select.ItemText>{choice.label}</Select.ItemText>
+                                        <Select.ItemIndicator className="k-menu__check">
+                                            <Check {...ICON} />
+                                        </Select.ItemIndicator>
+                                    </Select.Item>
+                                ))}
+                            </Select.Popup>
+                        </Select.Positioner>
+                    </Select.Portal>
+                </Select.Root>
+            )}
         </div>
     );
 }
@@ -239,9 +253,9 @@ export function ListScreen({
      */
     above?: ReactNode;
     /**
-     * More of the header's line after the count, like "Read only".
+     * More of the header's facts after the total, like "Access Read only".
      */
-    facts?: readonly ReactNode[];
+    facts?: readonly (MetaPair | null)[];
     nameOf?: (id: string) => string;
 }) {
     const panelId = useId();
@@ -308,6 +322,8 @@ export function ListScreen({
     };
     const ticked = (rows ?? []).filter((row) => selected.has(row.ref)).length;
     const nothingYet = rows !== undefined && rows.length === 0 && query.trim() === '' && !filtering;
+    // Rows arrive filtered, so drafts are counted only while they are all there.
+    const drafts = filtering ? 0 : (rows ?? []).filter((row) => row.status === 'draft').length;
 
     const createButton =
         create === undefined ? undefined : (
@@ -322,7 +338,23 @@ export function ListScreen({
             <PageHeader
                 crumbs={[]}
                 title={title}
-                meta={[rows === undefined ? null : countText(total ?? rows.length, noun), ...facts]}
+                meta={
+                    rows === undefined
+                        ? undefined
+                        : [
+                              {
+                                  label: 'Total',
+                                  value: countText(total ?? rows.length, noun),
+                              },
+                              drafts === 0
+                                  ? null
+                                  : {
+                                        label: 'Drafts',
+                                        value: countOf(drafts),
+                                    },
+                              ...facts,
+                          ]
+                }
                 actions={
                     bulk !== undefined && ticked > 0 ? (
                         <SelectionActions
@@ -388,7 +420,7 @@ export function ListScreen({
                 {rows === undefined ? (
                     <Loading problem={problem} />
                 ) : (
-                    <div className="k-list-card">
+                    <div className="k-list-results">
                         {sorted.length === 0 ? (
                             <>
                                 <EmptyTable
@@ -398,15 +430,15 @@ export function ListScreen({
                                         onSort: undefined,
                                     }}
                                 />
-                                <div className="k-list-card__empty">
-                                    <h2 className="k-list-card__empty-title">{nothingYet ? empty.title : 'Nothing matches'}</h2>
-                                    <p className="k-list-card__empty-text">
+                                <div className="k-list-results__empty">
+                                    <h2 className="k-list-results__empty-title">{nothingYet ? empty.title : 'Nothing matches'}</h2>
+                                    <p className="k-list-results__empty-text">
                                         {nothingYet ? empty.description : `No ${noun} match the search and filters.`}
                                     </p>
                                     {nothingYet && create !== undefined ? (
                                         <button
                                             type="button"
-                                            className="k-button k-button--secondary k-button--small k-list-card__empty-action"
+                                            className="k-button k-button--secondary k-button--small k-list-results__empty-action"
                                             disabled={create.busy}
                                             onClick={create.onCreate}>
                                             <Plus {...ICON} />
@@ -416,7 +448,7 @@ export function ListScreen({
                                     {nothingYet ? null : (
                                         <button
                                             type="button"
-                                            className="k-button k-button--secondary k-button--small k-list-card__empty-action"
+                                            className="k-button k-button--secondary k-button--small k-list-results__empty-action"
                                             onClick={() => {
                                                 if (search === undefined) setOwnQuery('');
                                                 else search.onQuery('');

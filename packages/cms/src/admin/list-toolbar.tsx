@@ -11,7 +11,7 @@ import type { ListColumn, Sort, SortDirection } from './list-columns.js';
 export type ListPanel = 'filters' | 'columns';
 
 /**
- * The search box, and the buttons for the filters, the columns and the sort
+ * The search box, and the buttons for the columns, the filters and the sort
  * on the right.
  */
 export function ListToolbar({
@@ -49,6 +49,15 @@ export function ListToolbar({
                 <input type="search" placeholder={placeholder} value={query} onChange={(event) => onQuery(event.target.value)} />
             </label>
             <div className="k-list-toolbar__buttons">
+                <button
+                    type="button"
+                    className="k-button k-button--small k-button--secondary k-list-toolbar__button"
+                    aria-expanded={panel === 'columns'}
+                    aria-controls={panelIds.columns}
+                    onClick={() => toggle('columns')}>
+                    <Columns3 {...ICON} />
+                    Columns
+                </button>
                 {hasFilters ? (
                     <button
                         type="button"
@@ -65,15 +74,6 @@ export function ListToolbar({
                         )}
                     </button>
                 ) : null}
-                <button
-                    type="button"
-                    className="k-button k-button--small k-button--secondary k-list-toolbar__button"
-                    aria-expanded={panel === 'columns'}
-                    aria-controls={panelIds.columns}
-                    onClick={() => toggle('columns')}>
-                    <Columns3 {...ICON} />
-                    Columns
-                </button>
                 {sort}
             </div>
         </div>

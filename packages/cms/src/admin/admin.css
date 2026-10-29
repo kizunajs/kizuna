@@ -44,7 +44,7 @@
         --k-gutter: 32px;
     }
 
-    @media (max-width: 1440px) {
+    @media (max-width: 1439px) {
         :root {
             --k-gutter: 24px;
         }
@@ -171,12 +171,12 @@
     .k-admin__body {
         display: flex;
         flex-direction: column;
-        gap: 14px;
+        gap: 16px;
         min-width: 0;
-        padding: 10px var(--k-gutter) 28px;
+        padding: 20px var(--k-gutter) 64px;
     }
 
-    /* The page header every screen shares: the trail back, the title large, a line of facts, and the actions. */
+    /* The page header every screen shares: the trail back, the title large, a line of facts, and the actions, closed by a hairline. */
 
     .k-page-header {
         display: grid;
@@ -188,7 +188,34 @@
             'bar bar';
         align-items: center;
         column-gap: 24px;
-        padding: 20px var(--k-gutter) 8px;
+        padding: 20px var(--k-gutter);
+        box-shadow: inset 0 -1px 0 var(--k-line);
+    }
+
+    /* Without a trail, as on the dashboard, the actions sit at the foot of the title and its facts. */
+    .k-page-header:not([data-trail]) {
+        grid-template-areas:
+            'title actions'
+            'meta actions'
+            'bar bar';
+    }
+
+    .k-page-header:not([data-trail]) :is(.k-page-header__title, .k-page-header__actions) {
+        margin-top: 0;
+    }
+
+    .k-page-header:not([data-trail]) .k-page-header__actions {
+        align-self: end;
+    }
+
+    .k-page-header:not([data-trail]) .k-page-header__meta--pairs {
+        margin-top: 8px;
+    }
+
+    .k-page-header__actions .k-select-menu {
+        height: var(--k-control-height-small);
+        padding: 0 10px 0 12px;
+        border-radius: 9px;
     }
 
     .k-page-header__nav {
@@ -275,7 +302,7 @@
     .k-page-header__pair {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 7px;
         min-width: 0;
     }
 
@@ -300,11 +327,10 @@
         gap: 8px;
     }
 
-    /* Tabs take a row of their own under the title, and a hairline closes the header. */
+    /* Tabs take a row of their own under the title, above the hairline. */
     .k-page-header[data-tabs] {
         gap: 0;
         padding-bottom: 0;
-        box-shadow: inset 0 -1px 0 var(--k-line);
     }
 
     .k-page-header__bar {
@@ -315,12 +341,6 @@
         gap: 2px;
         min-width: 0;
         padding: 14px 0 10px;
-    }
-
-    .k-dashboard__range {
-        font-size: 12.5px;
-        font-variant-numeric: tabular-nums;
-        color: var(--k-muted);
     }
 
     /* Dashboard */
@@ -359,17 +379,17 @@
     .k-collections {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 12px;
     }
 
     .k-collections .k-heading {
-        padding-left: 0;
+        padding: 0;
     }
 
     .k-collections__grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+        gap: 12px;
     }
 
     /* One surface: the link fills the card, and the + sits inside its right edge. */
@@ -377,23 +397,24 @@
         display: flex;
         align-items: center;
         min-width: 0;
-        border-radius: 12px;
+        border-radius: var(--k-radius-card);
         background: var(--k-surface);
         box-shadow: var(--k-elevation);
     }
 
     .k-card:has(.k-card__link:hover) {
-        background: var(--k-control);
+        background: var(--k-tint);
     }
 
     .k-card__link {
         display: flex;
         flex: 1;
-        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
         min-width: 0;
-        padding: 12px 14px;
+        padding: 16px 18px;
         border-radius: inherit;
-        font-size: 13.5px;
         outline: none;
     }
 
@@ -406,9 +427,26 @@
         padding-right: 4px;
     }
 
+    .k-card__text {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .k-card__name {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .k-card__chevron {
+        flex-shrink: 0;
+        color: var(--k-muted);
+    }
+
     .k-card__add {
         flex-shrink: 0;
-        margin-right: 8px;
+        margin-right: 10px;
     }
 
     .k-card__add:hover:not(:disabled) {
@@ -448,8 +486,10 @@
         text-underline-offset: 2px;
     }
 
+    /* On a phone the bar keeps its height and the screen takes the rest. */
     @media (max-width: 860px) {
         .k-admin {
+            grid-template-rows: auto minmax(0, 1fr);
             grid-template-columns: minmax(0, 1fr);
         }
     }
@@ -506,11 +546,16 @@
         }
     }
 
+    .k-admin__body.k-dashboard {
+        gap: 32px;
+        padding-top: 28px;
+    }
+
     .k-dashboard__tiles,
     .k-dashboard__panels {
         display: grid;
         grid-template-columns: repeat(var(--k-dashboard-columns), minmax(0, 1fr));
-        gap: 10px;
+        gap: 12px;
     }
 
     /* A stat reads as its label and change on one line, the number under them, and a line of detail. */
@@ -521,14 +566,15 @@
         display: flex;
         flex-direction: column;
         min-width: 0;
-        padding: 16px;
+        padding: 20px 20px 16px;
         border-radius: var(--k-radius-card);
         background: var(--k-surface);
         box-shadow: var(--k-elevation);
     }
 
     .k-stat {
-        gap: 4px;
+        gap: 10px;
+        padding: 18px 18px 16px;
     }
 
     .k-waiting {
@@ -537,7 +583,7 @@
 
     .k-waiting__title {
         margin: 0;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
     }
 
@@ -551,7 +597,8 @@
 
     .k-stat__label {
         min-width: 0;
-        font-size: 12.5px;
+        font-size: 13px;
+        font-weight: 500;
         color: var(--k-muted);
     }
 
@@ -560,25 +607,26 @@
         font-size: 28px;
         font-weight: 600;
         letter-spacing: -0.02em;
-        line-height: 1.25;
+        line-height: 1.1;
         font-variant-numeric: tabular-nums;
         overflow-wrap: anywhere;
     }
 
     .k-stat__detail {
-        font-size: 12px;
+        font-size: 12.5px;
+        font-variant-numeric: tabular-nums;
         color: var(--k-muted);
     }
 
     /* The one place the admin uses colour: a change up is green, down is red, and none is grey. */
     .k-change {
         flex-shrink: 0;
-        padding: 2px 6px;
-        border-radius: 6px;
+        padding: 0 7px;
+        border-radius: 999px;
         background: var(--k-change-none-surface);
-        font-size: 12px;
-        font-weight: 500;
-        line-height: 16px;
+        font-size: 11.5px;
+        font-weight: 600;
+        line-height: 20px;
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
         color: var(--k-change-none);
@@ -657,26 +705,26 @@
 
     .k-chart__title {
         margin: 0;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
     }
 
     .k-chart__description {
-        font-size: 12px;
+        font-size: 12.5px;
         color: var(--k-muted);
     }
 
     .k-chart__legend {
         display: flex;
-        gap: 14px;
-        font-size: 12px;
+        gap: 18px;
+        font-size: 12.5px;
         color: var(--k-muted);
     }
 
     .k-chart__legend-entry {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
+        gap: 7px;
     }
 
     .k-chart__swatch {
@@ -1865,7 +1913,7 @@
         min-height: 52px;
     }
 
-    /* Lists: the toolbar and its panels, then the table on one surface with its pager. */
+    /* Lists: the toolbar and its panels, then the table's rows between hairlines, and the pager under them. */
 
     .k-admin__body.k-list-screen {
         padding-inline: var(--k-gutter, 24px);
@@ -1880,13 +1928,13 @@
 
     .k-list-toolbar__search {
         display: flex;
-        flex: 1 1 260px;
+        flex: 1 1 320px;
         align-items: center;
         gap: 8px;
-        max-width: 380px;
-        height: 38px;
+        max-width: 420px;
+        height: var(--k-control-height-small);
         padding: 0 12px;
-        border-radius: var(--k-radius-control);
+        border-radius: 9px;
         background: var(--k-control);
         box-shadow: var(--k-control-elevation);
         color: var(--k-muted);
@@ -2152,11 +2200,11 @@
         font-size: 12.5px;
     }
 
-    .k-list-card {
-        overflow: hidden;
-        border-radius: var(--k-radius-card);
-        background: var(--k-surface);
-        box-shadow: var(--k-elevation);
+    .k-list-results {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
     }
 
     .k-table__scroll {
@@ -2175,7 +2223,7 @@
         height: 40px;
         padding: 0 12px;
         border-bottom: 1px solid var(--k-line);
-        font-size: 12px;
+        font-size: 12.5px;
         font-weight: 500;
         text-align: left;
         white-space: nowrap;
@@ -2184,36 +2232,33 @@
     }
 
     .k-table td {
-        padding: 11px 12px;
-        border-top: 1px solid var(--k-line);
+        height: 52px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--k-line);
         white-space: nowrap;
-        vertical-align: top;
+        vertical-align: middle;
         color: var(--k-muted);
     }
 
-    .k-table tbody tr:first-child td {
-        border-top: 0;
-    }
-
     .k-table :is(th, td):first-child {
-        padding-left: 16px;
+        padding-left: 8px;
     }
 
-    .k-table :is(th, td):last-child {
-        padding-right: 16px;
+    .k-table__row:hover {
+        background: var(--k-surface);
     }
 
-    .k-table__row:is(:hover, [data-selected]) {
+    .k-table__row[data-selected] {
         background: var(--k-tint);
     }
 
     .k-table .k-table__select {
-        width: 18px;
-        padding-right: 4px;
+        width: 44px;
+        padding-right: 0;
     }
 
-    .k-table td.k-table__select .k-check {
-        margin-top: 1px;
+    .k-table .k-table__select .k-check {
+        vertical-align: middle;
     }
 
     .k-table__heading[data-kind='title'] {
@@ -2289,13 +2334,11 @@
         font-variant-numeric: tabular-nums;
     }
 
-    /* Where a row stands: a white dot published, a ring for a draft, grey for changes not yet published. */
+    /* Where a row stands: published reads grey, and a draft or changes not yet published read in the ink. */
     .k-table__status {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
         height: 22px;
-        margin-top: -1px;
         padding: 0 9px;
         border-radius: 999px;
         background: var(--k-control);
@@ -2304,28 +2347,11 @@
         font-weight: 500;
         line-height: 22px;
         white-space: nowrap;
-        color: var(--k-muted);
-    }
-
-    .k-table__status[data-status='published'] {
         color: var(--k-ink);
     }
 
-    .k-table__dot {
-        flex: none;
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: var(--k-muted);
-    }
-
-    .k-table__status[data-status='published'] .k-table__dot {
-        background: var(--k-ink);
-    }
-
-    .k-table__status:is([data-status='draft'], [data-status='empty']) .k-table__dot {
-        background: none;
-        box-shadow: inset 0 0 0 1.5px var(--k-muted);
+    .k-table__status[data-status='published'] {
+        color: var(--k-muted);
     }
 
     .k-table__tree {
@@ -2369,9 +2395,8 @@
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 8px 20px;
-        padding: 8px 12px;
-        border-top: 1px solid var(--k-line);
+        justify-content: space-between;
+        gap: 12px;
         font-size: 12.5px;
         color: var(--k-muted);
     }
@@ -2384,7 +2409,8 @@
 
     .k-list-pager .k-tab {
         justify-content: center;
-        min-width: 28px;
+        min-width: 30px;
+        height: 30px;
     }
 
     .k-list-pager .k-tab:disabled {
@@ -2393,7 +2419,7 @@
     }
 
     .k-list-pager__step {
-        width: 28px;
+        width: 30px;
         padding: 0;
     }
 
@@ -2409,7 +2435,6 @@
     }
 
     .k-list-pager__range {
-        margin-left: auto;
         white-space: nowrap;
     }
 
@@ -2419,15 +2444,15 @@
     }
 
     /* A list with nothing in it keeps its header row, and says how to add the first. */
-    .k-list-card__empty {
+    .k-list-results__empty {
         display: flex;
         flex-direction: column;
         align-items: flex-start;
         gap: 6px;
-        padding: 36px 16px 40px;
+        padding: 24px 8px 40px;
     }
 
-    .k-list-card__empty-title {
+    .k-list-results__empty-title {
         margin: 0;
         font-size: 16px;
         font-weight: 600;
@@ -2435,14 +2460,14 @@
         color: var(--k-ink);
     }
 
-    .k-list-card__empty-text {
+    .k-list-results__empty-text {
         max-width: 460px;
         margin: 0;
         font-size: 13.5px;
         color: var(--k-muted);
     }
 
-    .k-list-card__empty-action {
+    .k-list-results__empty-action {
         margin-top: 12px;
     }
 
@@ -2510,7 +2535,7 @@
         }
 
         .k-table:not([data-selectable]) thead tr {
-            padding-left: 14px;
+            padding-left: 8px;
         }
 
         .k-table th {
@@ -2541,20 +2566,17 @@
             flex-wrap: wrap;
             align-items: center;
             gap: 6px 10px;
-            padding: 8px 14px 10px 48px;
-            border-top: 1px solid var(--k-line);
+            padding: 8px 8px 10px 48px;
+            border-bottom: 1px solid var(--k-line);
         }
 
         .k-table:not([data-selectable]) .k-table__row {
-            padding-left: 14px;
-        }
-
-        .k-table tbody tr:first-child {
-            border-top: 0;
+            padding-left: 8px;
         }
 
         .k-table td {
             display: block;
+            height: auto;
             padding: 0;
             border: 0;
             font-size: 12.5px;
@@ -2602,7 +2624,6 @@
 
         .k-list-pager {
             gap: 4px 8px;
-            padding: 6px 8px;
         }
 
         .k-list-pager .k-tab {
@@ -2699,7 +2720,16 @@
                 'bar';
         }
 
-        .k-page-header__actions {
+        .k-page-header:not([data-trail]) {
+            grid-template-areas:
+                'title'
+                'meta'
+                'actions'
+                'bar';
+        }
+
+        .k-page-header__actions,
+        .k-page-header:not([data-trail]) .k-page-header__actions {
             justify-content: flex-start;
             width: 100%;
             margin-top: 10px;

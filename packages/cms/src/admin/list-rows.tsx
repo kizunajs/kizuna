@@ -67,12 +67,11 @@ function Tick({
 }
 
 /**
- * Where a row stands, as a dot and a word.
+ * Where a row stands, as a word on a pill.
  */
 export function ListStatus({ status }: { status: string }) {
     return (
         <span className="k-table__status" data-status={status}>
-            <span className="k-table__dot" aria-hidden="true" />
             {STATUS_LABEL[status] ?? status}
         </span>
     );

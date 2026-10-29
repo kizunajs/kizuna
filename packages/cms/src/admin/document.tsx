@@ -83,30 +83,33 @@ const changedPaths = (document: Description, before: Record<string, unknown> | n
     );
 
 /**
- * The list a document opens from, for the crumb above it.
+ * The list a document opens from, for the trail above it. A global opens
+ * from the sidebar alone, so its trail is the dashboard and its title.
  */
-const crumbOf = (ref: string, collectionLabel: (name: string) => string | undefined): Crumb => {
+const crumbsOf = (ref: string, collectionLabel: (name: string) => string | undefined): Crumb[] => {
     const parsed = parseRef(ref);
     if (parsed?.type === 'item') {
-        return {
-            label: collectionLabel(parsed.collection) ?? parsed.collection,
-            href: hrefOf({
-                kind: 'collection',
-                name: parsed.collection,
-            }),
-        };
+        return [
+            {
+                label: collectionLabel(parsed.collection) ?? parsed.collection,
+                href: hrefOf({
+                    kind: 'collection',
+                    name: parsed.collection,
+                }),
+            },
+        ];
     }
     if (parsed?.type === 'page') {
-        return {
-            label: 'Pages',
-            href: hrefOf({
-                kind: 'pages',
-            }),
-        };
+        return [
+            {
+                label: 'Pages',
+                href: hrefOf({
+                    kind: 'pages',
+                }),
+            },
+        ];
     }
-    return {
-        label: 'Globals',
-    };
+    return [];
 };
 
 /**
@@ -394,12 +397,12 @@ export function DocumentScreen({
         opened.location.href = answer.body.url;
     };
 
-    const crumb = crumbOf(documentRef, collectionLabel);
+    const crumbs = crumbsOf(documentRef, collectionLabel);
 
     if (document === undefined) {
         return (
             <div className="k-document">
-                <PageHeader crumbs={[crumb]} title="" />
+                <PageHeader crumbs={crumbs} title="" />
                 <div className="k-admin__body">
                     <Loading problem={loadProblem} />
                 </div>
@@ -512,7 +515,7 @@ export function DocumentScreen({
         <EditorContext.Provider value={editorContext}>
             <Tabs.Root value={view} onValueChange={(key: DocumentView) => setView(key)} className="k-document" data-preview={previewShown}>
                 <PageHeader
-                    crumbs={[crumb]}
+                    crumbs={crumbs}
                     title={title}
                     meta={[
                         {
@@ -533,8 +536,8 @@ export function DocumentScreen({
                               },
                         document.usedOn.everywhere
                             ? {
-                                  label: 'Shows',
-                                  value: 'On every page',
+                                  label: 'Shows on',
+                                  value: 'every page',
                               }
                             : null,
                         document.review === null

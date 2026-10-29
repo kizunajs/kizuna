@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CircleAlert, Plus } from 'lucide-react';
+import { ChevronRight, CircleAlert, Plus } from 'lucide-react';
 import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import { Hint } from '../view/hint.js';
@@ -130,6 +130,10 @@ function ReviewsCard({ widget, collections }: { widget: ReviewsWidgetBody; colle
     );
 }
 
+/**
+ * Every collection and view as a card in one grid, in the order the sidebar
+ * lists them, with a + on each collection to add an item.
+ */
 function CollectionCards({
     widget,
     creating,
@@ -139,45 +143,50 @@ function CollectionCards({
     creating: string | undefined;
     onCreate: (name: string) => void;
 }) {
-    const groups = groupsOf(widget.collections);
-    if (groups.length === 0) return <p className="k-help">There are no collections for you to open.</p>;
+    const collections = groupsOf(widget.collections).flatMap((group) => group.collections);
+    if (collections.length === 0) return <p className="k-help">There are no collections for you to open.</p>;
     return (
-        <>
-            {groups.map((group) => (
-                <section key={group.label} className="k-collections" aria-label={group.label}>
-                    <h2 className="k-heading">{group.label}</h2>
-                    <div className="k-collections__grid">
-                        {group.collections.map((collection) => (
-                            <div key={`${collection.kind}:${collection.name}`} className="k-card">
-                                <a
-                                    className="k-card__link"
-                                    href={hrefOf({
-                                        kind: collection.kind,
-                                        name: collection.name,
-                                    })}>
-                                    <span className="k-ellipsis">{collection.label}</span>
-                                    <span className="k-card__count">
-                                        {collection.count === null ? 'View' : WHOLE.format(collection.count)}
-                                    </span>
-                                </a>
-                                {collection.kind === 'collection' ? (
-                                    <Hint label={`Add to ${collection.label}`}>
-                                        <button
-                                            type="button"
-                                            className="k-icon-button k-card__add"
-                                            aria-label={`Add to ${collection.label}`}
-                                            disabled={creating !== undefined}
-                                            onClick={() => onCreate(collection.name)}>
-                                            <Plus {...ICON} />
-                                        </button>
-                                    </Hint>
-                                ) : null}
-                            </div>
-                        ))}
+        <section className="k-collections" aria-labelledby="k-admin-collections">
+            <h2 id="k-admin-collections" className="k-heading">
+                Collections
+            </h2>
+            <div className="k-collections__grid">
+                {collections.map((collection) => (
+                    <div key={`${collection.kind}:${collection.name}`} className="k-card">
+                        <a
+                            className="k-card__link"
+                            href={hrefOf({
+                                kind: collection.kind,
+                                name: collection.name,
+                            })}>
+                            <span className="k-card__text">
+                                <span className="k-card__name k-ellipsis">{collection.label}</span>
+                                <span className="k-card__count">
+                                    {collection.count === null
+                                        ? 'View'
+                                        : `${WHOLE.format(collection.count)} ${collection.label.toLowerCase()}`}
+                                </span>
+                            </span>
+                            {collection.kind === 'collection' ? null : (
+                                <ChevronRight {...ICON} className="k-card__chevron" aria-hidden="true" />
+                            )}
+                        </a>
+                        {collection.kind === 'collection' ? (
+                            <Hint label={`Add to ${collection.label}`}>
+                                <button
+                                    type="button"
+                                    className="k-icon-button k-card__add"
+                                    aria-label={`Add to ${collection.label}`}
+                                    disabled={creating !== undefined}
+                                    onClick={() => onCreate(collection.name)}>
+                                    <Plus {...ICON} />
+                                </button>
+                            </Hint>
+                        ) : null}
                     </div>
-                </section>
-            ))}
-        </>
+                ))}
+            </div>
+        </section>
     );
 }
 
@@ -252,6 +261,7 @@ export function Dashboard({
     const firstStats = runsOf(widgets ?? []).find((run) => run.kind === 'stats');
     const columns = tileColumnsOf(firstStats?.kind === 'stats' ? firstStats.widgets.length : 0);
     const isNew = widgets !== undefined && isNewOf(widgets);
+    const compared = PERIODS.find((candidate) => candidate.key === counted?.key)?.before;
 
     const body = (() => {
         if (failure !== undefined) {
@@ -336,14 +346,23 @@ export function Dashboard({
         <>
             <PageHeader
                 title="Dashboard"
-                actions={
-                    isNew ? undefined : (
-                        <>
-                            {counted === undefined ? null : <span className="k-dashboard__range">{rangeOf(counted, 'en-GB')}</span>}
-                            <SelectMenu items={PERIOD_ITEMS} value={period} onChange={choosePeriod} label="Period" />
-                        </>
-                    )
+                meta={
+                    isNew || counted === undefined
+                        ? undefined
+                        : [
+                              {
+                                  label: 'Period',
+                                  value: rangeOf(counted, 'en-GB'),
+                              },
+                              compared === undefined
+                                  ? null
+                                  : {
+                                        label: 'Compared with',
+                                        value: compared,
+                                    },
+                          ]
                 }
+                actions={isNew ? undefined : <SelectMenu items={PERIOD_ITEMS} value={period} onChange={choosePeriod} label="Period" />}
             />
             <div className="k-admin__body k-dashboard" data-columns={columns} aria-busy={loading}>
                 {body}
