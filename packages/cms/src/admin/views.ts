@@ -1,5 +1,7 @@
 import { humanize, type DescribedField, type DescribedLayout } from '../view/schema.js';
 import { toolSegment, type AdminCall, type AvailableAction } from './actions.js';
+import type { ListFilter } from './config.js';
+import type { ListColumn, Sort } from './list-columns.js';
 
 /**
  * A view as the editing routes list it.
@@ -17,7 +19,32 @@ export interface ViewSummary {
      */
     options?: Record<string, Record<string, string>>;
     search: string[];
+    /**
+     * The fields its `list` filters by, with the values a condition may name.
+     */
+    filters?: ListFilter[];
+    /**
+     * The fields its `list` sorts by.
+     */
+    sorts?: string[];
     readOnly: boolean;
+}
+
+/**
+ * Whether a view's `list` filters, sorts and pages, so the admin asks it for
+ * each page rather than sorting and paging what it returns.
+ */
+export const servesPages = (view: ViewSummary): boolean => (view.filters ?? []).length > 0 || (view.sorts ?? []).length > 0;
+
+/**
+ * What the admin asks a view's `list` for beyond the search: the conditions
+ * as the route reads them, the sort and one page.
+ */
+export interface ViewPageQuery {
+    filter: readonly string[];
+    sort: Sort | undefined;
+    limit: number;
+    offset: number;
 }
 
 /**
@@ -53,19 +80,38 @@ export const viewTool = (view: string, route: 'list' | 'get' | 'save'): string =
     ['editing', 'views', view, route].map(toolSegment).join('_');
 
 /**
- * The call that searches a view's records. An empty search sends no `q`.
+ * The call that searches a view's records, and with `page`, filters, sorts
+ * and pages them. An empty search sends no `q`.
  */
-export const viewListCall = (view: string, query: string): AdminCall => {
+export const viewListCall = (view: string, query: string, page?: ViewPageQuery): AdminCall => {
     const search = query.trim();
     return {
         name: viewTool(view, 'list'),
         input: {
-            query:
-                search === ''
+            query: {
+                ...(search === ''
                     ? {}
                     : {
                           q: search,
-                      },
+                      }),
+                ...(page === undefined
+                    ? {}
+                    : {
+                          ...(page.filter.length === 0
+                              ? {}
+                              : {
+                                    filter: [...page.filter],
+                                }),
+                          ...(page.sort === undefined
+                              ? {}
+                              : {
+                                    orderBy: page.sort.column,
+                                    direction: page.sort.direction === 'ascending' ? 'asc' : 'desc',
+                                }),
+                          limit: page.limit,
+                          offset: page.offset,
+                      }),
+            },
         },
     };
 };
@@ -88,9 +134,53 @@ export const viewActionCall = (view: string, id: string, action: string): AdminC
 export const columnsOf = (view: ViewSummary): string[] => [view.title, ...view.columns.filter((column) => column !== view.title)];
 
 /**
+ * The fields of `sorts` the list does not show, which the editor can add as
+ * columns.
+ */
+export const hiddenSortsOf = (view: ViewSummary): string[] => {
+    const shown = columnsOf(view);
+    return (view.sorts ?? []).filter((field) => !shown.includes(field));
+};
+
+/**
  * A column's heading.
  */
 export const columnLabel = (column: string): string => (column === 'id' ? 'ID' : humanize(column));
+
+/**
+ * The columns of a view's list: the title and `columns`, then each field of
+ * `sorts` it does not show, until the editor adds it. A view that pages on
+ * the server sorts by the fields of `sorts` alone.
+ */
+export const viewColumnsOf = (view: ViewSummary): ListColumn[] => {
+    const serves = servesPages(view);
+    const sorts = view.sorts ?? [];
+    return [
+        ...columnsOf(view).map(
+            (column, index): ListColumn => ({
+                key: column,
+                label: columnLabel(column),
+                kind: index === 0 ? 'title' : 'text',
+                shown: true,
+                fixed: index === 0,
+                ...(serves
+                    ? {
+                          sortable: sorts.includes(column),
+                      }
+                    : {}),
+            })
+        ),
+        ...hiddenSortsOf(view).map(
+            (column): ListColumn => ({
+                key: column,
+                label: columnLabel(column),
+                kind: 'text',
+                shown: false,
+                sortable: true,
+            })
+        ),
+    ];
+};
 
 /**
  * What the search box says it looks in.

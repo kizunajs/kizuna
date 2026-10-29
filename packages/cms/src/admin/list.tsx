@@ -276,6 +276,10 @@ export function ListScreen({
     filters?:
         | {
               definitions: readonly ListFilter[];
+              /**
+               * Whether the rows have a status to filter by, as items do.
+               */
+              byStatus?: boolean;
               value: Filters;
               onChange: (filters: Filters) => void;
               connection: Connection;
@@ -472,6 +476,7 @@ export function ListScreen({
                         id={panelIds.filters}
                         connection={filters.connection}
                         filters={filters.definitions}
+                        byStatus={filters.byStatus ?? true}
                         value={filterValue}
                         onChange={filters.onChange}
                     />

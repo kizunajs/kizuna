@@ -38,8 +38,11 @@ export {
     type View,
     type ViewActions,
     type ViewColumn,
+    type ViewCondition,
     type ViewData,
     type ViewDefinition,
+    type ViewListInput,
+    type ViewOperator,
     type ViewRecords,
 } from './view-definition.js';
 export {

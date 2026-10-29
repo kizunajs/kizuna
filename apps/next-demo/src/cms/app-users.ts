@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { asc, eq, ilike, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, ne, or } from 'drizzle-orm';
 import { defineView } from '@kizunajs/cms';
 import { db } from '../db';
 import { session, user } from '../auth/schema';
@@ -13,16 +13,36 @@ const roles = {
 };
 
 /**
+ * The column each field of `sorts` reads.
+ */
+const sortColumns = {
+    name: user.name,
+    signedUpAt: user.createdAt,
+};
+
+/**
+ * A row of better-auth's table as the view's fields name it.
+ */
+const recordOf = (row: typeof user.$inferSelect) => ({
+    ...row,
+    signedUpAt: row.createdAt,
+});
+
+/**
  * Everyone who signs in, read from better-auth's own table. Any editor may
- * rename someone, and only an admin changes who is an admin.
+ * rename someone, and only an admin changes who is an admin. The list
+ * filters by role and sorts by name or sign-up date in the database, one
+ * page at a time.
  */
 export const AppUsers = defineView({
     name: 'appUsers',
     label: 'App users',
     group: 'People',
     title: 'name',
-    columns: ['name', 'email', 'role'],
+    columns: ['name', 'email', 'role', 'signedUpAt'],
     search: ['name', 'email'],
+    filters: ['role'],
+    sorts: ['name', 'signedUpAt'],
     fields: [
         {
             name: 'name',
@@ -42,18 +62,53 @@ export const AppUsers = defineView({
                 roles: 'admin',
             },
         },
+        {
+            name: 'signedUpAt',
+            label: 'Signed up',
+            schema: z.iso.datetime(),
+            readOnly: true,
+            position: 'sidebar',
+        },
     ],
-    list: async ({ query }) => {
+    list: async ({ query, filters, orderBy, direction, limit, offset }) => {
         const pattern = `%${query}%`;
-        return db
+        const where = and(
+            or(ilike(user.name, pattern), ilike(user.email, pattern)),
+            or(
+                ...filters.map((conditions) =>
+                    and(
+                        ...conditions.map((condition) =>
+                            condition.operator === 'is'
+                                ? eq(user[condition.field], condition.value)
+                                : ne(user[condition.field], condition.value)
+                        )
+                    )
+                )
+            )
+        );
+        const column = sortColumns[orderBy ?? 'name'];
+        const [counted] = await db
+            .select({
+                total: count(),
+            })
+            .from(user)
+            .where(where);
+        const page = db
             .select()
             .from(user)
-            .where(or(ilike(user.name, pattern), ilike(user.email, pattern)))
-            .orderBy(asc(user.name));
+            .where(where)
+            .orderBy(direction === 'desc' ? desc(column) : asc(column))
+            .offset(offset)
+            .$dynamic();
+        const rows = await (limit === undefined ? page : page.limit(limit));
+        return {
+            items: rows.map(recordOf),
+            total: counted?.total ?? 0,
+        };
     },
     get: async ({ id }) => {
         const [found] = await db.select().from(user).where(eq(user.id, id));
-        return found ?? null;
+        return found === undefined ? null : recordOf(found);
     },
     actions: {
         save: async ({ id, data }) => {

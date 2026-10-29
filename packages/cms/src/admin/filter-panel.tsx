@@ -111,6 +111,7 @@ const conditionText = (field: string, operator: Operator, value: string | undefi
 function ConditionRow({
     connection,
     filters,
+    byStatus,
     condition,
     first,
     onChange,
@@ -118,6 +119,7 @@ function ConditionRow({
 }: {
     connection: Connection;
     filters: readonly ListFilter[];
+    byStatus: boolean;
     condition: Condition;
     first: boolean;
     onChange: (condition: Condition) => void;
@@ -136,10 +138,14 @@ function ConditionRow({
                 label="Field"
                 labelShown={first}
                 choices={[
-                    {
-                        value: STATUS_FIELD,
-                        label: 'Status',
-                    },
+                    ...(byStatus
+                        ? [
+                              {
+                                  value: STATUS_FIELD,
+                                  label: 'Status',
+                              },
+                          ]
+                        : []),
                     ...filters.map((candidate) => ({
                         value: candidate.field,
                         label: labelOf(candidate),
@@ -198,9 +204,9 @@ function ConditionRow({
     );
 }
 
-const blankCondition = (join: Condition['join']): Condition => ({
+const blankCondition = (join: Condition['join'], field: string): Condition => ({
     join,
-    field: STATUS_FIELD,
+    field,
     operator: 'is',
     value: undefined,
 });
@@ -208,22 +214,26 @@ const blankCondition = (join: Condition['join']): Condition => ({
 /**
  * The filters above a list: rows of a field, how it compares and a value,
  * each joined to the row above by `and` or `or`. Rows joined by `and` must
- * all hold, and `or` starts another set that may hold instead.
+ * all hold, and `or` starts another set that may hold instead. Without
+ * `byStatus`, as for a view, the rows offer the fields alone.
  */
 export function FilterPanel({
     id,
     connection,
     filters,
+    byStatus = true,
     value,
     onChange,
 }: {
     id: string;
     connection: Connection;
     filters: readonly ListFilter[];
+    byStatus?: boolean;
     value: Filters;
     onChange: (filters: Filters) => void;
 }) {
-    const rows = value.length === 0 ? [blankCondition('and')] : value;
+    const firstField = byStatus ? STATUS_FIELD : (filters[0]?.field ?? STATUS_FIELD);
+    const rows = value.length === 0 ? [blankCondition('and', firstField)] : value;
     return (
         <section id={id} className="k-list-panel k-filter-panel" aria-label="Filters">
             {rows.map((condition, index) => (
@@ -231,6 +241,7 @@ export function FilterPanel({
                     key={index}
                     connection={connection}
                     filters={filters}
+                    byStatus={byStatus}
                     condition={condition}
                     first={index === 0}
                     onChange={(next) => onChange(value.length === 0 ? [next] : withCondition(value, index, next))}
@@ -241,14 +252,14 @@ export function FilterPanel({
                 <button
                     type="button"
                     className="k-button k-button--small k-list-panel__button"
-                    onClick={() => onChange([...rows, blankCondition('and')])}>
+                    onClick={() => onChange([...rows, blankCondition('and', firstField)])}>
                     <Plus {...ICON} />
                     And
                 </button>
                 <button
                     type="button"
                     className="k-button k-button--small k-list-panel__button"
-                    onClick={() => onChange([...rows, blankCondition('or')])}>
+                    onClick={() => onChange([...rows, blankCondition('or', firstField)])}>
                     <Plus {...ICON} />
                     Or
                 </button>

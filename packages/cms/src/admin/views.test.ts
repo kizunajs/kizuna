@@ -5,7 +5,9 @@ import {
     columnsOf,
     labelledValues,
     searchPlaceholder,
+    servesPages,
     viewActionCall,
+    viewColumnsOf,
     viewListCall,
     viewSaveCall,
     viewTool,
@@ -96,6 +98,25 @@ describe('views in the admin', () => {
         expect(viewListCall('appUsers', ' ').input).toEqual({
             query: {},
         });
+        expect(
+            viewListCall('appUsers', '', {
+                filter: ['role:is:admin'],
+                sort: {
+                    column: 'signedUpAt',
+                    direction: 'descending',
+                },
+                limit: 25,
+                offset: 50,
+            }).input
+        ).toEqual({
+            query: {
+                filter: ['role:is:admin'],
+                orderBy: 'signedUpAt',
+                direction: 'desc',
+                limit: 25,
+                offset: 50,
+            },
+        });
         expect(viewActionCall('appUsers', 'user_1', 'resetPassword')).toEqual({
             name: 'editing_views_app_users_actions_reset_password',
             input: {
@@ -175,5 +196,33 @@ describe('views in the admin', () => {
             email: 'ada@example.com',
             role: 'Admin',
         });
+    });
+    it('asks the server for each page once a view names filters or sorts, and sorts by those alone', () => {
+        const paged: ViewSummary = {
+            ...appUsers,
+            columns: ['email', 'role'],
+            filters: [
+                {
+                    field: 'role',
+                    label: null,
+                    choices: [
+                        {
+                            value: 'admin',
+                            label: 'Admin',
+                        },
+                    ],
+                },
+            ],
+            sorts: ['name', 'signedUpAt'],
+        };
+        expect(servesPages(appUsers)).toBe(false);
+        expect(servesPages(paged)).toBe(true);
+        expect(viewColumnsOf(paged).map((column) => [column.key, column.shown, column.sortable])).toEqual([
+            ['name', true, true],
+            ['email', true, false],
+            ['role', true, false],
+            ['signedUpAt', false, true],
+        ]);
+        expect(viewColumnsOf(appUsers).every((column) => column.sortable === undefined)).toBe(true);
     });
 });

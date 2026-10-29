@@ -171,18 +171,38 @@ export const AppUsers = defineView({
     sorts: ['name', 'signedUpAt'],
     fields: appUserFields,
     list: async ({ query, filters, orderBy, direction, limit, offset }) => {
-        const where = and(matchesSearch(query), matchesFilters(filters));
-        const [{ total }] = await db.select({ total: count() }).from(user).where(where);
-        const items = await db
+        const where = and(
+            or(ilike(user.name, `%${query}%`), ilike(user.email, `%${query}%`)),
+            or(
+                ...filters.map((conditions) =>
+                    and(
+                        ...conditions.map((condition) =>
+                            condition.operator === 'is' ? eq(user[condition.field], condition.value) : ne(user[condition.field], condition.value)
+                        )
+                    )
+                )
+            )
+        );
+        const column = orderBy === 'signedUpAt' ? user.createdAt : user.name;
+        const [counted] = await db
+            .select({
+                total: count(),
+            })
+            .from(user)
+            .where(where);
+        const rows = await db
             .select()
             .from(user)
             .where(where)
-            .orderBy(direction === 'desc' ? desc(user[orderBy ?? 'name']) : asc(user[orderBy ?? 'name']))
-            .limit(limit ?? total)
+            .orderBy(direction === 'desc' ? desc(column) : asc(column))
+            .limit(limit ?? counted.total)
             .offset(offset);
         return {
-            items,
-            total,
+            items: rows.map((row) => ({
+                ...row,
+                signedUpAt: row.createdAt,
+            })),
+            total: counted.total,
         };
     },
     get: getAppUser,
