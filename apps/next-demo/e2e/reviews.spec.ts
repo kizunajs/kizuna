@@ -41,7 +41,8 @@ test('an editor names an owner and asks her to review, and she approves it so it
     const contact = editor.locator('.k-review__group', {
         hasText: 'Button label',
     });
-    await expect(contact.getByText('Needs an approval before it goes live.')).toBeVisible();
+    await expect(contact).toBeVisible();
+    await expect(editor.locator('.k-review__blocker')).toContainText('Needs an approval before it goes live.');
     await editor
         .getByRole('button', {
             name: 'Ask for review',
@@ -56,6 +57,7 @@ test('an editor names an owner and asks her to review, and she approves it so it
         })
         .click();
     await expect(contact.locator('.k-review-badge')).toHaveText('Waiting for Kari');
+    await expect(editor.locator('.k-review__blocker')).toContainText('Kari Nordmann needs to approve this before it goes live.');
     await edda.close();
 
     const kari = await browser.newPage();

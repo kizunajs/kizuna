@@ -2201,8 +2201,10 @@
         margin-left: 8px;
     }
 
+    /* A removed item has no place in the new order, so it takes no number. */
     .k-review__removed {
         color: var(--k-muted);
+        list-style: none;
     }
 
     .k-review__fields {
@@ -2278,6 +2280,7 @@
     }
 
     .k-review__actions {
+        flex-wrap: wrap;
         align-items: center;
     }
 

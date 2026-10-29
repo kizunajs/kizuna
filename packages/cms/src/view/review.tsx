@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { useCallback, useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { AlertDialog } from '@base-ui/react/alert-dialog';
 import { Checkbox } from '@base-ui/react/checkbox';
 import { Check, CircleAlert, LoaderCircle, Undo2 } from 'lucide-react';
@@ -6,7 +6,8 @@ import { toolsFor, type Connection } from './connection.js';
 import { ICON, useEditorContext } from './context.js';
 import type { MediaRecord } from './media.js';
 import { PeoplePicker, ReviewBadge, type People } from './people.js';
-import type { PersonView, ReviewState } from './schema.js';
+import { changeView, referencesOf, textOf, type ChangeView, type Shown, type ValueShape } from './change-value.js';
+import type { Description, PersonView, ReviewState } from './schema.js';
 
 /**
  * One field the draft changes, as the changes route lists it.
@@ -28,81 +29,6 @@ interface Changes {
     requireReview: boolean;
 }
 
-const isImage = (value: unknown): value is { id: string; alt?: string } =>
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    typeof (value as { id?: unknown }).id === 'string' &&
-    'alt' in value;
-
-/**
- * Portable Text as the words it holds, so a rich-text change reads as text.
- */
-const richText = (value: unknown): string | undefined => {
-    if (!Array.isArray(value) || !value.every((block) => typeof block === 'object' && block !== null && '_type' in block)) return undefined;
-    return value
-        .map((block: { _type?: string; children?: Array<{ text?: string }> }) =>
-            block._type === 'block' ? (block.children ?? []).map((span) => span.text ?? '').join('') : '[image]'
-        )
-        .join('\n');
-};
-
-const asText = (value: unknown): string | undefined => {
-    if (typeof value === 'string') return value;
-    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-    return richText(value);
-};
-
-type Piece = { kind: 'same' | 'added' | 'removed'; text: string };
-
-/**
- * A word-level diff: the longest run the two texts share, with what was
- * removed and added around it.
- */
-const wordDiff = (before: string, after: string): Piece[] | undefined => {
-    // Each word keeps the space after it, so a run of changed words stays one run.
-    const left = before.match(/\S+\s*|\s+/g) ?? [];
-    const right = after.match(/\S+\s*|\s+/g) ?? [];
-    if (left.length * right.length > 250_000) return undefined;
-    const table = Array.from({ length: left.length + 1 }, () => new Array<number>(right.length + 1).fill(0));
-    for (let row = left.length - 1; row >= 0; row--) {
-        for (let column = right.length - 1; column >= 0; column--) {
-            table[row]![column] =
-                left[row] === right[column]
-                    ? table[row + 1]![column + 1]! + 1
-                    : Math.max(table[row + 1]![column]!, table[row]![column + 1]!);
-        }
-    }
-    const pieces: Piece[] = [];
-    const push = (kind: Piece['kind'], text: string): void => {
-        const last = pieces.at(-1);
-        if (last?.kind === kind) last.text += text;
-        else
-            pieces.push({
-                kind,
-                text,
-            });
-    };
-    let row = 0;
-    let column = 0;
-    while (row < left.length && column < right.length) {
-        if (left[row] === right[column]) {
-            push('same', left[row]!);
-            row++;
-            column++;
-        } else if (table[row + 1]![column]! >= table[row]![column + 1]!) {
-            push('removed', left[row]!);
-            row++;
-        } else {
-            push('added', right[column]!);
-            column++;
-        }
-    }
-    while (row < left.length) push('removed', left[row++]!);
-    while (column < right.length) push('added', right[column++]!);
-    return pieces;
-};
-
 function Thumbnail({ image }: { image: { id: string } }) {
     const { connection, resolveUrl } = useEditorContext();
     const [source, setSource] = useState<string | undefined>();
@@ -120,87 +46,115 @@ function Thumbnail({ image }: { image: { id: string } }) {
     return source === undefined ? <span className="k-review__thumb" /> : <img className="k-review__thumb" src={source} alt="" />;
 }
 
-type ImageValue = {
-    id: string;
-    alt?: string;
-    crop?: unknown;
-    focalPoint?: unknown;
-};
-
 /**
- * What changed about the same image, in words, since two thumbnails of it
- * look alike.
+ * A value as it reads, in the space of a line or a few.
  */
-const imageFacts = (before: ImageValue, after: ImageValue): string[] => {
-    const facts: string[] = [];
-    if ((before.alt ?? '') !== (after.alt ?? '')) {
-        facts.push(after.alt === undefined || after.alt === '' ? 'Alt text removed' : `Alt text: ${after.alt}`);
+function ShownValue({ shown }: { shown: Shown }) {
+    if (shown.kind === 'empty') return <span className="k-review__note">Empty</span>;
+    if (shown.kind === 'image') {
+        return (
+            <span className="k-review__image">
+                <Thumbnail image={shown} />
+                <span className={shown.alt === undefined ? 'k-review__note' : undefined}>{shown.alt ?? 'No alt text'}</span>
+            </span>
+        );
     }
-    if (JSON.stringify(before.focalPoint ?? null) !== JSON.stringify(after.focalPoint ?? null)) {
-        facts.push(after.focalPoint === undefined ? 'Focus point removed' : 'Focus point moved');
-    }
-    if (JSON.stringify(before.crop ?? null) !== JSON.stringify(after.crop ?? null)) {
-        facts.push(after.crop === undefined ? 'Crop removed' : 'Crop changed');
-    }
-    return facts.length === 0 ? ['Same image, settings changed'] : facts;
-};
-
-const brief = (value: unknown): string => {
-    const json = JSON.stringify(value);
-    return json === undefined ? '' : json.length > 140 ? `${json.slice(0, 140)}…` : json;
-};
+    if (shown.kind === 'text' && shown.prose) return <span className="k-review__prose">{shown.text}</span>;
+    return <span>{textOf(shown)}</span>;
+}
 
 /**
  * What one change does, shown the way its value reads.
  */
-function ChangeValue({ change }: { change: DraftChange }) {
-    if (change.after === undefined) return <p className="k-review__note">Cleared</p>;
-    if (isImage(change.before) && isImage(change.after) && change.before.id === change.after.id) {
+function ChangeValue({ view }: { view: ChangeView }) {
+    if (view.kind === 'words') {
+        return (
+            <p className="k-review__text">
+                {view.pieces.map((piece, index) =>
+                    piece.kind === 'same' ? (
+                        <span key={index}>{piece.text}</span>
+                    ) : piece.kind === 'added' ? (
+                        <ins key={index}>{piece.text}</ins>
+                    ) : (
+                        <del key={index}>{piece.text}</del>
+                    )
+                )}
+            </p>
+        );
+    }
+    if (view.kind === 'image') {
         return (
             <div className="k-review__images">
-                <Thumbnail image={change.after} />
+                <Thumbnail image={view.image} />
                 <ul className="k-review__facts">
-                    {imageFacts(change.before, change.after).map((fact) => (
+                    {view.facts.map((fact) => (
                         <li key={fact}>{fact}</li>
                     ))}
                 </ul>
             </div>
         );
     }
-    if (isImage(change.before) || isImage(change.after)) {
+    if (view.kind === 'list') {
         return (
-            <div className="k-review__images">
-                {isImage(change.before) ? <Thumbnail image={change.before} /> : <span className="k-review__note">No image</span>}
-                <span className="k-review__arrow">→</span>
-                {isImage(change.after) ? <Thumbnail image={change.after} /> : <span className="k-review__note">No image</span>}
+            <div className="k-review__list-change">
+                {view.summary === undefined ? null : <p className="k-review__note">{view.summary}</p>}
+                {view.items.length === 0 && view.removed.length === 0 ? <p className="k-review__note">Empty</p> : null}
+                <ol className="k-review__items">
+                    {view.items.map((item, index) => (
+                        <li key={index}>
+                            <ShownValue shown={item.value} />
+                            {item.added ? <span className="k-review__tag">Added</span> : null}
+                        </li>
+                    ))}
+                    {view.removed.map((item, index) => (
+                        <li key={`removed-${index}`} className="k-review__removed">
+                            <del>
+                                <ShownValue shown={item} />
+                            </del>
+                            <span className="k-review__tag">Removed</span>
+                        </li>
+                    ))}
+                </ol>
             </div>
         );
     }
-    const before = change.before === undefined ? '' : asText(change.before);
-    const after = asText(change.after);
-    if (before !== undefined && after !== undefined) {
-        const pieces = wordDiff(before, after);
-        if (pieces !== undefined) {
-            return (
-                <p className="k-review__text">
-                    {pieces.map((piece, index) =>
-                        piece.kind === 'same' ? (
-                            <span key={index}>{piece.text}</span>
-                        ) : piece.kind === 'added' ? (
-                            <ins key={index}>{piece.text}</ins>
-                        ) : (
-                            <del key={index}>{piece.text}</del>
-                        )
-                    )}
-                </p>
-            );
-        }
+    if (view.kind === 'fields') {
+        return (
+            <dl className="k-review__fields">
+                {view.entries.map((entry) => (
+                    <div key={entry.label} className="k-review__field">
+                        <dt>{entry.label}</dt>
+                        <dd>
+                            <ChangeValue view={entry.change} />
+                        </dd>
+                    </div>
+                ))}
+            </dl>
+        );
+    }
+    if (view.before.kind === 'empty') {
+        return (
+            <p className="k-review__swap">
+                <ShownValue shown={view.after} />
+            </p>
+        );
     }
     return (
-        <div className="k-review__json">
-            {change.before === undefined ? null : <del>{brief(change.before)}</del>}
-            <ins>{brief(change.after)}</ins>
-        </div>
+        <p className="k-review__swap">
+            <del>
+                <ShownValue shown={view.before} />
+            </del>
+            <span className="k-review__arrow" aria-hidden="true">
+                →
+            </span>
+            {view.after.kind === 'empty' ? (
+                <span className="k-review__note">Cleared</span>
+            ) : (
+                <ins>
+                    <ShownValue shown={view.after} />
+                </ins>
+            )}
+        </p>
     );
 }
 
@@ -212,12 +166,22 @@ interface Pending {
     title: string;
     tools: { prefix: string; params: Record<string, string> };
     published: boolean;
-    changes: DraftChange[];
+    changes: Array<
+        DraftChange & {
+            view: ChangeView;
+        }
+    >;
     owner: PersonView | null;
     review: ReviewState | null;
     requireReview: boolean;
     problem?: string;
 }
+
+/**
+ * Names as a sentence lists them: "Kari", "Kari or Ola", "Kari, Ola or Nils".
+ */
+const eitherOf = (names: readonly string[]): string =>
+    names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} or ${names.at(-1)!}`;
 
 /**
  * Why a document cannot go live yet, or undefined when it can.
@@ -226,9 +190,75 @@ const heldBack = (document: Pending): string | undefined => {
     if (!document.requireReview || document.review?.status === 'approved') return undefined;
     const review = document.review;
     if (review === null) return 'Needs an approval before it goes live.';
-    if (review.status === 'open') return 'Waiting for an approval.';
+    if (review.status === 'open') {
+        const names = review.reviewers.map((reviewer) => reviewer.name);
+        return names.length === 0
+            ? 'Needs an approval before it goes live.'
+            : `${eitherOf(names)} needs to approve this before it goes live.`;
+    }
     if (review.status === 'changes') return 'Changes were requested. Ask for a new review once they are made.';
     return 'Changed after the approval. Ask for a new review.';
+};
+
+/**
+ * How each change's value reads, from the fields `describe` lists and the
+ * labels of the items its ids name. A field it cannot find, or a label it
+ * cannot look up, shows the stored value plainly.
+ */
+const changeViewsOf = async (
+    connection: Connection,
+    ref: string,
+    changes: readonly DraftChange[]
+): Promise<Array<DraftChange & { view: ChangeView }>> => {
+    const described = await connection.call<Description>('editing_describe', {
+        query: {
+            ref,
+        },
+    });
+    const fields = described.status === 200 ? described.body.fields : [];
+    const shapeOf = (path: string): ValueShape => {
+        const field = fields.find((candidate) => candidate.path === path);
+        return field === undefined
+            ? {
+                  schema: {},
+                  root: {},
+              }
+            : {
+                  schema: field.schema,
+                  root: field.schema,
+                  options: field.options,
+                  brand: field.brand,
+              };
+    };
+    const wanted = new Map<string, Set<string>>();
+    for (const change of changes) {
+        for (const { brand, id } of [
+            ...referencesOf(change.before, shapeOf(change.path)),
+            ...referencesOf(change.after, shapeOf(change.path)),
+        ]) {
+            wanted.set(brand, (wanted.get(brand) ?? new Set()).add(id));
+        }
+    }
+    const labels = new Map<string, string>();
+    await Promise.all(
+        [...wanted].map(async ([brand, ids]) => {
+            const answer = await connection.call<{ items: Array<{ id: string; label: string }> }>('editing_search_items', {
+                params: {
+                    brand,
+                },
+                query: {
+                    ids: [...ids],
+                },
+            });
+            if (answer.status !== 200) return;
+            for (const item of answer.body.items) labels.set(`${brand}\n${item.id}`, item.label);
+        })
+    );
+    const labelOf = (brand: string, id: string): string | undefined => labels.get(`${brand}\n${id}`);
+    return changes.map((change) => ({
+        ...change,
+        view: changeView(change.before, change.after, shapeOf(change.path), labelOf),
+    }));
 };
 
 /**
@@ -302,6 +332,7 @@ export function PublishReview({
     const [step, setStep] = useState<Step>('changes');
     const [reviewers, setReviewers] = useState<ReadonlySet<string>>(new Set());
     const [note, setNote] = useState('');
+    const blockerId = useId();
 
     const load = useCallback(async () => {
         const listed = await candidates();
@@ -318,7 +349,7 @@ export function PublishReview({
                     title: answer.body.label,
                     tools,
                     published: answer.body.published,
-                    changes: answer.body.changes,
+                    changes: await changeViewsOf(connection, candidate.ref, answer.body.changes),
                     owner: answer.body.owner,
                     review: answer.body.review,
                     requireReview: answer.body.requireReview,
@@ -508,6 +539,19 @@ export function PublishReview({
         .filter((entry) => entry.paths.length > 0);
     const count = selected.reduce((total, document) => total + document.changes.length, 0);
     const several = (pending ?? []).length > 1;
+    // Why Publish leaves something out, or is off: said beside the button, which points at it.
+    const blockers =
+        pending === undefined
+            ? []
+            : pending.length === 0
+              ? ['Nothing changed since the last publish.']
+              : selected.length === 0
+                ? ['Choose at least one document to publish.']
+                : selected.flatMap((document) => {
+                      const reason = heldBack(document);
+                      if (reason === undefined) return [];
+                      return [several ? `${document.title}: ${reason}` : reason];
+                  });
 
     return (
         <AlertDialog.Root open={open} onOpenChange={setOpen}>
@@ -586,9 +630,7 @@ export function PublishReview({
                             <p className="k-help">
                                 <LoaderCircle {...ICON} className="k-spin" /> Listing the changes
                             </p>
-                        ) : pending.length === 0 ? (
-                            <p className="k-help">Nothing changed since the last publish.</p>
-                        ) : (
+                        ) : pending.length === 0 ? null : (
                             pending.map((document) => (
                                 <section key={document.ref} className="k-review__group" data-skipped={skipped.has(document.ref)}>
                                     {several || document.review !== null ? (
@@ -618,9 +660,6 @@ export function PublishReview({
                                     document.review.status !== 'open' ? (
                                         <p className="k-review__quote">{document.review.decisionNote}</p>
                                     ) : null}
-                                    {heldBack(document) !== undefined && document.review?.status !== 'open' ? (
-                                        <p className="k-review__blocked">{heldBack(document)}</p>
-                                    ) : null}
                                     {document.problem !== undefined ? (
                                         <p className="k-error" role="alert">
                                             <CircleAlert {...ICON} />
@@ -634,7 +673,7 @@ export function PublishReview({
                                                     {change.label}
                                                     {change.before === undefined ? <span className="k-review__tag">New</span> : null}
                                                 </p>
-                                                <ChangeValue change={change} />
+                                                <ChangeValue view={change.view} />
                                             </div>
                                             <button
                                                 type="button"
@@ -674,6 +713,16 @@ export function PublishReview({
                             <CircleAlert {...ICON} />
                             {problem}
                         </p>
+                    ) : null}
+                    {step === 'changes' && mine.length === 0 && blockers.length > 0 ? (
+                        <div className="k-review__blocker" id={blockerId}>
+                            {blockers.map((blocker) => (
+                                <p key={blocker}>
+                                    <CircleAlert {...ICON} />
+                                    {blocker}
+                                </p>
+                            ))}
+                        </div>
                     ) : null}
                     <div className="k-dialog__actions k-review__actions">
                         {step === 'changes' ? (
@@ -722,6 +771,7 @@ export function PublishReview({
                                             type="button"
                                             className="k-button k-button--primary"
                                             disabled={busy !== undefined || publishable.length === 0}
+                                            aria-describedby={blockers.length > 0 ? blockerId : undefined}
                                             onClick={() => void publish()}>
                                             {busy === 'publish'
                                                 ? 'Publishing'
