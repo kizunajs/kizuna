@@ -15,6 +15,7 @@ import { ChevronDown, CircleAlert } from 'lucide-react';
 import { arrange, inSidebar, tabSets, type Arranged } from './arrange.js';
 import { ICON } from './context.js';
 import { Control, foldsItems, listsItems, Required } from './controls.js';
+import { readOnlyTextOf, readsAsText } from './read-only.js';
 import { labelOf, valueAt, type DescribedField, type DescribedLayout } from './schema.js';
 
 /**
@@ -30,6 +31,11 @@ export type SaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'failed';
 export interface SaveFailure {
     problem?: string;
     fieldErrors?: Record<string, string>;
+    /**
+     * The changes never landed, so the form keeps them to send with the
+     * next save, as Retry does.
+     */
+    retry?: boolean;
 }
 
 export interface FieldFormProps {
@@ -59,6 +65,14 @@ export interface FieldFormProps {
      * it, the sidebar shows even when no field does.
      */
     aside?: ReactNode;
+    /**
+     * What shows under a field, like the comments a review left on it.
+     */
+    below?: (field: DescribedField) => ReactNode;
+    /**
+     * Shows every field as it stands, for a record nobody may save.
+     */
+    readOnly?: boolean;
     ref?: Ref<FieldFormHandle>;
 }
 
@@ -69,8 +83,8 @@ export interface FieldFormHandle {
     flush: () => Promise<void>;
 }
 
-const refusalFor = (field: DescribedField): string =>
-    field.readOnly ? 'Read only' : `Only ${(field.roles ?? ['another role']).join(' or ')} can change this`;
+const refusalFor = (field: DescribedField, readOnly: boolean): string =>
+    field.readOnly || readOnly ? 'Read only' : `Only ${(field.roles ?? ['another role']).join(' or ')} can change this`;
 
 /**
  * The id of the element that holds a field, to scroll to it.
@@ -90,7 +104,20 @@ export const changesForWire = (changes: Record<string, unknown>): Record<string,
  * collapsibles, with the sidebar beside them when the form is wide enough. A
  * change saves to the draft a moment after typing stops.
  */
-export function FieldForm({ fields, layout, draft, onSave, onState, changed, pointed, missing, aside, ref }: FieldFormProps) {
+export function FieldForm({
+    fields,
+    layout,
+    draft,
+    onSave,
+    onState,
+    changed,
+    pointed,
+    missing,
+    aside,
+    below,
+    readOnly,
+    ref,
+}: FieldFormProps) {
     const [values, setValues] = useState<Record<string, unknown>>({});
     const [shownTabs, setShownTabs] = useState<Readonly<Record<string, string>>>({});
     const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -131,7 +158,14 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
             setProblem(failure.problem);
             setFieldErrors(failure.fieldErrors ?? {});
         }
-        if (Object.keys(pending.current).length > 0) {
+        const typedSince = Object.keys(pending.current).length > 0;
+        if (failure?.retry === true) {
+            pending.current = {
+                ...sending,
+                ...pending.current,
+            };
+        }
+        if (typedSince) {
             void flush();
             return;
         }
@@ -255,7 +289,7 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                     />
                 </div>
                 {field.help !== undefined && !list ? <p className="k-help">{field.help}</p> : null}
-                {writable ? null : <p className="k-help">{refusalFor(field)}</p>}
+                {writable ? null : <p className="k-help">{refusalFor(field, readOnly === true)}</p>}
             </>
         );
     };
@@ -311,6 +345,22 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
             </label>
         );
         const needed = field.parent === undefined && missing?.includes(field.name) === true;
+        if ((readOnly === true || field.readOnly) && readsAsText(field.schema)) {
+            const text = readOnlyTextOf(field.schema, valueOf(field.path), field.options);
+            return (
+                <section key={field.path} id={fieldDomId(field.path)} className="k-field">
+                    <span className="k-field__label" id={fieldDomId(field.path) + '-label'}>
+                        {labelOf(field)}
+                    </span>
+                    <div className="k-field__control" data-changed={isMarked(field.path, changed)}>
+                        <p className="k-read-only" aria-labelledby={fieldDomId(field.path) + '-label'} data-empty={text === undefined}>
+                            {text ?? 'Not set'}
+                        </p>
+                        {field.help === undefined ? null : <p className="k-help">{field.help}</p>}
+                    </div>
+                </section>
+            );
+        }
         return (
             <section key={field.path} id={fieldDomId(field.path)} className="k-field">
                 {folds ? null : label}
@@ -319,9 +369,10 @@ export function FieldForm({ fields, layout, draft, onSave, onState, changed, poi
                     data-changed={isMarked(field.path, changed)}
                     data-pointed={isMarked(field.path, pointed)}
                     data-missing={needed}>
-                    {control(field, writable, folds ? label : undefined)}
+                    {control(field, writable && readOnly !== true, folds ? label : undefined)}
                     {needed ? <p className="k-field__needed">Needed before publishing.</p> : null}
                 </div>
+                {below?.(field)}
             </section>
         );
     };

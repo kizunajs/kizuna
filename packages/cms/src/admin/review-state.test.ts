@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { ReviewState } from '../view/schema.js';
-import { askAgainOf, draftOwnerOf, gateNoteOf, reviewStatusOf, verdictsOf, waitsForMe } from './review-state.js';
+import {
+    askAgainOf,
+    commentsOn,
+    draftOwnerOf,
+    gateNoteOf,
+    mayUndoApproval,
+    mayWithdraw,
+    reviewStatusOf,
+    takesPart,
+    verdictsOf,
+    waitsForMe,
+} from './review-state.js';
 
 const kari = {
     id: 'kari@example.com',
@@ -28,6 +39,7 @@ const review = (extra: Partial<ReviewState> = {}): ReviewState => ({
     decidedBy: null,
     decisionNote: null,
     decidedAt: null,
+    comments: [],
     ...extra,
 });
 
@@ -120,5 +132,94 @@ describe('where a review stands', () => {
     it('names whose draft it is', () => {
         expect(draftOwnerOf(review(), kari.id)).toBe('Grace’s draft');
         expect(draftOwnerOf(review(), grace.id)).toBe('Your draft');
+    });
+});
+
+describe('changing a review', () => {
+    it('lets the person who asked withdraw it while it waits', () => {
+        expect(mayWithdraw(review(), grace.id)).toBe(true);
+        expect(mayWithdraw(review(), kari.id)).toBe(false);
+        expect(
+            mayWithdraw(
+                review({
+                    status: 'changes',
+                    decidedBy: kari,
+                }),
+                grace.id
+            )
+        ).toBe(false);
+    });
+
+    it('lets the reviewer undo their own approval, outdated or not', () => {
+        const approved = review({
+            status: 'approved',
+            decidedBy: kari,
+        });
+        expect(mayUndoApproval(approved, kari.id)).toBe(true);
+        expect(mayUndoApproval(approved, grace.id)).toBe(false);
+        expect(
+            mayUndoApproval(
+                review({
+                    status: 'outdated',
+                    decidedBy: kari,
+                }),
+                kari.id
+            )
+        ).toBe(true);
+    });
+
+    it('says who published past the review', () => {
+        const past = review({
+            status: 'published-past-review',
+            decidedBy: kari,
+        });
+        expect(reviewStatusOf(past, grace.id)).toBe('Published past the review by Kari Nordmann');
+        expect(reviewStatusOf(past, kari.id)).toBe('Published past the review by you');
+    });
+});
+
+describe('comments on a field', () => {
+    it('splits the comments on one field into open and resolved', () => {
+        const commented = review({
+            comments: [
+                {
+                    id: 'comment-1',
+                    path: 'heading',
+                    text: 'Say which spring',
+                    by: kari,
+                    createdAt: '2026-10-29T10:05:00.000Z',
+                    resolvedBy: null,
+                    resolvedAt: null,
+                },
+                {
+                    id: 'comment-2',
+                    path: 'heading',
+                    text: 'Shorter, please',
+                    by: kari,
+                    createdAt: '2026-10-29T10:06:00.000Z',
+                    resolvedBy: grace,
+                    resolvedAt: '2026-10-29T10:10:00.000Z',
+                },
+                {
+                    id: 'comment-3',
+                    path: 'products',
+                    text: 'Keep the olive tree',
+                    by: kari,
+                    createdAt: '2026-10-29T10:07:00.000Z',
+                    resolvedBy: null,
+                    resolvedAt: null,
+                },
+            ],
+        });
+        const onHeading = commentsOn(commented, 'heading');
+        expect(onHeading.open.map((comment) => comment.id)).toEqual(['comment-1']);
+        expect(onHeading.resolved.map((comment) => comment.id)).toEqual(['comment-2']);
+        expect(commentsOn(null, 'heading').open).toEqual([]);
+    });
+
+    it('lets the people in the review comment', () => {
+        expect(takesPart(review(), grace.id)).toBe(true);
+        expect(takesPart(review(), kari.id)).toBe(true);
+        expect(takesPart(review(), ola.id)).toBe(false);
     });
 });

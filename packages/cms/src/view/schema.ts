@@ -144,11 +144,27 @@ export interface PersonView {
 }
 
 /**
+ * A comment on one field of a review's draft.
+ */
+export interface ReviewComment {
+    id: string;
+    /**
+     * The field, as a change to it is keyed.
+     */
+    path: string;
+    text: string;
+    by: PersonView;
+    createdAt: string;
+    resolvedBy: PersonView | null;
+    resolvedAt: string | null;
+}
+
+/**
  * Where a document's latest review stands.
  */
 export interface ReviewState {
     id: string;
-    status: 'open' | 'approved' | 'changes' | 'outdated';
+    status: 'open' | 'approved' | 'changes' | 'outdated' | 'withdrawn' | 'published-past-review';
     version: number;
     reviewers: PersonView[];
     requestedBy: PersonView;
@@ -157,6 +173,10 @@ export interface ReviewState {
     decidedBy: PersonView | null;
     decisionNote: string | null;
     decidedAt: string | null;
+    /**
+     * Comments on single fields, since the document was last published.
+     */
+    comments: ReviewComment[];
 }
 
 /**

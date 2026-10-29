@@ -1,4 +1,4 @@
-import type { PersonView, ReviewState } from '../view/schema.js';
+import type { PersonView, ReviewComment, ReviewState } from '../view/schema.js';
 import { sentenceOf } from './sections.js';
 
 const firstNameOf = (person: PersonView): string => person.name.split(' ')[0] ?? person.name;
@@ -45,6 +45,23 @@ export const reviewStatusPartsOf = (review: ReviewState, me: string | undefined)
                   lead: 'Changes requested by',
                   people: deciders,
               };
+    }
+    if (review.status === 'published-past-review') {
+        return byMe
+            ? {
+                  lead: 'Published past the review by you',
+                  people: [],
+              }
+            : {
+                  lead: 'Published past the review by',
+                  people: deciders,
+              };
+    }
+    if (review.status === 'withdrawn') {
+        return {
+            lead: 'Review request withdrawn',
+            people: [],
+        };
     }
     return byMe
         ? {
@@ -93,7 +110,11 @@ export const verdictsOf = (
             decider !== null && decider.id === person.id
                 ? review.status === 'changes'
                     ? 'Asked for changes'
-                    : 'Approved'
+                    : review.status === 'published-past-review'
+                      ? 'Published past review'
+                      : review.status === 'withdrawn'
+                        ? 'Withdrew the request'
+                        : 'Approved'
                 : review.status === 'open'
                   ? 'Not reviewed'
                   : '',
@@ -144,3 +165,57 @@ export const changeQuestionOf = (review: ReviewState): string => `What should ${
  * The button that sends the draft back: "Send to Kari".
  */
 export const sendBackLabelOf = (review: ReviewState): string => `Send to ${firstNameOf(review.requestedBy)}`;
+
+/**
+ * Whether the person asked for this review and it still waits, so they can
+ * withdraw it.
+ */
+export const mayWithdraw = (review: ReviewState | null, me: string | undefined): review is ReviewState =>
+    review !== null && review.status === 'open' && review.requestedBy.id === me;
+
+/**
+ * Whether the person approved this review, so they can undo the approval
+ * while the draft is unpublished. An outdated approval is still theirs.
+ */
+export const mayUndoApproval = (review: ReviewState | null, me: string | undefined): review is ReviewState =>
+    review !== null && (review.status === 'approved' || review.status === 'outdated') && review.decidedBy?.id === me;
+
+/**
+ * Whether the person takes part in the review, so they may comment on its
+ * fields: they asked, were asked, or answered.
+ */
+export const takesPart = (review: ReviewState | null, me: string | undefined): review is ReviewState =>
+    review !== null &&
+    me !== undefined &&
+    (review.requestedBy.id === me || review.decidedBy?.id === me || review.reviewers.some((reviewer) => reviewer.id === me));
+
+/**
+ * The comments on one field, open and resolved, oldest first.
+ */
+export const commentsOn = (
+    review: ReviewState | null,
+    path: string
+): {
+    open: ReviewComment[];
+    resolved: ReviewComment[];
+} => {
+    const comments = review?.comments.filter((comment) => comment.path === path) ?? [];
+    return {
+        open: comments.filter((comment) => comment.resolvedAt === null),
+        resolved: comments.filter((comment) => comment.resolvedAt !== null),
+    };
+};
+
+/**
+ * What a comment's head says: "Kari Nordmann on Products", or "You on
+ * Products".
+ */
+export const commentTitleOf = (comment: ReviewComment, label: string, me: string | undefined): string =>
+    `${comment.by.id === me ? 'You' : comment.by.name} on ${label}`;
+
+/**
+ * What the composer under a change hints: "Felix sees this beside the
+ * field", or a plainer line for the person who asked.
+ */
+export const commentHintOf = (review: ReviewState, me: string | undefined): string =>
+    review.requestedBy.id === me ? 'Reviewers see this under the change' : `${firstNameOf(review.requestedBy)} sees this under the field`;

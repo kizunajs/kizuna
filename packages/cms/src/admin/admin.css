@@ -988,6 +988,129 @@
         padding: 10px var(--k-gutter) 0;
     }
 
+    /* A record of a view: what its action answered under the header, and its id in the header's line. */
+    .k-action-problem {
+        padding: 10px var(--k-gutter) 0;
+    }
+
+    .k-record__id {
+        font-family: var(--k-mono);
+        font-size: 12px;
+    }
+
+    /* No access and not found: an icon, what happened, and the way on, in the middle of the screen. */
+    .k-state {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 64px var(--k-gutter) 120px;
+        text-align: center;
+    }
+
+    .k-state__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        background: var(--k-control);
+        box-shadow: var(--k-control-elevation);
+        color: var(--k-muted);
+    }
+
+    .k-state__icon svg {
+        width: 22px;
+        height: 22px;
+    }
+
+    .k-state__text {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-width: 460px;
+    }
+
+    .k-state__heading {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+
+    .k-state__detail {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.55;
+        color: var(--k-muted);
+    }
+
+    .k-state__actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+    .k-state__actions a.k-button {
+        text-decoration: none;
+    }
+
+    .k-state__shortcut {
+        font-family: var(--k-mono);
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--k-muted);
+    }
+
+    /* Offline, beside the header's buttons. */
+    .k-offline {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: var(--k-control);
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--k-muted);
+    }
+
+    /* Couldn't save, under Not saved: why, Retry now and Keep editing. */
+    .k-save-failed {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: min(340px, calc(100vw - 32px));
+        padding: 16px;
+    }
+
+    .k-save-failed__title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .k-save-failed__detail {
+        margin: 6px 0 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--k-muted);
+    }
+
+    .k-save-failed__actions {
+        display: flex;
+        gap: 8px;
+    }
+
     .k-document__body {
         display: flex;
         flex: 1;
@@ -3376,6 +3499,110 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
+    }
+
+    /* Comment beside a change, and the quiet buttons under a comment. */
+    .k-comment-toggle {
+        display: inline-flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 6px;
+        height: 28px;
+        margin-left: auto;
+        padding: 0 8px;
+        border: 0;
+        border-radius: 7px;
+        background: none;
+        font: inherit;
+        font-size: 12.5px;
+        color: var(--k-muted);
+        cursor: pointer;
+    }
+
+    .k-comment-toggle:hover {
+        background: var(--k-control);
+        color: var(--k-ink);
+    }
+
+    .k-comments {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding-top: 4px;
+    }
+
+    .k-comments > .k-comment-toggle {
+        margin-left: 0;
+    }
+
+    .k-comment {
+        display: flex;
+        flex-direction: column;
+        align-self: stretch;
+        gap: 8px;
+        padding: 12px 14px;
+        border: 0;
+        border-radius: var(--k-radius-card);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
+        font: inherit;
+        color: inherit;
+        text-align: left;
+    }
+
+    .k-comment[data-resolved] {
+        color: var(--k-muted);
+    }
+
+    .k-comment--link {
+        cursor: pointer;
+    }
+
+    .k-comment--link:hover {
+        background: var(--k-control);
+    }
+
+    .k-comment__actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .k-comment__actions .k-comment-toggle {
+        margin-left: 0;
+    }
+
+    .k-comment__resolved {
+        margin: 0;
+        font-size: 12px;
+        color: var(--k-muted);
+    }
+
+    .k-comment-composer {
+        display: flex;
+        flex-direction: column;
+        align-self: stretch;
+        gap: 8px;
+    }
+
+    .k-comment-composer__label {
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 18px;
+    }
+
+    .k-comment-composer__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    .k-versions__status {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
     }
 
     /* Why Publish waits, beside the header's buttons. */

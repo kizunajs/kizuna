@@ -10,8 +10,23 @@ import { problemOf } from './parts.js';
 /**
  * Everyone who may review, the owner first, leaving out the person asking.
  */
-export const reviewersToOffer = (people: readonly PersonView[], owner: string | null, me: string | undefined): PersonView[] =>
-    people.filter((person) => person.id !== me).sort((left, right) => Number(right.id === owner) - Number(left.id === owner));
+export const reviewersToOffer = <Candidate extends PersonView>(
+    people: readonly Candidate[],
+    owner: string | null,
+    me: string | undefined
+): Candidate[] => people.filter((person) => person.id !== me).sort((left, right) => Number(right.id === owner) - Number(left.id === owner));
+
+const capitalized = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
+
+/**
+ * What the Ask dialog says under a name: the person's roles, and that they
+ * own the page: "Admin", "Editor · Owner of this page".
+ */
+export const reviewerDetailOf = (person: PersonView & { roles?: readonly string[] }, owner: string | null): string | undefined => {
+    const parts = (person.roles ?? []).map(capitalized);
+    if (person.id === owner) parts.push('Owner of this page');
+    return parts.length === 0 ? undefined : parts.join(' · ');
+};
 
 /**
  * Asks people to review one document's draft: a tick for each person, the
@@ -114,24 +129,27 @@ export function AskForReview({
                                 <p className="k-help">Nobody else edits here yet.</p>
                             ) : (
                                 <div className="k-ask__people">
-                                    {offered.map((person) => (
-                                        <button
-                                            key={person.id}
-                                            type="button"
-                                            role="checkbox"
-                                            aria-checked={chosen.has(person.id)}
-                                            className="k-ask__person"
-                                            onClick={() => toggle(person.id)}>
-                                            <Avatar person={person} size={28} />
-                                            <span className="k-ask__who">
-                                                <span className="k-ask__name">{person.name}</span>
-                                                {person.id === owner?.id ? <span className="k-ask__role">Owner of this page</span> : null}
-                                            </span>
-                                            <span className="k-ask__box" aria-hidden="true">
-                                                {chosen.has(person.id) ? <Check {...ICON} /> : null}
-                                            </span>
-                                        </button>
-                                    ))}
+                                    {offered.map((person) => {
+                                        const detail = reviewerDetailOf(person, owner?.id ?? null);
+                                        return (
+                                            <button
+                                                key={person.id}
+                                                type="button"
+                                                role="checkbox"
+                                                aria-checked={chosen.has(person.id)}
+                                                className="k-ask__person"
+                                                onClick={() => toggle(person.id)}>
+                                                <Avatar person={person} size={28} />
+                                                <span className="k-ask__who">
+                                                    <span className="k-ask__name">{person.name}</span>
+                                                    {detail === undefined ? null : <span className="k-ask__role">{detail}</span>}
+                                                </span>
+                                                <span className="k-ask__box" aria-hidden="true">
+                                                    {chosen.has(person.id) ? <Check {...ICON} /> : null}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>

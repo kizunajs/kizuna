@@ -252,16 +252,26 @@ function InlineOf({ view }: { view: ChangeView }): ReactNode {
     );
 }
 
+/**
+ * What a comparison adds to each row: beside its label, and under its sides.
+ */
+export interface DiffExtras {
+    headFor?: (entry: DiffEntry) => ReactNode;
+    footFor?: (entry: DiffEntry) => ReactNode;
+}
+
 function DiffRow({
     entry,
     layout,
     beforeLabel,
     afterLabel,
+    extras,
 }: {
     entry: DiffEntry;
     layout: DiffLayout;
     beforeLabel: string;
     afterLabel: string;
+    extras: DiffExtras | undefined;
 }) {
     const same = 'same' in entry;
     return (
@@ -269,6 +279,7 @@ function DiffRow({
             <div className="k-diff__head">
                 <span className="k-diff__label">{entry.label}</span>
                 {entry.note === undefined ? null : <span className="k-diff__note">{entry.note}</span>}
+                {extras?.headFor?.(entry)}
             </div>
             {layout === 'side' ? (
                 <div className="k-diff__sides">
@@ -282,6 +293,7 @@ function DiffRow({
             ) : (
                 <div className="k-diff__inline">{same ? <ShownValue shown={entry.same} /> : <InlineOf view={entry.view} />}</div>
             )}
+            {extras?.footFor?.(entry)}
         </div>
     );
 }
@@ -295,11 +307,13 @@ export function DiffSections({
     layout,
     beforeLabel,
     afterLabel,
+    extras,
 }: {
     sections: readonly Section<DiffEntry>[];
     layout: DiffLayout;
     beforeLabel: string;
     afterLabel: string;
+    extras?: DiffExtras;
 }) {
     return (
         <div className="k-diff">
@@ -313,7 +327,14 @@ export function DiffSections({
                 <section key={section.title} className="k-diff__section" aria-label={section.title === '' ? undefined : section.title}>
                     {section.title === '' ? null : <h2 className="k-diff__title">{section.title}</h2>}
                     {section.entries.map((entry) => (
-                        <DiffRow key={entry.key} entry={entry} layout={layout} beforeLabel={beforeLabel} afterLabel={afterLabel} />
+                        <DiffRow
+                            key={entry.key}
+                            entry={entry}
+                            layout={layout}
+                            beforeLabel={beforeLabel}
+                            afterLabel={afterLabel}
+                            extras={extras}
+                        />
                     ))}
                 </section>
             ))}

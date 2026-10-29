@@ -135,7 +135,9 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-    await pglite.exec('delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;');
+    await pglite.exec(
+        'delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;'
+    );
     requested.length = 0;
 });
 

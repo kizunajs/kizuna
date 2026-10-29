@@ -589,6 +589,24 @@
         white-space: nowrap;
     }
 
+    /* A field nobody may change: its value as text, on a quieter fill than an input. */
+    .k-read-only {
+        display: flex;
+        align-items: center;
+        min-height: var(--k-control-height);
+        margin: 0;
+        padding: 9px 12px;
+        border-radius: var(--k-radius-control);
+        background: var(--k-surface);
+        font-size: 14px;
+        line-height: 22px;
+        overflow-wrap: anywhere;
+    }
+
+    .k-read-only[data-empty='true'] {
+        color: var(--k-muted);
+    }
+
     .k-required {
         margin-left: 2px;
         font-weight: 400;

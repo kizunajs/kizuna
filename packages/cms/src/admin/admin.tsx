@@ -22,7 +22,9 @@ import {
     type Screen,
 } from './navigation.js';
 import { Loading } from './parts.js';
+import { PageHeader } from './page-header.js';
 import { SignedIn } from './signed-in.js';
+import { NotFound, shownAddress } from './states.js';
 import { useTheme } from './theme.js';
 import { RecordScreen, ViewList } from './view-screen.js';
 import type { ViewSummary } from './views.js';
@@ -174,6 +176,32 @@ export function Admin({ config }: { config: AdminConfig }) {
 
     const me = people === undefined ? undefined : people.people.find((person) => person.id === people.me);
 
+    // A list the address names that the editor has none of, or may not open.
+    const missingList = (
+        <>
+            <PageHeader
+                crumbs={[]}
+                title="Not found"
+                meta={[
+                    {
+                        label: 'Address',
+                        value: shownAddress(),
+                    },
+                ]}
+            />
+            <NotFound
+                noun="list"
+                back={{
+                    label: 'Go to the dashboard',
+                    href: hrefOf({
+                        kind: 'dashboard',
+                    }),
+                }}
+                onSearch={openSearch}
+            />
+        </>
+    );
+
     const shown = (() => {
         if (screen.kind === 'pages') return <PagesList connection={connection} routes={config.routes} />;
         if (screen.kind === 'media') {
@@ -182,9 +210,10 @@ export function Admin({ config }: { config: AdminConfig }) {
         if (screen.kind === 'collection') {
             const collection = collections?.find((candidate) => candidate.name === screen.name);
             if (collection === undefined) {
+                if (collections !== undefined) return missingList;
                 return (
                     <div className="k-admin__body">
-                        <Loading problem={collections === undefined ? problem : `There is no collection named ${screen.name}.`} />
+                        <Loading problem={problem} />
                     </div>
                 );
             }
@@ -211,6 +240,8 @@ export function Admin({ config }: { config: AdminConfig }) {
                     waiting={waiting ?? []}
                     collectionLabel={collectionLabel}
                     onReviewsChanged={() => void loadWaiting()}
+                    role={config.role}
+                    onSearch={openSearch}
                 />
             );
         }
@@ -218,9 +249,10 @@ export function Admin({ config }: { config: AdminConfig }) {
             const name = screen.kind === 'view' ? screen.name : screen.view;
             const view = views?.find((candidate) => candidate.name === name);
             if (view === undefined) {
+                if (views !== undefined) return missingList;
                 return (
                     <div className="k-admin__body">
-                        <Loading problem={views === undefined ? undefined : `There is no view named ${name}.`} />
+                        <Loading />
                     </div>
                 );
             }
@@ -232,6 +264,8 @@ export function Admin({ config }: { config: AdminConfig }) {
                         viewName={view.name}
                         viewLabel={view.label}
                         id={screen.id}
+                        role={config.role}
+                        onSearch={openSearch}
                     />
                 );
             }

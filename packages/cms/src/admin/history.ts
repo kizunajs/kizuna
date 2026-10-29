@@ -1,3 +1,5 @@
+import type { PersonView } from '../view/schema.js';
+
 /**
  * One version of a document as its history lists it.
  */
@@ -7,6 +9,15 @@ export interface VersionSummary {
     createdAt: string;
     createdBy: string;
     published: boolean;
+    /**
+     * Who approved the version, or who published it before anyone approved
+     * it. Older servers leave it out.
+     */
+    review?: {
+        status: 'approved' | 'published-past-review';
+        by: PersonView;
+        at: string;
+    } | null;
 }
 
 const SAVED_AT = new Intl.DateTimeFormat(undefined, {

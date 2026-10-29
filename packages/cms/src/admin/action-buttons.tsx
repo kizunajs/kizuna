@@ -21,23 +21,31 @@ export interface ActionButton {
 }
 
 /**
- * A row of buttons. One with a question asks it first in a dialog. A problem
- * the server answered shows below the row, and anything else as a toast.
+ * A row of buttons, for a header's actions. One with a question asks it first
+ * in a dialog. What the server answered goes to `onProblem` when it refused,
+ * and shows as a toast when the button ran.
  */
-export function ActionBar({ buttons, onRun }: { buttons: readonly ActionButton[]; onRun: (name: string) => Promise<Outcome> }) {
+export function ActionBar({
+    buttons,
+    onRun,
+    onProblem,
+}: {
+    buttons: readonly ActionButton[];
+    onRun: (name: string) => Promise<Outcome>;
+    onProblem: (problem: string | undefined) => void;
+}) {
     const [confirming, setConfirming] = useState<ActionButton | undefined>();
     const [running, setRunning] = useState<string | undefined>();
-    const [problem, setProblem] = useState<string | undefined>();
     const toasts = Toast.useToastManager();
 
     const run = async (button: ActionButton): Promise<void> => {
         setConfirming(undefined);
-        setProblem(undefined);
+        onProblem(undefined);
         setRunning(button.name);
         const answered = await onRun(button.name);
         setRunning(undefined);
         if (answered.problem) {
-            setProblem(answered.message);
+            onProblem(answered.message);
             return;
         }
         toasts.add({
@@ -45,29 +53,23 @@ export function ActionBar({ buttons, onRun }: { buttons: readonly ActionButton[]
         });
     };
 
-    if (buttons.length === 0 && problem === undefined) return null;
-
     return (
-        <div className="k-actions">
-            {buttons.length === 0 ? null : (
-                <div className="k-actions__row">
-                    {buttons.map((button) => (
-                        <button
-                            key={button.name}
-                            type="button"
-                            className={`k-button k-button--small ${button.primary === true ? 'k-button--primary' : 'k-button--secondary'}`}
-                            disabled={button.disabled === true || running !== undefined}
-                            aria-haspopup={button.confirm === undefined ? undefined : 'dialog'}
-                            onClick={() => {
-                                if (button.confirm === undefined) void run(button);
-                                else setConfirming(button);
-                            }}>
-                            {running === button.name ? <LoaderCircle {...ICON} className="k-spin" /> : null}
-                            {button.label}
-                        </button>
-                    ))}
-                </div>
-            )}
+        <>
+            {buttons.map((button) => (
+                <button
+                    key={button.name}
+                    type="button"
+                    className={`k-button k-button--small ${button.primary === true ? 'k-button--primary' : 'k-button--secondary'}`}
+                    disabled={button.disabled === true || running !== undefined}
+                    aria-haspopup={button.confirm === undefined ? undefined : 'dialog'}
+                    onClick={() => {
+                        if (button.confirm === undefined) void run(button);
+                        else setConfirming(button);
+                    }}>
+                    {running === button.name ? <LoaderCircle {...ICON} className="k-spin" /> : null}
+                    {button.label}
+                </button>
+            ))}
             <ConfirmDialog
                 confirming={
                     confirming?.confirm === undefined
@@ -82,13 +84,20 @@ export function ActionBar({ buttons, onRun }: { buttons: readonly ActionButton[]
                 }}
                 onCancel={() => setConfirming(undefined)}
             />
-            {problem === undefined ? null : (
-                <p className="k-error" role="alert">
-                    <CircleAlert {...ICON} />
-                    {problem}
-                </p>
-            )}
-        </div>
+        </>
+    );
+}
+
+/**
+ * What the server refused, under the header.
+ */
+export function ActionProblem({ problem }: { problem: string | undefined }) {
+    if (problem === undefined) return null;
+    return (
+        <p className="k-error k-action-problem" role="alert">
+            <CircleAlert {...ICON} />
+            {problem}
+        </p>
     );
 }
 
@@ -108,9 +117,14 @@ export function ItemActions({
     onRan: () => void;
 }) {
     const shown = shownActions(actions);
+    const [problem, setProblem] = useState<string | undefined>();
+    if (shown.length === 0) return null;
     return (
-        <ActionBar
-            buttons={shown}
+        <div className="k-actions">
+            <div className="k-actions__row">
+                <ActionBar
+                    buttons={shown}
+                    onProblem={setProblem}
             onRun={async (name) => {
                 const action = shown.find((candidate) => candidate.name === name);
                 const call = itemActionCall(documentRef, name);
@@ -125,6 +139,9 @@ export function ItemActions({
                 if (answer.status < 300) onRan();
                 return outcomeOf(answer, label);
             }}
-        />
+                />
+            </div>
+            <ActionProblem problem={problem} />
+        </div>
     );
 }

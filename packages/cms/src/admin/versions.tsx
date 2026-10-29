@@ -152,7 +152,21 @@ export function Versions({
                                         </span>
                                     </td>
                                     <td>
-                                        <ListStatus status={entry.published ? 'published' : 'draft'} />
+                                        {entry.review?.status === 'published-past-review' ? (
+                                            <span className="k-versions__status">
+                                                <span className="k-table__status" data-status="published-past-review">
+                                                    Published past review
+                                                </span>
+                                                <span className="k-table__detail">by {entry.review.by.name}</span>
+                                            </span>
+                                        ) : entry.review?.status === 'approved' ? (
+                                            <span className="k-versions__status">
+                                                <ListStatus status={entry.published ? 'published' : 'draft'} />
+                                                <span className="k-table__detail">Approved by {entry.review.by.name}</span>
+                                            </span>
+                                        ) : (
+                                            <ListStatus status={entry.published ? 'published' : 'draft'} />
+                                        )}
                                     </td>
                                     <td>
                                         <span className="k-versions__by">

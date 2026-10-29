@@ -7,7 +7,11 @@ import type { PersonView, ReviewState } from './schema.js';
 
 export interface People {
     me: string;
-    people: PersonView[];
+    people: Array<
+        PersonView & {
+            roles?: string[];
+        }
+    >;
 }
 
 /**
@@ -79,7 +83,11 @@ export function ReviewBadge({ review, me }: { review: ReviewState; me: string | 
               ? `Approved by ${review.decidedBy?.name.split(' ')[0] ?? 'a reviewer'}`
               : review.status === 'changes'
                 ? `Changes requested`
-                : 'Approval outdated';
+                : review.status === 'published-past-review'
+                  ? `Published past review by ${review.decidedBy?.name.split(' ')[0] ?? 'someone'}`
+                  : review.status === 'withdrawn'
+                    ? 'Request withdrawn'
+                    : 'Approval outdated';
     const faces =
         review.status === 'open'
             ? waitingForMe

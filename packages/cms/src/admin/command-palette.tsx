@@ -7,7 +7,7 @@ import { ICON } from '../view/context.js';
 import { hrefOf, type CollectionSummary, type NavigationSection } from './navigation.js';
 import { groupsOfResults, highlightOf, loadDocuments, placesOf, searchOf, type SearchGroup, type SearchResult } from './search.js';
 
-const onApple = (): boolean => /Mac|iPhone|iPad/.test(window.navigator.userAgent);
+export const onApple = (): boolean => /Mac|iPhone|iPad/.test(window.navigator.userAgent);
 
 /**
  * Opens the palette on ⌘K, or Ctrl+K off a Mac, and closes it on a second

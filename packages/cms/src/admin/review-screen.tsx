@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { Popover } from '@base-ui/react/popover';
 import { ExternalLink } from 'lucide-react';
+import type { Connection } from '../view/connection.js';
 import { ICON } from '../view/context.js';
 import type { ChangeView } from '../view/change-value.js';
 import { Avatar, Avatars } from '../view/people.js';
@@ -9,7 +10,8 @@ import type { DescribedField, DescribedLayout, PersonView, ReviewState } from '.
 import { DiffSections, type DiffEntry } from './diff.js';
 import { savedAtOf } from './history.js';
 import { Loading } from './parts.js';
-import { changeQuestionOf, draftOwnerOf, sendBackLabelOf, verdictsOf } from './review-state.js';
+import { CommentButton, FieldComments } from './review-comments.js';
+import { changeQuestionOf, draftOwnerOf, sendBackLabelOf, takesPart, verdictsOf } from './review-state.js';
 import { sectionLabelOf, sectionTitleOf, sectionsOf, sentenceOf } from './sections.js';
 import { relativeTimeOf } from './time.js';
 
@@ -74,6 +76,8 @@ export function ReviewCard({
 const decisionTitleOf = (review: ReviewState, me: string | undefined): string | undefined => {
     if (review.decidedBy === null || review.status === 'open') return undefined;
     const who = review.decidedBy.id === me ? 'You' : review.decidedBy.name;
+    if (review.status === 'published-past-review') return `${who} published past the review`;
+    if (review.status === 'withdrawn') return `${who} withdrew the request`;
     return review.status === 'changes' ? `${who} asked for changes` : `${who} approved`;
 };
 
@@ -104,8 +108,9 @@ export const reviewSectionsOf = (changes: readonly ViewedChange[], fields: reado
 
 /**
  * The Review tab: each change beside what is live now, grouped by section,
- * and beside them the request, the answer, who was asked, and when the draft
- * was saved and the page went live.
+ * with Comment beside it and its comments under it, and beside them the
+ * request, the answer, who was asked, and when the draft was saved and the
+ * page went live.
  */
 export function ReviewScreen({
     review,
@@ -117,6 +122,8 @@ export function ReviewScreen({
     savedAt,
     liveSince,
     onOpenOnSite,
+    connection,
+    onReviewChanged,
 }: {
     review: ReviewState;
     changes: readonly ViewedChange[] | undefined;
@@ -127,7 +134,11 @@ export function ReviewScreen({
     savedAt: string | null;
     liveSince: string | null;
     onOpenOnSite: (() => void) | undefined;
+    connection: Connection;
+    onReviewChanged: (review: ReviewState) => void;
 }) {
+    const [composing, setComposing] = useState<string | undefined>();
+    const commenting = takesPart(review, me);
     const sections = changes === undefined ? [] : reviewSectionsOf(changes, fields, layout);
     const titles = sections.map((section) => section.title).filter((title) => title !== '');
     const count = changes?.length ?? 0;
@@ -139,7 +150,35 @@ export function ReviewScreen({
                 ) : changes.length === 0 ? (
                     <p className="k-help">The draft holds what is live now.</p>
                 ) : (
-                    <DiffSections sections={sections} layout="side" beforeLabel="Live now" afterLabel={draftOwnerOf(review, me)} />
+                    <DiffSections
+                        sections={sections}
+                        layout="side"
+                        beforeLabel="Live now"
+                        afterLabel={draftOwnerOf(review, me)}
+                        extras={{
+                            headFor: (entry) =>
+                                commenting ? (
+                                    <CommentButton
+                                        label={entry.label}
+                                        open={composing === entry.key}
+                                        onToggle={() => setComposing(composing === entry.key ? undefined : entry.key)}
+                                    />
+                                ) : null,
+                            footFor: (entry) => (
+                                <FieldComments
+                                    review={review}
+                                    path={entry.key}
+                                    label={entry.label}
+                                    me={me}
+                                    now={now}
+                                    connection={connection}
+                                    composing={composing === entry.key}
+                                    onComposingChange={(next) => setComposing(next ? entry.key : undefined)}
+                                    onChanged={onReviewChanged}
+                                />
+                            ),
+                        }}
+                    />
                 )}
             </section>
             <aside className="k-review-screen__aside" aria-label="Review">

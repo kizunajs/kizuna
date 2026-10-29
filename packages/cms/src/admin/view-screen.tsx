@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Connection } from '../view/connection.js';
 import { FieldForm, type SaveState } from '../view/form.js';
-import { ActionBar, type ActionButton } from './action-buttons.js';
+import { ActionBar, ActionProblem, type ActionButton } from './action-buttons.js';
 import { outcomeOf, shownActions, type Outcome } from './actions.js';
+import { singularOf } from '../view/array-rows.js';
+import { roleSubjectOf } from './access.js';
 import { hrefOf } from './navigation.js';
+import { NoAccess, NotFound, shownAddress } from './states.js';
 import { PageHeader } from './page-header.js';
 import { Loading, problemOf } from './parts.js';
 import { viewActionCall, viewSaveCall, viewTool, withEdits, type ViewRecord } from './views.js';
@@ -21,20 +24,26 @@ export function RecordScreen({
     viewName,
     viewLabel,
     id,
+    role,
+    onSearch,
 }: {
     connection: Connection;
     viewName: string;
     viewLabel: string;
     id: string;
+    role: string | null;
+    onSearch: () => void;
 }) {
     const [record, setRecord] = useState<ViewRecord | undefined>();
     const [gone, setGone] = useState(false);
     const [loadProblem, setLoadProblem] = useState<string | undefined>();
+    const [loadStatus, setLoadStatus] = useState<number | undefined>();
     const [edits, setEdits] = useState<Readonly<Record<string, unknown>>>({});
     const [formKey, setFormKey] = useState(0);
     const latestEdits = useRef<Readonly<Record<string, unknown>>>({});
     const formState = useRef<SaveState>('idle');
     const [typing, setTyping] = useState(false);
+    const [problem, setProblem] = useState<string | undefined>();
     const settled = useRef<(() => void) | undefined>(undefined);
 
     const replace = useCallback((next: ViewRecord | undefined, keepEdits: boolean): void => {
@@ -62,6 +71,7 @@ export function RecordScreen({
             .then((answer) => {
                 if (answer.status !== 200) {
                     setLoadProblem(problemOf(answer, 'The record did not load'));
+                    setLoadStatus(answer.status);
                     return;
                 }
                 setRecord(answer.body);
@@ -101,7 +111,7 @@ export function RecordScreen({
         const call = viewActionCall(viewName, record.id, name);
         const answer = await connection.call<ViewRecord>(call.name, call.input);
         if (answer.status === 200 || answer.status === 204) replace(answer.status === 200 ? answer.body : undefined, true);
-        return outcomeOf(answer, label);
+        return outcomeOf(answer, label, `${label} ran for ${record.title}.`);
     };
 
     const crumb = {
@@ -111,6 +121,37 @@ export function RecordScreen({
             name: viewName,
         }),
     };
+
+    const back = {
+        label: `Go to ${viewLabel}`,
+        href: crumb.href,
+    };
+    if (loadStatus === 404) {
+        const noun = singularOf(viewLabel).toLowerCase();
+        return (
+            <>
+                <PageHeader
+                    crumbs={[crumb]}
+                    title={`${singularOf(viewLabel)} not found`}
+                    meta={[
+                        {
+                            label: 'Address',
+                            value: shownAddress(),
+                        },
+                    ]}
+                />
+                <NotFound noun={noun === viewLabel.toLowerCase() ? 'record' : noun} back={back} onSearch={onSearch} />
+            </>
+        );
+    }
+    if (loadStatus === 403) {
+        return (
+            <>
+                <PageHeader crumbs={[crumb]} title={viewLabel} />
+                <NoAccess title={viewLabel} role={roleSubjectOf(role)} back={back} />
+            </>
+        );
+    }
 
     if (record === undefined) {
         return (
@@ -124,7 +165,9 @@ export function RecordScreen({
     }
 
     const changed = Object.keys(edits).length > 0;
+    // The view's own actions first, and Save last, where Publish sits on a document.
     const buttons: ActionButton[] = [
+        ...(gone ? [] : shownActions(record.actions)),
         ...(record.readOnly || gone
             ? []
             : [
@@ -135,16 +178,29 @@ export function RecordScreen({
                       disabled: !changed && !typing,
                   },
               ]),
-        ...(gone ? [] : shownActions(record.actions)),
     ];
+    const status = record.readOnly ? 'Read only' : changed && !gone ? 'Unsaved changes' : undefined;
 
     return (
         <>
             <PageHeader
                 crumbs={[crumb]}
                 title={record.title}
-                meta={[record.readOnly ? 'Read only' : null, changed && !gone ? 'Unsaved changes' : null]}
+                meta={[
+                    status === undefined
+                        ? null
+                        : {
+                              label: 'Status',
+                              value: status,
+                          },
+                    {
+                        label: 'ID',
+                        value: <span className="k-record__id">{record.id}</span>,
+                    },
+                ]}
+                actions={buttons.length === 0 ? undefined : <ActionBar buttons={buttons} onRun={run} onProblem={setProblem} />}
             />
+            <ActionProblem problem={problem} />
             <div className="k-admin__body">
                 {gone ? (
                     <p className="k-note">
@@ -182,9 +238,9 @@ export function RecordScreen({
                         }}
                         changed={NOTHING_CHANGED}
                         pointed={undefined}
+                        readOnly={record.readOnly}
                     />
                 )}
-                <ActionBar buttons={buttons} onRun={run} />
             </div>
         </>
     );

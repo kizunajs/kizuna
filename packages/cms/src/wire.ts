@@ -236,7 +236,9 @@ export const ReviewStateSchema = Kizuna.model({
         decidedAt: z.iso.datetime().nullable(),
         comments: z
             .array(ReviewCommentSchema)
-            .describe('Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.'),
+            .describe(
+                'Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.'
+            ),
     }),
 });
 

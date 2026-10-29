@@ -8,7 +8,7 @@ import { EditorContext, ICON, type EditorContextValue } from '../view/context.js
 import { FieldForm, fieldDomId, type FieldFormHandle, type SaveFailure, type SaveState } from '../view/form.js';
 import { OwnerControl, type People } from '../view/people.js';
 import { PublishReview, changeViewsOf, type Changes } from '../view/review.js';
-import { documentTitle, valueAt, type Description, type Draft } from '../view/schema.js';
+import { documentTitle, valueAt, type Description, type Draft, type ReviewState } from '../view/schema.js';
 import { sameContent } from '../same-content.js';
 import { parseRef } from '../refs.js';
 import { ConfirmDialog } from './confirm.js';
@@ -18,11 +18,16 @@ import { savedAtOf, type VersionSummary } from './history.js';
 import { hrefOf } from './navigation.js';
 import { PageHeader, type Crumb } from './page-header.js';
 import { Loading, SaveIndicator, Status, problemOf } from './parts.js';
+import { documentNounOf, documentStateOf, roleSubjectOf, titleOfRef } from './access.js';
+import { OfflineBadge, SaveFailedNotice, retriesSave, useOnline, useRetry, type SaveProblem } from './save-failed.js';
+import { NoAccess, NotFound, shownAddress, type Way } from './states.js';
 import { relativeTimeOf } from './time.js';
 import { AdminPreview } from './preview-pane.js';
 import { AskForReview } from './review-ask.js';
+import { CommentLinks, FieldComments } from './review-comments.js';
 import { DecisionCard, PeopleFact, RequestChanges, ReviewScreen, type ViewedChange } from './review-screen.js';
-import { askAgainLabelOf, askAgainOf, gateNoteOf, reviewStatusPartsOf, waitsForMe } from './review-state.js';
+import { askAgainLabelOf, askAgainOf, gateNoteOf, mayUndoApproval, mayWithdraw, reviewStatusPartsOf, waitsForMe } from './review-state.js';
+import { sectionLabelOf } from './sections.js';
 import { Versions } from './versions.js';
 import type { WaitingReview } from './dashboard.js';
 
@@ -74,8 +79,14 @@ const failureOf = (answer: ToolAnswer): SaveFailure => {
             problem: 'Someone else changed this draft. It reloads with their change.',
         };
     }
+    if (!retriesSave(answer.status)) {
+        return {
+            problem: problem?.detail ?? `The save failed (${answer.status}).`,
+        };
+    }
+    // The header says why, and the form keeps the changes to send again.
     return {
-        problem: problem?.detail ?? `The save failed (${answer.status}).`,
+        retry: true,
     };
 };
 
@@ -144,6 +155,8 @@ export function DocumentScreen({
     waiting,
     collectionLabel,
     onReviewsChanged,
+    role,
+    onSearch,
 }: {
     connection: Connection;
     documentRef: string;
@@ -152,9 +165,18 @@ export function DocumentScreen({
     waiting: readonly WaitingReview[];
     collectionLabel: (name: string) => string | undefined;
     onReviewsChanged: () => void;
+    /**
+     * The role the editor signed in with, which a document they may not edit names.
+     */
+    role: string | null;
+    onSearch: () => void;
 }) {
     const [document, setDocument] = useState<Description | undefined>();
     const [loadProblem, setLoadProblem] = useState<string | undefined>();
+    const [loadStatus, setLoadStatus] = useState<number | undefined>();
+    const [saveProblem, setSaveProblem] = useState<SaveProblem | undefined>();
+    const [noticeOpen, setNoticeOpen] = useState(false);
+    const online = useOnline();
     const [saveState, setSaveState] = useState<SaveState>('idle');
     const [formKey, setFormKey] = useState(0);
     const [changed, setChanged] = useState<ReadonlySet<string>>(new Set());
@@ -170,6 +192,8 @@ export function DocumentScreen({
     const [compared, setCompared] = useState<number | undefined>();
     const [restoring, setRestoring] = useState<number | undefined>();
     const [deciding, setDeciding] = useState(false);
+    // The field whose review comments the person is replying to on the Edit tab.
+    const [replyingOn, setReplyingOn] = useState<string | undefined>();
     const [draftChanges, setDraftChanges] = useState<{ changes: Changes; views: ViewedChange[] } | undefined>();
     // The document the screen last opened, so a review waiting for the person opens on its tab once.
     const opened = useRef<string | undefined>(undefined);
@@ -184,6 +208,9 @@ export function DocumentScreen({
     const typing = useRef(false);
     const latest = useRef<Description | undefined>(undefined);
     latest.current = document;
+    const failing = useRef<SaveProblem | undefined>(undefined);
+    const retry = useCallback(() => void form.current?.flush(), []);
+    useRetry(saveProblem, online, retry);
 
     const describe = useCallback(
         async (ref: string, options: { remount?: boolean } = {}): Promise<Description | undefined> => {
@@ -194,9 +221,11 @@ export function DocumentScreen({
             });
             if (answer.status !== 200) {
                 setLoadProblem(problemOf(answer, 'The CMS answered'));
+                setLoadStatus(answer.status);
                 return undefined;
             }
             setLoadProblem(undefined);
+            setLoadStatus(undefined);
             setDocument(answer.body);
             if (options.remount !== false) setFormKey((key) => key + 1);
             seen.current = null;
@@ -353,9 +382,20 @@ export function DocumentScreen({
                 const stillOpen = current?.ref === ref;
                 if (answer.status !== 200) {
                     if (answer.status === 409 && stillOpen) void describe(ref);
+                    if (stillOpen && retriesSave(answer.status)) {
+                        if (failing.current === undefined) setNoticeOpen(true);
+                        failing.current = {
+                            detail: problemOf(answer, 'The save failed'),
+                            unreachable: answer.status >= 500,
+                        };
+                        setSaveProblem(failing.current);
+                    }
                     return failureOf(answer);
                 }
                 if (stillOpen) {
+                    failing.current = undefined;
+                    setSaveProblem(undefined);
+                    setNoticeOpen(false);
                     seen.current = answer.body.updatedAt;
                     setUpdatedAt(answer.body.updatedAt);
                     setUpdatedBy(answer.body.updatedBy);
@@ -487,6 +527,44 @@ export function DocumentScreen({
     };
 
     /**
+     * Withdraws the review the person asked for, or undoes their approval of
+     * it, so it waits for an answer again.
+     */
+    const changeReview = async (change: 'withdraw' | 'reopen'): Promise<void> => {
+        const current = latest.current;
+        if (current?.review === null || current?.review === undefined) return;
+        setDeciding(true);
+        setLinkProblem(undefined);
+        const answer = await connection.call(`editing_reviews_${change}`, {
+            body: {
+                ids: [current.review.id],
+            },
+        });
+        setDeciding(false);
+        if (answer.status !== 200) {
+            setLinkProblem(problemOf(answer, change === 'withdraw' ? 'The request was not withdrawn' : 'The approval was not undone'));
+            return;
+        }
+        onReviewsChanged();
+        await describe(current.ref, {
+            remount: false,
+        });
+    };
+
+    /**
+     * Shows a review as a comment or a resolve left it.
+     */
+    const reviewChanged = (review: ReviewState): void =>
+        setDocument((previous) =>
+            previous === undefined || previous.review?.id !== review.id
+                ? previous
+                : {
+                      ...previous,
+                      review,
+                  }
+        );
+
+    /**
      * Sends the draft back to whoever asked for changes, once they are made.
      */
     const askAgain = async (person: { id: string; name: string }): Promise<void> => {
@@ -539,6 +617,70 @@ export function DocumentScreen({
         });
         await describe(documentRef);
     };
+
+    const { noun, list } = documentNounOf(documentRef, collectionLabel);
+    const back: Way =
+        list === undefined
+            ? {
+                  label: 'Go to the dashboard',
+                  href: hrefOf({
+                      kind: 'dashboard',
+                  }),
+              }
+            : {
+                  label: `Go to ${list.label}`,
+                  href: hrefOf(
+                      list.collection === undefined
+                          ? {
+                                kind: 'pages',
+                            }
+                          : {
+                                kind: 'collection',
+                                name: list.collection,
+                            }
+                  ),
+              };
+    const state = loadStatus === 404 ? 'not-found' : loadStatus === 403 ? 'no-access' : document === undefined ? undefined : documentStateOf(document);
+    if (state === 'not-found') {
+        const capitalised = `${noun.charAt(0).toUpperCase()}${noun.slice(1)}`;
+        return (
+            <div className="k-document">
+                <PageHeader
+                    crumbs={crumbs}
+                    title={`${capitalised} not found`}
+                    meta={[
+                        {
+                            label: 'Address',
+                            value: shownAddress(),
+                        },
+                    ]}
+                />
+                <NotFound noun={noun} back={back} onSearch={onSearch} />
+            </div>
+        );
+    }
+    if (state === 'no-access') {
+        const shownTitle = document === undefined ? titleOfRef(documentRef) : documentTitle(document);
+        return (
+            <div className="k-document">
+                <PageHeader
+                    crumbs={crumbs}
+                    title={shownTitle}
+                    meta={
+                        document === undefined
+                            ? undefined
+                            : [
+                                  {
+                                      label: 'Status',
+                                      value: STATUS_FACT[document.status] ?? document.status,
+                                  },
+                              ]
+                    }
+                />
+                <NoAccess title={shownTitle} role={roleSubjectOf(role)} back={back} />
+            </div>
+        );
+    }
 
     if (document === undefined) {
         return (
@@ -682,12 +824,16 @@ export function DocumentScreen({
         />
     );
 
-    // The note of whoever sent the draft back, at the top of the sidebar while the changes are made.
+    const fieldLabelOf = (path: string): string => sectionLabelOf(document.fields, document.layout, path, path);
+    // The note of whoever sent the draft back, and the open comments, at the top of the sidebar while the changes are made.
+    const sentBackNote = document.review?.status === 'changes' && document.review.decisionNote !== null;
+    const openComments = document.review?.comments.some((comment) => comment.resolvedAt === null) ?? false;
     const reviewAside =
-        document.review?.status === 'changes' && document.review.decisionNote !== null ? (
+        document.review !== null && (sentBackNote || openComments) ? (
             <section className="k-review-aside" aria-label="Review">
                 <h2 className="k-review-screen__heading">Review</h2>
-                <DecisionCard review={document.review} me={me} now={now} />
+                {sentBackNote ? <DecisionCard review={document.review} me={me} now={now} /> : null}
+                <CommentLinks review={document.review} labelOf={fieldLabelOf} me={me} now={now} onShow={(path) => setPointed(path)} />
             </section>
         ) : undefined;
 
@@ -708,7 +854,9 @@ export function DocumentScreen({
                         {
                             label: 'Status',
                             value:
-                                document.review === null ? (
+                                saveProblem !== undefined ? (
+                                    'Unsaved changes'
+                                ) : document.review === null ? (
                                     (STATUS_FACT[document.status] ?? document.status)
                                 ) : (
                                     <PeopleFact {...reviewStatusPartsOf(document.review, me)} />
@@ -812,7 +960,8 @@ export function DocumentScreen({
                             </>
                         ) : (
                             <>
-                                <SaveIndicator state={saveState} />
+                                {online ? null : <OfflineBadge />}
+                                {saveProblem === undefined ? <SaveIndicator state={saveState} /> : null}
                                 {blocker === undefined ? null : (
                                     <button type="button" className="k-document__blocker" id="k-document-blocker" onClick={showBlocker}>
                                         <CircleAlert {...ICON} />
@@ -822,7 +971,7 @@ export function DocumentScreen({
                                 {blocker !== undefined || gateNote === undefined ? null : (
                                     <span className="k-document__gate">{gateNote}</span>
                                 )}
-                                {shownView === 'review' ? null : (
+                                {shownView === 'review' ? null : saveProblem === undefined ? (
                                     <button
                                         type="button"
                                         className="k-button k-button--secondary k-button--small"
@@ -830,6 +979,15 @@ export function DocumentScreen({
                                         onClick={() => void form.current?.flush()}>
                                         Save draft
                                     </button>
+                                ) : (
+                                    <SaveFailedNotice
+                                        problem={saveProblem}
+                                        offline={!online}
+                                        saving={saveState === 'saving'}
+                                        open={noticeOpen}
+                                        onOpenChange={setNoticeOpen}
+                                        onRetry={retry}
+                                    />
                                 )}
                                 {sentBackBy === undefined ? null : (
                                     <button
@@ -840,6 +998,24 @@ export function DocumentScreen({
                                         {askAgainLabelOf(sentBackBy)}
                                     </button>
                                 )}
+                                {mayWithdraw(document.review, me) ? (
+                                    <button
+                                        type="button"
+                                        className="k-button k-button--secondary"
+                                        disabled={deciding}
+                                        onClick={() => void changeReview('withdraw')}>
+                                        Withdraw request
+                                    </button>
+                                ) : null}
+                                {mayUndoApproval(document.review, me) ? (
+                                    <button
+                                        type="button"
+                                        className="k-button k-button--secondary"
+                                        disabled={deciding}
+                                        onClick={() => void changeReview('reopen')}>
+                                        Undo approval
+                                    </button>
+                                ) : null}
                                 {reviewer ? (
                                     <button
                                         type="button"
@@ -857,7 +1033,9 @@ export function DocumentScreen({
                                         waiting={waiting.filter((entry) => entry.ref !== document.ref).length}
                                         everywhere={document.usedOn.everywhere}
                                         secondary={sentBackBy !== undefined}
-                                        disabled={unsaved || saveState === 'failed' || (blocker !== undefined && waiting.length === 0)}
+                                        disabled={
+                                            !online || unsaved || saveState === 'failed' || (blocker !== undefined && waiting.length === 0)
+                                        }
                                         describedBy={blocker === undefined ? undefined : 'k-document-blocker'}
                                         onChanged={(refs) => {
                                             onReviewsChanged();
@@ -894,6 +1072,21 @@ export function DocumentScreen({
                             pointed={pointed}
                             missing={document.complete ? [] : document.missing}
                             aside={reviewAside}
+                            below={(field) =>
+                                document.review === null ? null : (
+                                    <FieldComments
+                                        review={document.review}
+                                        path={field.path}
+                                        label={fieldLabelOf(field.path)}
+                                        me={me}
+                                        now={now}
+                                        connection={connection}
+                                        composing={replyingOn === field.path}
+                                        onComposingChange={(next) => setReplyingOn(next ? field.path : undefined)}
+                                        onChanged={reviewChanged}
+                                    />
+                                )
+                            }
                         />
                     </div>
                     {previewOpened && siteUrl !== null && previewPath !== null ? (
@@ -936,6 +1129,8 @@ export function DocumentScreen({
                             savedAt={updatedAt}
                             liveSince={dates.published}
                             onOpenOnSite={siteUrl === null || document.path === null ? undefined : () => void openOnSite(document.path!)}
+                            connection={connection}
+                            onReviewChanged={reviewChanged}
                         />
                     </Tabs.Panel>
                 )}
