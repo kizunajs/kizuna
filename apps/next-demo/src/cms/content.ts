@@ -238,7 +238,7 @@ export const Articles = defineCollection({
             fields: [
                 {
                     name: 'title',
-                    schema: HeadingSchema,
+                    schema: z.string().min(1).max(60).describe('Under 8 words.'),
                 },
                 {
                     name: 'excerpt',
@@ -317,6 +317,13 @@ export const Articles = defineCollection({
     ],
     indexes: ['topic', 'publishedOn'],
     columns: ['topic', 'author'],
+    migrate: {
+        // Titles once wrapped words in *asterisks* for italics. The admin names an article by its title, so it holds plain text.
+        1: (document) => ({
+            ...document,
+            title: typeof document['title'] === 'string' ? document['title'].replaceAll('*', '') : document['title'],
+        }),
+    },
     actions: {
         announce: {
             label: 'Announce to the team',

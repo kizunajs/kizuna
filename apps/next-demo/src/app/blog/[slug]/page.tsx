@@ -5,7 +5,6 @@ import { listOf } from '../../../lib/stored';
 import { topics, type Articles } from '../../../cms/content';
 import { formatDate } from '../../../lib/format';
 import { sizedImage } from '../../../lib/image';
-import { Emphasis } from '../../../components/Emphasis';
 import { Prose } from '../../../components/Prose';
 import { ArticleTile } from '../../../components/ArticleTile';
 import styles from './page.module.css';
@@ -45,7 +44,7 @@ const latestBeside = async (slug: string, topic: Output<typeof Articles>['topic'
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const article = await kizuna.content.pages.articlePage.get(await params);
     return {
-        title: article.seo?.title ?? article.title.replaceAll('*', ''),
+        title: article.seo?.title ?? article.title,
         description: article.seo?.description ?? article.excerpt,
     };
 }
@@ -77,9 +76,7 @@ export default async function ArticlePage({ params }: Props) {
                             <time dateTime={article.publishedOn}>{formatDate(article.publishedOn)}</time>
                         )}
                     </p>
-                    <h1 className={styles.title}>
-                        <Emphasis text={article.title} />
-                    </h1>
+                    <h1 className={styles.title}>{article.title}</h1>
                     <p className={styles.excerpt}>{article.excerpt}</p>
                     {author === undefined ? null : (
                         <p className={styles.byline}>

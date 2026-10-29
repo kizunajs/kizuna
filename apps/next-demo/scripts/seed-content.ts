@@ -171,7 +171,7 @@ const articleSeeds = [
         cover: 'forest-path.jpg',
         author: 'Felix Lund',
         values: {
-            title: 'Bring the balcony in before the *first frost*',
+            title: 'Bring the balcony in before the first frost',
             slug: 'bring-the-balcony-in-before-the-first-frost',
             topic: 'season',
             publishedOn: '2026-10-26',
@@ -198,7 +198,7 @@ Give it the brightest window you have, away from the radiator, and water about h
         cover: 'cherry-branch.jpg',
         author: 'Ingrid Solberg',
         values: {
-            title: 'Plant bulbs now, *thank yourself* in April',
+            title: 'Plant bulbs now, thank yourself in April',
             slug: 'plant-bulbs-now',
             topic: 'season',
             publishedOn: '2026-10-19',
@@ -221,7 +221,7 @@ This year we have twelve kinds of *Tulipa*, six daffodils and hyacinths in white
         cover: 'ferns.jpg',
         author: 'Martin Hale',
         values: {
-            title: 'Five ferns for a *north-facing* window',
+            title: 'Five ferns for a north-facing window',
             slug: 'five-ferns-for-a-north-facing-window',
             topic: 'care',
             publishedOn: '2026-10-12',
@@ -246,7 +246,7 @@ Brown tips mean the air is too dry. Yellow fronds from the base mean the soil is
         cover: 'forest-trunks.jpg',
         author: 'Aiko Tanaka',
         values: {
-            title: 'A morning at the nursery in *Hurdal*',
+            title: 'A morning at the nursery in Hurdal',
             slug: 'a-morning-at-the-nursery-in-hurdal',
             topic: 'growers',
             publishedOn: '2026-10-02',
@@ -267,7 +267,7 @@ We spent a September morning walking the beds with Ingrid, choosing this autumn'
         cover: 'fern-fronds.jpg',
         author: 'Martin Hale',
         values: {
-            title: 'Why are the leaves turning *yellow*?',
+            title: 'Why are the leaves turning yellow?',
             slug: 'why-are-the-leaves-turning-yellow',
             topic: 'care',
             publishedOn: '2026-09-21',
@@ -290,7 +290,7 @@ A photo of the whole plant, the soil and the window it stands by tells us more t
         cover: 'cherry-blossom.jpg',
         author: 'Sara Lindqvist',
         values: {
-            title: 'Planting a cherry tree in *Oslo clay*',
+            title: 'Planting a cherry tree in Oslo clay',
             slug: 'planting-a-cherry-tree-in-oslo-clay',
             topic: 'care',
             publishedOn: '2026-09-07',
@@ -313,7 +313,7 @@ Water it in well, then leave it until spring. A *Prunus serrulata* planted this 
         cover: 'forest-floor.jpg',
         author: 'Lucía Romero',
         values: {
-            title: 'Repotting without the *mess*',
+            title: 'Repotting without the mess',
             slug: 'repotting-without-the-mess',
             topic: 'care',
             publishedOn: '2026-08-24',
@@ -336,7 +336,7 @@ Water once, then leave it out of direct sun for a week while the roots settle.`,
         cover: 'cherry-blossom.jpg',
         author: 'Ingrid Solberg',
         values: {
-            title: 'Where our cherry trees *come from*',
+            title: 'Where our cherry trees come from',
             slug: 'where-our-cherry-trees-come-from',
             topic: 'growers',
             publishedOn: '2026-08-10',
@@ -620,7 +620,7 @@ export const seedContent = async (service: CmsService): Promise<void> => {
             eyebrow: 'Journal',
             heading: 'Notes on keeping plants *alive*',
             intro: 'Care guides from the plant care desk, what to plant this month, and visits to the growers we buy from.',
-            featured: articleId('Bring the balcony in before the *first frost*'),
+            featured: articleId('Bring the balcony in before the first frost'),
             seo: {
                 title: 'Journal: plant care, seasons and growers',
                 description: 'Plant care guides, what to plant in Oslo this month, and stories from the nurseries Hagen buys from.',
@@ -754,9 +754,9 @@ export const seedContent = async (service: CmsService): Promise<void> => {
                     eyebrow: 'Journal',
                     heading: 'From the *journal*',
                     articles: picked(
-                        'Five ferns for a *north-facing* window',
-                        'Plant bulbs now, *thank yourself* in April',
-                        'A morning at the nursery in *Hurdal*'
+                        'Five ferns for a north-facing window',
+                        'Plant bulbs now, thank yourself in April',
+                        'A morning at the nursery in Hurdal'
                     ),
                 },
                 {

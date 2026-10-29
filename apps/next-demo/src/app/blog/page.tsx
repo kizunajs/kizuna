@@ -5,7 +5,6 @@ import { formatDate } from '../../lib/format';
 import { sizedImage } from '../../lib/image';
 import { Hero } from '../../components/blocks/Hero';
 import { ArticleTile } from '../../components/ArticleTile';
-import { Emphasis } from '../../components/Emphasis';
 import styles from './page.module.css';
 
 const PAGE_SIZE = 7;
@@ -94,7 +93,7 @@ export default async function BlogPage({ searchParams }: { searchParams: Promise
                             )}
                         </span>
                         <span className={styles.featuredTitle}>
-                            <Emphasis text={featured.title} />
+                            {featured.title}
                             <span aria-hidden="true">{' ↗'}</span>
                         </span>
                         <span className={styles.featuredExcerpt}>{featured.excerpt}</span>

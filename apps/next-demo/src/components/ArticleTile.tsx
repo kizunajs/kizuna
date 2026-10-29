@@ -2,7 +2,6 @@ import type { Output } from '@kizunajs/cms';
 import type { Articles } from '../cms/content';
 import { topics } from '../cms/content';
 import { sizedImage } from '../lib/image';
-import { Emphasis } from './Emphasis';
 import styles from './ArticleTile.module.css';
 
 type Article = Pick<Output<typeof Articles>, 'id' | 'title' | 'slug' | 'excerpt' | 'cover' | 'topic'>;
@@ -26,7 +25,7 @@ export function ArticleTile({ article, shape = 'portrait' }: { article: Article;
                 <span className={styles.topic}>{topics[article.topic]}</span>
                 <span className={styles.text}>
                     <span className={styles.title}>
-                        <Emphasis text={article.title} />
+                        {article.title}
                         <span className={styles.arrow} aria-hidden="true">
                             {' ↗'}
                         </span>

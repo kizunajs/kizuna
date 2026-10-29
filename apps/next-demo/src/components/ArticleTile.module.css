@@ -46,10 +46,6 @@
     text-wrap: balance;
 }
 
-.title em {
-    font-style: italic;
-}
-
 .excerpt {
     display: -webkit-box;
     overflow: hidden;
