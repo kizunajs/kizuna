@@ -177,7 +177,9 @@ export const AppUsers = defineView({
                 ...filters.map((conditions) =>
                     and(
                         ...conditions.map((condition) =>
-                            condition.operator === 'is' ? eq(user[condition.field], condition.value) : ne(user[condition.field], condition.value)
+                            condition.operator === 'is'
+                                ? eq(user[condition.field], condition.value)
+                                : ne(user[condition.field], condition.value)
                         )
                     )
                 )

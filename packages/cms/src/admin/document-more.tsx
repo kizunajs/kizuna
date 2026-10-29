@@ -101,8 +101,7 @@ export function DocumentMore({
         }
         if (entry.kind === 'unpublish' && tools !== undefined) {
             // Publishing again brings back what was live only when the draft held nothing more, and no review stands in its way.
-            const republishes =
-                document.status === 'published' && (!document.requireReview || document.review?.status === 'approved');
+            const republishes = document.status === 'published' && (!document.requireReview || document.review?.status === 'approved');
             const answer = await connection.call(`${tools.prefix}_unpublish`, {
                 params: tools.params,
             });
