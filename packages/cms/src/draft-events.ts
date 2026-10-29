@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { route, type PluginApi } from 'kizunajs/plugin';
 import { adapterContextOf, authenticate } from 'kizunajs/adapter';
 import { ProblemDetailsSchema } from 'kizunajs/schemas';
-import { addressOf, collectionPreviewPath, type CmsService } from './cms.js';
+import { addressOf, CmsHttpError, collectionPreviewPath, type CmsService } from './cms.js';
 import { getAtPath } from './content.js';
 import type { DraftNotice } from './draft-notices.js';
 import type { ResolvedCmsOptions } from './options.js';
@@ -28,6 +28,16 @@ export const DraftChangeSchema = z.object({
     ref: z.string(),
     texts: z.record(z.string(), z.string()).nullable(),
 });
+
+/**
+ * Logs a draft the stream could not read. A document that is gone answers
+ * with a `CmsHttpError`, which is expected. Anything else, like a failed
+ * query, is not.
+ */
+const reportUnread = (ref: string, error: unknown): void => {
+    if (error instanceof CmsHttpError) return;
+    console.error(`[kizuna-cms] The draft preview could not read ${ref}:`, error);
+};
 
 const cookieValue = (header: string | string[] | undefined, name: string): string | undefined => {
     const joined = Array.isArray(header) ? header.join('; ') : header;
@@ -118,14 +128,18 @@ export const draftEventsRoute = (service: CmsService, options: ResolvedCmsOption
                 // A preview page that has nothing to show yet marks nothing, so it follows the item by its path.
                 const preview = collectionPreviewPath(state.target, content);
                 return preview !== undefined && new URL(preview, 'http://cms.local').pathname === query.path;
-            } catch {
+            } catch (error) {
+                reportUnread(notice.ref, error);
                 return false;
             }
         };
         const textsOf = async (notice: DraftNotice): Promise<Record<string, string> | null> => {
             const ref = parseRef(notice.ref);
             if (notice.paths === null || notice.paths.length === 0 || ref === undefined) return null;
-            const draft = await service.draft(ref).catch(() => undefined);
+            const draft = await service.draft(ref).catch((error: unknown) => {
+                reportUnread(notice.ref, error);
+                return undefined;
+            });
             if (draft === undefined) return null;
             const texts: Record<string, string> = {};
             for (const path of notice.paths) {

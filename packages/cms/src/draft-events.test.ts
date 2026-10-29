@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import express from 'express';
@@ -297,6 +297,24 @@ describe('the draft events route', () => {
             },
         });
         events.close();
+    });
+
+    it('logs a draft it cannot read, and asks for a render', async () => {
+        const failure = new Error('bind message supplies 5 parameters, but prepared statement "" requires 0');
+        const draft = vi.spyOn(content.service, 'draft').mockRejectedValueOnce(failure);
+        const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const events = await openEvents('refs=page:frontPage', `${PREVIEW_COOKIE}=${signPreviewToken(previewSecret(undefined))}`);
+        const next = blocksOf(events.response.body!);
+        await next();
+        await saveHeading('Spring sale');
+        expect(await nextChange(next)).toEqual({
+            ref: 'page:frontPage',
+            texts: null,
+        });
+        expect(logged).toHaveBeenCalledWith('[kizuna-cms] The draft preview could not read page:frontPage:', failure);
+        events.close();
+        draft.mockRestore();
+        logged.mockRestore();
     });
 
     it('asks for a render when the change is not text, for the page at the address', async () => {
