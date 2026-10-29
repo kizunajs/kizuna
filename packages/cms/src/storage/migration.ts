@@ -60,6 +60,21 @@ create table if not exists cms_reviews (
 );
 
 create index if not exists cms_reviews_document on cms_reviews (document_id, created_at);
+
+update cms_reviews set status = 'published-past-review', decision_note = null where status = 'approved' and decision_note like 'Published past the review by %';
+
+create table if not exists cms_review_comments (
+    id text primary key,
+    review_id text not null references cms_reviews (id),
+    path text not null,
+    text text not null,
+    created_by text not null,
+    created_at timestamptz not null,
+    resolved_by text,
+    resolved_at timestamptz
+);
+
+create index if not exists cms_review_comments_review on cms_review_comments (review_id, created_at);
 `;
 
 /**

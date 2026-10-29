@@ -108,6 +108,8 @@ Every screen opens with the same header: the trail back to the dashboard, the sc
 
 Pages, each collection and each view open as a list: a table with the title of every row, its path under it, where it stands, and when it last changed. The header counts the rows and offers **Create new**. The search box finds rows by title or path, and a click on a column's heading sorts by it, as **Sort** does.
 
+A collection's list asks the server for each page it shows, with the search, filters and sort, through the same [list route](/docs/cms/editing/agents#listing-items) a model calls. It sorts by title, status, when an item last changed, and the fields of the collection's `indexes`, which the store keeps an index for.
+
 **Filters** builds conditions from the item's status and from the fields of a collection's `indexes` that hold a choice or an id:
 
 ```ts title="src/cms/content.ts"
@@ -121,13 +123,27 @@ export const Articles = defineCollection({
 
 Rows joined by **And** must all hold, and **Or** starts another set that may hold instead. A field holding ids of a collection with a `tree` adds **is within** and **is outside**, which take in everything under the item picked as well.
 
-**Columns** shows and hides columns, like who saved each row last, and the admin remembers the choice in that browser. A long list comes in pages, 25 rows to a page until you pick another number.
+**Columns** shows and hides columns, like who saved each row last, and the admin remembers the choice in that browser. A collection offers every field of its `indexes`, and shows the fields its `columns` names until you hide them:
+
+```ts title="src/cms/content.ts"
+export const Articles = defineCollection({
+    name: 'articles',
+    id: ArticleId,
+    fields: articleFields,
+    indexes: ['topic', 'publishedOn'],
+    columns: ['topic', 'author'],
+});
+```
+
+A choice shows the label of its option, like Plant care, and an id shows the title of the item it names. Only the fields of `indexes` sort, so here Author shows in the list and its heading sorts nothing.
+
+A long list comes in pages, 25 rows to a page until you pick another number.
 
 Tick rows and their actions take the header's place: **Publish**, **Unpublish** and, for items, **Delete**, each asking first, as a single publish does. **Select all** ticks every row the search and filters keep, across pages. An item that refuses stays ticked, with the reason under the header.
 
 A collection with a `tree` lists its items nested under their parents, until you search, filter or sort. Drag a row onto another to move it under that one.
 
-A view's list shows its `title` and `columns`, and the search box asks its `list` function, which looks in the fields `search` names. The app keeps the records, so a view's list has no **Create new** and no tick boxes.
+A view's list shows its `title` and `columns`, a choice by the label of its option, and the search box asks its `list` function, which looks in the fields `search` names. `list` takes the search alone, so the admin sorts and pages the records it returns. The app keeps the records, so a view's list has no **Create new** and no tick boxes.
 
 ## Media
 
@@ -159,6 +175,8 @@ Each field has its label above it, with an asterisk when the document needs it b
 A field made of other fields, like a page's hero block, shows them under its name as a heading, or under its tab when a tab holds it alone. A list shows each item as a row: drag it by the handle or move it with the arrow keys, open it with the chevron to edit its fields, and remove it with the ×. A row shows the item's first text as its title, and a block's name before it. **Collapse all** and **Expand all** sit beside the list's label, and the add button under the rows names the item, like **Add link** for a list labelled Links.
 
 An image shows its file name and size, and in the sidebar the image itself, large. An empty one takes an image from the library, or a file dropped on it. Edit opens the image at size: click it to set the focus a crop keeps in view, write its alt text, and trim pixels from its edges under **Crop**. **Apply** keeps the changes.
+
+A field that holds one id of a collection or a [relationship](/docs/cms/relationships) picks it from a search. A list of ids shows a row for each, with its image and detail, in the order you drag them into. **Choose products**, named after the field, opens a sheet that searches as you type, ticks what the list holds, and counts it against the list's maximum. **Use 3 products** puts your choice in the field.
 
 A choice shows the label of the option picked. A field named `slug` shows its value locked, since changing a slug moves the page it names. **Unlock** makes it editable. A text field counts its characters once it nears its limit.
 

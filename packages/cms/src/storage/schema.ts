@@ -112,3 +112,30 @@ export const cmsReviews = pgTable(
     },
     (table) => [index('cms_reviews_document').on(table.documentId, table.createdAt)]
 );
+
+/**
+ * A comment on one field of a review's draft, by a reviewer or the person who
+ * asked, until someone resolves it.
+ */
+export const cmsReviewComments = pgTable(
+    'cms_review_comments',
+    {
+        id: text('id').primaryKey(),
+        reviewId: text('review_id')
+            .notNull()
+            .references(() => cmsReviews.id),
+        path: text('path').notNull(),
+        text: text('text').notNull(),
+        createdBy: text('created_by').notNull(),
+        createdAt: timestamp('created_at', {
+            withTimezone: true,
+            mode: 'date',
+        }).notNull(),
+        resolvedBy: text('resolved_by'),
+        resolvedAt: timestamp('resolved_at', {
+            withTimezone: true,
+            mode: 'date',
+        }),
+    },
+    (table) => [index('cms_review_comments_review').on(table.reviewId, table.createdAt)]
+);

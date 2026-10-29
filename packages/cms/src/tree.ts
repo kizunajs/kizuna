@@ -10,16 +10,6 @@ import type { CmsService, Listing } from './cms.js';
 export type Parents = ReadonlyMap<string, string | undefined>;
 
 /**
- * What the editing list keeps: the items whose field holds a value, and with
- * `descendants`, those holding an item under it too.
- */
-export interface ItemFilter {
-    field: string;
-    value: string;
-    descendants?: boolean;
-}
-
-/**
  * Checks a collection's `tree` when the config assembles: it names one of the
  * collection's fields, and that field holds the collection's own id and may
  * be left out, since an item at the top has no parent.
@@ -150,11 +140,3 @@ export const descendantsOf = (parents: Parents, id: string): Set<string> => {
     }
     return found;
 };
-
-/**
- * Whether a field's value is one of the values, or a list holding one.
- */
-export const holdsAny = (value: unknown, values: ReadonlySet<string>): boolean =>
-    Array.isArray(value)
-        ? value.some((entry) => typeof entry === 'string' && values.has(entry))
-        : typeof value === 'string' && values.has(value);

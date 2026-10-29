@@ -7,11 +7,13 @@ description: 'Asking someone to look before a change goes live, approving it, an
 
 <Tab value="Asking">
 
-**Ask for review** sits in the `…` menu beside Publish. Pick one or more people, with the page's owner first, and add a note for them. Send request waits until someone is picked:
+**Ask for review** sits in the `…` menu beside Publish. Pick one or more people, with the page's owner first and each person's role beside their name, and add a note for them. Send request waits until someone is picked:
 
 <EditorFigure kind="ask" />
 
 The status then reads "Waiting for review by Kari Nordmann". The reviewer sees the request in the editor, in their chat, and wherever you send it with `onReviewRequested`.
+
+While it waits, **Withdraw request** takes it back, and the page reads as if nobody was asked.
 
 </Tab>
 
@@ -21,13 +23,19 @@ For the reviewer, **Review** sits beside Publish and opens the changes. Each cha
 
 <EditorFigure kind="review" />
 
-Once it is approved, **Publish** sends it live. An approval covers the draft as it was, and a save after it marks the approval outdated.
+Once it is approved, **Publish** sends it live. An approval covers the draft as it was, and a save after it marks the approval outdated. **Undo approval** takes it back while the draft is still unpublished, and the review waits for an answer again.
 
-When changes are requested, the status says who asked for them, and their note sits at the top of the sidebar. **Ask Kari again** sends the draft back to them once it is fixed. A review holds one note from each side, the request's and the answer's.
+When changes are requested, the status says who asked for them, and their note sits at the top of the sidebar. **Ask Kari again** sends the draft back to them once it is fixed.
 
 </Tab>
 
 </Tabs>
+
+## Comments on a field
+
+**Comment** beside a change leaves a note on that one field. The person who asked sees it under the field on the Edit tab, and the reviewer sees it under the change. Either of them can comment, and **Resolve** folds a comment away once it is dealt with. Comments stay with the draft when Kari is asked again, and publishing clears them.
+
+> What did Kari say about the products?
 
 ## Requiring a review
 
@@ -55,7 +63,7 @@ reviews: {
 
 The publish route takes `{ force: true }` for the same thing. For anyone without one of those roles, `force` changes nothing and the route still answers `409`.
 
-The review records who published past it, with a note like "Published past the review by Grace Hopper", so it is clear afterwards that nobody approved it.
+The review records that the draft was published past it, and by whom. Versions shows that version as "Published past review" with their name, so it is clear afterwards that nobody approved it.
 
 ## Several pages at once
 
@@ -65,7 +73,7 @@ The Publish dialog lists every page with changes. Tick the ones to publish, or a
 
 ## People
 
-The editor shows people by name and picture. `people.list` reads them from your own users:
+The editor shows people by name and picture, and their roles where you pick reviewers. `people.list` reads them from your own users:
 
 ```ts title="kizuna.cms.config.ts"
 auth: {

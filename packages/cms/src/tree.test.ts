@@ -50,6 +50,7 @@ const Tags = defineCollection({
             schema: TagId.optional(),
         },
     ],
+    indexes: ['parent'],
 });
 
 const Articles = defineCollection({
@@ -65,6 +66,7 @@ const Articles = defineCollection({
             schema: z.array(TagId),
         },
     ],
+    indexes: ['title', 'tags'],
 });
 
 const pglite = new PGlite();
@@ -426,29 +428,34 @@ describe('filtering by a tag and the tags under it', () => {
             title: 'Polishing brass',
             tags: [brass],
         });
-        const titles = async (query: Record<string, string>) => {
+        const titles = async (query: Record<string, string | string[]>) => {
             const listed = await asEditor(request(app).get('/editing/collections/articles/items').query(query));
             expect(listed.status).toBe(200);
             return listed.body.items.map((item: { label: string }) => item.label);
         };
         expect(
             await titles({
-                field: 'tags',
-                value: lighting,
+                filter: `tags:is:${lighting}`,
             })
         ).toEqual(['Ceiling lights']);
         expect(
             await titles({
-                field: 'tags',
-                value: lighting,
-                descendants: 'true',
+                filter: `tags:within:${lighting}`,
             })
         ).toEqual(['Bench lamps', 'Ceiling lights']);
         expect(
             await titles({
-                field: 'tags',
-                value: workshop,
-                descendants: 'true',
+                filter: `tags:within:${workshop}`,
+            })
+        ).toEqual(['Bench lamps']);
+        expect(
+            await titles({
+                filter: `tags:outside:${lighting}`,
+            })
+        ).toEqual(['Polishing brass']);
+        expect(
+            await titles({
+                filter: [`tags:is:${workshop}`, 'or', `tags:isNot:${brass}`],
             })
         ).toEqual(['Bench lamps']);
     });
@@ -470,9 +477,7 @@ describe('filtering by a tag and the tags under it', () => {
         });
         const listed = await asEditor(
             request(app).get('/editing/collections/tags/items').query({
-                field: 'parent',
-                value: materials,
-                descendants: 'true',
+                filter: `parent:within:${materials}`,
             })
         );
         expect(listed.body.items.map((item: { treeLabel: string }) => item.treeLabel)).toEqual([
@@ -481,26 +486,23 @@ describe('filtering by a tag and the tags under it', () => {
         ]);
     });
 
-    it('refuses descendants on a field whose ids have no tree, and a field the collection lacks', async () => {
+    it('refuses within on a field whose ids have no tree, a field that is no index, and a filter it cannot read', async () => {
         const noTree = await asEditor(
             request(app).get('/editing/collections/articles/items').query({
-                field: 'title',
-                value: 'Bench lamps',
-                descendants: 'true',
+                filter: 'title:within:Bench lamps',
             })
         );
         expect(noTree.status).toBe(400);
         expect(noTree.body.detail).toBe("The title field holds no ids of a collection with a tree, so nothing sits under 'Bench lamps'.");
         const unknown = await asEditor(
             request(app).get('/editing/collections/articles/items').query({
-                field: 'author',
-                value: 'ada',
+                filter: 'author:is:ada',
             })
         );
         expect(unknown.status).toBe(400);
         const half = await asEditor(
             request(app).get('/editing/collections/articles/items').query({
-                field: 'tags',
+                filter: 'tags',
             })
         );
         expect(half.status).toBe(400);

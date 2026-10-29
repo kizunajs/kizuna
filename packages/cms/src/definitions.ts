@@ -88,6 +88,15 @@ export interface CollectionDefinition<Name extends string, Fields extends FieldL
      */
     indexes?: ReadonlyArray<DataFieldOf<Fields>['name']>;
     /**
+     * The fields the admin's list shows beside each item's title, until an
+     * editor hides them. The fields of `indexes` are offered too, and only
+     * those sort.
+     *
+     * @example
+     * columns: ['department', 'role'],
+     */
+    columns?: ReadonlyArray<DataFieldOf<Fields>['name']>;
+    /**
      * The field holding the id of the item above, which nests the items into
      * a tree. Its schema is the collection's own id, optional, and an item
      * without one is at the top.
@@ -233,6 +242,12 @@ export const defineCollection = <const Name extends string, const Fields extends
     const names = new Set(dataFields(definition.fields).map((field) => field.name));
     for (const index of definition.indexes ?? []) {
         if (!names.has(index)) throw new Error(`${owner} indexes '${index}', which is not one of its fields.`);
+        if (index === 'status' || index === 'updatedAt') {
+            throw new Error(`${owner} indexes '${index}', which the editing list uses for the item's own ${index}. Rename the field.`);
+        }
+    }
+    for (const column of definition.columns ?? []) {
+        if (!names.has(column)) throw new Error(`${owner} has the column '${column}', which is not one of its fields.`);
     }
     assertActions(definition.actions, owner);
     if (definition.preview !== undefined && typeof definition.preview.url !== 'function') {

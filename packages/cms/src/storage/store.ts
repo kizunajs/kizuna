@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, inArray, isNotNull, lt, max, sql } from 'drizzle-orm';
 import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
-import { cmsDocuments, cmsRefs, cmsReviews, cmsVersions } from './schema.js';
+import { cmsDocuments, cmsRefs, cmsReviewComments, cmsReviews, cmsVersions } from './schema.js';
 import { CMS_MIGRATION_SQL, likePrefix, type IndexType } from './migration.js';
 
 /**
@@ -42,10 +42,11 @@ export interface DocumentRow {
 }
 
 /**
- * Where a review stands: waiting for an answer, approved, or sent back with
- * changes to make.
+ * Where a review stands: waiting for an answer, approved, sent back with
+ * changes to make, taken back by the person who asked, or gone past by
+ * someone who published the draft before anyone approved it.
  */
-export type ReviewStatus = 'open' | 'approved' | 'changes';
+export type ReviewStatus = 'open' | 'approved' | 'changes' | 'withdrawn' | 'published-past-review';
 
 export interface ReviewRow {
     id: string;
@@ -70,6 +71,23 @@ export interface ReviewRow {
 }
 
 /**
+ * A comment on one field of a review's draft.
+ */
+export interface ReviewCommentRow {
+    id: string;
+    reviewId: string;
+    /**
+     * The field, as a change to it is keyed.
+     */
+    path: string;
+    text: string;
+    createdBy: string;
+    createdAt: Date;
+    resolvedBy: string | null;
+    resolvedAt: Date | null;
+}
+
+/**
  * One filter, sort or cursor field of a list, read out of the stored JSON.
  */
 export interface ListField {
@@ -91,6 +109,54 @@ export interface ListQuery {
     limit: number;
     cursor?: string;
 }
+
+/**
+ * One condition of the editing list: a field holding one of the values, or
+ * with `list`, a list holding one of them, or the document's status being
+ * one of them. `negate` keeps the documents it does not hold for.
+ */
+export type EditingCondition =
+    | {
+          kind: 'field';
+          field: ListField;
+          list: boolean;
+          values: readonly unknown[];
+          negate: boolean;
+      }
+    | {
+          kind: 'status';
+          values: readonly string[];
+          negate: boolean;
+      };
+
+export interface EditingQuery {
+    kind: DocumentKind;
+    keyPrefix: string;
+    /**
+     * Sets of conditions, the documents meeting every condition of any one
+     * set kept. No sets keeps every document.
+     */
+    groups: ReadonlyArray<ReadonlyArray<EditingCondition>>;
+    /**
+     * Text one of the fields holds, in any case.
+     */
+    search?: {
+        term: string;
+        fields: readonly string[];
+    };
+    /**
+     * `key` sorts by the document's key, for a list with no field to sort by.
+     */
+    orderBy: ListField | 'updatedAt' | 'status' | 'key';
+    direction: 'asc' | 'desc';
+    limit?: number;
+    offset: number;
+}
+
+/**
+ * The order the editing list sorts statuses in.
+ */
+const STATUS_RANK = ['published', 'changed', 'draft', 'empty'];
 
 /**
  * Where a page of results ends, opaque to callers.
@@ -185,7 +251,7 @@ const toReview = (row: typeof cmsReviews.$inferSelect): ReviewRow => ({
 });
 
 /**
- * The three tables the CMS owns, read and written through the app's Drizzle
+ * The tables the CMS owns, read and written through the app's Drizzle
  * instance. Every write that changes content goes through a transaction, so a
  * stale `If-Match` can never overwrite a newer version.
  */
@@ -278,11 +344,12 @@ export class DocumentStore {
     }
 
     /**
-     * Records an answer to a review, for the draft version the reviewer saw.
+     * Records an answer to a review, for the draft version the reviewer saw:
+     * theirs, the requester's withdrawal, or a publish past it.
      */
     async decideReview(
         id: string,
-        decision: { status: 'approved' | 'changes'; by: string; note: string | null; version: number }
+        decision: { status: Exclude<ReviewStatus, 'open'>; by: string; note: string | null; version: number }
     ): Promise<void> {
         await this.db
             .update(cmsReviews)
@@ -294,6 +361,59 @@ export class DocumentStore {
                 version: decision.version,
             })
             .where(eq(cmsReviews.id, id));
+    }
+
+    /**
+     * Takes back an answer, so the review waits for one again.
+     */
+    async reopenReview(id: string): Promise<void> {
+        await this.db
+            .update(cmsReviews)
+            .set({
+                status: 'open',
+                decidedBy: null,
+                decisionNote: null,
+                decidedAt: null,
+            })
+            .where(eq(cmsReviews.id, id));
+    }
+
+    async addReviewComment(comment: Omit<ReviewCommentRow, 'id' | 'resolvedBy' | 'resolvedAt'>): Promise<ReviewCommentRow> {
+        const [row] = await this.db
+            .insert(cmsReviewComments)
+            .values({
+                ...comment,
+                id: randomUUID(),
+            })
+            .returning();
+        return row!;
+    }
+
+    /**
+     * The comments on these reviews, oldest first.
+     */
+    async reviewComments(reviewIds: readonly string[]): Promise<ReviewCommentRow[]> {
+        if (reviewIds.length === 0) return [];
+        return this.db
+            .select()
+            .from(cmsReviewComments)
+            .where(inArray(cmsReviewComments.reviewId, [...reviewIds]))
+            .orderBy(asc(cmsReviewComments.createdAt));
+    }
+
+    async reviewComment(id: string): Promise<ReviewCommentRow | undefined> {
+        const [row] = await this.db.select().from(cmsReviewComments).where(eq(cmsReviewComments.id, id)).limit(1);
+        return row;
+    }
+
+    async resolveReviewComment(id: string, by: string): Promise<void> {
+        await this.db
+            .update(cmsReviewComments)
+            .set({
+                resolvedBy: by,
+                resolvedAt: new Date(),
+            })
+            .where(eq(cmsReviewComments.id, id));
     }
 
     async latestVersion(documentId: string): Promise<number> {
@@ -702,6 +822,104 @@ export class DocumentStore {
     }
 
     /**
+     * Documents under a key prefix as the editing list asks for them, by the
+     * draft where there is one: filtered by sets of conditions, searched,
+     * sorted with ties broken on the id, and one page of them, with each
+     * one's latest version and how many match in all.
+     */
+    async editingQuery(input: EditingQuery): Promise<{ rows: Array<DocumentRow & { latestVersion: number }>; total: number }> {
+        const copy = sql`coalesce(${cmsDocuments.draft}, ${cmsDocuments.published})`;
+        const read = (field: ListField) =>
+            field.type === 'text'
+                ? sql`(${copy} ->> ${field.field})`
+                : field.type === 'numeric'
+                  ? sql`((${copy} ->> ${field.field})::numeric)`
+                  : sql`((${copy} ->> ${field.field})::boolean)`;
+        const latest = sql`coalesce((select max(${cmsVersions.version}) from ${cmsVersions} where ${cmsVersions.documentId} = ${cmsDocuments.id}), 0)`;
+        const status = sql`(case when ${cmsDocuments.draft} is null and ${cmsDocuments.published} is null then 'empty' when ${cmsDocuments.published} is null then 'draft' when ${cmsDocuments.publishedVersion} = ${latest} then 'published' else 'changed' end)`;
+        const listOf = (values: readonly unknown[]) =>
+            sql.join(
+                values.map((value) => sql`${value}`),
+                sql`, `
+            );
+        const holds = (condition: EditingCondition) => {
+            if (condition.kind === 'status') return sql`${status} in (${listOf(condition.values)})`;
+            if (!condition.list) return sql`coalesce(${read(condition.field)} in (${listOf(condition.values)}), false)`;
+            const held = sql`(${copy} -> ${condition.field.field})`;
+            return sql`(jsonb_typeof(${held}) = 'array' and exists (select 1 from jsonb_array_elements_text(${held}) as element(value) where element.value in (${listOf(condition.values.map(String))})))`;
+        };
+        const groups = input.groups.filter((group) => group.length > 0);
+        const conditions = [
+            eq(cmsDocuments.kind, input.kind),
+            sql`${cmsDocuments.key} like ${likePrefix(input.keyPrefix)}`,
+            ...(groups.length === 0
+                ? []
+                : [
+                      sql`(${sql.join(
+                          groups.map(
+                              (group) =>
+                                  sql`(${sql.join(
+                                      group.map((condition) => (condition.negate ? sql`not ${holds(condition)}` : holds(condition))),
+                                      sql` and `
+                                  )})`
+                          ),
+                          sql` or `
+                      )})`,
+                  ]),
+            ...(input.search === undefined || input.search.term === '' || input.search.fields.length === 0
+                ? []
+                : [
+                      sql`(${sql.join(
+                          input.search.fields.map(
+                              (field) =>
+                                  sql`(${copy} ->> ${field}) ilike ${`%${input.search!.term.replace(/[\\%_]/g, (character) => `\\${character}`)}%`}`
+                          ),
+                          sql` or `
+                      )})`,
+                  ]),
+        ];
+        const sortExpression =
+            input.orderBy === 'updatedAt'
+                ? sql`${cmsDocuments.updatedAt}`
+                : input.orderBy === 'key'
+                  ? sql`${cmsDocuments.key}`
+                  : input.orderBy === 'status'
+                    ? sql`array_position(array[${listOf(STATUS_RANK)}]::text[], ${status})`
+                    : input.orderBy.type === 'text'
+                      ? sql`lower(${read(input.orderBy)})`
+                      : read(input.orderBy);
+        const where = and(...conditions);
+        const [rows, counted] = await Promise.all([
+            this.db
+                .select({
+                    document: cmsDocuments,
+                    latestVersion: sql<number>`${latest}`,
+                })
+                .from(cmsDocuments)
+                .where(where)
+                .orderBy(
+                    input.direction === 'desc' ? sql`${sortExpression} desc nulls last` : sql`${sortExpression} asc nulls last`,
+                    asc(cmsDocuments.id)
+                )
+                .limit(input.limit ?? Number.MAX_SAFE_INTEGER)
+                .offset(input.offset),
+            this.db
+                .select({
+                    total: sql<number>`count(*)`,
+                })
+                .from(cmsDocuments)
+                .where(where),
+        ]);
+        return {
+            rows: rows.map((row) => ({
+                ...toRow(row.document),
+                latestVersion: Number(row.latestVersion),
+            })),
+            total: Number(counted[0]?.total ?? 0),
+        };
+    }
+
+    /**
      * Removes a document with its versions and references.
      */
     /**
@@ -726,6 +944,9 @@ export class DocumentStore {
             if (existing === undefined) return false;
             await tx.delete(cmsRefs).where(eq(cmsRefs.documentId, existing.id));
             await tx.delete(cmsVersions).where(eq(cmsVersions.documentId, existing.id));
+            const reviews = tx.select({ id: cmsReviews.id }).from(cmsReviews).where(eq(cmsReviews.documentId, existing.id));
+            await tx.delete(cmsReviewComments).where(inArray(cmsReviewComments.reviewId, reviews));
+            await tx.delete(cmsReviews).where(eq(cmsReviews.documentId, existing.id));
             await tx.delete(cmsDocuments).where(eq(cmsDocuments.id, existing.id));
             return true;
         });

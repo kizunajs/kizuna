@@ -114,6 +114,7 @@ beforeAll(async () => {
                         {
                             id: 'grace',
                             name: 'Grace Hopper',
+                            roles: ['admin'],
                         },
                     ],
                     imageOrigins: ['https://images.example.com'],
@@ -134,7 +135,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-    await pglite.exec('delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;');
+    await pglite.exec('delete from cms_review_comments; delete from cms_reviews; delete from cms_refs; delete from cms_versions; delete from cms_documents;');
     requested.length = 0;
 });
 
@@ -160,6 +161,11 @@ describe('people and owners', () => {
             id: 'ada',
             name: 'Ada Lovelace',
             image: 'https://images.example.com/ada.jpg',
+        });
+        expect(response.body.people[2]).toEqual({
+            id: 'grace',
+            name: 'Grace Hopper',
+            roles: ['admin'],
         });
     });
 
@@ -344,9 +350,19 @@ describe('reviews', () => {
         expect(published.body.status).toBe('published');
         const [record] = await new DocumentStore(drizzle(pglite)).reviews([asked.body.reviews[0].id]);
         expect(record).toMatchObject({
-            status: 'approved',
+            status: 'published-past-review',
             decidedBy: 'grace',
-            decisionNote: 'Published past the review by Grace Hopper.',
+            decisionNote: null,
+        });
+        const history = await as('ada', request(app).get('/editing/pages/investorRelationsPage/versions'));
+        expect(history.body.versions[0]).toMatchObject({
+            published: true,
+            review: {
+                status: 'published-past-review',
+                by: {
+                    name: 'Grace Hopper',
+                },
+            },
         });
         expect((await as('kari', request(app).get('/editing/reviews'))).body.reviews).toEqual([]);
     });
@@ -363,8 +379,8 @@ describe('reviews', () => {
         expect(rows.rows).toEqual([
             {
                 decided_by: 'grace',
-                decision_note: 'Published past the review by Grace Hopper.',
-                status: 'approved',
+                decision_note: null,
+                status: 'published-past-review',
             },
         ]);
 
@@ -406,5 +422,243 @@ describe('reviews', () => {
             decision: 'approve',
         });
         expect(response.status).toBe(403);
+    });
+});
+
+describe('changing a review', () => {
+    const ask = async (page = 'investorRelationsPage') => {
+        await draft('ada', page, 'Results for Q3');
+        const asked = await as('ada', request(app).post('/editing/reviews')).send({
+            refs: [`page:${page}`],
+            reviewers: ['kari'],
+        });
+        return asked.body.reviews[0].id as string;
+    };
+
+    it('lets the person who asked withdraw an open review, and nobody else', async () => {
+        const id = await ask();
+        const stranger = await as('kari', request(app).post('/editing/reviews/withdraw')).send({
+            ids: [id],
+        });
+        expect(stranger.status).toBe(403);
+        const withdrawn = await as('ada', request(app).post('/editing/reviews/withdraw')).send({
+            ids: [id],
+        });
+        expect(withdrawn.status).toBe(200);
+        expect(withdrawn.body.reviews[0]).toMatchObject({
+            status: 'withdrawn',
+            decidedBy: {
+                id: 'ada',
+            },
+        });
+        const described = await as('ada', request(app).get('/editing/describe?ref=page:investorRelationsPage'));
+        expect(described.body.review).toBeNull();
+        expect((await as('kari', request(app).get('/editing/reviews'))).body.reviews).toEqual([]);
+        const twice = await as('ada', request(app).post('/editing/reviews/withdraw')).send({
+            ids: [id],
+        });
+        expect(twice.status).toBe(409);
+    });
+
+    it('refuses to withdraw a review that was answered', async () => {
+        const id = await ask();
+        await as('kari', request(app).post('/editing/reviews/decide')).send({
+            ids: [id],
+            decision: 'approve',
+        });
+        const response = await as('ada', request(app).post('/editing/reviews/withdraw')).send({
+            ids: [id],
+        });
+        expect(response.status).toBe(409);
+    });
+
+    it('lets the reviewer undo their approval until the draft is published', async () => {
+        const id = await ask();
+        await as('kari', request(app).post('/editing/reviews/decide')).send({
+            ids: [id],
+            decision: 'approve',
+            note: 'Looks right',
+        });
+        const someoneElse = await as('grace', request(app).post('/editing/reviews/reopen')).send({
+            ids: [id],
+        });
+        expect(someoneElse.status).toBe(403);
+
+        const reopened = await as('kari', request(app).post('/editing/reviews/reopen')).send({
+            ids: [id],
+        });
+        expect(reopened.status).toBe(200);
+        expect(reopened.body.reviews[0]).toMatchObject({
+            status: 'open',
+            decidedBy: null,
+            decisionNote: null,
+        });
+        expect((await as('ada', request(app).post('/editing/pages/investorRelationsPage/publish'))).status).toBe(409);
+        expect((await as('kari', request(app).get('/editing/reviews'))).body.reviews).toHaveLength(1);
+
+        await as('kari', request(app).post('/editing/reviews/decide')).send({
+            ids: [id],
+            decision: 'approve',
+        });
+        expect((await as('ada', request(app).post('/editing/pages/investorRelationsPage/publish'))).status).toBe(200);
+        const late = await as('kari', request(app).post('/editing/reviews/reopen')).send({
+            ids: [id],
+        });
+        expect(late.status).toBe(409);
+        const history = await as('ada', request(app).get('/editing/pages/investorRelationsPage/versions'));
+        expect(history.body.versions[0].review).toMatchObject({
+            status: 'approved',
+            by: {
+                id: 'kari',
+            },
+        });
+    });
+
+    it('refuses to undo a review that asked for changes', async () => {
+        const id = await ask();
+        await as('kari', request(app).post('/editing/reviews/decide')).send({
+            ids: [id],
+            decision: 'requestChanges',
+            note: 'Add the date',
+        });
+        const response = await as('kari', request(app).post('/editing/reviews/reopen')).send({
+            ids: [id],
+        });
+        expect(response.status).toBe(409);
+    });
+});
+
+describe('comments on a field', () => {
+    it('keeps comments from the reviewer and the person who asked under their field, until someone resolves them', async () => {
+        await draft('ada', 'frontPage', 'Spring is here');
+        const asked = await as('ada', request(app).post('/editing/reviews')).send({
+            refs: ['page:frontPage'],
+            reviewers: ['kari'],
+        });
+        const id = asked.body.reviews[0].id;
+        const commented = await as('kari', request(app).post('/editing/reviews/comments')).send({
+            review: id,
+            path: 'heading',
+            text: 'Say which spring',
+        });
+        expect(commented.status).toBe(201);
+        expect(commented.body.comments).toMatchObject([
+            {
+                path: 'heading',
+                text: 'Say which spring',
+                by: {
+                    id: 'kari',
+                },
+                resolvedBy: null,
+            },
+        ]);
+        const answered = await as('ada', request(app).post('/editing/reviews/comments')).send({
+            review: id,
+            path: 'heading',
+            text: 'Spring 2027 it is',
+        });
+        expect(answered.status).toBe(201);
+
+        const described = await as('ada', request(app).get('/editing/describe?ref=page:frontPage'));
+        expect(described.body.review.comments.map((comment: { text: string }) => comment.text)).toEqual([
+            'Say which spring',
+            'Spring 2027 it is',
+        ]);
+
+        const commentId = described.body.review.comments[0].id;
+        const resolved = await as('ada', request(app).post(`/editing/reviews/comments/${commentId}/resolve`));
+        expect(resolved.status).toBe(200);
+        expect(resolved.body.comments[0]).toMatchObject({
+            resolvedBy: {
+                id: 'ada',
+            },
+        });
+        expect((await as('ada', request(app).post(`/editing/reviews/comments/${commentId}/resolve`))).status).toBe(200);
+    });
+
+    it('refuses someone outside the review, and a field the document does not have', async () => {
+        await draft('ada', 'frontPage', 'Spring is here');
+        const asked = await as('ada', request(app).post('/editing/reviews')).send({
+            refs: ['page:frontPage'],
+            reviewers: ['grace'],
+        });
+        const id = asked.body.reviews[0].id;
+        const outsider = await as('kari', request(app).post('/editing/reviews/comments')).send({
+            review: id,
+            path: 'heading',
+            text: 'Looks fine',
+        });
+        expect(outsider.status).toBe(403);
+        const unknown = await as('grace', request(app).post('/editing/reviews/comments')).send({
+            review: id,
+            path: 'subheading',
+            text: 'Add one',
+        });
+        expect(unknown.status).toBe(422);
+    });
+
+    it('keeps comments when the reviewer is asked again, and clears them once the draft is published', async () => {
+        await draft('ada', 'frontPage', 'Spring is here');
+        const asked = await as('ada', request(app).post('/editing/reviews')).send({
+            refs: ['page:frontPage'],
+            reviewers: ['kari'],
+        });
+        const id = asked.body.reviews[0].id;
+        await as('kari', request(app).post('/editing/reviews/comments')).send({
+            review: id,
+            path: 'heading',
+            text: 'Say which spring',
+        });
+        await as('kari', request(app).post('/editing/reviews/decide')).send({
+            ids: [id],
+            decision: 'requestChanges',
+            note: 'See the heading',
+        });
+        await draft('ada', 'frontPage', 'Spring 2027 is here');
+        const again = await as('ada', request(app).post('/editing/reviews')).send({
+            refs: ['page:frontPage'],
+            reviewers: ['kari'],
+        });
+        expect(again.body.reviews[0].comments).toHaveLength(1);
+
+        await as('kari', request(app).post('/editing/reviews/decide')).send({
+            ids: [again.body.reviews[0].id],
+            decision: 'approve',
+        });
+        await as('ada', request(app).post('/editing/pages/frontPage/publish'));
+        const late = await as('kari', request(app).post('/editing/reviews/comments')).send({
+            review: again.body.reviews[0].id,
+            path: 'heading',
+            text: 'One more thing',
+        });
+        expect(late.status).toBe(409);
+
+        await draft('ada', 'frontPage', 'Summer is here');
+        const next = await as('ada', request(app).post('/editing/reviews')).send({
+            refs: ['page:frontPage'],
+            reviewers: ['kari'],
+        });
+        expect(next.body.reviews[0].comments).toEqual([]);
+    });
+});
+
+describe('storage', () => {
+    it('reads a publish past a review recorded as an approval with a note as published past the review, and creates the tables again', async () => {
+        await draft('ada', 'investorRelationsPage', 'Results for Q3');
+        await as('ada', request(app).post('/editing/reviews')).send({
+            refs: ['page:investorRelationsPage'],
+            reviewers: ['kari'],
+        });
+        await pglite.exec(
+            "update cms_reviews set status = 'approved', decided_by = 'grace', decision_note = 'Published past the review by Grace Hopper.'"
+        );
+        await new DocumentStore(drizzle(pglite)).createTables();
+        const rows = await pglite.query<{ status: string; decision_note: string | null }>('select status, decision_note from cms_reviews');
+        expect(rows.rows).toEqual([
+            {
+                status: 'published-past-review',
+                decision_note: null,
+            },
+        ]);
     });
 });

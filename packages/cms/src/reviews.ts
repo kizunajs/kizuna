@@ -4,7 +4,7 @@ import { CmsHttpError, type CmsService, type DraftState } from './cms.js';
 import { dataFields } from './field.js';
 import type { Person } from './options.js';
 import { formatRef, parseRef, type DocumentRef } from './refs.js';
-import type { ReviewRow } from './storage/store.js';
+import type { DocumentRow, ReviewCommentRow, ReviewRow } from './storage/store.js';
 
 /**
  * Someone as the editor shows them: their name and picture.
@@ -16,12 +16,25 @@ export interface PersonView {
 }
 
 /**
+ * A comment on one field of a review's draft.
+ */
+export interface ReviewComment {
+    id: string;
+    path: string;
+    text: string;
+    by: PersonView;
+    createdAt: string;
+    resolvedBy: PersonView | null;
+    resolvedAt: string | null;
+}
+
+/**
  * Where a document's latest review stands. `outdated` is an approval of a
  * draft that changed after it.
  */
 export interface ReviewState {
     id: string;
-    status: 'open' | 'approved' | 'changes' | 'outdated';
+    status: 'open' | 'approved' | 'changes' | 'outdated' | 'withdrawn' | 'published-past-review';
     version: number;
     reviewers: PersonView[];
     requestedBy: PersonView;
@@ -30,6 +43,7 @@ export interface ReviewState {
     decidedBy: PersonView | null;
     decisionNote: string | null;
     decidedAt: string | null;
+    comments: ReviewComment[];
 }
 
 const words = (name: string): string =>
@@ -78,7 +92,17 @@ const viewOf = (people: readonly Person[], id: string): PersonView => {
     };
 };
 
-const stateOf = (review: ReviewRow, version: number, people: readonly Person[]): ReviewState => ({
+const commentViewOf = (comment: ReviewCommentRow, people: readonly Person[]): ReviewComment => ({
+    id: comment.id,
+    path: comment.path,
+    text: comment.text,
+    by: viewOf(people, comment.createdBy),
+    createdAt: comment.createdAt.toISOString(),
+    resolvedBy: comment.resolvedBy === null ? null : viewOf(people, comment.resolvedBy),
+    resolvedAt: comment.resolvedAt?.toISOString() ?? null,
+});
+
+const stateOf = (review: ReviewRow, version: number, people: readonly Person[], comments: readonly ReviewCommentRow[]): ReviewState => ({
     id: review.id,
     status: review.status === 'approved' && review.version !== version ? 'outdated' : review.status,
     version: review.version,
@@ -89,20 +113,36 @@ const stateOf = (review: ReviewRow, version: number, people: readonly Person[]):
     decidedBy: review.decidedBy === null ? null : viewOf(people, review.decidedBy),
     decisionNote: review.decisionNote,
     decidedAt: review.decidedAt?.toISOString() ?? null,
+    comments: comments.map((comment) => commentViewOf(comment, people)),
 });
 
 /**
+ * A document's reviews since it was last published, newest first.
+ */
+const reviewsSincePublished = async (cms: CmsService, row: DocumentRow): Promise<ReviewRow[]> => {
+    const reviews = await cms.store.reviewsOf(row.id);
+    // A review from before the last publish was about a draft that is live now.
+    return row.publishedAt === null ? reviews : reviews.filter((review) => review.createdAt > row.publishedAt!);
+};
+
+/**
+ * The comments on a document's draft: on every review since it was last
+ * published, so asking again keeps them.
+ */
+const commentsOf = async (cms: CmsService, row: DocumentRow, reviews?: readonly ReviewRow[]): Promise<ReviewCommentRow[]> =>
+    cms.store.reviewComments((reviews ?? (await reviewsSincePublished(cms, row))).map((review) => review.id));
+
+/**
  * The document's latest review, or `null` when nobody asked for one since it
- * was last published.
+ * was last published or the person who asked took it back.
  */
 export const reviewOf = async (cms: CmsService, state: DraftState, people?: readonly Person[]): Promise<ReviewState | null> => {
     // Once the draft is live there is nothing left to review.
     if (state.row === undefined || state.status === 'published' || state.status === 'empty') return null;
-    const [latest] = await cms.store.reviewsOf(state.row.id);
-    if (latest === undefined) return null;
-    // A review from before the last publish was about a draft that is live now.
-    if (state.row.publishedAt !== null && latest.createdAt <= state.row.publishedAt) return null;
-    return stateOf(latest, state.version, people ?? (await peopleOf(cms)));
+    const reviews = await reviewsSincePublished(cms, state.row);
+    const [latest] = reviews;
+    if (latest === undefined || latest.status === 'withdrawn' || latest.status === 'published-past-review') return null;
+    return stateOf(latest, state.version, people ?? (await peopleOf(cms)), await commentsOf(cms, state.row, reviews));
 };
 
 /**
@@ -204,7 +244,12 @@ export const requestReviews = async (
             console.warn(`[kizuna-cms] onReviewRequested failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
-    return rows.map((row, index) => stateOf(row, states[index]!.version, people));
+    const requested: ReviewState[] = [];
+    for (const [index, row] of rows.entries()) {
+        const state = states[index]!;
+        requested.push(stateOf(row, state.version, people, await commentsOf(cms, state.row!)));
+    }
+    return requested;
 };
 
 /**
@@ -254,11 +299,189 @@ export const decideReviews = async (
                     version: state.version,
                 },
                 state.version,
-                people
+                people,
+                await commentsOf(cms, state.row!)
             )
         );
     }
     return decided;
+};
+
+/**
+ * A review with the document it is about, refused unless it is still that
+ * document's current review: not taken back, and from after the last publish.
+ */
+const currentReview = async (cms: CmsService, review: ReviewRow): Promise<{ state: DraftState; current: ReviewState }> => {
+    const state = await cms.draftState(refOrThrow(review.ref));
+    const current = await reviewOf(cms, state);
+    if (current?.id !== review.id) {
+        throw new CmsHttpError(409, {
+            detail:
+                review.status === 'withdrawn'
+                    ? `The review of '${review.ref}' was withdrawn.`
+                    : `The review of '${review.ref}' is over: the draft was published or a newer review replaced it.`,
+        });
+    }
+    return {
+        state,
+        current,
+    };
+};
+
+/**
+ * Takes back reviews the person asked for while they still wait for an
+ * answer, so nobody is asked any more.
+ */
+export const withdrawReviews = async (cms: CmsService, input: { ids: readonly string[]; by: string }): Promise<ReviewState[]> => {
+    const people = await peopleOf(cms);
+    const reviews = await cms.store.reviews(input.ids);
+    const withdrawn: ReviewState[] = [];
+    for (const id of new Set(input.ids)) {
+        const review = reviews.find((candidate) => candidate.id === id);
+        if (review === undefined) throw new CmsHttpError(404, { detail: `No review '${id}'.` });
+        if (review.requestedBy !== input.by) {
+            throw new CmsHttpError(403, { detail: `Only the person who asked for the review of '${review.ref}' can withdraw it.` });
+        }
+        if (review.status !== 'open') throw new CmsHttpError(409, { detail: `The review of '${review.ref}' was already answered.` });
+        const { state } = await currentReview(cms, review);
+        await cms.store.decideReview(id, {
+            status: 'withdrawn',
+            by: input.by,
+            note: null,
+            version: review.version,
+        });
+        withdrawn.push(
+            stateOf(
+                {
+                    ...review,
+                    status: 'withdrawn',
+                    decidedBy: input.by,
+                    decidedAt: new Date(),
+                },
+                state.version,
+                people,
+                await commentsOf(cms, state.row!)
+            )
+        );
+    }
+    return withdrawn;
+};
+
+/**
+ * Takes back the person's own approvals while the draft is unpublished, so
+ * the reviews wait for an answer again.
+ */
+export const reopenReviews = async (cms: CmsService, input: { ids: readonly string[]; by: string }): Promise<ReviewState[]> => {
+    const people = await peopleOf(cms);
+    const reviews = await cms.store.reviews(input.ids);
+    const reopened: ReviewState[] = [];
+    for (const id of new Set(input.ids)) {
+        const review = reviews.find((candidate) => candidate.id === id);
+        if (review === undefined) throw new CmsHttpError(404, { detail: `No review '${id}'.` });
+        if (review.status !== 'approved') throw new CmsHttpError(409, { detail: `The review of '${review.ref}' is not approved.` });
+        if (review.decidedBy !== input.by) {
+            throw new CmsHttpError(403, { detail: `Only the person who approved '${review.ref}' can undo the approval.` });
+        }
+        const { state } = await currentReview(cms, review);
+        await cms.store.reopenReview(id);
+        reopened.push(
+            stateOf(
+                {
+                    ...review,
+                    status: 'open',
+                    decidedBy: null,
+                    decisionNote: null,
+                    decidedAt: null,
+                },
+                state.version,
+                people,
+                await commentsOf(cms, state.row!)
+            )
+        );
+    }
+    return reopened;
+};
+
+/**
+ * Whether someone takes part in a review: they asked for it, were asked,
+ * answered it, or hold a role under `reviews.roles`.
+ */
+const takesPart = (cms: CmsService, review: ReviewRow, by: string, role: string | readonly string[] | undefined): boolean =>
+    review.requestedBy === by || review.reviewers.includes(by) || review.decidedBy === by || hasRole(role, reviewRoles(cms));
+
+/**
+ * Comments on one field of a review's draft, for the person who asked to see
+ * under that field.
+ */
+export const commentOnReview = async (
+    cms: CmsService,
+    input: { review: string; path: string; text: string; by: string; role: string | readonly string[] | undefined }
+): Promise<ReviewState> => {
+    const [review] = await cms.store.reviews([input.review]);
+    if (review === undefined) throw new CmsHttpError(404, { detail: `No review '${input.review}'.` });
+    if (!takesPart(cms, review, input.by, input.role)) {
+        throw new CmsHttpError(403, { detail: `You were not asked to review '${review.ref}'.` });
+    }
+    const { state } = await currentReview(cms, review);
+    const name = input.path.split('.')[0];
+    if (!dataFields(state.target.definition.fields).some((field) => field.name === name)) {
+        throw new CmsHttpError(422, { detail: `'${review.ref}' has no field '${input.path}'. Name a field from the changes list.` });
+    }
+    await cms.store.addReviewComment({
+        reviewId: review.id,
+        path: input.path,
+        text: input.text,
+        createdBy: input.by,
+        createdAt: new Date(),
+    });
+    return (await reviewOf(cms, state))!;
+};
+
+/**
+ * Marks a comment dealt with. Resolving one twice changes nothing.
+ */
+export const resolveComment = async (
+    cms: CmsService,
+    input: { id: string; by: string; role: string | readonly string[] | undefined }
+): Promise<ReviewState> => {
+    const comment = await cms.store.reviewComment(input.id);
+    if (comment === undefined) throw new CmsHttpError(404, { detail: `No comment '${input.id}'.` });
+    const [review] = await cms.store.reviews([comment.reviewId]);
+    if (review === undefined) throw new CmsHttpError(404, { detail: `No comment '${input.id}'.` });
+    if (!takesPart(cms, review, input.by, input.role)) {
+        throw new CmsHttpError(403, { detail: `You were not asked to review '${review.ref}'.` });
+    }
+    const state = await cms.draftState(refOrThrow(review.ref));
+    const current = await reviewOf(cms, state);
+    if (current === null || !current.comments.some((candidate) => candidate.id === comment.id)) {
+        throw new CmsHttpError(409, { detail: `The review of '${review.ref}' is over, so its comments are too.` });
+    }
+    if (comment.resolvedAt === null) await cms.store.resolveReviewComment(comment.id, input.by);
+    return (await reviewOf(cms, state))!;
+};
+
+/**
+ * How each version went live past its review, or was approved: the latest
+ * such answer per version.
+ */
+export const versionReviewsOf = async (
+    cms: CmsService,
+    ref: DocumentRef
+): Promise<Map<number, { status: 'approved' | 'published-past-review'; by: PersonView; at: string }>> => {
+    const answered = new Map<number, { status: 'approved' | 'published-past-review'; by: PersonView; at: string }>();
+    const state = await cms.draftState(ref);
+    if (state.row === undefined) return answered;
+    const people = await peopleOf(cms);
+    for (const review of await cms.store.reviewsOf(state.row.id)) {
+        if (review.status !== 'approved' && review.status !== 'published-past-review') continue;
+        if (review.decidedBy === null || review.decidedAt === null || answered.has(review.version)) continue;
+        answered.set(review.version, {
+            status: review.status,
+            by: viewOf(people, review.decidedBy),
+            at: review.decidedAt.toISOString(),
+        });
+    }
+    return answered;
 };
 
 /**
@@ -312,17 +535,16 @@ export interface PastReview {
 
 /**
  * Records on the review that someone published past it, once the publish
- * went through: the open review is answered in their name, and otherwise a
- * new one is, so the history shows that nobody approved this draft.
+ * went through: the open review is marked `published-past-review` in their
+ * name, and otherwise a new one is, so the history shows that nobody approved
+ * this draft.
  */
 export const recordPublishedPast = async (cms: CmsService, state: DraftState, past: PastReview, by: string): Promise<void> => {
-    const people = await peopleOf(cms);
-    const name = people.find((person) => person.id === by)?.name ?? by;
     const decide = (id: string): Promise<void> =>
         cms.store.decideReview(id, {
-            status: 'approved',
+            status: 'published-past-review',
             by,
-            note: `Published past the review by ${name}.`,
+            note: null,
             version: state.version,
         });
     if (past.review?.status === 'open') {

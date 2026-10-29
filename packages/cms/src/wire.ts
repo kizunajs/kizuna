@@ -58,6 +58,11 @@ export const EditorItemSchema = Kizuna.model({
         updatedAt: z.string(),
         updatedBy: z.string(),
         ...TreePlacementShape,
+        values: z.record(z.string(), z.unknown()).optional().describe('The fields `fields` names, as stored. Only when the list is asked for fields.'),
+        labels: z
+            .record(z.string(), z.string())
+            .optional()
+            .describe('What an editor reads for the fields of `values` holding a choice or an id, like "Plant care" for care.'),
     }),
 });
 
@@ -199,13 +204,28 @@ export const PersonSchema = Kizuna.model({
     }),
 });
 
+export const ReviewCommentSchema = Kizuna.model({
+    title: 'CMS.ReviewComment',
+    schema: z.object({
+        id: z.string(),
+        path: z.string().describe('The field it is about, as a change to it is keyed.'),
+        text: z.string(),
+        by: PersonSchema,
+        createdAt: z.iso.datetime(),
+        resolvedBy: PersonSchema.nullable().describe('Who resolved it, or null while it is open.'),
+        resolvedAt: z.iso.datetime().nullable(),
+    }),
+});
+
 export const ReviewStateSchema = Kizuna.model({
     title: 'CMS.ReviewState',
     schema: z.object({
         id: z.string(),
         status: z
-            .enum(['open', 'approved', 'changes', 'outdated'])
-            .describe('Waiting for an answer, approved, sent back with changes to make, or approved before the draft changed again.'),
+            .enum(['open', 'approved', 'changes', 'outdated', 'withdrawn', 'published-past-review'])
+            .describe(
+                'Waiting for an answer, approved, sent back with changes to make, approved before the draft changed again, taken back by the person who asked, or published before anyone approved it. `decidedBy` names who did the last.'
+            ),
         version: z.int().describe('The draft version it was asked about, or the one the reviewer answered.'),
         reviewers: z.array(PersonSchema),
         requestedBy: PersonSchema,
@@ -214,6 +234,9 @@ export const ReviewStateSchema = Kizuna.model({
         decidedBy: PersonSchema.nullable(),
         decisionNote: z.string().nullable(),
         decidedAt: z.iso.datetime().nullable(),
+        comments: z
+            .array(ReviewCommentSchema)
+            .describe('Comments on single fields, on this review and the earlier ones since the document was last published, oldest first.'),
     }),
 });
 
@@ -275,6 +298,14 @@ export const VersionSchema = Kizuna.model({
         createdAt: z.string(),
         createdBy: z.string(),
         published: z.boolean().describe('Whether this is the version readers see.'),
+        review: z
+            .object({
+                status: z.enum(['approved', 'published-past-review']),
+                by: PersonSchema,
+                at: z.iso.datetime(),
+            })
+            .nullable()
+            .describe('Who approved this version, or who published it before anyone approved it.'),
     }),
 });
 
@@ -518,7 +549,13 @@ export const PeopleSchema = Kizuna.model({
     title: 'CMS.People',
     schema: z.object({
         me: z.string().describe('The caller, by their id.'),
-        people: z.array(PersonSchema).describe('Everyone who edits, to name as an owner or a reviewer.'),
+        people: z
+            .array(
+                PersonSchema.extend({
+                    roles: z.array(z.string()).optional().describe('Their roles, as the app gives them.'),
+                })
+            )
+            .describe('Everyone who edits, to name as an owner or a reviewer.'),
     }),
 });
 
@@ -544,6 +581,22 @@ export const DecideReviewBodySchema = Kizuna.model({
         ids: z.array(z.string()).min(1).describe('The reviews to answer, from the waiting list.'),
         decision: z.enum(['approve', 'requestChanges']),
         note: z.string().max(2000).optional().describe('Why, or what to change.'),
+    }),
+});
+
+export const ReviewIdsBodySchema = Kizuna.model({
+    title: 'CMS.ReviewIds',
+    schema: z.object({
+        ids: z.array(z.string()).min(1).describe('The reviews, by their id.'),
+    }),
+});
+
+export const CommentBodySchema = Kizuna.model({
+    title: 'CMS.AddReviewComment',
+    schema: z.object({
+        review: z.string().describe("The review's id, from the document's `review`."),
+        path: z.string().min(1).describe('The field to comment on, as a change to it is keyed, like hero.heading.'),
+        text: z.string().trim().min(1).max(2000),
     }),
 });
 

@@ -7,6 +7,29 @@ description: 'The MCP tools behind the editor, and what holds for the form and t
 
 Every `editing` route is an MCP tool, so the model can do what the form does. `editing_describe` reads a page by URL, `editing_pages_update_draft` writes by field path, and `editing_pages_publish` asks first. Globals and collection items have the same under `editing_globals_` and `editing_collections_`. A [view](/docs/cms/views) reads and saves under `editing_views_app_users_`, and each action is a tool of its own, like `editing_actions_newsletters_send`. See [Tools](/docs/tools) and [MCP](/docs/mcp).
 
+## Listing items
+
+`editing_collections_list_items` lists the items of one collection, drafts included, as the [admin](/docs/cms/editing/admin#lists) does. Each item comes with its title, address, status and when it last changed, and `total` counts every item that matches.
+
+| Parameter         | What it does                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| `q`               | Keeps the items whose title or address holds the text                                         |
+| `filter`          | Conditions, each written `field:operator:value`                                               |
+| `orderBy`         | `title`, `status`, `updatedAt` or a field of `indexes`. `title` until you name another        |
+| `direction`       | `asc` or `desc`. Ascending until you name one, and for `updatedAt` newest first               |
+| `limit`, `offset` | One page, of up to 200 items, after skipping `offset`. Without `limit`, every item that holds |
+| `fields`          | The fields each item carries under `values`, from `indexes` and `columns`, like `topic,author` |
+
+A condition names `status` or a field of the collection's `indexes`, the fields the store keeps an index for, and the route answers any other field with `400`. `status` is `empty`, `draft`, `changed` or `published`. `is` and `isNot` compare a field with the value, or look for it in a list of ids, and a field holding ids of a collection with a [tree](/docs/cms/collections#trees) also takes `within` and `outside`, which count every item under the value as well.
+
+The conditions all hold together, and an `or` between them starts another set that may hold instead. These are the care articles still in draft, and every article in season, the newest date first:
+
+```
+GET /api/editing/collections/articles/items?filter=topic:is:care&filter=status:is:draft&filter=or&filter=topic:is:season&orderBy=publishedOn&direction=desc&limit=25
+```
+
+`values` holds what is stored, and `labels` what an editor reads for a choice or an id, so `topic` is `care` in one and `Plant care` in the other. Since `status` and `updatedAt` name the item's own status and time, an index cannot take either name.
+
 ## What holds
 
 - **Rules live in the routes.** Roles and field rules are checked in the `editing` routes, for the form and the model alike: `403` for a field the caller may not write, `422` past its schema, `409` behind the latest version.

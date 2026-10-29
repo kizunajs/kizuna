@@ -5,7 +5,7 @@ import type { RouteAuth } from 'kizunajs';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { addressOf, CmsHttpError, previewPathOf, type CmsService, type DraftState } from './cms.js';
 import { DEFAULT_SITE, routePrefix, sitesOf, type CmsPluginOptions, type PageMap } from './options.js';
-import type { ContentDefinition } from './definitions.js';
+import type { Collection, ContentDefinition } from './definitions.js';
 import { dataFields } from './field.js';
 import { servesCollection } from './page.js';
 import { addressFieldsOf } from './dynamic.js';
@@ -45,24 +45,33 @@ import {
     OwnerBodySchema,
     RequestReviewBodySchema,
     DecideReviewBodySchema,
+    ReviewIdsBodySchema,
+    CommentBodySchema,
+    ReviewStateSchema,
     WaitingReviewsSchema,
     ReviewListSchema,
     WhereUsedSchema,
 } from './wire.js';
 import { UploadRejectedError } from './media/media.js';
+import { parseFields, parseFilter } from './item-list.js';
 import { ImageQuerySchema, InvalidateBodySchema } from './wire.js';
 import { sameContent } from './same-content.js';
 import {
     assertReviewed,
+    commentOnReview,
     decideReviews,
     documentLabel,
     mayPublishPastReview,
     peopleOf,
     recordPublishedPast,
+    reopenReviews,
     requestReviews,
+    resolveComment,
     reviewOf,
     setOwner,
+    versionReviewsOf,
     waitingReviews,
+    withdrawReviews,
 } from './reviews.js';
 import type { Person } from './options.js';
 import { collectionActionRoutes, itemActions } from './action-routes.js';
@@ -490,11 +499,16 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         }).handler(
             guarded(async (cms, args) => {
                 const ref = scope.refOf(args.params);
+                const versions = await cms.history(ref);
+                const reviews = await versionReviewsOf(cms, ref);
                 return {
                     status: 200,
                     body: {
                         name: nameOf(ref),
-                        versions: await cms.history(ref),
+                        versions: versions.map((version) => ({
+                            ...version,
+                            review: reviews.get(version.version) ?? null,
+                        })),
                     },
                 };
             }) as never
@@ -908,20 +922,26 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         ])
     );
 
+    /**
+     * The fields a collection's lists filter and sort by: those its addresses
+     * read, then its `indexes`.
+     */
+    const indexesOf = (definition: Collection): string[] => [
+        ...new Set([
+            // A param naming no field is refused when the config assembles, with the field it lacks.
+            ...Object.values(sites)
+                .flatMap((declared) => addressFieldsOf(definition.name, declared.pages))
+                .filter((field) => dataFields(definition.fields).some((candidate) => candidate.name === field)),
+            ...(definition.indexes ?? []),
+        ]),
+    ];
+
     const collectionReads = Object.fromEntries(
         (options.collections ?? []).map((definition) => [
             definition.name,
             listingReads({
                 definition,
-                indexes: [
-                    ...new Set([
-                        // A param naming no field is refused when the config assembles, with the field it lacks.
-                        ...Object.values(sites)
-                            .flatMap((declared) => addressFieldsOf(definition.name, declared.pages))
-                            .filter((field) => dataFields(definition.fields).some((candidate) => candidate.name === field)),
-                        ...(definition.indexes ?? []),
-                    ]),
-                ],
+                indexes: indexesOf(definition),
                 path: `${base}/content/collections/${definition.name}`,
                 collection: definition.name,
                 refOf: (id) => ({
@@ -974,6 +994,13 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
     /**
      * Listing, adding and deleting the items of a collection.
      */
+    const listedCollections = (options.collections ?? [])
+        .map((definition) => {
+            const indexes = indexesOf(definition);
+            const columns = (definition.columns ?? []).filter((column) => !indexes.includes(column));
+            return `${definition.name} filters and sorts by ${indexes.length === 0 ? 'no field' : indexes.join(', ')}${columns.length === 0 ? '' : `, and also shows ${columns.join(', ')}`}.`;
+        })
+        .join(' ');
     const itemRoutes = () => ({
         list: route({
             method: 'GET',
@@ -1013,47 +1040,84 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             pathParams: z.object({
                 name: z.string(),
             }),
+            description: `Pages with \`limit\` and \`offset\`, and counts every item that matches as \`total\`. ${listedCollections}`,
             query: z.object({
-                field: z.string().optional().describe('Keep only the items whose field, by name, holds `value`, or holds it in a list.'),
-                value: z.string().optional().describe('What `field` holds, like an id.'),
-                descendants: z
-                    .boolean()
+                q: z.string().optional().describe('Keep the items whose title or address holds this text, in any case.'),
+                filter: z
+                    .array(z.string())
                     .optional()
-                    .describe('Also keep the items holding an item under `value`, when `field` holds ids of a collection with a tree.'),
+                    .describe(
+                        'Conditions, each `field:operator:value`, like `topic:is:care`. `field` is `status` (empty, draft, changed or published) or a field of the collection\'s indexes. `operator` is `is` or `isNot`, which also find the value in a list of ids, or for ids of a collection with a tree `within` or `outside`, which take in every item under the value. The conditions all hold together, and an `or` entry between them starts another set that may hold instead.'
+                    ),
+                orderBy: z.string().optional().describe('`title`, `status`, `updatedAt` or a field of the collection\'s indexes. `title` when left out.'),
+                direction: z.enum(['asc', 'desc']).optional().describe('Ascending when left out, newest first for `updatedAt`.'),
+                limit: z.int().min(1).max(200).optional().describe('How many items a page holds. Without it, every item that matches.'),
+                offset: z.int().min(0).optional().describe('How many matching items to skip, for the pages after the first.'),
+                fields: z
+                    .array(z.string())
+                    .optional()
+                    .describe(
+                        "Fields of the collection's indexes and columns each item carries under `values`, with `labels` for a choice or an id. A name or several joined by commas, like `topic,author`."
+                    ),
             }),
             responses: {
                 200: z.object({
                     items: z.array(EditorItemSchema),
+                    total: z.int().describe('How many items match, on every page together.'),
                 }),
                 400: ProblemDetailsSchema,
                 404: ProblemDetailsSchema,
             },
         }).handler(
             guarded(async (cms, args) => {
-                const { field, value, descendants } = (args.query ?? {}) as {
-                    field?: string;
-                    value?: string;
-                    descendants?: boolean;
+                const { q, filter, orderBy, direction, limit, offset, fields } = (args.query ?? {}) as {
+                    q?: string;
+                    filter?: string[];
+                    orderBy?: string;
+                    direction?: 'asc' | 'desc';
+                    limit?: number;
+                    offset?: number;
+                    fields?: string[];
                 };
-                if ((field === undefined) !== (value === undefined)) {
+                const parsed = parseFilter(filter ?? []);
+                if ('problem' in parsed) {
                     throw new CmsHttpError(400, {
-                        detail: 'A filter names both `field` and `value`.',
+                        detail: parsed.problem,
                     });
                 }
+                const listed = await cms.editorList(args.params['name']!, {
+                    groups: parsed.groups,
+                    fields: parseFields(fields ?? []),
+                    headers: forwardedHeaders(args),
+                    ...(q === undefined
+                        ? {}
+                        : {
+                              search: q,
+                          }),
+                    ...(orderBy === undefined
+                        ? {}
+                        : {
+                              orderBy,
+                          }),
+                    ...(direction === undefined
+                        ? {}
+                        : {
+                              direction,
+                          }),
+                    ...(limit === undefined
+                        ? {}
+                        : {
+                              limit,
+                          }),
+                    ...(offset === undefined
+                        ? {}
+                        : {
+                              offset,
+                          }),
+                });
                 return {
                     status: 200,
-                    body: {
-                        items: await cms.editorItems(
-                            args.params['name']!,
-                            field === undefined || value === undefined
-                                ? undefined
-                                : {
-                                      field,
-                                      value,
-                                      descendants,
-                                  }
-                        ),
-                    },
+                    body: listed,
                 };
             }) as never
         ),
@@ -1155,6 +1219,11 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         : {
                               image: person.image,
                           }),
+                    ...(person.roles === undefined
+                        ? {}
+                        : {
+                              roles: [...person.roles],
+                          }),
                 })),
             },
         })) as never
@@ -1195,7 +1264,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Ask people to review the drafts of one or more documents before they go live',
         description:
-            'Each reviewer sees the request in the editor and when they ask what is waiting for them. Name reviewers by their id from the people list, and suggest the owner first.',
+            'Each reviewer sees the request in the editor and when they ask what is waiting for them. Name reviewers by their id from the people list, and suggest the owner first. Comments on single fields from an earlier review of the same draft stay.',
         tool: true,
         body: RequestReviewBodySchema,
         responses: {
@@ -1228,7 +1297,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         auth: editor,
         summary: 'Approve reviews, or send them back with changes to make',
         description:
-            "An approval is the person's own judgement of what goes live, so they confirm first: in a host that cannot ask, such as Claude, they answer in the editor instead.",
+            "An approval is the person's own judgement of what goes live, so they confirm first: in a host that cannot ask, such as Claude, they answer in the editor instead. An approval can be undone until the draft is published, with the reopen route.",
         tool: {
             needsApproval: true,
             destructiveHint: false,
@@ -1256,6 +1325,134 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 },
             };
         }) as never
+    );
+
+    const withdrawReview = route({
+        method: 'POST',
+        path: `${editingBase}/reviews/withdraw`,
+        auth: editor,
+        summary: 'Withdraw reviews you asked for that still wait for an answer',
+        description:
+            'Nobody is asked any more, and the document reads as if no review was asked for. Only the person who asked may withdraw a review, and only while it waits.',
+        tool: {
+            destructiveHint: false,
+            idempotentHint: true,
+        },
+        body: ReviewIdsBodySchema,
+        responses: {
+            200: ReviewListSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof ReviewIdsBodySchema>;
+            return {
+                status: 200,
+                body: {
+                    reviews: await withdrawReviews(cms, {
+                        ids: body.ids,
+                        by: authorOf(cms, args),
+                    }),
+                },
+            };
+        }) as never
+    );
+
+    const reopenReview = route({
+        method: 'POST',
+        path: `${editingBase}/reviews/reopen`,
+        auth: editor,
+        summary: 'Undo your approval of reviews whose drafts are not published yet',
+        description:
+            'Each review waits for an answer again, and a document that requires a review stops publishing until someone approves it. Only the person who approved may undo it, and only before the draft goes live.',
+        tool: {
+            destructiveHint: false,
+            idempotentHint: true,
+        },
+        body: ReviewIdsBodySchema,
+        responses: {
+            200: ReviewListSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof ReviewIdsBodySchema>;
+            return {
+                status: 200,
+                body: {
+                    reviews: await reopenReviews(cms, {
+                        ids: body.ids,
+                        by: authorOf(cms, args),
+                    }),
+                },
+            };
+        }) as never
+    );
+
+    const commentReview = route({
+        method: 'POST',
+        path: `${editingBase}/reviews/comments`,
+        auth: editor,
+        summary: "Comment on one field of a review's draft",
+        description:
+            'The person who asked sees the comment under that field in the editor, and the reviewer under the change. Anyone taking part in the review may comment: who asked, who was asked, who answered, and a role under `reviews.roles`. Name the field as the changes list keys it. Answers with the review and every comment on the draft.',
+        tool: true,
+        body: CommentBodySchema,
+        responses: {
+            201: ReviewStateSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+            422: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const body = args.body as z.output<typeof CommentBodySchema>;
+            return {
+                status: 201,
+                body: await commentOnReview(cms, {
+                    review: body.review,
+                    path: body.path,
+                    text: body.text,
+                    by: authorOf(cms, args),
+                    role: cms.caller(args.auth).role,
+                }),
+            };
+        }) as never
+    );
+
+    const resolveReviewComment = route({
+        method: 'POST',
+        path: `${editingBase}/reviews/comments/:id/resolve`,
+        auth: editor,
+        summary: 'Resolve a comment on a review once it is dealt with',
+        description: 'The comment folds away under its field. Anyone taking part in the review may resolve it.',
+        tool: {
+            destructiveHint: false,
+            idempotentHint: true,
+        },
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        responses: {
+            200: ReviewStateSchema,
+            403: ProblemDetailsSchema,
+            404: ProblemDetailsSchema,
+            409: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => ({
+            status: 200,
+            body: await resolveComment(cms, {
+                id: args.params['id']!,
+                by: authorOf(cms, args),
+                role: cms.caller(args.auth).role,
+            }),
+        })) as never
     );
 
     const describe = route({
@@ -1679,6 +1876,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                         id: z.string(),
                         label: z.string(),
                         image: z.string().optional(),
+                        detail: z.string().optional(),
                         ...TreePlacementShape,
                     })
                 ),
@@ -1854,6 +2052,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 list: listReviews,
                 request: requestReview,
                 decide: decideReview,
+                withdraw: withdrawReview,
+                reopen: reopenReview,
+                comment: commentReview,
+                resolveComment: resolveReviewComment,
             },
         },
         invalidate,

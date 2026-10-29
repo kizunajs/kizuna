@@ -271,4 +271,37 @@ describe('DocumentStore', () => {
         expect(await store.list('media')).toHaveLength(1);
         expect(await store.list('page')).toHaveLength(0);
     });
+
+    it('deletes a document with its reviews and their comments', async () => {
+        const saved = await store.saveDraft({
+            kind: 'item',
+            key: 'articles/first',
+            draft: {
+                title: 'First',
+            },
+            author: 'ada',
+        });
+        const [review] = await store.addReviews([
+            {
+                requestId: 'request',
+                ref: 'item:articles/first',
+                documentId: saved.document.id,
+                version: saved.version,
+                reviewers: ['kari'],
+                requestedBy: 'ada',
+                note: null,
+                createdAt: new Date(),
+            },
+        ]);
+        await store.addReviewComment({
+            reviewId: review!.id,
+            path: 'title',
+            text: 'Name the season',
+            createdBy: 'kari',
+            createdAt: new Date(),
+        });
+        expect(await store.delete('item', 'articles/first')).toBe(true);
+        expect(await store.reviewsOf(saved.document.id)).toEqual([]);
+        expect(await store.reviewComments([review!.id])).toEqual([]);
+    });
 });

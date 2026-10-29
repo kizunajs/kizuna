@@ -35,12 +35,14 @@ import {
     VersionConflictError,
     type DocumentKind,
     type DocumentRow,
+    type EditingCondition,
     type ListField,
     type Migration,
 } from './storage/store.js';
 import { previewSecret, signPreviewToken, verifyPreviewToken } from './preview-token.js';
 import { DraftNotices } from './draft-notices.js';
-import { descendantsOf, holdsAny, loadParents, loopRefusal, parentIn, placeInTree, type ItemFilter } from './tree.js';
+import { descendantsOf, loadParents, loopRefusal, parentIn, placeInTree } from './tree.js';
+import { ITEM_STATUSES, type ItemCondition, type ItemListQuery } from './item-list.js';
 import type { PageStatusSchema } from './wire.js';
 import type { CmsRelationship, RelationshipOption } from './relationships.js';
 
@@ -203,6 +205,39 @@ export const brandOf = (schema: z.core.$ZodType): string | undefined => {
     const def = readDef(inner);
     return def.type === 'array' && def.element !== undefined ? brandOf(def.element) : undefined;
 };
+
+/**
+ * The field that names each item: the first that holds text.
+ */
+const labelFieldOf = (definition: Collection): string | undefined =>
+    dataFields(definition.fields).find((field) => readDef(unwrapOptionalWrappers(field.schema).inner).type === 'string')?.name;
+
+/**
+ * What an item is called in lists: its first text field, or Untitled.
+ */
+const itemLabelOf = (content: Record<string, unknown>, labelField: string | undefined): string => {
+    const label = labelField === undefined ? undefined : content[labelField];
+    return typeof label === 'string' && label !== '' ? label : 'Untitled';
+};
+
+/**
+ * One item as the editing list shows it. With `fields`, it carries their
+ * stored values, and the labels of those holding a choice or an id.
+ */
+export interface EditorItem {
+    id: string;
+    ref: string;
+    label: string;
+    path: string | null;
+    status: PageStatus;
+    complete: boolean;
+    updatedAt: string;
+    updatedBy: string;
+    parent?: string | null;
+    treeLabel?: string;
+    values?: Record<string, unknown>;
+    labels?: Record<string, string>;
+}
 
 /**
  * A reference resolved to what it addresses: where it is stored, and the
@@ -973,81 +1008,303 @@ export class CmsService {
         });
     }
 
-    async editorItems(
-        name: string,
-        filter?: ItemFilter
-    ): Promise<
-        Array<{
-            id: string;
-            ref: string;
-            label: string;
-            path: string | null;
-            status: PageStatus;
-            complete: boolean;
-            updatedAt: string;
-            updatedBy: string;
-            parent?: string | null;
-            treeLabel?: string;
-        }>
-    > {
-        const listing = this.listing(name);
-        const definition = listing.definition;
-        const rows = await this.store.list('item');
-        const labelField = dataFields(definition.fields).find(
-            (field) => readDef(unwrapOptionalWrappers(field.schema).inner).type === 'string'
-        )?.name;
-        const items = [];
-        const contents = new Map<string, Record<string, unknown>>();
-        for (const stored of rows) {
-            if (!stored.key.startsWith(listing.keyPrefix)) continue;
-            const id = stored.key.slice(listing.keyPrefix.length);
-            const row = this.migrated(this.target(listing.refOf(id)), stored)!;
-            const version = await this.store.latestVersion(row.id);
-            const content = row.draft ?? row.published ?? {};
-            contents.set(id, content);
-            const label = labelField === undefined ? undefined : content[labelField];
-            items.push({
-                id,
-                ref: formatRef(listing.refOf(id)),
-                label: typeof label === 'string' && label !== '' ? label : 'Untitled',
-                path: listing.routes[0] === undefined ? null : (fillPath(listing.routes[0].pattern, content) ?? null),
-                status: this.statusOf(row, version),
-                complete: missingFields(definition, row.draft).length === 0 && row.draft !== null,
-                updatedAt: row.updatedAt.toISOString(),
-                updatedBy: row.updatedBy,
-            });
-        }
-        const tree = definition.tree;
-        const placed =
-            tree === undefined ? items : placeInTree(items, new Map([...contents].map(([id, content]) => [id, parentIn(content, tree)])));
-        const matches = filter === undefined ? undefined : await this.itemMatcher(definition, filter);
-        return placed
-            .filter((item) => matches === undefined || matches(contents.get(item.id)!))
-            .sort((left, right) => left.label.localeCompare(right.label));
+    /**
+     * Every item of a collection as editors list it, by title.
+     */
+    async editorItems(name: string): Promise<EditorItem[]> {
+        return (await this.editorList(name, {})).items;
     }
 
     /**
-     * What a filter on the editing list keeps: the items whose field holds
-     * the value, and with `descendants`, the items holding one under it in
-     * its collection's tree.
+     * The fields a collection's editing list can show: its indexes, then its
+     * `columns`.
      */
-    private async itemMatcher(definition: Collection, filter: ItemFilter): Promise<(content: Record<string, unknown>) => boolean> {
-        const field = dataFields(definition.fields).find((candidate) => candidate.name === filter.field);
-        if (field === undefined) {
+    listColumnsOf(listing: Listing): string[] {
+        return [...new Set([...listing.indexes, ...(listing.definition.columns ?? [])])];
+    }
+
+    /**
+     * Items of a collection as editors list them, drafts and incomplete items
+     * included: searched, filtered and sorted by the store, one page of them,
+     * each with its status and, when a page shows it, its address, and how
+     * many match in all.
+     */
+    async editorList(name: string, query: ItemListQuery): Promise<{ items: EditorItem[]; total: number }> {
+        const listing = this.listing(name);
+        const definition = listing.definition;
+        const labelField = labelFieldOf(definition);
+        const columns = this.listColumnsOf(listing);
+        const unknown = (query.fields ?? []).filter((field) => !columns.includes(field));
+        if (unknown.length > 0) {
             throw new CmsHttpError(400, {
-                detail: `The ${definition.name} collection has no field '${filter.field}' to filter by.`,
+                detail: `'${unknown[0]}' is not a column of ${name}. Its list shows ${columns.join(', ') || 'no fields'}.`,
             });
         }
-        if (filter.descendants !== true) return (content) => holdsAny(content[filter.field], new Set([filter.value]));
-        const brand = brandOf(field.schema);
-        const held = brand === undefined ? undefined : this.listingFor(brand);
-        if (held?.definition.tree === undefined) {
+        const groups = await Promise.all(
+            (query.groups ?? []).map((group) => Promise.all(group.map((condition) => this.editingCondition(listing, condition))))
+        );
+        const orderBy = query.orderBy ?? 'title';
+        const result = await this.store.editingQuery({
+            kind: 'item',
+            keyPrefix: listing.keyPrefix,
+            groups,
+            ...(query.search === undefined || query.search.trim() === ''
+                ? {}
+                : {
+                      search: {
+                          term: query.search.trim(),
+                          fields: [...new Set([...(labelField === undefined ? [] : [labelField]), ...(listing.routes[0]?.params ?? [])])],
+                      },
+                  }),
+            orderBy:
+                orderBy === 'updatedAt' || orderBy === 'status'
+                    ? orderBy
+                    : orderBy === 'title' && !listing.indexes.includes('title')
+                      ? labelField === undefined
+                          ? 'key'
+                          : {
+                                field: labelField,
+                                type: 'text',
+                            }
+                      : this.sortIndexOf(listing, orderBy),
+            direction: query.direction ?? (orderBy === 'updatedAt' ? 'desc' : 'asc'),
+            ...(query.limit === undefined
+                ? {}
+                : {
+                      limit: query.limit,
+                  }),
+            offset: query.offset ?? 0,
+        });
+        const placements = definition.tree === undefined ? undefined : await this.treePlacements(listing);
+        const items = result.rows.map((stored): EditorItem & { content: Record<string, unknown> } => {
+            const id = stored.key.slice(listing.keyPrefix.length);
+            const row = this.migrated(this.target(listing.refOf(id)), stored)!;
+            const content = row.draft ?? row.published ?? {};
+            const placement = placements?.get(id);
+            return {
+                id,
+                ref: formatRef(listing.refOf(id)),
+                label: itemLabelOf(content, labelField),
+                path: listing.routes[0] === undefined ? null : (fillPath(listing.routes[0].pattern, content) ?? null),
+                status: this.statusOf(row, stored.latestVersion),
+                complete: missingFields(definition, row.draft).length === 0 && row.draft !== null,
+                updatedAt: row.updatedAt.toISOString(),
+                updatedBy: row.updatedBy,
+                ...(placement === undefined
+                    ? definition.tree === undefined
+                        ? {}
+                        : {
+                              parent: null,
+                              treeLabel: itemLabelOf(content, labelField),
+                          }
+                    : placement),
+                content,
+            };
+        });
+        const fields = query.fields ?? [];
+        const labels = fields.length === 0 ? undefined : await this.columnLabels(listing, fields, items, query.headers ?? {});
+        return {
+            items: items.map(({ content, ...item }) =>
+                fields.length === 0
+                    ? item
+                    : {
+                          ...item,
+                          values: Object.fromEntries(fields.map((field) => [field, content[field] ?? null])),
+                          labels: Object.fromEntries(
+                              fields.flatMap((field) => {
+                                  const label = labels?.get(field)?.(content[field]);
+                                  return label === undefined ? [] : [[field, label]];
+                              })
+                          ),
+                      }
+            ),
+            total: result.total,
+        };
+    }
+
+    /**
+     * How the editing list sorts by a field, which must be an index.
+     */
+    private sortIndexOf(listing: Listing, field: string): ListField {
+        if (!listing.indexes.includes(field)) {
             throw new CmsHttpError(400, {
-                detail: `The ${filter.field} field holds no ids of a collection with a tree, so nothing sits under '${filter.value}'.`,
+                detail: `The list of ${listing.name} cannot sort by '${field}'. It sorts by ${['title', 'status', 'updatedAt', ...listing.indexes].join(', ')}.`,
             });
         }
-        const values = descendantsOf(await loadParents(this, held, 'latest'), filter.value);
-        return (content) => holdsAny(content[filter.field], values);
+        return this.indexOf(listing, field);
+    }
+
+    /**
+     * One condition as the store reads it: the item's status, or a field of
+     * the collection's indexes holding the value, or with `within` and
+     * `outside`, the value or an item under it.
+     */
+    private async editingCondition(listing: Listing, condition: ItemCondition): Promise<EditingCondition> {
+        const negate = condition.operator === 'isNot' || condition.operator === 'outside';
+        const nested = condition.operator === 'within' || condition.operator === 'outside';
+        if (condition.field === 'status') {
+            if (!ITEM_STATUSES.includes(condition.value) || nested) {
+                throw new CmsHttpError(400, {
+                    detail: `A filter on status is status:is:<status> or status:isNot:<status>, with ${ITEM_STATUSES.join(', ')}.`,
+                });
+            }
+            return {
+                kind: 'status',
+                values: [condition.value],
+                negate,
+            };
+        }
+        if (!listing.indexes.includes(condition.field)) {
+            throw new CmsHttpError(400, {
+                detail: `The list of ${listing.name} cannot filter by '${condition.field}', since it is not one of its indexes. It filters by ${['status', ...listing.indexes].join(', ')}.`,
+            });
+        }
+        const field = this.indexOf(listing, condition.field);
+        const schema = dataFields(listing.definition.fields).find((candidate) => candidate.name === condition.field)!.schema;
+        const list = readDef(unwrapOptionalWrappers(schema).inner).type === 'array';
+        if (nested) {
+            const brand = brandOf(schema);
+            const held = brand === undefined ? undefined : this.listingFor(brand);
+            if (held?.definition.tree === undefined) {
+                throw new CmsHttpError(400, {
+                    detail: `The ${condition.field} field holds no ids of a collection with a tree, so nothing sits under '${condition.value}'.`,
+                });
+            }
+            return {
+                kind: 'field',
+                field,
+                list,
+                values: [...descendantsOf(await loadParents(this, held, 'latest'), condition.value)],
+                negate,
+            };
+        }
+        const value = list || field.type === 'text' ? condition.value : field.type === 'numeric' ? Number(condition.value) : condition.value;
+        if (
+            (!list && field.type === 'numeric' && (condition.value.trim() === '' || !Number.isFinite(value))) ||
+            (!list && field.type === 'boolean' && condition.value !== 'true' && condition.value !== 'false')
+        ) {
+            throw new CmsHttpError(400, {
+                detail: `The ${condition.field} field holds ${field.type === 'numeric' ? 'a number' : 'true or false'}, not '${condition.value}'.`,
+            });
+        }
+        return {
+            kind: 'field',
+            field,
+            list,
+            values: [value],
+            negate,
+        };
+    }
+
+    /**
+     * Each item's parent and its labels from the top of the tree, for a
+     * collection with a `tree`, from every item it holds.
+     */
+    private async treePlacements(listing: Listing): Promise<Map<string, { parent: string | null; treeLabel: string }>> {
+        const labelField = labelFieldOf(listing.definition);
+        const parents = new Map<string, string | undefined>();
+        const items: Array<{ id: string; label: string }> = [];
+        for (const stored of await this.store.list('item')) {
+            if (!stored.key.startsWith(listing.keyPrefix)) continue;
+            const id = stored.key.slice(listing.keyPrefix.length);
+            const row = this.migrated(this.target(listing.refOf(id)), stored)!;
+            const content = row.draft ?? row.published ?? {};
+            items.push({
+                id,
+                label: itemLabelOf(content, labelField),
+            });
+            parents.set(id, parentIn(content, listing.definition.tree!));
+        }
+        return new Map(
+            placeInTree(items, parents).map((item) => [
+                item.id,
+                {
+                    parent: item.parent,
+                    treeLabel: item.treeLabel,
+                },
+            ])
+        );
+    }
+
+    /**
+     * For each column holding a choice or an id, what an editor reads for a
+     * value of it: an option's label, or the title of the item or record an
+     * id names, a list of them joined by commas. A relationship whose
+     * `options` fails leaves its ids unlabelled.
+     */
+    private async columnLabels(
+        listing: Listing,
+        fields: readonly string[],
+        items: ReadonlyArray<{ content: Record<string, unknown> }>,
+        headers: Record<string, string>
+    ): Promise<Map<string, (value: unknown) => string | undefined>> {
+        const labels = new Map<string, (value: unknown) => string | undefined>();
+        const each = (read: (entry: string) => string | undefined) => (value: unknown) => {
+            const entries = (Array.isArray(value) ? value : [value]).filter((entry): entry is string => typeof entry === 'string');
+            const found = entries.map(read);
+            return entries.length === 0 || found.some((label) => label === undefined) ? undefined : found.join(', ');
+        };
+        for (const name of fields) {
+            const field = dataFields(listing.definition.fields).find((candidate) => candidate.name === name)!;
+            const options = field.options;
+            if (options !== undefined) {
+                labels.set(
+                    name,
+                    each((entry) => options[entry] ?? entry)
+                );
+                continue;
+            }
+            const brand = this.referenceBrandOf(field.schema);
+            if (brand === undefined) continue;
+            const ids = [
+                ...new Set(
+                    items.flatMap((item) => {
+                        const value = item.content[name];
+                        return (Array.isArray(value) ? value : [value]).filter((entry): entry is string => typeof entry === 'string');
+                    })
+                ),
+            ];
+            const named = await this.idLabels(brand, ids, headers);
+            labels.set(
+                name,
+                each((entry) => named.get(entry))
+            );
+        }
+        return labels;
+    }
+
+    /**
+     * The title of each id of a brand: an item's, by its path in the tree
+     * when it has one, or what a relationship's `options` names it.
+     */
+    private async idLabels(brand: string, ids: readonly string[], headers: Record<string, string>): Promise<Map<string, string>> {
+        const named = new Map<string, string>();
+        if (ids.length === 0) return named;
+        const owned = this.listingFor(brand);
+        if (owned !== undefined) {
+            const placements = owned.definition.tree === undefined ? undefined : await this.treePlacements(owned);
+            const labelField = labelFieldOf(owned.definition);
+            for (const id of ids) {
+                const stored = await this.store.get('item', `${owned.keyPrefix}${id}`);
+                if (stored === undefined) continue;
+                const row = this.migrated(this.target(owned.refOf(id)), stored)!;
+                named.set(id, placements?.get(id)?.treeLabel ?? itemLabelOf(row.draft ?? row.published ?? {}, labelField));
+            }
+            return named;
+        }
+        for (let start = 0; start < ids.length; start += 50) {
+            try {
+                for (const option of await this.searchItems(brand, {
+                    ids: ids.slice(start, start + 50),
+                    headers,
+                })) {
+                    named.set(option.id, option.label);
+                }
+            } catch {
+                // The ids show as they are stored.
+            }
+        }
+        return named;
     }
 
     /**
@@ -1240,6 +1497,11 @@ export class CmsService {
                 ? {}
                 : {
                       image: option.image,
+                  }),
+            ...(option.detail === undefined
+                ? {}
+                : {
+                      detail: option.detail,
                   }),
         }));
     }
