@@ -9529,6 +9529,47 @@ routes:
                       kind: array
                       element:
                         kind: string
+                  filters:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: object
+                        fields:
+                          field:
+                            optional: false
+                            schema:
+                              kind: string
+                          label:
+                            optional: false
+                            schema:
+                              kind: string
+                              nullable: true
+                          choices:
+                            optional: true
+                            schema:
+                              kind: array
+                              element:
+                                kind: object
+                                fields:
+                                  value:
+                                    optional: false
+                                    schema:
+                                      kind: string
+                                  label:
+                                    optional: false
+                                    schema:
+                                      kind: string
+                          brand:
+                            optional: true
+                            schema:
+                              kind: string
+                  sorts:
+                    optional: false
+                    schema:
+                      kind: array
+                      element:
+                        kind: string
                   readOnly:
                     optional: false
                     schema:
@@ -9576,6 +9617,7 @@ routes:
     path: /editing/views/appUsers/items
     statuses:
       - 200
+      - 400
       - 401
       - 403
     deprecated: false
@@ -9586,6 +9628,34 @@ routes:
           optional: true
           schema:
             kind: string
+        filter:
+          optional: true
+          schema:
+            kind: array
+            element:
+              kind: string
+        orderBy:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - name
+              - signedUpAt
+        direction:
+          optional: true
+          schema:
+            kind: enum
+            values:
+              - asc
+              - desc
+        limit:
+          optional: true
+          schema:
+            kind: number
+        offset:
+          optional: true
+          schema:
+            kind: number
     responses:
       "200":
         kind: object
@@ -9609,6 +9679,29 @@ routes:
                     optional: false
                     schema:
                       kind: record
+          total:
+            optional: false
+            schema:
+              kind: number
+      "400":
+        kind: object
+        fields:
+          type:
+            optional: false
+            schema:
+              kind: string
+          title:
+            optional: false
+            schema:
+              kind: string
+          status:
+            optional: false
+            schema:
+              kind: number
+          detail:
+            optional: false
+            schema:
+              kind: string
       "401":
         kind: object
         fields:
@@ -11251,6 +11344,10 @@ routes:
                     schema:
                       kind: string
                   image:
+                    optional: true
+                    schema:
+                      kind: string
+                  email:
                     optional: true
                     schema:
                       kind: string

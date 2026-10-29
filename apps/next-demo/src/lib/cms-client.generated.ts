@@ -558,6 +558,10 @@ export namespace API {
                  */
                 image?: string;
                 /**
+                 * Their email, when the app gives one.
+                 */
+                email?: string;
+                /**
                  * Their roles, as the app gives them.
                  */
                 roles?: Array<string>;
@@ -827,9 +831,36 @@ export namespace API {
              */
             search: Array<string>;
             /**
+             * The fields the list filters by.
+             */
+            filters: Array<CMS.ViewFilter>;
+            /**
+             * The fields the list sorts by.
+             */
+            sorts: Array<string>;
+            /**
              * Whether the caller may save nothing in it.
              */
             readOnly: boolean;
+        };
+
+        export type ViewFilter = {
+            field: string;
+            /**
+             * The field's `label`, or `null` to show its name.
+             */
+            label: string | null;
+            /**
+             * The values a condition may name, with the label editors see for each.
+             */
+            choices?: Array<{
+                value: string;
+                label: string;
+            }>;
+            /**
+             * The brand of the ids the field holds, which a condition names one of.
+             */
+            brand?: string;
         };
 
         export type ViewRecord = {
@@ -2524,17 +2555,41 @@ export namespace API {
              * What to search for, in name, email.
              */
             q?: string;
+            /**
+             * Conditions, each `field:operator:value`, like `role:is:editor`. `field` is role. `operator` is `is` or `isNot`, and on a field holding a list `is` finds the value in it. The conditions all hold together, and an `or` entry between them starts another set that may hold instead.
+             */
+            filter?: Array<string>;
+            /**
+             * name or signedUpAt. The order the view lists in when left out.
+             */
+            orderBy?: "name" | "signedUpAt";
+            /**
+             * Ascending when left out.
+             */
+            direction?: "asc" | "desc";
+            /**
+             * How many records a page holds. Without it, every record that matches.
+             */
+            limit?: number;
+            /**
+             * How many matching records to skip, for the pages after the first.
+             */
+            offset?: number;
         };
 
         export type Result =
             | { status: 200; body: {
                 items: Array<CMS.ViewRow>;
+                /**
+                 * How many records match, on every page together.
+                 */
+                total: number;
             }; headers: Record<string, string> }
+            | { status: 400; body: ProblemDetails | ValidationError; headers: Record<string, string> }
             | { status: 401; body: ProblemDetails; headers: {
                 "www-authenticate": string;
             } }
-            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> }
-            | { status: 400; body: ValidationError; headers: Record<string, string> };
+            | { status: 403; body: ProblemDetails | ProblemDetails; headers: Record<string, string> };
     }
 
     export namespace EditingViewsAppUsersGet {
@@ -3899,6 +3954,8 @@ export interface Client {
                 /**
                  * List the records of app users that match a search
                  *
+                 * Pages with `limit` and `offset`, and counts every record that matches as `total`. Filters by role (editor or admin). Sorts by name or signedUpAt.
+                 *
                  * @example
                  * const result = await client.editing.views.appUsers.list();
                  */
@@ -4885,9 +4942,9 @@ const routes: GeneratedRoutes = {
                     path: '/editing/views/appUsers/items',
                     responses: {
                         200: {},
+                        400: {},
                         401: {},
                         403: {},
-                        400: {},
                     },
                 },
                 get: {
