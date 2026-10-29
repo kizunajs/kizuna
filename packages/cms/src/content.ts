@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import { readMetaBrand, readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
-import { readBlock } from './block.js';
+import { readBlock, readBlocks } from './block.js';
+import { optionOf } from './union.js';
 import { dataFields, fieldDescription, isLayoutItem, type Field, type FieldAuth, type FieldList, type LayoutItem } from './field.js';
 import type { ContentDefinition } from './definitions.js';
 import type { Ref } from './storage/store.js';
@@ -36,6 +37,21 @@ export interface DescribedField {
      */
     block: string | undefined;
     fields: DescribedField[] | undefined;
+    /**
+     * For a list made with `blocks()`, the blocks an item may be.
+     */
+    blocks: DescribedBlock[] | undefined;
+}
+
+/**
+ * One block a `blocks()` list may hold, with its fields named relative to
+ * the item.
+ */
+export interface DescribedBlock {
+    name: string;
+    label: string | undefined;
+    description: string | undefined;
+    fields: DescribedField[];
 }
 
 /**
@@ -85,8 +101,64 @@ const describe = (field: Field, parentPath: string, within: readonly string[], l
         layout: [...within],
         block: block?.name,
         fields: block === undefined ? undefined : describeList(block.fields, path, [], layout),
+        blocks: readBlocks(field.schema)?.map((each) => ({
+            name: each.name,
+            label: each.label,
+            description: each.description,
+            // An item's fields show in order, in the card it opens into, so its layout items are left out.
+            fields: describeList(each.fields, '', [], []).map((inner) => ({
+                ...inner,
+                layout: [],
+            })),
+        })),
     };
 };
+
+/**
+ * The blocks a list holds, as `describe` answers them.
+ */
+export const blocksForWire = (blocks: readonly DescribedBlock[]) =>
+    blocks.map((block) => ({
+        name: block.name,
+        ...(block.label === undefined
+            ? {}
+            : {
+                  label: block.label,
+              }),
+        ...(block.description === undefined
+            ? {}
+            : {
+                  description: block.description,
+              }),
+        fields: block.fields.map((field) => ({
+            name: field.name,
+            ...(field.label === undefined
+                ? {}
+                : {
+                      label: field.label,
+                  }),
+            ...(field.options === undefined
+                ? {}
+                : {
+                      options: {
+                          ...field.options,
+                      },
+                  }),
+            ...(field.description === undefined
+                ? {}
+                : {
+                      description: field.description,
+                  }),
+            required: field.required,
+        })),
+    }));
+
+/**
+ * What the agent reads about a list of blocks: the key an item names its
+ * block under, and the blocks it may name.
+ */
+export const blocksHint = (blocks: readonly DescribedBlock[]): string =>
+    `A list of blocks. Each item is one block's fields with its name under 'block': ${blocks.map((block) => `'${block.name}'`).join(', ')}.`;
 
 /**
  * Every field of a page, with the fields of each block inside it. A field in
@@ -190,6 +262,11 @@ const collectRefs = (schema: z.core.$ZodType, value: unknown, path: string, into
         for (const [key, child] of Object.entries(def.shape)) {
             collectRefs(child, (value as Record<string, unknown>)[key], path === '' ? key : `${path}.${key}`, into);
         }
+        return;
+    }
+    if (def.discriminator !== undefined) {
+        const option = optionOf(def, value);
+        if (option !== undefined) collectRefs(option, value, path, into);
         return;
     }
     if ((def.type === 'union' || def.type === 'pipe') && def.options !== undefined) {

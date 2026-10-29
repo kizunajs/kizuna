@@ -16,7 +16,7 @@ import {
     setAtPath,
     type DescribedField,
 } from './content.js';
-import { fieldChain } from './content.js';
+import { blocksForWire, blocksHint, fieldChain } from './content.js';
 import { dataFields } from './field.js';
 import { randomBytes } from 'node:crypto';
 import type { ContentDefinition, Collection, Global } from './definitions.js';
@@ -1284,7 +1284,12 @@ export class CmsService {
                 route === undefined
                     ? undefined
                     : `Part of the address, ${route.pattern}, and unique. Changing it on a published item breaks links to the old address.`;
-            const description = [field.description, brand === undefined ? undefined : this.brandHint(brand, isList), address]
+            const description = [
+                field.description,
+                brand === undefined ? undefined : this.brandHint(brand, isList),
+                field.blocks === undefined ? undefined : blocksHint(field.blocks),
+                address,
+            ]
                 .filter(Boolean)
                 .join(' ');
             const help = [
@@ -1301,6 +1306,11 @@ export class CmsService {
                 ...(description === '' ? {} : { description }),
                 ...(help === '' ? {} : { help }),
                 ...(field.block === undefined ? {} : { block: field.block }),
+                ...(field.blocks === undefined
+                    ? {}
+                    : {
+                          blocks: blocksForWire(field.blocks),
+                      }),
                 ...(parent === undefined ? {} : { parent }),
                 ...(field.position === undefined
                     ? {}

@@ -118,7 +118,11 @@ const brandShape = (schema: z.core.$ZodType): string =>
     ).replace(/"description":"[^"]*",?/g, '');
 
 const allFields = (fields: readonly DescribedField[]): DescribedField[] =>
-    fields.flatMap((field) => [field, ...allFields(field.fields ?? [])]);
+    fields.flatMap((field) => [
+        field,
+        ...allFields(field.fields ?? []),
+        ...(field.blocks ?? []).flatMap((block) => allFields(block.fields)),
+    ]);
 
 /**
  * Checks that cannot run before the api assembles: field roles against the

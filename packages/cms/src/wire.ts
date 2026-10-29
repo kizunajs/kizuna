@@ -114,6 +114,26 @@ export const DraftHeadersSchema = z.object({
     etag: z.string(),
 });
 
+export const DescribedBlockSchema = Kizuna.model({
+    title: 'CMS.Block',
+    schema: z.object({
+        name: z.string().describe('What an item of the list stores under its block key.'),
+        label: z.string().optional().describe('What editors see the block called.'),
+        description: z.string().optional().describe('What the block is for, read when choosing one.'),
+        fields: z
+            .array(
+                z.object({
+                    name: z.string(),
+                    label: z.string().optional(),
+                    options: z.record(z.string(), z.string()).optional().describe('For an enum, the label editors see for each value.'),
+                    description: z.string().optional(),
+                    required: z.boolean(),
+                })
+            )
+            .describe("The block's fields, in the order editors see them, named as the item holds them."),
+    }),
+});
+
 export const DescribedFieldSchema = Kizuna.model({
     title: 'CMS.Field',
     schema: z.object({
@@ -124,6 +144,12 @@ export const DescribedFieldSchema = Kizuna.model({
         description: z.string().optional(),
         help: z.string().optional().describe('What an editor reads under the field: the description, without the guidance for agents.'),
         block: z.string().optional().describe('The block name, when the field is a block.'),
+        blocks: z
+            .array(DescribedBlockSchema)
+            .optional()
+            .describe(
+                "For a list of blocks, the blocks an item may be. Each item names its block under 'block', beside that block's fields."
+            ),
         parent: z.string().optional().describe('The path of the block field this one sits in.'),
         position: z.enum(['sidebar']).optional().describe('Where the editor shows it, when beside the main column.'),
         width: z.string().optional().describe('How much of a row it takes, like 50%.'),
@@ -419,7 +445,9 @@ export const UpdateMediaBodySchema = Kizuna.model({
     title: 'CMS.UpdateMedia',
     schema: z.object({
         alt: z.string().optional(),
-        focalPoint: FocalPointSchema.nullable().optional().describe('The default focal point, used where a field sets none. `null` clears it.'),
+        focalPoint: FocalPointSchema.nullable()
+            .optional()
+            .describe('The default focal point, used where a field sets none. `null` clears it.'),
     }),
 });
 

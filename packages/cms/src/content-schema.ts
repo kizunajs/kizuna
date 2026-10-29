@@ -38,8 +38,12 @@ export const resolvedSchema = (schema: z.core.$ZodType): z.ZodType => {
         }
         case 'array':
             return z.array(resolvedSchema(def.element!));
-        case 'union':
-            return z.union(def.options!.map(resolvedSchema));
+        case 'union': {
+            const options = def.options!.map(resolvedSchema);
+            return def.discriminator === undefined
+                ? z.union(options)
+                : z.discriminatedUnion(def.discriminator, options as [z.ZodObject, ...z.ZodObject[]]);
+        }
         default:
             return schema as z.ZodType;
     }

@@ -1,4 +1,16 @@
-export { defineBlock, readBlock, type Block, type BlockDefinition, type BlockSchema } from './block.js';
+export {
+    defineBlock,
+    blocks,
+    readBlock,
+    readBlocks,
+    BLOCK,
+    BLOCK_KEY,
+    type Block,
+    type BlockDefinition,
+    type BlockSchema,
+    type BlocksSchema,
+    type TaggedBlockSchema,
+} from './block.js';
 export { definePage, isPage, servesCollection, PAGE, type Page, type PageDefinition, type PageMigration } from './page.js';
 export { routeParamsOf, fillPath, matchPath, type ParamsOf } from './dynamic.js';
 export {
@@ -109,6 +121,14 @@ export { DocumentStore, VersionConflictError, type CmsDatabase, type DocumentRow
 export { CMS_MIGRATION_SQL, indexSql, type IndexedField, type IndexType } from './storage/migration.js';
 export { discoverPages, renderPagesModule, findAppDir, defaultPagesOutput, routePathOf, type DiscoveredPage } from './discovery.js';
 export { inStoredOrder } from './in-order.js';
-export { describeFields, describeLayout, refsOf, missingFields, type DescribedField, type DescribedLayout } from './content.js';
+export {
+    describeFields,
+    describeLayout,
+    refsOf,
+    missingFields,
+    type DescribedBlock,
+    type DescribedField,
+    type DescribedLayout,
+} from './content.js';
 export { signPreviewToken, verifyPreviewToken, previewSecret, PREVIEW_COOKIE } from './preview-token.js';
 export { withSourcePath, decodePath, decodeSource, stripPaths, encodeSourcePaths, type Source } from './source-path.js';

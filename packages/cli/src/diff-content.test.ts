@@ -128,6 +128,59 @@ describe('content', () => {
         expect(summaries(diffApis(before, after))).toEqual(['breaking page:frontPage is gone', 'added page:plansPage added']);
     });
 
+    describe('a list of blocks', () => {
+        const sectionsOf = (...options: [z.ZodObject, ...z.ZodObject[]]) =>
+            apiWith([
+                {
+                    ref: 'page:frontPage',
+                    schema: z.object({
+                        sections: z.array(z.discriminatedUnion('block', options)),
+                    }),
+                },
+            ]);
+        const Statement = z.object({
+            block: z.literal('statement'),
+            text: z.string(),
+        });
+        const Media = z.object({
+            block: z.literal('media'),
+            caption: z.string().optional(),
+        });
+        const withBlocks = sectionsOf(Statement, Media);
+
+        it('records each block under its name', () => {
+            const schema = toSnapshot(withBlocks).content?.['page:frontPage']?.schema as {
+                fields: Record<string, { schema: { element: { discriminator: string; options: Record<string, unknown> } } }>;
+            };
+            const element = schema.fields['sections']!.schema.element;
+            expect(element.discriminator).toBe('block');
+            expect(Object.keys(element.options)).toEqual(['statement', 'media']);
+        });
+
+        it('breaks on a block taken out of the list', () => {
+            expect(summaries(diffApis(withBlocks, sectionsOf(Statement)))).toEqual([
+                "breaking page:frontPage sections[] no longer accepts block 'media', with no migrate step",
+            ]);
+        });
+
+        it('breaks on a field a block now requires, and adds a block quietly', () => {
+            const after = sectionsOf(
+                Statement,
+                Media.extend({
+                    caption: z.string(),
+                }),
+                z.object({
+                    block: z.literal('quote'),
+                    text: z.string(),
+                })
+            );
+            expect(summaries(diffApis(withBlocks, after))).toEqual([
+                'breaking page:frontPage sections[](media).caption is no longer optional, with no migrate step',
+                "changed page:frontPage sections[] also accepts block 'quote'",
+            ]);
+        });
+    });
+
     it('leaves a config without content out of the snapshot', () => {
         expect(toSnapshot(defineConfig({}).api).content).toBeUndefined();
     });

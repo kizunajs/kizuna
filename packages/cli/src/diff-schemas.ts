@@ -25,6 +25,9 @@ const fieldsOf = (schema: SchemaNode): Record<string, { optional: boolean; schem
 const elementOf = (schema: SchemaNode): SchemaNode | undefined =>
     schema.kind === 'array' ? (schema as Extract<SchemaNode, { kind: 'array' }>).element : undefined;
 
+const taggedOf = (schema: SchemaNode): Extract<SchemaNode, { kind: 'union' }> | undefined =>
+    schema.kind === 'union' && 'options' in schema ? (schema as Extract<SchemaNode, { kind: 'union' }>) : undefined;
+
 const valuesOf = (schema: SchemaNode): string[] | undefined =>
     schema.kind === 'enum' ? (schema as Extract<SchemaNode, { kind: 'enum' }>).values : undefined;
 
@@ -134,6 +137,46 @@ export const diffSchemas = (
             changes.push({ breaking: direction === 'response', path: here, summary: `${here} is gone` });
         }
 
+        return changes;
+    }
+
+    const wasTagged = taggedOf(before);
+    const nowTagged = taggedOf(after);
+
+    if (wasTagged && nowTagged) {
+        const label = path || 'the body';
+        if (wasTagged.discriminator !== nowTagged.discriminator) {
+            changes.push({
+                breaking: true,
+                path,
+                summary: `${label} is told apart by ${nowTagged.discriminator} instead of ${wasTagged.discriminator}`,
+            });
+            return changes;
+        }
+        const { discriminator } = nowTagged;
+        for (const [tag, option] of Object.entries(nowTagged.options)) {
+            const existing = wasTagged.options[tag];
+            if (existing === undefined) {
+                changes.push({
+                    breaking: direction === 'response',
+                    path,
+                    summary:
+                        direction === 'response'
+                            ? `${label} can now be ${discriminator} '${tag}'`
+                            : `${label} also accepts ${discriminator} '${tag}'`,
+                });
+                continue;
+            }
+            changes.push(...diffSchemas(existing, option, direction, `${path}(${tag})`));
+        }
+        for (const tag of Object.keys(wasTagged.options)) {
+            if (tag in nowTagged.options) continue;
+            changes.push({
+                breaking: true,
+                path,
+                summary: `${label} no longer accepts ${discriminator} '${tag}'`,
+            });
+        }
         return changes;
     }
 

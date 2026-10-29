@@ -74,7 +74,7 @@ export const encodeSourcePaths = (
             return value.map((item, index) => walk(def.element!, item, `${path}.${index}`));
         }
         if (def.options !== undefined) {
-            const option = optionOf(def.options, value);
+            const option = optionOf(def, value);
             return option === undefined ? value : walk(option, value, path);
         }
         if (def.type === 'object' && def.shape !== undefined && typeof value === 'object') {

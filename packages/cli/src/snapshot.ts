@@ -21,6 +21,7 @@ export type SchemaNode =
     | { kind: 'object'; nullable?: true; fields: Record<string, { optional: boolean; schema: SchemaNode }>; refinements?: number }
     | { kind: 'array'; nullable?: true; element: SchemaNode; refinements?: number }
     | { kind: 'enum'; nullable?: true; values: string[]; refinements?: number }
+    | { kind: 'union'; nullable?: true; discriminator: string; options: Record<string, SchemaNode>; refinements?: number }
     | { kind: string; nullable?: true; refinements?: number };
 
 export interface RouteSnapshot {
@@ -118,6 +119,23 @@ export const toSchemaNode = (schema: z.core.$ZodType): SchemaNode => {
     const nullability: { nullable?: true } = nullable ? { nullable: true } : {};
     const refinements = refinementCount(inner);
     const carry = refinements === undefined ? {} : { refinements };
+
+    // A discriminated union records each option under its tag, so a removed or changed one shows.
+    if (def.type === 'union' && def.discriminator !== undefined) {
+        const discriminator = def.discriminator;
+        const tagged: Record<string, SchemaNode> = {};
+        for (const option of def.options ?? []) {
+            const literal = readObjectShape(option)?.[discriminator];
+            for (const value of literal === undefined ? [] : (readDef(literal).values ?? [])) tagged[String(value)] = toSchemaNode(option);
+        }
+        return {
+            kind: 'union',
+            ...nullability,
+            discriminator,
+            options: tagged,
+            ...carry,
+        };
+    }
 
     const shape = readObjectShape(inner);
     if (shape) {

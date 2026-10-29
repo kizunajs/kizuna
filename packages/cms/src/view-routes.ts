@@ -5,7 +5,7 @@ import { ProblemDetailsSchema, ValidationErrorSchema } from 'kizunajs/schemas';
 import { readDef, unwrapOptionalWrappers } from 'kizunajs/generator';
 import { CmsHttpError, type CmsService } from './cms.js';
 import { dataFields } from './field.js';
-import { describeFields, describeLayout, getAtPath, type DescribedField } from './content.js';
+import { blocksForWire, describeFields, describeLayout, getAtPath, type DescribedField } from './content.js';
 import { pathRefusal, type Caller } from './rules.js';
 import { sameContent } from './same-content.js';
 import { DescribedFieldSchema, DescribedLayoutSchema } from './wire.js';
@@ -185,6 +185,11 @@ const describeRecord = (cms: CmsService, view: View, record: object, caller: Cal
                 ? {}
                 : {
                       block: field.block,
+                  }),
+            ...(field.blocks === undefined
+                ? {}
+                : {
+                      blocks: blocksForWire(field.blocks),
                   }),
             ...(parent === undefined
                 ? {}

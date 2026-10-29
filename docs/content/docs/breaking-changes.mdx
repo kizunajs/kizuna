@@ -121,13 +121,14 @@ A rename is spotted by matching a departed key against an arrived one on the sam
 
 With [`content`](/docs/config#content) on the config, the snapshot records every page, global and collection with its schema and its latest `migrate` step. Stored content outlives the code that declared it, so a change the stored copies cannot read is breaking even though no caller sees it:
 
-| Change                                                        | Level    |
-| ------------------------------------------------------------- | -------- |
-| A required field added, with no default and no `migrate` step | breaking |
-| A field's type changed, with no `migrate` step                | breaking |
-| A page, global or collection removed                          | breaking |
-| A `migrate` step added                                        | changed  |
-| A field removed                                               | changed  |
+| Change                                                         | Level    |
+| -------------------------------------------------------------- | -------- |
+| A required field added, with no default and no `migrate` step  | breaking |
+| A field's type changed, with no `migrate` step                 | breaking |
+| A block taken out of a `blocks()` list, with no `migrate` step | breaking |
+| A page, global or collection removed                           | breaking |
+| A `migrate` step added                                         | changed  |
+| A field removed                                                | changed  |
 
 ```
 BREAKING page:frontPage subheading is now required, with no default and no migrate step
@@ -139,18 +140,20 @@ A `migrate` step in the same change settles the first two, since it says what th
 
 A caller sends requests and reads responses, so tightening an input and dropping an output are the two that hurt.
 
-| Change                         | Request      | Response     |
-| ------------------------------ | ------------ | ------------ |
-| A required field added         | **breaking** | changed      |
-| An optional field added        | quiet        | changed      |
-| A field removed                | changed      | **breaking** |
-| An optional field required     | **breaking** | changed      |
-| A required field optional      | changed      | **breaking** |
-| A field made nullable          | changed      | **breaking** |
-| A nullable field made non-null | **breaking** | changed      |
-| A type changed                 | **breaking** | **breaking** |
-| An enum value removed          | **breaking** | **breaking** |
-| An enum value added            | changed      | **breaking** |
+| Change                                    | Request      | Response     |
+| ----------------------------------------- | ------------ | ------------ |
+| A required field added                    | **breaking** | changed      |
+| An optional field added                   | quiet        | changed      |
+| A field removed                           | changed      | **breaking** |
+| An optional field required                | **breaking** | changed      |
+| A required field optional                 | changed      | **breaking** |
+| A field made nullable                     | changed      | **breaking** |
+| A nullable field made non-null            | **breaking** | changed      |
+| A type changed                            | **breaking** | **breaking** |
+| A `z.discriminatedUnion()` option removed | **breaking** | **breaking** |
+| A `z.discriminatedUnion()` option added   | changed      | **breaking** |
+| An enum value removed                     | **breaking** | **breaking** |
+| An enum value added                       | changed      | **breaking** |
 
 That last row catches people out. Adding a value to a response enum breaks any client that generated a closed enum for it, which is what [`unknownEnumCase`](/docs/clients/swift) exists for in the Swift and Kotlin clients.
 

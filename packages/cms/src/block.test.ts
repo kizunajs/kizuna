@@ -49,6 +49,21 @@ describe('block', () => {
         expect(readBlock(z.object({}))).toBeUndefined();
     });
 
+    it('throws on a label with no words', () => {
+        expect(() =>
+            defineBlock({
+                name: 'hero',
+                label: '',
+                fields: [
+                    {
+                        name: 'heading',
+                        schema: z.string(),
+                    },
+                ],
+            })
+        ).toThrow("defineBlock('hero') has a label that is no text.");
+    });
+
     it('throws on a name that is not camelCase', () => {
         expect(() =>
             defineBlock({
