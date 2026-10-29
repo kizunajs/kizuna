@@ -34,6 +34,9 @@ const page = async ({ name, entry, stylesheets, title = 'Kizuna CMS' }) => {
 
     const script = await readFile(`${scratch}/${name}.iife.js`, 'utf8');
     const font = await readFile(`${root}src/view/fonts/plus-jakarta-sans-latin.woff2`);
+    // The kanji tile, dark on a light browser and light on a dark one, as on kizunajs.com.
+    const lightIcon = (await readFile(`${root}src/view/favicon-dark.png`)).toString('base64');
+    const darkIcon = (await readFile(`${root}src/view/favicon-light.png`)).toString('base64');
     const styles = (await Promise.all(stylesheets.map((stylesheet) => readFile(`${root}${stylesheet}`, 'utf8'))))
         .join('\n')
         .replace('__PLUS_JAKARTA_SANS__', font.toString('base64'));
@@ -45,6 +48,8 @@ const page = async ({ name, entry, stylesheets, title = 'Kizuna CMS' }) => {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,${lightIcon}" media="(prefers-color-scheme: light)">
+<link rel="icon" type="image/png" href="data:image/png;base64,${darkIcon}" media="(prefers-color-scheme: dark)">
 <style>${styles}</style>
 <!--kizuna-cms-stylesheet-->
 <script id="kizuna-cms-config" type="application/json">"__KIZUNA_CMS_VIEW_CONFIG__"</script>
