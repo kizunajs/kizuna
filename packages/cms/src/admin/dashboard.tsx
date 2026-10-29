@@ -261,7 +261,6 @@ export function Dashboard({
     const firstStats = runsOf(widgets ?? []).find((run) => run.kind === 'stats');
     const columns = tileColumnsOf(firstStats?.kind === 'stats' ? firstStats.widgets.length : 0);
     const isNew = widgets !== undefined && isNewOf(widgets);
-    const compared = PERIODS.find((candidate) => candidate.key === counted?.key)?.before;
 
     const body = (() => {
         if (failure !== undefined) {
@@ -346,23 +345,14 @@ export function Dashboard({
         <>
             <PageHeader
                 title="Dashboard"
-                meta={
-                    isNew || counted === undefined
-                        ? undefined
-                        : [
-                              {
-                                  label: 'Period',
-                                  value: rangeOf(counted, 'en-GB'),
-                              },
-                              compared === undefined
-                                  ? null
-                                  : {
-                                        label: 'Compared with',
-                                        value: compared,
-                                    },
-                          ]
+                actions={
+                    isNew ? undefined : (
+                        <>
+                            {counted === undefined ? null : <span className="k-dashboard__range">{rangeOf(counted, 'en-GB')}</span>}
+                            <SelectMenu items={PERIOD_ITEMS} value={period} onChange={choosePeriod} label="Period" />
+                        </>
+                    )
                 }
-                actions={isNew ? undefined : <SelectMenu items={PERIOD_ITEMS} value={period} onChange={choosePeriod} label="Period" />}
             />
             <div className="k-admin__body k-dashboard" data-columns={columns} aria-busy={loading}>
                 {body}

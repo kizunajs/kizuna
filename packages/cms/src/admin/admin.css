@@ -343,6 +343,12 @@
         padding: 14px 0 10px;
     }
 
+    .k-dashboard__range {
+        font-size: 12.5px;
+        font-variant-numeric: tabular-nums;
+        color: var(--k-muted);
+    }
+
     /* Dashboard */
 
     .k-waiting__head {
