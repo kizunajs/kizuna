@@ -2207,8 +2207,12 @@
         min-width: 0;
     }
 
+    /* The table sits on one Kizuna card. */
     .k-table__scroll {
         overflow-x: auto;
+        border-radius: var(--k-radius-card);
+        background: var(--k-surface);
+        box-shadow: var(--k-elevation);
     }
 
     .k-table {
@@ -2240,12 +2244,20 @@
         color: var(--k-muted);
     }
 
+    .k-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
     .k-table :is(th, td):first-child {
-        padding-left: 8px;
+        padding-left: 16px;
+    }
+
+    .k-table :is(th, td):last-child {
+        padding-right: 16px;
     }
 
     .k-table__row:hover {
-        background: var(--k-surface);
+        background: var(--k-tint);
     }
 
     .k-table__row[data-selected] {
