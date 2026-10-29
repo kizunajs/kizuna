@@ -27,6 +27,7 @@ import {
     TreePlacementShape,
     MediaListSchema,
     MediaSchema,
+    MediaUsesSchema,
     MissingFieldsSchema,
     PageSummarySchema,
     PublishBodySchema,
@@ -1414,18 +1415,85 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         method: 'GET',
         path: `${editingBase}/media`,
         auth: editor,
-        summary: 'List uploaded media',
+        summary: 'List uploaded media, with how many pages hold each image',
         tool: true,
         responses: {
             200: MediaListSchema,
         },
     }).handler(
-        guarded(async (cms) => ({
-            status: 200,
-            body: {
-                media: (await cms.media.list()).map((record) => withUrl(cms, record)),
+        guarded(async (cms) => {
+            const uses = await cms.mediaUses();
+            return {
+                status: 200,
+                body: {
+                    media: (await cms.media.list()).map((record) => ({
+                        ...withUrl(cms, record),
+                        uses: uses.get(record.id)?.length ?? 0,
+                    })),
+                    maxBytes: cms.media.maxBytes,
+                },
+            };
+        }) as never
+    );
+
+    const mediaUses = route({
+        method: 'GET',
+        path: `${editingBase}/media/:id/uses`,
+        auth: editor,
+        summary: 'List the pages, globals and items that hold an image, and the fields holding it',
+        tool: true,
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        responses: {
+            200: {
+                body: MediaUsesSchema,
+                cache: 'no-store',
             },
-        })) as never
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const id = args.params['id']!;
+            if ((await cms.media.get(id)) === undefined) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
+            return {
+                status: 200,
+                body: {
+                    id,
+                    uses: (await cms.mediaUses()).get(id) ?? [],
+                },
+            };
+        }) as never
+    );
+
+    const deleteMedia = route({
+        method: 'DELETE',
+        path: `${editingBase}/media/:id`,
+        auth: editor,
+        summary: 'Delete an image and its stored file',
+        description:
+            'Pages, globals and items that hold it lose the image, so list its uses first. The person confirms before this runs.',
+        tool: {
+            needsApproval: true,
+        },
+        pathParams: z.object({
+            id: z.string(),
+        }),
+        responses: {
+            204: z.void(),
+            404: ProblemDetailsSchema,
+        },
+    }).handler(
+        guarded(async (cms, args) => {
+            const id = args.params['id']!;
+            const uses = (await cms.mediaUses()).get(id) ?? [];
+            if (!(await cms.media.delete(id))) throw new CmsHttpError(404, { detail: `No media item '${id}'.` });
+            await cms.revalidateMedia(uses);
+            return {
+                status: 204,
+                body: undefined,
+            };
+        }) as never
     );
 
     const getMedia = route({
@@ -1525,7 +1593,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         method: 'PATCH',
         path: `${editingBase}/media/:id`,
         auth: editor,
-        summary: 'Set the alt text or focal point of a media item',
+        summary: 'Set the default alt text or focal point of a media item, which every use without its own shows',
         tool: true,
         pathParams: z.object({
             id: z.string(),
@@ -1543,6 +1611,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
                 authorOf(cms, args)
             );
             if (record === undefined) throw new CmsHttpError(404, { detail: `No media item '${args.params['id']}'.` });
+            await cms.revalidateMedia((await cms.mediaUses()).get(record.id) ?? []);
             return {
                 status: 200,
                 body: withUrl(cms, record),
@@ -1739,8 +1808,10 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
             media: {
                 list: listMedia,
                 get: getMedia,
+                uses: mediaUses,
                 getFile: getMediaFile,
                 update: updateMedia,
+                delete: deleteMedia,
                 createUpload,
                 completeUpload,
             },

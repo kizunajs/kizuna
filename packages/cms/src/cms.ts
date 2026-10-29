@@ -23,12 +23,12 @@ import type { ContentDefinition, Collection, Global } from './definitions.js';
 import { servesCollection } from './page.js';
 import { fillPath, matchPath, routesOf, type ServedRoute } from './dynamic.js';
 import { DEFAULT_SITE, routePrefix, sitesOf, type PageEntry, type PageMap, type ResolvedCmsOptions } from './options.js';
-import { formatRef, type DocumentRef } from './refs.js';
+import { formatRef, parseRef, type DocumentRef } from './refs.js';
 import { CMS_MIGRATION_SQL, indexSql, type IndexType, type IndexedField } from './storage/migration.js';
 import { MediaService, type MediaRecord } from './media/media.js';
 import { memoryMediaStorage, type MediaStorage } from './media/storage.js';
 import { s3MediaStorage } from './media/s3.js';
-import { mediaIdsOf, resolveContent } from './media/resolve.js';
+import { mediaIdsOf, mediaUsesOf, resolveContent } from './media/resolve.js';
 import { pathRefusal, type Caller } from './rules.js';
 import {
     DocumentStore,
@@ -67,6 +67,24 @@ const migrationOf = (definition: ContentDefinition): Migration => ({
     version: latestMigration(definition),
     run: (content, from) => migrateContent(definition, content, from),
 });
+
+/**
+ * One document that holds an image, as the media library lists it.
+ */
+export interface MediaUse {
+    ref: string;
+    /**
+     * An item's title, or the page's or global's `label`. `null` when it has
+     * neither, so the reader writes out its name.
+     */
+    label: string | null;
+    fieldPaths: string[];
+    /**
+     * Whether the published content shows it. False when only the draft holds
+     * it.
+     */
+    published: boolean;
+}
 
 /**
  * Published content that fails its schema, for the content overview and
@@ -1627,6 +1645,63 @@ export class CmsService {
             }
         }
         return used;
+    }
+
+    /**
+     * Every document that holds each image, by media id: in its published
+     * content, its draft, or both, with the fields that hold it. Read from the
+     * content itself, so it is right however the content was written.
+     */
+    async mediaUses(): Promise<Map<string, MediaUse[]>> {
+        const found = new Map<string, MediaUse[]>();
+        for (const { target, row: stored } of await this.declaredDocuments()) {
+            const row = this.migrated(target, stored)!;
+            const published = new Set(mediaUsesOf(target.definition, row.published ?? {}).map((use) => use.id));
+            const byId = new Map<string, Set<string>>();
+            for (const content of [row.published, row.draft]) {
+                for (const use of mediaUsesOf(target.definition, content ?? {})) {
+                    byId.set(use.id, (byId.get(use.id) ?? new Set()).add(use.fieldPath));
+                }
+            }
+            if (byId.size === 0) continue;
+            const content = row.draft ?? row.published ?? {};
+            const labelField =
+                target.kind === 'item'
+                    ? dataFields(target.definition.fields).find(
+                          (field) => readDef(unwrapOptionalWrappers(field.schema).inner).type === 'string'
+                      )?.name
+                    : undefined;
+            const itemLabel = labelField === undefined ? undefined : content[labelField];
+            const label =
+                target.kind === 'item'
+                    ? typeof itemLabel === 'string' && itemLabel !== ''
+                        ? itemLabel
+                        : null
+                    : (target.definition.label ?? null);
+            for (const [id, fieldPaths] of byId) {
+                found.set(id, [
+                    ...(found.get(id) ?? []),
+                    {
+                        ref: formatRef(target.ref),
+                        label,
+                        fieldPaths: [...fieldPaths].sort(),
+                        published: published.has(id),
+                    },
+                ]);
+            }
+        }
+        return found;
+    }
+
+    /**
+     * Refreshes every page that shows an image, once its own alt text or
+     * focal point changed or it was deleted.
+     */
+    async revalidateMedia(uses: readonly MediaUse[]): Promise<void> {
+        for (const use of uses) {
+            const ref = parseRef(use.ref);
+            if (ref !== undefined) await this.revalidateDocument(ref);
+        }
     }
 
     /**

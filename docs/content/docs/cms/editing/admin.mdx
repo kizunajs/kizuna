@@ -129,16 +129,29 @@ A collection with a `tree` lists its items nested under their parents, until you
 
 A view's list shows its `title` and `columns`, and the search box asks its `list` function, which looks in the fields `search` names. The app keeps the records, so a view's list has no **Create new** and no tick boxes.
 
+## Media
+
+**Media**, under Content, shows every uploaded image with its file name, size and how many pages use it. The header counts the images, the ones nothing uses, and the space they take. **All images** and **Unused** pick which show, and **Grid** and **List** pick how. The search box finds an image by its file name or alt text, **Type** keeps one format, and **Sort** orders them by when they arrived, by name or by size.
+
+**Upload**, or files dropped on the screen, adds JPEG, PNG, WebP, GIF and AVIF images. Each is checked by its bytes and loses its location metadata, and the same file uploaded twice is one image.
+
+A click on an image opens it beside the grid: the image large, its alt text, its type, size and who uploaded it, and every page that uses it, each a link to that page with the field that holds the image. Click the image to set its focal point, the spot a crop keeps in frame, and **Save** keeps both.
+
+The library's alt text and focal point are the image's own, and each use can set its own instead. A field that picks the image starts with its alt text, and a page shows it wherever the field's is empty. The focal point holds wherever a field sets none. A crop, focal point or alt text set in a field belongs to that use alone, so a change on one page never moves the image on another. Saving in the library refreshes every page that shows the image.
+
+**Delete**, in the `…` menu, asks first and says how many pages use the image. Those pages lose it, so give each of them another image before deleting one that is in use.
+
 ## Editing
 
 A document opens with its title large and its actions on the right: **Save draft**, **Publish**, and a `…` menu. Under the title a line says where it stands, when it last changed and who saved it, and who owns it, where you can pick another owner. The menu holds **Ask for review**, which sends it to someone to look at first as in [Reviews](/docs/cms/editing/reviews), **Unpublish** once it is live, and for an item **Duplicate**, the collection's own [actions](/docs/cms/collections#actions) and **Delete**.
 
 The draft saves a moment after you stop typing, and the header says when it last did. **Save draft** saves at once, and **Publish** lists every change and asks you to confirm. While a required field is empty, Publish waits and says which field it waits for, like "Fill in Department before publishing". A click on that line takes you to the field, which says it is needed.
 
-Under the title, **Edit** shows the fields and **Versions** counts the saved versions. At the other end of that row, **Live preview** puts the site beside the fields and **Info** lists the document's status, owner, page, and when it was created, last updated and last published.
+Under the title, **Edit** shows the fields, **Versions** counts the saved versions, and **Review** lists the draft's changes once someone asks for a review. At the other end of that row, **Live preview** puts the site beside the fields and **Info** lists the document's status, owner, page, and when it was created, last updated and last published.
 
 - **Edit** lays the fields out with their [layout](/docs/cms/fields#layout): tabs over the fields, rows side by side, collapsible sections, and the fields marked `position: 'sidebar'` in a column on the right. A document with no sidebar fields gives the main column the full width.
-- **Versions** lists every saved version, newest first and eight to a page, with where it stood and who saved it. **Compare** shows what changed against the current draft, and **Restore** makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual.
+- **Versions** lists every saved version, newest first and eight to a page, with where it stood and who saved it. **Compare** opens a version beside the current draft, side by side or inline, and **Only changed fields** hides the fields they share. The other versions are listed beside it to compare with instead. **Restore this version** asks first, then makes that version the draft, which you [publish](/docs/cms/editing/drafts) as usual. The draft you had stays under Versions.
+- **Review** puts what is live beside the draft, field by field, with the request's note and each reviewer's answer, as in [Reviews](/docs/cms/editing/reviews).
 
 **Live preview** puts your site in [draft mode](/docs/cms/next#draft-mode) beside the fields, with the sidebar's fields moved under the main ones, at the Desktop, Tablet or Mobile width the select above it picks. What you type shows on the page as you type it, through [live updates](/docs/cms/next#live-updates). A page opens at its own path, and an item at the page its collection's [`preview`](/docs/cms/collections#live-preview) names, its own page, or the first page that holds it. An item no page shows has no Live preview.
 

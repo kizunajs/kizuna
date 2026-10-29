@@ -362,27 +362,56 @@ export const RollbackBodySchema = Kizuna.model({
     }),
 });
 
+const mediaFields = {
+    id: z.string(),
+    url: z.string(),
+    contentType: z.string(),
+    size: z.int(),
+    width: z.int(),
+    height: z.int(),
+    filename: z.string(),
+    alt: z.string().describe('The default alt text, used where a field sets none.'),
+    focalPoint: FocalPointSchema.optional().describe('The default focal point, used where a field sets none.'),
+    uploadedAt: z.string(),
+    uploadedBy: z.string(),
+};
+
 export const MediaSchema = Kizuna.model({
     title: 'CMS.Media',
+    schema: z.object(mediaFields),
+});
+
+export const MediaSummarySchema = Kizuna.model({
+    title: 'CMS.MediaSummary',
     schema: z.object({
-        id: z.string(),
-        url: z.string(),
-        contentType: z.string(),
-        size: z.int(),
-        width: z.int(),
-        height: z.int(),
-        filename: z.string(),
-        alt: z.string().describe('The default alt text, used where a field sets none.'),
-        focalPoint: FocalPointSchema.optional(),
-        uploadedAt: z.string(),
-        uploadedBy: z.string(),
+        ...mediaFields,
+        uses: z.int().describe('How many pages, globals and items hold it, published or in a draft.'),
     }),
 });
 
 export const MediaListSchema = Kizuna.model({
     title: 'CMS.MediaList',
     schema: z.object({
-        media: z.array(MediaSchema),
+        media: z.array(MediaSummarySchema),
+        maxBytes: z.int().describe('The largest file an upload accepts.'),
+    }),
+});
+
+export const MediaUseSchema = Kizuna.model({
+    title: 'CMS.MediaUse',
+    schema: z.object({
+        ref: z.string().describe('The document holding the image, like page:frontPage or item:articles:k3j9x2.'),
+        label: z.string().nullable().describe("An item's title, or the page's or global's label."),
+        fieldPaths: z.array(z.string()).describe('The fields holding it, as dotted paths.'),
+        published: z.boolean().describe('Whether the published content shows it. False when only the draft holds it.'),
+    }),
+});
+
+export const MediaUsesSchema = Kizuna.model({
+    title: 'CMS.MediaUses',
+    schema: z.object({
+        id: z.string(),
+        uses: z.array(MediaUseSchema),
     }),
 });
 
@@ -390,7 +419,7 @@ export const UpdateMediaBodySchema = Kizuna.model({
     title: 'CMS.UpdateMedia',
     schema: z.object({
         alt: z.string().optional(),
-        focalPoint: FocalPointSchema.optional(),
+        focalPoint: FocalPointSchema.nullable().optional().describe('The default focal point, used where a field sets none. `null` clears it.'),
     }),
 });
 

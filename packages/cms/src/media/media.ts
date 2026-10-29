@@ -145,16 +145,48 @@ export class MediaService {
         return rows.filter((row) => row.published !== null).map((row) => row.published as unknown as MediaRecord);
     }
 
-    async update(id: string, changes: Partial<Pick<MediaRecord, 'alt' | 'focalPoint'>>, author: string): Promise<MediaRecord | undefined> {
+    /**
+     * Sets the image's own alt text and focal point, which every use without
+     * its own falls back to. A `null` focal point clears it.
+     */
+    async update(
+        id: string,
+        changes: {
+            alt?: string;
+            focalPoint?: MediaRecord['focalPoint'] | null;
+        },
+        author: string
+    ): Promise<MediaRecord | undefined> {
         const current = await this.get(id);
         if (current === undefined) return undefined;
+        const { focalPoint: _, ...rest } = current;
         const next: MediaRecord = {
-            ...current,
-            ...(changes.alt === undefined ? {} : { alt: changes.alt }),
-            ...(changes.focalPoint === undefined ? {} : { focalPoint: changes.focalPoint }),
+            ...(changes.focalPoint === null ? rest : current),
+            ...(changes.alt === undefined
+                ? {}
+                : {
+                      alt: changes.alt,
+                  }),
+            ...(changes.focalPoint === undefined || changes.focalPoint === null
+                ? {}
+                : {
+                      focalPoint: changes.focalPoint,
+                  }),
         };
         await this.options.store.saveMedia(id, next as unknown as Record<string, unknown>, author);
         return next;
+    }
+
+    /**
+     * Removes the media document and its stored file. Answers false when
+     * there was no such item.
+     */
+    async delete(id: string): Promise<boolean> {
+        const current = await this.get(id);
+        if (current === undefined) return false;
+        await this.options.store.delete('media', id);
+        await this.options.storage.delete(current.key);
+        return true;
     }
 
     /**

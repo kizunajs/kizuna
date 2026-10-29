@@ -1000,6 +1000,104 @@ describe('media', () => {
         expect(list.body.media).toHaveLength(1);
     });
 
+    it('lists how many documents hold each image, and which fields, published or in a draft', async () => {
+        const completed = await upload(png);
+        const unused = await asEditor(request(app).get('/editing/media'));
+        expect(unused.body).toMatchObject({
+            media: [
+                {
+                    id: completed.body.id,
+                    uses: 0,
+                },
+            ],
+            maxBytes: 4096,
+        });
+        await asAdmin(request(app).patch('/editing/pages/frontPage/draft')).send({
+            changes: {
+                ...validDraft,
+                'hero.image': {
+                    id: completed.body.id,
+                    alt: '',
+                },
+            },
+        });
+        const drafted = await asEditor(request(app).get(`/editing/media/${completed.body.id}/uses`));
+        expect(drafted.status).toBe(200);
+        expect(drafted.body).toEqual({
+            id: completed.body.id,
+            uses: [
+                {
+                    ref: 'page:frontPage',
+                    label: null,
+                    fieldPaths: ['hero.image'],
+                    published: false,
+                },
+            ],
+        });
+        await asEditor(request(app).post('/editing/pages/frontPage/publish'));
+        const published = await asEditor(request(app).get(`/editing/media/${completed.body.id}/uses`));
+        expect(published.body.uses[0].published).toBe(true);
+        expect((await asEditor(request(app).get('/editing/media'))).body.media[0].uses).toBe(1);
+        expect((await asEditor(request(app).get('/editing/media/med_missing/uses'))).status).toBe(404);
+    });
+
+    it("refreshes the pages that show an image when its defaults change, and clears a focal point with null", async () => {
+        const completed = await upload(png);
+        await asAdmin(request(app).patch('/editing/pages/frontPage/draft')).send({
+            changes: {
+                ...validDraft,
+                'hero.image': {
+                    id: completed.body.id,
+                    alt: '',
+                },
+            },
+        });
+        await asEditor(request(app).post('/editing/pages/frontPage/publish'));
+        revalidated.length = 0;
+        const moved = await asEditor(request(app).patch(`/editing/media/${completed.body.id}`)).send({
+            focalPoint: {
+                x: 0.2,
+                y: 0.8,
+            },
+        });
+        expect(moved.body).toMatchObject({
+            focalPoint: {
+                x: 0.2,
+                y: 0.8,
+            },
+        });
+        expect(revalidated).toEqual([['kizuna-cms:page:frontPage']]);
+        const cleared = await asEditor(request(app).patch(`/editing/media/${completed.body.id}`)).send({
+            focalPoint: null,
+        });
+        expect(cleared.status).toBe(200);
+        expect(cleared.body.focalPoint).toBeUndefined();
+        const read = await request(app).get('/content/pages/frontPage');
+        expect(read.body.content.hero.image.url).toBe(`/api/cms/media/${completed.body.id}/image`);
+    });
+
+    it('deletes an image and its file, and refreshes the pages that held it', async () => {
+        const completed = await upload(png);
+        await asAdmin(request(app).patch('/editing/pages/frontPage/draft')).send({
+            changes: {
+                ...validDraft,
+                'hero.image': {
+                    id: completed.body.id,
+                    alt: '',
+                },
+            },
+        });
+        await asEditor(request(app).post('/editing/pages/frontPage/publish'));
+        revalidated.length = 0;
+        expect((await request(app).delete(`/editing/media/${completed.body.id}`)).status).toBe(401);
+        const deleted = await asEditor(request(app).delete(`/editing/media/${completed.body.id}`));
+        expect(deleted.status).toBe(204);
+        expect(storage.files.size).toBe(0);
+        expect(revalidated).toEqual([['kizuna-cms:page:frontPage']]);
+        expect((await asEditor(request(app).get(`/editing/media/${completed.body.id}`))).status).toBe(404);
+        expect((await asEditor(request(app).delete(`/editing/media/${completed.body.id}`))).status).toBe(404);
+    });
+
     it('serves the rendered image publicly with the crop applied, and the stored file to editors', async () => {
         const completed = await upload(png);
         const rendered = await request(app)

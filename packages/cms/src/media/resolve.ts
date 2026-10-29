@@ -42,29 +42,42 @@ export const resolveImage = (
 };
 
 /**
- * Every media id a document refers to.
+ * Every image a document holds: its media id and the dotted path of the
+ * field holding it, like `hero.image` or `body.2.image`.
  */
-export const mediaIdsOf = (page: ContentDefinition, content: Record<string, unknown>): string[] => {
-    const ids = new Set<string>();
-    const walk = (schema: z.core.$ZodType, value: unknown): void => {
+export const mediaUsesOf = (page: ContentDefinition, content: Record<string, unknown>): Array<{ id: string; fieldPath: string }> => {
+    const uses = new Map<string, { id: string; fieldPath: string }>();
+    const walk = (schema: z.core.$ZodType, value: unknown, path: string): void => {
         if (value === undefined || value === null) return;
         if (isImageSchema(schema)) {
             const id = (value as ImageRef).id;
-            if (typeof id === 'string') ids.add(id);
+            if (typeof id === 'string') {
+                uses.set(`${id} ${path}`, {
+                    id,
+                    fieldPath: path,
+                });
+            }
             return;
         }
         const def = readDef(unwrapOptionalWrappers(schema).inner);
         if (def.type === 'array' && def.element !== undefined && Array.isArray(value)) {
-            for (const item of value) walk(def.element, item);
+            value.forEach((item, index) => walk(def.element!, item, `${path}.${index}`));
         } else if (def.type === 'object' && def.shape !== undefined && typeof value === 'object') {
-            for (const [key, child] of Object.entries(def.shape)) walk(child, (value as Record<string, unknown>)[key]);
+            for (const [key, child] of Object.entries(def.shape)) walk(child, (value as Record<string, unknown>)[key], `${path}.${key}`);
         } else if (def.options !== undefined) {
-            for (const option of def.options) walk(option, value);
+            for (const option of def.options) walk(option, value, path);
         }
     };
-    for (const field of dataFields(page.fields)) walk(field.schema, content[field.name]);
-    return [...ids];
+    for (const field of dataFields(page.fields)) walk(field.schema, content[field.name], field.name);
+    return [...uses.values()];
 };
+
+/**
+ * Every media id a document refers to.
+ */
+export const mediaIdsOf = (page: ContentDefinition, content: Record<string, unknown>): string[] => [
+    ...new Set(mediaUsesOf(page, content).map((use) => use.id)),
+];
 
 /**
  * The content with every image reference replaced by its resolved image.
@@ -86,7 +99,7 @@ export const resolveContent = (
             return value.map((item) => walk(def.element!, item));
         }
         if (def.options !== undefined) {
-            const option = optionOf(def.options, value);
+            const option = optionOf(def, value);
             return option === undefined ? value : walk(option, value);
         }
         if (def.type === 'object' && def.shape !== undefined && typeof value === 'object') {
