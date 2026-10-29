@@ -88,5 +88,10 @@ export const parseFilter = (entries: readonly string[]): { groups: ItemCondition
  * joined by commas.
  */
 export const parseFields = (entries: readonly string[]): string[] => [
-    ...new Set(entries.flatMap((entry) => entry.split(',')).map((name) => name.trim()).filter((name) => name !== '')),
+    ...new Set(
+        entries
+            .flatMap((entry) => entry.split(','))
+            .map((name) => name.trim())
+            .filter((name) => name !== '')
+    ),
 ];

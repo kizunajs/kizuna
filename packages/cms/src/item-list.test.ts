@@ -314,7 +314,9 @@ describe('the editing list of a collection', () => {
             orderBy: 'excerpt',
         });
         expect(sorted.status).toBe(400);
-        expect(sorted.body.detail).toBe("The list of articles cannot sort by 'excerpt'. It sorts by title, status, updatedAt, topic, order.");
+        expect(sorted.body.detail).toBe(
+            "The list of articles cannot sort by 'excerpt'. It sorts by title, status, updatedAt, topic, order."
+        );
         const filtered = await list({
             filter: 'author:is:ingrid',
         });
@@ -358,7 +360,9 @@ describe('a collection that lists', () => {
                 ],
                 indexes: ['status'],
             })
-        ).toThrowError("defineCollection('orders') indexes 'status', which the editing list uses for the item's own status. Rename the field.");
+        ).toThrowError(
+            "defineCollection('orders') indexes 'status', which the editing list uses for the item's own status. Rename the field."
+        );
     });
 
     it('names a column among its fields', () => {

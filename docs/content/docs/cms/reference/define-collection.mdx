@@ -17,7 +17,7 @@ defineCollection(definition: CollectionDefinition): Collection
 | `tree`                                             | `string`                        | The field holding an item's parent. See [Trees](/docs/cms/collections#trees)                               |
 | `actions`                                          | `Record<string, Action>`        | Buttons on an item. See [Actions](/docs/cms/collections#actions)                                           |
 | `preview`                                          | `{ url: ({ item }) => string }` | The page the admin's Live preview shows an item on. See [Live preview](/docs/cms/collections#live-preview) |
-| `columns`                                          | `string[]`                      | Fields the admin's list shows beside each item's title, until an editor hides them                          |
+| `columns`                                          | `string[]`                      | Fields the admin's list shows beside each item's title, until an editor hides them                         |
 | `label`, `group`, `requireReview`, `migrate`, `on` |                                 | As on a global                                                                                             |
 
 `Collection.id` is the field schema a page uses to hold one item. `extendCollection(collection, { fields, overrides })` adds a site's own fields to every item.

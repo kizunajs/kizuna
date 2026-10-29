@@ -476,9 +476,11 @@ describe('filtering by a tag and the tags under it', () => {
             name: 'Lighting',
         });
         const listed = await asEditor(
-            request(app).get('/editing/collections/tags/items').query({
-                filter: `parent:within:${materials}`,
-            })
+            request(app)
+                .get('/editing/collections/tags/items')
+                .query({
+                    filter: `parent:within:${materials}`,
+                })
         );
         expect(listed.body.items.map((item: { treeLabel: string }) => item.treeLabel)).toEqual([
             'Materials / Brass',
