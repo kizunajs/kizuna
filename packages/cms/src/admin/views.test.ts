@@ -3,6 +3,7 @@ import { hrefOf, isCurrent, navigationOf, screenOf, type Screen } from './naviga
 import {
     cellText,
     columnsOf,
+    labelledValues,
     searchPlaceholder,
     viewActionCall,
     viewListCall,
@@ -152,5 +153,27 @@ describe('views in the admin', () => {
         expect(searchPlaceholder(orders)).toBe('Search id, customer');
         expect(searchPlaceholder(appUsers)).toBe('Search');
         expect(['Ada', 3, true, null, ['pro', 'beta']].map(cellText)).toEqual(['Ada', '3', 'Yes', '', 'pro, beta']);
+    });
+
+    it('shows a choice by the label of its option', () => {
+        const withRoles: ViewSummary = {
+            ...appUsers,
+            columns: ['email', 'role'],
+            options: {
+                role: {
+                    editor: 'Editor',
+                    admin: 'Admin',
+                },
+            },
+        };
+        expect(
+            labelledValues(withRoles, {
+                email: 'ada@example.com',
+                role: 'admin',
+            })
+        ).toEqual({
+            email: 'ada@example.com',
+            role: 'Admin',
+        });
     });
 });

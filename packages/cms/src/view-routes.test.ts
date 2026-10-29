@@ -77,6 +77,10 @@ const AppUsers = defineView({
         {
             name: 'plan',
             schema: z.enum(['free', 'pro']),
+            options: {
+                free: 'Free',
+                pro: 'Pro',
+            },
             auth: {
                 roles: 'admin',
             },
@@ -87,7 +91,7 @@ const AppUsers = defineView({
             readOnly: true,
         },
     ],
-    columns: ['name', 'email'],
+    columns: ['name', 'email', 'plan'],
     search: ['name', 'email'],
     list: async ({ query }) => {
         return [...appUsers.values()].filter((user) => user.name.toLowerCase().includes(query.toLowerCase()));
@@ -225,7 +229,13 @@ describe('listing views', () => {
                 label: 'App users',
                 group: 'People',
                 title: 'name',
-                columns: ['name', 'email'],
+                columns: ['name', 'email', 'plan'],
+                options: {
+                    plan: {
+                        free: 'Free',
+                        pro: 'Pro',
+                    },
+                },
                 search: ['name', 'email'],
                 readOnly: false,
             },
@@ -237,6 +247,7 @@ describe('listing views', () => {
                 group: null,
                 title: 'text',
                 columns: ['text'],
+                options: {},
                 search: [],
                 readOnly: true,
             },
@@ -257,6 +268,7 @@ describe('reading a view', () => {
                 values: {
                     name: 'Ada Lovelace',
                     email: 'ada@example.com',
+                    plan: 'free',
                 },
             },
         ]);

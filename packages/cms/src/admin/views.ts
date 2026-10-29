@@ -12,6 +12,10 @@ export interface ViewSummary {
      */
     title: string;
     columns: string[];
+    /**
+     * For each column holding a choice, the label of each value.
+     */
+    options?: Record<string, Record<string, string>>;
     search: string[];
     readOnly: boolean;
 }
@@ -93,6 +97,20 @@ export const columnLabel = (column: string): string => (column === 'id' ? 'ID' :
  */
 export const searchPlaceholder = (view: ViewSummary): string =>
     view.search.length === 0 ? 'Search' : `Search ${view.search.map((field) => columnLabel(field).toLowerCase()).join(', ')}`;
+
+/**
+ * A record's values with each choice read as the label of its option, so a
+ * role of `admin` shows Admin.
+ */
+export const labelledValues = (view: ViewSummary, values: Readonly<Record<string, unknown>>): Record<string, unknown> =>
+    Object.fromEntries(
+        Object.entries(values).map(([column, value]) => {
+            const options = view.options?.[column];
+            if (options === undefined) return [column, value];
+            const label = (entry: unknown) => (typeof entry === 'string' ? (options[entry] ?? entry) : entry);
+            return [column, Array.isArray(value) ? value.map(label) : label(value)];
+        })
+    );
 
 /**
  * A value as one cell of the list shows it.

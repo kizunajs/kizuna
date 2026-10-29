@@ -4,7 +4,7 @@ import type { ListColumn, ListRow } from './list-columns.js';
 import { ListScreen } from './list.js';
 import { hrefOf } from './navigation.js';
 import { problemOf } from './parts.js';
-import { columnLabel, columnsOf, viewListCall, type ViewRow, type ViewSummary } from './views.js';
+import { columnLabel, columnsOf, labelledValues, viewListCall, type ViewRow, type ViewSummary } from './views.js';
 
 /**
  * How long the search waits after the last key before it asks the view.
@@ -71,9 +71,9 @@ export function ViewList({ connection, view }: { connection: Connection; view: V
                     id: row.id,
                 }),
                 title: row.title,
-                values: row.values,
+                values: labelledValues(view, row.values),
             })),
-        [rows, view.name]
+        [rows, view]
     );
 
     return (

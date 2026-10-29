@@ -39,6 +39,9 @@ export const ViewSummarySchema = Kizuna.model({
         group: z.string().nullable().describe('The heading the sidebar lists it under.'),
         title: z.string().describe('The field that names each record in the list.'),
         columns: z.array(z.string()).describe('The fields the list shows.'),
+        options: z
+            .record(z.string(), z.record(z.string(), z.string()))
+            .describe('For each column holding a choice, the label editors see for each value, like Admin for admin.'),
         search: z.array(z.string()).describe('The fields the search box looks in.'),
         readOnly: z.boolean().describe('Whether the caller may save nothing in it.'),
     }),
@@ -342,6 +345,17 @@ interface ViewRouteInput {
 }
 
 /**
+ * The option labels of each column that holds a choice.
+ */
+const columnOptionsOf = (view: View): Record<string, Record<string, string>> =>
+    Object.fromEntries(
+        (view.columns ?? [titleFieldOf(view)]).flatMap((column) => {
+            const options = dataFields(view.fields).find((field) => field.name === column)?.options;
+            return options === undefined ? [] : [[column, options]];
+        })
+    );
+
+/**
  * `GET /editing/views`: the views the caller may open.
  */
 export const listViewsRoute = (input: ViewRouteInput) =>
@@ -373,6 +387,7 @@ export const listViewsRoute = (input: ViewRouteInput) =>
                             group: view.group ?? null,
                             title: titleFieldOf(view),
                             columns: [...(view.columns ?? [titleFieldOf(view)])],
+                            options: columnOptionsOf(view),
                             search: [...(view.search ?? [])],
                             readOnly: !mayRun(saveOf(view), caller),
                         })),
