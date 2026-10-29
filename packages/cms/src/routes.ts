@@ -1471,8 +1471,7 @@ export const cmsRoutes = (declaration: PluginDeclaration<string, any>) => {
         path: `${editingBase}/media/:id`,
         auth: editor,
         summary: 'Delete an image and its stored file',
-        description:
-            'Pages, globals and items that hold it lose the image, so list its uses first. The person confirms before this runs.',
+        description: 'Pages, globals and items that hold it lose the image, so list its uses first. The person confirms before this runs.',
         tool: {
             needsApproval: true,
         },

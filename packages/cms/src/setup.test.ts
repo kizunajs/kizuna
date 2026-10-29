@@ -1041,7 +1041,7 @@ describe('media', () => {
         expect((await asEditor(request(app).get('/editing/media/med_missing/uses'))).status).toBe(404);
     });
 
-    it("refreshes the pages that show an image when its defaults change, and clears a focal point with null", async () => {
+    it('refreshes the pages that show an image when its defaults change, and clears a focal point with null', async () => {
         const completed = await upload(png);
         await asAdmin(request(app).patch('/editing/pages/frontPage/draft')).send({
             changes: {
